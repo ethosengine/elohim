@@ -9,6 +9,8 @@ import {
   AfterViewInit,
   ElementRef,
   ViewChild,
+  ViewContainerRef,
+  ComponentRef,
   OnDestroy,
   inject,
 } from '@angular/core';
@@ -20,7 +22,9 @@ import { Router } from '@angular/router';
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
+import { Subscription } from 'rxjs';
 
+import { EprPopoverComponent } from '@app/elohim/components/epr-popover/epr-popover.component';
 import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
@@ -35,6 +39,8 @@ export interface TocEntry {
   text: string;
   level: number;
 }
+
+const EPR_ANCHOR_SELECTOR = 'a[data-epr]';
 
 @Component({
   selector: 'app-markdown-renderer',
@@ -125,6 +131,14 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly eprResolver = inject(EprResolverService);
   private readonly pathContext = inject(PathContextService);
   private readonly router = inject(Router);
+  private readonly vcr = inject(ViewContainerRef);
+  private activePopover: ComponentRef<EprPopoverComponent> | null = null;
+  private popoverSub: Subscription | null = null;
+  private eprHoverListener?: (e: Event) => void;
+  private eprLeaveListener?: (e: Event) => void;
+  private hoveredEprAnchor: HTMLAnchorElement | null = null;
+  private popoverShowTimer: ReturnType<typeof setTimeout> | null = null;
+  private popoverDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
@@ -207,14 +221,22 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   ngAfterViewInit(): void {
     this.setupScrollListener();
     this.setupEprClickHandler();
+    this.setupEprHoverHandler();
   }
 
   ngOnDestroy(): void {
+    this.destroyPopover();
     if (this.scrollListener) {
       window.removeEventListener('scroll', this.scrollListener);
     }
     if (this.eprClickListener && this.contentEl) {
       this.contentEl.nativeElement.removeEventListener('click', this.eprClickListener);
+    }
+    if (this.eprHoverListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('mouseover', this.eprHoverListener);
+    }
+    if (this.eprLeaveListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('mouseout', this.eprLeaveListener);
     }
   }
 
@@ -244,6 +266,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       console.warn('Markdown renderer expects string content');
       return;
     }
+
+    this.destroyPopover();
 
     // Parse markdown to HTML
     let html = await this.marked.parse(this.node.content);
@@ -347,7 +371,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     if (!this.contentEl) return;
 
     this.eprClickListener = (e: Event) => {
-      const target = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-epr]');
+      const target = (e.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
       if (!target) return;
 
       e.preventDefault();
@@ -363,10 +387,135 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       // Cross-path matches not yet wired — standalone fallback for now
       const resolved = this.eprResolver.resolveInContext(eprUri, currentPathId, this.pathSteps);
 
+      this.destroyPopover();
       void this.router.navigate(resolved.route);
     };
 
     this.contentEl.nativeElement.addEventListener('click', this.eprClickListener);
+  }
+
+  /**
+   * Set up hover-based popover for epr: links.
+   * Uses mouseover/mouseout event delegation on the content element.
+   * Shows EPR Head metadata popover after a short debounce delay.
+   */
+  private setupEprHoverHandler(): void {
+    if (!this.contentEl) return;
+    const el = this.contentEl.nativeElement;
+
+    this.eprHoverListener = (e: Event) => {
+      const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
+      if (!anchor || anchor === this.hoveredEprAnchor) return;
+
+      this.hoveredEprAnchor = anchor;
+
+      // Cancel any pending dismiss
+      if (this.popoverDismissTimer) {
+        clearTimeout(this.popoverDismissTimer);
+        this.popoverDismissTimer = null;
+      }
+
+      // Debounce show to avoid flashing on quick mouse movements
+      if (this.popoverShowTimer) clearTimeout(this.popoverShowTimer);
+      this.popoverShowTimer = setTimeout(() => {
+        this.showPopover(anchor);
+      }, 300);
+    };
+
+    this.eprLeaveListener = (e: Event) => {
+      const me = e as MouseEvent;
+      const anchor = (me.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
+      if (!anchor) return;
+
+      // Ignore if moving to a child within the same anchor
+      const related = me.relatedTarget as HTMLElement | null;
+      if (related && anchor.contains(related)) return;
+
+      this.hoveredEprAnchor = null;
+
+      // Cancel pending show
+      if (this.popoverShowTimer) {
+        clearTimeout(this.popoverShowTimer);
+        this.popoverShowTimer = null;
+      }
+
+      // Delay dismiss to allow mouse to reach the popover
+      this.scheduleDismiss();
+    };
+
+    el.addEventListener('mouseover', this.eprHoverListener);
+    el.addEventListener('mouseout', this.eprLeaveListener);
+  }
+
+  private showPopover(anchor: HTMLAnchorElement): void {
+    const eprUri = anchor.dataset['epr'];
+    if (!eprUri) return;
+
+    // Clean up any existing popover
+    this.destroyPopover();
+    this.hoveredEprAnchor = anchor; // Restore — destroyPopover clears it
+
+    // Get route synchronously for the "Open resource" link
+    const { route } = this.eprResolver.resolveUrl(eprUri);
+
+    // Fetch EPR Head metadata
+    this.popoverSub = this.eprResolver.resolveEprHead(eprUri).subscribe(head => {
+      if (!head) return;
+
+      // Position below the anchor
+      const rect = anchor.getBoundingClientRect();
+      const position = { top: rect.bottom + 8, left: rect.left };
+
+      // Create popover component programmatically
+      const ref = this.vcr.createComponent(EprPopoverComponent);
+
+      // Ensure host is at viewport origin for correct fixed positioning
+      const hostEl = ref.location.nativeElement as HTMLElement;
+      hostEl.style.top = '0';
+      hostEl.style.left = '0';
+
+      ref.instance.head = head;
+      ref.instance.position = position;
+      ref.instance.route = route;
+      ref.instance.dismissed.subscribe(() => this.destroyPopover());
+
+      // Cancel dismiss when mouse enters the popover
+      hostEl.addEventListener('mouseenter', () => {
+        if (this.popoverDismissTimer) {
+          clearTimeout(this.popoverDismissTimer);
+          this.popoverDismissTimer = null;
+        }
+      });
+
+      this.activePopover = ref;
+    });
+  }
+
+  private scheduleDismiss(): void {
+    if (this.popoverDismissTimer) clearTimeout(this.popoverDismissTimer);
+    this.popoverDismissTimer = setTimeout(() => {
+      this.destroyPopover();
+    }, 200);
+  }
+
+  private destroyPopover(): void {
+    if (this.popoverShowTimer) {
+      clearTimeout(this.popoverShowTimer);
+      this.popoverShowTimer = null;
+    }
+    if (this.popoverDismissTimer) {
+      clearTimeout(this.popoverDismissTimer);
+      this.popoverDismissTimer = null;
+    }
+    if (this.popoverSub) {
+      this.popoverSub.unsubscribe();
+      this.popoverSub = null;
+    }
+    if (this.activePopover) {
+      this.activePopover.destroy();
+      this.activePopover = null;
+    }
+    this.hoveredEprAnchor = null;
   }
 
   private setupScrollListener(): void {

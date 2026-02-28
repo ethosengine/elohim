@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
 import {
@@ -23,7 +25,11 @@ describe('EprResolverService', () => {
     storageSpy.getBlobUrl.and.callFake((hash: string) => `https://doorway.host/blob/${hash}`);
 
     TestBed.configureTestingModule({
-      providers: [{ provide: StorageClientService, useValue: storageSpy }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StorageClientService, useValue: storageSpy },
+      ],
     });
     service = TestBed.inject(EprResolverService);
   });
