@@ -667,7 +667,7 @@ VEOF
                     dir('elohim-app') {
                         script {
                             echo 'Running Angular tests with coverage'
-                            sh 'pnpm exec ng test --watch=false --browsers=ChromeHeadless --code-coverage'
+                            sh 'NODE_OPTIONS="--max-old-space-size=4096" pnpm exec ng test --watch=false --browsers=ChromeHeadless --code-coverage'
                         }
                     }
                 }
