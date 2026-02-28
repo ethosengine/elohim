@@ -541,6 +541,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
+                                # Copy root lockfile into build context (doorway-app is a pnpm workspace member)
+                                cp pnpm-lock.yaml doorway-app/
+
                                 cd doorway-app
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\

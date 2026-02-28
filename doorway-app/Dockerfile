@@ -7,17 +7,20 @@
 # Stage 1: Build Angular app
 FROM node:20-alpine AS builder
 
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+
 WORKDIR /app
 
-# Copy package files first for layer caching
-COPY package*.json ./
+# Copy package + lockfile first for layer caching
+COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN npm ci --legacy-peer-deps
+RUN pnpm install --frozen-lockfile
 
 # Copy source and build with /threshold/ base href
 COPY . .
-RUN npm run build -- --configuration=production --base-href=/threshold/
+RUN pnpm run build -- --configuration=production --base-href=/threshold/
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
