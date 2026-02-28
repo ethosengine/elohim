@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ContentService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
+import { HeliaFetchService } from './helia-fetch.service';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
@@ -58,12 +59,21 @@ describe('ContentService', () => {
     mockStorageClient = jasmine.createSpyObj('StorageClientService', ['getBlobUrl']);
     mockStorageClient.getBlobUrl.and.callFake((hash: string) => `/blob/${hash}`);
 
+    const mockHeliaFetch = jasmine.createSpyObj('HeliaFetchService', ['fetchVerified']);
+    mockHeliaFetch.fetchVerified.and.callFake((cid: string) => {
+      if (cid.includes('failblob')) {
+        return Promise.reject(new Error('Blob not found'));
+      }
+      return Promise.resolve(new TextEncoder().encode(`# Blob content for ${cid}`));
+    });
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [
         ContentService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
+        { provide: HeliaFetchService, useValue: mockHeliaFetch },
       ],
     });
 
@@ -149,14 +159,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      // Should make HTTP request for blob
-      const req = httpMock.expectOne('/blob/sha256-abc123def456');
-      expect(req.request.method).toBe('GET');
-      req.flush('# Blob Content Here');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Blob Content Here');
+      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
     }));
 
     it('should resolve sha256- blob references', fakeAsync(() => {
@@ -172,12 +176,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-abc123def456');
-      req.flush('# More Blob Content');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# More Blob Content');
+      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
     }));
 
     it('should fetch blob when contentBody is empty but blobCid exists', fakeAsync(() => {
@@ -194,12 +194,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-xyz789');
-      req.flush('# Sparse Content');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Sparse Content');
+      expect(result!.content).toBe('# Blob content for sha256-xyz789');
     }));
 
     it('should fall back gracefully when blob fetch fails', fakeAsync(() => {
@@ -215,11 +211,7 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-failblob');
-      req.error(new ProgressEvent('error'), { status: 404 });
-      tick();
-
-      // Should still return content without blob
+      // HeliaFetchService mock rejects for 'failblob' — service should fall back
       expect(result).toBeTruthy();
       expect(result!.id).toBe('test-content-1');
     }));
