@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdi = "0.5"
+hdi = "=0.7.0"
 serde = "1"
 
 [profile.release]

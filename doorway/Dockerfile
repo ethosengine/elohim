@@ -36,8 +36,16 @@ RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/
 # Copy actual source
 COPY doorway/src ./src
 
+# Accept git info as build args (build.rs reads these env vars)
+ARG GIT_COMMIT_SHORT=unknown
+ARG GIT_COMMIT_FULL=unknown
+ARG BUILD_TIMESTAMP=unknown
+
 # Touch source files to ensure rebuild and build the release binary
-RUN touch src/main.rs src/lib.rs && cargo build --release
+RUN GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT} \
+    GIT_COMMIT_FULL=${GIT_COMMIT_FULL} \
+    BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+    touch src/main.rs src/lib.rs && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
