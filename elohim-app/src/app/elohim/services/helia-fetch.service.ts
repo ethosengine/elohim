@@ -106,7 +106,7 @@ export class HeliaFetchService {
 
     this.loadAttempted = true;
     try {
-      const { verifiedFetch } = await import('@helia/verified-fetch');
+      const { verifiedFetch } = await import(/* webpackIgnore: true */ '@helia/verified-fetch');
       this.verifiedFetchFn = verifiedFetch;
       return verifiedFetch;
     } catch {
