@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SimpleChange } from '@angular/core';
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
@@ -28,7 +30,11 @@ describe('MarkdownRendererComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MarkdownRendererComponent],
-      providers: [{ provide: StorageClientService, useValue: mockStorageClientService }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StorageClientService, useValue: mockStorageClientService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MarkdownRendererComponent);

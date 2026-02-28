@@ -28,6 +28,11 @@ describe('PlaidIntegrationService', () => {
       ],
     });
     service = TestBed.inject(PlaidIntegrationService);
+
+    // Stub private crypto methods — tests pass fake tokens that aren't valid base64,
+    // so atob() throws. Spying prevents real Web Crypto API calls.
+    spyOn(service as any, 'decryptAccessToken').and.resolveTo('fake-decrypted-token');
+    spyOn(service as any, 'encryptAccessToken').and.resolveTo('fake-encrypted-token');
   });
 
   // ==========================================================================
