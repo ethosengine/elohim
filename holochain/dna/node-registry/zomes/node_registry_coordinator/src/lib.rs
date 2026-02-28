@@ -201,7 +201,7 @@ pub fn heartbeat(heartbeat_data: NodeHeartbeat) -> ExternResult<ActionHash> {
 pub fn attest_health(attestation: HealthAttestation) -> ExternResult<ActionHash> {
     // Prevent self-attestation
     let my_agent_info = agent_info()?;
-    let my_node = get_node_by_agent(my_agent_info.agent_latest_pubkey)?;
+    let my_node = get_node_by_agent(my_agent_info.agent_initial_pubkey)?;
 
     if my_node.node_id == attestation.subject_node_id {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -308,9 +308,8 @@ pub fn get_nodes_by_region(region: String) -> ExternResult<Vec<NodeRegistration>
     };
     let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(region_anchor_hash, LinkTypes::RegionToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(region_anchor_hash, LinkTypes::RegionToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut nodes = Vec::new();
     for link in links {
@@ -348,9 +347,8 @@ pub fn get_available_custodians(filters: CustodianFilters) -> ExternResult<Vec<N
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut candidates = Vec::new();
     for link in links {
@@ -412,9 +410,8 @@ pub fn get_nodes_by_tier(tier: String) -> ExternResult<Vec<NodeRegistration>> {
     };
     let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(tier_anchor_hash, LinkTypes::TierToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(tier_anchor_hash, LinkTypes::TierToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut nodes = Vec::new();
     for link in links {
@@ -478,9 +475,8 @@ pub fn get_assignments_for_content(content_id: String) -> ExternResult<Vec<Custo
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -505,9 +501,8 @@ pub fn get_assignments_for_node(node_id: String) -> ExternResult<Vec<CustodianAs
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -705,9 +700,8 @@ pub fn detect_failed_nodes(_: ()) -> ExternResult<Vec<String>> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut failed_nodes = Vec::new();
     let now = sys_time()?;
@@ -884,9 +878,8 @@ pub fn get_shard_assignments_for_content(content_hash: String) -> ExternResult<V
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(content_anchor_hash, LinkTypes::ContentToShardAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToShardAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -910,9 +903,8 @@ pub fn get_shard_assignments_for_custodian(custodian_did: String) -> ExternResul
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToShardAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToShardAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -1077,9 +1069,8 @@ fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
-    )?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1107,9 +1098,8 @@ fn get_node_registration_hash(node_id: &str) -> ExternResult<ActionHash> {
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
-    )?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1130,9 +1120,8 @@ fn get_node_by_agent(agent_key: AgentPubKey) -> ExternResult<NodeRegistration> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
@@ -1158,9 +1147,8 @@ fn get_latest_heartbeat(node_id: &str) -> ExternResult<NodeHeartbeat> {
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?.build()
-    )?;
+    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1191,9 +1179,8 @@ fn get_recent_attestations(node_id: &str, max_age_seconds: i64) -> ExternResult<
     };
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?.build()
-    )?;
+    let query = LinkQuery::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let now = sys_time()?;
     let mut recent_attestations = Vec::new();
