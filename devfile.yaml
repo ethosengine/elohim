@@ -90,7 +90,7 @@ components:
         # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
         # (not just interactive shells that source .bashrc)
         - name: PATH
-          value: '/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+          value: '/nix/xdg/cache/pnpm:/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -130,13 +130,19 @@ components:
     volume:
       size: 100Gi
 commands:
-  - id: setup-pnpm-env
+  - id: setup-pnpm
     exec:
       component: tools
+      workingDir: /projects/elohim
       commandLine: |
-        echo 'export PNPM_HOME=/nix/xdg/cache/pnpm' >> ~/.bashrc
-        echo 'export PATH="$PNPM_HOME:$PATH"' >> ~/.bashrc
-        source ~/.bashrc
+        # Install pnpm standalone binary to $PNPM_HOME (on PATH via devfile env).
+        # Runs as user, no root or corepack needed. Version pinned to match package.json.
+        if pnpm --version 2>/dev/null | grep -q "10.30.3"; then
+          echo "pnpm 10.30.3 already installed"
+        else
+          curl -fsSL https://get.pnpm.io/install.sh | env PNPM_HOME="$PNPM_HOME" SHELL=/bin/bash bash -
+        fi
+        pnpm --version
 
   - id: setup-vscode-cli
     exec:
@@ -211,8 +217,8 @@ commands:
       commandLine: |
         pnpm install && pnpm run seed
 
-##events:
-#  postStart:
-#    - setup-vscode-cli
-#    - setup-npm-env
-#    - setup-claude-mcp
+events:
+  postStart:
+    - setup-pnpm
+    - setup-vscode-cli
+    - setup-claude-mcp
