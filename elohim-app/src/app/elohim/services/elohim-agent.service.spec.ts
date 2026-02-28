@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 
 import { ElohimAgentService } from './elohim-agent.service';
 import { DataLoaderService } from './data-loader.service';
@@ -306,7 +306,7 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('invoke', () => {
-    it('should invoke Elohim with request', fakeAsync(() => {
+    it('should invoke Elohim with request', async () => {
       const request: ElohimRequest = {
         requestId: 'req-123',
         targetElohimId: 'elohim-1',
@@ -321,16 +321,11 @@ describe('ElohimAgentService', () => {
         requestedAt: new Date().toISOString(),
       };
 
-      let response: ElohimResponse | undefined;
-      service.invoke(request).subscribe((r) => {
-        response = r;
-      });
-
-      tick(2000); // Processing time
+      const response = await firstValueFrom(service.invoke(request));
 
       expect(response).toBeDefined();
       expect(response?.requestId).toBe('req-123');
-    }));
+    });
 
     it('should log request to request log', fakeAsync(() => {
       const request: ElohimRequest = {
@@ -355,7 +350,7 @@ describe('ElohimAgentService', () => {
       expect(recentRequests[0].requestId).toBe('req-123');
     }));
 
-    it('should handle auto-selection of Elohim', fakeAsync(() => {
+    it('should handle auto-selection of Elohim', async () => {
       const request: ElohimRequest = {
         requestId: 'req-123',
         targetElohimId: 'auto',
@@ -370,15 +365,10 @@ describe('ElohimAgentService', () => {
         requestedAt: new Date().toISOString(),
       };
 
-      let response: ElohimResponse | undefined;
-      service.invoke(request).subscribe((r) => {
-        response = r;
-      });
-
-      tick(2000);
+      const response = await firstValueFrom(service.invoke(request));
 
       expect(response).toBeDefined();
-    }));
+    });
 
     it('should decline if Elohim not found', fakeAsync(() => {
       mockDataLoader.getAgentIndex.mockReturnValue(of({ agents: [] }));
@@ -455,20 +445,14 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('requestContentReview', () => {
-    it('should create content review request', fakeAsync(() => {
-      let response: ElohimResponse | undefined;
-
-      service
-        .requestContentReview('content-123', 'safety', 'user-123')
-        .subscribe((r) => {
-          response = r;
-        });
-
-      tick(2000);
+    it('should create content review request', async () => {
+      const response = await firstValueFrom(
+        service.requestContentReview('content-123', 'safety', 'user-123')
+      );
 
       expect(response).toBeDefined();
       expect(response?.status).toBeDefined();
-    }));
+    });
 
     it('should set correct capability', fakeAsync(() => {
       service.requestContentReview('content-123', 'safety', 'user-123').subscribe();
@@ -496,20 +480,14 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('requestAttestationRecommendation', () => {
-    it('should create attestation recommendation request', fakeAsync(() => {
-      let response: ElohimResponse | undefined;
-
-      service
-        .requestAttestationRecommendation('content-123', 'fact-check', 'user-123')
-        .subscribe((r) => {
-          response = r;
-        });
-
-      tick(2000);
+    it('should create attestation recommendation request', async () => {
+      const response = await firstValueFrom(
+        service.requestAttestationRecommendation('content-123', 'fact-check', 'user-123')
+      );
 
       expect(response).toBeDefined();
       expect(response?.status).toBeDefined();
-    }));
+    });
 
     it('should set correct capability', fakeAsync(() => {
       service

@@ -2,7 +2,7 @@
  * Requests-and-offers Service Tests
  */
 
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 
 import { RequestsAndOffersService } from './requests-and-offers.service';
 import { EconomicService } from './economic.service';
@@ -44,8 +44,8 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.createRequest).toBe('function');
     });
 
-    it('should throw error when title is empty', fakeAsync(async () => {
-      const result = service.createRequest('user-1', {
+    it('should throw error when title is empty', async () => {
+      await expect(service.createRequest('user-1', {
         title: '',
         description: 'Test description for request',
         serviceTypeIds: ['service-1'],
@@ -62,20 +62,11 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         requiredSkills: [],
         isPublic: true
-      } as any);
+      } as any)).rejects.toThrow(/required/);
+    });
 
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('required');
-    }));
-
-    it('should throw error when description is too short', fakeAsync(async () => {
-      const result = service.createRequest('user-1', {
+    it('should throw error when description is too short', async () => {
+      await expect(service.createRequest('user-1', {
         title: 'Request Title',
         description: 'Short',
         serviceTypeIds: ['service-1'],
@@ -92,20 +83,11 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         requiredSkills: [],
         isPublic: true
-      } as any);
+      } as any)).rejects.toThrow(/20 characters/);
+    });
 
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('20 characters');
-    }));
-
-    it('should throw error when serviceTypeIds is empty', fakeAsync(async () => {
-      const result = service.createRequest('user-1', {
+    it('should throw error when serviceTypeIds is empty', async () => {
+      await expect(service.createRequest('user-1', {
         title: 'Request Title',
         description: 'Test description for request',
         serviceTypeIds: [],
@@ -122,20 +104,11 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         requiredSkills: [],
         isPublic: true
-      } as any);
+      } as any)).rejects.toThrow(/service type/);
+    });
 
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('service type');
-    }));
-
-    it('should throw error when mediumOfExchangeIds is empty', fakeAsync(async () => {
-      const result = service.createRequest('user-1', {
+    it('should throw error when mediumOfExchangeIds is empty', async () => {
+      await expect(service.createRequest('user-1', {
         title: 'Request Title',
         description: 'Test description for request',
         serviceTypeIds: ['service-1'],
@@ -152,17 +125,8 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         requiredSkills: [],
         isPublic: true
-      } as any);
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('payment method');
-    }));
+      } as any)).rejects.toThrow(/payment method/);
+    });
   });
 
   describe('updateRequest', () => {
@@ -171,18 +135,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.updateRequest).toBe('function');
     });
 
-    it('should throw error when request not found', fakeAsync(async () => {
-      const result = service.updateRequest('request-1', 'user-1', {});
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when request not found', async () => {
+      await expect(service.updateRequest('request-1', 'user-1', {})).rejects.toThrow(/not found/);
+    });
   });
 
   describe('archiveRequest', () => {
@@ -191,18 +146,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.archiveRequest).toBe('function');
     });
 
-    it('should throw error when request not found', fakeAsync(async () => {
-      const result = service.archiveRequest('request-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when request not found', async () => {
+      await expect(service.archiveRequest('request-1', 'user-1')).rejects.toThrow(/not found/);
+    });
   });
 
   describe('deleteRequest', () => {
@@ -211,18 +157,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.deleteRequest).toBe('function');
     });
 
-    it('should throw error when request not found', fakeAsync(async () => {
-      const result = service.deleteRequest('request-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when request not found', async () => {
+      await expect(service.deleteRequest('request-1', 'user-1')).rejects.toThrow(/not found/);
+    });
   });
 
   describe('getRequest', () => {
@@ -231,10 +168,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getRequest).toBe('function');
     });
 
-    it('should return null', fakeAsync(async () => {
+    it('should return null', async () => {
       const result = await service.getRequest('request-1');
       expect(result).toBeNull();
-    }));
+    });
   });
 
   describe('getUserRequests', () => {
@@ -243,10 +180,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getUserRequests).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.getUserRequests('user-1');
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('createOffer', () => {
@@ -255,8 +192,8 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.createOffer).toBe('function');
     });
 
-    it('should throw error when title is empty', fakeAsync(async () => {
-      const result = service.createOffer('user-1', {
+    it('should throw error when title is empty', async () => {
+      await expect(service.createOffer('user-1', {
         title: '',
         description: 'Test description for offer',
         serviceTypeIds: ['service-1'],
@@ -273,20 +210,11 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         offeredSkills: [],
         isPublic: true
-      } as any);
+      } as any)).rejects.toThrow(/required/);
+    });
 
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('required');
-    }));
-
-    it('should throw error when description is too short', fakeAsync(async () => {
-      const result = service.createOffer('user-1', {
+    it('should throw error when description is too short', async () => {
+      await expect(service.createOffer('user-1', {
         title: 'Offer Title',
         description: 'Short',
         serviceTypeIds: ['service-1'],
@@ -303,17 +231,8 @@ describe('RequestsAndOffersService', () => {
         timePreference: 'flexible',
         offeredSkills: [],
         isPublic: true
-      } as any);
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('20 characters');
-    }));
+      } as any)).rejects.toThrow(/20 characters/);
+    });
   });
 
   describe('updateOffer', () => {
@@ -322,18 +241,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.updateOffer).toBe('function');
     });
 
-    it('should throw error when offer not found', fakeAsync(async () => {
-      const result = service.updateOffer('offer-1', 'user-1', {});
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when offer not found', async () => {
+      await expect(service.updateOffer('offer-1', 'user-1', {})).rejects.toThrow(/not found/);
+    });
   });
 
   describe('archiveOffer', () => {
@@ -342,18 +252,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.archiveOffer).toBe('function');
     });
 
-    it('should throw error when offer not found', fakeAsync(async () => {
-      const result = service.archiveOffer('offer-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when offer not found', async () => {
+      await expect(service.archiveOffer('offer-1', 'user-1')).rejects.toThrow(/not found/);
+    });
   });
 
   describe('deleteOffer', () => {
@@ -362,18 +263,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.deleteOffer).toBe('function');
     });
 
-    it('should throw error when offer not found', fakeAsync(async () => {
-      const result = service.deleteOffer('offer-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-      expect(thrownError.message).toContain('not found');
-    }));
+    it('should throw error when offer not found', async () => {
+      await expect(service.deleteOffer('offer-1', 'user-1')).rejects.toThrow(/not found/);
+    });
   });
 
   describe('getOffer', () => {
@@ -382,10 +274,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getOffer).toBe('function');
     });
 
-    it('should return null', fakeAsync(async () => {
+    it('should return null', async () => {
       const result = await service.getOffer('offer-1');
       expect(result).toBeNull();
-    }));
+    });
   });
 
   describe('getUserOffers', () => {
@@ -394,10 +286,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getUserOffers).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.getUserOffers('user-1');
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('searchRequests', () => {
@@ -406,7 +298,7 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.searchRequests).toBe('function');
     });
 
-    it('should return paginated result', fakeAsync(async () => {
+    it('should return paginated result', async () => {
       const result = await service.searchRequests({});
       expect(result).toEqual(expect.objectContaining({
         requests: expect.any(Array),
@@ -414,7 +306,7 @@ describe('RequestsAndOffersService', () => {
         page: 1,
         pageSize: 20,
       }));
-    }));
+    });
   });
 
   describe('searchOffers', () => {
@@ -423,7 +315,7 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.searchOffers).toBe('function');
     });
 
-    it('should return paginated result', fakeAsync(async () => {
+    it('should return paginated result', async () => {
       const result = await service.searchOffers({});
       expect(result).toEqual(expect.objectContaining({
         offers: expect.any(Array),
@@ -431,7 +323,7 @@ describe('RequestsAndOffersService', () => {
         page: 1,
         pageSize: 20,
       }));
-    }));
+    });
   });
 
   describe('getTrendingRequests', () => {
@@ -440,10 +332,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getTrendingRequests).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.getTrendingRequests();
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('getTrendingOffers', () => {
@@ -452,10 +344,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getTrendingOffers).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.getTrendingOffers();
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('findMatchesForRequest', () => {
@@ -464,10 +356,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.findMatchesForRequest).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.findMatchesForRequest('request-1');
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('findMatchesForOffer', () => {
@@ -476,10 +368,10 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.findMatchesForOffer).toBe('function');
     });
 
-    it('should return empty array', fakeAsync(async () => {
+    it('should return empty array', async () => {
       const result = await service.findMatchesForOffer('offer-1');
       expect(result).toEqual([]);
-    }));
+    });
   });
 
   describe('createMatch', () => {
@@ -488,17 +380,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.createMatch).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.createMatch('request-1', 'offer-1', 'Good match');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.createMatch('request-1', 'offer-1', 'Good match')).rejects.toBeDefined();
+    });
   });
 
   describe('getMatch', () => {
@@ -507,17 +391,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getMatch).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getMatch('match-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getMatch('match-1')).rejects.toBeDefined();
+    });
   });
 
   describe('updateMatchStatus', () => {
@@ -526,17 +402,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.updateMatchStatus).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.updateMatchStatus('match-1', 'contacted');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.updateMatchStatus('match-1', 'contacted')).rejects.toBeDefined();
+    });
   });
 
   describe('proposeOfferToRequest', () => {
@@ -545,17 +413,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.proposeOfferToRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.proposeOfferToRequest('offer-1', 'request-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.proposeOfferToRequest('offer-1', 'request-1')).rejects.toBeDefined();
+    });
   });
 
   describe('proposeRequestToOffer', () => {
@@ -564,17 +424,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.proposeRequestToOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.proposeRequestToOffer('request-1', 'offer-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.proposeRequestToOffer('request-1', 'offer-1')).rejects.toBeDefined();
+    });
   });
 
   describe('acceptProposal', () => {
@@ -583,17 +435,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.acceptProposal).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.acceptProposal('proposal-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.acceptProposal('proposal-1', 'user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('rejectProposal', () => {
@@ -602,17 +446,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.rejectProposal).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.rejectProposal('proposal-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.rejectProposal('proposal-1', 'user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('markWorkComplete', () => {
@@ -621,17 +457,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.markWorkComplete).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.markWorkComplete('commitment-1', 'user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.markWorkComplete('commitment-1', 'user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('settlePayment', () => {
@@ -640,21 +468,13 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.settlePayment).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.settlePayment('match-1', {
+    it('should reject with not implemented error', async () => {
+      await expect(service.settlePayment('match-1', {
         amount: { hasNumericalValue: 100, hasUnit: 'token' },
         mediumOfExchangeId: 'exchange-1',
         paymentMethod: 'mutual-credit',
-      });
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+      })).rejects.toBeDefined();
+    });
   });
 
   describe('setUserPreferences', () => {
@@ -663,8 +483,8 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.setUserPreferences).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.setUserPreferences('user-1', {
+    it('should reject with not implemented error', async () => {
+      await expect(service.setUserPreferences('user-1', {
         contactPreference: 'email',
         contactValue: 'user@example.com',
         timeZone: 'UTC',
@@ -673,16 +493,8 @@ describe('RequestsAndOffersService', () => {
         languages: [],
         skillsToLearn: [],
         skillsToShare: []
-      } as any);
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+      } as any)).rejects.toBeDefined();
+    });
   });
 
   describe('getUserPreferences', () => {
@@ -691,17 +503,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getUserPreferences).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getUserPreferences('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getUserPreferences('user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('getRecommendedRequests', () => {
@@ -710,17 +514,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getRecommendedRequests).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getRecommendedRequests('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getRecommendedRequests('user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('getRecommendedOffers', () => {
@@ -729,17 +525,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getRecommendedOffers).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getRecommendedOffers('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getRecommendedOffers('user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('saveRequest', () => {
@@ -748,17 +536,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.saveRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.saveRequest('user-1', 'request-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.saveRequest('user-1', 'request-1')).rejects.toBeDefined();
+    });
   });
 
   describe('saveOffer', () => {
@@ -767,17 +547,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.saveOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.saveOffer('user-1', 'offer-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.saveOffer('user-1', 'offer-1')).rejects.toBeDefined();
+    });
   });
 
   describe('getSavedRequests', () => {
@@ -786,17 +558,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getSavedRequests).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getSavedRequests('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getSavedRequests('user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('getSavedOffers', () => {
@@ -805,17 +569,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getSavedOffers).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getSavedOffers('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getSavedOffers('user-1')).rejects.toBeDefined();
+    });
   });
 
   describe('unsaveRequest', () => {
@@ -824,17 +580,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.unsaveRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.unsaveRequest('user-1', 'saved-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.unsaveRequest('user-1', 'saved-1')).rejects.toBeDefined();
+    });
   });
 
   describe('unsaveOffer', () => {
@@ -843,17 +591,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.unsaveOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.unsaveOffer('user-1', 'saved-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.unsaveOffer('user-1', 'saved-1')).rejects.toBeDefined();
+    });
   });
 
   describe('createServiceType', () => {
@@ -862,23 +602,15 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.createServiceType).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.createServiceType('user-1', {
+    it('should reject with not implemented error', async () => {
+      await expect(service.createServiceType('user-1', {
         name: 'Test Service',
         description: 'A test service type',
         isTechnical: false,
         creatorId: 'user-1',
         isAuthorOnly: false
-      } as any);
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+      } as any)).rejects.toBeDefined();
+    });
   });
 
   describe('updateServiceType', () => {
@@ -887,17 +619,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.updateServiceType).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.updateServiceType('type-1', 'user-1', {});
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.updateServiceType('type-1', 'user-1', {})).rejects.toBeDefined();
+    });
   });
 
   describe('getServiceTypes', () => {
@@ -906,17 +630,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getServiceTypes).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getServiceTypes();
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getServiceTypes()).rejects.toBeDefined();
+    });
   });
 
   describe('getServiceType', () => {
@@ -925,17 +641,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getServiceType).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getServiceType('type-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getServiceType('type-1')).rejects.toBeDefined();
+    });
   });
 
   describe('createMediumOfExchange', () => {
@@ -944,23 +652,15 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.createMediumOfExchange).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.createMediumOfExchange('user-1', {
+    it('should reject with not implemented error', async () => {
+      await expect(service.createMediumOfExchange('user-1', {
         code: 'TEST',
         name: 'Test Currency',
         creatorId: 'user-1',
         isAuthorOnly: false,
         exchangeType: 'currency'
-      } as any);
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+      } as any)).rejects.toBeDefined();
+    });
   });
 
   describe('updateMediumOfExchange', () => {
@@ -969,17 +669,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.updateMediumOfExchange).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.updateMediumOfExchange('medium-1', 'user-1', {});
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.updateMediumOfExchange('medium-1', 'user-1', {})).rejects.toBeDefined();
+    });
   });
 
   describe('getMediumsOfExchange', () => {
@@ -988,17 +680,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getMediumsOfExchange).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getMediumsOfExchange();
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getMediumsOfExchange()).rejects.toBeDefined();
+    });
   });
 
   describe('getMediumOfExchange', () => {
@@ -1007,17 +691,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getMediumOfExchange).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getMediumOfExchange('medium-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getMediumOfExchange('medium-1')).rejects.toBeDefined();
+    });
   });
 
   describe('getPendingRequests', () => {
@@ -1026,17 +702,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getPendingRequests).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getPendingRequests();
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getPendingRequests()).rejects.toBeDefined();
+    });
   });
 
   describe('getPendingOffers', () => {
@@ -1045,17 +713,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getPendingOffers).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getPendingOffers();
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getPendingOffers()).rejects.toBeDefined();
+    });
   });
 
   describe('approveRequest', () => {
@@ -1064,17 +724,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.approveRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.approveRequest('request-1', 'admin-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.approveRequest('request-1', 'admin-1')).rejects.toBeDefined();
+    });
   });
 
   describe('approveOffer', () => {
@@ -1083,17 +735,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.approveOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.approveOffer('offer-1', 'admin-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.approveOffer('offer-1', 'admin-1')).rejects.toBeDefined();
+    });
   });
 
   describe('rejectRequest', () => {
@@ -1102,17 +746,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.rejectRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.rejectRequest('request-1', 'admin-1', 'Not appropriate');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.rejectRequest('request-1', 'admin-1', 'Not appropriate')).rejects.toBeDefined();
+    });
   });
 
   describe('rejectOffer', () => {
@@ -1121,17 +757,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.rejectOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.rejectOffer('offer-1', 'admin-1', 'Not appropriate');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.rejectOffer('offer-1', 'admin-1', 'Not appropriate')).rejects.toBeDefined();
+    });
   });
 
   describe('suspendRequest', () => {
@@ -1140,17 +768,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.suspendRequest).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.suspendRequest('request-1', 'admin-1', 'Violation');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.suspendRequest('request-1', 'admin-1', 'Violation')).rejects.toBeDefined();
+    });
   });
 
   describe('suspendOffer', () => {
@@ -1159,17 +779,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.suspendOffer).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.suspendOffer('offer-1', 'admin-1', 'Violation');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.suspendOffer('offer-1', 'admin-1', 'Violation')).rejects.toBeDefined();
+    });
   });
 
   describe('getActivityStats', () => {
@@ -1178,17 +790,9 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getActivityStats).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getActivityStats('7-days');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getActivityStats('7-days')).rejects.toBeDefined();
+    });
   });
 
   describe('getUserActivitySummary', () => {
@@ -1197,16 +801,8 @@ describe('RequestsAndOffersService', () => {
       expect(typeof service.getUserActivitySummary).toBe('function');
     });
 
-    it('should reject with not implemented error', fakeAsync(async () => {
-      const result = service.getUserActivitySummary('user-1');
-
-      let thrownError: any;
-      result.catch((err) => {
-        thrownError = err;
-      });
-
-      tick();
-      expect(thrownError).toBeDefined();
-    }));
+    it('should reject with not implemented error', async () => {
+      await expect(service.getUserActivitySummary('user-1')).rejects.toBeDefined();
+    });
   });
 });

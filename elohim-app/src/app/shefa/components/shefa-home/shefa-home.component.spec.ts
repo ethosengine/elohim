@@ -22,38 +22,36 @@ describe('ShefaHomeComponent', () => {
 
   beforeEach(async () => {
     mockEconomicService = {
-    testAvailability: vi.fn(),
-    isAvailable: vi.fn(),
-    getEventsForAgent: vi.fn(),
-  };
+      testAvailability: vi.fn(),
+      isAvailable: vi.fn(),
+      getEventsForAgent: vi.fn(),
+    };
     mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
     mockEconomicService.isAvailable.mockReturnValue(false);
     mockEconomicService.getEventsForAgent.mockReturnValue(of([]));
 
     mockAppreciationService = {
-    testAvailability: vi.fn(),
-    isAvailable: vi.fn(),
-    getAppreciationsFor: vi.fn(),
-  };
+      testAvailability: vi.fn(),
+      isAvailable: vi.fn(),
+      getAppreciationsFor: vi.fn(),
+    };
     mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
     mockAppreciationService.isAvailable.mockReturnValue(false);
     mockAppreciationService.getAppreciationsFor.mockReturnValue(of([]));
 
     mockHolochainClient = {
-    testAdminConnection']: vi.fn(),
-    {
-        isConnected: vi.fn().mockReturnValue(false): vi.fn(),
-    }
-    );
+      testAdminConnection: vi.fn(),
+      isConnected: vi.fn(),
+    };
     mockHolochainClient.testAdminConnection.mockReturnValue(
       Promise.resolve({ success: false })
     );
+    mockHolochainClient.isConnected.mockReturnValue(false);
 
     await TestBed.configureTestingModule({
-      imports: [ShefaHomeComponent]: vi.fn(),
-    providers: [
-        provideRouter([: vi.fn(),
-  },
+      imports: [ShefaHomeComponent],
+      providers: [
+        provideRouter([]),
         { provide: EconomicService, useValue: mockEconomicService },
         { provide: AppreciationService, useValue: mockAppreciationService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
@@ -151,6 +149,30 @@ describe('ShefaHomeComponent', () => {
   // Data Loading - Success Cases
   // ==========================================================================
 
+  /**
+   * Helper: wait for the component's loadData() to finish.
+   * ngOnInit calls `void this.loadData()` — an untracked promise.
+   * whenStable() may return before it resolves in sequential test runs.
+   * We hook into a loading→false transition via a signal watch.
+   */
+  async function waitForLoadData(): Promise<void> {
+    return new Promise<void>(resolve => {
+      if (!component.loading()) {
+        resolve();
+        return;
+      }
+      // Poll until loading becomes false
+      const interval = setInterval(() => {
+        if (!component.loading()) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 5);
+      // Timeout safety
+      setTimeout(() => { clearInterval(interval); resolve(); }, 2000);
+    });
+  }
+
   describe('Data Loading - Success', () => {
     beforeEach(() => {
       mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
@@ -168,28 +190,28 @@ describe('ShefaHomeComponent', () => {
 
     it('should load events when service is available', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.events().length).toBeGreaterThan(0);
     });
 
     it('should load appreciations when service is available', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.appreciations().length).toBeGreaterThan(0);
     });
 
     it('should set loading to false after data loads', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.loading()).toBe(false);
     });
 
     it('should not set error on successful load', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.error()).toBeNull();
     });
@@ -206,7 +228,7 @@ describe('ShefaHomeComponent', () => {
       mockAppreciationService.isAvailable.mockReturnValue(false);
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.events().length).toBeGreaterThan(0);
       expect(component.appreciations().length).toBeGreaterThan(0);
@@ -216,7 +238,7 @@ describe('ShefaHomeComponent', () => {
       mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.error()).toContain('Failed to connect');
     });
@@ -225,7 +247,7 @@ describe('ShefaHomeComponent', () => {
       mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Error')));
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.loading()).toBe(false);
     });
@@ -268,10 +290,17 @@ describe('ShefaHomeComponent', () => {
 
   describe('User Actions', () => {
     it('should refresh data when refreshData is called', async () => {
+      // Wait for initial load to complete first
+      fixture.detectChanges();
+      await waitForLoadData();
+
       mockEconomicService.testAvailability.mockClear();
       mockAppreciationService.testAvailability.mockClear();
 
-      await component.refreshData();
+      // refreshData() calls `void this.loadData()` - hook loadData to detect when it runs
+      component.refreshData();
+      // loadData sets loading=true synchronously, so we wait for it to complete
+      await waitForLoadData();
 
       expect(mockEconomicService.testAvailability).toHaveBeenCalled();
       expect(mockAppreciationService.testAvailability).toHaveBeenCalled();
@@ -443,12 +472,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should display stats grid when not loading', async () => {
-      // Manually set loading to false without triggering ngOnInit
-      component.loading.set(false);
-      // Initial render
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
-      // Second render to ensure template updates
+      await waitForLoadData();
       fixture.detectChanges();
 
       const statsGrid = fixture.nativeElement.querySelector('.stats-grid');
@@ -456,9 +482,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should display action buttons', async () => {
-      component.loading.set(false);
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
       fixture.detectChanges();
 
       const refreshButton = fixture.nativeElement.querySelector('.action-btn.primary');
@@ -467,15 +493,13 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error banner when error is set', async () => {
-      // First render the component with initialization
+      // Trigger init and wait for it to settle
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
-      // Now set the error state
+      // Set the error state
       component.loading.set(false);
       component.error.set('Test error message');
-
-      // Trigger change detection to reflect the new state
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -485,11 +509,12 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should call refreshData when refresh button is clicked', async () => {
-      const refreshSpy = vi.spyOn(component, 'refreshData');
-      component.loading.set(false);
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
       fixture.detectChanges();
+
+      const refreshSpy = vi.spyOn(component, 'refreshData').mockImplementation(() => {});
 
       const refreshButton = fixture.nativeElement.querySelector('.action-btn.primary');
       expect(refreshButton).toBeTruthy();

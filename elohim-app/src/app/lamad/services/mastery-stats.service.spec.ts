@@ -84,6 +84,7 @@ describe('MasteryStatsService', () => {
     mockPointsService = {
       earnPoints: vi.fn(),
       refreshBalance: vi.fn(),
+      totalPoints$: totalPointsSubject.asObservable(),
     };
     mockPointsService.earnPoints.mockReturnValue(of(null));
 

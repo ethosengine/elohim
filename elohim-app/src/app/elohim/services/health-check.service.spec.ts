@@ -255,7 +255,7 @@ describe('HealthCheckService', () => {
 
     it('refresh should return Promise of HealthStatus', async () => {
       const result = service.refresh();
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
       const status = await result;
       expect(status).toBeDefined();
       expect(typeof status).toBe('object');
@@ -264,7 +264,7 @@ describe('HealthCheckService', () => {
 
     it('checkHolochainOnly should return Promise of HealthCheck', async () => {
       const result = service.checkHolochainOnly();
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
       const check = await result;
       expect(check).toBeDefined();
       expect(typeof check).toBe('object');
@@ -548,12 +548,13 @@ describe('HealthCheckService', () => {
     it('should stop auto-check on destroy when interval is active', () => {
       // Simulate afterNextRender having set up the interval
       (service as any).autoCheckInterval = setInterval(() => {}, 60000);
-      vi.spyOn(globalThis, 'clearInterval').mockRestore();
+      const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
 
       service.ngOnDestroy();
 
-      expect(globalThis.clearInterval).toHaveBeenCalled();
+      expect(clearIntervalSpy).toHaveBeenCalled();
       expect((service as any).autoCheckInterval).toBeNull();
+      clearIntervalSpy.mockRestore();
     });
 
     it('should handle destroy when no interval is set', () => {

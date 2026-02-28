@@ -14,24 +14,28 @@ describe('SessionHumanService', () => {
   beforeEach(() => {
     localStorageMock = {};
 
-    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => localStorageMock[key] || null);
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+    // Use Storage.prototype to intercept all localStorage calls (works in jsdom/vitest)
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
-    vi.spyOn(localStorage, 'key').mockImplementation((index: number) => {
-      return Object.keys(localStorageMock)[index] || null;
+    vi.spyOn(Storage.prototype, 'key').mockImplementation((index: number) => {
+      return Object.keys(localStorageMock)[index] ?? null;
     });
-    // Note: Can't mock localStorage.length in browser environment
-    // since it's a native accessor property that can't be redefined
 
+    // Provide SessionHumanService explicitly so each test gets a fresh instance
     TestBed.configureTestingModule({
       providers: [SessionHumanService],
     });
 
     service = TestBed.inject(SessionHumanService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('initialization', () => {

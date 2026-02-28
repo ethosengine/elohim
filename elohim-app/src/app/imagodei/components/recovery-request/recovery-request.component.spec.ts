@@ -31,7 +31,10 @@ describe('RecoveryRequestComponent', () => {
       error: signal(null),
     };
 
-    mockDoorwayRegistry = {};
+    mockDoorwayRegistry = {
+      hasSelection: signal(false),
+      selected: signal(null),
+    };
 
     mockRouter = { navigate: vi.fn() };
 

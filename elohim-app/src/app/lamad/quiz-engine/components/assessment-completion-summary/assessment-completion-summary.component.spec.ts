@@ -113,36 +113,30 @@ describe('AssessmentCompletionSummaryComponent', () => {
     profileSubject = new BehaviorSubject<LearnerMasteryProfile | null>(null);
 
     mockPresenceService = {
-    onDiscoveryCompleted: vi.fn(),
-    onContentCompleted: vi.fn(),
-    dismissNotice: vi.fn(),
-    handleAction']: vi.fn(),
-    {
-        presence$: of([: vi.fn(),
-  },
-        cost$: of({
-          tokensProcessed: 0,
-          timeMs: 0,
-          constitutionalChecks: 0,
-          precedentLookups: 0,
-        }),
-        notices$: of([]),
-        providerId: 'elohim-presence',
-      },
-    );
+      onDiscoveryCompleted: vi.fn(),
+      onContentCompleted: vi.fn(),
+      dismissNotice: vi.fn(),
+      handleAction: vi.fn(),
+      presence$: of([]),
+      cost$: of({
+        tokensProcessed: 0,
+        timeMs: 0,
+        constitutionalChecks: 0,
+        precedentLookups: 0,
+      }),
+      notices$: of([]),
+      providerId: 'elohim-presence',
+    };
     mockPresenceService.onDiscoveryCompleted.mockReturnValue(of(mockFulfilledResponse));
     mockPresenceService.onContentCompleted.mockReturnValue(of(mockFulfilledResponse));
 
     mockDiscoveryService = {
-    recordFromCompletion: vi.fn(),
-    getBadgeDisplay']: vi.fn(),
-    {
-        results: signal([: vi.fn(),
-  },
-        attestations: signal([]),
-        featuredResults: signal([]),
-      },
-    );
+      recordFromCompletion: vi.fn(),
+      getBadgeDisplay: vi.fn(),
+      results: signal([]),
+      attestations: signal([]),
+      featuredResults: signal([]),
+    };
     mockDiscoveryService.recordFromCompletion.mockReturnValue({
       id: 'discovery-result-1',
       assessmentId: 'attachment-style-discovery',

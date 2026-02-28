@@ -72,9 +72,18 @@ describe('ElohimNavigatorComponent', () => {
       error: null,
     });
 
-    mockIdentityService = { logout: vi.fn() };
+    mockIdentityService = {
+      logout: vi.fn(),
+      mode: signal<'anonymous' | 'hosted' | 'steward'>('anonymous'),
+      displayName: signal<string | null>(null),
+      humanId: signal<string | null>(null),
+    };
 
-    mockAuthService = { isAuthenticated: vi.fn() };
+    mockAuthService = {
+      isAuthenticated: vi.fn(),
+      identifier: signal<string | null>(null),
+      doorwayUrl: signal<string | null>(null),
+    };
     mockAuthService.isAuthenticated.mockReturnValue(false);
 
     mockRunningContext = {

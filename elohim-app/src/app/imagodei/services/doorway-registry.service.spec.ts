@@ -46,13 +46,13 @@ describe('DoorwayRegistryService', () => {
   };
 
   beforeEach(() => {
-    // Setup localStorage mock
+    // Setup localStorage mock using Storage.prototype (works reliably in jsdom/vitest)
     localStorageMock = {};
-    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => localStorageMock[key] || null);
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
 
@@ -80,6 +80,8 @@ describe('DoorwayRegistryService', () => {
   });
 
   afterEach(() => {
+    // Cancel any pending requests left over from async service internals
+    httpMock.match(() => true).forEach(r => r.error(new ProgressEvent('error')));
     httpMock.verify();
   });
 
@@ -137,7 +139,7 @@ describe('DoorwayRegistryService', () => {
     it('should persist selection to localStorage', () => {
       service.selectDoorway(mockDoorway);
 
-      expect(localStorage.setItem).toHaveBeenCalled();
+      expect(Storage.prototype.setItem).toHaveBeenCalled();
     });
 
     it('should mark explicit selection', () => {
@@ -181,7 +183,7 @@ describe('DoorwayRegistryService', () => {
       service.selectDoorway(mockDoorway);
       service.clearSelection();
 
-      expect(localStorage.removeItem).toHaveBeenCalled();
+      expect(Storage.prototype.removeItem).toHaveBeenCalled();
     });
   });
 
@@ -356,7 +358,7 @@ describe('DoorwayRegistryService', () => {
 
       await service.loadDoorways();
 
-      expect(localStorage.setItem).toHaveBeenCalled();
+      expect(Storage.prototype.setItem).toHaveBeenCalled();
     });
 
     it('should clear error on successful load', async () => {
@@ -464,7 +466,7 @@ describe('DoorwayRegistryService', () => {
       service = TestBed.inject(DoorwayRegistryService);
 
       // Check localStorage.getItem was called
-      expect(localStorage.getItem).toHaveBeenCalled();
+      expect(Storage.prototype.getItem).toHaveBeenCalled();
     });
   });
 

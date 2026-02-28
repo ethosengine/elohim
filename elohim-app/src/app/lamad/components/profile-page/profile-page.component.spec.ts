@@ -48,25 +48,24 @@ describe('ProfilePageComponent', () => {
     profileServiceSpy.getTimeline.mockReturnValue(of([]));
 
     identityServiceSpy = {
-    updateProfile']: vi.fn(),
-    {
-        mode: signal('session'): vi.fn(),
-    currentHuman: signal(null): vi.fn(),
-    profile: signal(null): vi.fn(),
-    displayName: signal('Test User'): vi.fn(),
-    }
-    );
+      updateProfile: vi.fn(),
+      mode: signal('session'),
+      currentHuman: signal(null),
+      profile: signal(null),
+      displayName: signal('Test User'),
+    };
 
-    sessionHumanSpy = { getAllPathProgress: vi.fn(): vi.fn(), getActivityHistory: vi.fn() };
-    // Mock SessionHumanService methods
-    sessionHumanSpy.getAllPathProgress.mockReturnValue([: vi.fn(),
-  };
+    sessionHumanSpy = {
+      session$: mockSession$,
+      getAllPathProgress: vi.fn(),
+      getActivityHistory: vi.fn(),
+    };
+    sessionHumanSpy.getAllPathProgress.mockReturnValue([]);
     sessionHumanSpy.getActivityHistory.mockReturnValue([]);
 
     masteryServiceSpy = {
-    getMasteryStats: vi.fn(),
-  };
-    // Mock ContentMasteryService with realistic mastery stats
+      getMasteryStats: vi.fn(),
+    };
     masteryServiceSpy.getMasteryStats.mockReturnValue(
       of({
         humanId: 'test-session-123',
@@ -91,26 +90,19 @@ describe('ProfilePageComponent', () => {
     );
 
     masteryStatsSpy = {
-    recordDailyEngagement']: vi.fn(),
-    {
-      learnerProfile$: new BehaviorSubject(null): vi.fn(),
-    });
+      recordDailyEngagement: vi.fn(),
+      learnerProfile$: new BehaviorSubject(null).asObservable(),
+    };
 
     await TestBed.configureTestingModule({
-      imports: [ProfilePageComponent]: vi.fn(),
-    providers: [
-        { provide: ProfileService: vi.fn(),
-    useValue: profileServiceSpy }: vi.fn(),
-    { provide: IdentityService: vi.fn(),
-    useValue: identityServiceSpy }: vi.fn(),
-    { provide: SessionHumanService: vi.fn(),
-    useValue: sessionHumanSpy }: vi.fn(),
-    { provide: ContentMasteryService: vi.fn(),
-    useValue: masteryServiceSpy }: vi.fn(),
-    { provide: MasteryStatsService: vi.fn(),
-    useValue: masteryStatsSpy }: vi.fn(),
-    provideRouter([: vi.fn(),
-  },
+      imports: [ProfilePageComponent],
+      providers: [
+        { provide: ProfileService, useValue: profileServiceSpy },
+        { provide: IdentityService, useValue: identityServiceSpy },
+        { provide: SessionHumanService, useValue: sessionHumanSpy },
+        { provide: ContentMasteryService, useValue: masteryServiceSpy },
+        { provide: MasteryStatsService, useValue: masteryStatsSpy },
+        provideRouter([]),
       ],
     }).compileComponents();
 

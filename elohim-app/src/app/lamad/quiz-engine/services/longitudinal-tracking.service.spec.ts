@@ -35,11 +35,8 @@ describe('LongitudinalTrackingService', () => {
 
   beforeEach(() => {
     attestationSpy = {
-    results']: vi.fn(),
-    {
-      results: vi.fn().mockReturnValue([: vi.fn(),
-  },
-    });
+      results: vi.fn().mockReturnValue([]),
+    };
 
     TestBed.configureTestingModule({
       providers: [

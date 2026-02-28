@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError, Observable } from 'rxjs';
 import { BlobVerificationService, BlobVerificationResult } from './blob-verification.service';
@@ -320,7 +321,7 @@ describe('BlobVerificationService', () => {
       const blob = new Blob(['test']);
       const result = service.streamComputeHash(blob);
 
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof (result as any).then).toBe('function');
 
       const hash = await result;
       expect(typeof hash).toBe('string');

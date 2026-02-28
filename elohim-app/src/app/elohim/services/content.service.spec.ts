@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ContentService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
-import { BLOB_FETCHER } from '../interfaces/blob-fetcher.interface';
+import { HeliaFetchService } from './helia-fetch.service';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';

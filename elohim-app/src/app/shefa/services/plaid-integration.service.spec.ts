@@ -66,12 +66,12 @@ describe('PlaidIntegrationService', () => {
     it('should initiatePlaidLink return Promise', () => {
       const stewardId = 'steward-123';
       const promise = service.initiatePlaidLink(stewardId);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should handlePlaidCallback return Promise<PlaidConnection>', () => {
       const promise = service.handlePlaidCallback('public-token-123');
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -110,7 +110,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.fetchTransactions(mockConnection, dateRange);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should syncRecentTransactions return Promise', () => {
@@ -130,7 +130,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.syncRecentTransactions(mockConnection);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -149,7 +149,7 @@ describe('PlaidIntegrationService', () => {
 
     it('should getAccounts return Promise', () => {
       const promise = service.getAccounts('encrypted-token');
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should refreshConnection return Promise', () => {
@@ -169,7 +169,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.refreshConnection(mockConnection);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -365,12 +365,12 @@ describe('PlaidIntegrationService', () => {
 
     it('initiatePlaidLink should return Promise', () => {
       const result = service.initiatePlaidLink('steward-123');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('handlePlaidCallback should return Promise', () => {
       const result = service.handlePlaidCallback('public-token');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('fetchTransactions should return Promise', () => {
@@ -394,7 +394,7 @@ describe('PlaidIntegrationService', () => {
         end: '2024-01-31',
       });
 
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('syncRecentTransactions should return Promise', () => {
@@ -414,12 +414,12 @@ describe('PlaidIntegrationService', () => {
       };
 
       const result = service.syncRecentTransactions(mockConnection);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('getAccounts should return Promise', () => {
       const result = service.getAccounts('encrypted-token');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('refreshConnection should return Promise', () => {
@@ -439,7 +439,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const result = service.refreshConnection(mockConnection);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
   });
 

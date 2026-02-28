@@ -98,14 +98,39 @@ describe('LearnerDashboardComponent', () => {
     masterySubject = new BehaviorSubject<ContentMastery[]>([]);
 
     mockMasteryStats = {
-    recordDailyEngagement']: vi.fn(),
-    {
-      learnerProfile$: profileSubject.asObservable(): vi.fn(),
-    });
+      recordDailyEngagement: vi.fn(),
+      learnerProfile$: profileSubject.asObservable(),
+    };
 
-    mockContentMastery = { getAllMastery: vi.fn(): vi.fn(), getContentNeedingRefresh: vi.fn(): vi.fn(), };
+    mockContentMastery = {
+      getAllMastery: vi.fn(),
+      getContentNeedingRefresh: vi.fn(),
+    };
     mockContentMastery.getAllMastery.mockReturnValue(masterySubject.asObservable());
-    mockContentMastery.getContentNeedingRefresh.mockReturnValue(of([: vi.fn() };
+    mockContentMastery.getContentNeedingRefresh.mockReturnValue(of([]));
+
+    mockPathService = {
+      listPaths: vi.fn().mockReturnValue(of(emptyPathIndex)),
+    };
+
+    mockAgentService = {
+      getCurrentAgentId: vi.fn().mockReturnValue('test-agent'),
+      getAgentProgress: vi.fn().mockReturnValue(of([])),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [LearnerDashboardComponent, RouterTestingModule],
+      providers: [
+        { provide: MasteryStatsService, useValue: mockMasteryStats },
+        { provide: ContentMasteryService, useValue: mockContentMastery },
+        { provide: PathService, useValue: mockPathService },
+        { provide: AgentService, useValue: mockAgentService },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(LearnerDashboardComponent);
+    component = fixture.componentInstance;
+  });
 
   describe('Loading state', () => {
     it('should create', () => {

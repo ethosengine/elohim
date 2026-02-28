@@ -12,11 +12,11 @@ import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider'
 import { IdentityService } from '../../services/identity.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
-import { vi, Mock } from 'vitest';
+import { vi } from 'vitest';
 
 describe('LoginComponent', () => {
   let component: LoginComponent;
@@ -29,6 +29,9 @@ describe('LoginComponent', () => {
   let mockTauriAuth: any;
   let mockRouter: any;
   let mockActivatedRoute: any;
+  let localStorageGetItemSpy: ReturnType<typeof vi.spyOn>;
+  let localStorageSetItemSpy: ReturnType<typeof vi.spyOn>;
+  let localStorageRemoveItemSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     mockAuthService = {
@@ -86,23 +89,27 @@ describe('LoginComponent', () => {
     };
 
     // Mock localStorage
-    vi.spyOn(localStorage, 'getItem').mockReturnValue(null);
-    vi.spyOn(localStorage, 'setItem');
-    vi.spyOn(localStorage, 'removeItem');
+    localStorageGetItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+    localStorageSetItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+    localStorageRemoveItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
+        provideRouter([]),
         { provide: AuthService, useValue: mockAuthService },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: TauriAuthService, useValue: mockTauriAuth },
-        { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
     }).compileComponents();
+
+    // Spy on the real Router's navigate method
+    mockRouter = TestBed.inject(Router);
+    vi.spyOn(mockRouter, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(LoginComponent);
     component = fixture.componentInstance;
@@ -268,6 +275,7 @@ describe('LoginComponent', () => {
 
     it('should not register password provider if already registered', () => {
       mockAuthService.hasProvider.mockReturnValue(true);
+      mockAuthService.registerProvider.mockClear();
 
       component.ngOnInit();
 
@@ -297,7 +305,7 @@ describe('LoginComponent', () => {
     }));
 
     it('should pre-fill identifier from localStorage if remembered', () => {
-      (localStorage.getItem as Mock).mockReturnValue('user@example.com');
+      localStorageGetItemSpy.mockReturnValue('user@example.com');
 
       component.ngOnInit();
 
@@ -519,7 +527,7 @@ describe('LoginComponent', () => {
 
       await component.onLogin();
 
-      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'user@example.com');
+      expect(localStorageSetItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'user@example.com');
     });
 
     it('should remove identifier from localStorage when rememberMe is false', async () => {
@@ -527,7 +535,7 @@ describe('LoginComponent', () => {
 
       await component.onLogin();
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
+      expect(localStorageRemoveItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
     });
 
     it('should wait for authenticated state before navigation', async () => {

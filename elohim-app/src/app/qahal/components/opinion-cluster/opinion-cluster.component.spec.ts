@@ -88,7 +88,7 @@ describe('OpinionClusterComponent', () => {
 
   describe('ngOnChanges', () => {
     it('should recalculate clusters when votes change', () => {
-      spyOn<any>(component, 'recalculateClusters');
+      vi.spyOn<any, any>(component, 'recalculateClusters').mockImplementation(() => {});
 
       const changes: SimpleChanges = {
         votes: new SimpleChange([], [{ participantId: 'p1', statementId: 's1', value: 1 }], false),
@@ -99,7 +99,7 @@ describe('OpinionClusterComponent', () => {
     });
 
     it('should recalculate clusters when statements change', () => {
-      spyOn<any>(component, 'recalculateClusters');
+      vi.spyOn<any, any>(component, 'recalculateClusters').mockImplementation(() => {});
 
       const changes: SimpleChanges = {
         statements: new SimpleChange([], [{ id: 's1', text: 'Statement 1' }], false),
@@ -596,11 +596,11 @@ describe('OpinionClusterComponent', () => {
 
   describe('recalculateClusters()', () => {
     it('should call computeParticipantPositions, computeClusters, identifyConsensusAndDivisive, and updateStats', () => {
-      spyOn<any>(component, 'computeParticipantPositions').mockReturnValue([]);
-      spyOn<any>(component, 'computeClusters').mockReturnValue([]);
-      spyOn<any>(component, 'identifyConsensusAndDivisive');
-      spyOn<any>(component, 'updateStats');
-      spyOn<any>(component, 'render');
+      vi.spyOn<any, any>(component, 'computeParticipantPositions').mockReturnValue([]);
+      vi.spyOn<any, any>(component, 'computeClusters').mockReturnValue([]);
+      vi.spyOn<any, any>(component, 'identifyConsensusAndDivisive').mockImplementation(() => {});
+      vi.spyOn<any, any>(component, 'updateStats').mockImplementation(() => {});
+      vi.spyOn<any, any>(component, 'render').mockImplementation(() => {});
 
       (component as any).recalculateClusters();
 

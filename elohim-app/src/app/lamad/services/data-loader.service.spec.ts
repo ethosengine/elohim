@@ -184,6 +184,7 @@ describe('DataLoaderService', () => {
 
   afterEach(() => {
     httpMock.verify();
+    vi.restoreAllMocks();
   });
 
   it('should be created', () => {
@@ -330,70 +331,76 @@ describe('DataLoaderService', () => {
     }));
   });
 
+  // Use Object.defineProperty for localStorage mocks — vi.spyOn on native Storage is unreliable
+  let localStorageData: Record<string, string | null>;
+  let mockGetItem: ReturnType<typeof vi.fn>;
+  let mockSetItem: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    localStorageData = {};
+    mockGetItem = vi.fn((key: string) => localStorageData[key] ?? null);
+    mockSetItem = vi.fn((key: string, value: string) => { localStorageData[key] = value; });
+    Object.defineProperty(window, 'localStorage', {
+      value: { getItem: mockGetItem, setItem: mockSetItem, removeItem: vi.fn(), clear: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+  });
+
   describe('getAgentProgress', () => {
-    it('should load agent progress from localStorage', () => new Promise<void>(done => {
+    it('should load agent progress from localStorage', async () => {
       const progressJson = JSON.stringify(mockProgress);
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(progressJson);
+      localStorageData['lamad-progress-test-agent-test-path'] = progressJson;
 
-      service.getAgentProgress('test-agent', 'test-path').subscribe(progress => {
-        expect(progress).toEqual(mockProgress);
-        expect(localStorage.getItem).toHaveBeenCalledWith('lamad-progress-test-agent-test-path');
-        done();
-      });
-    }));
+      const { firstValueFrom } = await import('rxjs');
+      const progress = await firstValueFrom(service.getAgentProgress('test-agent', 'test-path'));
+      expect(progress).toEqual(mockProgress);
+      expect(mockGetItem).toHaveBeenCalledWith('lamad-progress-test-agent-test-path');
+    });
 
-    it('should return null if progress not in localStorage', () => new Promise<void>(done => {
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(null);
-
-      service.getAgentProgress('test-agent', 'missing-path').subscribe(progress => {
-        expect(progress).toBeNull();
-        done();
-      });
-    }));
+    it('should return null if progress not in localStorage', async () => {
+      const { firstValueFrom } = await import('rxjs');
+      const progress = await firstValueFrom(service.getAgentProgress('test-agent', 'missing-path'));
+      expect(progress).toBeNull();
+    });
   });
 
   describe('saveAgentProgress', () => {
-    it('should save progress to localStorage', () => new Promise<void>(done => {
-      vi.spyOn(localStorage, 'setItem');
+    it('should save progress to localStorage', async () => {
+      const { firstValueFrom } = await import('rxjs');
+      await firstValueFrom(service.saveAgentProgress(mockProgress));
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'lamad-progress-test-agent-test-path',
+        expect.any(String)
+      );
+    });
 
-      service.saveAgentProgress(mockProgress).subscribe(() => {
-        expect(localStorage.setItem).toHaveBeenCalledWith(
-          'lamad-progress-test-agent-test-path',
-          expect.any(String)
-        );
-        done();
-      });
-    }));
+    it('should handle localStorage errors gracefully', async () => {
+      mockSetItem.mockImplementation(() => { throw 'QuotaExceededError'; });
 
-    it('should handle localStorage errors gracefully', () => new Promise<void>(done => {
-      vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw 'QuotaExceededError'; });
-
-      service.saveAgentProgress(mockProgress).subscribe(() => {
-        expect(true).toBe(true); // Should complete without error
-        done();
-      });
-    }));
+      const { firstValueFrom } = await import('rxjs');
+      await firstValueFrom(service.saveAgentProgress(mockProgress));
+      expect(true).toBe(true); // Should complete without error
+    });
   });
 
   describe('getLocalProgress', () => {
     it('should retrieve progress from localStorage', () => {
       const progressJson = JSON.stringify(mockProgress);
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(progressJson);
+      localStorageData['lamad-progress-test-agent-test-path'] = progressJson;
 
       const result = service.getLocalProgress('test-agent', 'test-path');
       expect(result).toEqual(mockProgress);
-      expect(localStorage.getItem).toHaveBeenCalledWith('lamad-progress-test-agent-test-path');
+      expect(mockGetItem).toHaveBeenCalledWith('lamad-progress-test-agent-test-path');
     });
 
     it('should return null if no progress in localStorage', () => {
-      vi.spyOn(localStorage, 'getItem').mockReturnValue(null);
-
       const result = service.getLocalProgress('test-agent', 'test-path');
       expect(result).toBeNull();
     });
 
     it('should return null for malformed JSON', () => {
-      vi.spyOn(localStorage, 'getItem').mockReturnValue('invalid json');
+      localStorageData['lamad-progress-test-agent-test-path'] = 'invalid json';
 
       const result = service.getLocalProgress('test-agent', 'test-path');
       expect(result).toBeNull();

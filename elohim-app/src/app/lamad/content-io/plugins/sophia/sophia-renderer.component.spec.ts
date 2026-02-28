@@ -84,31 +84,27 @@ describe('SophiaRendererComponent', () => {
 
   beforeEach(async () => {
     const mockMasteryStats = {
-    recordDailyEngagement']: vi.fn(),
-    {
-      learnerProfile$: new BehaviorSubject(null): vi.fn(),
-    });
+      recordDailyEngagement: vi.fn(),
+      learnerProfile$: new BehaviorSubject(null).asObservable(),
+    };
 
     await TestBed.configureTestingModule({
-      imports: [SophiaRendererComponent: vi.fn(),
-    RouterModule.forRoot([: vi.fn(),
-  }, NoopAnimationsModule],
+      imports: [SophiaRendererComponent, RouterModule.forRoot([]), NoopAnimationsModule],
       providers: [
         { provide: MasteryStatsService, useValue: mockMasteryStats },
         {
           provide: ElohimPresenceService,
           useValue: (() => {
             const spy = {
-    onDiscoveryCompleted: vi.fn(),
-    onContentCompleted: vi.fn(),
-    ]: vi.fn(),
-    {
-              presence$: of([: vi.fn(),
-  },
+              onDiscoveryCompleted: vi.fn(),
+              onContentCompleted: vi.fn(),
+              dismissNotice: vi.fn(),
+              handleAction: vi.fn(),
+              presence$: of([]),
               cost$: of({ tokensProcessed: 0, timeMs: 0, constitutionalChecks: 0, precedentLookups: 0 }),
               notices$: of([]),
               providerId: 'elohim-presence',
-            });
+            };
             const mockResponse = of({
               requestId: 'req-1',
               elohimId: 'elohim-1',

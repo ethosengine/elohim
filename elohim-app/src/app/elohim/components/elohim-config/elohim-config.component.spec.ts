@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { BehaviorSubject, of } from 'rxjs';
 
@@ -178,25 +178,26 @@ describe('ElohimConfigComponent', () => {
   // =========================================================================
 
   describe('test connection', () => {
-    it('should set testing signal during test', fakeAsync(() => {
+    it('should set testing signal during test', async () => {
       expect(component.testing()).toBe(false);
 
-      component.testBackend();
+      // testing becomes true synchronously at start of testBackend
+      const testPromise = component.testBackend();
       expect(component.testing()).toBe(true);
 
-      tick();
+      // After the async method completes, testing is false again
+      await testPromise;
       expect(component.testing()).toBe(false);
-    }));
+    });
 
-    it('should show success message when available', fakeAsync(() => {
-      component.testBackend();
-      tick();
+    it('should show success message when available', async () => {
+      await component.testBackend();
 
       expect(component.testResult()!.success).toBe(true);
       expect(component.testResult()!.message).toContain('available');
-    }));
+    });
 
-    it('should show error when not available', fakeAsync(() => {
+    it('should show error when not available', async () => {
       mockCatalog.selectBackend.mockReturnValue(
         Promise.resolve({
           id: 'mock',
@@ -207,22 +208,20 @@ describe('ElohimConfigComponent', () => {
         }),
       );
 
-      component.testBackend();
-      tick();
+      await component.testBackend();
 
       expect(component.testResult()!.success).toBe(false);
       expect(component.testResult()!.message).toContain('not available');
-    }));
+    });
 
-    it('should handle test failure gracefully', fakeAsync(() => {
+    it('should handle test failure gracefully', async () => {
       mockCatalog.selectBackend.mockReturnValue(Promise.reject(new Error('Network error')));
 
-      component.testBackend();
-      tick();
+      await component.testBackend();
 
       expect(component.testResult()!.success).toBe(false);
       expect(component.testResult()!.message).toContain('failed');
-    }));
+    });
   });
 
   // =========================================================================

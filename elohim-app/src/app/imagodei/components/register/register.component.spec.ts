@@ -13,7 +13,7 @@ import { DoorwayRegistryService } from '../../services/doorway-registry.service'
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of, EMPTY } from 'rxjs';
 import { vi } from 'vitest';
@@ -60,7 +60,7 @@ describe('RegisterComponent', () => {
     mockMigrationService = {
       migrate: vi.fn(),
       canMigrate: signal(false),
-      migrationState: signal(null),
+      state: signal(null),
     };
     mockMigrationService.migrate.mockReturnValue(
       Promise.resolve({ success: true })
@@ -88,8 +88,7 @@ describe('RegisterComponent', () => {
       isConnected: signal(true),
     };
 
-    mockRouter = { navigate: vi.fn() };
-    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
+    // mockRouter will be set after TestBed.inject(Router) below
 
     mockActivatedRoute = {
       queryParams: of({}),
@@ -98,6 +97,7 @@ describe('RegisterComponent', () => {
     await TestBed.configureTestingModule({
       imports: [RegisterComponent],
       providers: [
+        provideRouter([]),
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: SessionHumanService, useValue: mockSessionHumanService },
         { provide: SessionMigrationService, useValue: mockMigrationService },
@@ -105,10 +105,13 @@ describe('RegisterComponent', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: HolochainClientService, useValue: mockHolochainClient },
-        { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
     }).compileComponents();
+
+    // Spy on the real Router's navigate method
+    mockRouter = TestBed.inject(Router);
+    vi.spyOn(mockRouter, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(RegisterComponent);
     component = fixture.componentInstance;
@@ -312,27 +315,27 @@ describe('RegisterComponent', () => {
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('should get return URL from query params', (done) => {
+    it('should get return URL from query params', () => new Promise<void>(resolve => {
       mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
 
       component.ngOnInit();
 
       setTimeout(() => {
         expect((component as any).returnUrl).toBe('/dashboard');
-        done();
+        resolve();
       }, 100);
-    });
+    }));
 
-    it('should default return URL to / when not in query params', (done) => {
+    it('should default return URL to / when not in query params', () => new Promise<void>(resolve => {
       mockActivatedRoute.queryParams = of({});
 
       component.ngOnInit();
 
       setTimeout(() => {
         expect((component as any).returnUrl).toBe('/');
-        done();
+        resolve();
       }, 100);
-    });
+    }));
 
     it('should auto-select doorway from environment when none selected', () => {
       // Default mock has hasSelection = signal(false), environment has localhost doorwayUrl
@@ -643,7 +646,8 @@ describe('RegisterComponent', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockIdentityService.registerHuman.mockReturnValue(Promise.reject(new Error('Unknown error')));
+      // Reject with a non-Error value (string) to test the fallback error message
+      mockIdentityService.registerHuman.mockReturnValue(Promise.reject('Unknown error'));
 
       await component.onRegister();
 

@@ -194,7 +194,7 @@ describe('ContributorService', () => {
     it('should return Promise<boolean>', async () => {
       holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.testAvailability();
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof (result as any).then).toBe('function');
       const isAvailable = await result;
       expect(typeof isAvailable).toBe('boolean');
     });

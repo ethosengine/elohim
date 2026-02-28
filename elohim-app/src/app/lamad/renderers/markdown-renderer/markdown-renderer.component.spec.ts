@@ -1,5 +1,5 @@
-import { vi, Mock } from 'vitest';
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { vi } from 'vitest';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SimpleChange } from '@angular/core';
@@ -54,17 +54,18 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('markdown rendering', () => {
-    it('should render basic markdown', fakeAsync(() => {
+    it('should render basic markdown', async () => {
       component.node = createContentNode('# Hello World\n\nThis is a test.');
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should render markdown with multiple headings', fakeAsync(() => {
+    it('should render markdown with multiple headings', async () => {
       const markdown = `# Heading 1
 ## Heading 2
 ### Heading 3`;
@@ -73,24 +74,26 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries.length).toBe(3);
-    }));
+    });
 
-    it('should handle code blocks', fakeAsync(() => {
+    it('should handle code blocks', async () => {
       const markdown = '```javascript\nconst x = 1;\n```';
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should warn for non-string content', fakeAsync(() => {
+    it('should warn for non-string content', async () => {
       vi.spyOn(console, 'warn');
       const node = createContentNode('');
       (node as any).content = { invalid: 'object' };
@@ -98,14 +101,15 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(console.warn).toHaveBeenCalledWith('Markdown renderer expects string content');
-    }));
+    });
   });
 
   describe('table of contents', () => {
-    it('should generate TOC from headings', fakeAsync(() => {
+    it('should generate TOC from headings', async () => {
       const markdown = `# First
 ## Second
 ### Third`;
@@ -114,15 +118,16 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries.length).toBe(3);
       expect(component.tocEntries[0].level).toBe(1);
       expect(component.tocEntries[1].level).toBe(2);
       expect(component.tocEntries[2].level).toBe(3);
-    }));
+    });
 
-    it('should emit tocGenerated event', fakeAsync(() => {
+    it('should emit tocGenerated event', async () => {
       let emittedToc: TocEntry[] = [];
       component.tocGenerated.subscribe((toc: TocEntry[]) => {
         emittedToc = toc;
@@ -132,12 +137,13 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(emittedToc.length).toBe(1);
-    }));
+    });
 
-    it('should generate unique IDs for duplicate headings', fakeAsync(() => {
+    it('should generate unique IDs for duplicate headings', async () => {
       const markdown = `# Test
 # Test
 # Test`;
@@ -146,12 +152,13 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       const ids = component.tocEntries.map(e => e.id);
       const uniqueIds = new Set(ids);
       expect(uniqueIds.size).toBe(3);
-    }));
+    });
 
     it('should toggle TOC visibility', () => {
       expect(component.tocVisible).toBe(false);
@@ -165,17 +172,19 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('scroll behavior', () => {
-    it('should scroll to heading when link clicked', fakeAsync(() => {
+    it('should scroll to heading when link clicked', async () => {
       const markdown = '# Test Heading';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
-      // Create a mock element
+      // Create a mock element (jsdom doesn't implement scrollIntoView, so assign it first)
       const mockElement = document.createElement('div');
       mockElement.id = component.tocEntries[0].id;
+      mockElement.scrollIntoView = vi.fn();
       document.body.appendChild(mockElement);
       vi.spyOn(mockElement, 'scrollIntoView');
 
@@ -192,22 +201,24 @@ describe('MarkdownRendererComponent', () => {
       expect(component.activeHeadingId).toBe(component.tocEntries[0].id);
 
       document.body.removeChild(mockElement);
-    }));
+    });
 
-    it('should close TOC on mobile after clicking link', fakeAsync(() => {
+    it('should close TOC on mobile after clicking link', async () => {
       const markdown = '# Test';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       // Mock mobile viewport
       vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(500);
 
-      // Create mock element
+      // Create mock element (jsdom doesn't implement scrollIntoView)
       const mockElement = document.createElement('div');
       mockElement.id = component.tocEntries[0].id;
+      mockElement.scrollIntoView = vi.fn();
       document.body.appendChild(mockElement);
 
       component.tocVisible = true;
@@ -217,7 +228,7 @@ describe('MarkdownRendererComponent', () => {
       expect(component.tocVisible).toBe(false);
 
       document.body.removeChild(mockElement);
-    }));
+    });
 
     it('should scroll to top when scrollToTop called', () => {
       vi.spyOn(window, 'scrollTo');
@@ -227,19 +238,20 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('embedded mode', () => {
-    it('should apply embedded class when embedded is true', fakeAsync(() => {
+    it('should apply embedded class when embedded is true', async () => {
       component.embedded = true;
       component.node = createContentNode('# Test');
       fixture.detectChanges();
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.markdown-wrapper');
       expect(wrapper.classList.contains('embedded')).toBe(true);
-    }));
+    });
   });
 
   describe('lifecycle', () => {
@@ -260,56 +272,60 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('ID generation', () => {
-    it('should generate lowercase IDs', fakeAsync(() => {
+    it('should generate lowercase IDs', async () => {
       const markdown = '# UPPERCASE HEADING';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).toBe(component.tocEntries[0].id.toLowerCase());
-    }));
+    });
 
-    it('should replace spaces with hyphens', fakeAsync(() => {
+    it('should replace spaces with hyphens', async () => {
       const markdown = '# Test Heading Here';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).toContain('-');
       expect(component.tocEntries[0].id).not.toContain(' ');
-    }));
+    });
 
-    it('should remove special characters', fakeAsync(() => {
+    it('should remove special characters', async () => {
       const markdown = '# Test! @Heading#';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).not.toContain('!');
       expect(component.tocEntries[0].id).not.toContain('@');
       expect(component.tocEntries[0].id).not.toContain('#');
-    }));
+    });
 
-    it('should truncate long IDs', fakeAsync(() => {
+    it('should truncate long IDs', async () => {
       const longHeading = '# ' + 'A'.repeat(100);
       component.node = createContentNode(longHeading);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id.length).toBeLessThanOrEqual(50);
-    }));
+    });
   });
 
   describe('GFM support', () => {
-    it('should render task lists', fakeAsync(() => {
+    it('should render task lists', async () => {
       const markdown = `- [ ] Task 1
 - [x] Task 2`;
 
@@ -317,12 +333,13 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should render tables', fakeAsync(() => {
+    it('should render tables', async () => {
       const markdown = `| Header 1 | Header 2 |
 | --- | --- |
 | Cell 1 | Cell 2 |`;
@@ -331,10 +348,11 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
   });
 
   describe('back to top button', () => {
@@ -342,16 +360,15 @@ describe('MarkdownRendererComponent', () => {
       expect(component.showBackToTop).toBe(false);
     });
 
-    it('should show back to top button after scrolling', fakeAsync(() => {
+    it('should show back to top button after scrolling', async () => {
       component.ngAfterViewInit();
-      tick();
 
       // Simulate scroll event
       Object.defineProperty(window, 'scrollY', { value: 400, writable: true });
       window.dispatchEvent(new Event('scroll'));
-      tick();
+      await fixture.whenStable();
 
       expect(component.showBackToTop).toBe(true);
-    }));
+    });
   });
 });

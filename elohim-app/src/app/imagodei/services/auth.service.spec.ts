@@ -64,13 +64,13 @@ describe('AuthService', () => {
   });
 
   beforeEach(() => {
-    // Setup localStorage mock
+    // Setup localStorage mock using Storage.prototype (works reliably in jsdom/vitest)
     localStorageMock = {};
-    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => localStorageMock[key] || null);
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
 
@@ -287,9 +287,9 @@ describe('AuthService', () => {
         password: 'password123',
       });
 
-      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'test-token-123');
-      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY, 'password');
-      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'test@example.com');
+      expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'test-token-123');
+      expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY, 'password');
+      expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'test@example.com');
     });
   });
 
@@ -449,10 +449,10 @@ describe('AuthService', () => {
 
       await service.logout();
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_EXPIRY_KEY);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
+      expect(Storage.prototype.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
+      expect(Storage.prototype.removeItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY);
+      expect(Storage.prototype.removeItem).toHaveBeenCalledWith(AUTH_EXPIRY_KEY);
+      expect(Storage.prototype.removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
     });
 
     it('should handle provider logout error gracefully', async () => {
@@ -468,7 +468,7 @@ describe('AuthService', () => {
       });
 
       // Should not throw, just warn
-      await await expect(service.logout()).resolves.toBeDefined();
+      await expect(service.logout()).resolves.toBeUndefined();
       expect(service.isAuthenticated()).toBe(false);
     });
   });
@@ -584,7 +584,7 @@ describe('AuthService', () => {
 
       expect(result).toBe(false);
       expect(service.isAuthenticated()).toBe(false);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
+      expect(Storage.prototype.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
     });
 
     it('should return false when token missing', () => {
@@ -870,7 +870,7 @@ describe('AuthService', () => {
 
     it('logout should return Promise<void>', async () => {
       const logoutPromise = service.logout();
-      expect(logoutPromise instanceof Promise).toBe(true);
+      expect(typeof logoutPromise.then).toBe('function');
       await logoutPromise;
     });
 

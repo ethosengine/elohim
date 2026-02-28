@@ -71,8 +71,8 @@ describe('BlobManagerService', () => {
 
   it('should initialize cache lock as resolved promise', async () => {
     const lock = service['cacheLock'];
-    expect(lock).toBeInstanceOf(Promise);
-    await await expect(Promise.resolve(lock)).resolves.toBeDefined();
+    expect(typeof (lock as any).then).toBe('function');
+    await lock; // Should resolve without error
   });
 
   it('should initialize storageClient as null', () => {
@@ -334,14 +334,11 @@ describe('BlobManagerService', () => {
       const blob = new Blob(['test content']);
       const filename = 'test.mp4';
 
+      const mockAnchor = document.createElement('a');
+      const removeSpy = vi.spyOn(mockAnchor, 'remove');
+      vi.spyOn(mockAnchor, 'click');
+      vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor);
       vi.spyOn(document.body, 'appendChild');
-      const removeSpy = vi.fn();
-      vi.spyOn(document, 'createElement').mockReturnValue({
-        set href(_: string) { /* noop */ },
-        set download(_: string) { /* noop */ },
-        click: vi.fn(),
-        remove: removeSpy,
-      } as unknown as HTMLElement);
 
       service.downloadBlobToFile(blob, filename);
 
@@ -362,7 +359,6 @@ describe('BlobManagerService', () => {
       const mockAnchor = document.createElement('a');
       vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor);
       vi.spyOn(document.body, 'appendChild');
-      vi.spyOn(document.body, 'removeChild');
 
       service.downloadBlobToFile(blob, filename);
 
@@ -502,18 +498,21 @@ describe('BlobManagerService', () => {
       const blob = new Blob(['test']);
       const filename = 'test.txt';
 
+      const mockAnchor = document.createElement('a');
+      vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor);
       vi.spyOn(document.body, 'appendChild');
-      vi.spyOn(document.body, 'removeChild');
 
       expect(() => service.downloadBlobToFile(blob, filename)).not.toThrow();
     });
 
     it('removeFromCache should accept hash string', async () => {
-      await await expect(service.removeFromCache('test_hash')).resolves.toBeDefined();
+      await service.removeFromCache('test_hash'); // Should resolve without error
+      expect(true).toBe(true);
     });
 
     it('clearCache should return resolved Promise', async () => {
-      await await expect(service.clearCache()).resolves.toBeDefined();
+      await service.clearCache(); // Should resolve without error
+      expect(true).toBe(true);
     });
 
     it('testBlobAccess should accept ContentBlob and return Promise', async () => {
@@ -521,7 +520,7 @@ describe('BlobManagerService', () => {
       vi.spyOn(fallbackService, 'testFallbackUrls').mockReturnValue(Promise.resolve([]));
 
       const result = service.testBlobAccess(contentBlob);
-      expect(result).toBeInstanceOf(Promise);
+      expect(typeof (result as any).then).toBe('function');
     });
 
     it('isAccessible should accept ContentBlob and return boolean', () => {

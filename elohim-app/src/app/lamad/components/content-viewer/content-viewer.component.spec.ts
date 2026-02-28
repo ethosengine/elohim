@@ -14,6 +14,7 @@ import { PathContextService } from '../../services/path-context.service';
 import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
+import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
@@ -61,34 +62,103 @@ describe('ContentViewerComponent', () => {
     pathContextSubject = new Subject();
 
     const affinitySpyObj = {
-    getAffinity: vi.fn(),
-    trackView: vi.fn(),
-    incrementAffinity: vi.fn(),
-    setAffinity']: vi.fn(),
-    { changes$: affinityChangesSubject.asObservable() }
-    );
+      getAffinity: vi.fn().mockReturnValue(0),
+      trackView: vi.fn(),
+      incrementAffinity: vi.fn(),
+      setAffinity: vi.fn(),
+      changes$: affinityChangesSubject.asObservable(),
+      affinity$: of({}),
+      getStats: vi.fn().mockReturnValue({ totalNodes: 0, averageAffinity: 0, engagedNodes: 0, distribution: {}, byCategory: new Map(), byType: new Map() }),
+    };
 
-    const agentSpyObj = { markContentSeen: vi.fn(): vi.fn(), };
-    const contentSpyObj = {
-    getContainingPathsSummary: vi.fn(): vi.fn(), };
+    const agentSpyObj = { markContentSeen: vi.fn().mockReturnValue(of(undefined)) };
+    const contentSpyObj = { getContainingPathsSummary: vi.fn().mockReturnValue(of([])) };
     const dataLoaderSpyObj = {
-    getContent: vi.fn(): vi.fn(), getGovernanceState: vi.fn(): vi.fn(), };
-    const trustBadgeSpyObj = {
-    getBadge: vi.fn(): vi.fn(), };
+      getContent: vi.fn().mockReturnValue(of(mockContentNode)),
+      getGovernanceState: vi.fn().mockReturnValue(of(null)),
+    };
+    const trustBadgeSpyObj = { getBadge: vi.fn().mockReturnValue(of(null)) };
     const governanceSpyObj = {
-    getGovernanceState: vi.fn(): vi.fn(), getChallengesForEntity: vi.fn(): vi.fn(), getDiscussionsForEntity: vi.fn(): vi.fn(), };
-    const editorSpyObj = {
-    canEdit: vi.fn(): vi.fn(), };
+      getGovernanceState: vi.fn().mockReturnValue(of(null)),
+      getChallengesForEntity: vi.fn().mockReturnValue(of([])),
+      getDiscussionsForEntity: vi.fn().mockReturnValue(of([])),
+    };
+    const editorSpyObj = { canEdit: vi.fn().mockReturnValue(false) };
     const pathContextSpyObj = {
-    startDetour: vi.fn(): vi.fn(), returnToPath: vi.fn() };
-    const rendererRegistrySpyObj = { getRenderer: vi.fn(): vi.fn(), };
-    const routerSpyObj = {
-    navigate: vi.fn(): vi.fn(), };
+      startDetour: vi.fn(),
+      returnToPath: vi.fn(),
+      context$: pathContextSubject.asObservable(),
+    };
+    const rendererRegistrySpyObj = { getRenderer: vi.fn().mockReturnValue(null) };
+    // Use a real Router (from provideRouter) so RouterLink directives work;
+    // routerSpy is set after inject below
+    const routerSpyObj = null;
     const seoServiceSpyObj = {
-    updateForContent: vi.fn(): vi.fn(), updateSeo: vi.fn(): vi.fn(), setTitle: vi.fn(): vi.fn(), };
+      updateForContent: vi.fn(),
+      updateSeo: vi.fn(),
+      setTitle: vi.fn(),
+    };
+    const emptyReactionCounts = { total: 0, byType: {}, supportive: 0, critical: 0, neutral: 0 };
+    const governanceSignalSpyObj = {
+      changes$: of(null),
+      signalChanges$: of(null),
+      onEntityUpdate: vi.fn().mockReturnValue(of(null)),
+      getContentSignals: vi.fn().mockReturnValue(of(null)),
+      getReactionCounts: vi.fn().mockReturnValue(of(emptyReactionCounts)),
+      getReactions: vi.fn().mockReturnValue(of([])),
+      recordReaction: vi.fn().mockReturnValue(of(true)),
+      recordMediationProceed: vi.fn().mockReturnValue(of(true)),
+      recordInteractiveCompletion: vi.fn().mockReturnValue(of(true)),
+      checkAttestationTrigger: vi.fn().mockReturnValue(of(null)),
+      recordLearningSignal: vi.fn().mockReturnValue(of(true)),
+      getGraduatedFeedback: vi.fn().mockReturnValue(of([])),
+      recordGraduatedFeedback: vi.fn().mockReturnValue(of(true)),
+      getFeedbackStats: vi.fn().mockReturnValue(of(null)),
+    };
 
     await TestBed.configureTestingModule({
-      imports: [ContentViewerComponent: vi.fn() };
+      imports: [ContentViewerComponent],
+      providers: [
+        provideHttpClient(),
+        provideRouter([]),
+        { provide: AffinityTrackingService, useValue: affinitySpyObj },
+        { provide: AgentService, useValue: agentSpyObj },
+        { provide: ContentService, useValue: contentSpyObj },
+        { provide: DataLoaderService, useValue: dataLoaderSpyObj },
+        { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
+        { provide: GovernanceService, useValue: governanceSpyObj },
+        { provide: ContentEditorService, useValue: editorSpyObj },
+        { provide: PathContextService, useValue: pathContextSpyObj },
+        { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
+        { provide: SeoService, useValue: seoServiceSpyObj },
+        { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: { get: vi.fn().mockReturnValue('test-content-1') } },
+            paramMap: of({ get: (k: string) => k === 'id' ? 'test-content-1' : null }),
+            params: of({ resourceId: 'test-content-1' }),
+            queryParams: of({}),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    affinityServiceSpy = TestBed.inject(AffinityTrackingService);
+    agentServiceSpy = TestBed.inject(AgentService);
+    contentServiceSpy = TestBed.inject(ContentService);
+    dataLoaderSpy = TestBed.inject(DataLoaderService);
+    trustBadgeServiceSpy = TestBed.inject(TrustBadgeService);
+    governanceServiceSpy = TestBed.inject(GovernanceService);
+    editorServiceSpy = TestBed.inject(ContentEditorService);
+    pathContextServiceSpy = TestBed.inject(PathContextService);
+    rendererRegistrySpy = TestBed.inject(RendererRegistryService);
+    routerSpy = TestBed.inject(Router);
+    vi.spyOn(routerSpy, 'navigate').mockResolvedValue(true);
+
+    fixture = TestBed.createComponent(ContentViewerComponent);
+    component = fixture.componentInstance;
+  });
 
   it('should create', () => {
     expect(component).toBeTruthy();

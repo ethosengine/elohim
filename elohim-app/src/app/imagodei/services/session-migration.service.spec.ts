@@ -99,6 +99,8 @@ describe('SessionMigrationService', () => {
 
     mockIdentityService = {
       registerHuman: vi.fn(),
+      mode: vi.fn().mockReturnValue('session'),
+      humanId: vi.fn().mockReturnValue(null),
     };
 
     mockContentMasteryService = {

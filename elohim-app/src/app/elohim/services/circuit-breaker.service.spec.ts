@@ -206,7 +206,7 @@ describe('CircuitBreakerService', () => {
     it('should be async and return Promise', () => {
       const fn = vi.fn().mockResolvedValue('data');
       const result = service.execute('mech-exec-4', fn);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
   });
 
@@ -386,30 +386,26 @@ describe('CircuitBreakerService', () => {
   });
 
   describe('execute - HALF_OPEN state', () => {
-    it('should transition to HALF_OPEN after timeout', fakeAsync(async () => {
+    it('should transition to HALF_OPEN after timeout', async () => {
       const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('halfopen-test', {
         failureThreshold: 2,
-        resetTimeoutMs: 1000,
+        resetTimeoutMs: 100, // Short timeout for testing
       });
 
       // Open the circuit
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      void service.execute('halfopen-test', fn);
-      tick(0);
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      void service.execute('halfopen-test', fn);
-      tick(0);
+      await service.execute('halfopen-test', fn);
+      await service.execute('halfopen-test', fn);
 
       expect(service.getState('halfopen-test')).toBe('OPEN');
 
-      // Wait for reset timeout
-      tick(1100);
+      // Wait for reset timeout to elapse
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Check state should trigger transition
       expect(service.getState('halfopen-test')).toBe('HALF_OPEN');
-    }));
+    });
 
     it('should close circuit after success threshold in HALF_OPEN', async () => {
       const failFn = vi.fn().mockRejectedValue(new Error('fail'));
@@ -481,27 +477,25 @@ describe('CircuitBreakerService', () => {
       expect(stats!.timeSinceStateChange).toBeDefined();
     });
 
-    it('should clean old failures from window', fakeAsync(async () => {
+    it('should clean old failures from window', async () => {
       const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('window-test', {
         failureThreshold: 10,
-        failureWindowMs: 1000,
+        failureWindowMs: 100, // Short window for testing
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      void service.execute('window-test', fn);
-      tick(0);
+      await service.execute('window-test', fn);
 
       let stats = service.getStats('window-test');
       expect(stats!.recentFailures).toBe(1);
 
       // Wait for failure to age out of window
-      tick(1100);
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       stats = service.getStats('window-test');
       expect(stats!.recentFailures).toBe(0);
-    }));
+    });
   });
 
   describe('reset', () => {

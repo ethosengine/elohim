@@ -23,17 +23,17 @@ describe('LoggerService', () => {
     });
     service = TestBed.inject(LoggerService);
 
-    // Spy on console methods
+    // Spy on console methods and clear call history between tests
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.clearAllMocks();
+  });
 
-    vi.spyOn(console, 'debug');
-
-    vi.spyOn(console, 'info');
-
-    vi.spyOn(console, 'warn');
-
-    vi.spyOn(console, 'error');
-
-    vi.spyOn(console, 'log');
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {

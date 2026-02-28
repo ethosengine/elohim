@@ -174,9 +174,8 @@ describe('AppreciationService', () => {
 
       // callZome should only be called for the availability test and once for data
       // (not twice for entity-1)
-      const dataCalls = holochainClientMock.callZome.calls
-        .all()
-        .filter(call => call.args[0].fnName === 'get_appreciations_for');
+      const dataCalls = holochainClientMock.callZome.mock.calls
+        .filter((args: any[]) => args[0].fnName === 'get_appreciations_for');
       expect(dataCalls.length).toBe(2); // availability test + one data fetch
     });
 
@@ -438,11 +437,10 @@ describe('AppreciationService', () => {
       });
 
       // Verify the zome was called again for entity-1
-      const entityCalls = holochainClientMock.callZome.calls
-        .all()
+      const entityCalls = holochainClientMock.callZome.mock.calls
         .filter(
-          call =>
-            call.args[0].fnName === 'get_appreciations_for' && call.args[0].payload === 'entity-1'
+          (args: any[]) =>
+            args[0].fnName === 'get_appreciations_for' && args[0].payload === 'entity-1'
         );
       expect(entityCalls.length).toBe(2); // Before clear + after clear
     });

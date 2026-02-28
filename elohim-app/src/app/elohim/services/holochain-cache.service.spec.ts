@@ -169,7 +169,7 @@ describe('HolochainCacheService', () => {
     });
 
     it('should handle deleting non-existent key', async () => {
-      await await expect(service.delete('non-existent')).resolves.toBeDefined();
+      await expect(service.delete('non-existent')).resolves.not.toThrow();
     });
   });
 
@@ -358,7 +358,7 @@ describe('HolochainCacheService', () => {
       //   3. Emit warning event for monitoring
 
       // Placeholder - can't easily trigger quota errors in unit tests
-      await await expect(service.set('key', 'value')).resolves.toBeDefined();
+      await expect(service.set('key', 'value')).resolves.not.toThrow();
     });
   });
 });

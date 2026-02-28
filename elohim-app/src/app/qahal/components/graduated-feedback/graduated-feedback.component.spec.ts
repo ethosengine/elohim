@@ -34,20 +34,16 @@ describe('GraduatedFeedbackComponent', () => {
   beforeEach(async () => {
     signalChanges$ = new Subject();
     mockSignalService = {
-    recordGraduatedFeedback: vi.fn(),
-    getFeedbackStats']: vi.fn(),
-    {
-        signalChanges$: signalChanges$.asObservable(): vi.fn(),
-    }
-    );
+      recordGraduatedFeedback: vi.fn(),
+      getFeedbackStats: vi.fn(),
+      signalChanges$: signalChanges$.asObservable(),
+    };
     mockSignalService.getFeedbackStats.mockReturnValue(of(mockStats));
     mockSignalService.recordGraduatedFeedback.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
-      imports: [GraduatedFeedbackComponent: vi.fn(),
-    FormsModule]: vi.fn(),
-    providers: [{ provide: GovernanceSignalService: vi.fn(),
-    useValue: mockSignalService }]: vi.fn(),
+      imports: [GraduatedFeedbackComponent, FormsModule],
+      providers: [{ provide: GovernanceSignalService, useValue: mockSignalService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(GraduatedFeedbackComponent);
@@ -59,30 +55,24 @@ describe('GraduatedFeedbackComponent', () => {
     fixture.destroy();
   });
 
-  it('should create: vi.fn(),
-    () => {
+  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('initialization: vi.fn(),
-    () => {
-    it('should have default context as usefulness: vi.fn(),
-    () => {
+  describe('initialization', () => {
+    it('should have default context as usefulness', () => {
       expect(component.context).toBe('usefulness');
     });
 
-    it('should have default intensity of 5: vi.fn(),
-    () => {
+    it('should have default intensity of 5', () => {
       expect(component.intensity).toBe(5);
     });
 
-    it('should have no selected position initially: vi.fn(),
-    () => {
+    it('should have no selected position initially', () => {
       expect(component.selectedPosition).toBeNull();
     });
 
-    it('should load stats when showAggregates is true: vi.fn(),
-    fakeAsync(() => {
+    it('should load stats when showAggregates is true', fakeAsync(() => {
       component.showAggregates = true;
       fixture.detectChanges();
       tick();
@@ -91,8 +81,7 @@ describe('GraduatedFeedbackComponent', () => {
       expect(component.stats).toEqual(mockStats);
     }));
 
-    it('should not load stats when showAggregates is false: vi.fn(),
-    fakeAsync(() => {
+    it('should not load stats when showAggregates is false', fakeAsync(() => {
       component.showAggregates = false;
       fixture.detectChanges();
       tick();
@@ -101,20 +90,13 @@ describe('GraduatedFeedbackComponent', () => {
     }));
   });
 
-  describe('scales: vi.fn(),
-    () => {
-    it('should have 5 contexts defined: vi.fn(),
-    () => {
+  describe('scales', () => {
+    it('should have 5 contexts defined', () => {
       const contexts: FeedbackContext[] = [
-        'accuracy: vi.fn(),
-    usefulness: vi.fn(),
-    proposal: vi.fn(),
-    clarity: vi.fn(),
-    relevance: vi.fn(),
-    ];
+        'accuracy', 'usefulness', 'proposal', 'clarity', 'relevance',
+      ];
       contexts.forEach(ctx => {
-        expect(component.scales[ctx: vi.fn(),
-  }.toBeDefined();
+        expect(component.scales[ctx]).toBeDefined();
       });
     });
 

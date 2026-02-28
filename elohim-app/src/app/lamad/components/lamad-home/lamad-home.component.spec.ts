@@ -20,6 +20,8 @@ describe('LamadHomeComponent', () => {
   let agentService: any;
   let identityService: any;
   let localStorageMock: { [key: string]: string };
+  let localStorageGetItem: ReturnType<typeof vi.fn>;
+  let localStorageSetItem: ReturnType<typeof vi.fn>;
 
   const mockPaths: PathIndexEntry[] = [
     {
@@ -71,13 +73,19 @@ describe('LamadHomeComponent', () => {
     // mode() returns 'anonymous' by default (unauthenticated)
     identityServiceSpy.mode.mockReturnValue('anonymous');
 
-    // Mock localStorage
+    // Mock localStorage with stable vi.fn() references (spyOn native Storage is unreliable)
     localStorageMock = {};
-    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
-      return localStorageMock[key] || null;
-    });
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
-      localStorageMock[key] = value;
+    localStorageGetItem = vi.fn((key: string) => localStorageMock[key] ?? null);
+    localStorageSetItem = vi.fn((key: string, value: string) => { localStorageMock[key] = value; });
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: localStorageGetItem,
+        setItem: localStorageSetItem,
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+      },
+      writable: true,
+      configurable: true,
     });
 
     await TestBed.configureTestingModule({
@@ -107,6 +115,10 @@ describe('LamadHomeComponent', () => {
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   it('should create', () => {
@@ -218,14 +230,14 @@ describe('LamadHomeComponent', () => {
     component.setViewMode('paths');
 
     expect(component.viewMode).toBe('paths');
-    expect(localStorage.setItem).toHaveBeenCalledWith('lamad-view-mode', 'paths');
+    expect(localStorageSetItem).toHaveBeenCalledWith('lamad-view-mode', 'paths');
   });
 
   it('should set view mode to explore and navigate', () => {
     component.setViewMode('explore');
 
     expect(component.viewMode).toBe('explore');
-    expect(localStorage.setItem).toHaveBeenCalledWith('lamad-view-mode', 'explore');
+    expect(localStorageSetItem).toHaveBeenCalledWith('lamad-view-mode', 'explore');
     expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
   });
 

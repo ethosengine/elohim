@@ -300,8 +300,21 @@ describe('AppComponent', () => {
       mockTauriAuth.needsLogin.mockReturnValue(false);
 
       const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance;
+
+      // Spy on the private initializeHolochainConnection so we can verify it was called,
+      // or verify via startBootstrap being called after awaiting it directly.
+      // The Tauri path calls initializeHolochainConnection which calls initializeContentServices.
+      let resolveHolochainInit!: () => void;
+      const holochainInitPromise = new Promise<void>(r => (resolveHolochainInit = r));
+      const origStartBootstrap = mockBlobBootstrap.startBootstrap;
+      mockBlobBootstrap.startBootstrap = vi.fn().mockImplementation(() => {
+        origStartBootstrap();
+        resolveHolochainInit();
+      });
+
       fixture.detectChanges();
-      await fixture.whenStable();
+      await Promise.race([holochainInitPromise, new Promise(r => setTimeout(r, 1000))]);
 
       expect(mockBlobBootstrap.startBootstrap).toHaveBeenCalled();
     });

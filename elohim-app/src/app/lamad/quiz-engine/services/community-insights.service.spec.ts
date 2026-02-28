@@ -36,13 +36,9 @@ describe('CommunityInsightsService', () => {
 
   beforeEach(() => {
     attestationSpy = {
-    getResultsForContext']: vi.fn(),
-    {
-        aggregatableResults: vi.fn().mockReturnValue([: vi.fn(),
-  },
-      }
-    );
-    attestationSpy.getResultsForContext.mockReturnValue([]);
+      getResultsForContext: vi.fn().mockReturnValue([]),
+      aggregatableResults: vi.fn().mockReturnValue([]),
+    };
 
     TestBed.configureTestingModule({
       providers: [

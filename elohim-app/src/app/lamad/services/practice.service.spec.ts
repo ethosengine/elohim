@@ -451,7 +451,7 @@ describe('PracticeService', () => {
         });
       }));
 
-      it('should clear currentChallenge$ on success', fakeAsync(async () => {
+      it('should clear currentChallenge$ on success', async () => {
         // Set a current challenge first
         const challenge = buildChallenge();
         mockBackend.startMasteryChallenge.mockReturnValue(
@@ -463,21 +463,19 @@ describe('PracticeService', () => {
         mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
-        service.submitChallenge('challenge-1', responses, 300).subscribe();
-        tick();
+        await firstValueFrom(service.submitChallenge('challenge-1', responses, 300));
         expect(service.getCurrentChallengeSync()).toBeNull();
-      }));
+      });
 
-      it('should call refreshPool when pool exists and result has challenge', fakeAsync(async () => {
+      it('should call refreshPool when pool exists and result has challenge', async () => {
         await setPoolState();
         mockBackend.refreshPracticePool.mockClear();
         mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
-        service.submitChallenge('challenge-1', responses, 300).subscribe();
-        tick();
+        await firstValueFrom(service.submitChallenge('challenge-1', responses, 300));
         expect(mockBackend.refreshPracticePool).toHaveBeenCalled();
-      }));
+      });
 
       it('should NOT call refreshPool when pool is null', fakeAsync(() => {
         mockBackend.refreshPracticePool.mockClear();

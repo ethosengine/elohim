@@ -41,21 +41,18 @@ describe('ReactionBarComponent', () => {
   beforeEach(async () => {
     signalChanges$ = new Subject();
     mockSignalService = {
-    recordReaction: vi.fn(),
-    getReactionCounts: vi.fn(),
-    recordMediationProceed']: vi.fn(),
-    {
-        signalChanges$: signalChanges$.asObservable(): vi.fn(),
-    }
-    );
+      recordReaction: vi.fn(),
+      getReactionCounts: vi.fn(),
+      recordMediationProceed: vi.fn(),
+      signalChanges$: signalChanges$.asObservable(),
+    };
     mockSignalService.getReactionCounts.mockReturnValue(of(mockReactionCounts));
     mockSignalService.recordReaction.mockReturnValue(of(true));
     mockSignalService.recordMediationProceed.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
-      imports: [ReactionBarComponent]: vi.fn(),
-    providers: [{ provide: GovernanceSignalService: vi.fn(),
-    useValue: mockSignalService }]: vi.fn(),
+      imports: [ReactionBarComponent],
+      providers: [{ provide: GovernanceSignalService, useValue: mockSignalService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ReactionBarComponent);
@@ -67,30 +64,25 @@ describe('ReactionBarComponent', () => {
     fixture.destroy();
   });
 
-  it('should create: vi.fn(),
-    () => {
+  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('initialization: vi.fn(),
-    () => {
-    it('should have default values: vi.fn(),
-    () => {
+  describe('initialization', () => {
+    it('should have default values', () => {
       expect(component.showCounts).toBe(true);
       expect(component.compact).toBe(false);
       expect(component.contentType).toBe('learning-content');
     });
 
-    it('should build available reactions on init: vi.fn(),
-    fakeAsync(() => {
+    it('should build available reactions on init', fakeAsync(() => {
       fixture.detectChanges();
       tick();
 
       expect(component.availableReactions.length).toBeGreaterThan(0);
     }));
 
-    it('should load reaction counts on init: vi.fn(),
-    fakeAsync(() => {
+    it('should load reaction counts on init', fakeAsync(() => {
       fixture.detectChanges();
       tick();
 
@@ -98,29 +90,18 @@ describe('ReactionBarComponent', () => {
       expect(component.reactionCounts).toEqual(mockReactionCounts);
     }));
 
-    it('should have no user reaction initially: vi.fn(),
-    () => {
+    it('should have no user reaction initially', () => {
       expect(component.userReaction).toBeNull();
     });
   });
 
-  describe('reaction types: vi.fn(),
-    () => {
-    it('should have 8 reaction types defined: vi.fn(),
-    () => {
+  describe('reaction types', () => {
+    it('should have 8 reaction types defined', () => {
       const reactionTypes: EmotionalReactionType[] = [
-        'moved: vi.fn(),
-    grateful: vi.fn(),
-    inspired: vi.fn(),
-    hopeful: vi.fn(),
-    grieving: vi.fn(),
-    challenged: vi.fn(),
-    concerned: vi.fn(),
-    uncomfortable: vi.fn(),
-    ];
+        'moved', 'grateful', 'inspired', 'hopeful', 'grieving', 'challenged', 'concerned', 'uncomfortable',
+      ];
       reactionTypes.forEach(type => {
-        expect((component as any).reactionIcons[type: vi.fn(),
-  }.toBeDefined();
+        expect((component as any).reactionIcons[type]).toBeDefined();
       });
     });
 

@@ -56,19 +56,49 @@ describe('MeaningMapComponent', () => {
     affinitySubject = new BehaviorSubject(new Map<string, number>());
 
     const dataLoaderSpyObj = {
-    getContentIndex: vi.fn(),
-  };
+      getContentIndex: vi.fn().mockReturnValue(of({ nodes: mockNodes, totalCount: 3, byType: {} })),
+    };
     const affinitySpyObj = {
-    getAffinity: vi.fn(),
-    getStats']: vi.fn(),
-    {
-        affinity$: affinitySubject.asObservable(): vi.fn(),
-    }
-    );
-    const routerSpyObj = { navigate: vi.fn(): vi.fn(), };
+      getAffinity: vi.fn().mockImplementation((id: string) => {
+        if (id === 'node-1') return 0.6;
+        if (id === 'node-2') return 0.6;
+        if (id === 'node-3') return 0.4;
+        return 0;
+      }),
+      getStats: vi.fn().mockReturnValue({
+        totalNodes: 3,
+        averageAffinity: 0.5,
+        engagedNodes: 2,
+        engagedCount: 2,
+        distribution: { unseen: 1, low: 0, medium: 1, high: 1 },
+        byCategory: new Map([
+          ['core', { category: 'core', nodeCount: 2, engagedCount: 2, averageAffinity: 0.6 }],
+          ['deployment', { category: 'deployment', nodeCount: 1, engagedCount: 0, averageAffinity: 0.4 }],
+        ]),
+        byType: new Map(),
+      }),
+      affinity$: affinitySubject.asObservable(),
+      changes$: of(null),
+    };
+    const routerSpyObj = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [MeaningMapComponent: vi.fn() };
+      imports: [MeaningMapComponent],
+      providers: [
+        provideHttpClient(),
+        { provide: DataLoaderService, useValue: dataLoaderSpyObj },
+        { provide: AffinityTrackingService, useValue: affinitySpyObj },
+        { provide: Router, useValue: routerSpyObj },
+      ],
+    }).compileComponents();
+
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as any;
+    affinityServiceSpy = TestBed.inject(AffinityTrackingService) as any;
+    routerSpy = TestBed.inject(Router) as any;
+
+    fixture = TestBed.createComponent(MeaningMapComponent);
+    component = fixture.componentInstance;
+  });
 
   it('should create', () => {
     expect(component).toBeTruthy();

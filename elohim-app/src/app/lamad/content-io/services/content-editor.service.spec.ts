@@ -386,13 +386,14 @@ describe('ContentEditorService', () => {
 
       service.saveContent(draft.id).subscribe({
         next: () => {
-          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledOnceWith(
+          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledWith(
             expect.objectContaining({
               actionType: 'content-create',
               contentType: 'concept',
               contentFormat: 'markdown',
             })
           );
+          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledTimes(1);
           done();
         },
         error: done.fail,

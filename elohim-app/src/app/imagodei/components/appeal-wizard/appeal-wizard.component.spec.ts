@@ -399,6 +399,8 @@ describe('AppealWizardComponent', () => {
       component.grant.set(mockGrant);
       component.appealType.set('excessive');
       component.selectedGrounds.set(['Restrictions are too strict']);
+      // Reset mock return value in case a previous test overrode it
+      mockStewardshipService.fileAppeal.mockReturnValue(Promise.resolve(mockAppeal));
     });
 
     it('should not submit without grant', async () => {
@@ -454,8 +456,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.mock.lastCall;
-      const input = call.args[0];
+      const input = mockStewardshipService.fileAppeal.mock.lastCall![0];
       const evidence = JSON.parse(input.evidenceJson);
 
       expect(evidence.description).toBe('Evidence details');
@@ -531,8 +532,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.mock.lastCall;
-      const grounds = call.args[0].grounds;
+      const grounds = mockStewardshipService.fileAppeal.mock.lastCall![0].grounds;
 
       expect(grounds[grounds.length - 1]).toBe('Custom ground');
     });
@@ -543,9 +543,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.mock.lastCall;
-
-      expect(call.args[0].grounds).toEqual(['Ground 1']);
+      expect(mockStewardshipService.fileAppeal.mock.lastCall![0].grounds).toEqual(['Ground 1']);
     });
   });
 

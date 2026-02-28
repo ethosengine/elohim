@@ -656,7 +656,7 @@ describe('Practice Model', () => {
 
       expect(activeIds).toEqual(['content-1', 'content-2', 'content-3']);
       expect(refreshIds).toEqual(['stale-1', 'stale-2']);
-      expect(discoveries).toHaveSize(1);
+      expect(discoveries.length).toBe(1);
       expect(discoveries[0].content_id).toBe('discovery-1');
     });
 
@@ -737,11 +737,11 @@ describe('Practice Model', () => {
       const parsedLevelChanges = parseLevelChanges(challenge.level_changes_json);
       const parsedDiscoveries = parseDiscoveries(challenge.discoveries_json);
 
-      expect(parsedMix).toHaveSize(3);
-      expect(parsedQuestions).toHaveSize(2);
-      expect(parsedResponses).toHaveSize(2);
-      expect(parsedLevelChanges).toHaveSize(1);
-      expect(parsedDiscoveries).toHaveSize(1);
+      expect(parsedMix.length).toBe(3);
+      expect(parsedQuestions.length).toBe(2);
+      expect(parsedResponses.length).toBe(2);
+      expect(parsedLevelChanges.length).toBe(1);
+      expect(parsedDiscoveries.length).toBe(1);
 
       expect(parsedMix[0].source).toBe('path_active');
       expect(parsedQuestions[0].question_text).toBe('Question 1?');

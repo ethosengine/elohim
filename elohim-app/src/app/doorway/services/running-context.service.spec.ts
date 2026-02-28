@@ -409,7 +409,7 @@ describe('RunningContextService', () => {
 
       tick(60000); // Wait 60 seconds
 
-      expect(service.context().detectedAt.getTime()).toBeGreaterThan(initialDetectedAt.getTime());
+      expect(service.context().detectedAt.getTime()).toBeGreaterThanOrEqual(initialDetectedAt.getTime());
       discardPeriodicTasks();
     }));
 

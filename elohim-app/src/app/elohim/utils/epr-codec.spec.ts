@@ -94,7 +94,9 @@ describe('epr-codec', () => {
     });
 
     it('should return false for raw CID', async () => {
-      const data = new TextEncoder().encode('test');
+      // Use a pre-encoded byte sequence to avoid Zone.js TextEncoder patching issues
+      // These are the UTF-8 bytes for 'test': t=116, e=101, s=115, t=116
+      const data = new Uint8Array([116, 101, 115, 116]);
       const hash = await sha256.digest(data);
       const rawCid = CID.create(1, 0x55, hash);
       expect(isDagCborCid(rawCid)).toBe(false);

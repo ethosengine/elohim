@@ -219,14 +219,19 @@ describe('AgencyBadgeComponent', () => {
     it('should copy text to clipboard', async () => {
       const mockEvent = new MouseEvent('click');
       vi.spyOn(mockEvent, 'stopPropagation');
-      vi.spyOn(navigator.clipboard, 'writeText').mockReturnValue(
-        Promise.resolve()
-      );
+
+      // jsdom doesn't implement navigator.clipboard — define a mock
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: writeTextMock },
+        writable: true,
+        configurable: true,
+      });
 
       await component.copyToClipboard('test-value', mockEvent);
 
       expect(mockEvent.stopPropagation).toHaveBeenCalled();
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('test-value');
+      expect(writeTextMock).toHaveBeenCalledWith('test-value');
     });
   });
 
