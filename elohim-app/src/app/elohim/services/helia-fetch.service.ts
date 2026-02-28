@@ -11,10 +11,12 @@
  * skip directly to the HTTP fallback.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
+
+import { type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 
 import { StorageClientService } from './storage-client.service';
 
@@ -25,7 +27,7 @@ type VerifiedFetchFn = (input: string) => Promise<Response>;
 const HELIA_TIMEOUT_MS = 5000;
 
 @Injectable({ providedIn: 'root' })
-export class HeliaFetchService {
+export class HeliaFetchService implements IBlobFetcher {
   private readonly http = inject(HttpClient);
   private readonly storageClient = inject(StorageClientService);
 

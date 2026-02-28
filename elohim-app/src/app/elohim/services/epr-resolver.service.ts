@@ -19,6 +19,10 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, of, switchMap, map, catchError } from 'rxjs';
 
+import {
+  type IEprContentResolver,
+  type IEprUriResolver,
+} from '../interfaces/epr-resolver.interface';
 import { decodeEprHead } from '../utils/epr-codec';
 import { type EprRef, parseEpr, eprToRoute } from '../utils/epr-ref';
 
@@ -84,7 +88,7 @@ export interface CrossPathMatch {
 }
 
 @Injectable({ providedIn: 'root' })
-export class EprResolverService {
+export class EprResolverService implements IEprUriResolver, IEprContentResolver {
   private readonly http = inject(HttpClient);
   private readonly storage = inject(StorageClientService);
 
@@ -218,13 +222,18 @@ export class EprResolverService {
     const base = this.storage.getStorageBaseUrl();
     const url = `${base}/epr-head/${encodeURIComponent(ref.id)}`;
 
-    return this.http.get(url, { responseType: 'arraybuffer' }).pipe(
-      map(buffer => {
-        const bytes = new Uint8Array(buffer);
-        return decodeEprHead(bytes);
-      }),
-      catchError(() => of(null))
-    );
+    return this.http
+      .get(url, {
+        responseType: 'arraybuffer',
+        headers: { Accept: 'application/vnd.ipld.dag-cbor' },
+      })
+      .pipe(
+        map(buffer => {
+          const bytes = new Uint8Array(buffer);
+          return decodeEprHead(bytes);
+        }),
+        catchError(() => of(null))
+      );
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────

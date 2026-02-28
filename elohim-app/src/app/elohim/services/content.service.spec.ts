@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { ContentService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
-import { HeliaFetchService } from './helia-fetch.service';
+import { BLOB_FETCHER } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
@@ -59,8 +59,8 @@ describe('ContentService', () => {
     mockStorageClient = jasmine.createSpyObj('StorageClientService', ['getBlobUrl']);
     mockStorageClient.getBlobUrl.and.callFake((hash: string) => `/blob/${hash}`);
 
-    const mockHeliaFetch = jasmine.createSpyObj('HeliaFetchService', ['fetchVerified']);
-    mockHeliaFetch.fetchVerified.and.callFake((cid: string) => {
+    const mockBlobFetcher = jasmine.createSpyObj('IBlobFetcher', ['fetchVerified']);
+    mockBlobFetcher.fetchVerified.and.callFake((cid: string) => {
       if (cid.includes('failblob')) {
         return Promise.reject(new Error('Blob not found'));
       }
@@ -73,7 +73,7 @@ describe('ContentService', () => {
         ContentService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
-        { provide: HeliaFetchService, useValue: mockHeliaFetch },
+        { provide: BLOB_FETCHER, useValue: mockBlobFetcher },
       ],
     });
 
@@ -211,7 +211,7 @@ describe('ContentService', () => {
       });
       tick();
 
-      // HeliaFetchService mock rejects for 'failblob' — service should fall back
+      // Blob fetcher mock rejects for 'failblob' — service should fall back
       expect(result).toBeTruthy();
       expect(result!.id).toBe('test-content-1');
     }));

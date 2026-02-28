@@ -20,9 +20,9 @@ import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath, PathStep } from '../../lamad/models/learning-path.model';
+import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
-import { HeliaFetchService } from './helia-fetch.service';
 import { StorageClientService } from './storage-client.service';
 
 import type { KnowledgeMap, KnowledgeMapType } from '../../lamad/models/knowledge-map.model';
@@ -286,7 +286,7 @@ interface RawPathExtensionData {
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
   private readonly storageClient = inject(StorageClientService);
-  private readonly heliaFetch = inject(HeliaFetchService);
+  private readonly blobFetcher: IBlobFetcher = inject(BLOB_FETCHER);
   private readonly http = inject(HttpClient);
 
   // In-memory cache for hot paths
@@ -365,8 +365,8 @@ export class ContentService {
     const cached = this.blobCache.get(normalizedCid);
     if (cached) return cached;
 
-    // Use Helia verified-fetch with HTTP fallback (handles CID gating internally)
-    const obs = from(this.heliaFetch.fetchVerified(normalizedCid)).pipe(
+    // Use blob fetcher (Helia verified-fetch with HTTP fallback, handles CID gating internally)
+    const obs = from(this.blobFetcher.fetchVerified(normalizedCid)).pipe(
       map(bytes => new TextDecoder().decode(bytes)),
       shareReplay(1)
     );

@@ -45,6 +45,9 @@ export type {
   CrossPathMatch,
 } from './epr-resolver.service';
 
+// Helia blob fetch (IBlobFetcher implementation)
+export { HeliaFetchService } from './helia-fetch.service';
+
 // Cross-pillar services (formerly in shared/)
 export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';

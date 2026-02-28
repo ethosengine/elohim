@@ -14,6 +14,9 @@
  * - Shared UI components (App Shell, Graph visualizations)
  */
 
+// Interfaces (abstract contracts for IoC)
+export * from './interfaces';
+
 // Models
 export * from './models';
 
