@@ -667,7 +667,7 @@ VEOF
                     dir('elohim-app') {
                         script {
                             echo 'Running Angular tests with coverage'
-                            sh 'pnpm run test -- --watch=false --browsers=ChromeHeadless --code-coverage'
+                            sh 'pnpm exec ng test --watch=false --browsers=ChromeHeadless --code-coverage'
                         }
                     }
                 }
