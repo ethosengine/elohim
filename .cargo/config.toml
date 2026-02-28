@@ -1,0 +1,6 @@
+# Limit concurrent rustc processes to prevent RAM spikes during builds.
+# Default (nproc) spawns 24 parallel compilations, each ~100MB+, causing OOM
+# in 18GB containers when combined with rust-analyzer (~8.8GB).
+# 4 jobs keeps peak compilation RAM under ~400MB per project.
+[build]
+jobs = 4

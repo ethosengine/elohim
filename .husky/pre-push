@@ -175,6 +175,34 @@ run_gate() {
   return $rc
 }
 
+# ── Resource Guard ────────────────────────────────────────────────
+#
+# Pause rust-analyzer during gate runs to free ~8.8GB of active RAM.
+# SIGSTOP freezes the process (no new allocations, OS can reclaim pages).
+# SIGCONT resumes on any exit — normal, error, or signal.
+
+RA_PIDS=""
+if command -v pgrep >/dev/null 2>&1; then
+  RA_PIDS=$(pgrep -f rust-analyzer 2>/dev/null || true)
+fi
+
+resume_rust_analyzer() {
+  if [ -n "$RA_PIDS" ]; then
+    for pid in $RA_PIDS; do
+      kill -CONT "$pid" 2>/dev/null || true
+    done
+  fi
+}
+
+if [ -n "$RA_PIDS" ]; then
+  RA_COUNT=$(echo "$RA_PIDS" | wc -l | tr -d ' ')
+  echo "  Pausing $RA_COUNT rust-analyzer process(es) to free RAM..."
+  for pid in $RA_PIDS; do
+    kill -STOP "$pid" 2>/dev/null || true
+  done
+  trap resume_rust_analyzer EXIT INT TERM HUP
+fi
+
 # ── Run Gates ─────────────────────────────────────────────────────
 
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -w | tr -d ' ')
