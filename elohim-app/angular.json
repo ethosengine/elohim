@@ -193,7 +193,10 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "exclude": [
+              "src/**/*.vitest.spec.ts"
+            ]
           }
         }
       }

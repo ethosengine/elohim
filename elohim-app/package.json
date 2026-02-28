@@ -18,6 +18,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --code-coverage",
+    "test:vitest": "vitest run --config vite.config.ts",
+    "test:vitest:watch": "vitest --config vite.config.ts",
     "posttest": "python3 scripts/update-coverage-annotations.py",
     "test:headless": "ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
     "posttest:headless": "python3 scripts/update-coverage-annotations.py",
@@ -92,6 +94,8 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.3.0",
+    "@analogjs/vitest-angular": "^2.3.0",
     "@angular-devkit/build-angular": "^19.2.15",
     "@angular-eslint/eslint-plugin": "^19.3.0",
     "@angular-eslint/eslint-plugin-template": "^19.3.0",
@@ -104,6 +108,7 @@
     "@types/jasmine": "~5.1.0",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
     "@typescript-eslint/parser": "^8.50.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -113,6 +118,7 @@
     "eslint-plugin-unicorn": "^62.0.0",
     "husky": "^9.1.7",
     "jasmine-core": "~5.6.0",
+    "jsdom": "^28.1.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.0",
@@ -124,6 +130,8 @@
     "stylelint": "^17.0.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "typescript": "~5.7.2",
-    "typescript-eslint": "^8.50.1"
+    "typescript-eslint": "^8.50.1",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.0.18"
   }
 }
