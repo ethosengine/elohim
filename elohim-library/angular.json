@@ -99,6 +99,28 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n"
         },
+        "storybook": {
+          "builder": "@storybook/angular:start-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "elohim-ui-playground:build",
+            "tsConfig": "tsconfig.storybook.json",
+            "port": 6006,
+            "host": "0.0.0.0",
+            "open": false,
+            "compodoc": false
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular:build-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "elohim-ui-playground:build",
+            "tsConfig": "tsconfig.storybook.json",
+            "outputDir": "dist/storybook",
+            "compodoc": false
+          }
+        },
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
