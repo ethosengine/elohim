@@ -229,8 +229,8 @@ impl PathService {
             )));
         }
 
-        // Validate visibility
-        let valid_visibility = ["public", "private", "unlisted", "draft"];
+        // Validate visibility — aligned with healing.rs PATH_VISIBILITIES
+        let valid_visibility = ["public", "private", "unlisted", "draft", "intimate", "community"];
         if !valid_visibility.contains(&input.visibility.as_str()) {
             return Err(StorageError::InvalidInput(format!(
                 "visibility '{}' is not valid. Valid values: {:?}",

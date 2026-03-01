@@ -217,12 +217,14 @@ impl ContentService {
             // Just warn, don't reject - be permissive
         }
 
-        // Validate content_format
+        // Validate content_format — aligned with healing.rs CONTENT_FORMATS
         let valid_formats = [
             "markdown",
             "html",
             "json",
             "text",
+            "plaintext",
+            "plain",
             "perseus",
             "perseus-json",
             "perseus-quiz-json",
@@ -236,6 +238,14 @@ impl ContentService {
             "html5-app",
             "iframe",
             "embed",
+            "video",
+            "audio",
+            "interactive",
+            "external",
+            "video-embed",
+            "audio-file",
+            "human-json",
+            "organization-json",
         ];
         if !valid_formats.contains(&input.content_format.as_str()) {
             return Err(StorageError::InvalidInput(format!(
@@ -244,9 +254,22 @@ impl ContentService {
             )));
         }
 
-        // Validate reach level
+        // Validate reach level — protocol spec (8 levels) + legacy for backward compat
         let valid_reach = [
-            "public", "commons", "regional", "local", "private", "invited",
+            // Protocol spec (social/relational hierarchy)
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "community",
+            "public",
+            "commons",
+            // Legacy values (backward compat with existing stored data)
+            "regional",
+            "local",
+            "invited",
+            "federated",
         ];
         if !valid_reach.contains(&input.reach.as_str()) {
             return Err(StorageError::InvalidInput(format!(

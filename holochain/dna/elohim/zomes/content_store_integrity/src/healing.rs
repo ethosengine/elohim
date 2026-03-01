@@ -87,6 +87,7 @@ pub const CONTENT_FORMATS: &[&str] = &[
 
 pub const PATH_VISIBILITIES: &[&str] = &[
     "private",   // Only creator
+    "intimate",  // Mutual-attestation paths (e.g. love-map)
     "unlisted",  // Accessible by link
     "community", // Community members
     "public",    // Anyone
