@@ -27,6 +27,10 @@ The title, the subject, how it relates to other content. Think of this as the la
 
 Which humans steward this content — the nearest responsible caretakers — and how recognition flows to them. This is like the stewardship record on a community resource — except the system enforces it. You can't circulate the knowledge without the system knowing who to recognize.
 
+When someone accesses this content, a small economic event is recorded — not a financial transaction, but a protocol-level acknowledgment that serving knowledge generates value for those who care for it. Recognition flows proportionally to each steward based on their allocation (Alice 60%, Bob 40%, for example).
+
+The value isn't denominated in a single currency. It flows through multiple channels depending on the *kind* of contribution: a learning token for educational content, a care token for community support, a steward token for maintaining resources. Each community defines its own circulation rules — how fast tokens move, how much can accumulate, what thresholds matter — through their constitutional documents. This is the bridge between the content link you're looking at and the REA (Resource-Event-Agent) economic layer that tracks real contributions.
+
 ### 3. What rules apply (Governance)
 
 Is this content personal (just for you)? Shared with trusted friends? Open to a community? Available to everyone? These aren't permissions bolted on after the fact — they're baked into the link itself.
@@ -92,8 +96,9 @@ Every piece of content has a small metadata envelope — about 500 bytes, small 
 |   Tags: economics, fairness                       |
 |                                                    |
 | Stewardship:                                      |
-|   Steward: Alice                                  |
-|   Recognition: 100% to Alice                      |
+|   Steward: Alice (60%), Bob (40%)                 |
+|   Token type: learning                            |
+|   Recognition flows on delivery                   |
 |                                                    |
 | Governance:                                       |
 |   Access: open to everyone                        |
@@ -183,6 +188,8 @@ Technical terms used in the codebase, explained in plain language.
 | **Helia** | A browser-side library that verifies content fingerprints. Makes sure what you downloaded is what was promised. |
 | **IPFS / IPLD** | Peer-to-peer content sharing standards that the Elohim Protocol builds on. IPFS moves content between computers; IPLD structures how content relates to other content. |
 | **Lamad** | Hebrew for "to learn." The knowledge pillar — what content IS and how it connects to other content. |
+| **REA** | Resource-Event-Agent — an accounting pattern where economic activity is tracked as events (someone did something with a resource). The protocol uses REA to record when content is served and recognition flows to stewards. |
+| **Recognition event** | The economic event created when content is delivered — acknowledgment that serving knowledge generates value. Not a financial transaction, but a protocol-level signal that flows to stewards. |
 | **Qahal** | Hebrew for "assembly." The governance pillar — what rules and access levels apply to content. |
 | **Shefa** | Hebrew for "abundance." The value pillar — who stewards content and how recognition flows. |
 | **Three pillars** | The requirement that every content link carries knowledge context, value context, and governance context simultaneously. |
