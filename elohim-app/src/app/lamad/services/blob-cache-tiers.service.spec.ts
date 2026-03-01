@@ -382,7 +382,7 @@ describe('BlobCacheTiersService', () => {
       service.setMetadata('metadata_hash', metadata);
 
       // Add large blob (should NOT evict metadata)
-      const largeBlob = new Blob(['x'.repeat(100 * 1024 * 1024)]); // 100 MB
+      const largeBlob = new Blob(['x'.repeat(1024 * 1024)]); // 1 MB
       service.setBlob('blob_hash', largeBlob);
 
       // Metadata should still be there

@@ -287,9 +287,10 @@ describe('Html5AppFormatPlugin', () => {
       });
 
       it('should warn on large files', async () => {
-        // Create a mock file with size > 100MB
-        const largeContent = new ArrayBuffer(101 * 1024 * 1024);
-        const file = new File([largeContent], 'large-app.zip', { type: 'application/zip' });
+        // Create a mock file that reports size > 100MB without allocating real memory
+        const smallContent = new ArrayBuffer(1024);
+        const file = new File([smallContent], 'large-app.zip', { type: 'application/zip' });
+        Object.defineProperty(file, 'size', { value: 101 * 1024 * 1024 });
 
         const result = await plugin.validate(file);
 

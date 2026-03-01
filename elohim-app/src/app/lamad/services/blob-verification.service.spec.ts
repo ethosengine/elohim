@@ -512,11 +512,11 @@ describe('BlobVerificationService', () => {
     });
 
     it('should handle custom chunk sizes', async () => {
-      const testData = new TextEncoder().encode('a'.repeat(2 * 1024 * 1024)); // 2 MB
+      const testData = new TextEncoder().encode('a'.repeat(64 * 1024)); // 64 KB
       const blob = new Blob([testData]);
 
-      const smallChunkHash = await service.streamComputeHash(blob, 256 * 1024); // 256 KB chunks
-      const largeChunkHash = await service.streamComputeHash(blob, 2 * 1024 * 1024); // 2 MB chunk
+      const smallChunkHash = await service.streamComputeHash(blob, 16 * 1024); // 16 KB chunks
+      const largeChunkHash = await service.streamComputeHash(blob, 64 * 1024); // 64 KB chunk
 
       // Same content should produce same hash regardless of chunk size
       expect(smallChunkHash).toEqual(largeChunkHash);

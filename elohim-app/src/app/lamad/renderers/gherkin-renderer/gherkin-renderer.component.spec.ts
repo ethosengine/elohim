@@ -22,6 +22,7 @@ describe('GherkinRendererComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [GherkinRendererComponent],
+      teardown: { destroyAfterEach: false },
     }).compileComponents();
 
     fixture = TestBed.createComponent(GherkinRendererComponent);

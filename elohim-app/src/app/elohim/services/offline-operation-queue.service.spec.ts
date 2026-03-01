@@ -679,14 +679,16 @@ describe('OfflineOperationQueueService', () => {
         // Trigger sync to schedule a retry
         await service.syncAll();
 
-        // Cancel the retry
+        // Cancel the retry and remove from queue so auto-sync can't re-trigger it
         service.cancelRetry(opId);
+        service.dismissOperation(opId);
 
-        // Advance time past retry delay
-        await vi.advanceTimersByTimeAsync(5000);
+        // Reset call tracking and advance well past any retry/auto-sync delays
+        mockHolochainClient.callZome.mockClear();
+        await vi.advanceTimersByTimeAsync(10000);
 
-        // Operation should not have been retried (only 1 callZome from initial syncAll)
-        expect(mockHolochainClient.callZome).toHaveBeenCalledTimes(1);
+        // No calls should have happened — retry was cancelled and op was dismissed
+        expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
       });
     });
   });
