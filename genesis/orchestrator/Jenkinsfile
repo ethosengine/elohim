@@ -670,6 +670,13 @@ spec:
 ═══════════════════════════════════════════════════════════════════════════════
                         """
 
+                        // Check for [skip ci] in commit message
+                        def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
+                        if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
+                            echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
+                            env.SKIP_CI = 'true'
+                        }
+
                         // Milestone 2: Abort older builds that reach this point after checkout
                         milestone(ordinal: 2, label: 'Checkout Complete')
                     }
@@ -678,6 +685,7 @@ spec:
         }
 
         stage('Pre-flight Health Check') {
+            when { expression { env.SKIP_CI != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -705,6 +713,7 @@ spec:
         }
 
         stage('Determine Build Plan') {
+            when { expression { env.SKIP_CI != 'true' } }
             steps {
                 container('builder') {
                     script {
