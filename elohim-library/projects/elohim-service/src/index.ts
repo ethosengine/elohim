@@ -38,9 +38,6 @@ export * from './services/relationship-extractor.service';
 export * from './services/manifest.service';
 export * from './services/import-pipeline.service';
 
-// Database
-export * from './db';
-
 // Cache (framework-agnostic reach-aware caching)
 export * from './cache';
 

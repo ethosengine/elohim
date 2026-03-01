@@ -16,7 +16,6 @@ jest.mock('../services/standards.service');
 jest.mock('../services/trust.service');
 jest.mock('../services/human.service');
 jest.mock('../services/scaffold.service');
-jest.mock('../db/kuzu-client');
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -64,15 +63,14 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('-f, --full', 'Full import', false)
         .option('-v, --verbose', 'Verbose', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: options.full ? 'full' : 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             verbose: options.verbose,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -87,7 +85,7 @@ describe('CLI import commands', () => {
         expect.objectContaining({
           mode: 'incremental',
           sourceDir: expect.stringContaining('docs/content'),
-          dbPath: expect.stringContaining('lamad.kuzu'),
+          outputDir: expect.stringContaining('lamad'),
           verbose: false
         })
       );
@@ -109,13 +107,12 @@ describe('CLI import commands', () => {
         .command('import')
         .option('-f, --full', 'Full import', false)
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           await runImportPipeline({
             mode: options.full ? 'full' : 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -147,13 +144,12 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -185,14 +181,13 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('-v, --verbose', 'Verbose', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             verbose: options.verbose,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -225,14 +220,13 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('--dry-run', 'Dry run', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             dryRun: options.dryRun,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -265,14 +259,13 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('--skip-relationships', 'Skip relationships', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             skipRelationships: options.skipRelationships,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -327,13 +320,12 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           const result = await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -357,7 +349,7 @@ describe('CLI import commands', () => {
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           try {
             await runImportPipeline({
@@ -630,81 +622,4 @@ describe('CLI import commands', () => {
     });
   });
 
-  describe('db:init command', () => {
-    it('should initialize Kuzu database from JSON data', async () => {
-      // Arrange
-      const { KuzuClient } = require('../db/kuzu-client');
-
-      const mockClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(10),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(5),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 10, RELATES_TO: 5 }),
-        close: jest.fn()
-      };
-
-      KuzuClient.mockImplementation(() => mockClient);
-
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(JSON.stringify([
-        { id: 'node-1', contentType: 'epic', title: 'Test' }
-      ]));
-
-      program
-        .command('db:init')
-        .option('-i, --input <dir>', 'Input directory', './output/lamad')
-        .option('-o, --output <file>', 'Output database', './output/lamad.kuzu')
-        .option('--force', 'Overwrite existing', false)
-        .action(async (options) => {
-          const client = new KuzuClient(path.resolve(options.output));
-          await client.initialize();
-
-          const nodesPath = path.join(path.resolve(options.input), 'nodes.json');
-          if (fs.existsSync(nodesPath)) {
-            const nodes = JSON.parse(fs.readFileSync(nodesPath, 'utf-8'));
-            await client.bulkInsertContentNodes(nodes);
-          }
-
-          const stats = await client.getStats();
-          console.log(`Inserted ${stats.ContentNode} nodes`);
-          client.close();
-        });
-
-      // Act
-      await program.parseAsync(['node', 'test', 'db:init']);
-
-      // Assert
-      expect(mockClient.initialize).toHaveBeenCalled();
-      expect(mockClient.bulkInsertContentNodes).toHaveBeenCalled();
-      expect(mockClient.close).toHaveBeenCalled();
-    });
-
-    it('should prevent overwriting existing database without --force', async () => {
-      // Arrange
-      mockFs.existsSync.mockReturnValue(true);
-
-      program
-        .command('db:init')
-        .option('-i, --input <dir>', 'Input directory', './output/lamad')
-        .option('-o, --output <file>', 'Output database', './output/lamad.kuzu')
-        .option('--force', 'Overwrite existing', false)
-        .action(async (options) => {
-          const dbPath = path.resolve(options.output);
-
-          if (fs.existsSync(dbPath) && !options.force) {
-            console.error(`Database already exists at ${dbPath}. Use --force to overwrite.`);
-            process.exit(1);
-          }
-        });
-
-      // Act & Assert
-      await expect(
-        program.parseAsync(['node', 'test', 'db:init'])
-      ).rejects.toThrow('process.exit(1)');
-
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining('already exists')
-      );
-    });
-  });
 });

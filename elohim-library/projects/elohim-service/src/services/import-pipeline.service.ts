@@ -14,7 +14,6 @@ import * as path from 'path';
 
 import { glob } from 'glob';
 
-import { KuzuClient } from '../db/kuzu-client';
 import { ContentNode, ContentRelationship } from '../models/content-node.model';
 import {
   ImportOptions,
@@ -179,19 +178,11 @@ export async function runImportPipeline(options: ImportOptions): Promise<ImportR
       console.log(`Extracted ${relationships.length} relationships`);
     }
 
-    // 9. Write to Kuzu database
+    // 9. Save manifest for incremental tracking
     context.stage = 'writing';
-    if (!options.dryRun) {
-      if (!options.dbPath) {
-        throw new Error('dbPath is required. Use --db to specify the Kuzu database path.');
-      }
-      await writeToKuzu(mergedNodes, relationships, options.dbPath);
-
-      // Save manifest for incremental tracking
-      if (context.previousManifest) {
-        context.previousManifest.totalRelationships = relationships.length;
-        saveManifest(context.previousManifest, options.outputDir);
-      }
+    if (!options.dryRun && context.previousManifest) {
+      context.previousManifest.totalRelationships = relationships.length;
+      saveManifest(context.previousManifest, options.outputDir);
     }
 
     // 10. Build result
@@ -401,53 +392,6 @@ function mergeNodes(existing: ContentNode[], newNodes: ContentNode[]): ContentNo
 }
 
 /**
- * Write to Kuzu database (new primary flow)
- */
-async function writeToKuzu(
-  nodes: ContentNode[],
-  relationships: ContentRelationship[],
-  dbPath: string
-): Promise<void> {
-  console.log(`\nWriting to Kuzu database: ${dbPath}`);
-
-  const client = new KuzuClient(dbPath);
-  await client.initialize();
-
-  try {
-    // Deduplicate nodes by ID
-    const seenIds = new Set<string>();
-    const uniqueNodes = nodes.filter(node => {
-      if (seenIds.has(node.id)) {
-        return false;
-      }
-      seenIds.add(node.id);
-      return true;
-    });
-
-    console.log(`  Found ${nodes.length} nodes, ${uniqueNodes.length} unique`);
-
-    // Insert content nodes
-    const insertedNodes = await client.bulkInsertContentNodes(uniqueNodes);
-    console.log(`  Inserted ${insertedNodes} content nodes`);
-
-    // Insert relationships
-    const insertedRels = await client.bulkInsertRelationships(relationships);
-    console.log(`  Inserted ${insertedRels} relationships`);
-
-    // Show stats
-    const stats = await client.getStats();
-    console.log('\n  Database Statistics:');
-    for (const [table, count] of Object.entries(stats)) {
-      if (count > 0) {
-        console.log(`    ${table}: ${count}`);
-      }
-    }
-  } finally {
-    client.close();
-  }
-}
-
-/**
  * Generate import summary for logging
  */
 function _generateSummary(
@@ -501,8 +445,7 @@ function _generateSummary(
 export async function importContent(
   sourceDir: string,
   outputDir: string,
-  incremental = true,
-  dbPath?: string
+  incremental = true
 ): Promise<ImportResult> {
   return runImportPipeline({
     mode: incremental ? 'incremental' : 'full',
@@ -511,7 +454,5 @@ export async function importContent(
     generateSourceNodes: true,
     generateDerivedNodes: true,
     verbose: true,
-    dbPath,
-    dryRun: !dbPath,
   });
 }

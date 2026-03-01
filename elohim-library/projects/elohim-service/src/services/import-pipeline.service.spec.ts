@@ -10,13 +10,11 @@ import { runImportPipeline, importContent } from './import-pipeline.service';
 import { ImportOptions, ImportResult } from '../models/import-context.model';
 import { ContentNode } from '../models/content-node.model';
 import * as manifestService from './manifest.service';
-import { KuzuClient } from '../db/kuzu-client';
 
 // Mock dependencies
 jest.mock('fs');
 jest.mock('glob');
 jest.mock('./manifest.service');
-jest.mock('../db/kuzu-client');
 jest.mock('../parsers/path-metadata-parser');
 jest.mock('../parsers/markdown-parser');
 jest.mock('../parsers/gherkin-parser');
@@ -78,18 +76,9 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      const mockKuzuClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(2),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(0),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 2 }),
-        close: jest.fn()
-      };
-      (KuzuClient as jest.Mock).mockImplementation(() => mockKuzuClient);
-
       const options: ImportOptions = {
         ...baseOptions,
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -132,19 +121,10 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      const mockKuzuClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(0),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(0),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 1 }),
-        close: jest.fn()
-      };
-      (KuzuClient as jest.Mock).mockImplementation(() => mockKuzuClient);
-
       const options: ImportOptions = {
         ...baseOptions,
         mode: 'incremental',
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -187,19 +167,10 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      const mockKuzuClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(0),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(0),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 1 }),
-        close: jest.fn()
-      };
-      (KuzuClient as jest.Mock).mockImplementation(() => mockKuzuClient);
-
       const options: ImportOptions = {
         ...baseOptions,
         mode: 'incremental',
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -231,19 +202,10 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      const mockKuzuClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(0),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(0),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 0 }),
-        close: jest.fn()
-      };
-      (KuzuClient as jest.Mock).mockImplementation(() => mockKuzuClient);
-
       const options: ImportOptions = {
         ...baseOptions,
         mode: 'incremental',
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -287,19 +249,10 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      const mockKuzuClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(1),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(0),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 1 }),
-        close: jest.fn()
-      };
-      (KuzuClient as jest.Mock).mockImplementation(() => mockKuzuClient);
-
       const options: ImportOptions = {
         ...baseOptions,
         skipRelationships: true,
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -365,8 +318,7 @@ describe('import-pipeline.service', () => {
 
       const options: ImportOptions = {
         ...baseOptions,
-        dryRun: true,
-        dbPath: '/test/output/db.kuzu'
+        dryRun: true
       };
 
       // Act
@@ -374,53 +326,6 @@ describe('import-pipeline.service', () => {
 
       // Assert
       expect(result.totalNodes).toBeGreaterThan(0);
-      expect(KuzuClient).not.toHaveBeenCalled();
-    });
-
-    it('should throw error if dbPath is missing in non-dry-run mode', async () => {
-      // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValue(['/test/source/doc1.md']);
-
-      mockFs.readFileSync.mockReturnValue('# Test');
-      mockFs.existsSync.mockReturnValue(false);
-
-      const { createEmptyManifest } = require('../models/manifest.model');
-      mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
-
-      mockManifestService.calculateFileHash.mockReturnValue('hash123');
-
-      const { parsePathMetadata } = require('../parsers/path-metadata-parser');
-      parsePathMetadata.mockReturnValue({
-        filePath: '/test/source/doc1.md',
-        relativePath: 'doc1.md',
-        extension: '.md'
-      });
-
-      const { parseMarkdown } = require('../parsers/markdown-parser');
-      parseMarkdown.mockReturnValue({
-        pathMeta: {},
-        frontmatter: {},
-        rawContent: '# Test',
-        title: 'Test',
-        contentHash: 'hash123'
-      });
-
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
-
-      const options: ImportOptions = {
-        ...baseOptions,
-        dryRun: false
-        // dbPath intentionally omitted
-      };
-
-      // Act
-      const result = await runImportPipeline(options);
-
-      // Assert
-      expect(result.errors).toBeGreaterThan(0);
-      expect(result.fileResults[0]?.error).toContain('dbPath is required');
     });
   });
 

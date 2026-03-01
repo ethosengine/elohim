@@ -54,9 +54,6 @@ export interface ImportOptions {
 
   /** Skip relationship extraction (faster, less memory) */
   skipRelationships?: boolean;
-
-  /** Path to Kuzu database (if set, writes to Kuzu instead of JSON) */
-  dbPath?: string;
 }
 
 /**
