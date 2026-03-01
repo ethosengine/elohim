@@ -3,10 +3,15 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withHashLocation } from '@angular/router';
+import { Component } from '@angular/core';
 
 import { ShefaSidenavComponent } from './shefa-sidenav.component';
 import { vi } from 'vitest';
+
+// Stub component to satisfy router routes for all sidenav links
+@Component({ standalone: true, template: '' })
+class StubRouteComponent {}
 
 describe('ShefaSidenavComponent', () => {
   let component: ShefaSidenavComponent;
@@ -15,7 +20,23 @@ describe('ShefaSidenavComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ShefaSidenavComponent],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([
+          { path: 'shefa', component: StubRouteComponent },
+          { path: 'shefa/accounts', component: StubRouteComponent },
+          { path: 'shefa/transactions', component: StubRouteComponent },
+          { path: 'shefa/devices', component: StubRouteComponent },
+          { path: 'shefa/resources/property', component: StubRouteComponent },
+          { path: 'shefa/resources/energy', component: StubRouteComponent },
+          { path: 'shefa/resources/knowledge', component: StubRouteComponent },
+          { path: 'shefa/exchange', component: StubRouteComponent },
+          { path: 'shefa/insurance', component: StubRouteComponent },
+          { path: 'shefa/constitutional', component: StubRouteComponent },
+          { path: 'shefa/dashboard', component: StubRouteComponent },
+          { path: 'shefa/planning', component: StubRouteComponent },
+          { path: 'shefa/settings', component: StubRouteComponent },
+        ]),
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ShefaSidenavComponent);

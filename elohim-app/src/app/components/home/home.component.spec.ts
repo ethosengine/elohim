@@ -19,6 +19,17 @@ describe('HomeComponent', () => {
   let mockDomInteractionService: any;
 
   beforeEach(async () => {
+    // IntersectionObserver is not available in jsdom — stub it out
+    if (!('IntersectionObserver' in window)) {
+      class MockIntersectionObserver {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        constructor(_callback: IntersectionObserverCallback) {}
+      }
+      (window as any).IntersectionObserver = MockIntersectionObserver;
+    }
+
     mockConfigService = {
     getConfig: vi.fn(),
   };
@@ -61,7 +72,7 @@ describe('HomeComponent', () => {
     expect(mockConfigService.getConfig).toHaveBeenCalled();
   });
 
-  it('should setup scroll listeners on init', () => new Promise<void>(done => {
+  it('should setup scroll listeners on init', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
     const scrollSpy = vi.spyOn(component as any, 'setupParallaxScrolling');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
@@ -70,14 +81,12 @@ describe('HomeComponent', () => {
     fixture.detectChanges();
 
     // Wait for async operations
-    setTimeout(() => {
-      expect(scrollSpy).toHaveBeenCalled();
-      expect(observerSpy).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupScrollIndicator).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
-      done();
-    }, 100);
-  }));
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    expect(scrollSpy).toHaveBeenCalled();
+    expect(observerSpy).toHaveBeenCalled();
+    expect(mockDomInteractionService.setupScrollIndicator).toHaveBeenCalled();
+    expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
+  });
 
   it('should cleanup on destroy', () => {
     fixture.detectChanges();

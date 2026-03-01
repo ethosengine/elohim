@@ -7,7 +7,8 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { take } from 'rxjs/operators';
+import { firstValueFrom } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -94,21 +95,17 @@ describe('AffinityTrackingService', () => {
       expect(service.changes$ instanceof Observable).toBe(true);
     });
 
-    it('should emit initial empty affinity on affinity$ subscription', done => {
-      service.affinity$.pipe(take(1)).subscribe(affinity => {
-        expect(affinity).toBeDefined();
-        expect(affinity.affinity).toEqual({});
-        expect(affinity.humanId).toBeDefined();
-        expect(affinity.lastUpdated).toBeDefined();
-        done();
-      });
+    it('should emit initial empty affinity on affinity$ subscription', async () => {
+      const affinity = await firstValueFrom(service.affinity$);
+      expect(affinity).toBeDefined();
+      expect(affinity.affinity).toEqual({});
+      expect(affinity.humanId).toBeDefined();
+      expect(affinity.lastUpdated).toBeDefined();
     });
 
-    it('should emit null on initial changes$ subscription', done => {
-      service.changes$.pipe(take(1)).subscribe(change => {
-        expect(change).toBeNull();
-        done();
-      });
+    it('should emit null on initial changes$ subscription', async () => {
+      const change = await firstValueFrom(service.changes$);
+      expect(change).toBeNull();
     });
   });
 
@@ -195,27 +192,21 @@ describe('AffinityTrackingService', () => {
       expect(affinity).toBe(0.5);
     });
 
-    it('should update affinity$ observable', done => {
+    it('should update affinity$ observable', async () => {
       service.setAffinity('node-1', 0.7);
-
-      service.affinity$.pipe(take(1)).subscribe(affinity => {
-        expect(affinity.affinity['node-1']).toBe(0.7);
-        done();
-      });
+      const affinity = await firstValueFrom(service.affinity$);
+      expect(affinity.affinity['node-1']).toBe(0.7);
     });
 
-    it('should emit change event on affinity change', () => new Promise<void>(done => {
+    it('should emit change event on affinity change', async () => {
       service.setAffinity('node-1', 0.3);
-
-      service.changes$.pipe(take(1)).subscribe(change => {
-        if (change !== null) {
-          expect(change.nodeId).toBe('node-1');
-          expect(change.newValue).toBe(0.3);
-          expect(typeof change.timestamp).toBe('string');
-          done();
-        }
-      });
-    }));
+      const change = await firstValueFrom(
+        service.changes$.pipe(filter(c => c !== null && c.nodeId === 'node-1'))
+      );
+      expect(change!.nodeId).toBe('node-1');
+      expect(change!.newValue).toBe(0.3);
+      expect(typeof change!.timestamp).toBe('string');
+    });
 
     it('should record affinity change via session service', () => {
       service.setAffinity('node-1', 0.6);
@@ -223,33 +214,29 @@ describe('AffinityTrackingService', () => {
       expect(mockSessionHumanService.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.6);
     });
 
-    it('should update lastUpdated timestamp', () => new Promise<void>(done => {
+    it('should update lastUpdated timestamp', async () => {
       const beforeTime = Date.now();
       service.setAffinity('node-1', 0.5);
+      const affinity = await firstValueFrom(service.affinity$);
+      expect(affinity.lastUpdated).toBeDefined();
+      const lastUpdated = new Date(affinity.lastUpdated).getTime();
+      expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
+    });
 
-      service.affinity$.pipe(take(1)).subscribe(affinity => {
-        expect(affinity.lastUpdated).toBeDefined();
-        const lastUpdated = new Date(affinity.lastUpdated).getTime();
-        expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
-        done();
-      });
-    }));
-
-    it('should not emit change if value unchanged', () => new Promise<void>(done => {
+    it('should not emit change if value unchanged', async () => {
       service.setAffinity('node-1', 0.5);
 
       let changeCount = 0;
-      service.changes$.subscribe(() => {
+      const sub = service.changes$.subscribe(() => {
         changeCount++;
       });
 
       service.setAffinity('node-1', 0.5);
 
-      setTimeout(() => {
-        expect(changeCount).toBeLessThanOrEqual(2); // Initial null + one change
-        done();
-      }, 100);
-    }));
+      await new Promise<void>(resolve => setTimeout(resolve, 100));
+      sub.unsubscribe();
+      expect(changeCount).toBeLessThanOrEqual(2); // Initial null + one change
+    });
   });
 
   // ==========================================================================
@@ -432,26 +419,20 @@ describe('AffinityTrackingService', () => {
       expect(service.getAffinity('node-2')).toBe(0.0);
     });
 
-    it('should emit updated affinity$ on reset', () => new Promise<void>(done => {
+    it('should emit updated affinity$ on reset', async () => {
       service.setAffinity('node-1', 0.5);
       service.reset();
+      const affinity = await firstValueFrom(service.affinity$);
+      expect(affinity.affinity).toEqual({});
+    });
 
-      service.affinity$.pipe(take(1)).subscribe(affinity => {
-        expect(affinity.affinity).toEqual({});
-        done();
-      });
-    }));
-
-    it('should update lastUpdated on reset', () => new Promise<void>(done => {
+    it('should update lastUpdated on reset', async () => {
       const beforeTime = Date.now();
       service.reset();
-
-      service.affinity$.pipe(take(1)).subscribe(affinity => {
-        const lastUpdated = new Date(affinity.lastUpdated).getTime();
-        expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
-        done();
-      });
-    }));
+      const affinity = await firstValueFrom(service.affinity$);
+      const lastUpdated = new Date(affinity.lastUpdated).getTime();
+      expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
+    });
   });
 
   // ==========================================================================
@@ -476,54 +457,44 @@ describe('AffinityTrackingService', () => {
   // ==========================================================================
 
   describe('observable return types', () => {
-    it('affinity$ should be Observable<HumanAffinity>', () => new Promise<void>(done => {
-      service.affinity$.pipe(take(1)).subscribe(value => {
-        expect(value).toBeDefined();
-        expect(typeof value === 'object').toBe(true);
-        expect('humanId' in value).toBe(true);
-        expect('affinity' in value).toBe(true);
-        expect('lastUpdated' in value).toBe(true);
-        done();
-      });
-    }));
+    it('affinity$ should be Observable<HumanAffinity>', async () => {
+      const value = await firstValueFrom(service.affinity$);
+      expect(value).toBeDefined();
+      expect(typeof value === 'object').toBe(true);
+      expect('humanId' in value).toBe(true);
+      expect('affinity' in value).toBe(true);
+      expect('lastUpdated' in value).toBe(true);
+    });
 
-    it('changes$ should be Observable<AffinityChangeEvent | null>', () => new Promise<void>(done => {
-      service.changes$.pipe(take(1)).subscribe(value => {
-        expect(value === null || typeof value === 'object').toBe(true);
-        if (value !== null) {
-          expect('nodeId' in value).toBe(true);
-          expect('oldValue' in value).toBe(true);
-          expect('newValue' in value).toBe(true);
-          expect('timestamp' in value).toBe(true);
-        }
-        done();
-      });
-    }));
+    it('changes$ should be Observable<AffinityChangeEvent | null>', async () => {
+      const value = await firstValueFrom(service.changes$);
+      expect(value === null || typeof value === 'object').toBe(true);
+      if (value !== null) {
+        expect('nodeId' in value).toBe(true);
+        expect('oldValue' in value).toBe(true);
+        expect('newValue' in value).toBe(true);
+        expect('timestamp' in value).toBe(true);
+      }
+    });
 
-    it('affinity$ should emit new value on setAffinity', () => new Promise<void>(done => {
-      service.affinity$.subscribe(affinity => {
-        if (affinity.affinity['test-node']) {
-          expect(affinity.affinity['test-node']).toBe(0.5);
-          done();
-        }
-      });
-
+    it('affinity$ should emit new value on setAffinity', async () => {
       service.setAffinity('test-node', 0.5);
-    }));
+      const affinity = await firstValueFrom(
+        service.affinity$.pipe(filter(a => !!a.affinity['test-node']))
+      );
+      expect(affinity.affinity['test-node']).toBe(0.5);
+    });
 
-    it('changes$ should emit AffinityChangeEvent on setAffinity', () => new Promise<void>(done => {
+    it('changes$ should emit AffinityChangeEvent on setAffinity', async () => {
       const changeNodeId = 'test-node-2';
-      service.changes$.subscribe(change => {
-        if (change?.nodeId === changeNodeId) {
-          expect(change.nodeId).toBe(changeNodeId);
-          expect(change.newValue).toBe(0.8);
-          expect(change.oldValue).toBe(0.0);
-          done();
-        }
-      });
-
       service.setAffinity(changeNodeId, 0.8);
-    }));
+      const change = await firstValueFrom(
+        service.changes$.pipe(filter(c => c?.nodeId === changeNodeId))
+      );
+      expect(change!.nodeId).toBe(changeNodeId);
+      expect(change!.newValue).toBe(0.8);
+      expect(change!.oldValue).toBe(0.0);
+    });
   });
 
   // ==========================================================================
@@ -531,7 +502,7 @@ describe('AffinityTrackingService', () => {
   // ==========================================================================
 
   describe('storage integration', () => {
-    it('should load affinity from localStorage on creation', () => new Promise<void>(done => {
+    it('should load affinity from localStorage on creation', async () => {
       const testAffinity: HumanAffinity = {
         humanId: 'test-session-id',
         affinity: { 'node-1': 0.5 },
@@ -545,33 +516,28 @@ describe('AffinityTrackingService', () => {
       service.setAffinity('node-2', 0.7);
 
       // Wait for async storage operation
-      setTimeout(() => {
-        const stored = localStorage.getItem('test-session-key');
-        expect(stored).toBeTruthy();
-        if (stored) {
-          const parsed = JSON.parse(stored) as HumanAffinity;
-          expect(parsed.affinity['node-2']).toBe(0.7);
-        }
-        done();
-      }, 50);
-    }));
+      await new Promise<void>(resolve => setTimeout(resolve, 50));
+      const stored = localStorage.getItem('test-session-key');
+      expect(stored).toBeTruthy();
+      if (stored) {
+        const parsed = JSON.parse(stored) as HumanAffinity;
+        expect(parsed.affinity['node-2']).toBe(0.7);
+      }
+    });
 
-    it('should save affinity to localStorage on setAffinity', () => new Promise<void>(done => {
+    it('should save affinity to localStorage on setAffinity', async () => {
       service.setAffinity('node-1', 0.6);
 
       // Check localStorage after a small delay to ensure async write
-      setTimeout(() => {
-        const stored = localStorage.getItem('test-session-key');
-        expect(stored).toBeTruthy();
+      await new Promise<void>(resolve => setTimeout(resolve, 50));
+      const stored = localStorage.getItem('test-session-key');
+      expect(stored).toBeTruthy();
 
-        if (stored) {
-          const parsed = JSON.parse(stored) as HumanAffinity;
-          expect(parsed.affinity['node-1']).toBe(0.6);
-        }
-
-        done();
-      }, 50);
-    }));
+      if (stored) {
+        const parsed = JSON.parse(stored) as HumanAffinity;
+        expect(parsed.affinity['node-1']).toBe(0.6);
+      }
+    });
 
     it('should handle localStorage read failure gracefully', () => {
       vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw 'Storage error'; });
