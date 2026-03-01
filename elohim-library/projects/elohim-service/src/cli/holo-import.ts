@@ -295,7 +295,7 @@ program
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
   .option('--json', 'Output as JSON', false)
-  .action(async (id, options) => {
+  .action(async (id: string, options: any) => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
@@ -384,4 +384,4 @@ program
 // =============================================================================
 // Run CLI
 // =============================================================================
-program.parse();
+program.parse(process.argv);

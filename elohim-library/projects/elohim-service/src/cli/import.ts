@@ -61,7 +61,7 @@ program
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Dry run - do not write to database', false)
   .option('--skip-relationships', 'Skip relationship extraction (faster, less memory)', false)
-  .action(async options => {
+  .action(async (options: any) => {
     const sourceDir = path.resolve(options.source);
     const dbPath = path.resolve(options.db);
 
@@ -183,7 +183,7 @@ program
   .option('-t, --type <contentType>', 'Filter by content type (scenario, role, epic, etc.)')
   .option('--depth <n>', 'Relationship depth to explore (default: 1)', '1')
   .option('--limit <n>', 'Maximum nodes to return (default: 50)', '50')
-  .action(async options => {
+  .action(async (options: any) => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -280,7 +280,7 @@ program
   .command('list-epics')
   .description('List all unique epics in the imported content')
   .option('-o, --output <dir>', 'Output directory with nodes.json', './output/lamad')
-  .action(async options => {
+  .action(async (options: any) => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -327,7 +327,7 @@ program
   .description('List all unique user types/archetypes in the imported content')
   .option('-o, --output <dir>', 'Output directory with nodes.json', './output/lamad')
   .option('-e, --epic <name>', 'Filter to specific epic')
-  .action(async options => {
+  .action(async (options: any) => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -383,7 +383,7 @@ program
   .command('validate-standards')
   .description('Validate standards alignment (DID, JSON-LD, Open Graph)')
   .option('-o, --output <dir>', 'Content directory with nodes.json', './output/lamad')
-  .action(async options => {
+  .action(async (options: any) => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -475,7 +475,7 @@ program
     'Attestations index file',
     './output/lamad/attestations/index.json'
   )
-  .action(async options => {
+  .action(async (options: any) => {
     const contentDir = path.resolve(options.output, 'content');
     const attestationsPath = path.resolve(options.attestations);
 
@@ -693,7 +693,7 @@ program
   .description('Import humans and relationships from data/humans/')
   .option('-s, --source <file>', 'Humans JSON file', '/projects/elohim/data/humans/humans.json')
   .option('-o, --output <dir>', 'Output directory', './output/lamad')
-  .action(async options => {
+  .action(async (options: any) => {
     const sourcePath = path.resolve(options.source);
     const outputDir = path.resolve(options.output);
 
@@ -751,7 +751,7 @@ program
   .option('--max-steps <n>', 'Maximum number of steps', '10')
   .option('--chapters', 'Organize into chapters by content type', false)
   .option('--dry-run', 'Preview path without writing', false)
-  .action(async options => {
+  .action(async (options: any) => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
     const pathsDir = path.join(outputDir, 'paths');
@@ -993,7 +993,7 @@ program
   .option('-i, --input <dir>', 'Input lamad-data directory', './output/lamad')
   .option('-o, --output <file>', 'Output database file', './output/lamad.kuzu')
   .option('--force', 'Overwrite existing database', false)
-  .action(async options => {
+  .action(async (options: any) => {
     const inputDir = path.resolve(options.input);
     const dbPath = path.resolve(options.output);
 
@@ -1107,7 +1107,7 @@ program
   .command('db:stats')
   .description('Show database statistics')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     if (!fs.existsSync(dbPath)) {
@@ -1138,7 +1138,7 @@ program
   .description('Export database to Cypher seed file (git-friendly)')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .option('-o, --output <file>', 'Output Cypher file', './output/lamad-seed.cypher')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
     const outputFile = path.resolve(options.output);
 
@@ -1292,7 +1292,7 @@ program
   .option('--difficulty <level>', 'Difficulty (beginner, intermediate, advanced)', 'intermediate')
   .option('--path-type <type>', 'Path type (journey, quest, expedition, practice)', 'journey')
   .option('--tags <tags>', 'Comma-separated tags')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1333,7 +1333,7 @@ program
   .option('--title <title>', 'Step title (defaults to content title)')
   .option('--narrative <text>', 'Step narrative/description')
   .option('--optional', 'Mark step as optional', false)
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1373,7 +1373,7 @@ program
   .command('path:list')
   .description('List all learning paths in the database')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1403,7 +1403,7 @@ program
   .description('Show details of a learning path')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .requiredOption('--id <pathId>', 'Path ID')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1461,7 +1461,7 @@ program
   .option('--format <fmt>', 'Content format', 'markdown')
   .option('--tags <tags>', 'Comma-separated tags')
   .option('--reach <reach>', 'Content reach', 'commons')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1501,7 +1501,7 @@ program
   .description('Show a content node from the database')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .requiredOption('--id <id>', 'Content ID')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1540,7 +1540,7 @@ program
   .option('-q, --query <cypher>', 'Cypher query string')
   .option('-f, --file <path>', 'Read query from file')
   .option('--json', 'Output as JSON', false)
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
 
     let query = options.query || '';
@@ -1586,7 +1586,7 @@ program
   .description('Export database to JSON files')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .option('-o, --output <dir>', 'Output directory', './output/lamad-export')
-  .action(async options => {
+  .action(async (options: any) => {
     const dbPath = path.resolve(options.db);
     const outputDir = path.resolve(options.output);
 
@@ -1661,4 +1661,4 @@ program
     }
   });
 
-program.parse();
+program.parse(process.argv);
