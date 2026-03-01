@@ -12,11 +12,13 @@ RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 WORKDIR /app
 
-# Copy package + lockfile first for layer caching
-COPY package.json pnpm-lock.yaml ./
+# Copy package file for layer caching
+COPY package.json ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+# Note: doorway-app is a pnpm workspace member but has no workspace: deps,
+# so we install standalone without the workspace lockfile
+RUN pnpm install
 
 # Copy source and build with /threshold/ base href
 COPY . .
