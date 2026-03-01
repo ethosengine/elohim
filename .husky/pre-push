@@ -10,7 +10,7 @@
 #   sophia/                  → pnpm lint + typecheck + test
 #   holochain/elohim-storage → cargo fmt + clippy + tests
 #   elohim-node/             → cargo fmt + clippy + tests
-#   elohim-library/          → tsc type-check + jest tests
+#   elohim-library/          → tsc type-check + vitest tests
 #   genesis/                 → schema validation + tests
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
@@ -153,7 +153,7 @@ run_gate() {
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
-        pnpm exec jest --config projects/elohim-service/jest.config.js --ci 2>&1
+        (cd projects/elohim-service && pnpm exec vitest run) 2>&1
         rc=$?
         ;;
       genesis)

@@ -59,7 +59,7 @@ pnpm typecheck                     # Full type-check
 ```bash
 cd elohim-library
 pnpm install                       # Or from repo root
-pnpm exec jest                     # Jest tests for elohim-service
+cd projects/elohim-service && pnpm exec vitest run   # Vitest tests for elohim-service
 ```
 
 ### elohim-node (Rust P2P runtime)
