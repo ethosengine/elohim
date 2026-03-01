@@ -41,6 +41,7 @@
     "@storybook/addon-viewport": "^8.6.17",
     "@storybook/angular": "^8.6.17",
     "@types/jasmine": "~5.1.0",
+    "@types/jest": "^30.0.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
