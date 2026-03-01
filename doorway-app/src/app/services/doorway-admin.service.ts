@@ -368,6 +368,16 @@ export class DoorwayAdminService {
     );
   }
 
+  /**
+   * Logout the current user (self-service)
+   */
+  logout(): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/auth/logout`, {}).pipe(
+      timeout(this.timeout),
+      catchError(this.handleError<void>('logout', undefined))
+    );
+  }
+
   // ============================================================================
   // User Admin API Methods
   // ============================================================================

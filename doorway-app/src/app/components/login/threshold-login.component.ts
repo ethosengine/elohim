@@ -18,6 +18,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
+import { AuthStateService } from '../../services/auth-state.service';
+
 /** OAuth params from query string */
 interface OAuthParams {
   clientId: string;
@@ -161,6 +163,7 @@ export class ThresholdLoginComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
+  private readonly authState = inject(AuthStateService);
 
   // State
   readonly state = signal<LoginState>('form');
@@ -286,7 +289,8 @@ export class ThresholdLoginComponent implements OnInit {
         this.state.set('authorizing');
         await this.authorizeOAuth(authResult.token, params);
       } else {
-        // Direct login (no OAuth) - redirect to dashboard
+        // Direct login (no OAuth) - refresh auth state and redirect to dashboard
+        await this.authState.refresh();
         this.router.navigate(['/dashboard']);
       }
     } catch (err) {
