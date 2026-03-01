@@ -20,9 +20,9 @@ COPY package.json ./
 # so we install standalone without the workspace lockfile
 RUN pnpm install
 
-# Copy source and build with /threshold/ base href
+# Copy source and build (baseHref=/threshold/ is set in angular.json production config)
 COPY . .
-RUN pnpm run build -- --configuration=production --base-href=/threshold/
+RUN pnpm run build
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
