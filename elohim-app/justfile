@@ -22,7 +22,7 @@ build:
 
 # Run unit tests
 test:
-    pnpm exec ng test --watch=false --browsers=ChromeHeadlessCI
+    pnpm exec vitest run --config vite.config.ts
 
 # Lint
 lint:

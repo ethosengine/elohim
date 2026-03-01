@@ -68,10 +68,12 @@ Production builds load configuration from `/assets/config.json` which is mounted
 
 ## Running unit tests
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+Unit tests use [Vitest](https://vitest.dev/) with `@analogjs/vitest-angular`:
 
 ```bash
-ng test
+pnpm test                                                    # Run all tests with coverage
+pnpm exec vitest run --config vite.config.ts "my-service"    # Run a single test file
+pnpm exec vitest --config vite.config.ts                     # Watch mode
 ```
 
 ## Running end-to-end tests

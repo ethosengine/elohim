@@ -705,8 +705,8 @@ VEOF
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
-                                    -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
+                                    -Dsonar.typescript.lcov.reportPaths=coverage/vitest/lcov.info \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/vitest/lcov.info \
                                     -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
                                     -Dsonar.qualitygate.wait=false
                                 """

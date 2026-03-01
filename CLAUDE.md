@@ -18,9 +18,9 @@ pnpm run lint                      # ESLint
 pnpm run lint:fix                  # ESLint with auto-fix
 pnpm run lint:css                  # Stylelint (SCSS/CSS)
 pnpm run format:check              # Prettier check
-pnpm test                          # Unit tests (Karma/Jasmine) with coverage
-pnpm exec ng test --watch=false --browsers=ChromeHeadlessCI  # CI-mode tests
-pnpm exec ng test --include='**/path.service.spec.ts'        # Single test file
+pnpm test                          # Unit tests (Vitest) with coverage
+pnpm exec vitest run --config vite.config.ts                 # CI-mode tests
+pnpm exec vitest run --config vite.config.ts "path.service"  # Single test file
 pnpm run cypress:run               # E2E tests (Cucumber BDD)
 pnpm run hc:start                  # Start Holochain + doorway + storage
 pnpm run hc:start:seed             # Start with content seeding
