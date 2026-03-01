@@ -4,35 +4,43 @@
  * Tests for holochain-specific import commands and option handling
  */
 
+import { type MockInstance } from 'vitest';
 import { Command } from 'commander';
+import { runImportPipeline } from '../services/import-pipeline.service';
+import { HolochainImportService } from '../services/holochain-import.service';
+import { HolochainClientService } from '../services/holochain-client.service';
 
 // Mock dependencies
 // Manual factories needed because these services import @holochain/client (ESM)
-jest.mock('../services/import-pipeline.service');
-jest.mock('../services/holochain-import.service', () => ({
-  HolochainImportService: jest.fn(),
+vi.mock('../services/import-pipeline.service');
+vi.mock('../services/holochain-import.service', () => ({
+  HolochainImportService: vi.fn(),
 }));
-jest.mock('../services/holochain-client.service', () => ({
-  HolochainClientService: jest.fn(),
+vi.mock('../services/holochain-client.service', () => ({
+  HolochainClientService: vi.fn(),
 }));
+
+const mockRunImportPipeline = vi.mocked(runImportPipeline);
+const MockHolochainImportService = vi.mocked(HolochainImportService);
+const MockHolochainClientService = vi.mocked(HolochainClientService);
 
 describe('CLI holo-import commands', () => {
   let program: Command;
-  let mockExit: jest.SpyInstance;
-  let mockConsoleLog: jest.SpyInstance;
-  let mockConsoleError: jest.SpyInstance;
+  let mockExit: MockInstance;
+  let mockConsoleLog: MockInstance;
+  let mockConsoleError: MockInstance;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock process.exit
-    mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
+    mockExit = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`process.exit(${code})`);
     }) as any;
 
     // Mock console methods
-    mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
-    mockConsoleError = jest.spyOn(console, 'error').mockImplementation();
+    mockConsoleLog = vi.spyOn(console, 'log').mockImplementation();
+    mockConsoleError = vi.spyOn(console, 'error').mockImplementation();
 
     // Create fresh program instance
     program = new Command();
@@ -47,19 +55,16 @@ describe('CLI holo-import commands', () => {
   describe('holo:import command', () => {
     it('should run import pipeline and holochain import with default options', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      const HolochainImportServiceModule = require('../services/holochain-import.service');
-
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         totalNodes: 10,
         totalFiles: 5,
         nodes: [
           { id: 'node-1', contentType: 'epic', title: 'Test' }
         ]
-      });
+      } as any);
 
       const mockHoloService = {
-        importNodes: jest.fn().mockResolvedValue({
+        importNodes: vi.fn().mockResolvedValue({
           importId: 'import-123',
           createdNodes: 10,
           totalNodes: 10,
@@ -68,7 +73,7 @@ describe('CLI holo-import commands', () => {
         })
       };
 
-      HolochainImportServiceModule.HolochainImportService = jest.fn(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:import')
@@ -90,13 +95,13 @@ describe('CLI holo-import commands', () => {
           });
 
           if (!options.dryRun) {
-            const holoService = new HolochainImportServiceModule.HolochainImportService({
+            const holoService = new HolochainImportService({
               adminUrl: options.adminUrl,
               appId: options.appId,
               batchSize: parseInt(options.batchSize, 10)
-            });
+            } as any);
 
-            await holoService.importNodes(pipelineResult.nodes);
+            await (holoService as any).importNodes(pipelineResult.nodes);
           }
         });
 
@@ -104,7 +109,7 @@ describe('CLI holo-import commands', () => {
       await program.parseAsync(['node', 'test', 'holo:import']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalled();
+      expect(mockRunImportPipeline).toHaveBeenCalled();
       expect(mockHoloService.importNodes).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ id: 'node-1' })
@@ -114,16 +119,11 @@ describe('CLI holo-import commands', () => {
 
     it('should skip holochain import in dry-run mode', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      const HolochainImportServiceModule = require('../services/holochain-import.service');
-      const mockConstructor = jest.fn();
-      HolochainImportServiceModule.HolochainImportService = mockConstructor;
-
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         totalNodes: 5,
         totalFiles: 3,
         nodes: []
-      });
+      } as any);
 
       program
         .command('holo:import')
@@ -141,12 +141,12 @@ describe('CLI holo-import commands', () => {
           });
 
           if (!options.dryRun) {
-            const holoService = new HolochainImportServiceModule.HolochainImportService({
+            const holoService = new HolochainImportService({
               adminUrl: 'wss://test',
               appId: 'elohim',
               batchSize: 50
-            });
-            await holoService.importNodes(pipelineResult.nodes);
+            } as any);
+            await (holoService as any).importNodes(pipelineResult.nodes);
           }
         });
 
@@ -154,23 +154,20 @@ describe('CLI holo-import commands', () => {
       await program.parseAsync(['node', 'test', 'holo:import', '--dry-run']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalled();
-      expect(mockConstructor).not.toHaveBeenCalled();
+      expect(mockRunImportPipeline).toHaveBeenCalled();
+      expect(MockHolochainImportService).not.toHaveBeenCalled();
     });
 
     it('should handle custom admin URL and app ID', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         totalNodes: 3,
         totalFiles: 2,
         nodes: []
-      });
+      } as any);
 
       const mockHoloService = {
-        importNodes: jest.fn().mockResolvedValue({
+        importNodes: vi.fn().mockResolvedValue({
           importId: 'import-456',
           createdNodes: 3,
           totalNodes: 3,
@@ -179,7 +176,7 @@ describe('CLI holo-import commands', () => {
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:import')
@@ -204,8 +201,8 @@ describe('CLI holo-import commands', () => {
               adminUrl: options.adminUrl,
               appId: options.appId,
               batchSize: parseInt(options.batchSize, 10)
-            });
-            await holoService.importNodes(pipelineResult.nodes);
+            } as any);
+            await (holoService as any).importNodes(pipelineResult.nodes);
           }
         });
 
@@ -221,7 +218,7 @@ describe('CLI holo-import commands', () => {
       ]);
 
       // Assert
-      expect(HolochainImportService).toHaveBeenCalledWith({
+      expect(MockHolochainImportService).toHaveBeenCalledWith({
         adminUrl: 'wss://custom.host',
         appId: 'custom-app',
         batchSize: 50
@@ -230,17 +227,14 @@ describe('CLI holo-import commands', () => {
 
     it('should handle custom batch size', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         totalNodes: 100,
         totalFiles: 20,
         nodes: []
-      });
+      } as any);
 
       const mockHoloService = {
-        importNodes: jest.fn().mockResolvedValue({
+        importNodes: vi.fn().mockResolvedValue({
           importId: 'import-789',
           createdNodes: 100,
           totalNodes: 100,
@@ -249,7 +243,7 @@ describe('CLI holo-import commands', () => {
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:import')
@@ -274,8 +268,8 @@ describe('CLI holo-import commands', () => {
               adminUrl: options.adminUrl,
               appId: options.appId,
               batchSize: parseInt(options.batchSize, 10)
-            });
-            await holoService.importNodes(pipelineResult.nodes);
+            } as any);
+            await (holoService as any).importNodes(pipelineResult.nodes);
           }
         });
 
@@ -283,24 +277,21 @@ describe('CLI holo-import commands', () => {
       await program.parseAsync(['node', 'test', 'holo:import', '--batch-size', '100']);
 
       // Assert
-      expect(HolochainImportService).toHaveBeenCalledWith(
+      expect(MockHolochainImportService).toHaveBeenCalledWith(
         expect.objectContaining({ batchSize: 100 })
       );
     });
 
     it('should handle import errors and display them', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         totalNodes: 10,
         totalFiles: 5,
         nodes: []
-      });
+      } as any);
 
       const mockHoloService = {
-        importNodes: jest.fn().mockResolvedValue({
+        importNodes: vi.fn().mockResolvedValue({
           importId: 'import-error',
           createdNodes: 7,
           totalNodes: 10,
@@ -313,7 +304,7 @@ describe('CLI holo-import commands', () => {
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:import')
@@ -338,9 +329,9 @@ describe('CLI holo-import commands', () => {
               adminUrl: options.adminUrl,
               appId: options.appId,
               batchSize: parseInt(options.batchSize, 10)
-            });
+            } as any);
 
-            const result = await holoService.importNodes(pipelineResult.nodes);
+            const result = await (holoService as any).importNodes(pipelineResult.nodes);
 
             if (result.errors.length > 0) {
               console.log(`Errors (${result.errors.length}):`);
@@ -362,10 +353,8 @@ describe('CLI holo-import commands', () => {
   describe('holo:stats command', () => {
     it('should fetch and display holochain content statistics', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        getStats: jest.fn().mockResolvedValue({
+        getStats: vi.fn().mockResolvedValue({
           total_count: 150,
           by_type: {
             scenario: 50,
@@ -377,7 +366,7 @@ describe('CLI holo-import commands', () => {
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:stats')
@@ -388,9 +377,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const stats = await holoService.getStats();
+          const stats = await (holoService as any).getStats();
           console.log(`Total nodes: ${stats.total_count}`);
 
           if (Object.keys(stats.by_type).length > 0) {
@@ -412,16 +401,14 @@ describe('CLI holo-import commands', () => {
 
     it('should handle empty holochain database', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        getStats: jest.fn().mockResolvedValue({
+        getStats: vi.fn().mockResolvedValue({
           total_count: 0,
           by_type: {}
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:stats')
@@ -432,9 +419,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const stats = await holoService.getStats();
+          const stats = await (holoService as any).getStats();
           console.log(`Total nodes: ${stats.total_count}`);
 
           if (Object.keys(stats.by_type).length === 0) {
@@ -453,16 +440,14 @@ describe('CLI holo-import commands', () => {
   describe('holo:verify command', () => {
     it('should verify content IDs exist in holochain', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        verifyContent: jest.fn().mockResolvedValue({
+        verifyContent: vi.fn().mockResolvedValue({
           found: ['node-1', 'node-2', 'node-3'],
           missing: []
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:verify')
@@ -476,9 +461,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const result = await holoService.verifyContent(ids);
+          const result = await (holoService as any).verifyContent(ids);
           console.log(`Found: ${result.found.length}/${ids.length}`);
           console.log(`Missing: ${result.missing.length}`);
 
@@ -503,16 +488,14 @@ describe('CLI holo-import commands', () => {
 
     it('should exit with code 1 if content is missing', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        verifyContent: jest.fn().mockResolvedValue({
+        verifyContent: vi.fn().mockResolvedValue({
           found: ['node-1'],
           missing: ['node-2', 'node-3']
         })
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:verify')
@@ -526,9 +509,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const result = await holoService.verifyContent(ids);
+          const result = await (holoService as any).verifyContent(ids);
 
           if (result.missing.length > 0) {
             console.log('Missing IDs:');
@@ -551,15 +534,13 @@ describe('CLI holo-import commands', () => {
   describe('holo:test command', () => {
     it('should test holochain connection successfully', async () => {
       // Arrange
-      const { HolochainClientService } = require('../services/holochain-client.service');
-
       const mockClient = {
-        connect: jest.fn().mockResolvedValue(undefined),
-        callZome: jest.fn().mockResolvedValue({ total_count: 42 }),
-        disconnect: jest.fn().mockResolvedValue(undefined)
+        connect: vi.fn().mockResolvedValue(undefined),
+        callZome: vi.fn().mockResolvedValue({ total_count: 42 }),
+        disconnect: vi.fn().mockResolvedValue(undefined)
       };
 
-      HolochainClientService.mockImplementation(() => mockClient);
+      MockHolochainClientService.mockImplementation(function () { return mockClient; } as any);
 
       program
         .command('holo:test')
@@ -569,13 +550,13 @@ describe('CLI holo-import commands', () => {
           const client = new HolochainClientService({
             adminUrl: options.adminUrl,
             appId: options.appId
-          });
+          } as any);
 
           try {
-            await client.connect();
+            await (client as any).connect();
             console.log('[OK] Connected to conductor');
 
-            const stats = await client.callZome({
+            const stats = await (client as any).callZome({
               zomeName: 'content_store',
               fnName: 'get_content_stats',
               payload: null
@@ -583,7 +564,7 @@ describe('CLI holo-import commands', () => {
             console.log(`[OK] Zome call successful`);
             console.log(`  Content count: ${stats.total_count}`);
 
-            await client.disconnect();
+            await (client as any).disconnect();
             console.log('[OK] Disconnected cleanly');
 
             console.log('Connection test PASSED');
@@ -605,15 +586,13 @@ describe('CLI holo-import commands', () => {
 
     it('should handle connection failure', async () => {
       // Arrange
-      const { HolochainClientService } = require('../services/holochain-client.service');
-
       const mockClient = {
-        connect: jest.fn().mockRejectedValue(new Error('Connection refused')),
-        callZome: jest.fn(),
-        disconnect: jest.fn()
+        connect: vi.fn().mockRejectedValue(new Error('Connection refused')),
+        callZome: vi.fn(),
+        disconnect: vi.fn()
       };
 
-      HolochainClientService.mockImplementation(() => mockClient);
+      MockHolochainClientService.mockImplementation(function () { return mockClient; } as any);
 
       program
         .command('holo:test')
@@ -623,10 +602,10 @@ describe('CLI holo-import commands', () => {
           const client = new HolochainClientService({
             adminUrl: options.adminUrl,
             appId: options.appId
-          });
+          } as any);
 
           try {
-            await client.connect();
+            await (client as any).connect();
           } catch (err) {
             console.error(`[FAIL] ${err}`);
             process.exit(1);
@@ -647,10 +626,8 @@ describe('CLI holo-import commands', () => {
   describe('holo:list command', () => {
     it('should list content by type', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        getContentByType: jest.fn().mockResolvedValue([
+        getContentByType: vi.fn().mockResolvedValue([
           {
             content: {
               id: 'scenario-1',
@@ -672,7 +649,7 @@ describe('CLI holo-import commands', () => {
         ])
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:list')
@@ -685,9 +662,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const results = await holoService.getContentByType(
+          const results = await (holoService as any).getContentByType(
             options.type,
             parseInt(options.limit, 10)
           );
@@ -716,13 +693,11 @@ describe('CLI holo-import commands', () => {
 
     it('should handle empty results', async () => {
       // Arrange
-      const { HolochainImportService } = require('../services/holochain-import.service');
-
       const mockHoloService = {
-        getContentByType: jest.fn().mockResolvedValue([])
+        getContentByType: vi.fn().mockResolvedValue([])
       };
 
-      HolochainImportService.mockImplementation(() => mockHoloService);
+      MockHolochainImportService.mockImplementation(function () { return mockHoloService; } as any);
 
       program
         .command('holo:list')
@@ -735,9 +710,9 @@ describe('CLI holo-import commands', () => {
             adminUrl: options.adminUrl,
             appId: options.appId,
             batchSize: 50
-          });
+          } as any);
 
-          const results = await holoService.getContentByType(
+          const results = await (holoService as any).getContentByType(
             options.type,
             parseInt(options.limit, 10)
           );

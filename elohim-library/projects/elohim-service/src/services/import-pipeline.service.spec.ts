@@ -6,27 +6,38 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { glob } from 'glob';
 import { runImportPipeline, importContent } from './import-pipeline.service';
 import { ImportOptions, ImportResult } from '../models/import-context.model';
 import { ContentNode } from '../models/content-node.model';
+import { createEmptyManifest } from '../models/manifest.model';
 import * as manifestService from './manifest.service';
+import { parsePathMetadata } from '../parsers/path-metadata-parser';
+import { parseMarkdown } from '../parsers/markdown-parser';
+import { extractRelationships } from './relationship-extractor.service';
+import * as transformers from '../transformers';
 
 // Mock dependencies
-jest.mock('fs');
-jest.mock('glob');
-jest.mock('./manifest.service');
-jest.mock('../parsers/path-metadata-parser');
-jest.mock('../parsers/markdown-parser');
-jest.mock('../parsers/gherkin-parser');
-jest.mock('./relationship-extractor.service');
-jest.mock('../transformers');
+vi.mock('fs');
+vi.mock('glob');
+vi.mock('./manifest.service');
+vi.mock('../parsers/path-metadata-parser');
+vi.mock('../parsers/markdown-parser');
+vi.mock('../parsers/gherkin-parser');
+vi.mock('./relationship-extractor.service');
+vi.mock('../transformers');
 
-const mockFs = fs as jest.Mocked<typeof fs>;
-const mockManifestService = manifestService as jest.Mocked<typeof manifestService>;
+const mockFs = vi.mocked(fs);
+const mockManifestService = vi.mocked(manifestService);
+const mockGlob = vi.mocked(glob);
+const mockParsePathMetadata = vi.mocked(parsePathMetadata);
+const mockParseMarkdown = vi.mocked(parseMarkdown);
+const mockExtractRelationships = vi.mocked(extractRelationships);
+const mockTransformers = vi.mocked(transformers);
 
 describe('import-pipeline.service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('runImportPipeline', () => {
@@ -41,40 +52,34 @@ describe('import-pipeline.service', () => {
 
     it('should complete a full import pipeline successfully', async () => {
       // Arrange
-      const { glob } = require('glob');
       // scanSourceFiles calls glob twice: once for *.md and once for *.feature patterns.
       // We return the two .md files on the first call and empty on the second to get totalFiles = 2.
-      glob.mockResolvedValueOnce(['/test/source/doc1.md', '/test/source/doc2.md'])
-          .mockResolvedValueOnce([]);
+      mockGlob.mockResolvedValueOnce(['/test/source/doc1.md', '/test/source/doc2.md'] as any)
+          .mockResolvedValueOnce([] as any);
 
       mockFs.readFileSync.mockReturnValue('# Test Content');
       mockFs.existsSync.mockReturnValue(false);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
-
       mockManifestService.calculateFileHash.mockReturnValue('hash123');
 
-      const { parsePathMetadata } = require('../parsers/path-metadata-parser');
-      parsePathMetadata.mockReturnValue({
+      mockParsePathMetadata.mockReturnValue({
         filePath: '/test/source/doc1.md',
         relativePath: 'doc1.md',
         extension: '.md',
         filename: 'doc1',
         directoryPath: '/test/source'
-      });
+      } as any);
 
-      const { parseMarkdown } = require('../parsers/markdown-parser');
-      parseMarkdown.mockReturnValue({
+      mockParseMarkdown.mockReturnValue({
         pathMeta: {},
         frontmatter: {},
         rawContent: '# Test',
         title: 'Test Document',
         contentHash: 'hash123'
-      });
+      } as any);
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -87,18 +92,16 @@ describe('import-pipeline.service', () => {
       // Assert
       expect(result.totalFiles).toBe(2);
       expect(result.errors).toBe(0);
-      expect(glob).toHaveBeenCalled();
+      expect(mockGlob).toHaveBeenCalled();
     });
 
     it('should handle incremental mode with unchanged files', async () => {
       // Arrange
-      const { glob } = require('glob');
       // scanSourceFiles calls glob twice: once for *.md and once for *.feature patterns.
       // Return the single doc on the first call and empty on the second to keep totalFiles = 1.
-      glob.mockResolvedValueOnce(['/test/source/doc1.md'])
-          .mockResolvedValueOnce([]);
+      mockGlob.mockResolvedValueOnce(['/test/source/doc1.md'] as any)
+          .mockResolvedValueOnce([] as any);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       const existingManifest = createEmptyManifest();
       existingManifest.sourceHashes['/test/source/doc1.md'] = {
         hash: 'unchangedHash',
@@ -118,8 +121,7 @@ describe('import-pipeline.service', () => {
         { id: 'node-1', contentType: 'epic', title: 'Existing' }
       ]));
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -138,10 +140,8 @@ describe('import-pipeline.service', () => {
 
     it('should handle removed files in incremental mode', async () => {
       // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValue(['/test/source/doc1.md']);
+      mockGlob.mockResolvedValue(['/test/source/doc1.md'] as any);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       const existingManifest = createEmptyManifest();
       existingManifest.sourceHashes['/test/source/doc1.md'] = {
         hash: 'hash1',
@@ -164,8 +164,7 @@ describe('import-pipeline.service', () => {
 
       mockFs.existsSync.mockReturnValue(false);
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -185,22 +184,18 @@ describe('import-pipeline.service', () => {
 
     it('should handle parsing errors gracefully', async () => {
       // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValue(['/test/source/bad.md']);
+      mockGlob.mockResolvedValue(['/test/source/bad.md'] as any);
 
       mockFs.readFileSync.mockImplementation(() => {
         throw new Error('File read error');
       });
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
-
       mockManifestService.calculateFileHash.mockReturnValue('hash123');
       mockManifestService.getNewOrChangedSources.mockReturnValue(['/test/source/bad.md']);
       mockManifestService.getRemovedSources.mockReturnValue([]);
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -219,35 +214,29 @@ describe('import-pipeline.service', () => {
 
     it('should skip relationships when flag is set', async () => {
       // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValue(['/test/source/doc1.md']);
+      mockGlob.mockResolvedValue(['/test/source/doc1.md'] as any);
 
       mockFs.readFileSync.mockReturnValue('# Test');
       mockFs.existsSync.mockReturnValue(false);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
-
       mockManifestService.calculateFileHash.mockReturnValue('hash123');
 
-      const { parsePathMetadata } = require('../parsers/path-metadata-parser');
-      parsePathMetadata.mockReturnValue({
+      mockParsePathMetadata.mockReturnValue({
         filePath: '/test/source/doc1.md',
         relativePath: 'doc1.md',
         extension: '.md'
-      });
+      } as any);
 
-      const { parseMarkdown } = require('../parsers/markdown-parser');
-      parseMarkdown.mockReturnValue({
+      mockParseMarkdown.mockReturnValue({
         pathMeta: {},
         frontmatter: {},
         rawContent: '# Test',
         title: 'Test',
         contentHash: 'hash123'
-      });
+      } as any);
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -260,40 +249,34 @@ describe('import-pipeline.service', () => {
 
       // Assert
       expect(result.totalRelationships).toBe(0);
-      expect(extractRelationships).not.toHaveBeenCalled();
+      expect(mockExtractRelationships).not.toHaveBeenCalled();
     });
 
     it('should not write to database in dry-run mode', async () => {
       // Arrange
-      const { glob } = require('glob');
       // scanSourceFiles calls glob twice (*.md then *.feature); return 1 file then empty.
-      glob.mockResolvedValueOnce(['/test/source/doc1.md'])
-          .mockResolvedValueOnce([]);
+      mockGlob.mockResolvedValueOnce(['/test/source/doc1.md'] as any)
+          .mockResolvedValueOnce([] as any);
 
       mockFs.readFileSync.mockReturnValue('# Test');
       mockFs.existsSync.mockReturnValue(false);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
-
       mockManifestService.calculateFileHash.mockReturnValue('hash123');
 
-      const { parsePathMetadata } = require('../parsers/path-metadata-parser');
-      parsePathMetadata.mockReturnValue({
+      mockParsePathMetadata.mockReturnValue({
         filePath: '/test/source/doc1.md',
         relativePath: 'doc1.md',
         extension: '.md'
-      });
+      } as any);
 
-      const mockParsed = {
+      mockParseMarkdown.mockReturnValue({
         pathMeta: { extension: '.md', relativePath: 'doc1.md' },
         frontmatter: {},
         rawContent: '# Test',
         title: 'Test',
         contentHash: 'hash123'
-      };
-      const { parseMarkdown } = require('../parsers/markdown-parser');
-      parseMarkdown.mockReturnValue(mockParsed);
+      } as any);
 
       // Configure transformers so that at least one node is produced.
       // shouldCreateSourceNode returns true so a source node is created via transformToSourceNode.
@@ -305,16 +288,14 @@ describe('import-pipeline.service', () => {
         tags: ['source'],
         metadata: {}
       };
-      const transformers = require('../transformers');
-      transformers.shouldCreateSourceNode.mockReturnValue(true);
-      transformers.transformToSourceNode.mockReturnValue(mockSourceNode);
-      transformers.isEpicContent.mockReturnValue(false);
-      transformers.isArchetypeContent.mockReturnValue(false);
-      transformers.isScenarioContent.mockReturnValue(false);
-      transformers.isResourceContent.mockReturnValue(false);
+      mockTransformers.shouldCreateSourceNode.mockReturnValue(true);
+      mockTransformers.transformToSourceNode.mockReturnValue(mockSourceNode as any);
+      mockTransformers.isEpicContent.mockReturnValue(false);
+      mockTransformers.isArchetypeContent.mockReturnValue(false);
+      mockTransformers.isScenarioContent.mockReturnValue(false);
+      mockTransformers.isResourceContent.mockReturnValue(false);
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       const options: ImportOptions = {
         ...baseOptions,
@@ -332,14 +313,11 @@ describe('import-pipeline.service', () => {
   describe('importContent', () => {
     it('should call runImportPipeline with correct defaults', async () => {
       // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValue([]);
+      mockGlob.mockResolvedValue([] as any);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       // Act
       await importContent('/source', '/output', true);
@@ -350,14 +328,11 @@ describe('import-pipeline.service', () => {
 
     it('should use full mode when incremental is false', async () => {
       // Arrange
-      const { glob } = require('glob');
-      glob.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGlob.mockResolvedValueOnce([] as any).mockResolvedValueOnce([] as any);
 
-      const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
 
-      const { extractRelationships } = require('./relationship-extractor.service');
-      extractRelationships.mockReturnValue([]);
+      mockExtractRelationships.mockReturnValue([]);
 
       // Act — no dbPath means dryRun defaults to true
       const result = await importContent('/source', '/output', false);

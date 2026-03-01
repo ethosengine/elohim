@@ -5,13 +5,13 @@
  * web (Doorway) and native (Direct) deployment modes.
  */
 
-// Mock @holochain/client to avoid ESM transitive dependency chain in Jest
-jest.mock('@holochain/client', () => ({
-  AdminWebsocket: { connect: jest.fn() },
-  AppWebsocket: { connect: jest.fn() },
-  generateSigningKeyPair: jest.fn(),
-  randomCapSecret: jest.fn(),
-  setSigningCredentials: jest.fn(),
+// Mock @holochain/client to avoid ESM transitive dependency chain
+vi.mock('@holochain/client', () => ({
+  AdminWebsocket: { connect: vi.fn() },
+  AppWebsocket: { connect: vi.fn() },
+  generateSigningKeyPair: vi.fn(),
+  randomCapSecret: vi.fn(),
+  setSigningCredentials: vi.fn(),
 }));
 
 import {
