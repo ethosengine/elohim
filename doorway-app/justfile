@@ -22,5 +22,9 @@ build:
 lint:
     pnpm exec eslint src --ext .ts,.html
 
-# Quality gate: lint + build
-gate: lint build
+# Run unit tests
+test:
+    pnpm exec vitest run --config vite.config.ts
+
+# Quality gate: lint + build + test
+gate: lint build test
