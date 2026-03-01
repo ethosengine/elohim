@@ -154,7 +154,7 @@ run_gate() {
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
-        pnpm exec jest --config projects/elohim-service/jest.config.js --ci 2>&1
+        (cd projects/elohim-service && pnpm exec jest --ci) 2>&1
         rc=$?
         ;;
       genesis)
