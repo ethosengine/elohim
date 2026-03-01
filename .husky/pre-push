@@ -137,7 +137,8 @@ run_gate() {
         ;;
       doorway-app)
         pnpm exec eslint src --ext .ts,.html 2>&1 && \
-        pnpm exec ng build --configuration=development 2>&1
+        pnpm exec ng build --configuration=development 2>&1 && \
+        pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
         ;;
       sophia)

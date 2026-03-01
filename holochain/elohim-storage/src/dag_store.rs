@@ -161,10 +161,7 @@ mod tests {
     #[test]
     fn test_extract_links_invalid_cbor() {
         // Invalid CBOR should return empty, not panic
-        assert_eq!(
-            extract_links(&[0xFF, 0xFE, 0xFD], 0x71),
-            Vec::<Cid>::new()
-        );
+        assert_eq!(extract_links(&[0xFF, 0xFE, 0xFD], 0x71), Vec::<Cid>::new());
     }
 
     #[test]
