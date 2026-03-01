@@ -4832,9 +4832,7 @@ impl HttpServer {
 
         // Look up EPR Head from content DB by ID
         if let Some(ref content_db) = self.content_db {
-            let content_opt = content_db.with_conn(|conn| {
-                db::content::get_content(conn, id)
-            })?;
+            let content_opt = content_db.with_conn(|conn| db::content::get_content(conn, id))?;
 
             if let Some(content) = content_opt {
                 // Build an EprHead from the content row
@@ -4875,10 +4873,7 @@ impl HttpServer {
                         Ok((cbor_bytes, _cid)) => {
                             return Ok(Response::builder()
                                 .status(StatusCode::OK)
-                                .header(
-                                    header::CONTENT_TYPE,
-                                    "application/vnd.ipld.dag-cbor",
-                                )
+                                .header(header::CONTENT_TYPE, "application/vnd.ipld.dag-cbor")
                                 .body(Full::new(Bytes::from(cbor_bytes)))
                                 .unwrap());
                         }
@@ -4903,7 +4898,9 @@ impl HttpServer {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(serde_json::to_string(&view).unwrap())))
+                    .body(Full::new(Bytes::from(
+                        serde_json::to_string(&view).unwrap(),
+                    )))
                     .unwrap());
             }
         }
@@ -4970,11 +4967,7 @@ impl HttpServer {
 
         match self.blob_store.exists_by_address(cid_str).await {
             Ok(true) => {
-                let size = self
-                    .blob_store
-                    .size_by_address(cid_str)
-                    .await
-                    .unwrap_or(0);
+                let size = self.blob_store.size_by_address(cid_str).await.unwrap_or(0);
                 Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/octet-stream")
@@ -4996,10 +4989,7 @@ impl HttpServer {
     /// GET /dag/{cid} — Decode DAG-CBOR block to JSON.
     ///
     /// Retrieves a block by CID and decodes it from DAG-CBOR to JSON for display.
-    async fn handle_get_dag(
-        &self,
-        cid_str: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_get_dag(&self, cid_str: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         if cid_str.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
