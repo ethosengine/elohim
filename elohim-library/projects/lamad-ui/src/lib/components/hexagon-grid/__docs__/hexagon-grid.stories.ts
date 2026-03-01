@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/angular';
 import { action } from '@storybook/addon-actions';
 
 import { HexagonGridComponent, HexNode } from '../hexagon-grid.component';
+
 import {
   nodes12,
   nodes48,
@@ -10,6 +10,8 @@ import {
   nodesAllUnseen,
   nodesLearnerProgress,
 } from './hexagon-grid.testdata';
+
+import type { Meta, StoryObj } from '@storybook/angular';
 
 const meta: Meta<HexagonGridComponent> = {
   title: 'Components/Hexagon Grid',
@@ -32,7 +34,8 @@ const meta: Meta<HexagonGridComponent> = {
     },
     nodes: {
       control: false,
-      description: 'Array of HexNode objects to render. Each node requires id, title, affinity (0–1), and affinityLevel.',
+      description:
+        'Array of HexNode objects to render. Each node requires id, title, affinity (0–1), and affinityLevel.',
     },
     nodeClick: {
       action: 'nodeClick',
@@ -75,7 +78,8 @@ export const FullyMastered: Story = {
     backgrounds: { default: 'obsidian' },
     docs: {
       description: {
-        story: 'All nodes at high affinity — the target end-state for any content area. Nodes glow green.',
+        story:
+          'All nodes at high affinity — the target end-state for any content area. Nodes glow green.',
       },
     },
   },

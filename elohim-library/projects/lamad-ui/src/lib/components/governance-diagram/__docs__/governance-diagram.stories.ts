@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/angular';
-
 import { GovernanceDiagramComponent } from '../governance-diagram.component';
+
+import type { Meta, StoryObj } from '@storybook/angular';
 
 const meta: Meta<GovernanceDiagramComponent> = {
   title: 'Components/Governance Diagram',
@@ -49,7 +49,8 @@ export const GlobalLayer: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'The Global layer: universal principles that cannot be overridden by any jurisdiction.',
+        story:
+          'The Global layer: universal principles that cannot be overridden by any jurisdiction.',
       },
     },
   },
@@ -72,7 +73,8 @@ export const OnStoneDark: Story = {
     backgrounds: { default: 'stone-dark' },
     docs: {
       description: {
-        story: 'Governance diagram on stone-dark — intermediate surface between light pages and full-bleed dark sections.',
+        story:
+          'Governance diagram on stone-dark — intermediate surface between light pages and full-bleed dark sections.',
       },
     },
   },

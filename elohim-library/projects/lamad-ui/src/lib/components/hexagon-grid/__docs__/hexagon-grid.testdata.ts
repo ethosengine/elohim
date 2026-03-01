@@ -2,10 +2,10 @@ import { HexNode } from '../hexagon-grid.component';
 
 // Deterministic affinity cycle: unseen → low → medium → high
 const CYCLE: { affinityLevel: HexNode['affinityLevel']; affinity: number }[] = [
-  { affinityLevel: 'unseen', affinity: 0.0 },
-  { affinityLevel: 'low',    affinity: 0.3 },
+  { affinityLevel: 'unseen', affinity: 0 },
+  { affinityLevel: 'low', affinity: 0.3 },
   { affinityLevel: 'medium', affinity: 0.65 },
-  { affinityLevel: 'high',   affinity: 0.92 },
+  { affinityLevel: 'high', affinity: 0.92 },
 ];
 
 function makeNodes(count: number, label = 'Node'): HexNode[] {
@@ -45,10 +45,10 @@ export const nodesAllUnseen: HexNode[] = Array.from({ length: 48 }, (_, i) => ({
 export const nodesLearnerProgress: HexNode[] = Array.from({ length: 60 }, (_, i) => {
   const progress = i / 59;
   let affinityLevel: HexNode['affinityLevel'];
-  if (progress < 0.25)      affinityLevel = 'unseen';
-  else if (progress < 0.5)  affinityLevel = 'low';
+  if (progress < 0.25) affinityLevel = 'unseen';
+  else if (progress < 0.5) affinityLevel = 'low';
   else if (progress < 0.75) affinityLevel = 'medium';
-  else                      affinityLevel = 'high';
+  else affinityLevel = 'high';
   return {
     id: `progress-${i}`,
     title: `Concept ${i + 1}`,

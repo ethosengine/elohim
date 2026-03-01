@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/angular';
-
 import { ValueScannerDiagramComponent } from '../value-scanner-diagram.component';
+
+import type { Meta, StoryObj } from '@storybook/angular';
 
 const meta: Meta<ValueScannerDiagramComponent> = {
   title: 'Components/Value Scanner Diagram',
@@ -34,7 +34,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Auto-advancing through all four protocol steps. The transaction bundle reveals Care and Community fields at step 3.',
+        story:
+          'Auto-advancing through all four protocol steps. The transaction bundle reveals Care and Community fields at step 3.',
       },
     },
   },
@@ -46,7 +47,8 @@ export const OnMidBackground: Story = {
     backgrounds: { default: 'stone-mid' },
     docs: {
       description: {
-        story: 'Value Scanner on a slightly darker stone surface, as used in alternating explainer sections.',
+        story:
+          'Value Scanner on a slightly darker stone surface, as used in alternating explainer sections.',
       },
     },
   },
@@ -58,7 +60,8 @@ export const LaptopLayout: Story = {
     viewport: { defaultViewport: 'laptop' },
     docs: {
       description: {
-        story: 'On wider viewports the timeline stretches to fill the container, reducing label truncation.',
+        story:
+          'On wider viewports the timeline stretches to fill the container, reducing label truncation.',
       },
     },
   },
@@ -70,7 +73,8 @@ export const MobileLayout: Story = {
     viewport: { defaultViewport: 'mobile' },
     docs: {
       description: {
-        story: 'On mobile, the step icons stack and label text wraps. The bundle card remains readable.',
+        story:
+          'On mobile, the step icons stack and label text wraps. The bundle card remains readable.',
       },
     },
   },

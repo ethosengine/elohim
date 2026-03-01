@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/angular';
-
 import { ObserverDiagramComponent } from '../observer-diagram.component';
+
+import type { Meta, StoryObj } from '@storybook/angular';
 
 const meta: Meta<ObserverDiagramComponent> = {
   title: 'Components/Observer Diagram',
@@ -49,7 +49,8 @@ export const OnLightBackground: Story = {
     backgrounds: { default: 'stone-light' },
     docs: {
       description: {
-        story: 'Observer on the standard stone-light surface — as it appears in the main protocol explainer.',
+        story:
+          'Observer on the standard stone-light surface — as it appears in the main protocol explainer.',
       },
     },
   },
@@ -62,7 +63,7 @@ export const OnDarkBackground: Story = {
     docs: {
       description: {
         story:
-          'Observer on an obsidian background. The card\'s white surface creates strong contrast, ' +
+          "Observer on an obsidian background. The card's white surface creates strong contrast, " +
           'suitable for dark-mode landings.',
       },
     },
