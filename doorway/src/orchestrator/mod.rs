@@ -348,6 +348,19 @@ impl Orchestrator {
     pub async fn start(&mut self) -> Result<()> {
         info!("Starting orchestrator...");
 
+        // Self-register the doorway so it appears in the admin dashboard immediately.
+        // This bypasses the normal mDNS discovery flow — the doorway is always Online.
+        let bootstrap_config = NodeBootstrapConfig {
+            mdns_service_type: self.state.config.mdns_service_type.clone(),
+            admin_port: self.state.config.admin_port,
+            region: self.state.config.region.clone(),
+        };
+        let self_inventory = node_bootstrap::register_self(&bootstrap_config).await?;
+        self.state
+            .register_node(self_inventory.node_id.clone(), self_inventory.clone())
+            .await?;
+        self.state.mark_provisioned(&self_inventory.node_id).await?;
+
         // Start node bootstrap (mDNS listener)
         let bootstrap_config = NodeBootstrapConfig {
             mdns_service_type: self.state.config.mdns_service_type.clone(),

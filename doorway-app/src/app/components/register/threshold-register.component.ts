@@ -345,6 +345,9 @@ export class ThresholdRegisterComponent implements OnInit {
         throw new Error('Registration failed');
       }
 
+      // Store token so the auth interceptor can attach it to subsequent requests
+      this.authState.storeToken(authResult.token);
+
       // Step 3: If OAuth flow, generate authorization code
       const params = this.oauthParams();
       if (params) {

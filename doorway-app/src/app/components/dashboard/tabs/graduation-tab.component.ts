@@ -7,6 +7,7 @@
 
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { NotificationService } from '../../../core/notifications/notification.service';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
 import { GraduationUser } from '../../../models/doorway.model';
 
@@ -105,6 +106,7 @@ import { GraduationUser } from '../../../models/doorway.model';
 })
 export class GraduationTabComponent implements OnInit {
   private readonly adminService = inject(DoorwayAdminService);
+  private readonly notify = inject(NotificationService);
 
   readonly loading = signal(true);
   readonly pending = signal<GraduationUser[]>([]);
@@ -148,13 +150,13 @@ export class GraduationTabComponent implements OnInit {
     try {
       const result = await this.adminService.forceGraduate(user.id).toPromise();
       if (result?.success) {
-        // Refresh data
+        this.notify.success('User graduated to steward');
         await this.loadData();
       } else {
-        alert('Failed to graduate user: ' + (result?.message ?? 'Unknown error'));
+        this.notify.error('Failed to graduate user: ' + (result?.message ?? 'Unknown error'));
       }
     } catch {
-      alert('Failed to graduate user');
+      this.notify.error('Failed to graduate user');
     } finally {
       this.graduating.update(set => {
         const next = new Set(set);

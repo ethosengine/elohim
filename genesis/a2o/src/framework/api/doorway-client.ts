@@ -149,6 +149,164 @@ export interface PathWithDetailsView extends PathIndexEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Session Transfer types (mirrors Rust session handoff endpoints)
+// ---------------------------------------------------------------------------
+
+export interface SessionTokenResponse {
+  sessionToken: string;
+  expiresAt: number;
+}
+
+export interface SessionExchangeResponse {
+  token: string;
+  humanId: string;
+  agentPubKey: string;
+  identifier: string;
+  expiresAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// Account types (mirrors doorway admin AccountResponse)
+// ---------------------------------------------------------------------------
+
+export interface AccountResponse {
+  identifier: string;
+  humanId: string;
+  agentPubKey: string;
+  permissionLevel: string;
+  isActive: boolean;
+  isSteward: boolean;
+  doorwayId?: string;
+  doorwayName?: string;
+  doorwayRegion?: string;
+  memberSince?: string;
+  lastLogin?: string;
+  usage?: {
+    storageBytes: number;
+    projectionQueries: number;
+    bandwidthBytes: number;
+  };
+  quota?: {
+    storageLimit: number;
+    dailyQueryLimit: number;
+    dailyBandwidthLimit: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Status types (mirrors doorway /status endpoint)
+// ---------------------------------------------------------------------------
+
+export interface StatusResponse {
+  version: string;
+  uptime: number;
+  conductor?: Record<string, unknown>;
+  orchestrator?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Admin Node types (mirrors doorway /admin/nodes endpoint)
+// ---------------------------------------------------------------------------
+
+export interface AdminNodeView {
+  nodeId: string;
+  status: string;
+  combinedScore: number;
+  trustScore?: number;
+  stewardTier?: string;
+  lastHeartbeat?: string;
+  inventory?: {
+    cpuCores: number;
+    memoryGb: number;
+    storageTb: number;
+    bandwidthMbps: number;
+    region: string;
+  };
+}
+
+export interface AdminNodesResponse {
+  total: number;
+  nodes: AdminNodeView[];
+}
+
+// ---------------------------------------------------------------------------
+// Admin Conductor types (mirrors doorway /admin/conductors endpoints)
+// ---------------------------------------------------------------------------
+
+export interface ConductorSummary {
+  conductorId: string;
+  conductorUrl: string;
+  adminUrl: string;
+  capacityUsed: number;
+  capacityMax: number;
+  capacityAvailable: number;
+  agentCount: number;
+}
+
+export interface AdminConductorsResponse {
+  total: number;
+  totalAgents: number;
+  totalCapacity: number;
+  conductors: ConductorSummary[];
+}
+
+export interface AgentSummary {
+  agentPubKey: string;
+  appId: string;
+  assignedAt: string;
+}
+
+export interface ConductorAgentsResponse {
+  conductorId: string;
+  total: number;
+  agents: AgentSummary[];
+}
+
+export interface AgentConductorResponse {
+  agentPubKey: string;
+  conductorId: string;
+  conductorUrl: string;
+  appId: string;
+  assignedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Admin Federation types (mirrors doorway /admin/federation endpoints)
+// ---------------------------------------------------------------------------
+
+export interface FederationPeer {
+  url: string;
+  reachable: boolean;
+  doorwayId: string | null;
+  region: string | null;
+  capabilities: string[];
+}
+
+export interface FederationPeersResponse {
+  peers: FederationPeer[];
+  total: number;
+  selfId: string | null;
+}
+
+export interface AdminMutationResponse {
+  success: boolean;
+  message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Admin Pipeline types (mirrors doorway /admin/pipeline endpoint)
+// ---------------------------------------------------------------------------
+
+export interface PipelineResponse {
+  registeredTotal: number;
+  registeredActive: number;
+  hostedTotal: number;
+  graduatingCount: number;
+  stewardCount: number;
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
@@ -255,6 +413,78 @@ export class DoorwayClient {
     return envelope.items;
   }
 
+  // -- Session Handoff ------------------------------------------------------
+
+  async sessionToken(): Promise<SessionTokenResponse> {
+    return this.get<SessionTokenResponse>('/auth/session-token');
+  }
+
+  async exchangeSession(sessionToken: string): Promise<SessionExchangeResponse> {
+    return this.get<SessionExchangeResponse>(
+      `/auth/exchange-session?session_token=${encodeURIComponent(sessionToken)}`
+    );
+  }
+
+  // -- Account (doorway-app) ------------------------------------------------
+
+  async account(): Promise<AccountResponse> {
+    return this.get<AccountResponse>('/auth/account');
+  }
+
+  // -- Status (comprehensive) -----------------------------------------------
+
+  async status(): Promise<StatusResponse> {
+    return this.get<StatusResponse>('/status');
+  }
+
+  // -- Admin: Nodes ---------------------------------------------------------
+
+  async adminNodes(): Promise<AdminNodesResponse> {
+    return this.get<AdminNodesResponse>('/admin/nodes');
+  }
+
+  // -- Admin: Conductors ----------------------------------------------------
+
+  async adminConductors(): Promise<AdminConductorsResponse> {
+    return this.get<AdminConductorsResponse>('/admin/conductors');
+  }
+
+  async adminConductorAgents(conductorId: string): Promise<ConductorAgentsResponse> {
+    return this.get<ConductorAgentsResponse>(
+      `/admin/conductors/${encodeURIComponent(conductorId)}/agents`
+    );
+  }
+
+  async adminAgentConductor(agentPubKey: string): Promise<AgentConductorResponse> {
+    return this.get<AgentConductorResponse>(
+      `/admin/agents/${encodeURIComponent(agentPubKey)}/conductor`
+    );
+  }
+
+  // -- Admin: Federation ----------------------------------------------------
+
+  async adminFederationPeers(): Promise<FederationPeersResponse> {
+    return this.get<FederationPeersResponse>('/admin/federation/peers');
+  }
+
+  async adminAddFederationPeer(url: string): Promise<AdminMutationResponse> {
+    return this.post<AdminMutationResponse>('/admin/federation/peers', { url });
+  }
+
+  async adminRemoveFederationPeer(url: string): Promise<AdminMutationResponse> {
+    return this.delete<AdminMutationResponse>('/admin/federation/peers', { url });
+  }
+
+  async adminRefreshFederationPeers(): Promise<AdminMutationResponse> {
+    return this.post<AdminMutationResponse>('/admin/federation/peers/refresh', {});
+  }
+
+  // -- Admin: Pipeline (agency funnel) --------------------------------------
+
+  async adminPipeline(): Promise<PipelineResponse> {
+    return this.get<PipelineResponse>('/admin/pipeline');
+  }
+
   // -- HTTP helpers ---------------------------------------------------------
 
   private async get<T>(path: string): Promise<T> {
@@ -278,6 +508,19 @@ export class DoorwayClient {
     const text = await body.text();
     if (statusCode < 200 || statusCode >= 300) {
       throw new Error(`POST ${path} returned ${statusCode}: ${text}`);
+    }
+    return JSON.parse(text) as T;
+  }
+
+  private async delete<T>(path: string, payload: unknown): Promise<T> {
+    const { statusCode, body } = await request(`${this.baseUrl}${path}`, {
+      method: 'DELETE',
+      headers: { ...this.headers(), 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await body.text();
+    if (statusCode < 200 || statusCode >= 300) {
+      throw new Error(`DELETE ${path} returned ${statusCode}: ${text}`);
     }
     return JSON.parse(text) as T;
   }

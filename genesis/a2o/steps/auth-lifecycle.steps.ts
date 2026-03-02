@@ -75,6 +75,41 @@ Then('the auth response should include an agentPubKey', function (this: E2EWorld
 });
 
 // ---------------------------------------------------------------------------
+// Identity plumbing (Sprint 7 — JWT carries Holochain identity)
+// ---------------------------------------------------------------------------
+
+Then('the agentPubKey should not be empty', function (this: E2EWorld) {
+  const auth = JSON.parse(this.contentIds.get('lastAuthResponse')!) as AuthResponse;
+  assert.ok(auth.agentPubKey, 'Auth response missing agentPubKey');
+  assert.ok(
+    auth.agentPubKey.length > 10,
+    `agentPubKey looks invalid (too short): "${auth.agentPubKey}"`
+  );
+});
+
+Then('the identity should include an agent public key', function (this: E2EWorld) {
+  assert.strictEqual(this.contentIds.get('lastMeSuccess'), 'true', '/auth/me failed');
+  const me = JSON.parse(this.contentIds.get('lastMeResponse')!) as Record<string, unknown>;
+  assert.ok(me.agentPubKey, 'Identity response missing agentPubKey');
+});
+
+Then(
+  "the identity agent key should match {word}'s auth agentPubKey",
+  function (this: E2EWorld, humanName: string) {
+    const human = this.getHuman(humanName);
+    assert.ok(human.agentPubKey, `${humanName} has no stored agentPubKey from auth`);
+
+    assert.strictEqual(this.contentIds.get('lastMeSuccess'), 'true', '/auth/me failed');
+    const me = JSON.parse(this.contentIds.get('lastMeResponse')!) as Record<string, unknown>;
+    assert.strictEqual(
+      me.agentPubKey,
+      human.agentPubKey,
+      `Identity agentPubKey doesn't match auth agentPubKey`
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Token and identifier verification
 // ---------------------------------------------------------------------------
 

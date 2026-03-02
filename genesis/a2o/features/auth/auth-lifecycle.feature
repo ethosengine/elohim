@@ -63,6 +63,21 @@ Feature: Authentication Lifecycle
     When Lifecycle checks their identity
     Then the identity check should succeed
 
+  # --- Identity plumbing (Sprint 7 — JWT carries Holochain identity) ---
+
+  Scenario: Registration creates a valid Holochain identity
+    When a new human "IdentityTest" registers on doorway "alpha"
+    Then the auth response should include a token
+    And the auth response should include a humanId
+    And the auth response should include an agentPubKey
+    And the agentPubKey should not be empty
+
+  Scenario: API requests carry requester identity from JWT
+    Given human "Matthew" is logged in on doorway "alpha"
+    When Matthew checks their identity
+    Then the identity should include an agent public key
+    And the identity agent key should match Matthew's auth agentPubKey
+
   # --- Concurrent sessions (the family is online) ---
 
   Scenario: Multiple humans logged in simultaneously

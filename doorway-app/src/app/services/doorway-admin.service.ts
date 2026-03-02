@@ -659,13 +659,13 @@ export class DoorwayAdminService {
    */
   private handleError<T>(operation: string, fallback: T) {
     return (error: HttpErrorResponse): Observable<T> => {
-      console.error(`[DoorwayAdmin] ${operation} failed:`, error.message);
-
-      // Could emit to an error service here
-      if (error.status === 503) {
-        console.warn('[DoorwayAdmin] Orchestrator not enabled on this doorway');
+      // Suppress expected errors: 503 (feature disabled), 401/403 (not authenticated yet)
+      if (error.status === 503 || error.status === 401 || error.status === 403) {
+        // These are expected during startup or when features are disabled -- don't pollute console
+        return of(fallback);
       }
 
+      console.error(`[DoorwayAdmin] ${operation} failed:`, error.message);
       return of(fallback);
     };
   }

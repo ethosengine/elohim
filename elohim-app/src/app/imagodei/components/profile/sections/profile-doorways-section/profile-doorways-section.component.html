@@ -41,15 +41,15 @@
           @if (doorway.latencyMs) {
             <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
           }
-          <a
-            [href]="doorway.url + '/threshold'"
-            target="_blank"
-            rel="noopener"
+          <button
+            type="button"
             class="doorway-visit-link"
+            (click)="visitDoorway(doorway.url)"
+            data-testid="doorway-visit-btn"
           >
             Visit
             <span class="material-icons">open_in_new</span>
-          </a>
+          </button>
           @if (doorway.id !== activeDoorwayId()) {
             <button
               type="button"

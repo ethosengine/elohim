@@ -283,6 +283,9 @@ export class ThresholdLoginComponent implements OnInit {
         throw new Error('Authentication failed');
       }
 
+      // Store token so the auth interceptor can attach it to subsequent requests
+      this.authState.storeToken(authResult.token);
+
       // If OAuth flow, generate authorization code
       const params = this.oauthParams();
       if (params) {

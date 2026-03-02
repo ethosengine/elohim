@@ -14,7 +14,10 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, OnceLock};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::auth::{
@@ -33,6 +36,63 @@ use crate::types::DoorwayError;
 use rand::Rng;
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
+
+// =============================================================================
+// Session Transfer Store (cross-app session handoff)
+// =============================================================================
+
+/// Data stored for each pending session transfer token.
+struct SessionTransferEntry {
+    human_id: String,
+    agent_pub_key: String,
+    identifier: String,
+    permission_level: crate::auth::PermissionLevel,
+    session_id: Option<String>,
+    conductor_id: Option<String>,
+    installed_app_id: Option<String>,
+    is_steward: bool,
+    has_local_conductor: bool,
+    doorway_id: Option<String>,
+    doorway_url: Option<String>,
+    expires_at: Instant,
+    consumed: bool,
+}
+
+/// Module-level singleton for the session transfer store.
+/// Short-lived (60 s TTL) single-use tokens — no persistence needed.
+fn session_transfer_store() -> &'static Arc<RwLock<HashMap<String, SessionTransferEntry>>> {
+    static STORE: OnceLock<Arc<RwLock<HashMap<String, SessionTransferEntry>>>> = OnceLock::new();
+    STORE.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
+}
+
+// =============================================================================
+// Session Transfer Response Types
+// =============================================================================
+
+/// Response for GET /auth/session-token
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTokenResponse {
+    /// Short-lived single-use transfer token (60 s TTL)
+    pub session_token: String,
+    /// Unix timestamp when the token expires
+    pub expires_at: u64,
+}
+
+/// Response for GET /auth/exchange-session
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeSessionResponse {
+    pub token: String,
+    pub human_id: String,
+    pub agent_pub_key: String,
+    pub identifier: String,
+    pub expires_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_url: Option<String>,
+}
 
 // =============================================================================
 // Request/Response Types
@@ -3182,6 +3242,259 @@ fn generate_oauth_token_response(
 }
 
 // =============================================================================
+// Session Transfer Handlers
+// =============================================================================
+
+/// GET /auth/session-token
+///
+/// Given a valid Bearer token, issues a short-lived (60 s) single-use transfer
+/// token that doorway-app can exchange for a full JWT without re-login.
+///
+/// Flow:
+/// 1. Validate Bearer token from Authorization header
+/// 2. Generate a random UUID transfer token
+/// 3. Store identity snapshot with 60 s TTL in the in-memory store
+/// 4. Opportunistically sweep expired/consumed entries
+/// 5. Return { sessionToken, expiresAt }
+async fn handle_session_token(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    let auth_header = get_auth_header(&req);
+    let token = match extract_token_from_header(auth_header) {
+        Some(t) => t,
+        None => {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                &ErrorResponse {
+                    error: "No token provided".into(),
+                    code: Some("NO_TOKEN".into()),
+                },
+            )
+        }
+    };
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    let result = jwt.verify_token(token);
+    if !result.valid {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            &ErrorResponse {
+                error: result
+                    .error
+                    .unwrap_or_else(|| "Invalid or expired token".into()),
+                code: Some("INVALID_TOKEN".into()),
+            },
+        );
+    }
+
+    let claims = result.claims.unwrap();
+
+    // Generate a random single-use transfer token.
+    let transfer_token = uuid::Uuid::new_v4().to_string();
+    let ttl = std::time::Duration::from_secs(60);
+    let expires_at_instant = Instant::now() + ttl;
+
+    // Unix timestamp for the client (Instant is not serializable).
+    let expires_at_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() + 60)
+        .unwrap_or(0);
+
+    let entry = SessionTransferEntry {
+        human_id: claims.human_id,
+        agent_pub_key: claims.agent_pub_key,
+        identifier: claims.identifier,
+        permission_level: claims.permission_level,
+        session_id: claims.session_id,
+        conductor_id: claims.conductor_id,
+        installed_app_id: claims.installed_app_id,
+        is_steward: claims.is_steward,
+        has_local_conductor: claims.has_local_conductor,
+        doorway_id: claims.doorway_id,
+        doorway_url: claims.doorway_url,
+        expires_at: expires_at_instant,
+        consumed: false,
+    };
+
+    let store = session_transfer_store();
+    {
+        let mut map = store.write().await;
+
+        // Opportunistic cleanup: remove expired or consumed entries.
+        let now = Instant::now();
+        map.retain(|_, v| !v.consumed && v.expires_at > now);
+
+        map.insert(transfer_token.clone(), entry);
+    }
+
+    info!("Issued session transfer token for cross-app handoff");
+
+    json_response(
+        StatusCode::OK,
+        &SessionTokenResponse {
+            session_token: transfer_token,
+            expires_at: expires_at_unix,
+        },
+    )
+}
+
+/// GET /auth/exchange-session?session_token=xxx
+///
+/// Validates a transfer token issued by /auth/session-token and returns a
+/// full JWT.  The token is marked consumed on first use.
+///
+/// Flow:
+/// 1. Parse `session_token` query parameter
+/// 2. Look up in store — reject if missing, expired, or already consumed
+/// 3. Mark as consumed
+/// 4. Generate a fresh JWT from the stored identity snapshot
+/// 5. Return full auth response
+async fn handle_exchange_session(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    // Parse the session_token query parameter.
+    let query = req.uri().query().unwrap_or("");
+    let session_token = serde_urlencoded::from_str::<HashMap<String, String>>(query)
+        .ok()
+        .and_then(|m| m.get("session_token").cloned());
+
+    let session_token = match session_token {
+        Some(t) if !t.is_empty() => t,
+        _ => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: "Missing required query parameter: session_token".into(),
+                    code: Some("MISSING_PARAM".into()),
+                },
+            )
+        }
+    };
+
+    let store = session_transfer_store();
+
+    // Lock, validate, and consume atomically.
+    let entry_snapshot = {
+        let mut map = store.write().await;
+        match map.get_mut(&session_token) {
+            None => {
+                return json_response(
+                    StatusCode::UNAUTHORIZED,
+                    &ErrorResponse {
+                        error: "Invalid or unknown session token".into(),
+                        code: Some("INVALID_SESSION_TOKEN".into()),
+                    },
+                )
+            }
+            Some(entry) => {
+                if entry.consumed {
+                    return json_response(
+                        StatusCode::UNAUTHORIZED,
+                        &ErrorResponse {
+                            error: "Session token has already been used".into(),
+                            code: Some("TOKEN_CONSUMED".into()),
+                        },
+                    );
+                }
+                if Instant::now() > entry.expires_at {
+                    return json_response(
+                        StatusCode::UNAUTHORIZED,
+                        &ErrorResponse {
+                            error: "Session token has expired".into(),
+                            code: Some("TOKEN_EXPIRED".into()),
+                        },
+                    );
+                }
+                // Mark consumed before releasing the lock.
+                entry.consumed = true;
+                // Clone the identity fields we need to generate the JWT.
+                (
+                    entry.human_id.clone(),
+                    entry.agent_pub_key.clone(),
+                    entry.identifier.clone(),
+                    entry.permission_level,
+                    entry.session_id.clone(),
+                    entry.conductor_id.clone(),
+                    entry.installed_app_id.clone(),
+                    entry.is_steward,
+                    entry.has_local_conductor,
+                    entry.doorway_id.clone(),
+                    entry.doorway_url.clone(),
+                )
+            }
+        }
+    };
+
+    let (
+        human_id,
+        agent_pub_key,
+        identifier,
+        permission_level,
+        session_id,
+        conductor_id,
+        installed_app_id,
+        is_steward,
+        has_local_conductor,
+        doorway_id,
+        doorway_url,
+    ) = entry_snapshot;
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    let input = TokenInput {
+        human_id: human_id.clone(),
+        agent_pub_key: agent_pub_key.clone(),
+        identifier: identifier.clone(),
+        permission_level,
+        session_id,
+        doorway_id: doorway_id.clone(),
+        doorway_url: doorway_url.clone(),
+        conductor_id,
+        installed_app_id,
+        is_steward,
+        has_local_conductor,
+    };
+
+    match jwt.generate_token(input) {
+        Ok(new_token) => {
+            let verification = jwt.verify_token(&new_token);
+            let expires_at = verification.claims.map(|c| c.exp).unwrap_or(0);
+
+            info!("Session token exchanged for JWT (user: {})", identifier);
+
+            json_response(
+                StatusCode::OK,
+                &ExchangeSessionResponse {
+                    token: new_token,
+                    human_id,
+                    agent_pub_key,
+                    identifier,
+                    expires_at,
+                    doorway_id,
+                    doorway_url,
+                },
+            )
+        }
+        Err(e) => json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &ErrorResponse {
+                error: format!("Failed to generate token: {e}"),
+                code: Some("TOKEN_ERROR".into()),
+            },
+        ),
+    }
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -3320,6 +3633,10 @@ pub async fn handle_auth_request(
         // Native handoff (Tauri session migration)
         (&Method::GET, "/auth/native-handoff") => handle_native_handoff(req, state).await,
 
+        // Cross-app session handoff (elohim-app -> doorway-app)
+        (&Method::GET, "/auth/session-token") => handle_session_token(req, state).await,
+        (&Method::GET, "/auth/exchange-session") => handle_exchange_session(req, state).await,
+
         // Stewardship migration endpoints
         (&Method::GET, "/auth/export-key") => handle_export_key(req, state).await,
         (&Method::POST, "/auth/confirm-stewardship")
@@ -3359,7 +3676,9 @@ pub async fn handle_auth_request(
         | (_, "/auth/check-recovery-status")
         | (_, "/auth/activate-recovery")
         | (_, "/auth/elohim-verify/start")
-        | (_, "/auth/elohim-verify/answer") => json_response(
+        | (_, "/auth/elohim-verify/answer")
+        | (_, "/auth/session-token")
+        | (_, "/auth/exchange-session") => json_response(
             StatusCode::METHOD_NOT_ALLOWED,
             &ErrorResponse {
                 error: "Method not allowed".into(),

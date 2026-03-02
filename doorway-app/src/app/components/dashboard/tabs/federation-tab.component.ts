@@ -10,6 +10,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NotificationService } from '../../../core/notifications/notification.service';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
 import {
   FederatedDoorway,
@@ -203,6 +204,7 @@ import {
 })
 export class FederationTabComponent implements OnInit {
   private readonly adminService = inject(DoorwayAdminService);
+  private readonly notify = inject(NotificationService);
 
   readonly loading = signal(true);
   readonly doorways = signal<FederatedDoorway[]>([]);
@@ -258,10 +260,10 @@ export class FederationTabComponent implements OnInit {
         this.newPeerUrl = '';
         await this.reloadPeerConfig();
       } else {
-        alert(result?.message ?? 'Failed to add peer');
+        this.notify.error(result?.message ?? 'Failed to add peer');
       }
     } catch {
-      alert('Failed to add peer');
+      this.notify.error('Failed to add peer');
     } finally {
       this.addingPeer.set(false);
     }
@@ -274,10 +276,10 @@ export class FederationTabComponent implements OnInit {
       if (result?.success) {
         await this.reloadPeerConfig();
       } else {
-        alert(result?.message ?? 'Failed to remove peer');
+        this.notify.error(result?.message ?? 'Failed to remove peer');
       }
     } catch {
-      alert('Failed to remove peer');
+      this.notify.error('Failed to remove peer');
     } finally {
       this.removingPeer.set(null);
     }
@@ -289,7 +291,7 @@ export class FederationTabComponent implements OnInit {
       await this.adminService.refreshFederationPeers().toPromise();
       await this.reloadPeerConfig();
     } catch {
-      alert('Failed to refresh peers');
+      this.notify.error('Failed to refresh peers');
     } finally {
       this.refreshing.set(false);
     }
