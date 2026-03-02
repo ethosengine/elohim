@@ -65,12 +65,13 @@ impl CorsConfig {
     /// Returns `None` when the origin is not permitted (the browser will
     /// block the request).
     ///
-    /// | Scenario                        | Result                   |
-    /// |---------------------------------|--------------------------|
-    /// | No `Origin` header              | `Some("*")`              |
-    /// | Dev mode + any origin           | `Some(<reflected>)`      |
-    /// | Production + origin in list     | `Some(<reflected>)`      |
-    /// | Production + origin NOT in list | `None`                   |
+    /// | Scenario                            | Result                   |
+    /// |-------------------------------------|--------------------------|
+    /// | No `Origin` header                  | `Some("*")`              |
+    /// | Dev mode + any origin               | `Some(<reflected>)`      |
+    /// | No allowlist configured + any origin | `Some("*")`              |
+    /// | Allowlist + origin in list          | `Some(<reflected>)`      |
+    /// | Allowlist + origin NOT in list      | `None`                   |
     pub fn resolve_origin(&self, request_origin: Option<&str>) -> Option<String> {
         match request_origin {
             // No Origin header → same-origin or non-browser client.
@@ -79,6 +80,12 @@ impl CorsConfig {
             Some(origin) if self.dev_mode => {
                 // Dev mode: reflect whatever the caller sent.
                 Some(origin.to_string())
+            }
+
+            Some(_) if self.allowed_origins.is_empty() => {
+                // No CORS_ORIGINS configured → permissive (previous behaviour).
+                // Operators opt into restriction by setting CORS_ORIGINS explicitly.
+                Some("*".to_string())
             }
 
             Some(origin) => {
@@ -220,9 +227,14 @@ mod tests {
     }
 
     #[test]
-    fn empty_allowlist_rejects_everything_in_production() {
+    fn empty_allowlist_is_permissive_in_production() {
+        // No CORS_ORIGINS set → behave like pre-middleware (wildcard).
+        // Operators opt into restriction by setting CORS_ORIGINS explicitly.
         let config = prod_config(&[]);
-        assert_eq!(config.resolve_origin(Some("https://elohim.host")), None);
+        assert_eq!(
+            config.resolve_origin(Some("https://elohim.host")),
+            Some("*".to_string()),
+        );
     }
 
     // ── preflight_response ───────────────────────────────────────
