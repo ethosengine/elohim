@@ -114,6 +114,7 @@ import type { EprHead } from '../../models/epr-head.model';
         width: 280px;
         padding: 12px;
         background: var(--epr-popover-bg, #ffffff);
+        color: var(--epr-popover-color, #1e293b);
         border: 1px solid var(--epr-popover-border, #e5e7eb);
         border-radius: 8px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);

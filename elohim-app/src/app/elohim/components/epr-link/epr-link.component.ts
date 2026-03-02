@@ -292,6 +292,11 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
     this.popoverRef.instance.head = this.eprHead;
     this.popoverRef.instance.route = this.resolved?.route ?? null;
 
+    // Ensure host is at viewport origin for correct fixed positioning
+    const hostEl = this.popoverRef.location.nativeElement as HTMLElement;
+    hostEl.style.top = '0';
+    hostEl.style.left = '0';
+
     // Position below the link
     const rect = this.elRef.nativeElement.getBoundingClientRect();
     this.popoverRef.instance.position = {

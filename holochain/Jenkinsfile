@@ -744,18 +744,27 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     env.IMAGES_PUSHED = 'true'
                                 }
 
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
-                                        echo "Pushing Doorway image: ${DOORWAY_TAG}"
-                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
-                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
+                                def doorwayPushed = sh(
+                                    script: """
+                                        if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
+                                            echo "Pushing Doorway image: ${DOORWAY_TAG}"
+                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
+                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "Doorway image not found, skipping push"
-                                    fi
-                                """
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
+                                            exit 0
+                                        else
+                                            echo "Doorway image not found, skipping push"
+                                            exit 1
+                                        fi
+                                    """,
+                                    returnStatus: true
+                                ) == 0
+
+                                if (doorwayPushed) {
+                                    env.IMAGES_PUSHED = 'true'
+                                }
 
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
