@@ -110,6 +110,7 @@ async fn proxy_response(response: reqwest::Response) -> Result<Response<Full<Byt
     Ok(Response::builder()
         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR))
         .header(header::CONTENT_TYPE, &content_type)
+        .header("Access-Control-Allow-Origin", "*")
         .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::from(data.to_vec())))
         .unwrap())
