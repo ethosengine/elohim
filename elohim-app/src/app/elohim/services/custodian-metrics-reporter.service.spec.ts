@@ -31,6 +31,10 @@ describe('CustodianMetricsReporterService', () => {
     shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
   });
 
+  afterEach(() => {
+    service.disableReporting();
+  });
+
   it('should be created', () => {
     expect(service).toBeTruthy();
   });

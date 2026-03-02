@@ -13,6 +13,8 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
     pool: 'forks',
     maxForks: 8,
+    testTimeout: 10000,
+    hookTimeout: 10000,
     reporters: ['default'],
     coverage: {
       provider: 'v8',

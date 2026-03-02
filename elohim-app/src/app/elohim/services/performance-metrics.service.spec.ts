@@ -9,6 +9,10 @@ describe('PerformanceMetricsService', () => {
     service = TestBed.inject(PerformanceMetricsService);
   });
 
+  afterEach(() => {
+    service.ngOnDestroy();
+  });
+
   describe('Service Creation', () => {
     it('should be created', () => { expect(service).toBeTruthy(); });
     it('should be a singleton (providedIn: root)', () => {

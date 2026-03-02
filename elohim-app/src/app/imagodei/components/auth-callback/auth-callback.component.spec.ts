@@ -376,6 +376,14 @@ describe('AuthCallbackComponent', () => {
   // ==========================================================================
 
   describe('Template State Rendering', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should show processing state initially', () => {
       mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
