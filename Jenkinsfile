@@ -638,6 +638,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
+                                sh 'bash ../scripts/fetch-fonts.sh'
                                 sh "pnpm exec ng build --configuration=${buildConfig}"
 
                                 // Generate version.json for deployment verification

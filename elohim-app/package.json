@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "prestart": "bash ../scripts/fetch-fonts.sh",
     "prebuild": "bash ../scripts/check-sophia.sh && bash ../scripts/fetch-fonts.sh",
     "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs --disable-host-check",
