@@ -14,6 +14,12 @@ canvas {
   display: block; /* Remove inline gap */
 }
 
+canvas:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .hex-tooltip {
   position: absolute;
   background: rgba(15, 23, 42, 0.95);
@@ -36,7 +42,40 @@ canvas {
   font-weight: 600;
 }
 
+.tooltip-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.tooltip-category {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .tooltip-affinity {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.tooltip-owner {
+  font-size: 0.7rem;
+  color: rgba(168, 85, 247, 0.9);
+}
+
+.tooltip-freshness {
+  font-size: 0.7rem;
+  color: rgba(251, 146, 60, 0.9);
+}
+
+.tooltip-lock {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.tooltip-source {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
 }
