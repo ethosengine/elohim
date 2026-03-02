@@ -1105,6 +1105,46 @@ async fn handle_request(
             ));
         }
 
+        // EPR Head proxy routes (proxied to elohim-storage)
+        // GET/PUT /epr-head/{id} - Three-pillar metadata envelope (DAG-CBOR)
+        (method, p)
+            if matches!(method, Method::GET | Method::PUT) && p.starts_with("/epr-head/") =>
+        {
+            let id = p.strip_prefix("/epr-head/").unwrap_or("");
+            debug!(path = %p, id = %id, "Forwarding EPR Head request to elohim-storage");
+            let storage_url = match &state.args.storage_url {
+                Some(url) => url,
+                None => {
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .header("Content-Type", "application/json")
+                            .header("Access-Control-Allow-Origin", "*")
+                            .body(Full::new(Bytes::from(
+                                r#"{"error":"Storage URL not configured"}"#,
+                            )))
+                            .unwrap(),
+                    ));
+                }
+            };
+            match routes::handle_epr_head_request(req, storage_url, id).await {
+                Ok(resp) => to_boxed(resp),
+                Err(e) => {
+                    error!(error = %e, "EPR Head proxy failed");
+                    to_boxed(
+                        Response::builder()
+                            .status(StatusCode::BAD_GATEWAY)
+                            .header("Content-Type", "application/json")
+                            .header("Access-Control-Allow-Origin", "*")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error":"EPR Head proxy failed: {e}"}}"#
+                            ))))
+                            .unwrap(),
+                    )
+                }
+            }
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };
@@ -1355,6 +1395,7 @@ fn not_found_response(path: &str) -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }

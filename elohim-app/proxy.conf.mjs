@@ -8,7 +8,7 @@
  */
 export default [
   {
-    context: ['/api', '/db', '/blob', '/apps', '/health'],
+    context: ['/api', '/db', '/blob', '/apps', '/epr-head', '/health'],
     target: 'http://localhost:8888',
     secure: false,
     changeOrigin: true,

@@ -540,6 +540,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             App will use TypeScript fallback (slightly slower but functional).
                             To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
                             """
+                            // TODO: Make WASM deployment more reliable for alpha/staging.
+                            // The 404 on /wasm/holochain-cache-core/holochain_cache_core.js
+                            // is harmless (TS fallback works) but creates console noise that
+                            // obscures real errors and mismatches production expectations.
+                            // Options: (1) pre-seed Harbor with a known-good WASM artifact,
+                            // (2) suppress the fetch in the browser when WASM isn't bundled,
+                            // (3) make DNA pipeline a dependency of alpha deploys.
                         }
 
                         if (fileExists("${wasmDir}/holochain_cache_core.js")) {
