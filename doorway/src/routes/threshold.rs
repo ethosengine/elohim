@@ -18,22 +18,17 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::body::Incoming;
-use hyper::{Method, Request, Response, StatusCode};
+use hyper::{Request, Response, StatusCode};
 use tracing::{debug, warn};
 
 /// Handle threshold proxy requests
 ///
 /// Forwards all /threshold/* requests to doorway-app container
 pub async fn handle_threshold_request(
-    req: Request<Incoming>,
+    _req: Request<Incoming>,
     threshold_url: &str,
     path: &str,
 ) -> Response<Full<Bytes>> {
-    // Handle CORS preflight requests
-    if req.method() == Method::OPTIONS {
-        return cors_preflight();
-    }
-
     // Forward the request to doorway-app
     forward_threshold_request(threshold_url, path).await
 }
@@ -120,16 +115,4 @@ async fn forward_threshold_request(threshold_url: &str, path: &str) -> Response<
                 .unwrap()
         }
     }
-}
-
-/// CORS preflight response
-fn cors_preflight() -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::NO_CONTENT)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type")
-        .header("Access-Control-Max-Age", "86400")
-        .body(Full::new(Bytes::new()))
-        .unwrap()
 }

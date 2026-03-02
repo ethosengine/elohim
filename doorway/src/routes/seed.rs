@@ -286,7 +286,6 @@ fn json_response<T: Serialize>(status: StatusCode, data: &T) -> Response<Full<By
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
 }
@@ -301,7 +300,6 @@ fn error_response(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }

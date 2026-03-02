@@ -101,6 +101,8 @@ pub struct AppState {
     pub peer_url_list: crate::services::federation::PeerUrlList,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
+    /// CORS configuration (origin allowlist, dev-mode flag)
+    pub cors_config: crate::cors::CorsConfig,
 }
 
 impl AppState {
@@ -136,6 +138,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -167,6 +170,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -206,6 +210,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -237,6 +242,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -291,6 +297,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -322,6 +329,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -370,6 +378,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Ok(Self {
             args,
@@ -401,6 +410,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         })
     }
 
@@ -540,6 +550,17 @@ async fn handle_request(
     let method = req.method().clone();
     let path = req.uri().path().to_string();
 
+    // Extract Origin header for CORS before any handler consumes the request
+    let request_origin = req
+        .headers()
+        .get(hyper::header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let origin_ref = request_origin.as_deref();
+
+    // Clone CORS config upfront before any handler moves the Arc<AppState>
+    let cors_config = state.cors_config.clone();
+
     // Check if this is a signal subdomain request (signal.*.elohim.host)
     let host = req
         .headers()
@@ -550,17 +571,31 @@ async fn handle_request(
 
     info!("[{}] {} {} (host: {})", addr, method, path, host);
 
+    // CORS preflight — handle centrally before any route matching
+    if method == Method::OPTIONS {
+        return Ok(to_boxed(crate::cors::preflight_response(
+            &cors_config,
+            origin_ref,
+        )));
+    }
+
     // Signal subdomain: route /{pubkey} to signal handler (tx5 protocol)
     // Path should be /{pubkey} where pubkey has no additional slashes
     if is_signal_host && method == Method::GET && path.len() > 1 {
         let after_slash = &path[1..]; // Skip leading /
         if !after_slash.is_empty() && !after_slash.contains('/') {
             if hyper_tungstenite::is_upgrade_request(&req) {
-                return Ok(handle_signal_request(state, req, &path, addr).await);
+                // WebSocket upgrade — apply_cors_headers will no-op on 101
+                let resp = handle_signal_request(state, req, &path, addr).await;
+                return Ok(resp);
             } else {
-                return Ok(to_boxed(bad_request_response(
-                    "Signal endpoint requires WebSocket upgrade",
-                )));
+                return Ok(crate::cors::apply_cors_headers(
+                    &cors_config,
+                    origin_ref,
+                    to_boxed(bad_request_response(
+                        "Signal endpoint requires WebSocket upgrade",
+                    )),
+                ));
             }
         }
     }
@@ -568,11 +603,19 @@ async fn handle_request(
     // Handle auth routes (/auth/*) - these consume the request
     if path.starts_with("/auth") {
         if let Some(response) = routes::handle_auth_request(req, Arc::clone(&state)).await {
-            return Ok(response);
+            return Ok(crate::cors::apply_cors_headers(
+                &cors_config,
+                origin_ref,
+                response,
+            ));
         }
         // If handle_auth_request returns None, it didn't handle the request
         // This shouldn't happen since we checked the path prefix, but handle gracefully
-        return Ok(to_boxed(not_found_response(&path)));
+        return Ok(crate::cors::apply_cors_headers(
+            &cors_config,
+            origin_ref,
+            to_boxed(not_found_response(&path)),
+        ));
     }
 
     let response = match (method, path.as_str()) {
@@ -629,9 +672,6 @@ async fn handle_request(
         (Method::GET, "/api/v1/federation/p2p-peers") => {
             to_boxed(routes::handle_federation_p2p_peers(Arc::clone(&state)).await)
         }
-
-        // CORS preflight
-        (Method::OPTIONS, _) => to_boxed(preflight_response()),
 
         // ====================================================================
         // Threshold (operator dashboard) - Angular SPA at /threshold/*
@@ -1119,7 +1159,6 @@ async fn handle_request(
                         Response::builder()
                             .status(StatusCode::SERVICE_UNAVAILABLE)
                             .header("Content-Type", "application/json")
-                            .header("Access-Control-Allow-Origin", "*")
                             .body(Full::new(Bytes::from(
                                 r#"{"error":"Storage URL not configured"}"#,
                             )))
@@ -1135,7 +1174,6 @@ async fn handle_request(
                         Response::builder()
                             .status(StatusCode::BAD_GATEWAY)
                             .header("Content-Type", "application/json")
-                            .header("Access-Control-Allow-Origin", "*")
                             .body(Full::new(Bytes::from(format!(
                                 r#"{{"error":"EPR Head proxy failed: {e}"}}"#
                             ))))
@@ -1149,7 +1187,11 @@ async fn handle_request(
         _ => to_boxed(not_found_response(&path)),
     };
 
-    Ok(response)
+    Ok(crate::cors::apply_cors_headers(
+        &cors_config,
+        origin_ref,
+        response,
+    ))
 }
 
 /// Handle bootstrap service requests
@@ -1301,7 +1343,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(
                         r#"{"error": "Failed to read request body"}"#,
                     )))
@@ -1319,7 +1360,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(format!(
                         r#"{{"error": "Invalid JSON: {e}"}}"#
                     ))))
@@ -1348,7 +1388,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(
                         r#"{"error": "Internal serialization error"}"#,
                     )))
@@ -1361,7 +1400,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
         Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .header("Access-Control-Allow-Origin", "*")
             .header("Cache-Control", "no-store")
             .body(Full::new(Bytes::from(json_body)))
             .unwrap(),
@@ -1371,17 +1409,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
 /// Convert a Full<Bytes> body to BoxBody
 fn to_boxed(response: Response<Full<Bytes>>) -> Response<BoxBody> {
     response.map(|body| body.map_err(|never| match never {}).boxed())
-}
-
-/// CORS preflight response
-fn preflight_response() -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Headers", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .body(Full::new(Bytes::new()))
-        .unwrap()
 }
 
 /// Not found response
@@ -1395,7 +1422,6 @@ fn not_found_response(path: &str) -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }

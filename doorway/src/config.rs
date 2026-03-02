@@ -160,6 +160,12 @@ pub struct Args {
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,
 
+    /// Comma-separated list of allowed CORS origins.
+    /// In dev mode this is ignored (all origins allowed).
+    /// e.g. "https://elohim.host,https://alpha.elohim.host,tauri://localhost"
+    #[arg(long, env = "CORS_ORIGINS", value_delimiter = ',')]
+    pub cors_origins: Vec<String>,
+
     /// Comma-separated list of peer doorway URLs for federation discovery
     /// Each peer is queried at startup and periodically for cross-doorway awareness
     /// e.g. "https://doorway-staging.elohim.host,https://doorway.elohim.host"

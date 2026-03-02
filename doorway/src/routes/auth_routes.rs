@@ -568,27 +568,7 @@ fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header(
-            "Access-Control-Allow-Headers",
-            "Content-Type, Authorization",
-        )
         .body(full_body(json))
-        .unwrap()
-}
-
-fn cors_preflight() -> Response<BoxBody> {
-    Response::builder()
-        .status(StatusCode::NO_CONTENT)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header(
-            "Access-Control-Allow-Headers",
-            "Content-Type, Authorization",
-        )
-        .header("Access-Control-Max-Age", "86400")
-        .body(empty_body())
         .unwrap()
 }
 
@@ -3607,11 +3587,6 @@ pub async fn handle_auth_request(
     // Only handle /auth/* routes
     if !path.starts_with("/auth") {
         return None;
-    }
-
-    // Handle CORS preflight
-    if method == Method::OPTIONS {
-        return Some(cors_preflight());
     }
 
     // Remove query string for matching

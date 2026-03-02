@@ -283,7 +283,6 @@ async fn forward_queue_import(
                     Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", "application/json")
-                        .header("Access-Control-Allow-Origin", "*")
                         .body(Full::new(Bytes::from(body)))
                         .unwrap()
                 }
@@ -336,7 +335,6 @@ async fn forward_get_status(storage_url: &str, batch_id: &str) -> Response<Full<
                 Ok(body) => Response::builder()
                     .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(body)))
                     .unwrap(),
                 Err(e) => import_error_response(
@@ -365,7 +363,6 @@ fn import_error_response(status: StatusCode, message: &str) -> Response<Full<Byt
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }

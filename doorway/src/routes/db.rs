@@ -40,11 +40,6 @@ pub async fn handle_db_request(
     storage_url: Option<String>,
     path: &str,
 ) -> Response<Full<Bytes>> {
-    // Handle CORS preflight requests
-    if req.method() == Method::OPTIONS {
-        return cors_preflight();
-    }
-
     let storage_url = match storage_url {
         Some(url) => url,
         None => {
@@ -52,7 +47,6 @@ pub async fn handle_db_request(
             return Response::builder()
                 .status(StatusCode::SERVICE_UNAVAILABLE)
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(
                     r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#,
                 )))
@@ -97,7 +91,6 @@ async fn forward_db_request(
             return Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
                 .unwrap();
         }
@@ -129,7 +122,6 @@ async fn forward_db_request(
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(format!(
                         r#"{{"error": "Failed to read request body: {e}"}}"#
                     ))))
@@ -161,7 +153,6 @@ async fn forward_db_request(
                     Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
-                        .header("Access-Control-Allow-Origin", "*")
                         // Required for COEP: require-corp in Angular app
                         .header("Cross-Origin-Resource-Policy", "cross-origin")
                         .body(Full::new(Bytes::from(body.to_vec())))
@@ -172,7 +163,6 @@ async fn forward_db_request(
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
                         .header("Content-Type", "application/json")
-                        .header("Access-Control-Allow-Origin", "*")
                         .body(Full::new(Bytes::from(format!(
                             r#"{{"error": "Failed to read storage response: {e}"}}"#
                         ))))
@@ -185,29 +175,10 @@ async fn forward_db_request(
             Response::builder()
                 .status(StatusCode::BAD_GATEWAY)
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(format!(
                     r#"{{"error": "Failed to connect to storage: {e}"}}"#
                 ))))
                 .unwrap()
         }
     }
-}
-
-/// CORS preflight response
-fn cors_preflight() -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::NO_CONTENT)
-        .header("Access-Control-Allow-Origin", "*")
-        .header(
-            "Access-Control-Allow-Methods",
-            "GET, POST, PUT, DELETE, OPTIONS",
-        )
-        .header(
-            "Access-Control-Allow-Headers",
-            "Content-Type, Authorization",
-        )
-        .header("Access-Control-Max-Age", "86400")
-        .body(Full::new(Bytes::new()))
-        .unwrap()
 }

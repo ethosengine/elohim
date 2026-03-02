@@ -82,7 +82,6 @@ fn error_response(status: StatusCode, message: &str, code: &'static str) -> Resp
         .status(status)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "no-cache")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap_or_else(|_| {
             Response::builder()
@@ -98,7 +97,6 @@ fn json_response(data: Vec<u8>) -> Response<Full<Bytes>> {
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "public, max-age=60")
-        .header("Access-Control-Allow-Origin", "*")
         // Required for COEP: require-corp in Angular app
         .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::from(data)))
