@@ -307,6 +307,51 @@ export interface PipelineResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Admin User types (mirrors doorway /admin/users endpoints)
+// ---------------------------------------------------------------------------
+
+export interface AdminUserSummary {
+  id: string;
+  identifier: string;
+  permissionLevel: string;
+  isActive: boolean;
+  storagePercent?: number;
+  createdAt?: string;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUserSummary[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminUserDetailsResponse {
+  id: string;
+  identifier: string;
+  permissionLevel: string;
+  isActive: boolean;
+  usage?: {
+    storageBytes: number;
+    projectionQueries: number;
+    bandwidthBytes: number;
+  };
+  quota?: {
+    storageLimit: number;
+    dailyQueryLimit: number;
+    dailyBandwidthLimit: number;
+  };
+}
+
+export interface AdminListUsersParams {
+  search?: string;
+  page?: number;
+  limit?: number;
+  isActive?: boolean;
+  permissionLevel?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
@@ -487,6 +532,41 @@ export class DoorwayClient {
     return this.get<PipelineResponse>('/admin/pipeline');
   }
 
+  // -- Admin: Users ---------------------------------------------------------
+
+  async adminListUsers(params?: AdminListUsersParams): Promise<AdminUsersResponse> {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set('search', params.search);
+    if (params?.page !== undefined) qs.set('page', String(params.page));
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+    if (params?.isActive !== undefined) qs.set('is_active', String(params.isActive));
+    if (params?.permissionLevel) qs.set('permission_level', params.permissionLevel);
+    const query = qs.toString();
+    const path = query ? `/admin/users?${query}` : '/admin/users';
+    return this.get<AdminUsersResponse>(path);
+  }
+
+  async adminGetUser(userId: string): Promise<AdminUserDetailsResponse> {
+    return this.get<AdminUserDetailsResponse>(`/admin/users/${encodeURIComponent(userId)}`);
+  }
+
+  async adminSetUserStatus(userId: string, isActive: boolean): Promise<AdminMutationResponse> {
+    return this.put<AdminMutationResponse>(`/admin/users/${encodeURIComponent(userId)}/status`, {
+      isActive,
+    });
+  }
+
+  async adminDeleteUser(userId: string): Promise<AdminMutationResponse> {
+    return this.delete<AdminMutationResponse>(`/admin/users/${encodeURIComponent(userId)}`, {});
+  }
+
+  async adminForceLogout(userId: string): Promise<AdminMutationResponse> {
+    return this.post<AdminMutationResponse>(
+      `/admin/users/${encodeURIComponent(userId)}/force-logout`,
+      {}
+    );
+  }
+
   // -- HTTP helpers ---------------------------------------------------------
 
   private async get<T>(path: string): Promise<T> {
@@ -510,6 +590,19 @@ export class DoorwayClient {
     const text = await body.text();
     if (statusCode < 200 || statusCode >= 300) {
       throw new Error(`POST ${path} returned ${statusCode}: ${text}`);
+    }
+    return JSON.parse(text) as T;
+  }
+
+  private async put<T>(path: string, payload: unknown): Promise<T> {
+    const { statusCode, body } = await request(`${this.baseUrl}${path}`, {
+      method: 'PUT',
+      headers: { ...this.headers(), 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await body.text();
+    if (statusCode < 200 || statusCode >= 300) {
+      throw new Error(`PUT ${path} returned ${statusCode}: ${text}`);
     }
     return JSON.parse(text) as T;
   }

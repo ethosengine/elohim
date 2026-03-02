@@ -51,6 +51,20 @@ When(
 
     // Store auth response for subsequent assertions
     this.contentIds.set('lastAuthResponse', JSON.stringify(auth));
+
+    // Register cleanup to soft-delete the ephemeral user after the scenario
+    const identifier = creds.identifier;
+    const doorwayUrl = doorway.url;
+    this.onCleanup(async () => {
+      try {
+        const admin = await this.getAdminClient(doorwayUrl);
+        const list = await admin.adminListUsers({ search: identifier, limit: 1 });
+        const match = list.users.find(u => u.identifier === identifier);
+        if (match) await admin.adminDeleteUser(match.id);
+      } catch {
+        // best-effort cleanup
+      }
+    });
   }
 );
 

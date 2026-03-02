@@ -19,11 +19,14 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import {
   PlaywrightDevice,
   type CapturedConsoleLog,
-  type CapturedFailedRequest,
 } from '../../src/framework/devices/playwright-device.js';
 import { getFixture } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { ThresholdLoginPage, AppShellPage } from '../../src/framework/pages/index.js';
+import {
+  isSpaRoutingNoise,
+  isExpectedNetworkFailure,
+} from '../../src/framework/utils/console-filters.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -43,31 +46,6 @@ function requirePlaywrightDevice(world: E2EWorld, humanName: string): Playwright
   const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
   assert.ok(device, `${humanName} has no Playwright device. Is E2E_DEVICE_MODE=playwright?`);
   return device;
-}
-
-/**
- * SPA routing causes the browser to log "Failed to load resource: 404" for
- * client-side routes that the server doesn't recognize. These are not real
- * errors — the Angular router handles them before the 404 response matters.
- * Filter them out so they don't cause false failures.
- */
-function isSpaRoutingNoise(log: CapturedConsoleLog): boolean {
-  return (
-    log.text.includes('Failed to load resource: the server responded with a status of 404') ||
-    log.text.includes('Failed to load resource: the server responded with a status of 0')
-  );
-}
-
-/**
- * Network requests that fail with ERR_ABORTED are typically caused by
- * SPA navigation canceling in-flight fetches, or by external resources
- * (YouTube embeds, CDN badges) that are unavailable in test environments.
- * These are not actionable failures for our app code.
- */
-function isExpectedNetworkFailure(req: CapturedFailedRequest): boolean {
-  if (req.failure === 'net::ERR_ABORTED') return true;
-  const externalHosts = ['youtube.com', 'ytimg.com', 'shields.io', 'googleapis.com'];
-  return externalHosts.some(host => req.url.includes(host));
 }
 
 /** Find PlaywrightDevices across all humans and assert on their console errors. */

@@ -1,4 +1,4 @@
-@e2e @browser-only @doorway-dashboard @requires:doorway
+@browser @doorway-dashboard @requires:doorway
 Feature: Doorway Dashboard Health
   As Matthew, the genesis steward operating the alpha doorway
   I want the dashboard to load without console errors
@@ -10,9 +10,8 @@ Feature: Doorway Dashboard Health
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
-    And human "Matthew" is logged in on doorway "alpha"
+    And human "Matthew" is logged in on doorway-app "alpha" with device
 
-  @wip
   Scenario: Dashboard overview tab loads cleanly
     When Matthew opens the doorway dashboard
     Then the dashboard should render without JavaScript errors
@@ -29,4 +28,14 @@ Feature: Doorway Dashboard Health
     When Matthew opens the nodes tab
     And no orchestrator is configured
     Then the nodes tab should show a "No orchestrator" message
-    And no console errors should be logged
+    And no unexpected console errors should be logged
+
+  Scenario: Tab switching works without errors
+    When Matthew opens the doorway dashboard
+    And Matthew opens the users tab
+    Then no unexpected console errors should be logged
+
+  Scenario: Dashboard toolbar shows authenticated state
+    When Matthew opens the doorway dashboard
+    And Matthew logs out via the toolbar
+    Then no unexpected console errors should be logged

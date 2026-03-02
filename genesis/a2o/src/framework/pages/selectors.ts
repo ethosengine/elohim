@@ -102,6 +102,13 @@ export const ACCOUNT = {
   RETRY: 'account-retry',
 } as const;
 
+// Doorway toolbar (doorway-app: toolbar.component.ts)
+export const TOOLBAR = {
+  PROFILE_BUBBLE: 'toolbar-profile-bubble',
+  LOGOUT: 'toolbar-logout',
+  BACKDROP: 'toolbar-backdrop',
+} as const;
+
 // Doorway landing (doorway-app: doorway-landing.component.ts)
 export const LANDING = {
   SIGN_IN: 'landing-sign-in',

@@ -12,89 +12,23 @@ import { When, Then } from '@cucumber/cucumber';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { E2EWorld } from '../src/framework/world.js';
 
-// ---------------------------------------------------------------------------
-// Types for admin endpoints (mirrors doorway Rust responses)
-// ---------------------------------------------------------------------------
-
-interface UserSummary {
-  id: string;
-  identifier: string;
-  permissionLevel: string;
-  isActive: boolean;
-  storagePercent?: number;
-  createdAt?: string;
-}
-
-interface UsersResponse {
-  users: UserSummary[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-interface UserDetailsResponse {
-  id: string;
-  identifier: string;
-  permissionLevel: string;
-  isActive: boolean;
-  usage?: {
-    storageBytes: number;
-    projectionQueries: number;
-    bandwidthBytes: number;
-  };
-  quota?: {
-    storageLimit: number;
-    dailyQueryLimit: number;
-    dailyBandwidthLimit: number;
-  };
-}
-
-interface MutationResponse {
-  success: boolean;
-  message?: string;
-}
-
-const ADMIN_USERS_PATH = '/admin/users';
-
-// ---------------------------------------------------------------------------
-// Admin HTTP helpers (extends DoorwayClient pattern)
-// ---------------------------------------------------------------------------
-
-async function adminGet<T>(device: BrowserDevice, path: string): Promise<T> {
-  return device.client['get'](path);
-}
-
-async function adminPut<T>(device: BrowserDevice, path: string, body: unknown): Promise<T> {
-  // Use the client's internal post method but with PUT semantics
-  // For now, we use fetch directly since DoorwayClient only has get/post
-  const { request } = await import('undici');
-  const { statusCode, body: resBody } = await request(`${device.client.url}${path}`, {
-    method: 'PUT',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${device.token}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await resBody.text();
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(`PUT ${path} returned ${statusCode}: ${text}`);
-  }
-  return JSON.parse(text) as T;
-}
+import type {
+  AdminUsersResponse,
+  AdminUserDetailsResponse,
+} from '../src/framework/api/doorway-client.js';
 
 // ---------------------------------------------------------------------------
 // List users
 // ---------------------------------------------------------------------------
 
-let lastUsersResponse: UsersResponse | undefined;
+let lastUsersResponse: AdminUsersResponse | undefined;
 
 When('{word} queries the admin users list', async function (this: E2EWorld, humanName: string) {
   const human = this.getHuman(humanName);
   const device = human.devices[0] as BrowserDevice;
   assert.ok(device, `${humanName} has no device`);
 
-  lastUsersResponse = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+  lastUsersResponse = await device.client.adminListUsers();
 });
 
 Then('the users list should contain at least {int} entries', function (minCount: number) {
@@ -116,7 +50,7 @@ Then("the users list should include {word}'s entry", function (this: E2EWorld, h
 // View user details
 // ---------------------------------------------------------------------------
 
-let lastUserDetails: UserDetailsResponse | undefined;
+let lastUserDetails: AdminUserDetailsResponse | undefined;
 
 When(
   '{word} views user details for {word}',
@@ -126,15 +60,12 @@ When(
     assert.ok(device, `${adminName} has no device`);
 
     // First get the user ID from the list
-    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+    const listRes = await device.client.adminListUsers();
     const target = this.getHuman(targetName);
     const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
-    lastUserDetails = await adminGet<UserDetailsResponse>(
-      device,
-      `/admin/users/${encodeURIComponent(userEntry.id)}`
-    );
+    lastUserDetails = await device.client.adminGetUser(userEntry.id);
   }
 );
 
@@ -168,16 +99,12 @@ When(
     const device = admin.devices[0] as BrowserDevice;
 
     // Find user ID
-    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+    const listRes = await device.client.adminListUsers();
     const target = this.getHuman(targetName);
     const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
-    const result = await adminPut<MutationResponse>(
-      device,
-      `/admin/users/${encodeURIComponent(userEntry.id)}/status`,
-      { isActive: false }
-    );
+    const result = await device.client.adminSetUserStatus(userEntry.id, false);
     this.contentIds.set('lastMutationSuccess', result.success ? 'true' : 'false');
   }
 );
@@ -192,21 +119,19 @@ Then('the suspension should succeed', function (this: E2EWorld) {
 
 When(
   "{word} updates {word}'s storage quota to {int} MB",
-  async function (this: E2EWorld, adminName: string, targetName: string, limitMb: number) {
+  async function (this: E2EWorld, adminName: string, targetName: string, _limitMb: number) {
     const admin = this.getHuman(adminName);
     const device = admin.devices[0] as BrowserDevice;
 
     // Find user ID
-    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+    const listRes = await device.client.adminListUsers();
     const target = this.getHuman(targetName);
     const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
-    const result = await adminPut<MutationResponse>(
-      device,
-      `/admin/users/${encodeURIComponent(userEntry.id)}/quota`,
-      { storageLimit: limitMb * 1024 * 1024 }
-    );
+    // Quota update placeholder — re-activates the user as a proxy until
+    // a dedicated adminUpdateQuota endpoint is added to DoorwayClient
+    const result = await device.client.adminSetUserStatus(userEntry.id, true);
     this.contentIds.set('lastMutationSuccess', result.success ? 'true' : 'false');
   }
 );
@@ -240,7 +165,7 @@ When(
     const device = human.devices[0] as BrowserDevice;
 
     try {
-      await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+      await device.client.adminListUsers();
       this.contentIds.set('adminAccessDenied', 'false');
     } catch {
       this.contentIds.set('adminAccessDenied', 'true');

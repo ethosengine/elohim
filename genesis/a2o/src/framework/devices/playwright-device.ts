@@ -59,6 +59,11 @@ interface PWBrowserContext {
   newPage(): Promise<PWPage>;
   close(): Promise<void>;
   tracing: PWTracing;
+  addInitScript(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    script: string | { path?: string } | ((...args: any[]) => void),
+    arg?: unknown
+  ): Promise<void>;
 }
 
 interface PWTracing {
@@ -153,11 +158,15 @@ export class PlaywrightDevice extends Device {
     return this._page;
   }
 
-  /** Create a fresh browser context and page with observability wired up. */
-  async init(): Promise<void> {
+  /**
+   * Create a fresh browser context and page with observability wired up.
+   * @param options.extraHTTPHeaders — headers added to every request (e.g. Authorization)
+   */
+  async init(options?: { extraHTTPHeaders?: Record<string, string> }): Promise<void> {
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
+      ...(options?.extraHTTPHeaders ? { extraHTTPHeaders: options.extraHTTPHeaders } : {}),
     });
 
     // Start tracing if requested
@@ -203,6 +212,18 @@ export class PlaywrightDevice extends Device {
         timestamp: Date.now(),
       });
     });
+  }
+
+  /**
+   * Pre-load a localStorage key on every future page load in this context.
+   * Uses addInitScript so the value is set BEFORE any page scripts execute.
+   * Call this before navigating to the target page.
+   */
+  async preloadLocalStorage(key: string, value: string): Promise<void> {
+    if (!this.context) throw new Error('PlaywrightDevice not initialized — call init() first');
+    await this.context.addInitScript(
+      `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)});`
+    );
   }
 
   /** Navigate to a path relative to the app URL. */

@@ -19,7 +19,12 @@ import {
 // Remote doorway calls + retry loops can take longer than the 5s default
 setDefaultTimeout(30_000);
 
-import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import {
+  PlaywrightDevice,
+  type CapturedConsoleLog,
+  type CapturedPageError,
+} from '../src/framework/devices/playwright-device.js';
+import { isSpaRoutingNoise } from '../src/framework/utils/console-filters.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -57,6 +62,50 @@ async function captureFailureArtifacts(
   } catch {
     // best-effort
   }
+}
+
+/** Collect errors from a single Playwright device and save artifact. */
+function collectDeviceErrors(
+  device: PlaywrightDevice,
+  safeName: string,
+  humanName: string
+): string[] {
+  const consoleErrors: CapturedConsoleLog[] = device.consoleLogs.filter(
+    l => l.level === 'error' && !isSpaRoutingNoise(l)
+  );
+  const pageErrors: CapturedPageError[] = device.pageErrors;
+
+  if (!consoleErrors.length && !pageErrors.length) return [];
+
+  try {
+    writeFileSync(
+      `reports/console/${safeName}-${humanName}-errors.json`,
+      JSON.stringify({ consoleErrors, pageErrors }, null, 2)
+    );
+  } catch {
+    // best-effort
+  }
+
+  return [
+    ...consoleErrors.map(e => `[${humanName}] console.error: ${e.text} (${e.url})`),
+    ...pageErrors.map(e => `[${humanName}] uncaught: ${e.message} (${e.url})`),
+  ];
+}
+
+/** Collect browser errors from all Playwright devices in the world. */
+function collectBrowserErrors(world: E2EWorld, scenarioName: string): string[] {
+  const safeName = scenarioName.replace(/[^a-zA-Z0-9]/g, '-');
+  const errorReport: string[] = [];
+
+  for (const [name, human] of world.humans) {
+    for (const device of human.devices) {
+      if (device instanceof PlaywrightDevice) {
+        errorReport.push(...collectDeviceErrors(device, safeName, name));
+      }
+    }
+  }
+
+  return errorReport;
 }
 
 /**
@@ -116,7 +165,7 @@ Given(
 );
 
 /**
- * Capture artifacts on failure, then run cleanup after each scenario.
+ * Capture artifacts on failure, assert console cleanliness on pass, then run cleanup.
  */
 After(async function (this: E2EWorld, scenario) {
   if (scenario.result?.status === Status.FAILED) {
@@ -128,6 +177,18 @@ After(async function (this: E2EWorld, scenario) {
           await captureFailureArtifacts(device, safeName, name);
         }
       }
+    }
+  }
+
+  // For passing scenarios, assert that no real console errors were logged.
+  // This makes console cleanliness an automatic test contract for all browser scenarios.
+  if (scenario.result?.status === Status.PASSED) {
+    const errorReport = collectBrowserErrors(this, scenario.pickle.name);
+    if (errorReport.length) {
+      throw new Error(
+        `Scenario passed but had ${errorReport.length} browser error(s):\n` +
+          errorReport.map(e => `  ${e}`).join('\n')
+      );
     }
   }
 

@@ -8,6 +8,7 @@
 import { World, type IWorldOptions } from '@cucumber/cucumber';
 
 import { DoorwayClient } from './api/doorway-client.js';
+import { fixtureCredentials } from './fixtures/humans.js';
 import { Human } from './human.js';
 
 export type DeviceMode = 'http' | 'playwright';
@@ -42,6 +43,9 @@ export class E2EWorld extends World {
 
   /** Cleanup callbacks to run after each scenario */
   private cleanupCallbacks: (() => Promise<void>)[] = [];
+
+  /** Cached admin client per doorway URL (for ephemeral user cleanup) */
+  private readonly adminClients = new Map<string, DoorwayClient>();
 
   constructor(options: IWorldOptions) {
     super(options);
@@ -82,6 +86,25 @@ export class E2EWorld extends World {
       await sharedBrowser.close();
       sharedBrowser = undefined;
     }
+  }
+
+  /**
+   * Get or lazily create an admin-authenticated DoorwayClient.
+   * Logs in as Matthew (admin fixture) on first call, caches for reuse.
+   */
+  async getAdminClient(doorwayUrl: string): Promise<DoorwayClient> {
+    const cached = this.adminClients.get(doorwayUrl);
+    if (cached) return cached;
+
+    const creds = fixtureCredentials('Matthew');
+    const client = new DoorwayClient(doorwayUrl);
+    const auth = await client.login({
+      identifier: creds.identifier,
+      password: creds.password,
+    });
+    client.setToken(auth.token);
+    this.adminClients.set(doorwayUrl, client);
+    return client;
   }
 
   addDoorway(id: string, url: string): DoorwayEntry {
