@@ -7,6 +7,7 @@ export { DoorwayDashboardPage } from './doorway-dashboard.page.js';
 export { UsersTabPage } from './users-tab.page.js';
 export { FederationTabPage } from './federation-tab.page.js';
 export { PipelineTabPage } from './pipeline-tab.page.js';
+export { EprContentPage } from './epr-content.page.js';
 export {
   THRESHOLD,
   THRESHOLD_REGISTER,
@@ -20,4 +21,5 @@ export {
   SHELL,
   LOGIN,
   FOOTER,
+  EPR,
 } from './selectors.js';

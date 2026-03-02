@@ -52,7 +52,11 @@ export interface PWLocator {
   textContent(): Promise<string | null>;
   fill(value: string): Promise<void>;
   getByText(text: string, options?: Record<string, unknown>): PWLocator;
+  hover(options?: Record<string, unknown>): Promise<void>;
   isVisible(): Promise<boolean>;
+  getAttribute(name: string): Promise<string | null>;
+  locator(selector: string): PWLocator;
+  allTextContents(): Promise<string[]>;
 }
 
 interface PWBrowserContext {

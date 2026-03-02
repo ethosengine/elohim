@@ -3,9 +3,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SimpleChange } from '@angular/core';
+
+import { of } from 'rxjs';
+
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { PathService } from '../../services/path.service';
+import { PathContextService } from '../../services/path-context.service';
 
 describe('MarkdownRendererComponent', () => {
   let component: MarkdownRendererComponent;
@@ -14,6 +19,16 @@ describe('MarkdownRendererComponent', () => {
   // Mock StorageClientService
   const mockStorageClientService = {
     getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`,
+  };
+
+  const mockPathService = {
+    findContentInPaths: vi.fn().mockReturnValue(of([])),
+    listPaths: vi.fn().mockReturnValue(of({ paths: [] })),
+    getPath: vi.fn(),
+  };
+
+  const mockPathContextService = {
+    currentContext: null as { pathId: string } | null,
   };
 
   const createContentNode = (content: string): ContentNode => ({
@@ -35,6 +50,8 @@ describe('MarkdownRendererComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: StorageClientService, useValue: mockStorageClientService },
+        { provide: PathService, useValue: mockPathService },
+        { provide: PathContextService, useValue: mockPathContextService },
       ],
     }).compileComponents();
 
@@ -370,5 +387,107 @@ describe('MarkdownRendererComponent', () => {
 
       expect(component.showBackToTop).toBe(true);
     });
+  });
+});
+
+describe('MarkdownRendererComponent — cross-path prefetch', () => {
+  let component: MarkdownRendererComponent;
+  let fixture: ComponentFixture<MarkdownRendererComponent>;
+  let pathServiceSpy: { findContentInPaths: ReturnType<typeof vi.fn> };
+  let pathContextSpy: { currentContext: { pathId: string } | null };
+
+  const createContentNode = (content: string): ContentNode => ({
+    id: 'test-markdown',
+    title: 'Test',
+    description: '',
+    contentType: 'concept',
+    contentFormat: 'markdown',
+    content,
+    tags: [],
+    relatedNodeIds: [],
+    metadata: {},
+  });
+
+  beforeEach(async () => {
+    pathServiceSpy = {
+      findContentInPaths: vi.fn().mockReturnValue(of([])),
+    };
+    pathContextSpy = {
+      currentContext: { pathId: 'elohim-protocol' },
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [MarkdownRendererComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: StorageClientService,
+          useValue: { getBlobUrl: (h: string) => `https://test/blob/${h}` },
+        },
+        { provide: PathService, useValue: pathServiceSpy },
+        { provide: PathContextService, useValue: pathContextSpy },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(MarkdownRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    component?.ngOnDestroy();
+  });
+
+  it('should prefetch cross-path data for EPR links in markdown', async () => {
+    const markdown = 'Read about [REA](epr:rea-foundations) and [trust](epr:web-of-trust).';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Should call findContentInPaths for each unique EPR content ID
+    expect(pathServiceSpy.findContentInPaths).toHaveBeenCalledWith(
+      'rea-foundations',
+      'elohim-protocol'
+    );
+    expect(pathServiceSpy.findContentInPaths).toHaveBeenCalledWith(
+      'web-of-trust',
+      'elohim-protocol'
+    );
+  });
+
+  it('should not prefetch when no path context', async () => {
+    pathContextSpy.currentContext = null;
+    const markdown = 'Link to [REA](epr:rea-foundations).';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(pathServiceSpy.findContentInPaths).not.toHaveBeenCalled();
+  });
+
+  it('should deduplicate EPR content IDs before prefetching', async () => {
+    const markdown =
+      'First [link](epr:manifesto) and second [link](epr:manifesto) to same content.';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Should only call once for the deduplicated ID
+    const calls = pathServiceSpy.findContentInPaths.mock.calls.filter(
+      (c: string[]) => c[0] === 'manifesto'
+    );
+    expect(calls.length).toBe(1);
   });
 });

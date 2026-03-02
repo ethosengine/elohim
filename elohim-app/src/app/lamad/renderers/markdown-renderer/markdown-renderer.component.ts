@@ -22,14 +22,16 @@ import { Router } from '@angular/router';
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import { Subscription } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 
 import { EprPopoverComponent } from '@app/elohim/components/epr-popover/epr-popover.component';
 import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { parseEpr } from '@app/elohim/utils/epr-ref';
 
 import { ContentNode } from '../../models/content-node.model';
 import { PathContextService } from '../../services/path-context.service';
+import { PathService } from '../../services/path.service';
 
 /**
  * Table of Contents entry extracted from markdown headings.
@@ -130,6 +132,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly storageClient = inject(StorageClientService);
   private readonly eprResolver = inject(EprResolverService);
   private readonly pathContext = inject(PathContextService);
+  private readonly pathService = inject(PathService);
   private readonly router = inject(Router);
   private readonly vcr = inject(ViewContainerRef);
   private activePopover: ComponentRef<EprPopoverComponent> | null = null;
@@ -139,6 +142,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private hoveredEprAnchor: HTMLAnchorElement | null = null;
   private popoverShowTimer: ReturnType<typeof setTimeout> | null = null;
   private popoverDismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Prefetched cross-path matches, keyed by content ID. */
+  private crossPathCache = new Map<string, import('@app/elohim/services/epr-resolver.service').CrossPathMatch[]>();
 
   constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
@@ -286,6 +292,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Update heading elements after view updates
     setTimeout(() => this.cacheHeadingElements(), 0);
+
+    // Prefetch cross-path data for EPR links found in the markdown
+    this.prefetchCrossPathData(this.node.content);
   }
 
   /**
@@ -379,19 +388,66 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       const eprUri = target.dataset['epr'];
       if (!eprUri) return;
 
-      // Get current path context for context-aware resolution
-      const ctx = this.pathContext.currentContext;
-      const currentPathId = ctx?.pathId ?? null;
-
-      // Use path steps from @Input (provided by path step view parent)
-      // Cross-path matches not yet wired — standalone fallback for now
-      const resolved = this.eprResolver.resolveInContext(eprUri, currentPathId, this.pathSteps);
-
-      this.destroyPopover();
-      void this.router.navigate(resolved.route);
+      void this.resolveAndNavigate(eprUri);
     };
 
     this.contentEl.nativeElement.addEventListener('click', this.eprClickListener);
+  }
+
+  /**
+   * Resolve an EPR URI with cross-path context and navigate.
+   * Uses prefetched cross-path data when available, falls back to fetch.
+   */
+  private async resolveAndNavigate(eprUri: string): Promise<void> {
+    const ctx = this.pathContext.currentContext;
+    const currentPathId = ctx?.pathId ?? null;
+
+    const ref = parseEpr(eprUri);
+    let crossPathMatches = this.crossPathCache.get(ref.id);
+
+    // Fall back to live fetch if not prefetched
+    if (crossPathMatches === undefined && currentPathId) {
+      crossPathMatches = await firstValueFrom(
+        this.pathService.findContentInPaths(ref.id, currentPathId)
+      );
+    }
+
+    const resolved = this.eprResolver.resolveInContext(
+      eprUri,
+      currentPathId,
+      this.pathSteps,
+      crossPathMatches
+    );
+
+    this.destroyPopover();
+    void this.router.navigate(resolved.route);
+  }
+
+  /**
+   * Scan markdown for epr: URIs and prefetch cross-path data for each.
+   * This makes click resolution instant instead of waiting for an API call.
+   */
+  private prefetchCrossPathData(markdown: string): void {
+    const ctx = this.pathContext.currentContext;
+    const currentPathId = ctx?.pathId ?? null;
+    if (!currentPathId) return;
+
+    this.crossPathCache.clear();
+
+    // Find all epr: URIs in the markdown source
+    const eprPattern = /epr:([a-z0-9][\w-]*)/gi;
+    const contentIds = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = eprPattern.exec(markdown)) !== null) {
+      contentIds.add(match[1]);
+    }
+
+    // Prefetch cross-path matches for each unique content ID
+    for (const contentId of contentIds) {
+      this.pathService.findContentInPaths(contentId, currentPathId).subscribe(matches => {
+        this.crossPathCache.set(contentId, matches);
+      });
+    }
   }
 
   /**

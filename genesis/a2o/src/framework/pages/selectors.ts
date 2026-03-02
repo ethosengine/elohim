@@ -384,6 +384,19 @@ export const PERSEUS = {
   NEXT: 'perseus-next',
 } as const;
 
+// EPR links and popover (elohim-app: epr-link.component.ts, epr-popover.component.ts)
+export const EPR = {
+  LINK_INLINE: 'epr-link-inline',
+  LINK_CHIP: 'epr-link-chip',
+  LINK_CARD: 'epr-link-card',
+  POPOVER: 'epr-popover',
+  POPOVER_TITLE: 'epr-popover-title',
+  POPOVER_TYPE: 'epr-popover-type',
+  POPOVER_DESC: 'epr-popover-desc',
+  POPOVER_QAHAL: 'epr-popover-qahal',
+  POPOVER_LINK: 'epr-popover-link',
+} as const;
+
 // Markdown renderer (elohim-app: markdown-renderer.component.ts)
 export const MARKDOWN = {
   TOC_TOGGLE: 'markdown-toc-toggle',
