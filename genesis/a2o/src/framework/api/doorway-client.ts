@@ -463,16 +463,18 @@ export class DoorwayClient {
 
   // -- Admin: Federation ----------------------------------------------------
 
+  private static readonly FEDERATION_PEERS_PATH = '/admin/federation/peers';
+
   async adminFederationPeers(): Promise<FederationPeersResponse> {
-    return this.get<FederationPeersResponse>('/admin/federation/peers');
+    return this.get<FederationPeersResponse>(DoorwayClient.FEDERATION_PEERS_PATH);
   }
 
   async adminAddFederationPeer(url: string): Promise<AdminMutationResponse> {
-    return this.post<AdminMutationResponse>('/admin/federation/peers', { url });
+    return this.post<AdminMutationResponse>(DoorwayClient.FEDERATION_PEERS_PATH, { url });
   }
 
   async adminRemoveFederationPeer(url: string): Promise<AdminMutationResponse> {
-    return this.delete<AdminMutationResponse>('/admin/federation/peers', { url });
+    return this.delete<AdminMutationResponse>(DoorwayClient.FEDERATION_PEERS_PATH, { url });
   }
 
   async adminRefreshFederationPeers(): Promise<AdminMutationResponse> {

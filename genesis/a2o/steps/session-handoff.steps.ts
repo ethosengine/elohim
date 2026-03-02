@@ -10,11 +10,9 @@ import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
-import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { DoorwayClient } from '../src/framework/api/doorway-client.js';
+import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { E2EWorld } from '../src/framework/world.js';
-
-import type { SessionTokenResponse } from '../src/framework/api/doorway-client.js';
 
 // ---------------------------------------------------------------------------
 // Session transfer token
@@ -33,18 +31,15 @@ When(
   }
 );
 
-Given(
-  '{word} has a session transfer token',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+Given('{word} has a session transfer token', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    const response = await device.client.sessionToken();
-    this.contentIds.set('lastSessionToken', response.sessionToken);
-    this.contentIds.set('lastSessionTokenExpiresAt', String(response.expiresAt));
-  }
-);
+  const response = await device.client.sessionToken();
+  this.contentIds.set('lastSessionToken', response.sessionToken);
+  this.contentIds.set('lastSessionTokenExpiresAt', String(response.expiresAt));
+});
 
 Given(
   '{word} has an expired session transfer token',
@@ -69,10 +64,7 @@ Then(
     const now = Math.floor(Date.now() / 1000);
     const diff = expiresAt - now;
     assert.ok(diff > 0, `Transfer token already expired (expiresAt=${expiresAt}, now=${now})`);
-    assert.ok(
-      diff <= maxSeconds,
-      `Transfer token expiry ${diff}s exceeds maximum ${maxSeconds}s`
-    );
+    assert.ok(diff <= maxSeconds, `Transfer token expiry ${diff}s exceeds maximum ${maxSeconds}s`);
   }
 );
 

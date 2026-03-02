@@ -51,11 +51,11 @@ interface PipelineResponse {
 // ---------------------------------------------------------------------------
 
 async function adminGet<T>(device: BrowserDevice, path: string): Promise<T> {
-  return device.client['get'](path) as Promise<T>;
+  return device.client['get'](path);
 }
 
 async function adminPost<T>(device: BrowserDevice, path: string, body: unknown): Promise<T> {
-  return device.client['post'](path, body) as Promise<T>;
+  return device.client['post'](path, body);
 }
 
 async function adminDelete<T>(device: BrowserDevice, path: string, body: unknown): Promise<T> {
@@ -151,19 +151,13 @@ Then(
 let lastFederationPeers: FederationPeersResponse | undefined;
 let lastPeerMutation: MutationResponse | undefined;
 
-When(
-  '{word} lists federation peers',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+When('{word} lists federation peers', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    lastFederationPeers = await adminGet<FederationPeersResponse>(
-      device,
-      '/admin/federation/peers'
-    );
-  }
-);
+  lastFederationPeers = await adminGet<FederationPeersResponse>(device, '/admin/federation/peers');
+});
 
 Then('the federation peers response should succeed', function () {
   assert.ok(lastFederationPeers, 'No federation peers response available');
@@ -180,30 +174,22 @@ When(
     const device = human.devices[0] as BrowserDevice;
     assert.ok(device, `${humanName} has no device`);
 
-    lastPeerMutation = await adminPost<MutationResponse>(
-      device,
-      '/admin/federation/peers',
-      { url: peerUrl }
-    );
+    lastPeerMutation = await adminPost<MutationResponse>(device, '/admin/federation/peers', {
+      url: peerUrl,
+    });
   }
 );
 
 Then('the peer mutation should succeed', function () {
   assert.ok(lastPeerMutation, 'No peer mutation response available');
-  assert.ok(
-    lastPeerMutation.success,
-    `Peer mutation failed: ${lastPeerMutation.message}`
-  );
+  assert.ok(lastPeerMutation.success, `Peer mutation failed: ${lastPeerMutation.message}`);
 });
 
-Then(
-  'the federation peers list should include {string}',
-  function (peerUrl: string) {
-    assert.ok(lastFederationPeers, 'No federation peers response available');
-    const match = lastFederationPeers.peers.find((p) => p.url === peerUrl);
-    assert.ok(match, `Peer ${peerUrl} not found in federation peers list`);
-  }
-);
+Then('the federation peers list should include {string}', function (peerUrl: string) {
+  assert.ok(lastFederationPeers, 'No federation peers response available');
+  const match = lastFederationPeers.peers.find(p => p.url === peerUrl);
+  assert.ok(match, `Peer ${peerUrl} not found in federation peers list`);
+});
 
 When(
   '{word} removes the federation peer {string}',
@@ -212,28 +198,23 @@ When(
     const device = human.devices[0] as BrowserDevice;
     assert.ok(device, `${humanName} has no device`);
 
-    lastPeerMutation = await adminDelete<MutationResponse>(
-      device,
-      '/admin/federation/peers',
-      { url: peerUrl }
-    );
+    lastPeerMutation = await adminDelete<MutationResponse>(device, '/admin/federation/peers', {
+      url: peerUrl,
+    });
   }
 );
 
-When(
-  '{word} refreshes federation peers',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+When('{word} refreshes federation peers', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    lastPeerMutation = await adminPost<MutationResponse>(
-      device,
-      '/admin/federation/peers/refresh',
-      {}
-    );
-  }
-);
+  lastPeerMutation = await adminPost<MutationResponse>(
+    device,
+    '/admin/federation/peers/refresh',
+    {}
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Agency pipeline funnel
@@ -241,48 +222,27 @@ When(
 
 let lastPipeline: PipelineResponse | undefined;
 
-When(
-  '{word} queries the agency pipeline',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+When('{word} queries the agency pipeline', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    lastPipeline = await adminGet<PipelineResponse>(device, '/admin/pipeline');
-  }
-);
+  lastPipeline = await adminGet<PipelineResponse>(device, '/admin/pipeline');
+});
 
-Then(
-  'the pipeline should show at least {int} registered users',
-  function (minCount: number) {
-    assert.ok(lastPipeline, 'No pipeline response available');
-    assert.ok(
-      lastPipeline.registeredTotal >= minCount,
-      `Expected at least ${minCount} registered users but got ${lastPipeline.registeredTotal}`
-    );
-  }
-);
+Then('the pipeline should show at least {int} registered users', function (minCount: number) {
+  assert.ok(lastPipeline, 'No pipeline response available');
+  assert.ok(
+    lastPipeline.registeredTotal >= minCount,
+    `Expected at least ${minCount} registered users but got ${lastPipeline.registeredTotal}`
+  );
+});
 
 Then('the pipeline response should include all funnel stages', function () {
   assert.ok(lastPipeline, 'No pipeline response available');
-  assert.ok(
-    typeof lastPipeline.registeredTotal === 'number',
-    'Missing registeredTotal'
-  );
-  assert.ok(
-    typeof lastPipeline.registeredActive === 'number',
-    'Missing registeredActive'
-  );
-  assert.ok(
-    typeof lastPipeline.hostedTotal === 'number',
-    'Missing hostedTotal'
-  );
-  assert.ok(
-    typeof lastPipeline.graduatingCount === 'number',
-    'Missing graduatingCount'
-  );
-  assert.ok(
-    typeof lastPipeline.stewardCount === 'number',
-    'Missing stewardCount'
-  );
+  assert.ok(typeof lastPipeline.registeredTotal === 'number', 'Missing registeredTotal');
+  assert.ok(typeof lastPipeline.registeredActive === 'number', 'Missing registeredActive');
+  assert.ok(typeof lastPipeline.hostedTotal === 'number', 'Missing hostedTotal');
+  assert.ok(typeof lastPipeline.graduatingCount === 'number', 'Missing graduatingCount');
+  assert.ok(typeof lastPipeline.stewardCount === 'number', 'Missing stewardCount');
 });

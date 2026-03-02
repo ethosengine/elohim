@@ -58,7 +58,7 @@ interface AgentConductorResponse {
 // ---------------------------------------------------------------------------
 
 async function adminGet<T>(device: BrowserDevice, path: string): Promise<T> {
-  return device.client['get'](path) as Promise<T>;
+  return device.client['get'](path);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,16 +67,13 @@ async function adminGet<T>(device: BrowserDevice, path: string): Promise<T> {
 
 let lastConductorsResponse: ConductorsResponse | undefined;
 
-When(
-  '{word} queries the conductor pool',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+When('{word} queries the conductor pool', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    lastConductorsResponse = await adminGet<ConductorsResponse>(device, '/admin/conductors');
-  }
-);
+  lastConductorsResponse = await adminGet<ConductorsResponse>(device, '/admin/conductors');
+});
 
 Then('the conductor pool response should include a total count', function () {
   assert.ok(lastConductorsResponse, 'No conductors response available');
@@ -88,14 +85,8 @@ Then('the conductor pool response should include a total count', function () {
 
 Then('the conductor pool should include total capacity metrics', function () {
   assert.ok(lastConductorsResponse, 'No conductors response available');
-  assert.ok(
-    typeof lastConductorsResponse.totalCapacity === 'number',
-    'Missing totalCapacity'
-  );
-  assert.ok(
-    typeof lastConductorsResponse.totalAgents === 'number',
-    'Missing totalAgents'
-  );
+  assert.ok(typeof lastConductorsResponse.totalCapacity === 'number', 'Missing totalCapacity');
+  assert.ok(typeof lastConductorsResponse.totalAgents === 'number', 'Missing totalAgents');
 });
 
 // ---------------------------------------------------------------------------
@@ -108,10 +99,7 @@ When(
   '{word} views agents on the first conductor',
   async function (this: E2EWorld, humanName: string) {
     assert.ok(lastConductorsResponse, 'Must query conductor pool first');
-    assert.ok(
-      lastConductorsResponse.conductors.length > 0,
-      'No conductors in pool to inspect'
-    );
+    assert.ok(lastConductorsResponse.conductors.length > 0, 'No conductors in pool to inspect');
 
     const human = this.getHuman(humanName);
     const device = human.devices[0] as BrowserDevice;
@@ -126,18 +114,12 @@ When(
 
 Then('the conductor agents response should include the conductor ID', function () {
   assert.ok(lastConductorAgentsResponse, 'No conductor agents response available');
-  assert.ok(
-    lastConductorAgentsResponse.conductorId,
-    'Missing conductorId in agents response'
-  );
+  assert.ok(lastConductorAgentsResponse.conductorId, 'Missing conductorId in agents response');
 });
 
 Then('the agents list should be an array', function () {
   assert.ok(lastConductorAgentsResponse, 'No conductor agents response available');
-  assert.ok(
-    Array.isArray(lastConductorAgentsResponse.agents),
-    'agents should be an array'
-  );
+  assert.ok(Array.isArray(lastConductorAgentsResponse.agents), 'agents should be an array');
 });
 
 // ---------------------------------------------------------------------------
@@ -165,10 +147,7 @@ When(
 
 Then('the agent conductor lookup should return a conductor ID', function () {
   assert.ok(lastAgentConductorResponse, 'No agent conductor response available');
-  assert.ok(
-    lastAgentConductorResponse.conductorId,
-    'Missing conductorId in agent lookup response'
-  );
+  assert.ok(lastAgentConductorResponse.conductorId, 'Missing conductorId in agent lookup response');
 });
 
 Then('the lookup should include the conductor URL', function () {

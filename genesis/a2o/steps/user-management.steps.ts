@@ -54,12 +54,14 @@ interface MutationResponse {
   message?: string;
 }
 
+const ADMIN_USERS_PATH = '/admin/users';
+
 // ---------------------------------------------------------------------------
 // Admin HTTP helpers (extends DoorwayClient pattern)
 // ---------------------------------------------------------------------------
 
 async function adminGet<T>(device: BrowserDevice, path: string): Promise<T> {
-  return device.client['get'](path) as Promise<T>;
+  return device.client['get'](path);
 }
 
 async function adminPut<T>(device: BrowserDevice, path: string, body: unknown): Promise<T> {
@@ -87,39 +89,28 @@ async function adminPut<T>(device: BrowserDevice, path: string, body: unknown): 
 
 let lastUsersResponse: UsersResponse | undefined;
 
-When(
-  '{word} queries the admin users list',
-  async function (this: E2EWorld, humanName: string) {
-    const human = this.getHuman(humanName);
-    const device = human.devices[0] as BrowserDevice;
-    assert.ok(device, `${humanName} has no device`);
+When('{word} queries the admin users list', async function (this: E2EWorld, humanName: string) {
+  const human = this.getHuman(humanName);
+  const device = human.devices[0] as BrowserDevice;
+  assert.ok(device, `${humanName} has no device`);
 
-    lastUsersResponse = await adminGet<UsersResponse>(device, '/admin/users');
-  }
-);
+  lastUsersResponse = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
+});
 
-Then(
-  'the users list should contain at least {int} entries',
-  function (minCount: number) {
-    assert.ok(lastUsersResponse, 'No users response available');
-    assert.ok(
-      lastUsersResponse.users.length >= minCount,
-      `Expected at least ${minCount} users but got ${lastUsersResponse.users.length}`
-    );
-  }
-);
+Then('the users list should contain at least {int} entries', function (minCount: number) {
+  assert.ok(lastUsersResponse, 'No users response available');
+  assert.ok(
+    lastUsersResponse.users.length >= minCount,
+    `Expected at least ${minCount} users but got ${lastUsersResponse.users.length}`
+  );
+});
 
-Then(
-  "the users list should include {word}'s entry",
-  function (this: E2EWorld, humanName: string) {
-    assert.ok(lastUsersResponse, 'No users response available');
-    const human = this.getHuman(humanName);
-    const match = lastUsersResponse.users.find(
-      (u) => u.identifier === human.credentials.identifier
-    );
-    assert.ok(match, `${humanName} (${human.credentials.identifier}) not found in users list`);
-  }
-);
+Then("the users list should include {word}'s entry", function (this: E2EWorld, humanName: string) {
+  assert.ok(lastUsersResponse, 'No users response available');
+  const human = this.getHuman(humanName);
+  const match = lastUsersResponse.users.find(u => u.identifier === human.credentials.identifier);
+  assert.ok(match, `${humanName} (${human.credentials.identifier}) not found in users list`);
+});
 
 // ---------------------------------------------------------------------------
 // View user details
@@ -135,11 +126,9 @@ When(
     assert.ok(device, `${adminName} has no device`);
 
     // First get the user ID from the list
-    const listRes = await adminGet<UsersResponse>(device, '/admin/users');
+    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
     const target = this.getHuman(targetName);
-    const userEntry = listRes.users.find(
-      (u) => u.identifier === target.credentials.identifier
-    );
+    const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
     lastUserDetails = await adminGet<UserDetailsResponse>(
@@ -179,11 +168,9 @@ When(
     const device = admin.devices[0] as BrowserDevice;
 
     // Find user ID
-    const listRes = await adminGet<UsersResponse>(device, '/admin/users');
+    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
     const target = this.getHuman(targetName);
-    const userEntry = listRes.users.find(
-      (u) => u.identifier === target.credentials.identifier
-    );
+    const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
     const result = await adminPut<MutationResponse>(
@@ -196,11 +183,7 @@ When(
 );
 
 Then('the suspension should succeed', function (this: E2EWorld) {
-  assert.strictEqual(
-    this.contentIds.get('lastMutationSuccess'),
-    'true',
-    'User suspension failed'
-  );
+  assert.strictEqual(this.contentIds.get('lastMutationSuccess'), 'true', 'User suspension failed');
 });
 
 // ---------------------------------------------------------------------------
@@ -214,11 +197,9 @@ When(
     const device = admin.devices[0] as BrowserDevice;
 
     // Find user ID
-    const listRes = await adminGet<UsersResponse>(device, '/admin/users');
+    const listRes = await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
     const target = this.getHuman(targetName);
-    const userEntry = listRes.users.find(
-      (u) => u.identifier === target.credentials.identifier
-    );
+    const userEntry = listRes.users.find(u => u.identifier === target.credentials.identifier);
     assert.ok(userEntry, `${targetName} not found in users list`);
 
     const result = await adminPut<MutationResponse>(
@@ -231,11 +212,7 @@ When(
 );
 
 Then('the quota update should succeed', function (this: E2EWorld) {
-  assert.strictEqual(
-    this.contentIds.get('lastMutationSuccess'),
-    'true',
-    'Quota update failed'
-  );
+  assert.strictEqual(this.contentIds.get('lastMutationSuccess'), 'true', 'Quota update failed');
 });
 
 Then(
@@ -263,7 +240,7 @@ When(
     const device = human.devices[0] as BrowserDevice;
 
     try {
-      await adminGet<UsersResponse>(device, '/admin/users');
+      await adminGet<UsersResponse>(device, ADMIN_USERS_PATH);
       this.contentIds.set('adminAccessDenied', 'false');
     } catch {
       this.contentIds.set('adminAccessDenied', 'true');
