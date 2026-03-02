@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string -- test fixture data inherently repeats category/concept strings */
 import { HexNode, HexEdge, HexMasteryLevel, HexGraphData } from '../hexagon-grid.model';
 
 // =============================================================================
@@ -93,52 +94,96 @@ const ARITHMETIC_CATEGORIES: { name: string; concepts: string[] }[] = [
   {
     name: 'Counting & Place Value',
     concepts: [
-      'Counting to 100', 'Skip counting', 'Place value ones', 'Place value tens',
-      'Place value hundreds', 'Comparing numbers', 'Ordering numbers', 'Number line',
-      'Rounding to nearest 10', 'Rounding to nearest 100', 'Even and odd numbers',
+      'Counting to 100',
+      'Skip counting',
+      'Place value ones',
+      'Place value tens',
+      'Place value hundreds',
+      'Comparing numbers',
+      'Ordering numbers',
+      'Number line',
+      'Rounding to nearest 10',
+      'Rounding to nearest 100',
+      'Even and odd numbers',
       'Number patterns',
     ],
   },
   {
     name: 'Addition & Subtraction',
     concepts: [
-      'Adding single digits', 'Adding with carrying', 'Subtracting single digits',
-      'Subtracting with borrowing', 'Mental addition', 'Mental subtraction',
-      'Word problems: addition', 'Word problems: subtraction', 'Missing addend',
-      'Properties of addition', 'Estimation: sums', 'Multi-digit addition',
+      'Adding single digits',
+      'Adding with carrying',
+      'Subtracting single digits',
+      'Subtracting with borrowing',
+      'Mental addition',
+      'Mental subtraction',
+      'Word problems: addition',
+      'Word problems: subtraction',
+      'Missing addend',
+      'Properties of addition',
+      'Estimation: sums',
+      'Multi-digit addition',
       'Multi-digit subtraction',
     ],
   },
   {
     name: 'Multiplication & Division',
     concepts: [
-      'Multiplication as groups', 'Times tables 2-5', 'Times tables 6-9',
-      'Times tables 10-12', 'Multiplication properties', 'Multi-digit multiplication',
-      'Division as sharing', 'Division with remainders', 'Long division',
-      'Factors and multiples', 'Prime numbers', 'Divisibility rules',
+      'Multiplication as groups',
+      'Times tables 2-5',
+      'Times tables 6-9',
+      'Times tables 10-12',
+      'Multiplication properties',
+      'Multi-digit multiplication',
+      'Division as sharing',
+      'Division with remainders',
+      'Long division',
+      'Factors and multiples',
+      'Prime numbers',
+      'Divisibility rules',
     ],
   },
   {
     name: 'Fractions',
     concepts: [
-      'What is a fraction?', 'Fractions on number line', 'Comparing fractions',
-      'Equivalent fractions', 'Simplifying fractions', 'Adding fractions',
-      'Subtracting fractions', 'Mixed numbers', 'Improper fractions',
+      'What is a fraction?',
+      'Fractions on number line',
+      'Comparing fractions',
+      'Equivalent fractions',
+      'Simplifying fractions',
+      'Adding fractions',
+      'Subtracting fractions',
+      'Mixed numbers',
+      'Improper fractions',
       'Fractions of a whole',
     ],
   },
   {
     name: 'Decimals & Measurement',
     concepts: [
-      'Decimal place value', 'Comparing decimals', 'Adding decimals',
-      'Subtracting decimals', 'Fractions to decimals', 'Units of length',
-      'Units of weight', 'Units of time', 'Perimeter', 'Area basics',
+      'Decimal place value',
+      'Comparing decimals',
+      'Adding decimals',
+      'Subtracting decimals',
+      'Fractions to decimals',
+      'Units of length',
+      'Units of weight',
+      'Units of time',
+      'Perimeter',
+      'Area basics',
     ],
   },
 ];
 
 const BLOOM_LEVELS: HexMasteryLevel[] = [
-  'not_started', 'seen', 'remember', 'understand', 'apply', 'analyze', 'evaluate', 'create',
+  'not_started',
+  'seen',
+  'remember',
+  'understand',
+  'apply',
+  'analyze',
+  'evaluate',
+  'create',
 ];
 
 export function makeArithmeticTerritory(): HexGraphData {
@@ -227,12 +272,22 @@ const ADAM: LoveMapPersona = {
   domains: [
     {
       category: 'Stewardship',
-      concepts: ['Incorruptible Stewardship', 'Regenerative Agriculture', 'Intergenerational Thinking', 'Ecological Accounting'],
-      affinityRange: [0.7, 1.0],
+      concepts: [
+        'Incorruptible Stewardship',
+        'Regenerative Agriculture',
+        'Intergenerational Thinking',
+        'Ecological Accounting',
+      ],
+      affinityRange: [0.7, 1],
     },
     {
       category: 'Value Recognition',
-      concepts: ["The Value Scanner's Eye", 'Care Economy Visibility', 'Resource Mapping', 'Generative Economics'],
+      concepts: [
+        "The Value Scanner's Eye",
+        'Care Economy Visibility',
+        'Resource Mapping',
+        'Generative Economics',
+      ],
       affinityRange: [0.6, 0.95],
     },
     {
@@ -249,12 +304,22 @@ const EVE: LoveMapPersona = {
   domains: [
     {
       category: 'Truth-Seeking',
-      concepts: ["The Public Observer's Lens", 'Transparency as Immune System', 'Accountability Mechanisms', 'Investigative Patterns'],
-      affinityRange: [0.7, 1.0],
+      concepts: [
+        "The Public Observer's Lens",
+        'Transparency as Immune System',
+        'Accountability Mechanisms',
+        'Investigative Patterns',
+      ],
+      affinityRange: [0.7, 1],
     },
     {
       category: 'Digital Relationships',
-      concepts: ['Social Medium', 'Genuine Connection', 'Digital Presence', 'Relationship-Centered Communication'],
+      concepts: [
+        'Social Medium',
+        'Genuine Connection',
+        'Digital Presence',
+        'Relationship-Centered Communication',
+      ],
       affinityRange: [0.6, 0.95],
     },
     {
@@ -273,57 +338,83 @@ const SHARED_CONCEPTS = [
   { title: 'Love as Technology', category: 'Shared Ground', overlapScore: 0.68 },
   { title: 'Value-Generative Economics', category: 'Synthesis', overlapScore: 0.6 },
   { title: 'Communities Self-Govern', category: 'Synthesis', overlapScore: 0.55 },
-  { title: 'Different Values Coexist', category: 'Synthesis', overlapScore: 0.75 },
+  {
+    title: 'Different Values Coexist',
+    category: 'Synthesis',
+    overlapScore: 0.75,
+  },
   { title: 'Our Path Forward', category: 'Synthesis', overlapScore: 0.5 },
 ];
+
+function addPersonConcepts(
+  nodes: HexNode[],
+  domains: LoveMapPersona['domains'],
+  owner: HexNode['owner'],
+  sourceLabel: string,
+  idx: { value: number }
+): void {
+  for (const domain of domains) {
+    for (const concept of domain.concepts) {
+      if (SHARED_CONCEPTS.some(s => s.title === concept)) continue;
+      const affinity =
+        domain.affinityRange[0] +
+        seededRandom() * (domain.affinityRange[1] - domain.affinityRange[0]);
+      nodes.push({
+        id: `${sourceLabel.toLowerCase()}-${idx.value}`,
+        title: concept,
+        affinity,
+        affinityLevel: affinityLevelFromScore(affinity),
+        owner,
+        category: domain.category,
+        sourceLabel,
+      });
+      idx.value++;
+    }
+  }
+}
+
+function addTeachingEdges(
+  edges: HexEdge[],
+  nodes: HexNode[],
+  titles: string[],
+  owner: HexNode['owner'],
+  targetCategory: string,
+  edgeType: string
+): void {
+  for (const title of titles) {
+    const src = nodes.find(n => n.title === title && n.owner === owner);
+    const tgt = nodes.find(n => n.owner === 'shared' && n.category === targetCategory);
+    if (src && tgt) {
+      edges.push({
+        id: `${edgeType}-${src.id}`,
+        sourceId: src.id,
+        targetId: tgt.id,
+        edgeType: 'teaches',
+        confidence: 0.7,
+        directed: true,
+        label: `${owner === 'self' ? 'Adam' : 'Eve'} teaches`,
+      });
+    }
+  }
+}
 
 export function makeAdamEveLoveMap(): HexGraphData {
   resetSeed(777);
   const nodes: HexNode[] = [];
   const edges: HexEdge[] = [];
-  let idx = 0;
+  const idx = { value: 0 };
 
   // Adam's knowledge (red)
-  for (const domain of ADAM.domains) {
-    for (const concept of domain.concepts) {
-      if (SHARED_CONCEPTS.some(s => s.title === concept)) continue; // skip, will add as shared
-      const affinity = domain.affinityRange[0] + seededRandom() * (domain.affinityRange[1] - domain.affinityRange[0]);
-      nodes.push({
-        id: `adam-${idx}`,
-        title: concept,
-        affinity,
-        affinityLevel: affinityLevelFromScore(affinity),
-        owner: 'self',
-        category: domain.category,
-        sourceLabel: 'Adam',
-      });
-      idx++;
-    }
-  }
+  addPersonConcepts(nodes, ADAM.domains, 'self', 'Adam', idx);
 
   // Eve's knowledge (blue)
-  for (const domain of EVE.domains) {
-    for (const concept of domain.concepts) {
-      if (SHARED_CONCEPTS.some(s => s.title === concept)) continue;
-      const affinity = domain.affinityRange[0] + seededRandom() * (domain.affinityRange[1] - domain.affinityRange[0]);
-      nodes.push({
-        id: `eve-${idx}`,
-        title: concept,
-        affinity,
-        affinityLevel: affinityLevelFromScore(affinity),
-        owner: 'other',
-        category: domain.category,
-        sourceLabel: 'Eve',
-      });
-      idx++;
-    }
-  }
+  addPersonConcepts(nodes, EVE.domains, 'other', 'Eve', idx);
 
   // Shared knowledge (purple)
   for (const shared of SHARED_CONCEPTS) {
     const affinity = 0.5 + seededRandom() * 0.5;
     nodes.push({
-      id: `shared-${idx}`,
+      id: `shared-${idx.value}`,
       title: shared.title,
       affinity,
       affinityLevel: affinityLevelFromScore(affinity),
@@ -332,44 +423,26 @@ export function makeAdamEveLoveMap(): HexGraphData {
       category: shared.category,
       sourceLabel: 'Adam & Eve',
     });
-    idx++;
+    idx.value++;
   }
 
   // Teaching edges: Adam teaches Eve (chapter 2)
-  const adamTeaches = ['Incorruptible Stewardship', 'Regenerative Agriculture', "The Value Scanner's Eye", 'Intergenerational Thinking'];
-  for (const title of adamTeaches) {
-    const src = nodes.find(n => n.title === title && n.owner === 'self');
-    const tgt = nodes.find(n => n.owner === 'shared' && n.category === 'Shared Ground');
-    if (src && tgt) {
-      edges.push({
-        id: `teaches-adam-${src.id}`,
-        sourceId: src.id,
-        targetId: tgt.id,
-        edgeType: 'teaches',
-        confidence: 0.7,
-        directed: true,
-        label: 'Adam teaches',
-      });
-    }
-  }
+  const adamTeaches = [
+    'Incorruptible Stewardship',
+    'Regenerative Agriculture',
+    "The Value Scanner's Eye",
+    'Intergenerational Thinking',
+  ];
+  addTeachingEdges(edges, nodes, adamTeaches, 'self', 'Shared Ground', 'teaches-adam');
 
   // Teaching edges: Eve teaches Adam (chapter 3)
-  const eveTeaches = ["The Public Observer's Lens", 'Social Medium', 'Genuine Connection', 'Transparency as Immune System'];
-  for (const title of eveTeaches) {
-    const src = nodes.find(n => n.title === title && n.owner === 'other');
-    const tgt = nodes.find(n => n.owner === 'shared' && n.category === 'Synthesis');
-    if (src && tgt) {
-      edges.push({
-        id: `teaches-eve-${src.id}`,
-        sourceId: src.id,
-        targetId: tgt.id,
-        edgeType: 'teaches',
-        confidence: 0.7,
-        directed: true,
-        label: 'Eve teaches',
-      });
-    }
-  }
+  const eveTeaches = [
+    "The Public Observer's Lens",
+    'Social Medium',
+    'Genuine Connection',
+    'Transparency as Immune System',
+  ];
+  addTeachingEdges(edges, nodes, eveTeaches, 'other', 'Synthesis', 'teaches-eve');
 
   return { nodes, edges };
 }
@@ -382,36 +455,55 @@ const COMPLIANCE_MODULES: { category: string; modules: string[] }[] = [
   {
     category: 'Data Privacy',
     modules: [
-      'GDPR Fundamentals', 'Data Classification', 'Consent Management',
-      'Breach Notification', 'Right to Erasure', 'Cross-Border Transfer',
+      'GDPR Fundamentals',
+      'Data Classification',
+      'Consent Management',
+      'Breach Notification',
+      'Right to Erasure',
+      'Cross-Border Transfer',
     ],
   },
   {
     category: 'Anti-Bribery',
     modules: [
-      'FCPA Overview', 'Gift Policy', 'Third-Party Due Diligence',
-      'Red Flag Recognition', 'Reporting Obligations',
+      'FCPA Overview',
+      'Gift Policy',
+      'Third-Party Due Diligence',
+      'Red Flag Recognition',
+      'Reporting Obligations',
     ],
   },
   {
     category: 'Workplace Safety',
     modules: [
-      'Hazard Identification', 'Emergency Procedures', 'PPE Requirements',
-      'Incident Reporting', 'Ergonomics', 'Fire Safety',
+      'Hazard Identification',
+      'Emergency Procedures',
+      'PPE Requirements',
+      'Incident Reporting',
+      'Ergonomics',
+      'Fire Safety',
     ],
   },
   {
     category: 'Information Security',
     modules: [
-      'Password Hygiene', 'Phishing Recognition', 'Clean Desk Policy',
-      'Secure File Sharing', 'Social Engineering', 'Incident Response',
+      'Password Hygiene',
+      'Phishing Recognition',
+      'Clean Desk Policy',
+      'Secure File Sharing',
+      'Social Engineering',
+      'Incident Response',
     ],
   },
   {
     category: 'Ethics & Conduct',
     modules: [
-      'Code of Conduct', 'Conflict of Interest', 'Whistleblower Protection',
-      'Anti-Harassment', 'Diversity & Inclusion', 'Fair Competition',
+      'Code of Conduct',
+      'Conflict of Interest',
+      'Whistleblower Protection',
+      'Anti-Harassment',
+      'Diversity & Inclusion',
+      'Fair Competition',
     ],
   },
 ];
@@ -473,38 +565,62 @@ const POLITICAL_QUADRANTS: {
 }[] = [
   {
     name: 'Libertarian Left',
-    compassX: -0.7, compassY: -0.7,
+    compassX: -0.7,
+    compassY: -0.7,
     positions: [
-      'Universal Basic Income', 'Worker Cooperatives', 'Drug Decriminalization',
-      'Open Borders', 'Community Land Trusts', 'Mutual Aid Networks',
-      'Direct Democracy', 'Restorative Justice',
+      'Universal Basic Income',
+      'Worker Cooperatives',
+      'Drug Decriminalization',
+      'Open Borders',
+      'Community Land Trusts',
+      'Mutual Aid Networks',
+      'Direct Democracy',
+      'Restorative Justice',
     ],
   },
   {
     name: 'Authoritarian Left',
-    compassX: -0.7, compassY: 0.7,
+    compassX: -0.7,
+    compassY: 0.7,
     positions: [
-      'Universal Healthcare', 'Public Education', 'Progressive Taxation',
-      'Labor Protections', 'Housing as Right', 'Climate Regulation',
-      'Anti-Trust Enforcement', 'Public Media',
+      'Universal Healthcare',
+      'Public Education',
+      'Progressive Taxation',
+      'Labor Protections',
+      'Housing as Right',
+      'Climate Regulation',
+      'Anti-Trust Enforcement',
+      'Public Media',
     ],
   },
   {
     name: 'Libertarian Right',
-    compassX: 0.7, compassY: -0.7,
+    compassX: 0.7,
+    compassY: -0.7,
     positions: [
-      'Free Markets', 'Property Rights', 'Gun Rights', 'Crypto/Sound Money',
-      'Minimal Regulation', 'Voluntary Association', 'Private Education',
+      'Free Markets',
+      'Property Rights',
+      'Gun Rights',
+      'Crypto/Sound Money',
+      'Minimal Regulation',
+      'Voluntary Association',
+      'Private Education',
       'Self-Defense',
     ],
   },
   {
     name: 'Authoritarian Right',
-    compassX: 0.7, compassY: 0.7,
+    compassX: 0.7,
+    compassY: 0.7,
     positions: [
-      'National Security', 'Traditional Family', 'Immigration Control',
-      'Law and Order', 'Religious Freedom', 'Military Strength',
-      'Fiscal Conservatism', 'Border Sovereignty',
+      'National Security',
+      'Traditional Family',
+      'Immigration Control',
+      'Law and Order',
+      'Religious Freedom',
+      'Military Strength',
+      'Fiscal Conservatism',
+      'Border Sovereignty',
     ],
   },
 ];
@@ -519,9 +635,28 @@ const POLITICAL_SHARED: { title: string; quadrants: string[] }[] = [
   { title: 'Environmental Stewardship', quadrants: ['Libertarian Left', 'Authoritarian Left'] },
 ];
 
+function determineOwnerAndAffinity(
+  isA: boolean,
+  isB: boolean
+): { owner: HexNode['owner']; affinity: number } {
+  if (isA && isB) {
+    return { owner: 'shared', affinity: 0.5 + seededRandom() * 0.5 };
+  }
+  if (isA) {
+    return { owner: 'self', affinity: 0.5 + seededRandom() * 0.5 };
+  }
+  if (isB) {
+    return { owner: 'other', affinity: 0.5 + seededRandom() * 0.5 };
+  }
+  return {
+    owner: seededRandom() > 0.5 ? 'self' : 'other',
+    affinity: seededRandom() * 0.35,
+  };
+}
+
 export function makePoliticalCompass(
   personAQuadrant = 'Libertarian Left',
-  personBQuadrant = 'Libertarian Right',
+  personBQuadrant = 'Libertarian Right'
 ): HexGraphData {
   resetSeed(555);
   const nodes: HexNode[] = [];
@@ -533,23 +668,7 @@ export function makePoliticalCompass(
     const isB = quad.name === personBQuadrant;
 
     for (const position of quad.positions) {
-      let owner: HexNode['owner'];
-      let affinity: number;
-
-      if (isA && isB) {
-        owner = 'shared';
-        affinity = 0.5 + seededRandom() * 0.5;
-      } else if (isA) {
-        owner = 'self';
-        affinity = 0.5 + seededRandom() * 0.5;
-      } else if (isB) {
-        owner = 'other';
-        affinity = 0.5 + seededRandom() * 0.5;
-      } else {
-        // Neither person's primary quadrant — neutral
-        owner = seededRandom() > 0.5 ? 'self' : 'other';
-        affinity = seededRandom() * 0.35; // low affinity — not their territory
-      }
+      const { owner, affinity } = determineOwnerAndAffinity(isA, isB);
 
       nodes.push({
         id: `pol-${idx}`,
@@ -631,21 +750,36 @@ export function makeCrossJourneyOverlap(): HexGraphData {
 
   // Arithmetic concepts (already mastered — Layer 0 in DAG)
   const arithmeticConcepts = [
-    'Number Sense', 'Addition', 'Subtraction', 'Multiplication', 'Division',
+    'Number Sense',
+    'Addition',
+    'Subtraction',
+    'Multiplication',
+    'Division',
     'Place Value',
   ];
 
   // Bridge concepts — the shared overlap (Layer 1 in DAG)
   const bridgeConcepts = [
-    'Order of Operations', 'Number Patterns', 'Fractions', 'Decimals',
-    'Word Problems', 'Estimation',
+    'Order of Operations',
+    'Number Patterns',
+    'Fractions',
+    'Decimals',
+    'Word Problems',
+    'Estimation',
   ];
 
   // Algebra concepts (not yet started — Layer 2 in DAG)
   const algebraConcepts = [
-    'Variables & Expressions', 'Solving Equations', 'Inequalities',
-    'Functions', 'Graphing Linear', 'Systems of Equations',
-    'Polynomials', 'Factoring', 'Quadratics', 'Exponents',
+    'Variables & Expressions',
+    'Solving Equations',
+    'Inequalities',
+    'Functions',
+    'Graphing Linear',
+    'Systems of Equations',
+    'Polynomials',
+    'Factoring',
+    'Quadratics',
+    'Exponents',
   ];
 
   // Layer 0: Arithmetic (mastered, owner: self)
@@ -737,61 +871,95 @@ const ASTRONAUT_DOMAINS: { name: string; concepts: string[]; masteryBias: number
   {
     name: 'Mathematics',
     concepts: [
-      'Calculus I', 'Calculus II', 'Linear Algebra', 'Differential Equations',
-      'Statistics', 'Orbital Mechanics Math',
+      'Calculus I',
+      'Calculus II',
+      'Linear Algebra',
+      'Differential Equations',
+      'Statistics',
+      'Orbital Mechanics Math',
     ],
     masteryBias: 0.5, // some math done
   },
   {
     name: 'Physics',
     concepts: [
-      'Classical Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics',
-      'Fluid Dynamics', 'Quantum Basics', 'Astrophysics Intro',
+      'Classical Mechanics',
+      'Thermodynamics',
+      'Electromagnetism',
+      'Optics',
+      'Fluid Dynamics',
+      'Quantum Basics',
+      'Astrophysics Intro',
     ],
     masteryBias: 0.3,
   },
   {
     name: 'Aerospace Engineering',
     concepts: [
-      'Aerodynamics', 'Propulsion Systems', 'Spacecraft Design', 'Orbital Mechanics',
-      'Launch Systems', 'Re-entry Physics', 'Life Support Systems',
-      'Thermal Protection', 'Avionics',
+      'Aerodynamics',
+      'Propulsion Systems',
+      'Spacecraft Design',
+      'Orbital Mechanics',
+      'Launch Systems',
+      'Re-entry Physics',
+      'Life Support Systems',
+      'Thermal Protection',
+      'Avionics',
     ],
     masteryBias: 0.05, // barely started
   },
   {
     name: 'Flight Training',
     concepts: [
-      'Private Pilot License', 'Instrument Rating', 'Multi-Engine Rating',
-      'Jet Certification', 'High-Performance Aircraft', 'Test Pilot School',
-      'Zero-G Training', 'Simulator Hours (1000+)',
+      'Private Pilot License',
+      'Instrument Rating',
+      'Multi-Engine Rating',
+      'Jet Certification',
+      'High-Performance Aircraft',
+      'Test Pilot School',
+      'Zero-G Training',
+      'Simulator Hours (1000+)',
     ],
-    masteryBias: 0.0, // haven't started
+    masteryBias: 0, // haven't started
   },
   {
     name: 'Medical & Fitness',
     concepts: [
-      'NASA Class I Physical', 'Vision Requirements', 'Cardiovascular Fitness',
-      'G-Force Tolerance', 'Psychological Evaluation', 'Wilderness Survival',
-      'SCUBA Certification', 'Spacewalk Training (EVA)',
+      'NASA Class I Physical',
+      'Vision Requirements',
+      'Cardiovascular Fitness',
+      'G-Force Tolerance',
+      'Psychological Evaluation',
+      'Wilderness Survival',
+      'SCUBA Certification',
+      'Spacewalk Training (EVA)',
     ],
     masteryBias: 0.15,
   },
   {
     name: 'Leadership & Operations',
     concepts: [
-      'Team Leadership', 'Mission Planning', 'Risk Assessment',
-      'Communication Under Stress', 'Cross-Cultural Collaboration',
-      'Public Speaking', 'Scientific Research Methods',
+      'Team Leadership',
+      'Mission Planning',
+      'Risk Assessment',
+      'Communication Under Stress',
+      'Cross-Cultural Collaboration',
+      'Public Speaking',
+      'Scientific Research Methods',
     ],
     masteryBias: 0.25,
   },
   {
     name: 'Space Science',
     concepts: [
-      'Earth Observation', 'Microgravity Research', 'Space Station Operations',
-      'Robotics (Canadarm)', 'Docking Procedures', 'Emergency Protocols',
-      'Radiation Biology', 'Space Medicine',
+      'Earth Observation',
+      'Microgravity Research',
+      'Space Station Operations',
+      'Robotics (Canadarm)',
+      'Docking Procedures',
+      'Emergency Protocols',
+      'Radiation Biology',
+      'Space Medicine',
     ],
     masteryBias: 0.02,
   },
@@ -884,7 +1052,14 @@ export function makeAstronautGoal(): HexGraphData {
 
 export function makeBloomShowcase(): HexNode[] {
   const levels: HexMasteryLevel[] = [
-    'not_started', 'seen', 'remember', 'understand', 'apply', 'analyze', 'evaluate', 'create',
+    'not_started',
+    'seen',
+    'remember',
+    'understand',
+    'apply',
+    'analyze',
+    'evaluate',
+    'create',
   ];
   const labels: Record<HexMasteryLevel, string> = {
     not_started: 'Not Started',
@@ -922,9 +1097,12 @@ export function makeBloomShowcase(): HexNode[] {
 
 export function makeP2PNetwork(): HexGraphData {
   resetSeed(42);
-  const RELATIONSHIPS = ['family', 'friend', 'colleague', 'mentor', 'neighbor', 'acquaintance'];
   const INTIMACY_AFFINITY: Record<string, number> = {
-    intimate: 0.95, trusted: 0.75, connection: 0.55, acquaintance: 0.35, recognition: 0.15,
+    intimate: 0.95,
+    trusted: 0.75,
+    connection: 0.55,
+    acquaintance: 0.35,
+    recognition: 0.15,
   };
 
   const agents = [
@@ -950,11 +1128,19 @@ export function makeP2PNetwork(): HexGraphData {
 
   const nodes: HexNode[] = agents.map((agent, i) => {
     const intimacyKeys = Object.keys(INTIMACY_AFFINITY);
-    const intimacy = agent.group === 'self' ? 'intimate'
-      : agent.group === 'family' ? pick(intimacyKeys.slice(0, 2))
-        : agent.group === 'friend' ? pick(intimacyKeys.slice(1, 3))
-          : pick(intimacyKeys.slice(2));
-    const affinity = INTIMACY_AFFINITY[intimacy] || 0.3;
+    let intimacy: string;
+
+    if (agent.group === 'self') {
+      intimacy = 'intimate';
+    } else if (agent.group === 'family') {
+      intimacy = pick(intimacyKeys.slice(0, 2));
+    } else if (agent.group === 'friend') {
+      intimacy = pick(intimacyKeys.slice(1, 3));
+    } else {
+      intimacy = pick(intimacyKeys.slice(2));
+    }
+
+    const affinity = INTIMACY_AFFINITY[intimacy] ?? 0.3;
 
     return {
       id: `agent-${i}`,
@@ -962,7 +1148,7 @@ export function makeP2PNetwork(): HexGraphData {
       affinity,
       affinityLevel: affinityLevelFromScore(affinity),
       group: agent.group,
-      owner: agent.group === 'self' ? 'self' as const : undefined,
+      owner: agent.group === 'self' ? ('self' as const) : undefined,
       subtitle: agent.group,
     };
   });
@@ -978,9 +1164,27 @@ export function makeP2PNetwork(): HexGraphData {
 
   // Add some inter-agent connections
   edges.push(
-    { id: 'social-family-1', sourceId: 'agent-3', targetId: 'agent-4', edgeType: 'social', confidence: 0.95 }, // Mom-Dad
-    { id: 'social-family-2', sourceId: 'agent-1', targetId: 'agent-2', edgeType: 'social', confidence: 0.8 }, // Sarah-James
-    { id: 'social-work', sourceId: 'agent-8', targetId: 'agent-9', edgeType: 'social', confidence: 0.6 }, // Casey-Morgan
+    {
+      id: 'social-family-1',
+      sourceId: 'agent-3',
+      targetId: 'agent-4',
+      edgeType: 'social',
+      confidence: 0.95,
+    }, // Mom-Dad
+    {
+      id: 'social-family-2',
+      sourceId: 'agent-1',
+      targetId: 'agent-2',
+      edgeType: 'social',
+      confidence: 0.8,
+    }, // Sarah-James
+    {
+      id: 'social-work',
+      sourceId: 'agent-8',
+      targetId: 'agent-9',
+      edgeType: 'social',
+      confidence: 0.6,
+    } // Casey-Morgan
   );
 
   return { nodes, edges };
@@ -990,7 +1194,10 @@ export function makeP2PNetwork(): HexGraphData {
 // Scenario 9: Bloom's Staircase — Curriculum Progression with Gate Line
 // =============================================================================
 
-const STAIRCASE_CATEGORIES: { name: string; concepts: { title: string; bloom: HexMasteryLevel }[] }[] = [
+const STAIRCASE_CATEGORIES: {
+  name: string;
+  concepts: { title: string; bloom: HexMasteryLevel }[];
+}[] = [
   {
     name: 'Number Sense',
     concepts: [
@@ -1167,6 +1374,32 @@ const LOVE_DOMAINS: LoveMapDomain[] = [
   },
 ];
 
+/** Add teaches edges between owner nodes and shared targets. */
+function addTeachesEdges(
+  nodes: HexNode[],
+  edges: HexEdge[],
+  pairs: [string, string][],
+  sourceOwner: HexNode['owner'],
+  prefix: string,
+  label: string
+): void {
+  for (const [from, to] of pairs) {
+    const src = nodes.find(n => n.title === from && n.owner === sourceOwner);
+    const tgt = nodes.find(n => n.title === to && n.owner === 'shared');
+    if (src && tgt) {
+      edges.push({
+        id: `teaches-${prefix}-${src.id}-${tgt.id}`,
+        sourceId: src.id,
+        targetId: tgt.id,
+        edgeType: 'teaches',
+        confidence: 0.75,
+        directed: true,
+        label,
+      });
+    }
+  }
+}
+
 export function makeLoveMap(): HexGraphData {
   resetSeed(808);
   const nodes: HexNode[] = [];
@@ -1232,53 +1465,33 @@ export function makeLoveMap(): HexGraphData {
     }
   }
 
-  // Teaches edges: River teaches Sky
-  const riverTeachesSky: [string, string][] = [
-    ['Retirement Planning', 'Shared Savings Goal'],
-    ['Nutrition Planning', 'Family Health Goals'],
-    ['Professional Networking', 'Couple Career Support'],
-    ['Monthly Budgeting', 'Emergency Fund'],
-  ];
+  addTeachesEdges(
+    nodes,
+    edges,
+    [
+      ['Retirement Planning', 'Shared Savings Goal'],
+      ['Nutrition Planning', 'Family Health Goals'],
+      ['Professional Networking', 'Couple Career Support'],
+      ['Monthly Budgeting', 'Emergency Fund'],
+    ],
+    'self',
+    'r',
+    'River teaches'
+  );
 
-  for (const [from, to] of riverTeachesSky) {
-    const src = nodes.find(n => n.title === from && n.owner === 'self');
-    const tgt = nodes.find(n => n.title === to && n.owner === 'shared');
-    if (src && tgt) {
-      edges.push({
-        id: `teaches-r-${src.id}-${tgt.id}`,
-        sourceId: src.id,
-        targetId: tgt.id,
-        edgeType: 'teaches',
-        confidence: 0.75,
-        directed: true,
-        label: 'River teaches',
-      });
-    }
-  }
-
-  // Teaches edges: Sky teaches River
-  const skyTeachesRiver: [string, string][] = [
-    ['Love Languages', 'Quality Time Rituals'],
-    ['Emotional Coaching', 'Discipline Approach'],
-    ['Mental Health Check-ins', 'Cooking Together'],
-    ['Date Night Planning', 'Conflict Resolution'],
-  ];
-
-  for (const [from, to] of skyTeachesRiver) {
-    const src = nodes.find(n => n.title === from && n.owner === 'other');
-    const tgt = nodes.find(n => n.title === to && n.owner === 'shared');
-    if (src && tgt) {
-      edges.push({
-        id: `teaches-s-${src.id}-${tgt.id}`,
-        sourceId: src.id,
-        targetId: tgt.id,
-        edgeType: 'teaches',
-        confidence: 0.75,
-        directed: true,
-        label: 'Sky teaches',
-      });
-    }
-  }
+  addTeachesEdges(
+    nodes,
+    edges,
+    [
+      ['Love Languages', 'Quality Time Rituals'],
+      ['Emotional Coaching', 'Discipline Approach'],
+      ['Mental Health Check-ins', 'Cooking Together'],
+      ['Date Night Planning', 'Conflict Resolution'],
+    ],
+    'other',
+    's',
+    'Sky teaches'
+  );
 
   // Social edges from center to shared concepts
   for (const n of nodes.filter(n => n.owner === 'shared')) {
@@ -1312,21 +1525,30 @@ const POLICY_DOMAINS: PolicyDomain[] = [
     leftPositions: ['Universal Coverage', 'Public Option', 'Drug Price Controls'],
     rightPositions: ['Market Competition', 'Health Savings Accounts', 'Deregulation'],
     commonGround: ['Mental Health Funding'],
-    oppositions: [['Universal Coverage', 'Market Competition'], ['Drug Price Controls', 'Deregulation']],
+    oppositions: [
+      ['Universal Coverage', 'Market Competition'],
+      ['Drug Price Controls', 'Deregulation'],
+    ],
   },
   {
     name: 'Economy',
     leftPositions: ['Progressive Taxation', 'Worker Protections', 'Union Rights'],
     rightPositions: ['Flat Tax', 'Business Deregulation', 'Free Trade'],
     commonGround: ['Small Business Support', 'Job Training'],
-    oppositions: [['Progressive Taxation', 'Flat Tax'], ['Worker Protections', 'Business Deregulation']],
+    oppositions: [
+      ['Progressive Taxation', 'Flat Tax'],
+      ['Worker Protections', 'Business Deregulation'],
+    ],
   },
   {
     name: 'Environment',
     leftPositions: ['Green New Deal', 'Carbon Tax', 'Renewable Mandate'],
     rightPositions: ['Energy Independence', 'Nuclear Power', 'Market Solutions'],
     commonGround: ['Clean Water', 'Conservation'],
-    oppositions: [['Carbon Tax', 'Market Solutions'], ['Renewable Mandate', 'Energy Independence']],
+    oppositions: [
+      ['Carbon Tax', 'Market Solutions'],
+      ['Renewable Mandate', 'Energy Independence'],
+    ],
   },
   {
     name: 'Immigration',
@@ -1340,16 +1562,138 @@ const POLICY_DOMAINS: PolicyDomain[] = [
     leftPositions: ['Universal Pre-K', 'Student Debt Relief', 'Teacher Pay'],
     rightPositions: ['School Choice', 'Charter Schools', 'Local Control'],
     commonGround: ['STEM Investment', 'Vocational Training'],
-    oppositions: [['Universal Pre-K', 'School Choice'], ['Student Debt Relief', 'Local Control']],
+    oppositions: [
+      ['Universal Pre-K', 'School Choice'],
+      ['Student Debt Relief', 'Local Control'],
+    ],
   },
   {
     name: 'Criminal Justice',
     leftPositions: ['Police Reform', 'Restorative Justice', 'Decriminalization'],
     rightPositions: ['Law & Order', 'Tough Sentencing', 'Victim Rights'],
     commonGround: ['Reentry Programs'],
-    oppositions: [['Police Reform', 'Law & Order'], ['Decriminalization', 'Tough Sentencing']],
+    oppositions: [
+      ['Police Reform', 'Law & Order'],
+      ['Decriminalization', 'Tough Sentencing'],
+    ],
   },
 ];
+
+/** Build nodes and edges for a single policy domain. */
+function buildPolicyDomainNodes(
+  domain: PolicyDomain,
+  nodes: HexNode[],
+  edges: HexEdge[],
+  startIdx: number
+): number {
+  let idx = startIdx;
+
+  // Left positions
+  for (const pos of domain.leftPositions) {
+    const affinity = 0.5 + seededRandom() * 0.5;
+    nodes.push({
+      id: `pol-l-${idx}`,
+      title: pos,
+      affinity,
+      affinityLevel: affinityLevelFromScore(affinity),
+      owner: 'self',
+      category: domain.name,
+      group: 'Civic Left',
+      sourceLabel: 'Civic Left',
+      compassX: -0.5 - seededRandom() * 0.4,
+      compassY: (seededRandom() - 0.5) * 1.4,
+    });
+    idx++;
+  }
+
+  // Right positions
+  for (const pos of domain.rightPositions) {
+    const affinity = 0.5 + seededRandom() * 0.5;
+    nodes.push({
+      id: `pol-r-${idx}`,
+      title: pos,
+      affinity,
+      affinityLevel: affinityLevelFromScore(affinity),
+      owner: 'other',
+      category: domain.name,
+      group: 'Civic Right',
+      sourceLabel: 'Civic Right',
+      compassX: 0.5 + seededRandom() * 0.4,
+      compassY: (seededRandom() - 0.5) * 1.4,
+    });
+    idx++;
+  }
+
+  // Common ground + connecting edges
+  idx = addPolicyCommonGround(domain, nodes, edges, idx);
+
+  // Opposition edges (tension lines)
+  for (const [leftTitle, rightTitle] of domain.oppositions) {
+    const leftNode = nodes.find(n => n.title === leftTitle && n.group === 'Civic Left');
+    const rightNode = nodes.find(n => n.title === rightTitle && n.group === 'Civic Right');
+    if (leftNode && rightNode) {
+      edges.push({
+        id: `opposes-${leftNode.id}-${rightNode.id}`,
+        sourceId: leftNode.id,
+        targetId: rightNode.id,
+        edgeType: 'opposes',
+        confidence: 0.7 + seededRandom() * 0.3,
+      });
+    }
+  }
+
+  return idx;
+}
+
+/** Add common ground nodes and connect them to both sides. */
+function addPolicyCommonGround(
+  domain: PolicyDomain,
+  nodes: HexNode[],
+  edges: HexEdge[],
+  startIdx: number
+): number {
+  let idx = startIdx;
+  for (const pos of domain.commonGround) {
+    const affinity = 0.4 + seededRandom() * 0.3;
+    const nodeId = `pol-cg-${idx}`;
+    nodes.push({
+      id: nodeId,
+      title: pos,
+      affinity,
+      affinityLevel: affinityLevelFromScore(affinity),
+      owner: 'shared',
+      overlapScore: 0.5 + seededRandom() * 0.3,
+      category: domain.name,
+      group: 'Common Ground',
+      sourceLabel: 'Common Ground',
+      compassX: (seededRandom() - 0.5) * 0.4,
+      compassY: (seededRandom() - 0.5) * 1.4,
+    });
+
+    const leftNode = nodes.find(n => n.group === 'Civic Left' && n.category === domain.name);
+    const rightNode = nodes.find(n => n.group === 'Civic Right' && n.category === domain.name);
+    if (leftNode) {
+      edges.push({
+        id: `cg-l-${nodeId}-${leftNode.id}`,
+        sourceId: nodeId,
+        targetId: leftNode.id,
+        edgeType: 'relates_to',
+        confidence: 0.6,
+      });
+    }
+    if (rightNode) {
+      edges.push({
+        id: `cg-r-${nodeId}-${rightNode.id}`,
+        sourceId: nodeId,
+        targetId: rightNode.id,
+        edgeType: 'relates_to',
+        confidence: 0.6,
+      });
+    }
+    idx++;
+  }
+  return idx;
+}
 
 export function makePoliticalFaultLines(): HexGraphData {
   resetSeed(1776);
@@ -1358,98 +1702,7 @@ export function makePoliticalFaultLines(): HexGraphData {
   let idx = 0;
 
   for (const domain of POLICY_DOMAINS) {
-    // Left positions
-    for (const pos of domain.leftPositions) {
-      const affinity = 0.5 + seededRandom() * 0.5;
-      nodes.push({
-        id: `pol-l-${idx}`,
-        title: pos,
-        affinity,
-        affinityLevel: affinityLevelFromScore(affinity),
-        owner: 'self',
-        category: domain.name,
-        group: 'Civic Left',
-        sourceLabel: 'Civic Left',
-        compassX: -0.5 - seededRandom() * 0.4,
-        compassY: (seededRandom() - 0.5) * 1.4,
-      });
-      idx++;
-    }
-
-    // Right positions
-    for (const pos of domain.rightPositions) {
-      const affinity = 0.5 + seededRandom() * 0.5;
-      nodes.push({
-        id: `pol-r-${idx}`,
-        title: pos,
-        affinity,
-        affinityLevel: affinityLevelFromScore(affinity),
-        owner: 'other',
-        category: domain.name,
-        group: 'Civic Right',
-        sourceLabel: 'Civic Right',
-        compassX: 0.5 + seededRandom() * 0.4,
-        compassY: (seededRandom() - 0.5) * 1.4,
-      });
-      idx++;
-    }
-
-    // Common ground
-    for (const pos of domain.commonGround) {
-      const affinity = 0.4 + seededRandom() * 0.3;
-      const nodeId = `pol-cg-${idx}`;
-      nodes.push({
-        id: nodeId,
-        title: pos,
-        affinity,
-        affinityLevel: affinityLevelFromScore(affinity),
-        owner: 'shared',
-        overlapScore: 0.5 + seededRandom() * 0.3,
-        category: domain.name,
-        group: 'Common Ground',
-        sourceLabel: 'Common Ground',
-        compassX: (seededRandom() - 0.5) * 0.4,
-        compassY: (seededRandom() - 0.5) * 1.4,
-      });
-
-      // Connect common ground to both sides
-      const leftNode = nodes.find(n => n.group === 'Civic Left' && n.category === domain.name);
-      const rightNode = nodes.find(n => n.group === 'Civic Right' && n.category === domain.name);
-      if (leftNode) {
-        edges.push({
-          id: `cg-l-${nodeId}-${leftNode.id}`,
-          sourceId: nodeId,
-          targetId: leftNode.id,
-          edgeType: 'relates_to',
-          confidence: 0.6,
-        });
-      }
-      if (rightNode) {
-        edges.push({
-          id: `cg-r-${nodeId}-${rightNode.id}`,
-          sourceId: nodeId,
-          targetId: rightNode.id,
-          edgeType: 'relates_to',
-          confidence: 0.6,
-        });
-      }
-      idx++;
-    }
-
-    // Opposition edges (tension lines)
-    for (const [leftTitle, rightTitle] of domain.oppositions) {
-      const leftNode = nodes.find(n => n.title === leftTitle && n.group === 'Civic Left');
-      const rightNode = nodes.find(n => n.title === rightTitle && n.group === 'Civic Right');
-      if (leftNode && rightNode) {
-        edges.push({
-          id: `opposes-${leftNode.id}-${rightNode.id}`,
-          sourceId: leftNode.id,
-          targetId: rightNode.id,
-          edgeType: 'opposes',
-          confidence: 0.7 + seededRandom() * 0.3,
-        });
-      }
-    }
+    idx = buildPolicyDomainNodes(domain, nodes, edges, idx);
   }
 
   // Chain domains vertically: first node of each domain → first node of next domain

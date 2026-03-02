@@ -16,16 +16,23 @@
     <span class="tooltip-title">{{ hoveredNode.title }}</span>
     <span class="tooltip-subtitle" *ngIf="hoveredNode.subtitle">{{ hoveredNode.subtitle }}</span>
     <span class="tooltip-category" *ngIf="hoveredNode.category">{{ hoveredNode.category }}</span>
-    <span class="tooltip-affinity">{{ getAffinityPercentage(hoveredNode.affinity) }}% affinity</span>
+    <span class="tooltip-affinity">
+      {{ getAffinityPercentage(hoveredNode.affinity) }}% affinity
+    </span>
     <span class="tooltip-owner" *ngIf="hoveredNode.owner === 'shared'">Shared knowledge</span>
     <span class="tooltip-owner" *ngIf="hoveredNode.owner === 'self'">Your knowledge</span>
     <span class="tooltip-owner" *ngIf="hoveredNode.owner === 'other'">Their knowledge</span>
-    <span class="tooltip-freshness" *ngIf="showFreshness && hoveredNode.freshness !== undefined && hoveredNode.freshness < 0.7">
+    <span
+      class="tooltip-freshness"
+      *ngIf="showFreshness && hoveredNode.freshness !== undefined && hoveredNode.freshness < 0.7"
+    >
       {{ hoveredNode.freshness < 0.4 ? 'Needs refresh' : 'Growing stale' }}
     </span>
     <span class="tooltip-lock" *ngIf="showLockState && getLockStateLabel(hoveredNode)">
       {{ getLockStateLabel(hoveredNode) }}
     </span>
-    <span class="tooltip-source" *ngIf="hoveredNode.sourceLabel">via {{ hoveredNode.sourceLabel }}</span>
+    <span class="tooltip-source" *ngIf="hoveredNode.sourceLabel">
+      via {{ hoveredNode.sourceLabel }}
+    </span>
   </div>
 </div>

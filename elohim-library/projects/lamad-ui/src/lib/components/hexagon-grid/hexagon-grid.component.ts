@@ -13,6 +13,8 @@ import {
   NgZone,
 } from '@angular/core';
 
+import { HexAnimationLoop } from './hexagon-grid.animation';
+import { LAYOUTS, LayoutResult, ClusterInfo, DividerInfo } from './hexagon-grid.layout';
 import {
   HexNode,
   HexEdge,
@@ -23,8 +25,6 @@ import {
   BLOOM_ORDER,
 } from './hexagon-grid.model';
 import { getHexColor } from './hexagon-grid.palettes';
-import { LAYOUTS, LayoutResult, ClusterInfo, DividerInfo } from './hexagon-grid.layout';
-import { HexAnimationLoop } from './hexagon-grid.animation';
 
 // Re-export for backward compatibility
 export type { HexNode } from './hexagon-grid.model';
@@ -67,7 +67,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
   hoveredNode: HexNode | null = null;
   private computedNodes: HexNode[] = [];
-  private nodeMap = new Map<string, HexNode>();
+  private readonly nodeMap = new Map<string, HexNode>();
 
   // Layout metadata for rendering
   private clusters: ClusterInfo[] = [];
@@ -82,7 +82,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   };
 
   // Lock state map
-  private lockStates = new Map<string, HexLockState>();
+  private readonly lockStates = new Map<string, HexLockState>();
 
   // Pulse animation for available nodes
   private pulsePhase = 0;
@@ -92,7 +92,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   tooltipX = 0;
   tooltipY = 0;
 
-  constructor(private ngZone: NgZone) {}
+  constructor(private readonly ngZone: NgZone) {}
 
   ngAfterViewInit(): void {
     const canvas = this.canvasRef.nativeElement;
@@ -134,7 +134,11 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
       }
     }
     // Redraw on edge/palette change without relayout
-    if (this.ctx && (changes['edges'] || changes['showEdges'] || changes['showLockState']) && !changes['nodes']) {
+    if (
+      this.ctx &&
+      (changes['edges'] || changes['showEdges'] || changes['showLockState']) &&
+      !changes['nodes']
+    ) {
       this.draw();
     }
   }
@@ -162,7 +166,10 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     const wrapperWidth = wrapper.offsetWidth;
 
     // Save old positions for animation
-    const oldPositions = new Map<string, { x: number; y: number; scale: number; opacity: number }>();
+    const oldPositions = new Map<
+      string,
+      { x: number; y: number; scale: number; opacity: number }
+    >();
     for (const n of this.computedNodes) {
       if (n.x !== undefined && n.y !== undefined) {
         oldPositions.set(n.id, { x: n.x, y: n.y, scale: n.scale ?? 1, opacity: n.opacity ?? 1 });
@@ -171,7 +178,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     const layoutResult = this.applyLayout(wrapperWidth);
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio ?? 1;
     const height = Math.max(layoutResult.totalHeight + 40, 200);
 
     canvas.width = wrapperWidth * dpr;
@@ -211,21 +218,26 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   }
 
   private applyLayout(availableWidth: number): LayoutResult {
-    const layoutFn = LAYOUTS[this.layoutMode] || LAYOUTS['grid'];
-    const result = layoutFn(this.nodes, this.edges, {
-      width: availableWidth,
-      paddingTop: 40,
-      paddingLeft: 0,
-      paddingRight: 0,
-    }, {
-      hexRadius: this.hexRadius,
-      hexGap: this.hexGap,
-      hexWidth: this.hexWidth,
-      hexHeight: this.hexHeight,
-      xStep: this.xStep,
-      yStep: this.yStep,
-      itemsPerRow: this.itemsPerRow,
-    });
+    const layoutFn = LAYOUTS[this.layoutMode] ?? LAYOUTS['grid'];
+    const result = layoutFn(
+      this.nodes,
+      this.edges,
+      {
+        width: availableWidth,
+        paddingTop: 40,
+        paddingLeft: 0,
+        paddingRight: 0,
+      },
+      {
+        hexRadius: this.hexRadius,
+        hexGap: this.hexGap,
+        hexWidth: this.hexWidth,
+        hexHeight: this.hexHeight,
+        xStep: this.xStep,
+        yStep: this.yStep,
+        itemsPerRow: this.itemsPerRow,
+      }
+    );
 
     this.computedNodes = result.nodes;
     this.clusters = result.clusters;
@@ -242,11 +254,8 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   // Lock State Computation
   // ---------------------------------------------------------------------------
 
-  private computeLockStates(): void {
-    this.lockStates.clear();
+  private buildPrereqMap(): Map<string, Set<string>> {
     const prereqTypes = new Set(['requires', 'depends_on']);
-
-    // Build prerequisite map: node → set of prerequisite node IDs
     const prereqMap = new Map<string, Set<string>>();
     for (const n of this.nodes) {
       prereqMap.set(n.id, new Set());
@@ -256,29 +265,36 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
         prereqMap.get(e.targetId)!.add(e.sourceId);
       }
     }
+    return prereqMap;
+  }
 
+  private classifyNodeLockState(
+    node: HexNode,
+    prereqMap: Map<string, Set<string>>,
+    nodeById: Map<string, HexNode>
+  ): HexLockState {
+    const bloomOrder = node.masteryLevel ? BLOOM_ORDER[node.masteryLevel] : 0;
+
+    if (bloomOrder >= BLOOM_ORDER['apply']) return 'mastered';
+    if (bloomOrder > 0) return 'started';
+
+    const prereqs = prereqMap.get(node.id) ?? new Set<string>();
+    if (prereqs.size === 0) return 'available';
+
+    const allPrereqsMet = Array.from(prereqs).every(pid => {
+      const pNode = nodeById.get(pid);
+      return pNode?.masteryLevel && BLOOM_ORDER[pNode.masteryLevel] >= BLOOM_ORDER['apply'];
+    });
+    return allPrereqsMet ? 'available' : 'locked';
+  }
+
+  private computeLockStates(): void {
+    this.lockStates.clear();
+    const prereqMap = this.buildPrereqMap();
     const nodeById = new Map(this.nodes.map(n => [n.id, n]));
 
     for (const n of this.nodes) {
-      const bloomOrder = n.masteryLevel ? BLOOM_ORDER[n.masteryLevel] : 0;
-
-      if (bloomOrder >= BLOOM_ORDER['apply']) {
-        this.lockStates.set(n.id, 'mastered');
-      } else if (bloomOrder > 0) {
-        this.lockStates.set(n.id, 'started');
-      } else {
-        // Check if all prerequisites are mastered
-        const prereqs = prereqMap.get(n.id) || new Set();
-        if (prereqs.size === 0) {
-          this.lockStates.set(n.id, 'available');
-        } else {
-          const allPrereqsMet = Array.from(prereqs).every(pid => {
-            const pNode = nodeById.get(pid);
-            return pNode?.masteryLevel && BLOOM_ORDER[pNode.masteryLevel] >= BLOOM_ORDER['apply'];
-          });
-          this.lockStates.set(n.id, allPrereqsMet ? 'available' : 'locked');
-        }
-      }
+      this.lockStates.set(n.id, this.classifyNodeLockState(n, prereqMap, nodeById));
     }
   }
 
@@ -312,58 +328,113 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   // Focus State (click-to-expand)
   // ---------------------------------------------------------------------------
 
+  private collapseFocus(): void {
+    this.focusState = {
+      focusedNodeId: null,
+      connectedNodeIds: new Set(),
+      activeEdgeIds: new Set(),
+      prerequisiteChainIds: new Set(),
+    };
+
+    for (const n of this.computedNodes) {
+      if (n.originalX !== undefined) {
+        n.targetX = n.originalX;
+        n.targetY = n.originalY;
+        n.targetScale = (n as HexNode & { _origScale?: number })._origScale ?? 1;
+        n.targetOpacity = 1;
+      }
+    }
+  }
+
+  private findConnectedEdges(nodeId: string): {
+    connectedIds: Set<string>;
+    activeEdgeIds: Set<string>;
+  } {
+    const connectedIds = new Set<string>();
+    const activeEdgeIds = new Set<string>();
+    for (const e of this.edges) {
+      if (e.sourceId === nodeId) {
+        connectedIds.add(e.targetId);
+        activeEdgeIds.add(e.id);
+      }
+      if (e.targetId === nodeId) {
+        connectedIds.add(e.sourceId);
+        activeEdgeIds.add(e.id);
+      }
+    }
+    return { connectedIds, activeEdgeIds };
+  }
+
+  private tracePrereqChain(nodeId: string, activeEdgeIds: Set<string>): Set<string> {
+    const prereqChain = new Set<string>();
+    const prereqTypes = new Set(['requires', 'depends_on']);
+    const traceQueue = [nodeId];
+    let head = 0;
+    while (head < traceQueue.length) {
+      const current = traceQueue[head++];
+      for (const e of this.edges) {
+        if (e.targetId === current && prereqTypes.has(e.edgeType) && !prereqChain.has(e.sourceId)) {
+          prereqChain.add(e.sourceId);
+          activeEdgeIds.add(e.id);
+          traceQueue.push(e.sourceId);
+        }
+      }
+    }
+    return prereqChain;
+  }
+
+  private assignFocusTargets(
+    nodeId: string,
+    connectedIds: Set<string>,
+    prereqChain: Set<string>,
+    centerX: number,
+    centerY: number
+  ): void {
+    for (const n of this.computedNodes) {
+      if (n.originalX === undefined) {
+        n.originalX = n.x;
+        n.originalY = n.y;
+        (n as HexNode & { _origScale?: number })._origScale = n.scale ?? 1;
+      }
+
+      if (n.id === nodeId) {
+        n.targetX = centerX;
+        n.targetY = centerY;
+        n.targetScale = 1.8;
+        n.targetOpacity = 1;
+      } else if (connectedIds.has(n.id)) {
+        const connArr = Array.from(connectedIds);
+        const idx = connArr.indexOf(n.id);
+        const angle = (idx / connArr.length) * Math.PI * 2 - Math.PI / 2;
+        const ringRadius = this.hexRadius * 6;
+        n.targetX = centerX + ringRadius * Math.cos(angle);
+        n.targetY = centerY + ringRadius * Math.sin(angle);
+        n.targetScale = 1.2;
+        n.targetOpacity = 1;
+      } else if (prereqChain.has(n.id)) {
+        const chainArr = Array.from(prereqChain);
+        const idx = chainArr.indexOf(n.id);
+        n.targetX = centerX;
+        n.targetY = centerY - (idx + 1) * this.hexRadius * 3.5;
+        n.targetScale = 1;
+        n.targetOpacity = 0.7;
+      } else {
+        n.targetScale = 0.6;
+        n.targetOpacity = 0.12;
+        n.targetX = n.originalX;
+        n.targetY = n.originalY;
+      }
+    }
+  }
+
   private setFocus(nodeId: string | null): void {
     if (nodeId === null) {
-      // Collapse: restore all nodes
-      this.focusState = {
-        focusedNodeId: null,
-        connectedNodeIds: new Set(),
-        activeEdgeIds: new Set(),
-        prerequisiteChainIds: new Set(),
-      };
-
-      // Restore original positions
-      for (const n of this.computedNodes) {
-        if (n.originalX !== undefined) {
-          n.targetX = n.originalX;
-          n.targetY = n.originalY;
-          n.targetScale = (n as any)._origScale ?? 1;
-          n.targetOpacity = 1;
-        }
-      }
+      this.collapseFocus();
     } else {
-      const focused = this.nodeMap.get(nodeId);
-      if (!focused) return;
+      if (!this.nodeMap.has(nodeId)) return;
 
-      // Find 1-hop connected nodes
-      const connectedIds = new Set<string>();
-      const activeEdgeIds = new Set<string>();
-      for (const e of this.edges) {
-        if (e.sourceId === nodeId) {
-          connectedIds.add(e.targetId);
-          activeEdgeIds.add(e.id);
-        }
-        if (e.targetId === nodeId) {
-          connectedIds.add(e.sourceId);
-          activeEdgeIds.add(e.id);
-        }
-      }
-
-      // Trace prerequisite chain backward
-      const prereqChain = new Set<string>();
-      const prereqTypes = new Set(['requires', 'depends_on']);
-      const traceQueue = [nodeId];
-      let head = 0;
-      while (head < traceQueue.length) {
-        const current = traceQueue[head++];
-        for (const e of this.edges) {
-          if (e.targetId === current && prereqTypes.has(e.edgeType) && !prereqChain.has(e.sourceId)) {
-            prereqChain.add(e.sourceId);
-            activeEdgeIds.add(e.id);
-            traceQueue.push(e.sourceId);
-          }
-        }
-      }
+      const { connectedIds, activeEdgeIds } = this.findConnectedEdges(nodeId);
+      const prereqChain = this.tracePrereqChain(nodeId, activeEdgeIds);
 
       this.focusState = {
         focusedNodeId: nodeId,
@@ -372,53 +443,12 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
         prerequisiteChainIds: prereqChain,
       };
 
-      // Save original positions and compute focus layout
       const canvas = this.canvasRef.nativeElement;
-      const canvasW = canvas.width / (window.devicePixelRatio || 1);
-      const canvasH = canvas.height / (window.devicePixelRatio || 1);
-      const centerX = canvasW / 2;
-      const centerY = canvasH / 2;
+      const dpr = window.devicePixelRatio ?? 1;
+      const centerX = canvas.width / dpr / 2;
+      const centerY = canvas.height / dpr / 2;
 
-      for (const n of this.computedNodes) {
-        if (n.originalX === undefined) {
-          n.originalX = n.x;
-          n.originalY = n.y;
-          (n as any)._origScale = n.scale ?? 1;
-        }
-
-        if (n.id === nodeId) {
-          // Focused node: animate to center, scale up
-          n.targetX = centerX;
-          n.targetY = centerY;
-          n.targetScale = 1.8;
-          n.targetOpacity = 1;
-        } else if (connectedIds.has(n.id)) {
-          // Connected nodes: arrange in ring around focused
-          const connArr = Array.from(connectedIds);
-          const idx = connArr.indexOf(n.id);
-          const angle = (idx / connArr.length) * Math.PI * 2 - Math.PI / 2;
-          const ringRadius = this.hexRadius * 6;
-          n.targetX = centerX + ringRadius * Math.cos(angle);
-          n.targetY = centerY + ringRadius * Math.sin(angle);
-          n.targetScale = 1.2;
-          n.targetOpacity = 1;
-        } else if (prereqChain.has(n.id)) {
-          // Prereq chain: position above focused node
-          const chainArr = Array.from(prereqChain);
-          const idx = chainArr.indexOf(n.id);
-          n.targetX = centerX;
-          n.targetY = centerY - (idx + 1) * this.hexRadius * 3.5;
-          n.targetScale = 1;
-          n.targetOpacity = 0.7;
-        } else {
-          // All others: fade out
-          n.targetScale = 0.6;
-          n.targetOpacity = 0.12;
-          // Keep original position but shrink
-          n.targetX = n.originalX;
-          n.targetY = n.originalY;
-        }
-      }
+      this.assignFocusTargets(nodeId, connectedIds, prereqChain, centerX, centerY);
     }
 
     // Animate the transition
@@ -428,7 +458,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
       });
     }
 
-    this.nodeFocus.emit(nodeId ? this.nodeMap.get(nodeId) || null : null);
+    this.nodeFocus.emit(nodeId ? (this.nodeMap.get(nodeId) ?? null) : null);
   }
 
   // ---------------------------------------------------------------------------
@@ -438,8 +468,8 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   private draw(): void {
     if (!this.ctx || !this.computedNodes.length) return;
 
-    const width = this.canvasRef.nativeElement.width / (window.devicePixelRatio || 1);
-    const height = this.canvasRef.nativeElement.height / (window.devicePixelRatio || 1);
+    const width = this.canvasRef.nativeElement.width / (window.devicePixelRatio ?? 1);
+    const height = this.canvasRef.nativeElement.height / (window.devicePixelRatio ?? 1);
 
     this.ctx.clearRect(0, 0, width, height);
 
@@ -515,7 +545,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   // Grid Dividers (Khan-style unit row headers)
   // ---------------------------------------------------------------------------
 
-  private drawDividers(canvasWidth: number): void {
+  private drawDividers(_canvasWidth: number): void {
     if (!this.dividers.length) return;
     const ctx = this.ctx;
 
@@ -547,7 +577,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
         labelY - 10 - pillPadY,
         textMetrics.width + pillPadX * 2,
         12 + pillPadY * 2,
-        3,
+        3
       );
       ctx.fill();
 
@@ -567,7 +597,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     const padding = 60;
     const cx = canvasWidth / 2;
     const cy = this.computedNodes.length
-      ? this.computedNodes.reduce((s, n) => s + (n.y || 0), 0) / this.computedNodes.length
+      ? this.computedNodes.reduce((s, n) => s + (n.y ?? 0), 0) / this.computedNodes.length
       : canvasHeight / 2;
 
     ctx.save();
@@ -677,42 +707,56 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
       const target = this.nodeMap.get(edge.targetId);
       if (!source?.x || !source?.y || !target?.x || !target?.y) continue;
 
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
       const confidence = edge.confidence ?? 0.7;
 
       ctx.save();
-
-      // Focus dimming: non-active edges fade out
-      if (isFocused && !this.focusState.activeEdgeIds.has(edge.id)) {
-        ctx.globalAlpha = 0.05;
-      } else if (isFocused && this.focusState.activeEdgeIds.has(edge.id)) {
-        // Active edges get glow
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
-        ctx.shadowBlur = 8;
-      }
-
-      // Opposes edges get red glow
-      if (edge.edgeType === 'opposes') {
-        ctx.shadowColor = 'rgba(239, 68, 68, 0.3)';
-        ctx.shadowBlur = 4;
-      }
-
-      // Select connection style based on context
-      if (this.layoutMode === 'radial' && this.isHubNode(source)) {
-        this.drawTaperedSpoke(ctx, source, target, edge, confidence);
-      } else if (dist < this.hexRadius * 4.5 && this.layoutMode === 'dag') {
-        this.drawTightBridge(ctx, source, target, edge, confidence);
-      } else if (source.category !== target.category || edge.edgeType === 'shared_concept' || edge.edgeType === 'teaches') {
-        this.drawBridgeArc(ctx, source, target, edge, confidence);
-      } else if (confidence < 0.4 || edge.edgeType === 'relates_to') {
-        this.drawGhostThread(ctx, source, target, edge, confidence);
-      } else {
-        this.drawBridgeArc(ctx, source, target, edge, confidence);
-      }
-
+      this.applyEdgeFocus(ctx, edge, isFocused);
+      this.selectConnectionStyle(ctx, source, target, edge, confidence);
       ctx.restore();
+    }
+  }
+
+  /** Apply focus dimming / glow and opposes styling to an edge. */
+  private applyEdgeFocus(ctx: CanvasRenderingContext2D, edge: HexEdge, isFocused: boolean): void {
+    if (isFocused && !this.focusState.activeEdgeIds.has(edge.id)) {
+      ctx.globalAlpha = 0.05;
+    } else if (isFocused && this.focusState.activeEdgeIds.has(edge.id)) {
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      ctx.shadowBlur = 8;
+    }
+
+    if (edge.edgeType === 'opposes') {
+      ctx.shadowColor = 'rgba(239, 68, 68, 0.3)';
+      ctx.shadowBlur = 4;
+    }
+  }
+
+  /** Select and draw the appropriate connection style for an edge. */
+  private selectConnectionStyle(
+    ctx: CanvasRenderingContext2D,
+    source: HexNode,
+    target: HexNode,
+    edge: HexEdge,
+    confidence: number
+  ): void {
+    const dx = target.x! - source.x!;
+    const dy = target.y! - source.y!;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (this.layoutMode === 'radial' && this.isHubNode(source)) {
+      this.drawTaperedSpoke(ctx, source, target, edge, confidence);
+    } else if (dist < this.hexRadius * 4.5 && this.layoutMode === 'dag') {
+      this.drawTightBridge(ctx, source, target, edge, confidence);
+    } else if (
+      source.category !== target.category ||
+      edge.edgeType === 'shared_concept' ||
+      edge.edgeType === 'teaches'
+    ) {
+      this.drawBridgeArc(ctx, source, target, edge, confidence);
+    } else if (confidence < 0.4 || edge.edgeType === 'relates_to') {
+      this.drawGhostThread(ctx, source, target, edge, confidence);
+    } else {
+      this.drawBridgeArc(ctx, source, target, edge, confidence);
     }
   }
 
@@ -722,7 +766,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     source: HexNode,
     target: HexNode,
     edge: HexEdge,
-    confidence: number,
+    confidence: number
   ): void {
     const sx = source.x!;
     const sy = source.y!;
@@ -753,12 +797,15 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     ctx.lineTo(startX - perpX * sourceW, startY - perpY * sourceW);
     ctx.closePath();
 
-    ctx.fillStyle = this.withAlpha(this.blendColors(sourceColors.fill, targetColors.fill), 0.35 * confidence);
+    ctx.fillStyle = this.withAlpha(
+      this.blendColors(sourceColors.fill, targetColors.fill),
+      0.35 * confidence
+    );
     ctx.fill();
 
     // Arrowhead for directed edges
     if (edge.directed) {
-      this.drawArrowhead(ctx, sx, sy, tx, ty, edge.color || sourceColors.fill);
+      this.drawArrowhead(ctx, sx, sy, tx, ty, edge.color ?? sourceColors.fill);
     }
   }
 
@@ -768,7 +815,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     source: HexNode,
     target: HexNode,
     edge: HexEdge,
-    confidence: number,
+    confidence: number
   ): void {
     const sx = source.x!;
     const sy = source.y!;
@@ -780,7 +827,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     const perpY = Math.cos(angle);
 
     const hubW = 3.5; // Wide at hub
-    const tipW = 1.0; // Narrow at tip
+    const tipW = 1; // Narrow at tip
 
     const startX = sx + Math.cos(angle) * this.hexRadius * 1.2;
     const startY = sy + Math.sin(angle) * this.hexRadius * 1.2;
@@ -812,7 +859,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     source: HexNode,
     target: HexNode,
     edge: HexEdge,
-    confidence: number,
+    confidence: number
   ): void {
     const sx = source.x!;
     const sy = source.y!;
@@ -835,11 +882,15 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     // Create gradient
     const gradient = ctx.createLinearGradient(sx, sy, tx, ty);
-    gradient.addColorStop(0, edge.color || this.withAlpha(sourceColors.fill, 0.5 * confidence));
-    gradient.addColorStop(1, edge.color || this.withAlpha(
-      getHexColor(target, this.colorMode, this.showFreshness).fill,
-      0.5 * confidence,
-    ));
+    gradient.addColorStop(0, edge.color ?? this.withAlpha(sourceColors.fill, 0.5 * confidence));
+    gradient.addColorStop(
+      1,
+      edge.color ??
+        this.withAlpha(
+          getHexColor(target, this.colorMode, this.showFreshness).fill,
+          0.5 * confidence
+        )
+    );
 
     ctx.beginPath();
     ctx.moveTo(sx, sy);
@@ -855,7 +906,14 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     // Arrowhead for directed edges
     if (edge.directed) {
-      this.drawArrowhead(ctx, midX + offsetX, midY + offsetY, tx, ty, edge.color || sourceColors.fill);
+      this.drawArrowhead(
+        ctx,
+        midX + offsetX,
+        midY + offsetY,
+        tx,
+        ty,
+        edge.color ?? sourceColors.fill
+      );
     }
   }
 
@@ -865,7 +923,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     source: HexNode,
     target: HexNode,
     edge: HexEdge,
-    confidence: number,
+    confidence: number
   ): void {
     const style = this.EDGE_STYLES[edge.edgeType] || this.EDGE_STYLES['custom'];
 
@@ -873,7 +931,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     ctx.moveTo(source.x!, source.y!);
     ctx.lineTo(target.x!, target.y!);
 
-    ctx.strokeStyle = edge.color || style.color;
+    ctx.strokeStyle = edge.color ?? style.color;
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 3]);
     ctx.globalAlpha = Math.min(ctx.globalAlpha, confidence * 0.3);
@@ -894,63 +952,44 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   // Hex Node Rendering
   // ---------------------------------------------------------------------------
 
-  private drawHexNode(node: HexNode, isHovered: boolean): void {
-    if (node.x === undefined || node.y === undefined) return;
+  private applyHoverGlow(
+    ctx: CanvasRenderingContext2D,
+    colors: ReturnType<typeof getHexColor>
+  ): void {
+    ctx.shadowColor = colors.glowColor ?? colors.fill;
+    ctx.shadowBlur = 20;
+  }
 
-    const ctx = this.ctx;
-    const nodeScale = node.scale || 1;
-    const size = (isHovered ? this.hexRadius * 1.4 : this.hexRadius) * nodeScale;
-    const nodeOpacity = node.opacity ?? 1;
-
-    const colors = getHexColor(node, this.colorMode, this.showFreshness);
-    const lockState = this.lockStates.get(node.id);
-
-    ctx.save();
-    if (nodeOpacity < 1) {
-      ctx.globalAlpha = nodeOpacity;
-    }
-
-    // Lock state: locked nodes are desaturated and dimmed
-    if (this.showLockState && lockState === 'locked') {
-      ctx.globalAlpha = (node.opacity ?? 1) * 0.3;
-    }
-
-    // Build hex path
-    this.buildHexPath(ctx, node.x, node.y, size);
-
-    // Fill with palette color
-    ctx.fillStyle = colors.fill;
-
-    // Glow effect
-    if (isHovered) {
-      ctx.shadowColor = colors.glowColor || colors.fill;
-      ctx.shadowBlur = 20;
-    } else if (colors.glowBlur) {
+  private applyDefaultGlow(
+    ctx: CanvasRenderingContext2D,
+    colors: ReturnType<typeof getHexColor>
+  ): void {
+    if (colors.glowBlur) {
       ctx.shadowColor = colors.glowColor!;
       ctx.shadowBlur = colors.glowBlur;
     } else {
       ctx.shadowBlur = 0;
     }
+  }
 
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Ring (gate glow for Bloom's "apply" and "create" levels)
+  private drawHexRing(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: number,
+    colors: ReturnType<typeof getHexColor>
+  ): void {
     if (colors.ringColor) {
-      this.buildHexPath(ctx, node.x, node.y, size + 1);
+      this.buildHexPath(ctx, x, y, size + 1);
       ctx.strokeStyle = colors.ringColor;
-      ctx.lineWidth = colors.ringWidth || 2;
+      ctx.lineWidth = colors.ringWidth ?? 2;
       ctx.stroke();
     }
+  }
 
-    // Lock state visuals
-    if (this.showLockState && lockState) {
-      this.drawLockStateOverlay(ctx, node, size, lockState);
-    }
-
-    // Focus indicator: glow ring on focused node
+  private drawFocusIndicator(ctx: CanvasRenderingContext2D, node: HexNode, size: number): void {
     if (this.focusState.focusedNodeId === node.id) {
-      this.buildHexPath(ctx, node.x, node.y, size + 3);
+      this.buildHexPath(ctx, node.x!, node.y!, size + 3);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.lineWidth = 2;
       ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
@@ -958,7 +997,43 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
+  }
 
+  private drawHexNode(node: HexNode, isHovered: boolean): void {
+    if (node.x === undefined || node.y === undefined) return;
+
+    const ctx = this.ctx;
+    const nodeScale = node.scale ?? 1;
+    const size = (isHovered ? this.hexRadius * 1.4 : this.hexRadius) * nodeScale;
+    const nodeOpacity = node.opacity ?? 1;
+
+    const colors = getHexColor(node, this.colorMode, this.showFreshness);
+    const lockState = this.lockStates.get(node.id);
+
+    ctx.save();
+    ctx.globalAlpha = nodeOpacity;
+
+    if (this.showLockState && lockState === 'locked') {
+      ctx.globalAlpha = nodeOpacity * 0.3;
+    }
+
+    this.buildHexPath(ctx, node.x, node.y, size);
+    ctx.fillStyle = colors.fill;
+    if (isHovered) {
+      this.applyHoverGlow(ctx, colors);
+    } else {
+      this.applyDefaultGlow(ctx, colors);
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    this.drawHexRing(ctx, node.x, node.y, size, colors);
+
+    if (this.showLockState && lockState) {
+      this.drawLockStateOverlay(ctx, node, size, lockState);
+    }
+
+    this.drawFocusIndicator(ctx, node, size);
     ctx.restore();
   }
 
@@ -967,7 +1042,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     ctx: CanvasRenderingContext2D,
     node: HexNode,
     size: number,
-    state: HexLockState,
+    state: HexLockState
   ): void {
     if (state === 'locked') {
       // Draw padlock icon
@@ -1052,7 +1127,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     fromY: number,
     toX: number,
     toY: number,
-    color?: string,
+    color?: string
   ): void {
     const headLen = 8;
     const angle = Math.atan2(toY - fromY, toX - fromX);
@@ -1061,10 +1136,16 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
-    ctx.lineTo(tipX - headLen * Math.cos(angle - Math.PI / 6), tipY - headLen * Math.sin(angle - Math.PI / 6));
-    ctx.lineTo(tipX - headLen * Math.cos(angle + Math.PI / 6), tipY - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.lineTo(
+      tipX - headLen * Math.cos(angle - Math.PI / 6),
+      tipY - headLen * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      tipX - headLen * Math.cos(angle + Math.PI / 6),
+      tipY - headLen * Math.sin(angle + Math.PI / 6)
+    );
     ctx.closePath();
-    ctx.fillStyle = color || (ctx.strokeStyle as string);
+    ctx.fillStyle = color ?? (ctx.strokeStyle as string);
     ctx.fill();
   }
 
@@ -1091,7 +1172,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
       ctx.fillText(
         label.toUpperCase(),
         pos.x - ctx.measureText(label.toUpperCase()).width / 2,
-        pos.minY - this.hexRadius - 4,
+        pos.minY - this.hexRadius - 4
       );
     }
 
@@ -1105,20 +1186,20 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   /** Set the alpha of an rgba/hsla color string. */
   private withAlpha(color: string, alpha: number): string {
     // Handle rgba
-    const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+    const rgbaMatch = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/.exec(color);
     if (rgbaMatch) {
       return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
     }
     // Handle hsla
-    const hslaMatch = color.match(/hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*[\d.]+)?\)/);
+    const hslaMatch = /hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*[\d.]+)?\)/.exec(color);
     if (hslaMatch) {
       return `hsla(${hslaMatch[1]}, ${hslaMatch[2]}%, ${hslaMatch[3]}%, ${alpha})`;
     }
     // Handle hex
     if (color.startsWith('#')) {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
+      const r = Number.parseInt(color.slice(1, 3), 16);
+      const g = Number.parseInt(color.slice(3, 5), 16);
+      const b = Number.parseInt(color.slice(5, 7), 16);
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
     return color;
@@ -1127,13 +1208,13 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
   /** Simple midpoint blend of two color strings. */
   private blendColors(c1: string, c2: string): string {
     const parse = (c: string) => {
-      const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c);
       if (m) return [+m[1], +m[2], +m[3]];
       if (c.startsWith('#')) {
         return [
-          parseInt(c.slice(1, 3), 16),
-          parseInt(c.slice(3, 5), 16),
-          parseInt(c.slice(5, 7), 16),
+          Number.parseInt(c.slice(1, 3), 16),
+          Number.parseInt(c.slice(3, 5), 16),
+          Number.parseInt(c.slice(5, 7), 16),
         ];
       }
       return [128, 128, 128];
@@ -1154,7 +1235,7 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
 
     const hit = this.computedNodes.find(node => {
       if (node.x === undefined || node.y === undefined) return false;
-      const nodeScale = node.scale || 1;
+      const nodeScale = node.scale ?? 1;
       const dx = node.x - x;
       const dy = node.y - y;
       return Math.sqrt(dx * dx + dy * dy) < this.hexRadius * nodeScale;
@@ -1179,10 +1260,14 @@ export class HexagonGridComponent implements OnChanges, AfterViewInit, OnDestroy
     const state = this.lockStates.get(node.id);
     if (!state) return '';
     switch (state) {
-      case 'locked': return 'Prerequisites needed';
-      case 'available': return 'Ready to start';
-      case 'started': return 'In progress';
-      case 'mastered': return 'Mastered';
+      case 'locked':
+        return 'Prerequisites needed';
+      case 'available':
+        return 'Ready to start';
+      case 'started':
+        return 'In progress';
+      case 'mastered':
+        return 'Mastered';
     }
   }
 

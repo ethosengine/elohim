@@ -12,7 +12,7 @@
  * The freshness overlay is applied as a post-process on any palette.
  */
 
-import { HexNode, HexMasteryLevel, BLOOM_ORDER } from './hexagon-grid.model';
+import { HexNode, HexMasteryLevel } from './hexagon-grid.model';
 
 // =============================================================================
 // Palette Output
@@ -46,10 +46,10 @@ const DOMAIN_GLOW: Record<string, { color: string; blur: number } | null> = {
 };
 
 export function domainPalette(node: HexNode): HexColorResult {
-  const level = node.affinityLevel || 'unseen';
+  const level = node.affinityLevel ?? 'unseen';
   const glow = DOMAIN_GLOW[level];
   return {
-    fill: DOMAIN_COLORS[level] || DOMAIN_COLORS['unseen'],
+    fill: DOMAIN_COLORS[level] ?? DOMAIN_COLORS['unseen'],
     glowColor: glow?.color,
     glowBlur: glow?.blur,
   };
@@ -93,7 +93,7 @@ const BLOOM_RING: Partial<Record<HexMasteryLevel, { color: string; width: number
 };
 
 export function bloomPalette(node: HexNode): HexColorResult {
-  const level = node.masteryLevel || affinityToBloom(node.affinityLevel);
+  const level = node.masteryLevel ?? affinityToBloom(node.affinityLevel);
   const glow = BLOOM_GLOW[level];
   const ring = BLOOM_RING[level];
   return {
@@ -133,53 +133,55 @@ function affinityToBloom(level: string): HexMasteryLevel {
  * deeply-known nodes glow brighter than surface acquaintance.
  */
 
+function personPaletteSelf(intensity: number): HexColorResult {
+  const r = Math.round(200 + 55 * intensity);
+  const g = Math.round(60 * (1 - intensity));
+  const b = Math.round(60 * (1 - intensity));
+  return {
+    fill: `rgba(${r}, ${g}, ${b}, ${0.5 + intensity * 0.5})`,
+    glowColor: intensity > 0.7 ? `rgba(239, 68, 68, 0.8)` : undefined,
+    glowBlur: intensity > 0.7 ? 12 : undefined,
+  };
+}
+
+function personPaletteOther(intensity: number): HexColorResult {
+  const r = Math.round(60 * (1 - intensity));
+  const g = Math.round(80 + 40 * intensity);
+  const b = Math.round(180 + 75 * intensity);
+  return {
+    fill: `rgba(${r}, ${g}, ${b}, ${0.5 + intensity * 0.5})`,
+    glowColor: intensity > 0.7 ? `rgba(59, 130, 246, 0.8)` : undefined,
+    glowBlur: intensity > 0.7 ? 12 : undefined,
+  };
+}
+
+function personPaletteShared(node: HexNode, intensity: number): HexColorResult {
+  const overlap = node.overlapScore ?? intensity;
+  const r = Math.round(120 + 80 * overlap);
+  const g = Math.round(40 + 30 * (1 - overlap));
+  const b = Math.round(160 + 95 * overlap);
+  return {
+    fill: `rgba(${r}, ${g}, ${b}, ${0.55 + overlap * 0.45})`,
+    glowColor: overlap > 0.6 ? `rgba(168, 85, 247, 0.9)` : undefined,
+    glowBlur: overlap > 0.6 ? 14 : undefined,
+    ringColor: overlap > 0.8 ? '#a855f7' : undefined,
+    ringWidth: overlap > 0.8 ? 2 : undefined,
+  };
+}
+
 function personPalette(node: HexNode): HexColorResult {
-  const owner = node.owner || 'self';
-  const intensity = Math.max(0.15, node.affinity || 0);
+  const owner = node.owner ?? 'self';
+  const intensity = Math.max(0.15, node.affinity ?? 0);
 
   switch (owner) {
-    case 'self': {
-      // Warm red spectrum — "what I know"
-      const r = Math.round(200 + 55 * intensity);
-      const g = Math.round(60 * (1 - intensity));
-      const b = Math.round(60 * (1 - intensity));
-      const fill = `rgba(${r}, ${g}, ${b}, ${0.5 + intensity * 0.5})`;
-      return {
-        fill,
-        glowColor: intensity > 0.7 ? `rgba(239, 68, 68, 0.8)` : undefined,
-        glowBlur: intensity > 0.7 ? 12 : undefined,
-      };
-    }
-
-    case 'other': {
-      // Cool blue spectrum — "what they know"
-      const r = Math.round(60 * (1 - intensity));
-      const g = Math.round(80 + 40 * intensity);
-      const b = Math.round(180 + 75 * intensity);
-      const fill = `rgba(${r}, ${g}, ${b}, ${0.5 + intensity * 0.5})`;
-      return {
-        fill,
-        glowColor: intensity > 0.7 ? `rgba(59, 130, 246, 0.8)` : undefined,
-        glowBlur: intensity > 0.7 ? 12 : undefined,
-      };
-    }
-
-    case 'shared': {
-      // Purple gradient — "what we share"
-      // overlapScore drives purple saturation; high overlap = vivid purple
-      const overlap = node.overlapScore ?? intensity;
-      const r = Math.round(120 + 80 * overlap);
-      const g = Math.round(40 + 30 * (1 - overlap));
-      const b = Math.round(160 + 95 * overlap);
-      const fill = `rgba(${r}, ${g}, ${b}, ${0.55 + overlap * 0.45})`;
-      return {
-        fill,
-        glowColor: overlap > 0.6 ? `rgba(168, 85, 247, 0.9)` : undefined,
-        glowBlur: overlap > 0.6 ? 14 : undefined,
-        ringColor: overlap > 0.8 ? '#a855f7' : undefined,
-        ringWidth: overlap > 0.8 ? 2 : undefined,
-      };
-    }
+    case 'self':
+      return personPaletteSelf(intensity);
+    case 'other':
+      return personPaletteOther(intensity);
+    case 'shared':
+      return personPaletteShared(node, intensity);
+    default:
+      return personPaletteSelf(intensity);
   }
 }
 
@@ -195,12 +197,13 @@ function personPalette(node: HexNode): HexColorResult {
 
 function networkPalette(node: HexNode): HexColorResult {
   const hue = node.group ? hashToHue(node.group) : 210; // Default blue
-  const saturation = 30 + (node.affinity || 0) * 60; // 30–90%
-  const lightness = 35 + (node.affinity || 0) * 25; // 35–60%
-  const alpha = 0.5 + (node.affinity || 0) * 0.5;
+  const aff = node.affinity ?? 0;
+  const saturation = 30 + aff * 60; // 30–90%
+  const lightness = 35 + aff * 25; // 35–60%
+  const alpha = 0.5 + aff * 0.5;
 
   const fill = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-  const glowIntensity = (node.affinity || 0) > 0.7;
+  const glowIntensity = aff > 0.7;
 
   return {
     fill,
@@ -213,7 +216,7 @@ function networkPalette(node: HexNode): HexColorResult {
 function hashToHue(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash = (str.codePointAt(i) ?? 0) + ((hash << 5) - hash);
   }
   return ((hash % 360) + 360) % 360;
 }
@@ -238,9 +241,9 @@ export const PALETTES: Record<string, PaletteFn> = {
 export function getHexColor(
   node: HexNode,
   colorMode: string,
-  showFreshness: boolean,
+  showFreshness: boolean
 ): HexColorResult {
-  const palette = PALETTES[colorMode] || domainPalette;
+  const palette = PALETTES[colorMode] ?? domainPalette;
   const result = palette(node);
 
   // Freshness overlay — desaturate and dim stale content
@@ -281,7 +284,8 @@ function applyFreshness(color: string, freshness: number): string {
   }
 
   // Calculate desaturation factor (0 = full gray, 1 = full color)
-  const satFactor = freshness < 0.4 ? freshness / 0.4 * 0.5 : 0.5 + ((freshness - 0.4) / 0.3) * 0.5;
+  const satFactor =
+    freshness < 0.4 ? (freshness / 0.4) * 0.5 : 0.5 + ((freshness - 0.4) / 0.3) * 0.5;
 
   // Desaturate toward gray
   const gray = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -299,34 +303,34 @@ function applyFreshness(color: string, freshness: number): string {
 /** Naive color parser for rgba() and hex strings. */
 function parseColor(color: string): { r: number; g: number; b: number; a: number } | null {
   // rgba(r, g, b, a)
-  const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  const rgbaMatch = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(color);
   if (rgbaMatch) {
     return {
-      r: parseInt(rgbaMatch[1]),
-      g: parseInt(rgbaMatch[2]),
-      b: parseInt(rgbaMatch[3]),
-      a: rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) : 1,
+      r: Number.parseInt(rgbaMatch[1]),
+      g: Number.parseInt(rgbaMatch[2]),
+      b: Number.parseInt(rgbaMatch[3]),
+      a: rgbaMatch[4] ? Number.parseFloat(rgbaMatch[4]) : 1,
     };
   }
 
   // hsla — convert to RGB (simplified)
-  const hslaMatch = color.match(/hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)/);
+  const hslaMatch = /hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)/.exec(color);
   if (hslaMatch) {
     const { r, g, b } = hslToRgb(
-      parseInt(hslaMatch[1]),
-      parseFloat(hslaMatch[2]),
-      parseFloat(hslaMatch[3]),
+      Number.parseInt(hslaMatch[1]),
+      Number.parseFloat(hslaMatch[2]),
+      Number.parseFloat(hslaMatch[3])
     );
-    return { r, g, b, a: hslaMatch[4] !== undefined ? parseFloat(hslaMatch[4]) : 1 };
+    return { r, g, b, a: hslaMatch[4] ? Number.parseFloat(hslaMatch[4]) : 1 };
   }
 
   // #hex
-  const hexMatch = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  const hexMatch = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
   if (hexMatch) {
     return {
-      r: parseInt(hexMatch[1], 16),
-      g: parseInt(hexMatch[2], 16),
-      b: parseInt(hexMatch[3], 16),
+      r: Number.parseInt(hexMatch[1], 16),
+      g: Number.parseInt(hexMatch[2], 16),
+      b: Number.parseInt(hexMatch[3], 16),
       a: 1,
     };
   }

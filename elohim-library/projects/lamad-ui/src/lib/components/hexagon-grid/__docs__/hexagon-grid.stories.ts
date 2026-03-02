@@ -1,28 +1,31 @@
 import { action } from '@storybook/addon-actions';
-import type { Meta, StoryObj } from '@storybook/angular';
 
 import { HexagonGridComponent } from '../hexagon-grid.component';
 import { HexNode } from '../hexagon-grid.model';
 
+const DARK_BG = DARK_BG;
+
 import {
+  makeAdamEveLoveMap,
+  makeAstronautGoal,
+  makeArithmeticTerritory,
+  makeBloomShowcase,
+  makeBloomStaircase,
+  makeComplianceTraining,
+  makeCrossJourneyOverlap,
+  makeLoveMap,
+  makeP2PNetwork,
+  makePoliticalCompass,
+  makePoliticalFaultLines,
   nodes12,
   nodes48,
   nodes120,
   nodesAllHigh,
   nodesAllUnseen,
   nodesLearnerProgress,
-  makeArithmeticTerritory,
-  makeAdamEveLoveMap,
-  makeComplianceTraining,
-  makePoliticalCompass,
-  makeCrossJourneyOverlap,
-  makeAstronautGoal,
-  makeBloomShowcase,
-  makeP2PNetwork,
-  makeBloomStaircase,
-  makeLoveMap,
-  makePoliticalFaultLines,
 } from './hexagon-grid.testdata';
+
+import type { Meta, StoryObj } from '@storybook/angular';
 
 // =============================================================================
 // Meta
@@ -50,12 +53,14 @@ const meta: Meta<HexagonGridComponent> = {
     colorMode: {
       control: { type: 'select' },
       options: ['domain', 'bloom', 'person', 'network'],
-      description: 'Color palette: domain (4-tier), bloom (8-tier), person (love map), network (P2P).',
+      description:
+        'Color palette: domain (4-tier), bloom (8-tier), person (love map), network (P2P).',
     },
     layoutMode: {
       control: { type: 'select' },
       options: ['grid', 'dag', 'radial', 'scatter', 'tree'],
-      description: 'Layout algorithm: grid (honeycomb), dag (skill tree), radial (center-out), scatter (compass), tree (organic diagonal).',
+      description:
+        'Layout algorithm: grid (honeycomb), dag (skill tree), radial (center-out), scatter (compass), tree (organic diagonal).',
     },
     showFreshness: {
       control: 'boolean',
@@ -118,7 +123,7 @@ export const NewLearner: Story = {
 };
 
 export const LearnerProgress: Story = {
-  parameters: { backgrounds: { default: 'stone-dark' } },
+  parameters: { backgrounds: { default: DARK_BG } },
   args: { nodes: nodesLearnerProgress, itemsPerRow: 10 },
 };
 
@@ -136,7 +141,7 @@ const staircaseData = makeBloomStaircase();
  * green pulse on available ones. Reads like a curriculum progression map.
  */
 export const TheStaircase: Story = {
-  name: 'The Staircase — Bloom\'s Taxonomy',
+  name: "The Staircase — Bloom's Taxonomy",
   parameters: {
     backgrounds: { default: 'obsidian' },
     docs: {
@@ -429,7 +434,7 @@ const complianceFresh = makeComplianceTraining(2);
 export const TheUnitMap: Story = {
   name: 'The Unit Map — Compliance (Fresh)',
   parameters: {
-    backgrounds: { default: 'stone-dark' },
+    backgrounds: { default: DARK_BG },
     docs: {
       description: {
         story:
@@ -455,7 +460,7 @@ export const TheUnitMap: Story = {
 export const TheUnitMapGrid: Story = {
   name: 'The Unit Map — Grid (Original)',
   parameters: {
-    backgrounds: { default: 'stone-dark' },
+    backgrounds: { default: DARK_BG },
     docs: {
       description: {
         story:
@@ -485,7 +490,7 @@ export const TheUnitMapGrid: Story = {
 export const TheUnitMapTree: Story = {
   name: 'The Unit Map — Tree (Organic)',
   parameters: {
-    backgrounds: { default: 'stone-dark' },
+    backgrounds: { default: DARK_BG },
     docs: {
       description: {
         story:
@@ -543,7 +548,18 @@ export const PaletteComparison: Story = {
   args: {
     nodes: nodes48.map((n, i) => ({
       ...n,
-      masteryLevel: (['not_started', 'seen', 'remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'] as const)[i % 8],
+      masteryLevel: (
+        [
+          'not_started',
+          'seen',
+          'remember',
+          'understand',
+          'apply',
+          'analyze',
+          'evaluate',
+          'create',
+        ] as const
+      )[i % 8],
       owner: (['self', 'other', 'shared'] as const)[i % 3],
       overlapScore: i % 3 === 2 ? 0.5 + (i / 48) * 0.5 : undefined,
       group: ['alpha', 'beta', 'gamma', 'delta'][i % 4],
@@ -561,20 +577,25 @@ const complianceStale = makeComplianceTraining(8);
 
 export const ComplianceFresh: Story = {
   name: 'Compliance — Fresh (2 months)',
-  parameters: { backgrounds: { default: 'stone-dark' } },
+  parameters: { backgrounds: { default: DARK_BG } },
   args: { nodes: complianceFresh.nodes, itemsPerRow: 10, colorMode: 'bloom', showFreshness: true },
 };
 
 export const ComplianceStale: Story = {
   name: 'Compliance — Stale (8 months)',
-  parameters: { backgrounds: { default: 'stone-dark' } },
+  parameters: { backgrounds: { default: DARK_BG } },
   args: { nodes: complianceStale.nodes, itemsPerRow: 10, colorMode: 'bloom', showFreshness: true },
 };
 
 export const ComplianceCritical: Story = {
   name: 'Compliance — Critical (18 months)',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: complianceCritical.nodes, itemsPerRow: 10, colorMode: 'bloom', showFreshness: true },
+  args: {
+    nodes: complianceCritical.nodes,
+    itemsPerRow: 10,
+    colorMode: 'bloom',
+    showFreshness: true,
+  },
 };
 
 export const ArithmeticTerritory: Story = {
@@ -606,7 +627,13 @@ export const LoveMapAdamEve: Story = {
 export const LoveMapAdamEveWithEdges: Story = {
   name: 'Love Map — Adam & Eve (Teaching Edges)',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: adamEveData.nodes, edges: adamEveData.edges, itemsPerRow: 8, colorMode: 'person', showEdges: true },
+  args: {
+    nodes: adamEveData.nodes,
+    edges: adamEveData.edges,
+    itemsPerRow: 8,
+    colorMode: 'person',
+    showEdges: true,
+  },
 };
 
 const politicalData = makePoliticalCompass('Libertarian Left', 'Libertarian Right');
@@ -614,23 +641,48 @@ const politicalData = makePoliticalCompass('Libertarian Left', 'Libertarian Righ
 export const PoliticalCompassScatter: Story = {
   name: 'Political Compass — Scatter (Reference)',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: politicalData.nodes, edges: politicalData.edges, itemsPerRow: 9, colorMode: 'person', layoutMode: 'scatter', showEdges: true },
+  args: {
+    nodes: politicalData.nodes,
+    edges: politicalData.edges,
+    itemsPerRow: 9,
+    colorMode: 'person',
+    layoutMode: 'scatter',
+    showEdges: true,
+  },
 };
 
 export const CrossJourneyOverlap: Story = {
   name: 'Cross-Journey — Arithmetic → Algebra',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: overlapData.nodes, edges: overlapData.edges, itemsPerRow: 8, colorMode: 'person', showEdges: true },
+  args: {
+    nodes: overlapData.nodes,
+    edges: overlapData.edges,
+    itemsPerRow: 8,
+    colorMode: 'person',
+    showEdges: true,
+  },
 };
 
 export const AstronautGoal: Story = {
   name: 'Attestation Goal — Astronaut',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: astronautData.nodes, edges: astronautData.edges, itemsPerRow: 9, colorMode: 'bloom', showEdges: true },
+  args: {
+    nodes: astronautData.nodes,
+    edges: astronautData.edges,
+    itemsPerRow: 9,
+    colorMode: 'bloom',
+    showEdges: true,
+  },
 };
 
 export const P2PNetwork: Story = {
   name: 'P2P Network — Relationships',
   parameters: { backgrounds: { default: 'obsidian' } },
-  args: { nodes: networkData.nodes, edges: networkData.edges, itemsPerRow: 6, colorMode: 'network', showEdges: true },
+  args: {
+    nodes: networkData.nodes,
+    edges: networkData.edges,
+    itemsPerRow: 6,
+    colorMode: 'network',
+    showEdges: true,
+  },
 };

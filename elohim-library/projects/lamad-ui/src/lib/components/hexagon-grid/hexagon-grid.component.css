@@ -1,7 +1,7 @@
 .canvas-wrapper {
   width: 100%;
   min-height: 400px; /* Minimum height */
-  height: 100%;      /* Allow growing */
+  height: 100%; /* Allow growing */
   display: flex;
   justify-content: center;
   align-items: flex-start; /* Align top so we can see the grid start */

@@ -20,7 +20,7 @@ const SNAP_THRESHOLD_UNIT = 0.01;
 export class HexAnimationLoop {
   private rafId: number | null = null;
   private running = false;
-  private onFrame: () => void;
+  private readonly onFrame: () => void;
 
   constructor(onFrame: () => void) {
     this.onFrame = onFrame;
@@ -35,19 +35,35 @@ export class HexAnimationLoop {
     // Only start if there's something to animate
     let needsAnimation = false;
     for (const n of nodes) {
-      if (n.targetX !== undefined && n.x !== undefined && Math.abs(n.targetX - n.x) > SNAP_THRESHOLD) {
+      if (
+        n.targetX !== undefined &&
+        n.x !== undefined &&
+        Math.abs(n.targetX - n.x) > SNAP_THRESHOLD
+      ) {
         needsAnimation = true;
         break;
       }
-      if (n.targetY !== undefined && n.y !== undefined && Math.abs(n.targetY - n.y) > SNAP_THRESHOLD) {
+      if (
+        n.targetY !== undefined &&
+        n.y !== undefined &&
+        Math.abs(n.targetY - n.y) > SNAP_THRESHOLD
+      ) {
         needsAnimation = true;
         break;
       }
-      if (n.targetScale !== undefined && n.scale !== undefined && Math.abs(n.targetScale - n.scale) > SNAP_THRESHOLD_UNIT) {
+      if (
+        n.targetScale !== undefined &&
+        n.scale !== undefined &&
+        Math.abs(n.targetScale - n.scale) > SNAP_THRESHOLD_UNIT
+      ) {
         needsAnimation = true;
         break;
       }
-      if (n.targetOpacity !== undefined && n.opacity !== undefined && Math.abs(n.targetOpacity - n.opacity) > SNAP_THRESHOLD_UNIT) {
+      if (
+        n.targetOpacity !== undefined &&
+        n.opacity !== undefined &&
+        Math.abs(n.targetOpacity - n.opacity) > SNAP_THRESHOLD_UNIT
+      ) {
         needsAnimation = true;
         break;
       }
@@ -78,65 +94,67 @@ export class HexAnimationLoop {
     this.stop();
   }
 
+  /** Lerp a single value toward its target. Returns true if still converging. */
+  private static lerpValue(
+    current: number,
+    target: number,
+    threshold: number
+  ): { value: number; converging: boolean } {
+    const delta = target - current;
+    if (Math.abs(delta) > threshold) {
+      return { value: current + delta * LERP, converging: true };
+    }
+    return { value: target, converging: false };
+  }
+
+  /** Lerp all animated properties on a single node. Returns true if still converging. */
+  private static lerpNode(n: HexNode): boolean {
+    let converging = false;
+
+    if (n.targetX !== undefined && n.x !== undefined) {
+      const r = HexAnimationLoop.lerpValue(n.x, n.targetX, SNAP_THRESHOLD);
+      n.x = r.value;
+      converging = converging || r.converging;
+    }
+
+    if (n.targetY !== undefined && n.y !== undefined) {
+      const r = HexAnimationLoop.lerpValue(n.y, n.targetY, SNAP_THRESHOLD);
+      n.y = r.value;
+      converging = converging || r.converging;
+    }
+
+    if (n.targetScale !== undefined) {
+      const r = HexAnimationLoop.lerpValue(n.scale ?? 1, n.targetScale, SNAP_THRESHOLD_UNIT);
+      n.scale = r.value;
+      converging = converging || r.converging;
+    }
+
+    if (n.targetOpacity !== undefined) {
+      const r = HexAnimationLoop.lerpValue(n.opacity ?? 1, n.targetOpacity, SNAP_THRESHOLD_UNIT);
+      n.opacity = r.value;
+      converging = converging || r.converging;
+    }
+
+    return converging;
+  }
+
   private tick(nodes: HexNode[]): void {
     if (!this.running) return;
 
-    let allConverged = true;
-
+    let anyConverging = false;
     for (const n of nodes) {
-      // Position
-      if (n.targetX !== undefined && n.x !== undefined) {
-        const dx = n.targetX - n.x;
-        if (Math.abs(dx) > SNAP_THRESHOLD) {
-          n.x += dx * LERP;
-          allConverged = false;
-        } else {
-          n.x = n.targetX;
-        }
-      }
-
-      if (n.targetY !== undefined && n.y !== undefined) {
-        const dy = n.targetY - n.y;
-        if (Math.abs(dy) > SNAP_THRESHOLD) {
-          n.y += dy * LERP;
-          allConverged = false;
-        } else {
-          n.y = n.targetY;
-        }
-      }
-
-      // Scale
-      if (n.targetScale !== undefined) {
-        const currentScale = n.scale ?? 1;
-        const ds = n.targetScale - currentScale;
-        if (Math.abs(ds) > SNAP_THRESHOLD_UNIT) {
-          n.scale = currentScale + ds * LERP;
-          allConverged = false;
-        } else {
-          n.scale = n.targetScale;
-        }
-      }
-
-      // Opacity
-      if (n.targetOpacity !== undefined) {
-        const currentOpacity = n.opacity ?? 1;
-        const dop = n.targetOpacity - currentOpacity;
-        if (Math.abs(dop) > SNAP_THRESHOLD_UNIT) {
-          n.opacity = currentOpacity + dop * LERP;
-          allConverged = false;
-        } else {
-          n.opacity = n.targetOpacity;
-        }
+      if (HexAnimationLoop.lerpNode(n)) {
+        anyConverging = true;
       }
     }
 
     this.onFrame();
 
-    if (allConverged) {
+    if (anyConverging) {
+      this.rafId = requestAnimationFrame(() => this.tick(nodes));
+    } else {
       this.running = false;
       this.rafId = null;
-    } else {
-      this.rafId = requestAnimationFrame(() => this.tick(nodes));
     }
   }
 
