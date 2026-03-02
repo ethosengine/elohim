@@ -8,10 +8,11 @@
 
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthStateService } from '../../services/auth-state.service';
 
 /** Health endpoint response */
 interface HealthResponse {
@@ -81,7 +82,7 @@ type LoadingState = 'loading' | 'ready' | 'error';
       @if (state() === 'error') {
         <div class="error-state">
           <p>Unable to reach this doorway</p>
-          <button class="btn-secondary" (click)="load()">Retry</button>
+          <button class="btn-secondary" data-testid="landing-retry" (click)="load()">Retry</button>
         </div>
       }
 
@@ -152,6 +153,8 @@ type LoadingState = 'loading' | 'ready' | 'error';
 })
 export class DoorwayLandingComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly authState = inject(AuthStateService);
   private readonly baseUrl = environment.doorwayUrl ?? '';
 
   readonly state = signal<LoadingState>('loading');
@@ -178,6 +181,10 @@ export class DoorwayLandingComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    if (this.authState.isAuthenticated()) {
+      this.router.navigate(['/dashboard']);
+      return;
+    }
     this.load();
   }
 
