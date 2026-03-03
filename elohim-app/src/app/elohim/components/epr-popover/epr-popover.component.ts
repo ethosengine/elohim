@@ -19,6 +19,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   Input,
+  HostBinding,
   HostListener,
   EventEmitter,
   Output,
@@ -33,13 +34,7 @@ import type { EprHead } from '../../models/epr-head.model';
   imports: [CommonModule, RouterModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div
-      *ngIf="head"
-      class="epr-popover"
-      [style.top.px]="position.top"
-      [style.left.px]="position.left"
-      data-testid="epr-popover"
-    >
+    <div *ngIf="head" class="epr-popover" data-testid="epr-popover">
       <!-- Header: content type badge + title -->
       <div class="epr-popover-header">
         <span class="epr-popover-type" data-testid="epr-popover-type">
@@ -110,7 +105,6 @@ import type { EprHead } from '../../models/epr-head.model';
       }
 
       .epr-popover {
-        position: absolute;
         width: 280px;
         padding: 12px;
         background: var(--epr-popover-bg, #ffffff);
@@ -235,8 +229,23 @@ export class EprPopoverComponent {
   /** Angular route for the "Open resource" link */
   @Input() route: string[] | null = null;
 
+  /** Emitted when the mouse enters the popover */
+  @Output() entered = new EventEmitter<void>();
+
   /** Emitted when the mouse leaves the popover */
   @Output() dismissed = new EventEmitter<void>();
+
+  @HostBinding('style.top.px') get hostTop(): number {
+    return this.position.top;
+  }
+  @HostBinding('style.left.px') get hostLeft(): number {
+    return this.position.left;
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter(): void {
+    this.entered.emit();
+  }
 
   @HostListener('mouseleave')
   onMouseLeave(): void {

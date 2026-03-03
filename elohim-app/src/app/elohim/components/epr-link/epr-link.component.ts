@@ -231,6 +231,7 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
 
   private popoverRef: ComponentRef<EprPopoverComponent> | null = null;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  private dismissTimer: ReturnType<typeof setTimeout> | null = null;
   private eprHead: EprHead | null = null;
 
   @HostListener('mouseenter', ['$event'])
@@ -248,9 +249,9 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
       this.hoverTimer = null;
     }
     // Delay dismiss to allow mouse to enter popover
-    setTimeout(() => {
+    this.dismissTimer = setTimeout(() => {
       this.dismissPopover();
-    }, 100);
+    }, 150);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -292,17 +293,20 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
     this.popoverRef.instance.head = this.eprHead;
     this.popoverRef.instance.route = this.resolved?.route ?? null;
 
-    // Ensure host is at viewport origin for correct fixed positioning
-    const hostEl = this.popoverRef.location.nativeElement as HTMLElement;
-    hostEl.style.top = '0';
-    hostEl.style.left = '0';
-
-    // Position below the link
+    // Position below the link (applied to :host via HostBinding)
     const rect = this.elRef.nativeElement.getBoundingClientRect();
     this.popoverRef.instance.position = {
       top: rect.bottom + 4,
       left: Math.max(8, rect.left),
     };
+
+    // Cancel dismiss when mouse enters the popover
+    this.popoverRef.instance.entered.subscribe(() => {
+      if (this.dismissTimer) {
+        clearTimeout(this.dismissTimer);
+        this.dismissTimer = null;
+      }
+    });
 
     this.popoverRef.instance.dismissed.subscribe(() => {
       this.dismissPopover();
@@ -312,6 +316,10 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
   }
 
   private dismissPopover(): void {
+    if (this.dismissTimer) {
+      clearTimeout(this.dismissTimer);
+      this.dismissTimer = null;
+    }
     if (this.popoverRef) {
       this.popoverRef.destroy();
       this.popoverRef = null;

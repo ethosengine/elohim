@@ -166,14 +166,22 @@ describe('EprPopoverComponent', () => {
     expect(el.querySelector('[data-testid="epr-popover-qahal"]')).toBeNull();
   });
 
-  it('should position at specified coordinates', () => {
+  it('should position host element at specified coordinates', () => {
     component.head = mockHead;
     component.position = { top: 200, left: 150 };
     fixture.detectChanges();
 
-    const el = fixture.nativeElement as HTMLElement;
-    const popover = el.querySelector('[data-testid="epr-popover"]') as HTMLElement;
-    expect(popover.style.top).toBe('200px');
-    expect(popover.style.left).toBe('150px');
+    const hostEl = fixture.nativeElement as HTMLElement;
+    expect(hostEl.style.top).toBe('200px');
+    expect(hostEl.style.left).toBe('150px');
+  });
+
+  it('should emit entered on mouse enter', () => {
+    component.head = mockHead;
+    fixture.detectChanges();
+
+    const spy = vi.spyOn(component.entered, 'emit');
+    component.onMouseEnter();
+    expect(spy).toHaveBeenCalled();
   });
 });

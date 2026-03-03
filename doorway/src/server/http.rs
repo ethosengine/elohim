@@ -518,9 +518,34 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                 tokio::spawn(async move {
                     let io = TokioIo::new(stream);
 
-                    let service = service_fn(move |req| {
+                    let service = service_fn(move |req: Request<Incoming>| {
                         let state = Arc::clone(&state);
-                        async move { handle_request(state, addr, req).await }
+                        async move {
+                            // Extract CORS context at the outermost level so every
+                            // response — including early returns — gets CORS headers.
+                            let request_origin: Option<String> = req
+                                .headers()
+                                .get(hyper::header::ORIGIN)
+                                .and_then(|v| v.to_str().ok())
+                                .map(|s| s.to_string());
+                            let cors_config = state.cors_config.clone();
+
+                            if req.method() == hyper::Method::OPTIONS {
+                                let resp: Result<Response<BoxBody>, hyper::Error> =
+                                    Ok(to_boxed(crate::cors::preflight_response(
+                                        &cors_config,
+                                        request_origin.as_deref(),
+                                    )));
+                                return resp;
+                            }
+
+                            let response = handle_request(state, addr, req).await?;
+                            Ok(crate::cors::apply_cors_headers(
+                                &cors_config,
+                                request_origin.as_deref(),
+                                response,
+                            ))
+                        }
                     });
 
                     if let Err(err) = http1::Builder::new()
@@ -550,17 +575,6 @@ async fn handle_request(
     let method = req.method().clone();
     let path = req.uri().path().to_string();
 
-    // Extract Origin header for CORS before any handler consumes the request
-    let request_origin = req
-        .headers()
-        .get(hyper::header::ORIGIN)
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-    let origin_ref = request_origin.as_deref();
-
-    // Clone CORS config upfront before any handler moves the Arc<AppState>
-    let cors_config = state.cors_config.clone();
-
     // Check if this is a signal subdomain request (signal.*.elohim.host)
     let host = req
         .headers()
@@ -571,31 +585,18 @@ async fn handle_request(
 
     info!("[{}] {} {} (host: {})", addr, method, path, host);
 
-    // CORS preflight — handle centrally before any route matching
-    if method == Method::OPTIONS {
-        return Ok(to_boxed(crate::cors::preflight_response(
-            &cors_config,
-            origin_ref,
-        )));
-    }
-
     // Signal subdomain: route /{pubkey} to signal handler (tx5 protocol)
     // Path should be /{pubkey} where pubkey has no additional slashes
     if is_signal_host && method == Method::GET && path.len() > 1 {
         let after_slash = &path[1..]; // Skip leading /
         if !after_slash.is_empty() && !after_slash.contains('/') {
             if hyper_tungstenite::is_upgrade_request(&req) {
-                // WebSocket upgrade — apply_cors_headers will no-op on 101
                 let resp = handle_signal_request(state, req, &path, addr).await;
                 return Ok(resp);
             } else {
-                return Ok(crate::cors::apply_cors_headers(
-                    &cors_config,
-                    origin_ref,
-                    to_boxed(bad_request_response(
-                        "Signal endpoint requires WebSocket upgrade",
-                    )),
-                ));
+                return Ok(to_boxed(bad_request_response(
+                    "Signal endpoint requires WebSocket upgrade",
+                )));
             }
         }
     }
@@ -603,19 +604,9 @@ async fn handle_request(
     // Handle auth routes (/auth/*) - these consume the request
     if path.starts_with("/auth") {
         if let Some(response) = routes::handle_auth_request(req, Arc::clone(&state)).await {
-            return Ok(crate::cors::apply_cors_headers(
-                &cors_config,
-                origin_ref,
-                response,
-            ));
+            return Ok(response);
         }
-        // If handle_auth_request returns None, it didn't handle the request
-        // This shouldn't happen since we checked the path prefix, but handle gracefully
-        return Ok(crate::cors::apply_cors_headers(
-            &cors_config,
-            origin_ref,
-            to_boxed(not_found_response(&path)),
-        ));
+        return Ok(to_boxed(not_found_response(&path)));
     }
 
     let response = match (method, path.as_str()) {
@@ -1187,11 +1178,7 @@ async fn handle_request(
         _ => to_boxed(not_found_response(&path)),
     };
 
-    Ok(crate::cors::apply_cors_headers(
-        &cors_config,
-        origin_ref,
-        response,
-    ))
+    Ok(response)
 }
 
 /// Handle bootstrap service requests
