@@ -36,6 +36,8 @@ const DRY_RUN = process.env.DRY_RUN === 'true' || args.includes('--dry-run');
 const CONTENT_ONLY = args.includes('--content-only') || process.env.CONTENT_ONLY === 'true';
 const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === 'true';
 const SKIP_BLOB_UPLOAD = process.env.SKIP_BLOB_UPLOAD === 'true' || args.includes('--skip-blob-upload');
+const USE_ACCOUNT_PACKAGES = args.includes('--use-account-packages') || process.env.USE_ACCOUNT_PACKAGES === 'true';
+const ACCOUNT_PACKAGES_DIR = process.env.ACCOUNT_PACKAGES_DIR || path.join(GENESIS_DIR, 'data', 'account-packages');
 
 // Content formats that require blob upload
 const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
@@ -456,6 +458,91 @@ function loadContentFiles(): ConceptJson[] {
   return concepts;
 }
 
+// ============================================================================
+// Account Package Reach Override
+//
+// When --use-account-packages is set, loads account packages from
+// genesis/data/account-packages/ and uses the maximum reach level assigned
+// to each content item across all humans. This replaces the hardcoded
+// 'public' reach with per-content reach levels derived from human affinities,
+// stewardship, and relationship graphs.
+// ============================================================================
+
+/** Reach levels ordered from most restrictive to most permissive */
+const REACH_ORDER: Record<string, number> = {
+  private: 0,
+  invited: 1,
+  local: 2,
+  neighborhood: 3,
+  municipal: 4,
+  commons: 5,
+  public: 6, // Legacy compatibility
+};
+
+/**
+ * Load account packages and build a map of content ID → maximum reach level.
+ * The "maximum reach" is the most permissive reach assigned to this content
+ * across all humans. This determines what reach the content is seeded at —
+ * the P2P replication layer then restricts delivery based on per-human reach.
+ */
+function loadReachOverrides(): Map<string, string> {
+  const overrides = new Map<string, string>();
+
+  if (!fs.existsSync(ACCOUNT_PACKAGES_DIR)) {
+    console.warn(`   Account packages directory not found: ${ACCOUNT_PACKAGES_DIR}`);
+    return overrides;
+  }
+
+  const files = fs.readdirSync(ACCOUNT_PACKAGES_DIR).filter(
+    f => f.endsWith('.json') && f !== 'index.json' && f !== 'conductor-groups.json'
+  );
+
+  for (const file of files) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(ACCOUNT_PACKAGES_DIR, file), 'utf-8'));
+      if (!pkg.content || !Array.isArray(pkg.content)) continue;
+
+      for (const assignment of pkg.content) {
+        const existing = overrides.get(assignment.contentId);
+        const existingOrder = existing ? (REACH_ORDER[existing] ?? 0) : -1;
+        const newOrder = REACH_ORDER[assignment.reach] ?? 0;
+
+        if (newOrder > existingOrder) {
+          overrides.set(assignment.contentId, assignment.reach);
+        }
+      }
+    } catch {
+      // Skip malformed packages
+    }
+  }
+
+  return overrides;
+}
+
+/** Global reach overrides — loaded once if --use-account-packages is set */
+let reachOverrides: Map<string, string> | null = null;
+
+function getReachForContent(contentId: string): string {
+  if (!USE_ACCOUNT_PACKAGES) return 'public';
+
+  if (!reachOverrides) {
+    console.log('Loading reach overrides from account packages...');
+    reachOverrides = loadReachOverrides();
+    console.log(`   Loaded reach for ${reachOverrides.size} content items`);
+
+    // Show distribution
+    const dist = new Map<string, number>();
+    for (const reach of reachOverrides.values()) {
+      dist.set(reach, (dist.get(reach) || 0) + 1);
+    }
+    for (const [reach, count] of [...dist.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`     ${reach}: ${count}`);
+    }
+  }
+
+  return reachOverrides.get(contentId) || 'commons';
+}
+
 function transformContent(json: ConceptJson): CreateContentInput {
   // Serialize content body to string
   let contentBody: string | undefined;
@@ -484,7 +571,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     contentBody: contentBody,
     contentSizeBytes: contentSizeBytes,
     metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
-    reach: 'public',
+    reach: getReachForContent(json.id),
     tags: json.tags || [],
   };
 }

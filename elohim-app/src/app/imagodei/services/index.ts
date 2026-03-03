@@ -22,5 +22,8 @@ export { OAuthAuthProvider } from './providers/oauth-auth.provider';
 // Hosting
 export { HostingAccountService } from './hosting-account.service';
 
+// Account packages
+export { AccountPackageService } from './account-package.service';
+
 // Banner providers
 export { UpgradeBannerProvider } from './providers/upgrade-banner.provider';

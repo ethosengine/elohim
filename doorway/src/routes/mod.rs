@@ -1,5 +1,6 @@
 //! HTTP routes for Doorway
 
+pub mod account;
 pub mod admin;
 pub mod admin_conductors;
 pub mod admin_users;
@@ -68,4 +69,5 @@ pub use status::status_check;
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
 
+pub use account::handle_account_request;
 pub use epr::handle_epr_head_request;

@@ -12,7 +12,11 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::diesel_schema::*;
+use super::diesel_schema::{
+    apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
+    contributor_presences, economic_events, human_relationships, local_sessions, path_attestations,
+    path_tags, paths, relationships, stewardship_allocations, steps,
+};
 
 // ============================================================================
 // Timestamp Helpers (SQLite stores timestamps as TEXT)
@@ -1046,4 +1050,130 @@ pub struct NewLocalSession<'a> {
     pub display_name: Option<&'a str>,
     pub profile_image_hash: Option<&'a str>,
     pub bootstrap_url: Option<&'a str>,
+}
+
+// ============================================================================
+// Collective Models (Qahal - Governance Contexts)
+// ============================================================================
+
+/// Collective row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize, TS)]
+#[diesel(table_name = collectives)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct Collective {
+    pub id: String,
+    pub app_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub governance_layer: String,
+    pub constitutional_parent_id: Option<String>,
+    pub reach: String,
+    pub metadata_json: Option<String>,
+    pub created_by: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub dissolved_at: Option<String>,
+}
+
+/// New collective for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = collectives)]
+pub struct NewCollective<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub governance_layer: &'a str,
+    pub constitutional_parent_id: Option<&'a str>,
+    pub reach: &'a str,
+    pub metadata_json: Option<&'a str>,
+    pub created_by: Option<&'a str>,
+}
+
+// ============================================================================
+// Collective Participation Models
+// ============================================================================
+
+/// Collective participation row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize, TS)]
+#[diesel(table_name = collective_participations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CollectiveParticipation {
+    pub id: String,
+    pub app_id: String,
+    pub collective_id: String,
+    pub human_id: String,
+    pub intimacy_level: String,
+    pub role_context: Option<String>,
+    pub governance_weight: f32,
+    pub consent_state: String,
+    pub metadata_json: Option<String>,
+    pub joined_at: String,
+    pub updated_at: String,
+    pub departed_at: Option<String>,
+}
+
+/// New collective participation for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = collective_participations)]
+pub struct NewCollectiveParticipation<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub collective_id: &'a str,
+    pub human_id: &'a str,
+    pub intimacy_level: &'a str,
+    pub role_context: Option<&'a str>,
+    pub governance_weight: f32,
+    pub consent_state: &'a str,
+    pub metadata_json: Option<&'a str>,
+}
+
+// ============================================================================
+// Governance Layer Constants
+// ============================================================================
+
+/// Governance layer types for collectives
+pub mod governance_layers {
+    pub const FAMILY: &str = "family";
+    pub const NEIGHBORHOOD: &str = "neighborhood";
+    pub const FAITH: &str = "faith";
+    pub const EDUCATION: &str = "education";
+    pub const INTEREST: &str = "interest";
+    pub const GEOGRAPHIC: &str = "geographic";
+    pub const WORKPLACE: &str = "workplace";
+    pub const ECONOMIC: &str = "economic";
+    pub const COMMUNITY: &str = "community";
+
+    /// All governance layers
+    pub const ALL: [&str; 9] = [
+        FAMILY,
+        NEIGHBORHOOD,
+        FAITH,
+        EDUCATION,
+        INTEREST,
+        GEOGRAPHIC,
+        WORKPLACE,
+        ECONOMIC,
+        COMMUNITY,
+    ];
+
+    /// Check if a governance layer is valid
+    pub fn is_valid(layer: &str) -> bool {
+        ALL.contains(&layer)
+    }
+}
+
+/// Consent states for participation
+pub mod consent_states {
+    pub const PENDING: &str = "pending";
+    pub const CONSENTED: &str = "consented";
+    pub const WITHDRAWN: &str = "withdrawn";
+
+    pub const ALL: [&str; 3] = [PENDING, CONSENTED, WITHDRAWN];
+
+    pub fn is_valid(state: &str) -> bool {
+        ALL.contains(&state)
+    }
 }

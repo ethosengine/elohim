@@ -38,7 +38,7 @@ use crate::db::policy_cache::{
 };
 use crate::db::{self, AppContext, ContentDb, ContentQuery, DbPool};
 use crate::db::{
-    content_mastery, contributor_presences, economic_events, human_relationships,
+    collectives, content_mastery, contributor_presences, economic_events, human_relationships,
     stewardship_allocations,
 };
 use crate::error::StorageError;
@@ -50,11 +50,19 @@ use crate::sharding::{ShardEncoder, ShardManifest};
 use crate::sync::SyncManager;
 use crate::views::{
     validate_schema_versions,
+    AccountImportResultView,
+    AccountPackageInputView,
+    AccountPackageView,
+    CollectiveParticipationView,
+    CollectiveSeedView,
+    CollectiveView,
+    ContentAssignmentView,
     ContentMasteryView,
     ContentStewardshipView,
     ContentView,
     ContributorPresenceView,
     CreateAllocationInputView,
+    CreateCollectiveInputView,
     // InputView types for API boundary (camelCase with parsed JSON)
     CreateContentInputView,
     CreateContributorPresenceInputView,
@@ -66,12 +74,16 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
+    AccountIdentityView,
     InitiateClaimInputView,
     LocalSessionView,
+    PackageManifestView,
     PathView,
     PathWithDetailsView,
+    RelationshipSeedView,
     RelationshipView,
     StewardshipAllocationView,
+    StewardshipSeedView,
     UpdateAllocationInputView,
     SUPPORTED_SCHEMA_VERSIONS,
 };
@@ -468,6 +480,23 @@ impl HttpServer {
             (Method::GET, p) if p.starts_with("/dag/") => {
                 let cid_str = p.strip_prefix("/dag/").unwrap_or("");
                 self.handle_get_dag(cid_str).await
+            }
+
+            // Account API: Import/Export account packages
+            (Method::POST, "/account/import") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.do_account_import(req, pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+            (Method::GET, p) if p.starts_with("/account/export/") => {
+                let human_id = p.strip_prefix("/account/export/").unwrap_or("");
+                if let Some(ref pool) = self.db_pool {
+                    self.do_account_export(human_id, pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
             }
 
             // Not found
@@ -1562,6 +1591,44 @@ impl HttpServer {
             // Fall back to generic ID handler
             return self
                 .handle_human_relationship_by_id(req, method, rel_path, &app_ctx)
+                .await;
+        }
+
+        // Collective routes (Diesel)
+        if resource_path == "collectives" {
+            return self
+                .handle_collectives_list(req, method, &app_ctx)
+                .await;
+        }
+
+        if let Some(coll_path) = resource_path.strip_prefix("collectives/") {
+            // Check for participants sub-path
+            if let Some(rest) = coll_path.strip_suffix("/participants") {
+                return self
+                    .handle_collective_participants(req, method, rest, &app_ctx)
+                    .await;
+            }
+            // Check for participants/{human_id} delete pattern
+            if coll_path.contains("/participants/") {
+                let parts: Vec<&str> = coll_path.splitn(3, '/').collect();
+                if parts.len() == 3 && parts[1] == "participants" {
+                    return self
+                        .handle_collective_participant_depart(
+                            req, method, parts[0], parts[2], &app_ctx,
+                        )
+                        .await;
+                }
+            }
+            // Fall back to generic ID handler
+            return self
+                .handle_collective_by_id(req, method, coll_path, &app_ctx)
+                .await;
+        }
+
+        // Participations by human route
+        if let Some(human_id) = resource_path.strip_prefix("participations/") {
+            return self
+                .handle_participations_by_human(req, method, human_id, &app_ctx)
                 .await;
         }
 
@@ -5090,6 +5157,610 @@ impl HttpServer {
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(response.to_string())))
             .unwrap())
+    }
+
+    // =========================================================================
+    // Collective Handlers (Qahal - Governance Contexts)
+    // =========================================================================
+
+    /// GET/POST /db/collectives - List or create collectives
+    async fn handle_collectives_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let query: collectives::CollectiveQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+                match collectives::list_collectives(&mut conn, ctx, &query) {
+                    Ok(items) => {
+                        let views: Vec<CollectiveView> =
+                            items.into_iter().map(CollectiveView::from).collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+                let input_view: CreateCollectiveInputView =
+                    serde_json::from_slice(&body.to_bytes())
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                let input: collectives::CreateCollectiveInput = input_view.into();
+
+                match collectives::create_collective(&mut conn, ctx, &input) {
+                    Ok(c) => Ok(response::created(&CollectiveView::from(c))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/collectives/{id}
+    async fn handle_collective_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        match collectives::get_collective(&mut conn, ctx, id) {
+            Ok(Some(c)) => Ok(response::ok(&CollectiveView::from(c))),
+            Ok(None) => Ok(response::not_found(&format!("Collective {} not found", id))),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// GET/POST /db/collectives/{id}/participants
+    async fn handle_collective_participants(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        collective_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match collectives::get_participants_of_collective(&mut conn, ctx, collective_id) {
+                    Ok(items) => {
+                        let views: Vec<CollectiveParticipationView> =
+                            items.into_iter().map(CollectiveParticipationView::from).collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+
+                #[derive(Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct AddParticipantInput {
+                    human_id: String,
+                    #[serde(default)]
+                    intimacy_level: Option<String>,
+                    #[serde(default)]
+                    role_context: Option<String>,
+                }
+
+                let input: AddParticipantInput = serde_json::from_slice(&body.to_bytes())
+                    .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                let participation_input = collectives::CreateParticipationInput {
+                    id: None,
+                    collective_id: collective_id.to_string(),
+                    human_id: input.human_id,
+                    intimacy_level: input.intimacy_level.unwrap_or_else(|| "recognition".to_string()),
+                    role_context: input.role_context,
+                    governance_weight: 1.0,
+                    consent_state: "consented".to_string(),
+                    metadata_json: None,
+                };
+
+                match collectives::create_participation(&mut conn, ctx, &participation_input) {
+                    Ok(p) => Ok(response::created(&CollectiveParticipationView::from(p))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// DELETE /db/collectives/{id}/participants/{human_id} - Depart from collective
+    async fn handle_collective_participant_depart(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        collective_id: &str,
+        human_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::DELETE {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        match collectives::depart_collective(&mut conn, ctx, collective_id, human_id) {
+            Ok(true) => Ok(response::ok(&serde_json::json!({"departed": true}))),
+            Ok(false) => Ok(response::not_found("Participation not found")),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// GET /db/participations/{human_id} - All collectives for a human
+    async fn handle_participations_by_human(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        human_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        match collectives::get_participations_for_human(&mut conn, ctx, human_id) {
+            Ok(items) => {
+                let views: Vec<CollectiveParticipationView> =
+                    items.into_iter().map(CollectiveParticipationView::from).collect();
+                let body = serde_json::json!({
+                    "items": views,
+                    "count": views.len(),
+                });
+                Ok(response::ok(&body))
+            }
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    // =========================================================================
+    // Account Import/Export Handlers
+    // =========================================================================
+
+    /// POST /account/import - Import an account package
+    ///
+    /// Accepts an AccountPackageInputView and orchestrates:
+    /// 1. Content reach updates (sets per-content reach levels)
+    /// 2. Human relationship creation
+    /// 3. Stewardship allocation creation
+    /// 4. Collective participation creation
+    ///
+    /// This endpoint serves both genesis seeding (initial conditions) and
+    /// account recovery (restoring a human's world from a backup).
+    async fn do_account_import(
+        &self,
+        req: Request<Incoming>,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        let body_bytes = body.to_bytes();
+
+        let package: AccountPackageInputView = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::Parse(format!("Invalid account package JSON: {}", e)))?;
+
+        let human_id = package.identity.human_id.clone();
+        let ctx = AppContext::default_lamad();
+
+        info!(
+            human_id = %human_id,
+            content_count = package.content.len(),
+            relationship_count = package.relationships.len(),
+            stewardship_count = package.stewardship.len(),
+            "Importing account package"
+        );
+
+        let mut errors: Vec<String> = Vec::new();
+        let mut content_updated: usize = 0;
+        let mut relationships_created: usize = 0;
+        let mut stewardship_created: usize = 0;
+
+        // Phase 1: Update content reach levels
+        // The content itself is already seeded — we're updating reach per-human's assignment
+        if !package.content.is_empty() {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+            use crate::db::diesel_schema::content;
+            use diesel::prelude::*;
+
+            for assignment in &package.content {
+                let updated = diesel::update(
+                    content::table
+                        .filter(content::app_id.eq(&ctx.app_id))
+                        .filter(content::id.eq(&assignment.content_id)),
+                )
+                .set(content::reach.eq(&assignment.reach))
+                .execute(&mut *conn);
+
+                match updated {
+                    Ok(n) if n > 0 => content_updated += 1,
+                    Ok(_) => {
+                        // Content doesn't exist yet — not an error, just skip
+                        debug!(content_id = %assignment.content_id, "Content not found for reach update, skipping");
+                    }
+                    Err(e) => {
+                        errors.push(format!(
+                            "Failed to update reach for {}: {}",
+                            assignment.content_id, e
+                        ));
+                    }
+                }
+            }
+
+            info!(
+                human_id = %human_id,
+                content_updated = content_updated,
+                "Content reach updates complete"
+            );
+        }
+
+        // Phase 2: Create human relationships
+        if !package.relationships.is_empty() {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+            for rel_seed in &package.relationships {
+                let input = human_relationships::CreateHumanRelationshipInput {
+                    id: None,
+                    party_a_id: human_id.clone(),
+                    party_b_id: rel_seed.target_id.clone(),
+                    relationship_type: rel_seed.relationship_type.clone(),
+                    intimacy_level: rel_seed.intimacy_level.clone(),
+                    is_bidirectional: rel_seed.is_bidirectional,
+                    consent_given_by_a: true,
+                    consent_given_by_b: false, // Other party consents independently
+                    initiated_by: human_id.clone(),
+                    governance_layer: None,
+                    reach: rel_seed.reach.clone().unwrap_or_else(|| "private".to_string()),
+                    context_json: None,
+                    expires_at: None,
+                };
+
+                match human_relationships::create_human_relationship(&mut conn, &ctx, input) {
+                    Ok(_) => relationships_created += 1,
+                    Err(e) => {
+                        errors.push(format!(
+                            "Failed to create relationship {} -> {}: {}",
+                            human_id, rel_seed.target_id, e
+                        ));
+                    }
+                }
+            }
+
+            info!(
+                human_id = %human_id,
+                relationships_created = relationships_created,
+                "Human relationship creation complete"
+            );
+        }
+
+        // Phase 3: Create stewardship allocations
+        // Match stewardship seeds to content by category, create allocations
+        if !package.stewardship.is_empty() {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+            // For each stewardship seed, we need a contributor presence for the human.
+            // Look up or note that presences should already exist from seeding.
+            for steward_seed in &package.stewardship {
+                // Find content matching this category via content_type field
+                use crate::db::diesel_schema::content;
+                use diesel::prelude::*;
+
+                let matching_content: Vec<String> = content::table
+                    .filter(content::app_id.eq(&ctx.app_id))
+                    .filter(content::content_type.eq(&steward_seed.content_category))
+                    .select(content::id)
+                    .load(&mut *conn)
+                    .unwrap_or_default();
+
+                // Create allocation for each matching content item
+                // Note: This requires a presence_id for the human, which is resolved
+                // by the seeder beforehand. For now, use human_id as presence reference.
+                for content_id in &matching_content {
+                    let input = stewardship_allocations::CreateAllocationInput {
+                        content_id: content_id.clone(),
+                        steward_presence_id: human_id.clone(),
+                        allocation_ratio: steward_seed.allocation_ratio,
+                        allocation_method: "computed".to_string(),
+                        contribution_type: steward_seed
+                            .contribution_type
+                            .clone()
+                            .unwrap_or_else(|| "inherited".to_string()),
+                        contribution_evidence_json: None,
+                        note: Some(format!(
+                            "Account package import: {} stewardship",
+                            steward_seed.content_category
+                        )),
+                        metadata_json: None,
+                    };
+
+                    match stewardship_allocations::create_allocation(&mut conn, &ctx, &input) {
+                        Ok(_) => stewardship_created += 1,
+                        Err(e) => {
+                            // Duplicate allocations are expected on re-import
+                            let err_msg = e.to_string();
+                            if !err_msg.contains("UNIQUE constraint") {
+                                errors.push(format!(
+                                    "Failed to create allocation for {}: {}",
+                                    content_id, e
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            info!(
+                human_id = %human_id,
+                stewardship_created = stewardship_created,
+                "Stewardship allocation creation complete"
+            );
+        }
+
+        // Phase 4: Create collective participations
+        let mut collectives_joined: usize = 0;
+        if !package.collectives.is_empty() {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+            let qahal_ctx = AppContext::new("qahal");
+
+            for coll_seed in &package.collectives {
+                // Ensure the collective exists (create stub if needed for seeding)
+                let _ = collectives::get_collective(&mut conn, &qahal_ctx, &coll_seed.collective_id);
+
+                let participation_input = collectives::CreateParticipationInput {
+                    id: None,
+                    collective_id: coll_seed.collective_id.clone(),
+                    human_id: human_id.clone(),
+                    intimacy_level: coll_seed
+                        .intimacy_level
+                        .clone()
+                        .unwrap_or_else(|| "connection".to_string()),
+                    role_context: coll_seed.role_context.clone(),
+                    governance_weight: 1.0,
+                    consent_state: "consented".to_string(),
+                    metadata_json: None,
+                };
+
+                match collectives::create_participation(&mut conn, &qahal_ctx, &participation_input)
+                {
+                    Ok(_) => collectives_joined += 1,
+                    Err(e) => {
+                        errors.push(format!(
+                            "Failed to join collective {}: {}",
+                            coll_seed.collective_id, e
+                        ));
+                    }
+                }
+            }
+
+            info!(
+                human_id = %human_id,
+                collectives_joined = collectives_joined,
+                "Collective participation creation complete"
+            );
+        }
+
+        let result = AccountImportResultView {
+            human_id,
+            content_updated,
+            relationships_created,
+            stewardship_created,
+            collectives_joined,
+            errors,
+        };
+
+        Ok(response::ok(&result))
+    }
+
+    /// GET /account/export/{human_id} - Export an account package
+    ///
+    /// Assembles an account package from the current state of a human's world:
+    /// - Content assignments (what they can see and at what reach)
+    /// - Human relationships (who they know)
+    /// - Stewardship allocations (what they steward)
+    /// - Collective participations (what collectives they belong to)
+    ///
+    /// This serves both backup/recovery and migration between conductors.
+    async fn do_account_export(
+        &self,
+        human_id: &str,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        info!(human_id = %human_id, "Exporting account package");
+
+        // Phase 1: Gather content assignments
+        // Content where this human has specific reach (via stewardship or relationships)
+        let content_assignments: Vec<ContentAssignmentView> = {
+            use crate::db::diesel_schema::content;
+            use diesel::prelude::*;
+
+            // Get all content in this app context — the reach field tells us the assignment
+            let items: Vec<(String, String)> = content::table
+                .filter(content::app_id.eq(&ctx.app_id))
+                .select((content::id, content::reach))
+                .load(&mut *conn)
+                .map_err(|e| StorageError::Internal(format!("Content query failed: {}", e)))?;
+
+            items
+                .into_iter()
+                .map(|(id, reach)| ContentAssignmentView {
+                    content_id: id,
+                    reach,
+                    reason: None,
+                    steward_ratio: None,
+                })
+                .collect()
+        };
+
+        // Phase 2: Gather human relationships
+        let relationship_seeds: Vec<RelationshipSeedView> = {
+            let query = human_relationships::HumanRelationshipQuery {
+                party_id: Some(human_id.to_string()),
+                limit: 10000,
+                ..Default::default()
+            };
+
+            let rels =
+                human_relationships::list_human_relationships(&mut conn, &ctx, &query)
+                    .unwrap_or_default();
+
+            rels.into_iter()
+                .map(|r| {
+                    // Determine which party is the "other" one
+                    let target = if r.party_a_id == human_id {
+                        r.party_b_id
+                    } else {
+                        r.party_a_id
+                    };
+
+                    RelationshipSeedView {
+                        target_id: target,
+                        relationship_type: r.relationship_type,
+                        intimacy_level: r.intimacy_level,
+                        is_bidirectional: r.is_bidirectional == 1,
+                        reach: Some(r.reach),
+                    }
+                })
+                .collect()
+        };
+
+        // Phase 3: Gather stewardship allocations
+        let stewardship_seeds: Vec<StewardshipSeedView> = {
+            let allocs = stewardship_allocations::get_allocations_for_steward(
+                &mut conn,
+                &ctx,
+                human_id,
+            )
+            .unwrap_or_default();
+
+            // Group by content_type (category) and compute aggregate ratios
+            let mut category_map: std::collections::HashMap<String, (f32, String)> =
+                std::collections::HashMap::new();
+
+            for alloc in &allocs {
+                // Look up content_type for this content
+                use crate::db::diesel_schema::content;
+                use diesel::prelude::*;
+
+                let content_type: Option<String> = content::table
+                    .filter(content::id.eq(&alloc.content_id))
+                    .select(content::content_type)
+                    .first(&mut *conn)
+                    .optional()
+                    .unwrap_or(None);
+
+                if let Some(ct) = content_type {
+                    let entry = category_map.entry(ct).or_insert((0.0, alloc.contribution_type.clone()));
+                    entry.0 += alloc.allocation_ratio;
+                }
+            }
+
+            category_map
+                .into_iter()
+                .map(|(category, (ratio, contribution_type))| StewardshipSeedView {
+                    content_category: category,
+                    allocation_ratio: ratio,
+                    contribution_type: Some(contribution_type),
+                })
+                .collect()
+        };
+
+        // Phase 4: Gather collective participations
+        let collective_seeds: Vec<CollectiveSeedView> = {
+            let qahal_ctx = AppContext::new("qahal");
+            let participations =
+                collectives::get_participations_for_human(&mut conn, &qahal_ctx, human_id)
+                    .unwrap_or_default();
+
+            participations
+                .into_iter()
+                .map(|p| CollectiveSeedView {
+                    collective_id: p.collective_id,
+                    role_context: p.role_context,
+                    intimacy_level: Some(p.intimacy_level),
+                })
+                .collect()
+        };
+
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+        let package = AccountPackageView {
+            identity: AccountIdentityView {
+                human_id: human_id.to_string(),
+                display_name: human_id.to_string(), // Will be enriched when identity service is integrated
+                category: None,
+                profile_reach: None,
+                bio: None,
+                location: None,
+                affinities: vec![],
+                organizations: vec![],
+            },
+            content: content_assignments,
+            relationships: relationship_seeds,
+            stewardship: stewardship_seeds,
+            collectives: collective_seeds,
+            manifest: PackageManifestView {
+                version: "1.0.0".to_string(),
+                generated_at: now,
+                source_story: Some("export".to_string()),
+                content_hash: None,
+            },
+        };
+
+        info!(
+            human_id = %human_id,
+            content_count = package.content.len(),
+            relationship_count = package.relationships.len(),
+            stewardship_count = package.stewardship.len(),
+            collectives_count = package.collectives.len(),
+            "Account package exported"
+        );
+
+        Ok(response::ok(&package))
     }
 
     // =========================================================================

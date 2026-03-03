@@ -11,6 +11,40 @@ diesel::table! {
 }
 
 diesel::table! {
+    collectives (id) {
+        id -> Text,
+        app_id -> Text,
+        name -> Text,
+        description -> Nullable<Text>,
+        governance_layer -> Text,
+        constitutional_parent_id -> Nullable<Text>,
+        reach -> Text,
+        metadata_json -> Nullable<Text>,
+        created_by -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+        dissolved_at -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    collective_participations (id) {
+        id -> Text,
+        app_id -> Text,
+        collective_id -> Text,
+        human_id -> Text,
+        intimacy_level -> Text,
+        role_context -> Nullable<Text>,
+        governance_weight -> Float,
+        consent_state -> Text,
+        metadata_json -> Nullable<Text>,
+        joined_at -> Text,
+        updated_at -> Text,
+        departed_at -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     chapters (id) {
         id -> Text,
         app_id -> Text,
@@ -291,6 +325,7 @@ diesel::table! {
 }
 
 diesel::joinable!(chapters -> paths (path_id));
+diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(path_attestations -> paths (path_id));
 diesel::joinable!(path_tags -> paths (path_id));
@@ -300,6 +335,8 @@ diesel::joinable!(steps -> paths (path_id));
 diesel::allow_tables_to_appear_in_same_query!(
     apps,
     chapters,
+    collective_participations,
+    collectives,
     content,
     content_mastery,
     content_tags,

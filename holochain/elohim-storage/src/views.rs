@@ -1614,6 +1614,266 @@ impl From<CreateMasteryInputView> for CreateMasteryInput {
 }
 
 // ============================================================================
+// Collective Views (Qahal - Governance Contexts)
+// ============================================================================
+
+use crate::db::models::{Collective, CollectiveParticipation};
+
+/// Collective response view
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CollectiveView {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub governance_layer: String,
+    pub constitutional_parent_id: Option<String>,
+    pub reach: String,
+    pub metadata: Option<JsonVal>,
+    pub created_by: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub dissolved_at: Option<String>,
+}
+
+impl From<Collective> for CollectiveView {
+    fn from(c: Collective) -> Self {
+        Self {
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            governance_layer: c.governance_layer,
+            constitutional_parent_id: c.constitutional_parent_id,
+            reach: c.reach,
+            metadata: parse_json_opt(&c.metadata_json),
+            created_by: c.created_by,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            dissolved_at: c.dissolved_at,
+        }
+    }
+}
+
+/// Create collective input view
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateCollectiveInputView {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub governance_layer: String,
+    #[serde(default)]
+    pub constitutional_parent_id: Option<String>,
+    #[serde(default)]
+    pub reach: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+    #[serde(default)]
+    pub created_by: Option<String>,
+}
+
+impl From<CreateCollectiveInputView> for crate::db::collectives::CreateCollectiveInput {
+    fn from(v: CreateCollectiveInputView) -> Self {
+        Self {
+            id: v.id,
+            name: v.name,
+            description: v.description,
+            governance_layer: v.governance_layer,
+            constitutional_parent_id: v.constitutional_parent_id,
+            reach: v.reach.unwrap_or_else(|| "community".to_string()),
+            metadata_json: serialize_json_opt(&v.metadata),
+            created_by: v.created_by,
+        }
+    }
+}
+
+/// Collective participation response view
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CollectiveParticipationView {
+    pub id: String,
+    pub collective_id: String,
+    pub human_id: String,
+    pub intimacy_level: String,
+    pub role_context: Option<String>,
+    pub governance_weight: f32,
+    pub consent_state: String,
+    pub metadata: Option<JsonVal>,
+    pub joined_at: String,
+    pub updated_at: String,
+    pub departed_at: Option<String>,
+}
+
+impl From<CollectiveParticipation> for CollectiveParticipationView {
+    fn from(p: CollectiveParticipation) -> Self {
+        Self {
+            id: p.id,
+            collective_id: p.collective_id,
+            human_id: p.human_id,
+            intimacy_level: p.intimacy_level,
+            role_context: p.role_context,
+            governance_weight: p.governance_weight,
+            consent_state: p.consent_state,
+            metadata: parse_json_opt(&p.metadata_json),
+            joined_at: p.joined_at,
+            updated_at: p.updated_at,
+            departed_at: p.departed_at,
+        }
+    }
+}
+
+// ============================================================================
+// Account Package Views (Import/Export)
+// ============================================================================
+
+/// Content assignment within an account package
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentAssignmentView {
+    pub content_id: String,
+    pub reach: String,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub steward_ratio: Option<f32>,
+}
+
+/// Relationship seed within an account package
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RelationshipSeedView {
+    pub target_id: String,
+    pub relationship_type: String,
+    pub intimacy_level: String,
+    #[serde(default)]
+    pub is_bidirectional: bool,
+    #[serde(default)]
+    pub reach: Option<String>,
+}
+
+/// Stewardship seed within an account package
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardshipSeedView {
+    pub content_category: String,
+    pub allocation_ratio: f32,
+    #[serde(default)]
+    pub contribution_type: Option<String>,
+}
+
+/// Collective seed within an account package
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CollectiveSeedView {
+    pub collective_id: String,
+    #[serde(default)]
+    pub role_context: Option<String>,
+    #[serde(default)]
+    pub intimacy_level: Option<String>,
+}
+
+/// Organization context within account identity (display-only, from humans.json)
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OrganizationContextView {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub role: Option<String>,
+}
+
+/// Identity section of an account package
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccountIdentityView {
+    pub human_id: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub profile_reach: Option<String>,
+    #[serde(default)]
+    pub bio: Option<String>,
+    #[serde(default)]
+    pub location: Option<String>,
+    #[serde(default)]
+    pub affinities: Vec<String>,
+    #[serde(default)]
+    pub organizations: Vec<OrganizationContextView>,
+}
+
+/// Package manifest metadata
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PackageManifestView {
+    pub version: String,
+    pub generated_at: String,
+    #[serde(default)]
+    pub source_story: Option<String>,
+    #[serde(default)]
+    pub content_hash: Option<String>,
+}
+
+/// Account package input — accepts a full account package for import
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccountPackageInputView {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    pub identity: AccountIdentityView,
+    #[serde(default)]
+    pub content: Vec<ContentAssignmentView>,
+    #[serde(default)]
+    pub relationships: Vec<RelationshipSeedView>,
+    #[serde(default)]
+    pub stewardship: Vec<StewardshipSeedView>,
+    #[serde(default)]
+    pub collectives: Vec<CollectiveSeedView>,
+    #[serde(default)]
+    pub conductor_group: Option<u32>,
+    #[serde(default)]
+    pub manifest: Option<PackageManifestView>,
+}
+
+/// Result of an account package import
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccountImportResultView {
+    pub human_id: String,
+    pub content_updated: usize,
+    pub relationships_created: usize,
+    pub stewardship_created: usize,
+    pub collectives_joined: usize,
+    pub errors: Vec<String>,
+}
+
+/// Exported account package (full response)
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccountPackageView {
+    pub identity: AccountIdentityView,
+    pub content: Vec<ContentAssignmentView>,
+    pub relationships: Vec<RelationshipSeedView>,
+    pub stewardship: Vec<StewardshipSeedView>,
+    pub collectives: Vec<CollectiveSeedView>,
+    pub manifest: PackageManifestView,
+}
+
+// ============================================================================
 // EPR Head Views
 // ============================================================================
 
@@ -1853,6 +2113,9 @@ mod schema_version_tests {
             serde_json::from_value(serde_json::json!({})).unwrap();
         let mastery: CreateMasteryInputView =
             serde_json::from_value(serde_json::json!({"humanId":"h","contentId":"c"})).unwrap();
+        let account_pkg: AccountPackageInputView = serde_json::from_value(
+            serde_json::json!({"identity":{"humanId":"h","displayName":"Test"}})
+        ).unwrap();
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);
@@ -1867,6 +2130,7 @@ mod schema_version_tests {
         assert_eq!(alloc.schema_version, 1);
         assert_eq!(update_alloc.schema_version, 1);
         assert_eq!(mastery.schema_version, 1);
+        assert_eq!(account_pkg.schema_version, 1);
     }
 
     #[test]

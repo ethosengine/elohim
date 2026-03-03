@@ -577,6 +577,56 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Seed Collectives') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "SEED COLLECTIVES"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Doorway: ${doorwayHost}"
+                                echo ""
+                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-collectives.ts
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Accounts') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "SEED ACCOUNTS"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Doorway: ${doorwayHost}"
+                                echo ""
+                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-accounts.ts
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('E2E Verification') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {

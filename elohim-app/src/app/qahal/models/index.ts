@@ -10,3 +10,4 @@ export * from './governance-feedback.model';
 export * from './governance-deliberation.model';
 export * from './place.model';
 export * from './collective-research.model';
+export * from './collective.model';

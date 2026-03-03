@@ -1127,6 +1127,16 @@ async fn handle_request(
             ));
         }
 
+        // Account API routes (proxied to elohim-storage)
+        // POST /account/import - Import account package
+        // GET /account/export/{human_id} - Export account package
+        (_, p) if p.starts_with("/account/") => {
+            debug!(path = %p, "Forwarding account request to elohim-storage");
+            return Ok(to_boxed(
+                routes::handle_account_request(req, state.args.storage_url.clone(), p).await,
+            ));
+        }
+
         // HTML5 App serving routes (proxied to elohim-storage)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
