@@ -550,14 +550,23 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        def adminKey = ''
+                        try {
+                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                adminKey = env.ADMIN_KEY
+                            }
+                        } catch (e) {
+                            echo "doorway-admin-bootstrap-key credential not found — seeding without admin promotion"
+                        }
                         dir('genesis/seeder') {
-                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'API_KEY_ADMIN')]) {
+                            withEnv(["API_KEY_ADMIN=${adminKey}"]) {
                                 sh """#!/bin/bash
                                     set -euo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED HUMANS"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
+                                    echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
                                     echo ""
                                     DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
                                 """
