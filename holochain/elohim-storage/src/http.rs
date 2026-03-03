@@ -50,6 +50,7 @@ use crate::sharding::{ShardEncoder, ShardManifest};
 use crate::sync::SyncManager;
 use crate::views::{
     validate_schema_versions,
+    AccountIdentityView,
     AccountImportResultView,
     AccountPackageInputView,
     AccountPackageView,
@@ -74,7 +75,6 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
-    AccountIdentityView,
     InitiateClaimInputView,
     LocalSessionView,
     PackageManifestView,
@@ -1596,9 +1596,7 @@ impl HttpServer {
 
         // Collective routes (Diesel)
         if resource_path == "collectives" {
-            return self
-                .handle_collectives_list(req, method, &app_ctx)
-                .await;
+            return self.handle_collectives_list(req, method, &app_ctx).await;
         }
 
         if let Some(coll_path) = resource_path.strip_prefix("collectives/") {
@@ -5244,8 +5242,10 @@ impl HttpServer {
             Method::GET => {
                 match collectives::get_participants_of_collective(&mut conn, ctx, collective_id) {
                     Ok(items) => {
-                        let views: Vec<CollectiveParticipationView> =
-                            items.into_iter().map(CollectiveParticipationView::from).collect();
+                        let views: Vec<CollectiveParticipationView> = items
+                            .into_iter()
+                            .map(CollectiveParticipationView::from)
+                            .collect();
                         let body = serde_json::json!({
                             "items": views,
                             "count": views.len(),
@@ -5278,7 +5278,9 @@ impl HttpServer {
                     id: None,
                     collective_id: collective_id.to_string(),
                     human_id: input.human_id,
-                    intimacy_level: input.intimacy_level.unwrap_or_else(|| "recognition".to_string()),
+                    intimacy_level: input
+                        .intimacy_level
+                        .unwrap_or_else(|| "recognition".to_string()),
                     role_context: input.role_context,
                     governance_weight: 1.0,
                     consent_state: "consented".to_string(),
@@ -5330,8 +5332,10 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
         match collectives::get_participations_for_human(&mut conn, ctx, human_id) {
             Ok(items) => {
-                let views: Vec<CollectiveParticipationView> =
-                    items.into_iter().map(CollectiveParticipationView::from).collect();
+                let views: Vec<CollectiveParticipationView> = items
+                    .into_iter()
+                    .map(CollectiveParticipationView::from)
+                    .collect();
                 let body = serde_json::json!({
                     "items": views,
                     "count": views.len(),
@@ -5445,7 +5449,10 @@ impl HttpServer {
                     consent_given_by_b: false, // Other party consents independently
                     initiated_by: human_id.clone(),
                     governance_layer: None,
-                    reach: rel_seed.reach.clone().unwrap_or_else(|| "private".to_string()),
+                    reach: rel_seed
+                        .reach
+                        .clone()
+                        .unwrap_or_else(|| "private".to_string()),
                     context_json: None,
                     expires_at: None,
                 };
@@ -5544,7 +5551,8 @@ impl HttpServer {
 
             for coll_seed in &package.collectives {
                 // Ensure the collective exists (create stub if needed for seeding)
-                let _ = collectives::get_collective(&mut conn, &qahal_ctx, &coll_seed.collective_id);
+                let _ =
+                    collectives::get_collective(&mut conn, &qahal_ctx, &coll_seed.collective_id);
 
                 let participation_input = collectives::CreateParticipationInput {
                     id: None,
@@ -5644,9 +5652,8 @@ impl HttpServer {
                 ..Default::default()
             };
 
-            let rels =
-                human_relationships::list_human_relationships(&mut conn, &ctx, &query)
-                    .unwrap_or_default();
+            let rels = human_relationships::list_human_relationships(&mut conn, &ctx, &query)
+                .unwrap_or_default();
 
             rels.into_iter()
                 .map(|r| {
@@ -5670,12 +5677,9 @@ impl HttpServer {
 
         // Phase 3: Gather stewardship allocations
         let stewardship_seeds: Vec<StewardshipSeedView> = {
-            let allocs = stewardship_allocations::get_allocations_for_steward(
-                &mut conn,
-                &ctx,
-                human_id,
-            )
-            .unwrap_or_default();
+            let allocs =
+                stewardship_allocations::get_allocations_for_steward(&mut conn, &ctx, human_id)
+                    .unwrap_or_default();
 
             // Group by content_type (category) and compute aggregate ratios
             let mut category_map: std::collections::HashMap<String, (f32, String)> =
@@ -5694,18 +5698,22 @@ impl HttpServer {
                     .unwrap_or(None);
 
                 if let Some(ct) = content_type {
-                    let entry = category_map.entry(ct).or_insert((0.0, alloc.contribution_type.clone()));
+                    let entry = category_map
+                        .entry(ct)
+                        .or_insert((0.0, alloc.contribution_type.clone()));
                     entry.0 += alloc.allocation_ratio;
                 }
             }
 
             category_map
                 .into_iter()
-                .map(|(category, (ratio, contribution_type))| StewardshipSeedView {
-                    content_category: category,
-                    allocation_ratio: ratio,
-                    contribution_type: Some(contribution_type),
-                })
+                .map(
+                    |(category, (ratio, contribution_type))| StewardshipSeedView {
+                        content_category: category,
+                        allocation_ratio: ratio,
+                        contribution_type: Some(contribution_type),
+                    },
+                )
                 .collect()
         };
 

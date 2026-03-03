@@ -296,8 +296,7 @@ pub fn create_participation(
     if let Some(existing) = existing {
         // Update existing participation
         diesel::update(
-            collective_participations::table
-                .filter(collective_participations::id.eq(&existing.id)),
+            collective_participations::table.filter(collective_participations::id.eq(&existing.id)),
         )
         .set((
             collective_participations::intimacy_level.eq(&input.intimacy_level),
@@ -342,9 +341,7 @@ pub fn create_participation(
         .first(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
-        .ok_or_else(|| {
-            StorageError::Internal("Failed to retrieve created participation".into())
-        })
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve created participation".into()))
 }
 
 /// Update participation intimacy level

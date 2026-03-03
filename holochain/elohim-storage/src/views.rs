@@ -2114,8 +2114,9 @@ mod schema_version_tests {
         let mastery: CreateMasteryInputView =
             serde_json::from_value(serde_json::json!({"humanId":"h","contentId":"c"})).unwrap();
         let account_pkg: AccountPackageInputView = serde_json::from_value(
-            serde_json::json!({"identity":{"humanId":"h","displayName":"Test"}})
-        ).unwrap();
+            serde_json::json!({"identity":{"humanId":"h","displayName":"Test"}}),
+        )
+        .unwrap();
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);
