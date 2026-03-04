@@ -18,7 +18,7 @@ describe('App Routes', () => {
   });
 
   it('should have correct number of routes', () => {
-    expect(routes.length).toBe(9); // home, lamad, community, shefa, identity, doorway, auth/callback, resolve, and 404 catch-all
+    expect(routes.length).toBe(10); // home, lamad, community, shefa, identity, doorway, auth/callback, resolve, resources, and 404 catch-all
   });
 
   it('should have an auth callback route for OAuth', () => {

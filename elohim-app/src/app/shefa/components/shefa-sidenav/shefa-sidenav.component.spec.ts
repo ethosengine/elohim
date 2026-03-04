@@ -26,6 +26,7 @@ describe('ShefaSidenavComponent', () => {
           { path: 'shefa/accounts', component: StubRouteComponent },
           { path: 'shefa/transactions', component: StubRouteComponent },
           { path: 'shefa/devices', component: StubRouteComponent },
+          { path: 'shefa/resources', component: StubRouteComponent },
           { path: 'shefa/resources/property', component: StubRouteComponent },
           { path: 'shefa/resources/energy', component: StubRouteComponent },
           { path: 'shefa/resources/knowledge', component: StubRouteComponent },
@@ -81,14 +82,14 @@ describe('ShefaSidenavComponent', () => {
 
     it('should render 13 nav items total', () => {
       const items = fixture.nativeElement.querySelectorAll('.nav-item');
-      expect(items.length).toBe(13);
+      expect(items.length).toBe(14);
     });
   });
 
   describe('nav items', () => {
     it('should render Material icons for each nav item', () => {
       const icons = fixture.nativeElement.querySelectorAll('.nav-icon');
-      expect(icons.length).toBe(13);
+      expect(icons.length).toBe(14);
       expect(icons[0].textContent?.trim()).toBe('home');
     });
 
@@ -110,8 +111,8 @@ describe('ShefaSidenavComponent', () => {
 
     it('should have correct routerLink on Dashboard', () => {
       const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
-      // Dashboard is the 11th item (index 10) in Management group
-      expect(items[10].getAttribute('href')).toBe('/shefa/dashboard');
+      // Dashboard is the 12th item (index 11) in Management group
+      expect(items[11].getAttribute('href')).toBe('/shefa/dashboard');
     });
   });
 

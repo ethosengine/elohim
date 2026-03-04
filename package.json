@@ -18,6 +18,9 @@
     "overrides": {
       "libsodium-wrappers": "^0.8.2",
       "libsodium": "^0.8.2"
+    },
+    "patchedDependencies": {
+      "@angular/build@19.2.22": "patches/@angular__build@19.2.22.patch"
     }
   },
   "devDependencies": {
