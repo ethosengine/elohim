@@ -85,7 +85,15 @@ describe('AgentService', () => {
       }));
 
     it('should create anonymous agent without session service', () => {
-      const noSessionService = new AgentService(mockDataLoader, null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgentService,
+          { provide: DataLoaderService, useValue: mockDataLoader },
+          { provide: SessionHumanService, useValue: null },
+        ],
+      });
+      const noSessionService = TestBed.inject(AgentService);
 
       noSessionService.getCurrentAgent().subscribe(agent => {
         expect(agent).toBeTruthy();
@@ -140,7 +148,15 @@ describe('AgentService', () => {
     });
 
     it('should return anonymous if no session', () => {
-      const noSessionService = new AgentService(mockDataLoader, null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgentService,
+          { provide: DataLoaderService, useValue: mockDataLoader },
+          { provide: SessionHumanService, useValue: null },
+        ],
+      });
+      const noSessionService = TestBed.inject(AgentService);
       const agentId = noSessionService.getCurrentAgentId();
 
       expect(agentId).toContain('anon-');
@@ -153,7 +169,15 @@ describe('AgentService', () => {
     });
 
     it('should return false without session service', () => {
-      const noSessionService = new AgentService(mockDataLoader, null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgentService,
+          { provide: DataLoaderService, useValue: mockDataLoader },
+          { provide: SessionHumanService, useValue: null },
+        ],
+      });
+      const noSessionService = TestBed.inject(AgentService);
       expect(noSessionService.isSessionUser()).toBe(false);
     });
   });
@@ -168,7 +192,15 @@ describe('AgentService', () => {
     });
 
     it('should return visitor without session', () => {
-      const noSessionService = new AgentService(mockDataLoader, null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgentService,
+          { provide: DataLoaderService, useValue: mockDataLoader },
+          { provide: SessionHumanService, useValue: null },
+        ],
+      });
+      const noSessionService = TestBed.inject(AgentService);
       const level = noSessionService.getAccessLevel();
 
       expect(level).toBe('visitor');
@@ -186,7 +218,15 @@ describe('AgentService', () => {
     });
 
     it('should allow access without metadata', () => {
-      const noSessionService = new AgentService(mockDataLoader, null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgentService,
+          { provide: DataLoaderService, useValue: mockDataLoader },
+          { provide: SessionHumanService, useValue: null },
+        ],
+      });
+      const noSessionService = TestBed.inject(AgentService);
       const result = noSessionService.checkContentAccess();
 
       expect(result.canAccess).toBe(true);

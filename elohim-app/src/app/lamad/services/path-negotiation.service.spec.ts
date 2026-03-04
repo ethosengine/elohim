@@ -561,11 +561,16 @@ describe('PathNegotiationService', () => {
 
       sourceChainSpy.getEntriesByType.mockReturnValue([mockNegotiationEntry]);
 
-      const newService = new PathNegotiationService(
-        sourceChainSpy,
-        consentServiceSpy,
-        affinityServiceSpy
-      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          PathNegotiationService,
+          { provide: LocalSourceChainService, useValue: sourceChainSpy },
+          { provide: HumanConsentService, useValue: consentServiceSpy },
+          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+        ],
+      });
+      const newService = TestBed.inject(PathNegotiationService);
       newService.initialize();
 
       newService.negotiations$.subscribe(negotiations => {
@@ -577,11 +582,16 @@ describe('PathNegotiationService', () => {
     it('should not load negotiations when source chain not initialized', () => {
       sourceChainSpy.isInitialized.mockReturnValue(false);
 
-      const newService = new PathNegotiationService(
-        sourceChainSpy,
-        consentServiceSpy,
-        affinityServiceSpy
-      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          PathNegotiationService,
+          { provide: LocalSourceChainService, useValue: sourceChainSpy },
+          { provide: HumanConsentService, useValue: consentServiceSpy },
+          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+        ],
+      });
+      const newService = TestBed.inject(PathNegotiationService);
       newService.initialize();
 
       newService.negotiations$.subscribe(negotiations => {
@@ -623,11 +633,16 @@ describe('PathNegotiationService', () => {
 
       sourceChainSpy.getEntriesByType.mockReturnValue(mockEntries);
 
-      const newService = new PathNegotiationService(
-        sourceChainSpy,
-        consentServiceSpy,
-        affinityServiceSpy
-      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          PathNegotiationService,
+          { provide: LocalSourceChainService, useValue: sourceChainSpy },
+          { provide: HumanConsentService, useValue: consentServiceSpy },
+          { provide: AffinityTrackingService, useValue: affinityServiceSpy },
+        ],
+      });
+      const newService = TestBed.inject(PathNegotiationService);
       newService.initialize();
 
       newService.negotiations$.subscribe(negotiations => {
