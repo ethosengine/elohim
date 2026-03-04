@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 80.0% (2026-02-24)
 
@@ -73,7 +73,9 @@ export class PathExtensionService {
   // Current agent ID
   private currentAgentId = 'demo-learner';
 
-  constructor(private readonly pathService: PathService) {
+  private readonly pathService = inject(PathService);
+
+  constructor() {
     this.initializeDemoExtensions();
   }
 

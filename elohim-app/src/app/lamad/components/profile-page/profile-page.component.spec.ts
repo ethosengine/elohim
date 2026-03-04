@@ -36,10 +36,10 @@ describe('ProfilePageComponent', () => {
     });
 
     profileServiceSpy = {
-    getResumePoint: vi.fn(),
-    getPathsOverview: vi.fn(),
-    getTimeline: vi.fn(),
-  };
+      getResumePoint: vi.fn(),
+      getPathsOverview: vi.fn(),
+      getTimeline: vi.fn(),
+    };
     // Mock ProfileService methods with observables
     profileServiceSpy.getResumePoint.mockReturnValue(of(null));
     profileServiceSpy.getPathsOverview.mockReturnValue(

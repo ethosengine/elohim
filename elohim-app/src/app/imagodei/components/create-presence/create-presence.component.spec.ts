@@ -22,16 +22,16 @@ describe('CreatePresenceComponent', () => {
   beforeEach(async () => {
     // Create mocks
     mockPresenceService = {
-    createPresence: vi.fn(),
-  };
+      createPresence: vi.fn(),
+    };
 
     mockContentService = {
-    searchContent: vi.fn(),
-  };
+      searchContent: vi.fn(),
+    };
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [CreatePresenceComponent],
@@ -196,12 +196,13 @@ describe('CreatePresenceComponent', () => {
   // Cancel
   // ==========================================================================
 
-  it('should emit cancelled when onCancel is called', () => new Promise<void>(done => {
-    component.cancelled.subscribe(() => {
-      done();
-    });
-    component.onCancel();
-  }));
+  it('should emit cancelled when onCancel is called', () =>
+    new Promise<void>(done => {
+      component.cancelled.subscribe(() => {
+        done();
+      });
+      component.onCancel();
+    }));
 
   // ==========================================================================
   // New Identifier Initialization
@@ -266,20 +267,21 @@ describe('CreatePresenceComponent', () => {
       expect(identifiers[0].value).toBe('johndoe');
     });
 
-    it('should generate unique ID for each identifier', () => new Promise<void>(done => {
-      component.newIdentifier.set({ id: '', provider: 'github', value: 'user1' });
-      component.addIdentifier();
-
-      // Small delay to ensure different timestamps
-      setTimeout(() => {
-        component.newIdentifier.set({ id: '', provider: 'github', value: 'user2' });
+    it('should generate unique ID for each identifier', () =>
+      new Promise<void>(done => {
+        component.newIdentifier.set({ id: '', provider: 'github', value: 'user1' });
         component.addIdentifier();
 
-        const identifiers = component.identifiers();
-        expect(identifiers[0].id).not.toBe(identifiers[1].id);
-        done();
-      }, 10);
-    }));
+        // Small delay to ensure different timestamps
+        setTimeout(() => {
+          component.newIdentifier.set({ id: '', provider: 'github', value: 'user2' });
+          component.addIdentifier();
+
+          const identifiers = component.identifiers();
+          expect(identifiers[0].id).not.toBe(identifiers[1].id);
+          done();
+        }, 10);
+      }));
 
     it('should trim identifier value', () => {
       component.newIdentifier.set({
@@ -665,16 +667,17 @@ describe('CreatePresenceComponent', () => {
       );
     });
 
-    it('should emit created event with presence ID', () => new Promise<void>(done => {
-      component.displayName.set('John Doe');
+    it('should emit created event with presence ID', () =>
+      new Promise<void>(done => {
+        component.displayName.set('John Doe');
 
-      component.created.subscribe((presenceId: string) => {
-        expect(presenceId).toBe('presence-123');
-        done();
-      });
+        component.created.subscribe((presenceId: string) => {
+          expect(presenceId).toBe('presence-123');
+          done();
+        });
 
-      void component.onSubmit();
-    }));
+        void component.onSubmit();
+      }));
 
     it('should navigate to presence detail page', async () => {
       component.displayName.set('John Doe');

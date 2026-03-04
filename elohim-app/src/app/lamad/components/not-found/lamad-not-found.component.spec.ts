@@ -12,8 +12,8 @@ describe('LamadNotFoundComponent', () => {
 
   beforeEach(async () => {
     seoServiceSpy = {
-    updateSeo: vi.fn(),
-  };
+      updateSeo: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [LamadNotFoundComponent],

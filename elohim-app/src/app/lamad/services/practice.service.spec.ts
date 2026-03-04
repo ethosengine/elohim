@@ -128,15 +128,15 @@ describe('PracticeService', () => {
 
   beforeEach(() => {
     mockBackend = {
-    getOrCreatePracticePool: vi.fn(),
-    addPathToPool: vi.fn(),
-    refreshPracticePool: vi.fn(),
-    getPoolRecommendations: vi.fn(),
-    checkChallengeCooldown: vi.fn(),
-    startMasteryChallenge: vi.fn(),
-    submitMasteryChallenge: vi.fn(),
-    getChallengeHistory: vi.fn(),
-  };
+      getOrCreatePracticePool: vi.fn(),
+      addPathToPool: vi.fn(),
+      refreshPracticePool: vi.fn(),
+      getPoolRecommendations: vi.fn(),
+      checkChallengeCooldown: vi.fn(),
+      startMasteryChallenge: vi.fn(),
+      submitMasteryChallenge: vi.fn(),
+      getChallengeHistory: vi.fn(),
+    };
 
     // Default return values for fire-and-forget side-effect methods
     mockBackend.getPoolRecommendations.mockReturnValue(Promise.resolve(null));
@@ -344,7 +344,9 @@ describe('PracticeService', () => {
 
       it('should emit false when cooldown blocks', fakeAsync(() => {
         mockBackend.checkChallengeCooldown.mockReturnValue(
-          Promise.resolve(buildCooldown({ can_take_challenge: false, cooldown_remaining_hours: 12 }))
+          Promise.resolve(
+            buildCooldown({ can_take_challenge: false, cooldown_remaining_hours: 12 })
+          )
         );
         service.checkCooldown();
         tick();
@@ -439,9 +441,7 @@ describe('PracticeService', () => {
       ];
 
       it('should call backend with correct SubmitChallengeInput', fakeAsync(() => {
-        mockBackend.submitMasteryChallenge.mockReturnValue(
-          Promise.resolve(buildChallengeResult())
-        );
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(buildChallengeResult()));
         service.submitChallenge('challenge-1', responses, 300).subscribe();
         tick();
         expect(mockBackend.submitMasteryChallenge).toHaveBeenCalledWith({
@@ -460,9 +460,7 @@ describe('PracticeService', () => {
         await firstValueFrom(service.startChallenge(10));
         expect(service.getCurrentChallengeSync()).not.toBeNull();
 
-        mockBackend.submitMasteryChallenge.mockReturnValue(
-          Promise.resolve(buildChallengeResult())
-        );
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(buildChallengeResult()));
         await firstValueFrom(service.submitChallenge('challenge-1', responses, 300));
         expect(service.getCurrentChallengeSync()).toBeNull();
       });
@@ -470,18 +468,14 @@ describe('PracticeService', () => {
       it('should call refreshPool when pool exists and result has challenge', async () => {
         await setPoolState();
         mockBackend.refreshPracticePool.mockClear();
-        mockBackend.submitMasteryChallenge.mockReturnValue(
-          Promise.resolve(buildChallengeResult())
-        );
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(buildChallengeResult()));
         await firstValueFrom(service.submitChallenge('challenge-1', responses, 300));
         expect(mockBackend.refreshPracticePool).toHaveBeenCalled();
       });
 
       it('should NOT call refreshPool when pool is null', fakeAsync(() => {
         mockBackend.refreshPracticePool.mockClear();
-        mockBackend.submitMasteryChallenge.mockReturnValue(
-          Promise.resolve(buildChallengeResult())
-        );
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(buildChallengeResult()));
         service.submitChallenge('challenge-1', responses, 300).subscribe();
         tick();
         expect(mockBackend.refreshPracticePool).not.toHaveBeenCalled();
@@ -489,9 +483,7 @@ describe('PracticeService', () => {
 
       it('should call checkCooldown on success', fakeAsync(() => {
         mockBackend.checkChallengeCooldown.mockClear();
-        mockBackend.submitMasteryChallenge.mockReturnValue(
-          Promise.resolve(buildChallengeResult())
-        );
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(buildChallengeResult()));
         service.submitChallenge('challenge-1', responses, 300).subscribe();
         tick();
         expect(mockBackend.checkChallengeCooldown).toHaveBeenCalled();
@@ -528,9 +520,7 @@ describe('PracticeService', () => {
 
       it('should return null on backend error', async () => {
         mockBackend.submitMasteryChallenge.mockReturnValue(Promise.reject(new Error('fail')));
-        const result = await firstValueFrom(
-          service.submitChallenge('challenge-1', responses, 300)
-        );
+        const result = await firstValueFrom(service.submitChallenge('challenge-1', responses, 300));
         expect(result).toBeNull();
       });
     });

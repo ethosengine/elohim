@@ -21,7 +21,9 @@ describe('HolochainContentService', () => {
     });
 
     service = TestBed.inject(HolochainContentService);
-    clientMock = TestBed.inject(HolochainClientService) as { [K in keyof HolochainClientService]?: Mock };
+    clientMock = TestBed.inject(HolochainClientService) as {
+      [K in keyof HolochainClientService]?: Mock;
+    };
   });
 
   it('should be created', () => {

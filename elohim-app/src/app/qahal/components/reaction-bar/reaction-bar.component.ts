@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -73,7 +73,7 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
     uncomfortable: '😟',
   };
 
-  constructor(private readonly signalService: GovernanceSignalService) {}
+  private readonly signalService = inject(GovernanceSignalService);
 
   ngOnInit(): void {
     this.buildAvailableReactions();

@@ -12,11 +12,11 @@ describe('CustodianMetricsReporterService', () => {
 
   beforeEach(() => {
     const metricsSpy = {
-    getMetricsForReport: vi.fn(),
-  };
+      getMetricsForReport: vi.fn(),
+    };
     const shefaSpy = {
-    reportMetrics: vi.fn(),
-  };
+      reportMetrics: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -27,7 +27,9 @@ describe('CustodianMetricsReporterService', () => {
     });
 
     service = TestBed.inject(CustodianMetricsReporterService);
-    metricsMock = TestBed.inject(PerformanceMetricsService) as { [K in keyof PerformanceMetricsService]?: Mock };
+    metricsMock = TestBed.inject(PerformanceMetricsService) as {
+      [K in keyof PerformanceMetricsService]?: Mock;
+    };
     shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
   });
 

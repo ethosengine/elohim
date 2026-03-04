@@ -144,9 +144,14 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private popoverDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Prefetched cross-path matches, keyed by content ID. */
-  private crossPathCache = new Map<string, import('@app/elohim/services/epr-resolver.service').CrossPathMatch[]>();
+  private readonly crossPathCache = new Map<
+    string,
+    import('@app/elohim/services/epr-resolver.service').CrossPathMatch[]
+  >();
 
-  constructor(private readonly sanitizer: DomSanitizer) {
+  private readonly sanitizer = inject(DomSanitizer);
+
+  constructor() {
     // Configure marked with syntax highlighting
     this.marked = new Marked(
       markedHighlight({

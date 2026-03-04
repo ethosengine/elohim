@@ -50,22 +50,22 @@ describe('ContentService', () => {
 
   beforeEach(() => {
     mockClient = {
-    get: vi.fn(),
-    query: vi.fn(),
-    getBatch: vi.fn(),
-    fetch: vi.fn(),
-    supportsOffline: vi.fn(),
-    backpressure: vi.fn(),
-  };
+      get: vi.fn(),
+      query: vi.fn(),
+      getBatch: vi.fn(),
+      fetch: vi.fn(),
+      supportsOffline: vi.fn(),
+      backpressure: vi.fn(),
+    };
 
     mockStorageClient = {
-    getBlobUrl: vi.fn(),
-  };
+      getBlobUrl: vi.fn(),
+    };
     mockStorageClient.getBlobUrl.mockImplementation((hash: string) => `/blob/${hash}`);
 
     const mockHeliaFetch = {
-    fetchVerified: vi.fn(),
-  };
+      fetchVerified: vi.fn(),
+    };
     mockHeliaFetch.fetchVerified.mockImplementation((cid: string) => {
       if (cid.includes('failblob')) {
         return Promise.reject(new Error('Blob not found'));
@@ -74,10 +74,14 @@ describe('ContentService', () => {
     });
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), ContentService,
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        ContentService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
-        { provide: HeliaFetchService, useValue: mockHeliaFetch },],
+        { provide: HeliaFetchService, useValue: mockHeliaFetch },
+      ],
     });
 
     service = TestBed.inject(ContentService);

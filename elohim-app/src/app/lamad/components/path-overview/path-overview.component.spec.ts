@@ -148,26 +148,26 @@ describe('PathOverviewComponent', () => {
     localStorage.clear();
 
     const pathServiceSpy = {
-    getPath: vi.fn(),
-    getAccessibleSteps: vi.fn(),
-    getAccessCheckResults: vi.fn(),
-    getPathCompletionByContent: vi.fn(),
-    getChapterSummariesWithContent: vi.fn(),
-    getAllStepsMetadata: vi.fn(),
-    getConceptProgressForPath: vi.fn(),
-    getChapterFirstStep: vi.fn(),
-  };
+      getPath: vi.fn(),
+      getAccessibleSteps: vi.fn(),
+      getAccessCheckResults: vi.fn(),
+      getPathCompletionByContent: vi.fn(),
+      getChapterSummariesWithContent: vi.fn(),
+      getAllStepsMetadata: vi.fn(),
+      getConceptProgressForPath: vi.fn(),
+      getChapterFirstStep: vi.fn(),
+    };
     const agentServiceSpy = {
-    getProgressForPath: vi.fn(),
-  };
+      getProgressForPath: vi.fn(),
+    };
     const seoServiceSpy = {
-    updateForPath: vi.fn(),
-    updateSeo: vi.fn(),
-    setTitle: vi.fn(),
-  };
+      updateForPath: vi.fn(),
+      updateSeo: vi.fn(),
+      setTitle: vi.fn(),
+    };
     const contentMasteryServiceSpy = {
-    getMasteryLevelSync: vi.fn(),
-  };
+      getMasteryLevelSync: vi.fn(),
+    };
     contentMasteryServiceSpy.getMasteryLevelSync.mockReturnValue('not_started');
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path' });
@@ -195,12 +195,16 @@ describe('PathOverviewComponent', () => {
     pathService.getPath.mockReturnValue(of(mockPath));
     agentService.getProgressForPath.mockReturnValue(of(mockProgress));
     pathService.getAccessibleSteps.mockReturnValue(of(mockAccessibleSteps));
-    pathService.getAccessCheckResults.mockReturnValue(of(new Map<number, any>([
-      [0, { accessible: true, accessType: 'sequential' }],
-      [1, { accessible: true, accessType: 'sequential' }],
-      [2, { accessible: true, accessType: 'sequential' }],
-      [3, { accessible: false }],
-    ])));
+    pathService.getAccessCheckResults.mockReturnValue(
+      of(
+        new Map<number, any>([
+          [0, { accessible: true, accessType: 'sequential' }],
+          [1, { accessible: true, accessType: 'sequential' }],
+          [2, { accessible: true, accessType: 'sequential' }],
+          [3, { accessible: false }],
+        ])
+      )
+    );
     pathService.getPathCompletionByContent.mockReturnValue(of(mockCompletion));
     pathService.getChapterSummariesWithContent.mockReturnValue(of([]));
     pathService.getAllStepsMetadata.mockReturnValue(of(mockStepsMetadata));

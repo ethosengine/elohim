@@ -18,10 +18,10 @@ describe('EprResolverService', () => {
 
   beforeEach(() => {
     storageSpy = {
-    getBlobUrl: vi.fn(),
-    getStorageBaseUrl: vi.fn(),
-    getContent: vi.fn(),
-  };
+      getBlobUrl: vi.fn(),
+      getStorageBaseUrl: vi.fn(),
+      getContent: vi.fn(),
+    };
     storageSpy.getStorageBaseUrl.mockReturnValue('https://doorway.host');
     storageSpy.getBlobUrl.mockImplementation((hash: string) => `https://doorway.host/blob/${hash}`);
 
@@ -39,7 +39,9 @@ describe('EprResolverService', () => {
 
   describe('isContentAddress', () => {
     it('recognizes CIDv1 base32', () => {
-      expect(isContentAddress('bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')).toBe(true);
+      expect(isContentAddress('bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')).toBe(
+        true
+      );
     });
 
     it('recognizes CIDv0 base58', () => {
@@ -47,15 +49,21 @@ describe('EprResolverService', () => {
     });
 
     it('recognizes sha256-{hex}', () => {
-      expect(isContentAddress('sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
+      expect(
+        isContentAddress('sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
+      ).toBe(true);
     });
 
     it('recognizes sha256:{hex}', () => {
-      expect(isContentAddress('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
+      expect(
+        isContentAddress('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
+      ).toBe(true);
     });
 
     it('recognizes raw 64-char hex', () => {
-      expect(isContentAddress('abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
+      expect(
+        isContentAddress('abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
+      ).toBe(true);
     });
 
     it('rejects empty string', () => {
@@ -134,20 +142,26 @@ describe('EprResolverService', () => {
     });
 
     it('resolves to cross-path when matches provided', () => {
-      const crossMatches: CrossPathMatch[] = [
-        { pathId: 'other-path', stepIndex: 3 },
-      ];
-      const result = service.resolveInContext('epr:unknown-content', 'my-path', steps, crossMatches);
+      const crossMatches: CrossPathMatch[] = [{ pathId: 'other-path', stepIndex: 3 }];
+      const result = service.resolveInContext(
+        'epr:unknown-content',
+        'my-path',
+        steps,
+        crossMatches
+      );
       expect(result.resolution).toBe('cross-path');
       expect(result.crossPath).toEqual({ pathId: 'other-path', stepIndex: 3 });
       expect(result.route).toEqual(['/lamad/path', 'other-path', 'step', '3']);
     });
 
     it('prefers in-path over cross-path', () => {
-      const crossMatches: CrossPathMatch[] = [
-        { pathId: 'other-path', stepIndex: 5 },
-      ];
-      const result = service.resolveInContext('epr:rea-foundations', 'my-path', steps, crossMatches);
+      const crossMatches: CrossPathMatch[] = [{ pathId: 'other-path', stepIndex: 5 }];
+      const result = service.resolveInContext(
+        'epr:rea-foundations',
+        'my-path',
+        steps,
+        crossMatches
+      );
       expect(result.resolution).toBe('in-path');
       expect(result.stepIndex).toBe(1);
     });

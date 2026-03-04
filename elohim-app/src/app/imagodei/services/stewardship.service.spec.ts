@@ -18,8 +18,8 @@ describe('StewardshipService', () => {
   beforeEach(() => {
     // Create mock for HolochainClientService
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [StewardshipService, { provide: HolochainClientService, useValue: mockHolochain }],

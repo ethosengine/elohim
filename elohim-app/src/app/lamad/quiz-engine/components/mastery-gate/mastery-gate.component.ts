@@ -10,6 +10,7 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
 // @coverage: 88.6% (2026-02-24)
@@ -471,11 +472,9 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly adaptationService: PathAdaptationService,
-    private readonly cooldownService: AttemptCooldownService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly adaptationService = inject(PathAdaptationService);
+  private readonly cooldownService = inject(AttemptCooldownService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadGateStatus();

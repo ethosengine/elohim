@@ -1197,11 +1197,7 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should notify all callbacks for each change', () => {
-      const callbacks = [
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-      ];
+      const callbacks = [vi.fn(), vi.fn(), vi.fn()];
 
       callbacks.forEach(cb => service.onQueueChanged(cb));
 

@@ -399,7 +399,11 @@ describe('RecoveryInterviewComponent', () => {
 
       await component.submitAttestation();
 
-      expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith('affirm', 85, 'Strong match');
+      expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith(
+        'affirm',
+        85,
+        'Strong match'
+      );
     });
 
     it('should reset state and return to queue on success', async () => {
@@ -619,8 +623,22 @@ describe('RecoveryInterviewComponent', () => {
 
     it('should round progress percentage', () => {
       component.questions.set([
-        { id: 'q1', type: 'network-history', question: '1', difficulty: 1, points: 10, verifiable: true },
-        { id: 'q2', type: 'relationship', question: '2', difficulty: 1, points: 10, verifiable: true },
+        {
+          id: 'q1',
+          type: 'network-history',
+          question: '1',
+          difficulty: 1,
+          points: 10,
+          verifiable: true,
+        },
+        {
+          id: 'q2',
+          type: 'relationship',
+          question: '2',
+          difficulty: 1,
+          points: 10,
+          verifiable: true,
+        },
         { id: 'q3', type: 'content', question: '3', difficulty: 1, points: 10, verifiable: true },
       ]);
       component.currentQuestionIndex.set(2);

@@ -71,22 +71,22 @@ describe('GraphExplorerComponent', () => {
 
   beforeEach(async () => {
     const affinityServiceSpy = {
-    getAffinity: vi.fn(),
-  };
+      getAffinity: vi.fn(),
+    };
     const hierarchicalGraphSpy = {
-    initializeFromPath: vi.fn(),
-    expandCluster: vi.fn(),
-    collapseCluster: vi.fn(),
-    isExpanded: vi.fn(),
-    getVisibleNodes: vi.fn(),
-    getVisibleEdges: vi.fn(),
-    reset: vi.fn(),
-  };
+      initializeFromPath: vi.fn(),
+      expandCluster: vi.fn(),
+      collapseCluster: vi.fn(),
+      isExpanded: vi.fn(),
+      getVisibleNodes: vi.fn(),
+      getVisibleEdges: vi.fn(),
+      reset: vi.fn(),
+    };
     const dataLoaderSpy = {
-    getGraph: vi.fn(),
-    getPath: vi.fn(),
-    getPathHierarchy: vi.fn(),
-  };
+      getGraph: vi.fn(),
+      getPath: vi.fn(),
+      getPathHierarchy: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [GraphExplorerComponent, RouterTestingModule],
@@ -97,13 +97,15 @@ describe('GraphExplorerComponent', () => {
       ],
     }).compileComponents();
 
-    affinityService = TestBed.inject(
-      AffinityTrackingService
-    ) as { [K in keyof AffinityTrackingService]?: Mock };
-    hierarchicalGraphService = TestBed.inject(
-      HierarchicalGraphService
-    ) as { [K in keyof HierarchicalGraphService]?: Mock };
-    dataLoaderService = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    affinityService = TestBed.inject(AffinityTrackingService) as {
+      [K in keyof AffinityTrackingService]?: Mock;
+    };
+    hierarchicalGraphService = TestBed.inject(HierarchicalGraphService) as {
+      [K in keyof HierarchicalGraphService]?: Mock;
+    };
+    dataLoaderService = TestBed.inject(DataLoaderService) as {
+      [K in keyof DataLoaderService]?: Mock;
+    };
 
     affinityService.getAffinity.mockReturnValue(0);
     hierarchicalGraphService.initializeFromPath.mockReturnValue(of(mockGraphData));
@@ -643,7 +645,11 @@ describe('GraphExplorerComponent', () => {
       expect((component as any).getEdgeStrokeWidth({ type: 'NEXT' })).toBe(3);
       expect((component as any).getEdgeStrokeWidth({ type: 'OTHER', isAggregated: false })).toBe(2);
       expect(
-        (component as any).getEdgeStrokeWidth({ type: 'OTHER', isAggregated: true, connectionCount: 5 })
+        (component as any).getEdgeStrokeWidth({
+          type: 'OTHER',
+          isAggregated: true,
+          connectionCount: 5,
+        })
       ).toBe(5);
       expect(
         (component as any).getEdgeStrokeWidth({

@@ -31,15 +31,15 @@ describe('HomeComponent', () => {
     }
 
     mockConfigService = {
-    getConfig: vi.fn(),
-  };
+      getConfig: vi.fn(),
+    };
     mockAnalyticsService = {
-    trackEvent: vi.fn(),
-  };
+      trackEvent: vi.fn(),
+    };
     mockDomInteractionService = {
-    setupScrollIndicator: vi.fn(),
-    setupHeroTitleAnimation: vi.fn(),
-  };
+      setupScrollIndicator: vi.fn(),
+      setupHeroTitleAnimation: vi.fn(),
+    };
 
     mockConfigService.getConfig.mockReturnValue(
       of({

@@ -2,11 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
 import { ElohimBackendCatalog, MockBackend } from './elohim-backend';
 
-import type {
-  ElohimAgent,
-  ElohimRequest,
-  ElohimResponse,
-} from '../models/elohim-agent.model';
+import type { ElohimAgent, ElohimRequest, ElohimResponse } from '../models/elohim-agent.model';
 import type { ElohimBackend } from './elohim-backend';
 import { type Mock, vi } from 'vitest';
 
@@ -25,9 +21,7 @@ describe('MockBackend', () => {
     updatedAt: new Date().toISOString(),
   };
 
-  const buildRequest = (
-    overrides: Partial<ElohimRequest> = {},
-  ): ElohimRequest => ({
+  const buildRequest = (overrides: Partial<ElohimRequest> = {}): ElohimRequest => ({
     requestId: 'req-test-1',
     targetElohimId: 'elohim-1',
     capability: 'content-safety-review',
@@ -173,7 +167,11 @@ describe('MockBackend', () => {
 
     expect(response!.status).toBe('fulfilled');
     expect(response!.payload).toBeDefined();
-    const payload = response!.payload as { type: string; pathId: string; overallAssessment: string };
+    const payload = response!.payload as {
+      type: string;
+      pathId: string;
+      overallAssessment: string;
+    };
     expect(payload.type).toBe('path-analysis');
     expect(payload.pathId).toBe('know-thyself');
     expect(payload.overallAssessment).toBeTruthy();
@@ -211,12 +209,14 @@ describe('MockBackend', () => {
 describe('ElohimBackendCatalog', () => {
   let catalog: ElohimBackendCatalog;
 
-  const createMockBackend = (
-    overrides: Partial<ElohimBackend> = {},
-  ): any => {
-    const spy = { isAvailable: vi.fn(), invoke: vi.fn(), id: overrides.id ?? 'test-backend',
+  const createMockBackend = (overrides: Partial<ElohimBackend> = {}): any => {
+    const spy = {
+      isAvailable: vi.fn(),
+      invoke: vi.fn(),
+      id: overrides.id ?? 'test-backend',
       name: overrides.name ?? 'Test Backend',
-      type: overrides.type ?? 'mock', };
+      type: overrides.type ?? 'mock',
+    };
     spy.isAvailable.mockReturnValue(Promise.resolve(overrides.isAvailable?.() ?? true));
     return spy;
   };

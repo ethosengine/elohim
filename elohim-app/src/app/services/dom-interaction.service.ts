@@ -1,4 +1,4 @@
-import { Injectable, ElementRef, Renderer2, RendererFactory2 } from '@angular/core';
+import { ElementRef, Injectable, Renderer2, RendererFactory2, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -11,8 +11,10 @@ import { Injectable, ElementRef, Renderer2, RendererFactory2 } from '@angular/co
 export class DomInteractionService {
   private readonly renderer: Renderer2;
 
-  constructor(rendererFactory: RendererFactory2) {
-    this.renderer = rendererFactory.createRenderer(null, null);
+  private readonly rendererFactory = inject(RendererFactory2);
+
+  constructor() {
+    this.renderer = this.rendererFactory.createRenderer(null, null);
   }
 
   /**

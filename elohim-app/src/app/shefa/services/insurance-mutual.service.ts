@@ -17,7 +17,7 @@
 
 /* eslint-disable @typescript-eslint/require-await -- Phase 1: most methods are TODO stubs returning Promise<T> without async work */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 33.6% (2026-02-24)
 
@@ -72,7 +72,7 @@ const EVENT_TYPE_CLAIM_FILED = 'claim-filed';
   providedIn: 'root',
 })
 export class InsuranceMutualService {
-  constructor(private readonly economicService: EconomicService) {}
+  private readonly economicService = inject(EconomicService);
 
   // ============================================================================
   // MEMBER ENROLLMENT & RISK ASSESSMENT

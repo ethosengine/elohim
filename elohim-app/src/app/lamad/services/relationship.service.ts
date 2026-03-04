@@ -9,7 +9,7 @@
  * Uses StorageApiService for HTTP communication with elohim-storage.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -25,7 +25,7 @@ import { CreateRelationshipInput } from '@app/lamad/models/content-node.model';
   providedIn: 'root',
 })
 export class RelationshipService {
-  constructor(private readonly storageApi: StorageApiService) {}
+  private readonly storageApi = inject(StorageApiService);
 
   /**
    * Get all relationships for a content node (as source).

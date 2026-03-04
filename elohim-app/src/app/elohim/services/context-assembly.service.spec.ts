@@ -183,27 +183,27 @@ describe('ContextAssemblyService', () => {
 
   beforeEach(() => {
     mockAgentService = {
-    getCurrentAgentId: vi.fn(),
-    getAttestations: vi.fn(),
-    getLearningAnalytics: vi.fn(),
-  };
+      getCurrentAgentId: vi.fn(),
+      getAttestations: vi.fn(),
+      getLearningAnalytics: vi.fn(),
+    };
     mockAgentService.getCurrentAgentId.mockReturnValue('agent-test-1');
     mockAgentService.getAttestations.mockReturnValue(['author-verified']);
     mockAgentService.getLearningAnalytics.mockReturnValue(of(buildAnalytics()));
 
     mockElohimAgentService = {
-    invoke: vi.fn(),
-    selectElohim: vi.fn(),
-  };
+      invoke: vi.fn(),
+      selectElohim: vi.fn(),
+    };
     mockElohimAgentService.invoke.mockReturnValue(of(buildFulfilledResponse()));
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     mockElohimAgentService.selectElohim.mockReturnValue(of(buildElohimAgent()) as any);
 
     mockGovernanceService = {
-    getConstitutionalPrecedents: vi.fn(),
-    getActiveProposals: vi.fn(),
-    getGovernanceSummary: vi.fn(),
-  };
+      getConstitutionalPrecedents: vi.fn(),
+      getActiveProposals: vi.fn(),
+      getGovernanceSummary: vi.fn(),
+    };
     mockGovernanceService.getConstitutionalPrecedents.mockReturnValue(
       of([buildPrecedent('p-1', 'Human dignity'), buildPrecedent('p-2', 'Knowledge access')])
     );
@@ -215,14 +215,14 @@ describe('ContextAssemblyService', () => {
     );
 
     mockDataLoader = {
-    getContent: vi.fn(),
-  };
+      getContent: vi.fn(),
+    };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     mockDataLoader.getContent.mockReturnValue(of(buildParentContent()) as any);
 
     mockRelatedConcepts = {
-    getRelatedConcepts: vi.fn(),
-  };
+      getRelatedConcepts: vi.fn(),
+    };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     mockRelatedConcepts.getRelatedConcepts.mockReturnValue(of(buildRelatedConceptsResult()) as any);
 
@@ -233,8 +233,8 @@ describe('ContextAssemblyService', () => {
     };
 
     mockSessionHumanService = {
-    getActivityHistory: vi.fn(),
-  };
+      getActivityHistory: vi.fn(),
+    };
     mockSessionHumanService.getActivityHistory.mockReturnValue([buildActivity()]);
 
     TestBed.configureTestingModule({

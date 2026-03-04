@@ -18,7 +18,7 @@
  * Where rates are from infrastructure-token pricing model (TBD in Unyt swimlane spec).
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 79.4% (2026-02-24)
 
@@ -96,11 +96,9 @@ export class ComputeEventService {
   // Track emission to avoid duplicates
   private lastEmissionTime = Date.now();
 
-  constructor(
-    private readonly holochain: HolochainClientService,
-    private readonly economicService: EconomicService,
-    private readonly shefaCompute: ShefaComputeService
-  ) {}
+  private readonly holochain = inject(HolochainClientService);
+  private readonly economicService = inject(EconomicService);
+  private readonly shefaCompute = inject(ShefaComputeService);
 
   /**
    * Initialize event emission for an operator

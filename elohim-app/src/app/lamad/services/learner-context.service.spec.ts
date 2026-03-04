@@ -33,15 +33,15 @@ describe('LearnerContextService', () => {
     });
 
     service = TestBed.inject(LearnerContextService);
-    contentMasterySpy = TestBed.inject(
-      ContentMasteryService
-    ) as { [K in keyof ContentMasteryService]?: Mock };
-    pathAdaptationSpy = TestBed.inject(
-      PathAdaptationService
-    ) as { [K in keyof PathAdaptationService]?: Mock };
-    discoveryAttestationSpy = TestBed.inject(
-      DiscoveryAttestationService
-    ) as { [K in keyof DiscoveryAttestationService]?: Mock };
+    contentMasterySpy = TestBed.inject(ContentMasteryService) as {
+      [K in keyof ContentMasteryService]?: Mock;
+    };
+    pathAdaptationSpy = TestBed.inject(PathAdaptationService) as {
+      [K in keyof PathAdaptationService]?: Mock;
+    };
+    discoveryAttestationSpy = TestBed.inject(DiscoveryAttestationService) as {
+      [K in keyof DiscoveryAttestationService]?: Mock;
+    };
 
     // Defaults
     contentMasterySpy.getMasteryLevelSync.mockReturnValue('not_started');

@@ -142,11 +142,9 @@ function createMockPointsService(balance: LearnerPointBalance | null = null) {
   return {
     getBalance$: vi.fn().mockReturnValue(balanceSubject.asObservable()),
     loadHistory: vi.fn().mockReturnValue(of([])),
-    getPointsByTriggerSync: vi.fn().mockReturnValue(
-      balance
-        ? JSON.parse(balance.points_by_trigger_json)
-        : {}
-    ),
+    getPointsByTriggerSync: vi
+      .fn()
+      .mockReturnValue(balance ? JSON.parse(balance.points_by_trigger_json) : {}),
     getRecentPointsEarned: vi.fn().mockReturnValue(25),
     refreshBalance: vi.fn(),
     _balanceSubject: balanceSubject,
@@ -214,7 +212,7 @@ describe('DeviceStewardshipComponent', () => {
 
   function setupTestBed(
     agencyStage: IdentityState['agencyStage'] = 'visitor',
-    balance: LearnerPointBalance | null = null,
+    balance: LearnerPointBalance | null = null
   ) {
     mockService = createMockDeviceStewardshipService();
     mockIdentityService = createMockIdentityService(agencyStage);
@@ -563,8 +561,8 @@ describe('DeviceStewardshipComponent', () => {
     it('should render node steward section', () => {
       fixture.detectChanges();
       const headers = fixture.nativeElement.querySelectorAll('.section-header h2');
-      const infraHeader = Array.from(headers as NodeListOf<HTMLElement>).find(
-        h => h.textContent?.includes('Infrastructure Nodes'),
+      const infraHeader = Array.from(headers as NodeListOf<HTMLElement>).find(h =>
+        h.textContent?.includes('Infrastructure Nodes')
       );
       expect(infraHeader).toBeTruthy();
     });
@@ -604,7 +602,7 @@ describe('DeviceStewardshipComponent', () => {
     it('should display location when available', () => {
       fixture.detectChanges();
       const locationValue = fixture.nativeElement.querySelector(
-        '.device-grid .device-card .detail-value',
+        '.device-grid .device-card .detail-value'
       );
       expect(locationValue.textContent).toContain('Home Office');
     });

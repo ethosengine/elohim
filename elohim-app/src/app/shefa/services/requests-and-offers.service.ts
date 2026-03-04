@@ -23,7 +23,7 @@
 
 /* eslint-disable @typescript-eslint/require-await -- Phase 1: query/lookup stubs return Promise<T> without async work */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 59.7% (2026-02-24)
 
@@ -64,7 +64,7 @@ const NOT_YET_IMPLEMENTED = 'Not yet implemented';
   providedIn: 'root',
 })
 export class RequestsAndOffersService {
-  constructor(private readonly economicService: EconomicService) {}
+  private readonly economicService = inject(EconomicService);
 
   // ============================================================================
   // REQUEST MANAGEMENT

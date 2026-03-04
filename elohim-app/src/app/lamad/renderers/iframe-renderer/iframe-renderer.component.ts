@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 // @coverage: 80.7% (2026-02-24)
@@ -78,7 +78,7 @@ export class IframeRendererComponent implements OnChanges {
   fallbackUrl: string | null = null;
   // Note: sandbox is static in template due to Angular security restrictions (NG0910)
 
-  constructor(private readonly sanitizer: DomSanitizer) {}
+  private readonly sanitizer = inject(DomSanitizer);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['node'] && this.node) {

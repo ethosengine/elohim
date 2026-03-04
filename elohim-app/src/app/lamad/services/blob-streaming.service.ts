@@ -12,7 +12,7 @@
  */
 
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 47.9% (2026-02-24)
 
@@ -157,10 +157,8 @@ export class BlobStreamingService {
   /** Maximum history entries to keep */
   private readonly maxHistorySize = 20;
 
-  constructor(
-    private readonly http: HttpClient,
-    private readonly doorway: DoorwayClientService
-  ) {}
+  private readonly http = inject(HttpClient);
+  private readonly doorway = inject(DoorwayClientService);
 
   /**
    * Get download performance history for diagnostics.

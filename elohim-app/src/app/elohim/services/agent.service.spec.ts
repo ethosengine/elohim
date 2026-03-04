@@ -19,40 +19,41 @@ describe('AgentService', () => {
 
   beforeEach(() => {
     mockDataLoader = {
-    getAgentProgress: vi.fn(),
-    saveAgentProgress: vi.fn(),
-    getLocalProgress: vi.fn(),
-  };
+      getAgentProgress: vi.fn(),
+      saveAgentProgress: vi.fn(),
+      getLocalProgress: vi.fn(),
+    };
 
     mockSessionService = {
-    getSessionId: vi.fn(),
-    getAccessLevel: vi.fn(),
-    checkContentAccess: vi.fn(),
-    recordPathStarted: vi.fn(),
-    recordStepCompleted: vi.fn(),
-    recordNotesSaved: vi.fn(),
-  };
+      getSessionId: vi.fn(),
+      getAccessLevel: vi.fn(),
+      checkContentAccess: vi.fn(),
+      recordPathStarted: vi.fn(),
+      recordStepCompleted: vi.fn(),
+      recordNotesSaved: vi.fn(),
+    };
 
     Object.defineProperty(mockSessionService, 'session$', {
-      get: () => of({
-        sessionId: 'test-session-123',
-        displayName: 'Test User',
-        createdAt: new Date().toISOString(),
-        lastActiveAt: new Date().toISOString(),
-        stats: {
-          nodesViewed: 0,
-          nodesWithAffinity: 0,
-          pathsStarted: 0,
-          pathsCompleted: 0,
-          stepsCompleted: 0,
-          totalSessionTime: 0,
-          averageSessionLength: 0,
-          sessionCount: 1,
-        },
-        isAnonymous: true,
-        accessLevel: 'visitor' as const,
-        sessionState: 'active' as const,
-      }),
+      get: () =>
+        of({
+          sessionId: 'test-session-123',
+          displayName: 'Test User',
+          createdAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+          stats: {
+            nodesViewed: 0,
+            nodesWithAffinity: 0,
+            pathsStarted: 0,
+            pathsCompleted: 0,
+            stepsCompleted: 0,
+            totalSessionTime: 0,
+            averageSessionLength: 0,
+            sessionCount: 1,
+          },
+          isAnonymous: true,
+          accessLevel: 'visitor' as const,
+          sessionState: 'active' as const,
+        }),
     });
 
     TestBed.configureTestingModule({
@@ -71,16 +72,17 @@ describe('AgentService', () => {
       expect(service).toBeTruthy();
     });
 
-    it('should create agent from session', () => new Promise<void>(done => {
-      service.agent$.subscribe(agent => {
-        if (agent) {
-          expect(agent.id).toBe('test-session-123');
-          expect(agent.displayName).toBe('Test User');
-          expect(agent.type).toBe('human');
-          done();
-        }
-      });
-    }));
+    it('should create agent from session', () =>
+      new Promise<void>(done => {
+        service.agent$.subscribe(agent => {
+          if (agent) {
+            expect(agent.id).toBe('test-session-123');
+            expect(agent.displayName).toBe('Test User');
+            expect(agent.type).toBe('human');
+            done();
+          }
+        });
+      }));
 
     it('should create anonymous agent without session service', () => {
       const noSessionService = new AgentService(mockDataLoader, null);
@@ -94,27 +96,29 @@ describe('AgentService', () => {
   });
 
   describe('getCurrentAgent', () => {
-    it('should return current agent as observable', () => new Promise<void>(done => {
-      service.getCurrentAgent().subscribe(agent => {
-        expect(agent).toBeTruthy();
-        expect(agent?.id).toBe('test-session-123');
-        done();
-      });
-    }));
-
-    it('should emit only once (take 1)', () => new Promise<void>(done => {
-      let emissionCount = 0;
-
-      service.getCurrentAgent().subscribe({
-        next: () => {
-          emissionCount++;
-        },
-        complete: () => {
-          expect(emissionCount).toBe(1);
+    it('should return current agent as observable', () =>
+      new Promise<void>(done => {
+        service.getCurrentAgent().subscribe(agent => {
+          expect(agent).toBeTruthy();
+          expect(agent?.id).toBe('test-session-123');
           done();
-        },
-      });
-    }));
+        });
+      }));
+
+    it('should emit only once (take 1)', () =>
+      new Promise<void>(done => {
+        let emissionCount = 0;
+
+        service.getCurrentAgent().subscribe({
+          next: () => {
+            emissionCount++;
+          },
+          complete: () => {
+            expect(emissionCount).toBe(1);
+            done();
+          },
+        });
+      }));
   });
 
   describe('getAgent (deprecated)', () => {
@@ -190,32 +194,57 @@ describe('AgentService', () => {
   });
 
   describe('getProgressForPath', () => {
-    it('should return cached progress', () => new Promise<void>(done => {
-      const mockProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'test-path',
-        currentStepIndex: 2,
-        completedStepIndices: [0, 1],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should return cached progress', () =>
+      new Promise<void>(done => {
+        const mockProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'test-path',
+          currentStepIndex: 2,
+          completedStepIndices: [0, 1],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(mockProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(mockProgress);
 
-      service.getProgressForPath('test-path').subscribe(progress => {
-        expect(progress).toEqual(mockProgress);
-        done();
-      });
-    }));
+        service.getProgressForPath('test-path').subscribe(progress => {
+          expect(progress).toEqual(mockProgress);
+          done();
+        });
+      }));
 
-    it('should fall back to DataLoader if not in localStorage', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(
-        of({
+    it('should fall back to DataLoader if not in localStorage', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(
+          of({
+            agentId: 'test-session-123',
+            pathId: 'test-path',
+            currentStepIndex: 0,
+            completedStepIndices: [],
+            startedAt: new Date().toISOString(),
+            lastActivityAt: new Date().toISOString(),
+            stepAffinity: {},
+            stepNotes: {},
+            reflectionResponses: {},
+            attestationsEarned: [],
+          })
+        );
+
+        service.getProgressForPath('test-path').subscribe(progress => {
+          expect(progress).toBeTruthy();
+          expect(mockDataLoader.getAgentProgress).toHaveBeenCalled();
+          done();
+        });
+      }));
+
+    it('should cache progress after loading', () =>
+      new Promise<void>(done => {
+        const progress: AgentProgress = {
           agentId: 'test-session-123',
           pathId: 'test-path',
           currentStepIndex: 0,
@@ -225,64 +254,43 @@ describe('AgentService', () => {
           stepAffinity: {},
           stepNotes: {},
           reflectionResponses: {},
-          attestationsEarned: [],
-        })
-      );
+          attestationsEarned: ['att-1'],
+        };
 
-      service.getProgressForPath('test-path').subscribe(progress => {
-        expect(progress).toBeTruthy();
-        expect(mockDataLoader.getAgentProgress).toHaveBeenCalled();
-        done();
-      });
-    }));
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(progress));
 
-    it('should cache progress after loading', () => new Promise<void>(done => {
-      const progress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'test-path',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: ['att-1'],
-      };
+        service.getProgressForPath('test-path').subscribe(() => {
+          // Second call should use cache
+          service.getProgressForPath('test-path').subscribe(cached => {
+            expect(cached).toEqual(progress);
+            done();
+          });
+        });
+      }));
 
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(progress));
+    it('should track attestations from progress', () =>
+      new Promise<void>(done => {
+        const progress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'test-path',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: ['mastery-javascript'],
+        };
 
-      service.getProgressForPath('test-path').subscribe(() => {
-        // Second call should use cache
-        service.getProgressForPath('test-path').subscribe(cached => {
-          expect(cached).toEqual(progress);
+        mockDataLoader.getLocalProgress.mockReturnValue(progress);
+
+        service.getProgressForPath('test-path').subscribe(() => {
+          expect(service.hasAttestation('mastery-javascript')).toBe(true);
           done();
         });
-      });
-    }));
-
-    it('should track attestations from progress', () => new Promise<void>(done => {
-      const progress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'test-path',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: ['mastery-javascript'],
-      };
-
-      mockDataLoader.getLocalProgress.mockReturnValue(progress);
-
-      service.getProgressForPath('test-path').subscribe(() => {
-        expect(service.hasAttestation('mastery-javascript')).toBe(true);
-        done();
-      });
-    }));
+      }));
   });
 
   describe('completeStep', () => {
@@ -291,115 +299,122 @@ describe('AgentService', () => {
       mockSessionService.getSessionId.mockReturnValue('test-session-123');
     });
 
-    it('should complete a step', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should complete a step', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.completeStep('path-1', 0).subscribe(() => {
-        expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0).subscribe(() => {
+          expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
+          done();
+        });
+      }));
 
-    it('should add step to completedStepIndices', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should add step to completedStepIndices', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.completeStep('path-1', 0).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.completedStepIndices).toContain(0);
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.completedStepIndices).toContain(0);
+          done();
+        });
+      }));
 
-    it('should not duplicate completed steps', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 1,
-        completedStepIndices: [0],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should not duplicate completed steps', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 1,
+          completedStepIndices: [0],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.completeStep('path-1', 0).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.completedStepIndices).toEqual([0]);
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.completedStepIndices).toEqual([0]);
+          done();
+        });
+      }));
 
-    it('should advance currentStepIndex', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should advance currentStepIndex', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.completeStep('path-1', 0).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.currentStepIndex).toBe(1);
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.currentStepIndex).toBe(1);
+          done();
+        });
+      }));
 
-    it('should record path started for new paths', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should record path started for new paths', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.completeStep('new-path', 0).subscribe(() => {
-        expect(mockSessionService.recordPathStarted).toHaveBeenCalledWith('new-path');
-        done();
-      });
-    }));
+        service.completeStep('new-path', 0).subscribe(() => {
+          expect(mockSessionService.recordPathStarted).toHaveBeenCalledWith('new-path');
+          done();
+        });
+      }));
 
-    it('should record step completed in session', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should record step completed in session', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.completeStep('path-1', 0).subscribe(() => {
-        expect(mockSessionService.recordStepCompleted).toHaveBeenCalledWith('path-1', 0);
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0).subscribe(() => {
+          expect(mockSessionService.recordStepCompleted).toHaveBeenCalledWith('path-1', 0);
+          done();
+        });
+      }));
 
-    it('should track content completion when resourceId provided', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should track content completion when resourceId provided', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.completeStep('path-1', 0, 'content-123').subscribe(() => {
-        // Should trigger content completion tracking
-        expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.completeStep('path-1', 0, 'content-123').subscribe(() => {
+          // Should trigger content completion tracking
+          expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('updateAffinity', () => {
@@ -407,84 +422,88 @@ describe('AgentService', () => {
       mockDataLoader.saveAgentProgress.mockReturnValue(of(undefined));
     });
 
-    it('should update step affinity', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: { 0: 0.5 },
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should update step affinity', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: { 0: 0.5 },
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.updateAffinity('path-1', 0, 0.2).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.stepAffinity[0]).toBe(0.7);
-        done();
-      });
-    }));
+        service.updateAffinity('path-1', 0, 0.2).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.stepAffinity[0]).toBe(0.7);
+          done();
+        });
+      }));
 
-    it('should clamp affinity to 0.0-1.0 range', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: { 0: 0.9 },
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should clamp affinity to 0.0-1.0 range', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: { 0: 0.9 },
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.updateAffinity('path-1', 0, 0.5).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.stepAffinity[0]).toBe(1.0);
-        done();
-      });
-    }));
+        service.updateAffinity('path-1', 0, 0.5).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.stepAffinity[0]).toBe(1.0);
+          done();
+        });
+      }));
 
-    it('should clamp negative affinity to 0', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: { 0: 0.1 },
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should clamp negative affinity to 0', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: { 0: 0.1 },
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      service.updateAffinity('path-1', 0, -0.5).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.stepAffinity[0]).toBe(0);
-        done();
-      });
-    }));
+        service.updateAffinity('path-1', 0, -0.5).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.stepAffinity[0]).toBe(0);
+          done();
+        });
+      }));
 
-    it('should return early if no existing progress', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should return early if no existing progress', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.updateAffinity('path-1', 0, 0.5).subscribe(() => {
-        expect(mockDataLoader.saveAgentProgress).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.updateAffinity('path-1', 0, 0.5).subscribe(() => {
+          expect(mockDataLoader.saveAgentProgress).not.toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('saveStepNotes', () => {
@@ -493,38 +512,41 @@ describe('AgentService', () => {
       mockSessionService.getSessionId.mockReturnValue('test-session-123');
     });
 
-    it('should save notes for a step', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should save notes for a step', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.saveStepNotes('path-1', 0, 'My notes').subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.stepNotes[0]).toBe('My notes');
-        done();
-      });
-    }));
+        service.saveStepNotes('path-1', 0, 'My notes').subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.stepNotes[0]).toBe('My notes');
+          done();
+        });
+      }));
 
-    it('should record notes saved in session', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should record notes saved in session', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.saveStepNotes('path-1', 0, 'Notes').subscribe(() => {
-        expect(mockSessionService.recordNotesSaved).toHaveBeenCalledWith('path-1', 0);
-        done();
-      });
-    }));
+        service.saveStepNotes('path-1', 0, 'Notes').subscribe(() => {
+          expect(mockSessionService.recordNotesSaved).toHaveBeenCalledWith('path-1', 0);
+          done();
+        });
+      }));
 
-    it('should create progress if none exists', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should create progress if none exists', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.saveStepNotes('new-path', 0, 'First note').subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.pathId).toBe('new-path');
-        expect(savedProgress.stepNotes[0]).toBe('First note');
-        done();
-      });
-    }));
+        service.saveStepNotes('new-path', 0, 'First note').subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.pathId).toBe('new-path');
+          expect(savedProgress.stepNotes[0]).toBe('First note');
+          done();
+        });
+      }));
   });
 
   describe('saveReflectionResponses', () => {
@@ -532,39 +554,41 @@ describe('AgentService', () => {
       mockDataLoader.saveAgentProgress.mockReturnValue(of(undefined));
     });
 
-    it('should save reflection responses', () => new Promise<void>(done => {
-      const existingProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: 'path-1',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+    it('should save reflection responses', () =>
+      new Promise<void>(done => {
+        const existingProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: 'path-1',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
+        mockDataLoader.getLocalProgress.mockReturnValue(existingProgress);
 
-      const responses = ['Answer 1', 'Answer 2'];
-      service.saveReflectionResponses('path-1', 0, responses).subscribe(() => {
-        const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(savedProgress.reflectionResponses[0]).toEqual(responses);
-        done();
-      });
-    }));
+        const responses = ['Answer 1', 'Answer 2'];
+        service.saveReflectionResponses('path-1', 0, responses).subscribe(() => {
+          const savedProgress = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(savedProgress.reflectionResponses[0]).toEqual(responses);
+          done();
+        });
+      }));
 
-    it('should return early if no existing progress', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should return early if no existing progress', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.saveReflectionResponses('path-1', 0, ['answer']).subscribe(() => {
-        expect(mockDataLoader.saveAgentProgress).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.saveReflectionResponses('path-1', 0, ['answer']).subscribe(() => {
+          expect(mockDataLoader.saveAgentProgress).not.toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('attestations', () => {
@@ -601,100 +625,105 @@ describe('AgentService', () => {
       mockSessionService.getSessionId.mockReturnValue('test-session-123');
     });
 
-    it('should track content completion globally', () => new Promise<void>(done => {
-      service.completeContentNode('content-123').subscribe(() => {
-        expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should track content completion globally', () =>
+      new Promise<void>(done => {
+        service.completeContentNode('content-123').subscribe(() => {
+          expect(mockDataLoader.saveAgentProgress).toHaveBeenCalled();
+          done();
+        });
+      }));
 
-    it('should not duplicate completed content IDs', () => new Promise<void>(done => {
-      const globalProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: '__global__',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-        completedContentIds: ['content-123'],
-      };
+    it('should not duplicate completed content IDs', () =>
+      new Promise<void>(done => {
+        const globalProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: ['content-123'],
+        };
 
-      mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
-        return pathId === '__global__' ? globalProgress : null;
-      });
+        mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
+          return pathId === '__global__' ? globalProgress : null;
+        });
 
-      service.completeContentNode('content-123').subscribe(() => {
-        const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(saved.completedContentIds).toEqual(['content-123']);
-        done();
-      });
-    }));
+        service.completeContentNode('content-123').subscribe(() => {
+          const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(saved.completedContentIds).toEqual(['content-123']);
+          done();
+        });
+      }));
 
-    it('should check if content is completed', () => new Promise<void>(done => {
-      const globalProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: '__global__',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-        completedContentIds: ['content-123'],
-      };
+    it('should check if content is completed', () =>
+      new Promise<void>(done => {
+        const globalProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: ['content-123'],
+        };
 
-      mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
-        return pathId === '__global__' ? globalProgress : null;
-      });
+        mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
+          return pathId === '__global__' ? globalProgress : null;
+        });
 
-      service.isContentCompleted('content-123').subscribe(isCompleted => {
-        expect(isCompleted).toBe(true);
-        done();
-      });
-    }));
+        service.isContentCompleted('content-123').subscribe(isCompleted => {
+          expect(isCompleted).toBe(true);
+          done();
+        });
+      }));
 
-    it('should return false for non-completed content', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should return false for non-completed content', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.isContentCompleted('missing-content').subscribe(isCompleted => {
-        expect(isCompleted).toBe(false);
-        done();
-      });
-    }));
+        service.isContentCompleted('missing-content').subscribe(isCompleted => {
+          expect(isCompleted).toBe(false);
+          done();
+        });
+      }));
 
-    it('should get completed content IDs as Set', () => new Promise<void>(done => {
-      const globalProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: '__global__',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-        completedContentIds: ['c1', 'c2', 'c3'],
-      };
+    it('should get completed content IDs as Set', () =>
+      new Promise<void>(done => {
+        const globalProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: ['c1', 'c2', 'c3'],
+        };
 
-      mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
-        return pathId === '__global__' ? globalProgress : null;
-      });
+        mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
+          return pathId === '__global__' ? globalProgress : null;
+        });
 
-      service.getCompletedContentIds().subscribe(ids => {
-        expect(ids).toBeInstanceOf(Set);
-        expect(ids.size).toBe(3);
-        expect(ids.has('c1')).toBe(true);
-        done();
-      });
-    }));
+        service.getCompletedContentIds().subscribe(ids => {
+          expect(ids).toBeInstanceOf(Set);
+          expect(ids.size).toBe(3);
+          expect(ids.has('c1')).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('mastery tracking', () => {
@@ -703,149 +732,162 @@ describe('AgentService', () => {
       mockSessionService.getSessionId.mockReturnValue('test-session-123');
     });
 
-    it('should get mastery level for content', () => new Promise<void>(done => {
-      const globalProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: '__global__',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-        contentMastery: { 'content-123': 'understand' },
-      };
+    it('should get mastery level for content', () =>
+      new Promise<void>(done => {
+        const globalProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          contentMastery: { 'content-123': 'understand' },
+        };
 
-      mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
-        return pathId === '__global__' ? globalProgress : null;
-      });
+        mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
+          return pathId === '__global__' ? globalProgress : null;
+        });
 
-      service.getContentMastery('content-123').subscribe(mastery => {
-        expect(mastery).toBe('understand');
-        done();
-      });
-    }));
+        service.getContentMastery('content-123').subscribe(mastery => {
+          expect(mastery).toBe('understand');
+          done();
+        });
+      }));
 
-    it('should return not_started for unmapped content', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should return not_started for unmapped content', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.getContentMastery('new-content').subscribe(mastery => {
-        expect(mastery).toBe('not_started');
-        done();
-      });
-    }));
+        service.getContentMastery('new-content').subscribe(mastery => {
+          expect(mastery).toBe('not_started');
+          done();
+        });
+      }));
 
-    it('should update content mastery level', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should update content mastery level', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.updateContentMastery('content-123', 'remember').subscribe(() => {
-        const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(saved.contentMastery?.['content-123']).toBe('remember');
-        done();
-      });
-    }));
+        service.updateContentMastery('content-123', 'remember').subscribe(() => {
+          const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(saved.contentMastery?.['content-123']).toBe('remember');
+          done();
+        });
+      }));
 
-    it('should only increase mastery level (ratchet)', () => new Promise<void>(done => {
-      const globalProgress: AgentProgress = {
-        agentId: 'test-session-123',
-        pathId: '__global__',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-        contentMastery: { 'content-123': 'apply' },
-      };
+    it('should only increase mastery level (ratchet)', () =>
+      new Promise<void>(done => {
+        const globalProgress: AgentProgress = {
+          agentId: 'test-session-123',
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          contentMastery: { 'content-123': 'apply' },
+        };
 
-      mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
-        return pathId === '__global__' ? globalProgress : null;
-      });
+        mockDataLoader.getLocalProgress.mockImplementation((agentId: string, pathId: string) => {
+          return pathId === '__global__' ? globalProgress : null;
+        });
 
-      // Try to downgrade mastery
-      service.updateContentMastery('content-123', 'understand').subscribe(() => {
-        const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        // Should remain at 'apply' (higher level)
-        expect(saved.contentMastery?.['content-123']).toBe('apply');
-        done();
-      });
-    }));
+        // Try to downgrade mastery
+        service.updateContentMastery('content-123', 'understand').subscribe(() => {
+          const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          // Should remain at 'apply' (higher level)
+          expect(saved.contentMastery?.['content-123']).toBe('apply');
+          done();
+        });
+      }));
 
-    it('should mark as completed when mastery reaches apply', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should mark as completed when mastery reaches apply', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.updateContentMastery('content-123', 'apply').subscribe(() => {
-        const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(saved.completedContentIds).toContain('content-123');
-        done();
-      });
-    }));
+        service.updateContentMastery('content-123', 'apply').subscribe(() => {
+          const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(saved.completedContentIds).toContain('content-123');
+          done();
+        });
+      }));
 
-    it('should provide convenience method for marking content as seen', () => new Promise<void>(done => {
-      mockDataLoader.getLocalProgress.mockReturnValue(null);
-      mockDataLoader.getAgentProgress.mockReturnValue(of(null));
+    it('should provide convenience method for marking content as seen', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getLocalProgress.mockReturnValue(null);
+        mockDataLoader.getAgentProgress.mockReturnValue(of(null));
 
-      service.markContentSeen('content-123').subscribe(() => {
-        const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
-        expect(saved.contentMastery?.['content-123']).toBe('seen');
-        done();
-      });
-    }));
+        service.markContentSeen('content-123').subscribe(() => {
+          const saved = mockDataLoader.saveAgentProgress.mock.lastCall[0];
+          expect(saved.contentMastery?.['content-123']).toBe('seen');
+          done();
+        });
+      }));
   });
 
   describe('getAgentProgress', () => {
-    it('should return all progress records from localStorage', () => new Promise<void>(done => {
-      // Ensure mock returns correct session ID
-      mockSessionService.getSessionId.mockReturnValue('test-session-123');
+    it('should return all progress records from localStorage', () =>
+      new Promise<void>(done => {
+        // Ensure mock returns correct session ID
+        mockSessionService.getSessionId.mockReturnValue('test-session-123');
 
-      // Mock localStorage with actual data
-      const progressData1 = {
-        agentId: 'test-session-123',
-        pathId: 'path1',
-        currentStepIndex: 1,
-        completedStepIndices: [0],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+        // Mock localStorage with actual data
+        const progressData1 = {
+          agentId: 'test-session-123',
+          pathId: 'path1',
+          currentStepIndex: 1,
+          completedStepIndices: [0],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      const progressData2 = {
-        agentId: 'test-session-123',
-        pathId: 'path2',
-        currentStepIndex: 0,
-        completedStepIndices: [],
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        stepAffinity: {},
-        stepNotes: {},
-        reflectionResponses: {},
-        attestationsEarned: [],
-      };
+        const progressData2 = {
+          agentId: 'test-session-123',
+          pathId: 'path2',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+        };
 
-      // Actually set items in localStorage for this test
-      localStorage.setItem('lamad-progress-test-session-123-path1', JSON.stringify(progressData1));
-      localStorage.setItem('lamad-progress-test-session-123-path2', JSON.stringify(progressData2));
+        // Actually set items in localStorage for this test
+        localStorage.setItem(
+          'lamad-progress-test-session-123-path1',
+          JSON.stringify(progressData1)
+        );
+        localStorage.setItem(
+          'lamad-progress-test-session-123-path2',
+          JSON.stringify(progressData2)
+        );
 
-      service.getAgentProgress().subscribe(progress => {
-        expect(progress.length).toBeGreaterThanOrEqual(2);
+        service.getAgentProgress().subscribe(progress => {
+          expect(progress.length).toBeGreaterThanOrEqual(2);
 
-        // Clean up
-        localStorage.removeItem('lamad-progress-test-session-123-path1');
-        localStorage.removeItem('lamad-progress-test-session-123-path2');
+          // Clean up
+          localStorage.removeItem('lamad-progress-test-session-123-path1');
+          localStorage.removeItem('lamad-progress-test-session-123-path2');
 
-        done();
-      });
-    }));
+          done();
+        });
+      }));
   });
 
   describe('clearProgressCache', () => {

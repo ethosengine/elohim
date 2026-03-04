@@ -186,10 +186,7 @@ describe('ConnectionStrategyProvider', () => {
   describe('provideConnectionStrategySSR', () => {
     it('should use doorway strategy on server platform', () => {
       TestBed.configureTestingModule({
-        providers: [
-          provideConnectionStrategySSR(),
-          { provide: PLATFORM_ID, useValue: 'server' },
-        ],
+        providers: [provideConnectionStrategySSR(), { provide: PLATFORM_ID, useValue: 'server' }],
       });
 
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
@@ -199,10 +196,7 @@ describe('ConnectionStrategyProvider', () => {
 
     it('should use environment config on browser platform', () => {
       TestBed.configureTestingModule({
-        providers: [
-          provideConnectionStrategySSR(),
-          { provide: PLATFORM_ID, useValue: 'browser' },
-        ],
+        providers: [provideConnectionStrategySSR(), { provide: PLATFORM_ID, useValue: 'browser' }],
       });
 
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
@@ -239,10 +233,7 @@ describe('ConnectionStrategyProvider', () => {
 
       try {
         TestBed.configureTestingModule({
-          providers: [
-            provideConnectionStrategySSR(),
-            { provide: PLATFORM_ID, useValue: 'server' },
-          ],
+          providers: [provideConnectionStrategySSR(), { provide: PLATFORM_ID, useValue: 'server' }],
         });
 
         const strategy = TestBed.inject(CONNECTION_STRATEGY);
@@ -278,7 +269,7 @@ describe('ConnectionStrategyProvider', () => {
         'getSigningCredentials',
       ];
 
-      requiredMethods.forEach((method) => {
+      requiredMethods.forEach(method => {
         expect(typeof (strategy as any)[method]).toBe('function');
       });
     });
@@ -404,7 +395,7 @@ describe('ConnectionStrategyProvider', () => {
       expect(sources.length).toBeGreaterThan(0);
 
       // Each source should have required properties
-      sources.forEach((source) => {
+      sources.forEach(source => {
         expect(source.id).toBeDefined();
         expect(source.tier).toBeDefined();
         expect(source.priority).toBeDefined();
@@ -505,7 +496,7 @@ describe('ConnectionStrategyProvider', () => {
       expect(Array.isArray(sources)).toBe(true);
 
       // Direct mode should skip Projection tier
-      const projectionSources = sources.filter((s) => s.tier === SourceTier.Projection);
+      const projectionSources = sources.filter(s => s.tier === SourceTier.Projection);
       expect(projectionSources.length).toBe(0);
     });
 

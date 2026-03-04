@@ -45,8 +45,8 @@ describe('OpinionClusterComponent', () => {
 
   beforeEach(async () => {
     mockSignalService = {
-    computeOpinionClusters: vi.fn(),
-  };
+      computeOpinionClusters: vi.fn(),
+    };
     mockSignalService.computeOpinionClusters.mockReturnValue(of(mockClusters));
 
     await TestBed.configureTestingModule({

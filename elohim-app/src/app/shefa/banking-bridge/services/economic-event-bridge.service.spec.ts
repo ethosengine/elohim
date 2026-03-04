@@ -10,7 +10,12 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { EconomicEventBridgeService, EconomicEventPayload, CommitResult, BatchCommitResult } from './economic-event-bridge.service';
+import {
+  EconomicEventBridgeService,
+  EconomicEventPayload,
+  CommitResult,
+  BatchCommitResult,
+} from './economic-event-bridge.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { bankingStore, StagedTransactionLocal } from '../stores/banking-store';
 import { vi } from 'vitest';
@@ -21,13 +26,13 @@ describe('EconomicEventBridgeService', () => {
 
   beforeEach(() => {
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
         EconomicEventBridgeService,
-        { provide: HolochainClientService, useValue: mockHolochain }
+        { provide: HolochainClientService, useValue: mockHolochain },
       ],
     });
     service = TestBed.inject(EconomicEventBridgeService);
@@ -51,10 +56,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'action-hash-123'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'action-hash-123',
+        })
+      );
 
       const result = await service.commitStagedTransaction('staged-1');
 
@@ -63,7 +70,7 @@ describe('EconomicEventBridgeService', () => {
       expect(mockHolochain.callZome).toHaveBeenCalledWith(
         expect.objectContaining({
           zomeName: 'content_store',
-          fnName: 'create_economic_event'
+          fnName: 'create_economic_event',
         })
       );
     });
@@ -88,7 +95,12 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should handle already committed transactions', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', 100, 'existing-event-id');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        100,
+        'existing-event-id'
+      );
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
 
       const result = await service.commitStagedTransaction('staged-1');
@@ -101,10 +113,12 @@ describe('EconomicEventBridgeService', () => {
       const mockStaged = createMockStagedTransaction('staged-1', 'approved', 100);
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: false,
-        error: 'DHT error'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: false,
+          error: 'DHT error',
+        })
+      );
 
       const result = await service.commitStagedTransaction('staged-1');
 
@@ -126,10 +140,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       const saveSpy = vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'action-hash-abc'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'action-hash-abc',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -145,14 +161,22 @@ describe('EconomicEventBridgeService', () => {
 
   describe('transaction transformation', () => {
     it('should transform debit transaction to consume action', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', -50, undefined, 'debit');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        -50,
+        undefined,
+        'debit'
+      );
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       const result = await service.commitStagedTransaction('staged-1');
 
@@ -163,14 +187,22 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should transform credit transaction to produce action', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', 500, undefined, 'credit');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        500,
+        undefined,
+        'credit'
+      );
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -179,14 +211,22 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should transform transfer transaction correctly', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', 200, undefined, 'transfer');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        200,
+        undefined,
+        'transfer'
+      );
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -199,10 +239,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -211,16 +253,24 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should set provider and receiver based on transaction type', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', -50, undefined, 'debit');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        -50,
+        undefined,
+        'debit'
+      );
       mockStaged.stewardId = 'steward-123';
       mockStaged.merchantName = 'Store ABC';
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -230,15 +280,23 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should include resource classifications', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', -50, undefined, 'debit');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        -50,
+        undefined,
+        'debit'
+      );
       mockStaged.category = 'Groceries';
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -249,16 +307,24 @@ describe('EconomicEventBridgeService', () => {
     });
 
     it('should preserve metadata with Plaid provenance', async () => {
-      const mockStaged = createMockStagedTransaction('staged-1', 'approved', -50, undefined, 'debit');
+      const mockStaged = createMockStagedTransaction(
+        'staged-1',
+        'approved',
+        -50,
+        undefined,
+        'debit'
+      );
       mockStaged.plaidTransactionId = 'plaid-tx-123';
       mockStaged.plaidAccountId = 'plaid-acct-456';
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -273,10 +339,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitStagedTransaction('staged-1');
 
@@ -305,7 +373,7 @@ describe('EconomicEventBridgeService', () => {
         errorTransactions: 0,
         stagedTransactionIds: [],
         aiCategorizationEnabled: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
       const stagedTxs = [
         createMockStagedTransaction('staged-1', 'approved', 100),
@@ -320,10 +388,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
       vi.spyOn(bankingStore, 'saveBatch').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       const result = await service.commitBatch('batch-1');
 
@@ -356,7 +426,7 @@ describe('EconomicEventBridgeService', () => {
         errorTransactions: 0,
         stagedTransactionIds: [],
         aiCategorizationEnabled: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
       const stagedTxs = [
         createMockStagedTransaction('staged-1', 'approved', 100),
@@ -371,10 +441,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
       vi.spyOn(bankingStore, 'saveBatch').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       const result = await service.commitBatch('batch-1');
 
@@ -397,7 +469,7 @@ describe('EconomicEventBridgeService', () => {
         errorTransactions: 0,
         stagedTransactionIds: [],
         aiCategorizationEnabled: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
       const stagedTxs = [
         createMockStagedTransaction('staged-1', 'approved', 100),
@@ -440,11 +512,9 @@ describe('EconomicEventBridgeService', () => {
         errorTransactions: 0,
         stagedTransactionIds: [],
         aiCategorizationEnabled: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
-      const stagedTxs = [
-        createMockStagedTransaction('staged-1', 'approved', 100),
-      ];
+      const stagedTxs = [createMockStagedTransaction('staged-1', 'approved', 100)];
 
       vi.spyOn(bankingStore, 'getBatch').mockReturnValue(Promise.resolve(mockBatch));
       vi.spyOn(bankingStore, 'getStagedByBatch').mockReturnValue(Promise.resolve(stagedTxs));
@@ -452,10 +522,12 @@ describe('EconomicEventBridgeService', () => {
       vi.spyOn(bankingStore, 'saveStaged').mockReturnValue(Promise.resolve());
       const saveBatchSpy = vi.spyOn(bankingStore, 'saveBatch').mockReturnValue(Promise.resolve());
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: 'hash'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: 'hash',
+        })
+      );
 
       await service.commitBatch('batch-1');
 
@@ -475,10 +547,12 @@ describe('EconomicEventBridgeService', () => {
       const mockStaged = createMockStagedTransaction('staged-1', 'approved', 100, 'event-123');
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: { id: 'event-123', action: 'consume' }
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: { id: 'event-123', action: 'consume' },
+        })
+      );
 
       const result = await service.getCommittedEvent('staged-1');
 
@@ -500,10 +574,12 @@ describe('EconomicEventBridgeService', () => {
       const mockStaged = createMockStagedTransaction('staged-1', 'approved', 100, 'event-123');
       vi.spyOn(bankingStore, 'getStaged').mockReturnValue(Promise.resolve(mockStaged));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: false,
-        error: 'Not found'
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: false,
+          error: 'Not found',
+        })
+      );
 
       const result = await service.getCommittedEvent('staged-1');
 
@@ -536,10 +612,12 @@ describe('EconomicEventBridgeService', () => {
     it('should return false if not committed locally', async () => {
       vi.spyOn(bankingStore, 'checkDuplicate').mockReturnValue(Promise.resolve(undefined));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: false,
-        data: null
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: false,
+          data: null,
+        })
+      );
 
       const result = await service.isAlreadyCommitted('plaid-tx-123');
 
@@ -549,10 +627,12 @@ describe('EconomicEventBridgeService', () => {
     it('should check Holochain if not found locally', async () => {
       vi.spyOn(bankingStore, 'checkDuplicate').mockReturnValue(Promise.resolve(undefined));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: { id: 'event-123' }
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: { id: 'event-123' },
+        })
+      );
 
       const result = await service.isAlreadyCommitted('plaid-tx-123');
 
@@ -563,10 +643,12 @@ describe('EconomicEventBridgeService', () => {
     it('should query with correct event ID format', async () => {
       vi.spyOn(bankingStore, 'checkDuplicate').mockReturnValue(Promise.resolve(undefined));
 
-      mockHolochain.callZome.mockReturnValue(Promise.resolve({
-        success: true,
-        data: null
-      }));
+      mockHolochain.callZome.mockReturnValue(
+        Promise.resolve({
+          success: true,
+          data: null,
+        })
+      );
 
       await service.isAlreadyCommitted('plaid-tx-abc123');
 
@@ -594,7 +676,7 @@ function createMockStagedTransaction(
     type,
     amount: {
       value: Math.abs(amount),
-      unit: 'USD'
+      unit: 'USD',
     },
     timestamp: new Date().toISOString(),
     description: 'Test transaction',
@@ -609,6 +691,6 @@ function createMockStagedTransaction(
     merchantName: 'Test Merchant',
     plaidRawData: {},
     isDuplicate: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 }

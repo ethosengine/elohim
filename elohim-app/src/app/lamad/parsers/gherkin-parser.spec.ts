@@ -14,7 +14,11 @@ describe('GherkinParser', () => {
     When I enter valid credentials
     Then I should be logged in`;
 
-        const result = GherkinParser.parseFeature(content, 'features/login.feature', 'authentication');
+        const result = GherkinParser.parseFeature(
+          content,
+          'features/login.feature',
+          'authentication'
+        );
 
         expect(result.feature).toBeDefined();
         expect(result.feature.title).toBe('User Login');
@@ -95,7 +99,11 @@ Feature: Tagged Feature
     When an action
     Then verify result`;
 
-        const result = GherkinParser.parseFeature(content, 'features/scenario-tags.feature', 'test');
+        const result = GherkinParser.parseFeature(
+          content,
+          'features/scenario-tags.feature',
+          'test'
+        );
 
         expect(result.scenarios[0].tags).toContain('critical');
         expect(result.scenarios[0].tags).toContain('fast');
@@ -167,7 +175,11 @@ Feature: Epic tagged feature
     When an action
     Then a result`;
 
-        const result = GherkinParser.parseFeature(content, 'features/no-background.feature', 'test');
+        const result = GherkinParser.parseFeature(
+          content,
+          'features/no-background.feature',
+          'test'
+        );
 
         expect(result.feature.background).toBeUndefined();
       });
@@ -260,7 +272,11 @@ Feature: Epic tagged feature
         expect(result.scenarios.length).toBe(1);
         expect(result.scenarios[0].scenarioType).toBe('scenario_outline');
         expect(result.scenarios[0].examples).toBeDefined();
-        expect(result.scenarios[0].examples?.[0].headers).toEqual(['username', 'password', 'result']);
+        expect(result.scenarios[0].examples?.[0].headers).toEqual([
+          'username',
+          'password',
+          'result',
+        ]);
         expect(result.scenarios[0].examples?.[0].rows.length).toBe(3);
       });
 
@@ -272,7 +288,11 @@ Feature: Epic tagged feature
     When action occurs
     Then verify result`;
 
-        const result = GherkinParser.parseFeature(content, 'features/incomplete-outline.feature', 'test');
+        const result = GherkinParser.parseFeature(
+          content,
+          'features/incomplete-outline.feature',
+          'test'
+        );
 
         expect(result.scenarios[0].scenarioType).toBe('scenario_outline');
         expect(result.scenarios[0].examples).toBeUndefined();
@@ -473,7 +493,11 @@ Feature: Authentication feature
 
   Scenario: Empty scenario`;
 
-        const result = GherkinParser.parseFeature(content, 'features/empty-scenario.feature', 'test');
+        const result = GherkinParser.parseFeature(
+          content,
+          'features/empty-scenario.feature',
+          'test'
+        );
 
         expect(result.scenarios.length).toBe(1);
         expect(result.scenarios[0].steps.length).toBe(0);
@@ -496,7 +520,11 @@ Feature: Authentication feature
 
       it('should handle mixed line endings', () => {
         // Normalize line endings to \n before parsing
-        const content = "Feature: Mixed endings\r\n\r\n  Scenario: Test\r\n    Given a step\r\n    When action\n    Then result".replace(/\r\n/g, '\n');
+        const content =
+          'Feature: Mixed endings\r\n\r\n  Scenario: Test\r\n    Given a step\r\n    When action\n    Then result'.replace(
+            /\r\n/g,
+            '\n'
+          );
 
         const result = GherkinParser.parseFeature(content, 'features/mixed.feature', 'test');
 

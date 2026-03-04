@@ -16,7 +16,7 @@
  * - Types imported from lamad/models
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -56,7 +56,7 @@ const ZOME_NAME = 'content_store';
   providedIn: 'root',
 })
 export class LearnerBackendService {
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   // ===========================================================================
   // Connection Status

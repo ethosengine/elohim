@@ -41,7 +41,13 @@ describe('BlobManagerService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), BlobManagerService, BlobVerificationService, BlobFallbackService],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        BlobManagerService,
+        BlobVerificationService,
+        BlobFallbackService,
+      ],
     });
     service = TestBed.inject(BlobManagerService);
     verificationService = TestBed.inject(BlobVerificationService);
@@ -88,9 +94,9 @@ describe('BlobManagerService', () => {
   });
 
   it('should have connectionMode getter', () => {
-    expect(typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(service), 'connectionMode')?.get).toBe(
-      'function'
-    );
+    expect(
+      typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(service), 'connectionMode')?.get
+    ).toBe('function');
   });
 
   it('should have getPriorityUrls method', () => {
@@ -272,10 +278,7 @@ describe('BlobManagerService', () => {
 
     it('should get priority URLs with strategy URL first', () => {
       const contentBlob = createMockContentBlob();
-      contentBlob.fallbackUrls = [
-        'https://example.com/blob.mp4',
-        'https://fallback.com/blob.mp4',
-      ];
+      contentBlob.fallbackUrls = ['https://example.com/blob.mp4', 'https://fallback.com/blob.mp4'];
 
       vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
         getBlobUrl: vi.fn().mockReturnValue('https://strategy.host/blob'),
@@ -566,53 +569,58 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Holochain Metadata Retrieval', () => {
-    it('should retrieve blobs for content', () => new Promise<void>(done => {
-      const contentId = 'content_123';
+    it('should retrieve blobs for content', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
 
-      service.getBlobsForContent(contentId).subscribe(blobs => {
-        expect(Array.isArray(blobs)).toBe(true);
-        done();
-      });
-    }));
+        service.getBlobsForContent(contentId).subscribe(blobs => {
+          expect(Array.isArray(blobs)).toBe(true);
+          done();
+        });
+      }));
 
-    it('should return empty array on metadata retrieval error', () => new Promise<void>(done => {
-      const contentId = 'content_nonexistent';
+    it('should return empty array on metadata retrieval error', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_nonexistent';
 
-      service.getBlobsForContent(contentId).subscribe(blobs => {
-        expect(blobs).toEqual([]);
-        done();
-      });
-    }));
+        service.getBlobsForContent(contentId).subscribe(blobs => {
+          expect(blobs).toEqual([]);
+          done();
+        });
+      }));
 
-    it('should retrieve specific blob metadata by hash', () => new Promise<void>(done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
+    it('should retrieve specific blob metadata by hash', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
+        const blobHash = 'test_hash_123';
 
-      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
-        expect(metadata === null || metadata instanceof Object).toBe(true);
-        done();
-      });
-    }));
+        service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+          expect(metadata === null || metadata instanceof Object).toBe(true);
+          done();
+        });
+      }));
 
-    it('should check if blob exists in DHT', () => new Promise<void>(done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
+    it('should check if blob exists in DHT', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
+        const blobHash = 'test_hash_123';
 
-      service.blobExists(contentId, blobHash).subscribe(exists => {
-        expect(typeof exists).toBe('boolean');
-        done();
-      });
-    }));
+        service.blobExists(contentId, blobHash).subscribe(exists => {
+          expect(typeof exists).toBe('boolean');
+          done();
+        });
+      }));
 
-    it('should retrieve blobs for multiple content nodes', () => new Promise<void>(done => {
-      const contentIds = ['content_1', 'content_2', 'content_3'];
+    it('should retrieve blobs for multiple content nodes', () =>
+      new Promise<void>(done => {
+        const contentIds = ['content_1', 'content_2', 'content_3'];
 
-      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
-        expect(blobMap instanceof Map).toBe(true);
-        expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
-        done();
-      });
-    }));
+        service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
+          expect(blobMap instanceof Map).toBe(true);
+          expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
+          done();
+        });
+      }));
 
     it('should transform BlobMetadataOutput to ContentBlob', () => {
       const metadata: BlobMetadataOutput = {
@@ -662,55 +670,58 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Cached Blob Download', () => {
-    it('should report 100% progress when cached', () => new Promise<void>(done => {
-      const contentBlob = createMockContentBlob();
-      const progressUpdates: BlobDownloadProgress[] = [];
+    it('should report 100% progress when cached', () =>
+      new Promise<void>(done => {
+        const contentBlob = createMockContentBlob();
+        const progressUpdates: BlobDownloadProgress[] = [];
 
-      const progressCallback = (progress: BlobDownloadProgress) => {
-        progressUpdates.push(progress);
-      };
+        const progressCallback = (progress: BlobDownloadProgress) => {
+          progressUpdates.push(progress);
+        };
 
-      // Pre-cache the blob
-      const testBlob = new Blob(['cached data']);
-      service['blobCache'].set(contentBlob.hash, testBlob);
+        // Pre-cache the blob
+        const testBlob = new Blob(['cached data']);
+        service['blobCache'].set(contentBlob.hash, testBlob);
 
-      service.downloadBlob(contentBlob, progressCallback).subscribe(result => {
-        expect(result.wasCached).toBe(true);
-        expect(progressUpdates.length).toBeGreaterThan(0);
-        expect(progressUpdates[0].percentComplete).toBe(100);
-        done();
-      });
-    }));
+        service.downloadBlob(contentBlob, progressCallback).subscribe(result => {
+          expect(result.wasCached).toBe(true);
+          expect(progressUpdates.length).toBeGreaterThan(0);
+          expect(progressUpdates[0].percentComplete).toBe(100);
+          done();
+        });
+      }));
 
-    it('should return cached blob result with wasCached flag true', () => new Promise<void>(done => {
-      const contentBlob = createMockContentBlob();
-      const testBlob = new Blob(['cached']);
-      service['blobCache'].set(contentBlob.hash, testBlob);
+    it('should return cached blob result with wasCached flag true', () =>
+      new Promise<void>(done => {
+        const contentBlob = createMockContentBlob();
+        const testBlob = new Blob(['cached']);
+        service['blobCache'].set(contentBlob.hash, testBlob);
 
-      service.downloadBlob(contentBlob).subscribe(result => {
-        expect(result.wasCached).toBe(true);
-        expect(result.blob).toBe(testBlob);
-        expect(result.totalDurationMs).toBe(0);
-        expect(result.fetch.successUrl).toBe('(cached)');
-        done();
-      });
-    }));
+        service.downloadBlob(contentBlob).subscribe(result => {
+          expect(result.wasCached).toBe(true);
+          expect(result.blob).toBe(testBlob);
+          expect(result.totalDurationMs).toBe(0);
+          expect(result.fetch.successUrl).toBe('(cached)');
+          done();
+        });
+      }));
 
-    it('downloadBlob should return BlobDownloadResult with all required properties', () => new Promise<void>(done => {
-      const contentBlob = createMockContentBlob();
-      const testBlob = new Blob(['cached']);
-      service['blobCache'].set(contentBlob.hash, testBlob);
+    it('downloadBlob should return BlobDownloadResult with all required properties', () =>
+      new Promise<void>(done => {
+        const contentBlob = createMockContentBlob();
+        const testBlob = new Blob(['cached']);
+        service['blobCache'].set(contentBlob.hash, testBlob);
 
-      service.downloadBlob(contentBlob).subscribe(result => {
-        expect(result.blob).toBeDefined();
-        expect(result.metadata).toBeDefined();
-        expect(result.verification).toBeDefined();
-        expect(result.fetch).toBeDefined();
-        expect(typeof result.totalDurationMs).toBe('number');
-        expect(typeof result.wasCached).toBe('boolean');
-        done();
-      });
-    }));
+        service.downloadBlob(contentBlob).subscribe(result => {
+          expect(result.blob).toBeDefined();
+          expect(result.metadata).toBeDefined();
+          expect(result.verification).toBeDefined();
+          expect(result.fetch).toBeDefined();
+          expect(typeof result.totalDurationMs).toBe('number');
+          expect(typeof result.wasCached).toBe('boolean');
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -830,22 +841,23 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Multiple Blob Download', () => {
-    it('should download multiple blobs in parallel', () => new Promise<void>(done => {
-      const blob1 = createMockContentBlob();
-      const blob2 = createMockContentBlob();
-      blob2.hash = 'hash2';
+    it('should download multiple blobs in parallel', () =>
+      new Promise<void>(done => {
+        const blob1 = createMockContentBlob();
+        const blob2 = createMockContentBlob();
+        blob2.hash = 'hash2';
 
-      // Mock the single download to return cached result
-      service['blobCache'].set(blob1.hash, new Blob(['data1']));
-      service['blobCache'].set(blob2.hash, new Blob(['data2']));
+        // Mock the single download to return cached result
+        service['blobCache'].set(blob1.hash, new Blob(['data1']));
+        service['blobCache'].set(blob2.hash, new Blob(['data2']));
 
-      service.downloadBlobs([blob1, blob2]).subscribe((results: BlobDownloadResult[]) => {
-        expect(results.length).toBe(2);
-        expect(results[0].wasCached).toBe(true);
-        expect(results[1].wasCached).toBe(true);
-        done();
-      });
-    }));
+        service.downloadBlobs([blob1, blob2]).subscribe((results: BlobDownloadResult[]) => {
+          expect(results.length).toBe(2);
+          expect(results[0].wasCached).toBe(true);
+          expect(results[1].wasCached).toBe(true);
+          done();
+        });
+      }));
 
     it('downloadBlobs should accept array of ContentBlobs', () => {
       const blobs = [createMockContentBlob(), createMockContentBlob()];
@@ -942,52 +954,57 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Metadata Retrieval from Holochain - Integration', () => {
-    it('getBlobsForContent should return Observable of ContentBlob array', () => new Promise<void>(done => {
-      const contentId = 'content_123';
+    it('getBlobsForContent should return Observable of ContentBlob array', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
 
-      service.getBlobsForContent(contentId).subscribe(blobs => {
-        expect(Array.isArray(blobs)).toBe(true);
-        done();
-      });
-    }));
+        service.getBlobsForContent(contentId).subscribe(blobs => {
+          expect(Array.isArray(blobs)).toBe(true);
+          done();
+        });
+      }));
 
-    it('getBlobMetadata should return Observable of ContentBlob or null', () => new Promise<void>(done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
+    it('getBlobMetadata should return Observable of ContentBlob or null', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
+        const blobHash = 'test_hash_123';
 
-      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
-        expect(metadata === null || metadata instanceof Object).toBe(true);
-        done();
-      });
-    }));
+        service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+          expect(metadata === null || metadata instanceof Object).toBe(true);
+          done();
+        });
+      }));
 
-    it('blobExists should return Observable of boolean', () => new Promise<void>(done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
+    it('blobExists should return Observable of boolean', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_123';
+        const blobHash = 'test_hash_123';
 
-      service.blobExists(contentId, blobHash).subscribe(exists => {
-        expect(typeof exists).toBe('boolean');
-        done();
-      });
-    }));
+        service.blobExists(contentId, blobHash).subscribe(exists => {
+          expect(typeof exists).toBe('boolean');
+          done();
+        });
+      }));
 
-    it('getBlobsForMultipleContent should return Observable of Map', () => new Promise<void>(done => {
-      const contentIds = ['content_1', 'content_2', 'content_3'];
+    it('getBlobsForMultipleContent should return Observable of Map', () =>
+      new Promise<void>(done => {
+        const contentIds = ['content_1', 'content_2', 'content_3'];
 
-      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
-        expect(blobMap instanceof Map).toBe(true);
-        done();
-      });
-    }));
+        service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
+          expect(blobMap instanceof Map).toBe(true);
+          done();
+        });
+      }));
 
-    it('should return empty array on metadata retrieval error', () => new Promise<void>(done => {
-      const contentId = 'content_nonexistent';
+    it('should return empty array on metadata retrieval error', () =>
+      new Promise<void>(done => {
+        const contentId = 'content_nonexistent';
 
-      service.getBlobsForContent(contentId).subscribe(blobs => {
-        expect(blobs).toEqual([]);
-        done();
-      });
-    }));
+        service.getBlobsForContent(contentId).subscribe(blobs => {
+          expect(blobs).toEqual([]);
+          done();
+        });
+      }));
 
     // TODO: Add async flow tests
     // - Mock HolochainClientService.callZome with proper success/failure paths

@@ -31,10 +31,10 @@ describe('CommunityInterventionComponent', () => {
 
   beforeEach(async () => {
     mockStewardshipService = {
-    getIntervention: vi.fn(),
-    initiateIntervention: vi.fn(),
-    supportIntervention: vi.fn(),
-  };
+      getIntervention: vi.fn(),
+      initiateIntervention: vi.fn(),
+      supportIntervention: vi.fn(),
+    };
 
     mockRouter = vi.fn() as any;
 

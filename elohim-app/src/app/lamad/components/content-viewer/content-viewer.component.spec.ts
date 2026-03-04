@@ -68,7 +68,14 @@ describe('ContentViewerComponent', () => {
       setAffinity: vi.fn(),
       changes$: affinityChangesSubject.asObservable(),
       affinity$: of({}),
-      getStats: vi.fn().mockReturnValue({ totalNodes: 0, averageAffinity: 0, engagedNodes: 0, distribution: {}, byCategory: new Map(), byType: new Map() }),
+      getStats: vi.fn().mockReturnValue({
+        totalNodes: 0,
+        averageAffinity: 0,
+        engagedNodes: 0,
+        distribution: {},
+        byCategory: new Map(),
+        byType: new Map(),
+      }),
     };
 
     const agentSpyObj = { markContentSeen: vi.fn().mockReturnValue(of(undefined)) };
@@ -136,7 +143,7 @@ describe('ContentViewerComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: { paramMap: { get: vi.fn().mockReturnValue('test-content-1') } },
-            paramMap: of({ get: (k: string) => k === 'id' ? 'test-content-1' : null }),
+            paramMap: of({ get: (k: string) => (k === 'id' ? 'test-content-1' : null) }),
             params: of({ resourceId: 'test-content-1' }),
             queryParams: of({}),
           },
@@ -557,7 +564,14 @@ describe('ContentViewerComponent', () => {
         stepIndex: 2,
         totalSteps: 10,
         returnRoute: ['path', 'test-path'],
-        detourStack: [{ fromContentId: 'node-1', toContentId: 'test-content-1', detourType: 'graph-explore' as const, timestamp: new Date().toISOString() }],
+        detourStack: [
+          {
+            fromContentId: 'node-1',
+            toContentId: 'test-content-1',
+            detourType: 'graph-explore' as const,
+            timestamp: new Date().toISOString(),
+          },
+        ],
       };
 
       pathContextSubject.next(pathContext);

@@ -62,8 +62,8 @@ describe('ProfileDiscoverySectionComponent', () => {
     });
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
     mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
     await TestBed.configureTestingModule({
@@ -181,10 +181,7 @@ describe('ProfileDiscoverySectionComponent', () => {
     it('should navigate to resource when contentNodeId is present', () => {
       component.navigateToResult(buildResult({ contentNodeId: 'content-enneagram-001' }));
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith([
-        '/resource',
-        'content-enneagram-001',
-      ]);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/resource', 'content-enneagram-001']);
     });
 
     it('should emit navigateToDiscovery when contentNodeId is absent', () => {

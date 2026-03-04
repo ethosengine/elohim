@@ -13,9 +13,9 @@ describe('RelationshipService', () => {
 
   beforeEach(() => {
     mockStorageApi = {
-    getRelationships: vi.fn(),
-    createRelationship: vi.fn(),
-  };
+      getRelationships: vi.fn(),
+      createRelationship: vi.fn(),
+    };
     mockStorageApi.getRelationships.mockReturnValue(of([]));
     mockStorageApi.createRelationship.mockReturnValue(
       of({
@@ -43,187 +43,204 @@ describe('RelationshipService', () => {
   });
 
   describe('getRelationshipsForContent', () => {
-    it('should return observable of relationships', () => new Promise<void>(done => {
-      service.getRelationshipsForContent('content-1').subscribe((relationships) => {
-        expect(Array.isArray(relationships)).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of relationships', () =>
+      new Promise<void>(done => {
+        service.getRelationshipsForContent('content-1').subscribe(relationships => {
+          expect(Array.isArray(relationships)).toBe(true);
+          done();
+        });
+      }));
 
-    it('should call storage api with correct content ID', () => new Promise<void>(done => {
-      service.getRelationshipsForContent('content-abc').subscribe(() => {
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ sourceId: 'content-abc' });
-        done();
-      });
-    }));
+    it('should call storage api with correct content ID', () =>
+      new Promise<void>(done => {
+        service.getRelationshipsForContent('content-abc').subscribe(() => {
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ sourceId: 'content-abc' });
+          done();
+        });
+      }));
   });
 
   describe('getBidirectionalRelationships', () => {
-    it('should return observable of relationships', () => new Promise<void>(done => {
-      service.getBidirectionalRelationships('content-1').subscribe((relationships) => {
-        expect(Array.isArray(relationships)).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of relationships', () =>
+      new Promise<void>(done => {
+        service.getBidirectionalRelationships('content-1').subscribe(relationships => {
+          expect(Array.isArray(relationships)).toBe(true);
+          done();
+        });
+      }));
 
-    it('should call storage api for both directions', () => new Promise<void>(done => {
-      service.getBidirectionalRelationships('content-1').subscribe(() => {
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ sourceId: 'content-1' });
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ targetId: 'content-1' });
-        done();
-      });
-    }));
+    it('should call storage api for both directions', () =>
+      new Promise<void>(done => {
+        service.getBidirectionalRelationships('content-1').subscribe(() => {
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ sourceId: 'content-1' });
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({ targetId: 'content-1' });
+          done();
+        });
+      }));
 
-    it('should deduplicate relationships by ID', () => new Promise<void>(done => {
-      const mockRel: RelationshipView = {
-        id: 'rel-123',
-        sourceId: 'source-1',
-        targetId: 'target-1',
-        relationshipType: 'CONTAINS',
-        confidence: 1.0,
-      } as unknown as RelationshipView;
+    it('should deduplicate relationships by ID', () =>
+      new Promise<void>(done => {
+        const mockRel: RelationshipView = {
+          id: 'rel-123',
+          sourceId: 'source-1',
+          targetId: 'target-1',
+          relationshipType: 'CONTAINS',
+          confidence: 1.0,
+        } as unknown as RelationshipView;
 
-      mockStorageApi.getRelationships.mockReturnValue(of([mockRel]));
+        mockStorageApi.getRelationships.mockReturnValue(of([mockRel]));
 
-      service.getBidirectionalRelationships('content-1').subscribe((relationships) => {
-        expect(relationships.length).toBe(1);
-        done();
-      });
-    }));
+        service.getBidirectionalRelationships('content-1').subscribe(relationships => {
+          expect(relationships.length).toBe(1);
+          done();
+        });
+      }));
   });
 
   describe('getRelationshipsByType', () => {
-    it('should return observable of relationships', () => new Promise<void>(done => {
-      service.getRelationshipsByType('content-1', 'CONTAINS').subscribe((relationships) => {
-        expect(Array.isArray(relationships)).toBe(true);
-        done();
-      });
-    }));
-
-    it('should call storage api with relationship type filter', () => new Promise<void>(done => {
-      service.getRelationshipsByType('content-1', 'PREREQUISITE').subscribe(() => {
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
-          sourceId: 'content-1',
-          relationshipType: 'PREREQUISITE',
+    it('should return observable of relationships', () =>
+      new Promise<void>(done => {
+        service.getRelationshipsByType('content-1', 'CONTAINS').subscribe(relationships => {
+          expect(Array.isArray(relationships)).toBe(true);
+          done();
         });
-        done();
-      });
-    }));
+      }));
+
+    it('should call storage api with relationship type filter', () =>
+      new Promise<void>(done => {
+        service.getRelationshipsByType('content-1', 'PREREQUISITE').subscribe(() => {
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
+            sourceId: 'content-1',
+            relationshipType: 'PREREQUISITE',
+          });
+          done();
+        });
+      }));
   });
 
   describe('getHighConfidenceRelationships', () => {
-    it('should return observable of relationships', () => new Promise<void>(done => {
-      service.getHighConfidenceRelationships('content-1').subscribe((relationships) => {
-        expect(Array.isArray(relationships)).toBe(true);
-        done();
-      });
-    }));
-
-    it('should use default minimum confidence of 0.8', () => new Promise<void>(done => {
-      service.getHighConfidenceRelationships('content-1').subscribe(() => {
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
-          sourceId: 'content-1',
-          minConfidence: 0.8,
+    it('should return observable of relationships', () =>
+      new Promise<void>(done => {
+        service.getHighConfidenceRelationships('content-1').subscribe(relationships => {
+          expect(Array.isArray(relationships)).toBe(true);
+          done();
         });
-        done();
-      });
-    }));
+      }));
 
-    it('should use custom minimum confidence', () => new Promise<void>(done => {
-      service.getHighConfidenceRelationships('content-1', 0.9).subscribe(() => {
-        expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
-          sourceId: 'content-1',
-          minConfidence: 0.9,
+    it('should use default minimum confidence of 0.8', () =>
+      new Promise<void>(done => {
+        service.getHighConfidenceRelationships('content-1').subscribe(() => {
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
+            sourceId: 'content-1',
+            minConfidence: 0.8,
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
+
+    it('should use custom minimum confidence', () =>
+      new Promise<void>(done => {
+        service.getHighConfidenceRelationships('content-1', 0.9).subscribe(() => {
+          expect(mockStorageApi.getRelationships).toHaveBeenCalledWith({
+            sourceId: 'content-1',
+            minConfidence: 0.9,
+          });
+          done();
+        });
+      }));
   });
 
   describe('createRelationship', () => {
-    it('should return observable of created relationship', () => new Promise<void>(done => {
-      const input = {
-        sourceId: 'source-1',
-        targetId: 'target-1',
-        relationshipType: 'CONTAINS',
-      };
+    it('should return observable of created relationship', () =>
+      new Promise<void>(done => {
+        const input = {
+          sourceId: 'source-1',
+          targetId: 'target-1',
+          relationshipType: 'CONTAINS',
+        };
 
-      service.createRelationship(input).subscribe((relationship) => {
-        expect(relationship).toBeDefined();
-        expect(relationship.id).toBe('rel-123');
-        done();
-      });
-    }));
+        service.createRelationship(input).subscribe(relationship => {
+          expect(relationship).toBeDefined();
+          expect(relationship.id).toBe('rel-123');
+          done();
+        });
+      }));
 
-    it('should call storage api with input', () => new Promise<void>(done => {
-      const input = {
-        sourceId: 'source-1',
-        targetId: 'target-1',
-        relationshipType: 'CONTAINS',
-      };
+    it('should call storage api with input', () =>
+      new Promise<void>(done => {
+        const input = {
+          sourceId: 'source-1',
+          targetId: 'target-1',
+          relationshipType: 'CONTAINS',
+        };
 
-      service.createRelationship(input).subscribe(() => {
-        expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(input);
-        done();
-      });
-    }));
+        service.createRelationship(input).subscribe(() => {
+          expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(input);
+          done();
+        });
+      }));
   });
 
   describe('createBidirectionalRelationship', () => {
-    it('should return observable of created relationship', () => new Promise<void>(done => {
-      service.createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO').subscribe(
-        (relationship) => {
-          expect(relationship).toBeDefined();
-          done();
-        }
-      );
-    }));
+    it('should return observable of created relationship', () =>
+      new Promise<void>(done => {
+        service
+          .createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO')
+          .subscribe(relationship => {
+            expect(relationship).toBeDefined();
+            done();
+          });
+      }));
 
-    it('should call storage api with inverse relationship flag', () => new Promise<void>(done => {
-      service.createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO').subscribe(
-        () => {
-          expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(
-            expect.objectContaining({
-              sourceId: 'source-1',
-              targetId: 'target-1',
-              relationshipType: 'CONTAINS',
-              createInverse: true,
-              inverseType: 'BELONGS_TO',
-            })
-          );
-          done();
-        }
-      );
-    }));
+    it('should call storage api with inverse relationship flag', () =>
+      new Promise<void>(done => {
+        service
+          .createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO')
+          .subscribe(() => {
+            expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(
+              expect.objectContaining({
+                sourceId: 'source-1',
+                targetId: 'target-1',
+                relationshipType: 'CONTAINS',
+                createInverse: true,
+                inverseType: 'BELONGS_TO',
+              })
+            );
+            done();
+          });
+      }));
 
-    it('should use default confidence of 1.0', () => new Promise<void>(done => {
-      service.createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO').subscribe(
-        () => {
-          expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(
-            expect.objectContaining({
-              confidence: 1.0,
-            })
-          );
-          done();
-        }
-      );
-    }));
+    it('should use default confidence of 1.0', () =>
+      new Promise<void>(done => {
+        service
+          .createBidirectionalRelationship('source-1', 'target-1', 'CONTAINS', 'BELONGS_TO')
+          .subscribe(() => {
+            expect(mockStorageApi.createRelationship).toHaveBeenCalledWith(
+              expect.objectContaining({
+                confidence: 1.0,
+              })
+            );
+            done();
+          });
+      }));
   });
 
   describe('getRelationshipGraph', () => {
-    it('should return observable of relationship graph', () => new Promise<void>(done => {
-      service.getRelationshipGraph('root-1').subscribe((graph) => {
-        expect(graph instanceof Map).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of relationship graph', () =>
+      new Promise<void>(done => {
+        service.getRelationshipGraph('root-1').subscribe(graph => {
+          expect(graph instanceof Map).toBe(true);
+          done();
+        });
+      }));
 
-    it('should have root content ID in graph', () => new Promise<void>(done => {
-      service.getRelationshipGraph('root-1').subscribe((graph) => {
-        expect(graph.has('root-1')).toBe(true);
-        done();
-      });
-    }));
+    it('should have root content ID in graph', () =>
+      new Promise<void>(done => {
+        service.getRelationshipGraph('root-1').subscribe(graph => {
+          expect(graph.has('root-1')).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('Service Creation', () => {

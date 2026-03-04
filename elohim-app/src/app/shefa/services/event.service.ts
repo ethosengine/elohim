@@ -19,7 +19,7 @@
  * Uses StorageApiService for HTTP communication with elohim-storage.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 68.0% (2026-02-24)
 
@@ -68,7 +68,7 @@ export type REAAction = (typeof REAActions)[keyof typeof REAActions];
   providedIn: 'root',
 })
 export class EventService {
-  constructor(private readonly storageApi: StorageApiService) {}
+  private readonly storageApi = inject(StorageApiService);
 
   // ===========================================================================
   // Content Interaction Events

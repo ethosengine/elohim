@@ -34,6 +34,7 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
 // @coverage: 25.2% (2026-02-24)
@@ -577,11 +578,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   private lastRecognition: Recognition | null = null;
   private psycheAPI: PsycheAPI | null = null;
 
-  constructor(
-    private readonly poolService: QuestionPoolService,
-    private readonly discoveryService: DiscoveryAttestationService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly poolService = inject(QuestionPoolService);
+  private readonly discoveryService = inject(DiscoveryAttestationService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.initializePsycheAPI();

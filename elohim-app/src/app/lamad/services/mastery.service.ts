@@ -12,7 +12,7 @@
  * Uses StorageApiService for HTTP communication with elohim-storage.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -55,7 +55,7 @@ export const MASTERY_LEVEL_ORDER: Record<MasteryLevelType, number> = {
   providedIn: 'root',
 })
 export class MasteryService {
-  constructor(private readonly storageApi: StorageApiService) {}
+  private readonly storageApi = inject(StorageApiService);
 
   // ===========================================================================
   // Query Methods

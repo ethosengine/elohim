@@ -31,7 +31,7 @@
  */
 
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 67.9% (2026-02-24)
 
@@ -149,7 +149,9 @@ export class StorageApiService {
   /** Default request timeout in milliseconds */
   private readonly defaultTimeoutMs = 30000;
 
-  constructor(private readonly http: HttpClient) {
+  private readonly http = inject(HttpClient);
+
+  constructor() {
     // Use storageUrl from environment or fall back to doorway URL
     this.baseUrl =
       environment.holochain?.storageUrl ??

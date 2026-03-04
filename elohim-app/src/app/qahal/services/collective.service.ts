@@ -8,7 +8,7 @@
  */
 
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { Observable, map } from 'rxjs';
 
@@ -32,7 +32,9 @@ interface ListResponse<T> {
 export class CollectiveService {
   private readonly baseUrl: string;
 
-  constructor(private readonly http: HttpClient) {
+  private readonly http = inject(HttpClient);
+
+  constructor() {
     this.baseUrl =
       environment.holochain?.storageUrl ??
       (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??

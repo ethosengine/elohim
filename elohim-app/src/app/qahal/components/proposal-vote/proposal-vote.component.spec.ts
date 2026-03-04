@@ -34,9 +34,9 @@ describe('ProposalVoteComponent', () => {
 
   beforeEach(async () => {
     mockGovernanceService = {
-    voteOnProposal: vi.fn(),
-    getMyVote: vi.fn(),
-  };
+      voteOnProposal: vi.fn(),
+      getMyVote: vi.fn(),
+    };
     mockGovernanceService.getMyVote.mockReturnValue(of(null));
     mockGovernanceService.voteOnProposal.mockReturnValue(of(true));
 

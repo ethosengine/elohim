@@ -12,6 +12,7 @@ import {
   ComponentRef,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  inject,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -560,10 +561,8 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   private rendererSubscription: Subscription | null = null;
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly rendererRegistry: RendererRegistryService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly rendererRegistry = inject(RendererRegistryService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['content'] && this.content) {

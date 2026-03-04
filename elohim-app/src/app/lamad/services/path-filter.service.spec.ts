@@ -133,9 +133,7 @@ describe('PathFilterService', () => {
 
     it('should prioritize paths with good descriptions', () => {
       const featured = service.getFeaturedPaths(mockPaths, 6);
-      const allHaveDescriptions = featured.every(
-        p => p.description && p.description.length > 0
-      );
+      const allHaveDescriptions = featured.every(p => p.description && p.description.length > 0);
       expect(allHaveDescriptions).toBe(true);
     });
 

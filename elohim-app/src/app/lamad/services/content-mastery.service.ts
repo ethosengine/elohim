@@ -1,4 +1,4 @@
-import { Injectable, effect } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 
 // @coverage: 58.8% (2026-02-24)
 
@@ -72,12 +72,12 @@ export class ContentMasteryService {
   /** Tracks whether we've already synced since the last reconnect */
   private hasSyncedSinceConnect = false;
 
-  constructor(
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService,
-    private readonly backend: LearnerBackendService,
-    private readonly holochainClient: HolochainClientService
-  ) {
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly sessionHuman = inject(SessionHumanService);
+  private readonly backend = inject(LearnerBackendService);
+  private readonly holochainClient = inject(HolochainClientService);
+
+  constructor() {
     // Initialize when session is available
     this.sessionHuman.session$.subscribe(session => {
       if (session) {

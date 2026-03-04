@@ -22,11 +22,7 @@ describe('PlaidIntegrationService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        PlaidIntegrationService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [PlaidIntegrationService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(PlaidIntegrationService);
 
@@ -191,7 +187,7 @@ describe('PlaidIntegrationService', () => {
         webhook_type: 'TRANSACTIONS',
         webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
         item_id: 'item-123',
-        new_transactions: 5
+        new_transactions: 5,
       };
 
       expect(() => service.handleWebhook(payload)).not.toThrow();
@@ -203,21 +199,22 @@ describe('PlaidIntegrationService', () => {
       expect(observable.subscribe).toBeDefined();
     });
 
-    it('should emit webhook events on handleWebhook', () => new Promise<void>(done => {
-      const payload: PlaidWebhookPayload = {
-        webhook_type: 'ITEM',
-        webhook_code: 'LOGIN_REQUIRED',
-        item_id: 'item-123',
-        new_transactions: 0
-      };
+    it('should emit webhook events on handleWebhook', () =>
+      new Promise<void>(done => {
+        const payload: PlaidWebhookPayload = {
+          webhook_type: 'ITEM',
+          webhook_code: 'LOGIN_REQUIRED',
+          item_id: 'item-123',
+          new_transactions: 0,
+        };
 
-      service.onWebhookReceived().subscribe(received => {
-        expect(received).toEqual(payload);
-        done();
-      });
+        service.onWebhookReceived().subscribe(received => {
+          expect(received).toEqual(payload);
+          done();
+        });
 
-      service.handleWebhook(payload);
-    }));
+        service.handleWebhook(payload);
+      }));
   });
 
   // ==========================================================================
@@ -345,7 +342,7 @@ describe('PlaidIntegrationService', () => {
         webhook_type: 'TRANSACTIONS',
         webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
         item_id: 'item-123',
-        new_transactions: 5
+        new_transactions: 5,
       };
 
       expect(() => service.handleWebhook(payload)).not.toThrow();
@@ -448,29 +445,30 @@ describe('PlaidIntegrationService', () => {
   // ==========================================================================
 
   describe('edge cases', () => {
-    it('should handle multiple webhook subscriptions', () => new Promise<void>(done => {
-      let count = 0;
-      const payload: PlaidWebhookPayload = {
-        webhook_type: 'TRANSACTIONS',
-        webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
-        item_id: 'item-123',
-        new_transactions: 5
-      };
+    it('should handle multiple webhook subscriptions', () =>
+      new Promise<void>(done => {
+        let count = 0;
+        const payload: PlaidWebhookPayload = {
+          webhook_type: 'TRANSACTIONS',
+          webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
+          item_id: 'item-123',
+          new_transactions: 5,
+        };
 
-      const sub1 = service.onWebhookReceived().subscribe(() => {
-        count++;
-      });
+        const sub1 = service.onWebhookReceived().subscribe(() => {
+          count++;
+        });
 
-      const sub2 = service.onWebhookReceived().subscribe(() => {
-        count++;
-        sub1.unsubscribe();
-        sub2.unsubscribe();
-        expect(count).toBe(2);
-        done();
-      });
+        const sub2 = service.onWebhookReceived().subscribe(() => {
+          count++;
+          sub1.unsubscribe();
+          sub2.unsubscribe();
+          expect(count).toBe(2);
+          done();
+        });
 
-      service.handleWebhook(payload);
-    }));
+        service.handleWebhook(payload);
+      }));
 
     it('should accept empty linked accounts array', () => {
       const mockConnection: PlaidConnection = {

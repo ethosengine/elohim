@@ -101,7 +101,12 @@ describe('SophiaRendererComponent', () => {
               dismissNotice: vi.fn(),
               handleAction: vi.fn(),
               presence$: of([]),
-              cost$: of({ tokensProcessed: 0, timeMs: 0, constitutionalChecks: 0, precedentLookups: 0 }),
+              cost$: of({
+                tokensProcessed: 0,
+                timeMs: 0,
+                constitutionalChecks: 0,
+                precedentLookups: 0,
+              }),
               notices$: of([]),
               providerId: 'elohim-presence',
             };

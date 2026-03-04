@@ -13,9 +13,9 @@ describe('HealthCheckService', () => {
 
   beforeEach(() => {
     mockHolochainClient = {
-    isConnected: vi.fn(),
-    getDisplayInfo: vi.fn(),
-  };
+      isConnected: vi.fn(),
+      getDisplayInfo: vi.fn(),
+    };
     mockHolochainClient.isConnected.mockReturnValue(true);
     mockHolochainClient.getDisplayInfo.mockReturnValue({
       appUrl: 'ws://localhost:8888',
@@ -24,10 +24,10 @@ describe('HealthCheckService', () => {
     } as ReturnType<HolochainClientService['getDisplayInfo']>);
 
     mockIndexedDbCache = {
-    init: vi.fn(),
-    isAvailable: vi.fn(),
-    getStats: vi.fn(),
-  };
+      init: vi.fn(),
+      isAvailable: vi.fn(),
+      getStats: vi.fn(),
+    };
     mockIndexedDbCache.init.mockReturnValue(Promise.resolve(true));
     mockIndexedDbCache.isAvailable.mockReturnValue(true);
     mockIndexedDbCache.getStats.mockReturnValue(
@@ -49,8 +49,8 @@ describe('HealthCheckService', () => {
       }),
     };
     mockLogger = {
-    createChild: vi.fn(),
-  };
+      createChild: vi.fn(),
+    };
     mockLogger.createChild.mockReturnValue(
       mockChildLogger as unknown as ReturnType<LoggerService['createChild']>
     );
@@ -531,7 +531,9 @@ describe('HealthCheckService', () => {
 
   describe.skip('Error Handling', () => {
     it('should handle check errors gracefully', async () => {
-      mockHolochainClient.isConnected.mockImplementation(() => { throw 'Connection error'; });
+      mockHolochainClient.isConnected.mockImplementation(() => {
+        throw 'Connection error';
+      });
       const status = await service.refresh();
       expect(status.checks.holochain.status).toBe('unhealthy');
       expect(status.checks.holochain.message).toContain('Connection error');

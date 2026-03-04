@@ -40,44 +40,44 @@ describe('ShefaDashboardComponent', () => {
     TestBed.resetTestingModule();
 
     holochainClientMock = {
-    callZome: vi.fn(),
-    isConnected: vi.fn(),
-  };
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
     holochainClientMock.isConnected.mockReturnValue(true);
 
     shefaServiceMock = {
-    getComputeMetrics: vi.fn(),
-    getTokenBalance: vi.fn(),
-  };
+      getComputeMetrics: vi.fn(),
+      getTokenBalance: vi.fn(),
+    };
 
     performanceMetricsMock = {
-    getMetrics: vi.fn(),
-    recordResponseTime: vi.fn(),
-  };
+      getMetrics: vi.fn(),
+      recordResponseTime: vi.fn(),
+    };
 
     custodianCommitmentMock = {
-    getCommitments: vi.fn(),
-    createCommitment: vi.fn(),
-  };
+      getCommitments: vi.fn(),
+      createCommitment: vi.fn(),
+    };
 
     economicServiceMock = {
-    isAvailable: vi.fn(),
-    getTokenBalance: vi.fn(),
-  };
+      isAvailable: vi.fn(),
+      getTokenBalance: vi.fn(),
+    };
 
     stewardedResourceMock = {
-    getAllocatedResources: vi.fn(),
-  };
+      getAllocatedResources: vi.fn(),
+    };
 
     shefaComputeMock = {
-    initializeDashboard: vi.fn(),
-  };
+      initializeDashboard: vi.fn(),
+    };
     familyProtectionMock = {
-    initializeProtectionMonitoring: vi.fn(),
-  };
+      initializeProtectionMonitoring: vi.fn(),
+    };
     computeEventsMock = {
-    initializeEventEmission: vi.fn(),
-  };
+      initializeEventEmission: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ShefaDashboardComponent],

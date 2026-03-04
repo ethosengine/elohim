@@ -194,9 +194,9 @@ describe('PathExtensionService', () => {
     });
 
     it('should error for non-existent extension', async () => {
-      await expect(
-        firstValueFrom(service.forkExtension('non-existent'))
-      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(firstValueFrom(service.forkExtension('non-existent'))).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
     });
   });
 

@@ -73,10 +73,8 @@ export class PathService {
   private readonly contentMastery = inject(ContentMasteryService);
   private readonly learnerContext = inject(LearnerContextService);
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly agentService: AgentService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly agentService = inject(AgentService);
 
   /**
    * Get path metadata (does NOT load step content).

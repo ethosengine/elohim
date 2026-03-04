@@ -12,9 +12,9 @@ describe('HeroComponent', () => {
 
   beforeEach(async () => {
     const domInteractionServiceSpy = {
-    setupScrollIndicator: vi.fn(),
-    setupHeroTitleAnimation: vi.fn(),
-  };
+      setupScrollIndicator: vi.fn(),
+      setupHeroTitleAnimation: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [HeroComponent],
@@ -28,9 +28,9 @@ describe('HeroComponent', () => {
 
     fixture = TestBed.createComponent(HeroComponent);
     component = fixture.componentInstance;
-    domInteractionService = TestBed.inject(
-      DomInteractionService
-    ) as { [K in keyof DomInteractionService]?: Mock };
+    domInteractionService = TestBed.inject(DomInteractionService) as {
+      [K in keyof DomInteractionService]?: Mock;
+    };
   });
 
   it('should create', () => {

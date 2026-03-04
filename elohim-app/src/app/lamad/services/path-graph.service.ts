@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 75.3% (2026-02-24)
 
@@ -51,7 +51,7 @@ export class PathGraphService {
   // Cache for path nodes (path-type ContentNodes)
   private pathNodesCache$: Observable<Map<string, ContentNode>> | null = null;
 
-  constructor(private readonly dataLoader: DataLoaderService) {}
+  private readonly dataLoader = inject(DataLoaderService);
 
   // =========================================================================
   // Core Registration Methods

@@ -13,8 +13,8 @@ describe('RelatedConceptsPanelComponent', () => {
 
   beforeEach(async () => {
     mockRelatedConceptsService = {
-    getRelatedConcepts: vi.fn(),
-  };
+      getRelatedConcepts: vi.fn(),
+    };
     mockRelatedConceptsService.getRelatedConcepts.mockReturnValue(
       of({
         prerequisites: [],

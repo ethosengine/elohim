@@ -97,35 +97,35 @@ describe('PathNavigatorComponent', () => {
 
   beforeEach(async () => {
     const pathServiceSpy = {
-    getPath: vi.fn(),
-    getPathStep: vi.fn(),
-    getContentById: vi.fn(),
-  };
+      getPath: vi.fn(),
+      getPathStep: vi.fn(),
+      getContentById: vi.fn(),
+    };
     const agentServiceSpy = {
-    completeStep: vi.fn(),
-    markContentSeen: vi.fn(),
-    getContentMastery: vi.fn(),
-    updateContentMastery: vi.fn(),
-  };
+      completeStep: vi.fn(),
+      markContentSeen: vi.fn(),
+      getContentMastery: vi.fn(),
+      updateContentMastery: vi.fn(),
+    };
     const contentMasteryServiceSpy = {
-    recordView: vi.fn(),
-    setMasteryLevel: vi.fn(),
-    getMasteryLevelSync: vi.fn(),
-  };
+      recordView: vi.fn(),
+      setMasteryLevel: vi.fn(),
+      getMasteryLevelSync: vi.fn(),
+    };
     const pathContextServiceSpy = {
-    enterPath: vi.fn(),
-    exitPath: vi.fn(),
-    startDetour: vi.fn(),
-  };
+      enterPath: vi.fn(),
+      exitPath: vi.fn(),
+      startDetour: vi.fn(),
+    };
     const seoServiceSpy = {
-    updateSeo: vi.fn(),
-    updateForPath: vi.fn(),
-    setTitle: vi.fn(),
-  };
+      updateSeo: vi.fn(),
+      updateForPath: vi.fn(),
+      setTitle: vi.fn(),
+    };
     const governanceSignalServiceSpy = {
-    recordLearningSignal: vi.fn(),
-    recordInteractiveCompletion: vi.fn(),
-  };
+      recordLearningSignal: vi.fn(),
+      recordInteractiveCompletion: vi.fn(),
+    };
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
@@ -136,7 +136,7 @@ describe('PathNavigatorComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideElohimClient({
-          mode: { type: 'browser', doorway: { url: 'http://localhost:8888' } }
+          mode: { type: 'browser', doorway: { url: 'http://localhost:8888' } },
         }),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
@@ -153,7 +153,9 @@ describe('PathNavigatorComponent', () => {
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
     agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
-    contentMasteryService = TestBed.inject(ContentMasteryService) as { [K in keyof ContentMasteryService]?: Mock };
+    contentMasteryService = TestBed.inject(ContentMasteryService) as {
+      [K in keyof ContentMasteryService]?: Mock;
+    };
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
 
@@ -279,7 +281,11 @@ describe('PathNavigatorComponent', () => {
 
     component.markComplete(); // not_started -> seen
 
-    expect(contentMasteryService.setMasteryLevel).toHaveBeenCalledWith('node-2', 'seen', 'practice');
+    expect(contentMasteryService.setMasteryLevel).toHaveBeenCalledWith(
+      'node-2',
+      'seen',
+      'practice'
+    );
   });
 
   it('should sync mastery to AgentService on markComplete', () => {
@@ -576,17 +582,18 @@ describe('PathNavigatorComponent', () => {
       expect(component.isFocusedView).toBe(false);
     });
 
-    it('should increment content refresh key when toggling focused view', () => new Promise<void>(done => {
-      fixture.detectChanges();
-      const initialKey = component.contentRefreshKey;
+    it('should increment content refresh key when toggling focused view', () =>
+      new Promise<void>(done => {
+        fixture.detectChanges();
+        const initialKey = component.contentRefreshKey;
 
-      component.onFocusedViewToggle(true);
+        component.onFocusedViewToggle(true);
 
-      setTimeout(() => {
-        expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
-        done();
-      }, 350);
-    }));
+        setTimeout(() => {
+          expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
+          done();
+        }, 350);
+      }));
   });
 
   describe('exploration events', () => {
@@ -649,7 +656,9 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle lesson completion event', () => {
-      const governanceSignalService = TestBed.inject(GovernanceSignalService) as { [K in keyof GovernanceSignalService]?: Mock };
+      const governanceSignalService = TestBed.inject(GovernanceSignalService) as {
+        [K in keyof GovernanceSignalService]?: Mock;
+      };
 
       const completionEvent = {
         type: 'quiz' as const,
@@ -737,8 +746,8 @@ describe('PathNavigatorComponent', () => {
   describe('learning signal tracking', () => {
     it('should emit progress signal on navigation', () => {
       const governanceSignalService: any = {
-    recordLearningSignal: vi.fn(),
-  };
+        recordLearningSignal: vi.fn(),
+      };
       (component as any).governanceSignalService = governanceSignalService;
       governanceSignalService.recordLearningSignal.mockReturnValue(of(undefined));
 
@@ -757,8 +766,8 @@ describe('PathNavigatorComponent', () => {
 
     it('should not emit progress signal if time is too short', () => {
       const governanceSignalService: any = {
-    recordLearningSignal: vi.fn(),
-  };
+        recordLearningSignal: vi.fn(),
+      };
       (component as any).governanceSignalService = governanceSignalService;
       governanceSignalService.recordLearningSignal.mockReturnValue(of(undefined));
 
@@ -775,14 +784,16 @@ describe('PathNavigatorComponent', () => {
   describe('error handling', () => {
     it('should handle content not found', () => {
       // Mock getPathStep to return a step with null content (since mockPath has no chapters)
-      pathService.getPathStep.mockReturnValue(of({
-        step: mockPath.steps[0],
-        content: null,
-        hasNext: true,
-        hasPrevious: false,
-        nextStepIndex: 1,
-        previousStepIndex: undefined,
-      } as any));
+      pathService.getPathStep.mockReturnValue(
+        of({
+          step: mockPath.steps[0],
+          content: null,
+          hasNext: true,
+          hasPrevious: false,
+          nextStepIndex: 1,
+          previousStepIndex: undefined,
+        } as any)
+      );
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -792,9 +803,7 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle generic load errors', () => {
-      pathService.getPath.mockReturnValue(
-        throwError(() => ({ message: 'Server unreachable' }))
-      );
+      pathService.getPath.mockReturnValue(throwError(() => ({ message: 'Server unreachable' })));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();

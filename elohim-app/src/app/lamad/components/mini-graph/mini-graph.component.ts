@@ -12,6 +12,7 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  inject,
 } from '@angular/core';
 
 // @coverage: 43.4% (2026-02-24)
@@ -301,10 +302,8 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
   private width = 300;
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly relatedConceptsService: RelatedConceptsService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly relatedConceptsService = inject(RelatedConceptsService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngAfterViewInit(): void {
     this.initializeSvg();

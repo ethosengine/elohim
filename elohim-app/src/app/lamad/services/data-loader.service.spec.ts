@@ -169,13 +169,17 @@ describe('DataLoaderService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), DataLoaderService,
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        DataLoaderService,
         { provide: HolochainContentService, useValue: mockHolochainContent },
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
         { provide: ContentResolverService, useValue: mockContentResolver },
         { provide: ContentService, useValue: mockContentService },
-        { provide: ELOHIM_CLIENT, useValue: mockElohimClient },],
+        { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+      ],
     });
 
     service = TestBed.inject(DataLoaderService);
@@ -192,143 +196,149 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPath', () => {
-    it('should load path via ContentService', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'test-path',
-        version: '1.0.0',
-        title: 'Test Path',
-        description: 'A test path',
-        purpose: 'Testing',
-        createdBy: 'test-agent',
-        contributors: [],
-        difficulty: 'beginner',
-        estimatedDuration: '1 hour',
-        visibility: 'public',
-        pathType: 'journey',
-        tags: ['test'],
-        createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z',
-        steps: [],
-      };
-
-      // ContentService returns path directly
-      mockContentService.getPath.mockReturnValue(of(mockPath));
-
-      service.getPath('test-path').subscribe(path => {
-        expect(path.id).toBe('test-path');
-        expect(path.title).toBe('Test Path');
-        expect(mockContentService.getPath).toHaveBeenCalledWith('test-path');
-        done();
-      });
-    }));
-  });
-
-  describe('getContent', () => {
-    it('should load content via ContentService', () => new Promise<void>(done => {
-      // ContentService returns content directly
-      mockContentService.getContent.mockReturnValue(of(mockContent));
-
-      service.getContent('test-content').subscribe(content => {
-        expect(content.id).toBe(mockContent.id);
-        expect(content.title).toBe(mockContent.title);
-        expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
-        done();
-      });
-    }));
-
-    it('should cache content in IndexedDB after loading', () => new Promise<void>(done => {
-      mockContentService.getContent.mockReturnValue(of(mockContent));
-
-      service.getContent('test-content').subscribe(content => {
-        expect(content.id).toBe(mockContent.id);
-        // ContentService handles caching internally, but DataLoader also caches to IndexedDB
-        expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
-        done();
-      });
-    }));
-
-    it('should return placeholder when content not found', () => new Promise<void>(done => {
-      // Resolver returns null when content not found
-      mockContentResolver.resolveContent.mockReturnValue(Promise.resolve(null));
-
-      service.getContent('missing-content').subscribe({
-        next: content => {
-          expect(content.contentType).toBe('placeholder');
-          expect(content.title).toContain('Content Not Found');
-          expect(content.id).toBe('missing-content');
-          done();
-        },
-        error: () => {
-          throw new Error('Should not throw error, should return placeholder');
-        },
-      });
-    }));
-  });
-
-  describe('getPathIndex', () => {
-    it('should load path index from ContentService', () => new Promise<void>(done => {
-      const mockPaths: LearningPath[] = [
-        {
+    it('should load path via ContentService', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
           id: 'test-path',
           version: '1.0.0',
-          title: 'Test',
-          description: 'Desc',
+          title: 'Test Path',
+          description: 'A test path',
           purpose: 'Testing',
           createdBy: 'test-agent',
           contributors: [],
           difficulty: 'beginner',
-          estimatedDuration: '1h',
+          estimatedDuration: '1 hour',
           visibility: 'public',
           pathType: 'journey',
-          tags: [],
+          tags: ['test'],
           createdAt: '2025-01-01T00:00:00.000Z',
           updatedAt: '2025-01-01T00:00:00.000Z',
-          steps: [
-            {
-              order: 0,
-              stepType: 'content',
-              resourceId: 'step-1',
-              stepTitle: 'Step 1',
-              stepNarrative: '',
-              optional: false,
-              learningObjectives: [],
-              completionCriteria: [],
-            },
-          ],
-        },
-      ];
+          steps: [],
+        };
 
-      mockContentService.queryPaths.mockReturnValue(of(mockPaths));
+        // ContentService returns path directly
+        mockContentService.getPath.mockReturnValue(of(mockPath));
 
-      service.getPathIndex().subscribe(index => {
-        expect(index.totalCount).toBe(1);
-        expect(index.paths.length).toBe(1);
-        expect(index.paths[0].id).toBe('test-path');
-        expect(mockContentService.queryPaths).toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.getPath('test-path').subscribe(path => {
+          expect(path.id).toBe('test-path');
+          expect(path.title).toBe('Test Path');
+          expect(mockContentService.getPath).toHaveBeenCalledWith('test-path');
+          done();
+        });
+      }));
+  });
+
+  describe('getContent', () => {
+    it('should load content via ContentService', () =>
+      new Promise<void>(done => {
+        // ContentService returns content directly
+        mockContentService.getContent.mockReturnValue(of(mockContent));
+
+        service.getContent('test-content').subscribe(content => {
+          expect(content.id).toBe(mockContent.id);
+          expect(content.title).toBe(mockContent.title);
+          expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
+          done();
+        });
+      }));
+
+    it('should cache content in IndexedDB after loading', () =>
+      new Promise<void>(done => {
+        mockContentService.getContent.mockReturnValue(of(mockContent));
+
+        service.getContent('test-content').subscribe(content => {
+          expect(content.id).toBe(mockContent.id);
+          // ContentService handles caching internally, but DataLoader also caches to IndexedDB
+          expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
+          done();
+        });
+      }));
+
+    it('should return placeholder when content not found', () =>
+      new Promise<void>(done => {
+        // Resolver returns null when content not found
+        mockContentResolver.resolveContent.mockReturnValue(Promise.resolve(null));
+
+        service.getContent('missing-content').subscribe({
+          next: content => {
+            expect(content.contentType).toBe('placeholder');
+            expect(content.title).toContain('Content Not Found');
+            expect(content.id).toBe('missing-content');
+            done();
+          },
+          error: () => {
+            throw new Error('Should not throw error, should return placeholder');
+          },
+        });
+      }));
+  });
+
+  describe('getPathIndex', () => {
+    it('should load path index from ContentService', () =>
+      new Promise<void>(done => {
+        const mockPaths: LearningPath[] = [
+          {
+            id: 'test-path',
+            version: '1.0.0',
+            title: 'Test',
+            description: 'Desc',
+            purpose: 'Testing',
+            createdBy: 'test-agent',
+            contributors: [],
+            difficulty: 'beginner',
+            estimatedDuration: '1h',
+            visibility: 'public',
+            pathType: 'journey',
+            tags: [],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+            steps: [
+              {
+                order: 0,
+                stepType: 'content',
+                resourceId: 'step-1',
+                stepTitle: 'Step 1',
+                stepNarrative: '',
+                optional: false,
+                learningObjectives: [],
+                completionCriteria: [],
+              },
+            ],
+          },
+        ];
+
+        mockContentService.queryPaths.mockReturnValue(of(mockPaths));
+
+        service.getPathIndex().subscribe(index => {
+          expect(index.totalCount).toBe(1);
+          expect(index.paths.length).toBe(1);
+          expect(index.paths[0].id).toBe('test-path');
+          expect(mockContentService.queryPaths).toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('getContentIndex', () => {
-    it('should return content index from ContentService', () => new Promise<void>(done => {
-      // Mock content nodes with different types (cast to any to avoid full interface)
-      const mockNodes = [
-        { id: '1', title: 'A', contentType: 'concept', tags: [] },
-        { id: '2', title: 'B', contentType: 'concept', tags: [] },
-        { id: '3', title: 'C', contentType: 'concept', tags: [] },
-        { id: '4', title: 'D', contentType: 'exercise', tags: [] },
-        { id: '5', title: 'E', contentType: 'exercise', tags: [] },
-      ] as any[];
-      mockContentService.queryContent.mockReturnValue(of(mockNodes));
+    it('should return content index from ContentService', () =>
+      new Promise<void>(done => {
+        // Mock content nodes with different types (cast to any to avoid full interface)
+        const mockNodes = [
+          { id: '1', title: 'A', contentType: 'concept', tags: [] },
+          { id: '2', title: 'B', contentType: 'concept', tags: [] },
+          { id: '3', title: 'C', contentType: 'concept', tags: [] },
+          { id: '4', title: 'D', contentType: 'exercise', tags: [] },
+          { id: '5', title: 'E', contentType: 'exercise', tags: [] },
+        ] as any[];
+        mockContentService.queryContent.mockReturnValue(of(mockNodes));
 
-      service.getContentIndex().subscribe(index => {
-        expect(index.totalCount).toBe(5);
-        expect(index.byType!['concept']).toBe(3);
-        expect(index.byType!['exercise']).toBe(2);
-        done();
-      });
-    }));
+        service.getContentIndex().subscribe(index => {
+          expect(index.totalCount).toBe(5);
+          expect(index.byType!['concept']).toBe(3);
+          expect(index.byType!['exercise']).toBe(2);
+          done();
+        });
+      }));
   });
 
   // Use Object.defineProperty for localStorage mocks — vi.spyOn on native Storage is unreliable
@@ -339,7 +349,9 @@ describe('DataLoaderService', () => {
   beforeEach(() => {
     localStorageData = {};
     mockGetItem = vi.fn((key: string) => localStorageData[key] ?? null);
-    mockSetItem = vi.fn((key: string, value: string) => { localStorageData[key] = value; });
+    mockSetItem = vi.fn((key: string, value: string) => {
+      localStorageData[key] = value;
+    });
     Object.defineProperty(window, 'localStorage', {
       value: { getItem: mockGetItem, setItem: mockSetItem, removeItem: vi.fn(), clear: vi.fn() },
       writable: true,
@@ -376,7 +388,9 @@ describe('DataLoaderService', () => {
     });
 
     it('should handle localStorage errors gracefully', async () => {
-      mockSetItem.mockImplementation(() => { throw 'QuotaExceededError'; });
+      mockSetItem.mockImplementation(() => {
+        throw 'QuotaExceededError';
+      });
 
       const { firstValueFrom } = await import('rxjs');
       await firstValueFrom(service.saveAgentProgress(mockProgress));

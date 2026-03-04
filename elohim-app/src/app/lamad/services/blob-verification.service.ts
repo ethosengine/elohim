@@ -18,7 +18,7 @@
  * - Cache consistency checks
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 40.5% (2026-02-24)
 
@@ -93,7 +93,7 @@ export class BlobVerificationService {
   /** Whether WASM is available */
   private wasmAvailable = false;
 
-  constructor(private readonly doorway: DoorwayClientService) {}
+  private readonly doorway = inject(DoorwayClientService);
 
   /**
    * Verify blob integrity using SHA256 hash.

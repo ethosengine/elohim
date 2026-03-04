@@ -1,4 +1,4 @@
-import { Injectable, Optional, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 42.8% (2026-02-24)
 
@@ -139,7 +139,7 @@ export class GovernanceSignalService {
   private readonly signalChangeSubject = new BehaviorSubject<SignalChangeEvent | null>(null);
   public readonly signalChanges$ = this.signalChangeSubject.asObservable();
 
-  constructor(@Optional() private readonly sessionHumanService: SessionHumanService | null) {}
+  private readonly sessionHumanService = inject(SessionHumanService, { optional: true });
 
   // ===========================================================================
   // Signal Collection - Low Friction (Reactions)

@@ -73,11 +73,11 @@ describe('PathAdaptationService (story-first)', () => {
 
   beforeEach(() => {
     cooldownSpy = {
-    getCooldownStatus: vi.fn(),
-    recordAttempt: vi.fn(),
-    getBestScore: vi.fn(),
-    isMastered: vi.fn(),
-  };
+      getCooldownStatus: vi.fn(),
+      recordAttempt: vi.fn(),
+      getBestScore: vi.fn(),
+      isMastered: vi.fn(),
+    };
     cooldownSpy.getCooldownStatus.mockReturnValue({
       inCooldown: false,
       cooldownEndsAt: null,
@@ -92,17 +92,17 @@ describe('PathAdaptationService (story-first)', () => {
     cooldownSpy.isMastered.mockReturnValue(false);
 
     poolSpy = {
-    getQuestions: vi.fn(),
-  };
+      getQuestions: vi.fn(),
+    };
     streakSpy = {
-    isAchieved: vi.fn(),
-  };
+      isAchieved: vi.fn(),
+    };
     streakSpy.isAchieved.mockReturnValue(false);
 
     const mockElohimClient = {
-    getContent: vi.fn(),
-    listContent: vi.fn(),
-  };
+      getContent: vi.fn(),
+      listContent: vi.fn(),
+    };
     mockElohimClient.getContent.mockReturnValue(Promise.resolve(null));
     mockElohimClient.listContent.mockReturnValue(Promise.resolve([]));
 
@@ -156,12 +156,7 @@ describe('PathAdaptationService (story-first)', () => {
     it('recording a passing result should unlock the gate', () => {
       const result = makeQuizResult({ passed: true, score: 0.9 });
 
-      const gate = service.recordMasteryResult(
-        PATH_ID,
-        SECTION_ID,
-        HUMAN_ID,
-        result
-      );
+      const gate = service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       expect(gate.locked).toBe(false);
       expect(gate.mastered).toBe(true);
@@ -194,12 +189,7 @@ describe('PathAdaptationService (story-first)', () => {
     it('recording a failing result should keep gate locked', () => {
       const result = makeQuizResult({ passed: false, score: 0.4 });
 
-      const gate = service.recordMasteryResult(
-        PATH_ID,
-        SECTION_ID,
-        HUMAN_ID,
-        result
-      );
+      const gate = service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       expect(gate.locked).toBe(true);
       expect(gate.reason).toBe('failed');
@@ -208,12 +198,7 @@ describe('PathAdaptationService (story-first)', () => {
 
     it('best score should be tracked even on failure', () => {
       const result = makeQuizResult({ passed: false, score: 0.6 });
-      const gate = service.recordMasteryResult(
-        PATH_ID,
-        SECTION_ID,
-        HUMAN_ID,
-        result
-      );
+      const gate = service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       expect(gate.bestScore).toBe(0.6);
     });
@@ -235,10 +220,7 @@ describe('PathAdaptationService (story-first)', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Pre-assessment skip-ahead unlocks section steps', () => {
-    const sectionMapping = new Map<
-      string,
-      { title: string; conceptIds: string[] }
-    >([
+    const sectionMapping = new Map<string, { title: string; conceptIds: string[] }>([
       [
         'foundations',
         {
@@ -262,10 +244,10 @@ describe('PathAdaptationService (story-first)', () => {
         passed: true,
         contentScores: [
           makeContentScore('concept-1', 0.95),
-          makeContentScore('concept-2', 0.90),
+          makeContentScore('concept-2', 0.9),
           makeContentScore('concept-3', 0.88),
-          makeContentScore('concept-4', 0.50),
-          makeContentScore('concept-5', 0.40),
+          makeContentScore('concept-4', 0.5),
+          makeContentScore('concept-5', 0.4),
         ],
       });
 
@@ -291,19 +273,14 @@ describe('PathAdaptationService (story-first)', () => {
         passed: true,
         contentScores: [
           makeContentScore('concept-1', 0.95),
-          makeContentScore('concept-2', 0.90),
+          makeContentScore('concept-2', 0.9),
           makeContentScore('concept-3', 0.88),
-          makeContentScore('concept-4', 0.50),
-          makeContentScore('concept-5', 0.40),
+          makeContentScore('concept-4', 0.5),
+          makeContentScore('concept-5', 0.4),
         ],
       });
 
-      service.recordPreAssessmentResult(
-        PATH_ID,
-        HUMAN_ID,
-        result,
-        sectionMapping
-      );
+      service.recordPreAssessmentResult(PATH_ID, HUMAN_ID, result, sectionMapping);
 
       // "all steps in section 'foundations' should be accessible"
       const gate = service.getGateStatus(PATH_ID, 'foundations', HUMAN_ID);
@@ -314,13 +291,13 @@ describe('PathAdaptationService (story-first)', () => {
     it('section below skip threshold should NOT be skippable', () => {
       const result = makeQuizResult({
         type: 'pre-assessment',
-        score: 0.60,
+        score: 0.6,
         passed: false,
         contentScores: [
-          makeContentScore('concept-1', 0.50),
+          makeContentScore('concept-1', 0.5),
           makeContentScore('concept-2', 0.55),
-          makeContentScore('concept-3', 0.60),
-          makeContentScore('concept-4', 0.70),
+          makeContentScore('concept-3', 0.6),
+          makeContentScore('concept-4', 0.7),
           makeContentScore('concept-5', 0.65),
         ],
       });
@@ -345,10 +322,10 @@ describe('PathAdaptationService (story-first)', () => {
         passed: true,
         contentScores: [
           makeContentScore('concept-1', 0.95),
-          makeContentScore('concept-2', 0.90),
+          makeContentScore('concept-2', 0.9),
           makeContentScore('concept-3', 0.88),
-          makeContentScore('concept-4', 0.50),
-          makeContentScore('concept-5', 0.40),
+          makeContentScore('concept-4', 0.5),
+          makeContentScore('concept-5', 0.4),
         ],
       });
 
@@ -508,9 +485,7 @@ describe('PathAdaptationService (story-first)', () => {
       service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       // Verify data exists
-      expect(service.getState(PATH_ID, HUMAN_ID).completedSections.size).toBe(
-        1
-      );
+      expect(service.getState(PATH_ID, HUMAN_ID).completedSections.size).toBe(1);
 
       // Clear
       service.clearState(PATH_ID, HUMAN_ID);
@@ -521,10 +496,7 @@ describe('PathAdaptationService (story-first)', () => {
     });
 
     it('applySkipAhead marks sections as skipped and completed', () => {
-      service.applySkipAhead(PATH_ID, HUMAN_ID, [
-        'section-a',
-        'section-b',
-      ]);
+      service.applySkipAhead(PATH_ID, HUMAN_ID, ['section-a', 'section-b']);
 
       const state = service.getState(PATH_ID, HUMAN_ID);
       expect(state.skippedSections.has('section-a')).toBe(true);
@@ -551,11 +523,10 @@ describe('PathAdaptationService (story-first)', () => {
     it('incomplete inline quizzes should block mastery gate when configured', () => {
       streakSpy.isAchieved.mockReturnValue(false);
 
-      const complete = service.areSectionInlinesComplete(
-        PATH_ID,
-        SECTION_ID,
-        ['content-1', 'content-2']
-      );
+      const complete = service.areSectionInlinesComplete(PATH_ID, SECTION_ID, [
+        'content-1',
+        'content-2',
+      ]);
 
       expect(complete).toBe(false);
     });
@@ -563,11 +534,10 @@ describe('PathAdaptationService (story-first)', () => {
     it('completed inline quizzes allow mastery gate', () => {
       streakSpy.isAchieved.mockReturnValue(true);
 
-      const complete = service.areSectionInlinesComplete(
-        PATH_ID,
-        SECTION_ID,
-        ['content-1', 'content-2']
-      );
+      const complete = service.areSectionInlinesComplete(PATH_ID, SECTION_ID, [
+        'content-1',
+        'content-2',
+      ]);
 
       expect(complete).toBe(true);
     });
@@ -576,11 +546,10 @@ describe('PathAdaptationService (story-first)', () => {
       service.configure({ requireInlineBeforeMastery: false });
       streakSpy.isAchieved.mockReturnValue(false);
 
-      const complete = service.areSectionInlinesComplete(
-        PATH_ID,
-        SECTION_ID,
-        ['content-1', 'content-2']
-      );
+      const complete = service.areSectionInlinesComplete(PATH_ID, SECTION_ID, [
+        'content-1',
+        'content-2',
+      ]);
 
       expect(complete).toBe(true);
     });

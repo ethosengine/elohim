@@ -32,17 +32,17 @@ describe('PathNegotiationService', () => {
 
   beforeEach(() => {
     sourceChainSpy = {
-    isInitialized: vi.fn(),
-    getAgentId: vi.fn(),
-    getEntriesByType: vi.fn(),
-    createEntry: vi.fn(),
-  };
+      isInitialized: vi.fn(),
+      getAgentId: vi.fn(),
+      getEntriesByType: vi.fn(),
+      createEntry: vi.fn(),
+    };
     consentServiceSpy = {
-    getConsentWith: vi.fn(),
-  };
+      getConsentWith: vi.fn(),
+    };
     affinityServiceSpy = {
-    getAffinities: vi.fn(),
-  };
+      getAffinities: vi.fn(),
+    };
 
     sourceChainSpy.isInitialized.mockReturnValue(true);
     sourceChainSpy.getAgentId.mockReturnValue(AGENT_ID);
@@ -69,460 +69,476 @@ describe('PathNegotiationService', () => {
   });
 
   describe('proposeNegotiation', () => {
-    it('should create a negotiation with intimate consent', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+    it('should create a negotiation with intimate consent', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-          message: "Let's create a love map!",
-        })
-        .subscribe({
-          next: negotiation => {
-            expect(negotiation.initiatorId).toBe(AGENT_ID);
-            expect(negotiation.participantId).toBe(OTHER_AGENT_ID);
-            expect(negotiation.status).toBe('proposed');
-            expect(negotiation.consentId).toBe('consent-123');
-            expect(negotiation.validatingAttestationIds).toEqual(['attest-1', 'attest-2']);
-            done();
-          },
-          error: done.fail,
-        });
-    }));
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+            message: "Let's create a love map!",
+          })
+          .subscribe({
+            next: negotiation => {
+              expect(negotiation.initiatorId).toBe(AGENT_ID);
+              expect(negotiation.participantId).toBe(OTHER_AGENT_ID);
+              expect(negotiation.status).toBe('proposed');
+              expect(negotiation.consentId).toBe('consent-123');
+              expect(negotiation.validatingAttestationIds).toEqual(['attest-1', 'attest-2']);
+              done();
+            },
+            error: done.fail,
+          });
+      }));
 
-    it('should error when negotiating with self', () => new Promise<void>(done => {
-      service
-        .proposeNegotiation({
-          participantId: AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: () => done.fail('Should have errored'),
-          error: err => {
-            expect(err.message).toContain('yourself');
-            done();
-          },
-        });
-    }));
+    it('should error when negotiating with self', () =>
+      new Promise<void>(done => {
+        service
+          .proposeNegotiation({
+            participantId: AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: () => done.fail('Should have errored'),
+            error: err => {
+              expect(err.message).toContain('yourself');
+              done();
+            },
+          });
+      }));
 
-    it('should error when no consent exists', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(null));
+    it('should error when no consent exists', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(null));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: () => done.fail('Should have errored'),
-          error: err => {
-            expect(err.message).toContain('No consent');
-            done();
-          },
-        });
-    }));
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: () => done.fail('Should have errored'),
+            error: err => {
+              expect(err.message).toContain('No consent');
+              done();
+            },
+          });
+      }));
 
-    it('should error when consent is not at intimate level', () => new Promise<void>(done => {
-      const connectionConsent = {
-        ...mockIntimateConsent,
-        intimacyLevel: 'connection' as IntimacyLevel,
-      };
-      consentServiceSpy.getConsentWith.mockReturnValue(of(connectionConsent));
+    it('should error when consent is not at intimate level', () =>
+      new Promise<void>(done => {
+        const connectionConsent = {
+          ...mockIntimateConsent,
+          intimacyLevel: 'connection' as IntimacyLevel,
+        };
+        consentServiceSpy.getConsentWith.mockReturnValue(of(connectionConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: () => done.fail('Should have errored'),
-          error: err => {
-            expect(err.message).toContain('Intimate-level');
-            done();
-          },
-        });
-    }));
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: () => done.fail('Should have errored'),
+            error: err => {
+              expect(err.message).toContain('Intimate-level');
+              done();
+            },
+          });
+      }));
 
-    it('should error when consent is not accepted', () => new Promise<void>(done => {
-      const pendingConsent = {
-        ...mockIntimateConsent,
-        consentState: 'pending' as ConsentState,
-      };
-      consentServiceSpy.getConsentWith.mockReturnValue(of(pendingConsent));
+    it('should error when consent is not accepted', () =>
+      new Promise<void>(done => {
+        const pendingConsent = {
+          ...mockIntimateConsent,
+          consentState: 'pending' as ConsentState,
+        };
+        consentServiceSpy.getConsentWith.mockReturnValue(of(pendingConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: () => done.fail('Should have errored'),
-          error: err => {
-            expect(err.message).toContain('accepted');
-            done();
-          },
-        });
-    }));
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: () => done.fail('Should have errored'),
+            error: err => {
+              expect(err.message).toContain('accepted');
+              done();
+            },
+          });
+      }));
   });
 
   describe('acceptNegotiation', () => {
-    it('should accept a proposed negotiation', () => new Promise<void>(done => {
-      // First create a negotiation
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+    it('should accept a proposed negotiation', () =>
+      new Promise<void>(done => {
+        // First create a negotiation
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: negotiation => {
-            // Switch agent to participant
-            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: negotiation => {
+              // Switch agent to participant
+              sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
-            service.acceptNegotiation(negotiation.id).subscribe({
-              next: accepted => {
-                // Should be in analyzing or negotiating state after acceptance
-                expect(['analyzing', 'negotiating']).toContain(accepted.status);
-                done();
-              },
-              error: done.fail,
-            });
+              service.acceptNegotiation(negotiation.id).subscribe({
+                next: accepted => {
+                  // Should be in analyzing or negotiating state after acceptance
+                  expect(['analyzing', 'negotiating']).toContain(accepted.status);
+                  done();
+                },
+                error: done.fail,
+              });
+            },
+            error: done.fail,
+          });
+      }));
+
+    it('should error when negotiation not found', () =>
+      new Promise<void>(done => {
+        service.acceptNegotiation('nonexistent').subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('not found');
+            done();
           },
-          error: done.fail,
         });
-    }));
-
-    it('should error when negotiation not found', () => new Promise<void>(done => {
-      service.acceptNegotiation('nonexistent').subscribe({
-        next: () => done.fail('Should have errored'),
-        error: err => {
-          expect(err.message).toContain('not found');
-          done();
-        },
-      });
-    }));
+      }));
   });
 
   describe('declineNegotiation', () => {
-    it('should decline a proposed negotiation', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+    it('should decline a proposed negotiation', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: negotiation => {
-            // Switch agent to participant
-            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: negotiation => {
+              // Switch agent to participant
+              sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
-            service.declineNegotiation(negotiation.id, 'Not ready').subscribe({
-              next: () => {
-                const negotiations = (service as any).negotiationsSubject.value;
-                const declined = negotiations.find((n: any) => n.id === negotiation.id);
-                expect(declined.status).toBe('declined');
-                done();
-              },
-              error: done.fail,
-            });
-          },
-          error: done.fail,
-        });
-    }));
+              service.declineNegotiation(negotiation.id, 'Not ready').subscribe({
+                next: () => {
+                  const negotiations = (service as any).negotiationsSubject.value;
+                  const declined = negotiations.find((n: any) => n.id === negotiation.id);
+                  expect(declined.status).toBe('declined');
+                  done();
+                },
+                error: done.fail,
+              });
+            },
+            error: done.fail,
+          });
+      }));
   });
 
   describe('generateBridgingPath', () => {
-    it('should generate a path structure', () => new Promise<void>(done => {
-      // Create mock negotiation in negotiating state
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: ['concept-1', 'concept-2', 'concept-3'],
-        divergentNodes: {
-          initiator: ['concept-4', 'concept-5'],
-          participant: ['concept-6', 'concept-7'],
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
-
-      (service as any).negotiationsSubject.next([mockNegotiation]);
-
-      service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
-        next: proposedPath => {
-          expect(proposedPath.title).toBe('Common Ground Path');
-          expect(proposedPath.conceptIds).toEqual(['concept-1', 'concept-2', 'concept-3']);
-          expect(proposedPath.stats.sharedConcepts).toBe(3);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
-
-    it('should generate complementary path with teaching concepts', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: ['shared-1', 'shared-2', 'shared-3', 'shared-4'],
-        divergentNodes: {
-          initiator: ['init-1', 'init-2', 'init-3', 'init-4'],
-          participant: ['part-1', 'part-2', 'part-3', 'part-4'],
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
-
-      (service as any).negotiationsSubject.next([mockNegotiation]);
-
-      service.generateBridgingPath('neg-123', 'complementary').subscribe({
-        next: proposedPath => {
-          expect(proposedPath.title).toBe('Mutual Learning Path');
-          // Should have mix of initiator, shared, and participant concepts
-          expect(proposedPath.stats.initiatorTeaching).toBeGreaterThan(0);
-          expect(proposedPath.stats.participantTeaching).toBeGreaterThan(0);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
-
-    it('should error when negotiation not in negotiating state', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'proposed' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
-
-      (service as any).negotiationsSubject.next([mockNegotiation]);
-
-      service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
-        next: () => done.fail('Should have errored'),
-        error: err => {
-          expect(err.message).toContain('negotiating state');
-          done();
-        },
-      });
-    }));
-  });
-
-  describe('acceptGeneratedPath', () => {
-    it('should accept path and finalize negotiation', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: ['concept-1'],
-        divergentNodes: { initiator: [], participant: [] },
-        proposedPathStructure: {
-          title: 'Test Path',
-          description: 'A test path',
-          stepCount: 1,
-          estimatedDuration: '15 minutes',
-          conceptIds: ['concept-1'],
-          stats: {
-            sharedConcepts: 1,
-            initiatorTeaching: 0,
-            participantTeaching: 0,
-            novelConcepts: 0,
+    it('should generate a path structure', () =>
+      new Promise<void>(done => {
+        // Create mock negotiation in negotiating state
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: ['concept-1', 'concept-2', 'concept-3'],
+          divergentNodes: {
+            initiator: ['concept-4', 'concept-5'],
+            participant: ['concept-6', 'concept-7'],
           },
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service
-        .acceptGeneratedPath({
-          negotiationId: 'neg-123',
-          accept: true,
-        })
-        .subscribe({
-          next: negotiation => {
-            expect(negotiation.status).toBe('accepted');
-            expect(negotiation.generatedPathId).toBeDefined();
-            expect(negotiation.resolvedAt).toBeDefined();
+        service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
+          next: proposedPath => {
+            expect(proposedPath.title).toBe('Common Ground Path');
+            expect(proposedPath.conceptIds).toEqual(['concept-1', 'concept-2', 'concept-3']);
+            expect(proposedPath.stats.sharedConcepts).toBe(3);
             done();
           },
           error: done.fail,
         });
-    }));
+      }));
+
+    it('should generate complementary path with teaching concepts', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: ['shared-1', 'shared-2', 'shared-3', 'shared-4'],
+          divergentNodes: {
+            initiator: ['init-1', 'init-2', 'init-3', 'init-4'],
+            participant: ['part-1', 'part-2', 'part-3', 'part-4'],
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
+
+        (service as any).negotiationsSubject.next([mockNegotiation]);
+
+        service.generateBridgingPath('neg-123', 'complementary').subscribe({
+          next: proposedPath => {
+            expect(proposedPath.title).toBe('Mutual Learning Path');
+            // Should have mix of initiator, shared, and participant concepts
+            expect(proposedPath.stats.initiatorTeaching).toBeGreaterThan(0);
+            expect(proposedPath.stats.participantTeaching).toBeGreaterThan(0);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should error when negotiation not in negotiating state', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'proposed' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
+
+        (service as any).negotiationsSubject.next([mockNegotiation]);
+
+        service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('negotiating state');
+            done();
+          },
+        });
+      }));
+  });
+
+  describe('acceptGeneratedPath', () => {
+    it('should accept path and finalize negotiation', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: ['concept-1'],
+          divergentNodes: { initiator: [], participant: [] },
+          proposedPathStructure: {
+            title: 'Test Path',
+            description: 'A test path',
+            stepCount: 1,
+            estimatedDuration: '15 minutes',
+            conceptIds: ['concept-1'],
+            stats: {
+              sharedConcepts: 1,
+              initiatorTeaching: 0,
+              participantTeaching: 0,
+              novelConcepts: 0,
+            },
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
+
+        (service as any).negotiationsSubject.next([mockNegotiation]);
+
+        service
+          .acceptGeneratedPath({
+            negotiationId: 'neg-123',
+            accept: true,
+          })
+          .subscribe({
+            next: negotiation => {
+              expect(negotiation.status).toBe('accepted');
+              expect(negotiation.generatedPathId).toBeDefined();
+              expect(negotiation.resolvedAt).toBeDefined();
+              done();
+            },
+            error: done.fail,
+          });
+      }));
   });
 
   describe('getMyNegotiations', () => {
-    it('should return all negotiations for current agent', () => new Promise<void>(done => {
-      const negotiations = [
-        {
-          id: 'neg-1',
-          initiatorId: AGENT_ID,
-          participantId: OTHER_AGENT_ID,
-          status: 'proposed' as NegotiationStatus,
-          consentId: 'c1',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-        {
-          id: 'neg-2',
-          initiatorId: 'another-agent',
-          participantId: AGENT_ID,
-          status: 'accepted' as NegotiationStatus,
-          consentId: 'c2',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-      ];
+    it('should return all negotiations for current agent', () =>
+      new Promise<void>(done => {
+        const negotiations = [
+          {
+            id: 'neg-1',
+            initiatorId: AGENT_ID,
+            participantId: OTHER_AGENT_ID,
+            status: 'proposed' as NegotiationStatus,
+            consentId: 'c1',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+          {
+            id: 'neg-2',
+            initiatorId: 'another-agent',
+            participantId: AGENT_ID,
+            status: 'accepted' as NegotiationStatus,
+            consentId: 'c2',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+        ];
 
-      (service as any).negotiationsSubject.next(negotiations);
+        (service as any).negotiationsSubject.next(negotiations);
 
-      service.getMyNegotiations().subscribe({
-        next: result => {
-          expect(result.length).toBe(2);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.getMyNegotiations().subscribe({
+          next: result => {
+            expect(result.length).toBe(2);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should filter by status', () => new Promise<void>(done => {
-      const negotiations = [
-        {
-          id: 'neg-1',
-          initiatorId: AGENT_ID,
-          participantId: OTHER_AGENT_ID,
-          status: 'proposed' as NegotiationStatus,
-          consentId: 'c1',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-        {
-          id: 'neg-2',
-          initiatorId: AGENT_ID,
-          participantId: 'another-agent',
-          status: 'accepted' as NegotiationStatus,
-          consentId: 'c2',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-      ];
+    it('should filter by status', () =>
+      new Promise<void>(done => {
+        const negotiations = [
+          {
+            id: 'neg-1',
+            initiatorId: AGENT_ID,
+            participantId: OTHER_AGENT_ID,
+            status: 'proposed' as NegotiationStatus,
+            consentId: 'c1',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+          {
+            id: 'neg-2',
+            initiatorId: AGENT_ID,
+            participantId: 'another-agent',
+            status: 'accepted' as NegotiationStatus,
+            consentId: 'c2',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+        ];
 
-      (service as any).negotiationsSubject.next(negotiations);
+        (service as any).negotiationsSubject.next(negotiations);
 
-      service.getMyNegotiations({ status: 'proposed' }).subscribe({
-        next: result => {
-          expect(result.length).toBe(1);
-          expect(result[0].id).toBe('neg-1');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.getMyNegotiations({ status: 'proposed' }).subscribe({
+          next: result => {
+            expect(result.length).toBe(1);
+            expect(result[0].id).toBe('neg-1');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('sendMessage', () => {
-    it('should add a message to active negotiation', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+    it('should add a message to active negotiation', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service.sendMessage('neg-123', 'Hello!', 'comment').subscribe({
-        next: negotiation => {
-          expect(negotiation.negotiationLog.length).toBe(1);
-          expect(negotiation.negotiationLog[0].content).toBe('Hello!');
-          expect(negotiation.negotiationLog[0].type).toBe('comment');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.sendMessage('neg-123', 'Hello!', 'comment').subscribe({
+          next: negotiation => {
+            expect(negotiation.negotiationLog.length).toBe(1);
+            expect(negotiation.negotiationLog[0].content).toBe('Hello!');
+            expect(negotiation.negotiationLog[0].type).toBe('comment');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should error on resolved negotiation', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'accepted' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+    it('should error on resolved negotiation', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'accepted' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service.sendMessage('neg-123', 'Hello!').subscribe({
-        next: () => done.fail('Should have errored'),
-        error: err => {
-          expect(err.message).toContain('resolved');
-          done();
-        },
-      });
-    }));
+        service.sendMessage('neg-123', 'Hello!').subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('resolved');
+            done();
+          },
+        });
+      }));
   });
 
   describe('initialization and loadNegotiations', () => {
@@ -622,19 +638,20 @@ describe('PathNegotiationService', () => {
   });
 
   describe('analyzeSharedAffinities', () => {
-    it('should return placeholder affinity analysis', () => new Promise<void>(done => {
-      service.analyzeSharedAffinities('human-1', 'human-2').subscribe(analysis => {
-        expect(analysis.human1Id).toBe('human-1');
-        expect(analysis.human2Id).toBe('human-2');
-        expect(analysis.analyzedAt).toBeDefined();
-        expect(analysis.sharedHighAffinity).toEqual([]);
-        expect(analysis.divergent.human1Only).toEqual([]);
-        expect(analysis.divergent.human2Only).toEqual([]);
-        expect(analysis.compatibilityScore).toBe(0);
-        expect(analysis.recommendedStrategies).toContain('maximum_overlap');
-        done();
-      });
-    }));
+    it('should return placeholder affinity analysis', () =>
+      new Promise<void>(done => {
+        service.analyzeSharedAffinities('human-1', 'human-2').subscribe(analysis => {
+          expect(analysis.human1Id).toBe('human-1');
+          expect(analysis.human2Id).toBe('human-2');
+          expect(analysis.analyzedAt).toBeDefined();
+          expect(analysis.sharedHighAffinity).toEqual([]);
+          expect(analysis.divergent.human1Only).toEqual([]);
+          expect(analysis.divergent.human2Only).toEqual([]);
+          expect(analysis.compatibilityScore).toBe(0);
+          expect(analysis.recommendedStrategies).toContain('maximum_overlap');
+          done();
+        });
+      }));
   });
 
   describe('generateBridgingPath with different strategies', () => {
@@ -662,345 +679,360 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next([mockNegotiation]);
     });
 
-    it('should generate shortest_path strategy', () => new Promise<void>(done => {
-      service.generateBridgingPath('neg-123', 'shortest_path').subscribe(proposedPath => {
-        expect(proposedPath.title).toBe('Quick Connection Path');
-        expect(proposedPath.conceptIds.length).toBeLessThanOrEqual(5);
-        expect(proposedPath.stats.sharedConcepts).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should generate shortest_path strategy', () =>
+      new Promise<void>(done => {
+        service.generateBridgingPath('neg-123', 'shortest_path').subscribe(proposedPath => {
+          expect(proposedPath.title).toBe('Quick Connection Path');
+          expect(proposedPath.conceptIds.length).toBeLessThanOrEqual(5);
+          expect(proposedPath.stats.sharedConcepts).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should generate exploration strategy', () => new Promise<void>(done => {
-      service.generateBridgingPath('neg-123', 'exploration').subscribe(proposedPath => {
-        expect(proposedPath.title).toBe('Shared Adventure Path');
-        // Should have a mix of shared and divergent
-        expect(proposedPath.conceptIds.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should generate exploration strategy', () =>
+      new Promise<void>(done => {
+        service.generateBridgingPath('neg-123', 'exploration').subscribe(proposedPath => {
+          expect(proposedPath.title).toBe('Shared Adventure Path');
+          // Should have a mix of shared and divergent
+          expect(proposedPath.conceptIds.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should fallback to default when unknown strategy', () => new Promise<void>(done => {
-      service.generateBridgingPath('neg-123', 'unknown-strategy' as any).subscribe(proposedPath => {
-        expect(proposedPath.title).toBe('Love Map Path');
-        expect(proposedPath.conceptIds).toEqual(mockNegotiation.sharedAffinityNodes);
-        done();
-      });
-    }));
+    it('should fallback to default when unknown strategy', () =>
+      new Promise<void>(done => {
+        service
+          .generateBridgingPath('neg-123', 'unknown-strategy' as any)
+          .subscribe(proposedPath => {
+            expect(proposedPath.title).toBe('Love Map Path');
+            expect(proposedPath.conceptIds).toEqual(mockNegotiation.sharedAffinityNodes);
+            done();
+          });
+      }));
   });
 
   describe('acceptGeneratedPath with rejection', () => {
-    it('should request changes when accept is false', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: ['concept-1'],
-        divergentNodes: { initiator: [], participant: [] },
-        proposedPathStructure: {
-          title: 'Test Path',
-          description: 'A test path',
-          stepCount: 1,
-          estimatedDuration: '15 minutes',
-          conceptIds: ['concept-1'],
-          stats: {
-            sharedConcepts: 1,
-            initiatorTeaching: 0,
-            participantTeaching: 0,
-            novelConcepts: 0,
+    it('should request changes when accept is false', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: ['concept-1'],
+          divergentNodes: { initiator: [], participant: [] },
+          proposedPathStructure: {
+            title: 'Test Path',
+            description: 'A test path',
+            stepCount: 1,
+            estimatedDuration: '15 minutes',
+            conceptIds: ['concept-1'],
+            stats: {
+              sharedConcepts: 1,
+              initiatorTeaching: 0,
+              participantTeaching: 0,
+              novelConcepts: 0,
+            },
           },
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service
-        .acceptGeneratedPath({
-          negotiationId: 'neg-123',
-          accept: false,
-          feedback: 'Needs more shared concepts',
-        })
-        .subscribe({
-          next: negotiation => {
-            expect(negotiation.negotiationLog.length).toBe(1);
-            expect(negotiation.negotiationLog[0].type).toBe('counter');
-            expect(negotiation.negotiationLog[0].content).toBe('Needs more shared concepts');
-            // Status should remain negotiating
-            expect(negotiation.status).toBe('negotiating');
-            done();
-          },
-          error: done.fail,
-        });
-    }));
+        service
+          .acceptGeneratedPath({
+            negotiationId: 'neg-123',
+            accept: false,
+            feedback: 'Needs more shared concepts',
+          })
+          .subscribe({
+            next: negotiation => {
+              expect(negotiation.negotiationLog.length).toBe(1);
+              expect(negotiation.negotiationLog[0].type).toBe('counter');
+              expect(negotiation.negotiationLog[0].content).toBe('Needs more shared concepts');
+              // Status should remain negotiating
+              expect(negotiation.status).toBe('negotiating');
+              done();
+            },
+            error: done.fail,
+          });
+      }));
 
-    it('should error when no proposed path exists', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'negotiating' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        proposedPathStructure: undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+    it('should error when no proposed path exists', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'negotiating' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          proposedPathStructure: undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service
-        .acceptGeneratedPath({
-          negotiationId: 'neg-123',
-          accept: true,
-        })
-        .subscribe({
-          next: () => done.fail('Should have errored'),
-          error: err => {
-            expect(err.message).toContain('No proposed path');
-            done();
-          },
-        });
-    }));
+        service
+          .acceptGeneratedPath({
+            negotiationId: 'neg-123',
+            accept: true,
+          })
+          .subscribe({
+            next: () => done.fail('Should have errored'),
+            error: err => {
+              expect(err.message).toContain('No proposed path');
+              done();
+            },
+          });
+      }));
   });
 
   describe('getPendingNegotiations', () => {
-    it('should return negotiations where current user is participant and status is proposed', () => new Promise<void>(done => {
-      const negotiations = [
-        {
-          id: 'neg-1',
-          initiatorId: 'other-agent',
-          participantId: AGENT_ID,
-          status: 'proposed' as NegotiationStatus,
-          consentId: 'c1',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-        {
-          id: 'neg-2',
-          initiatorId: AGENT_ID,
-          participantId: OTHER_AGENT_ID,
-          status: 'proposed' as NegotiationStatus,
-          consentId: 'c2',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-        {
-          id: 'neg-3',
-          initiatorId: 'another-agent',
-          participantId: AGENT_ID,
-          status: 'accepted' as NegotiationStatus,
-          consentId: 'c3',
-          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-          validatingAttestationIds: [],
-          sharedAffinityNodes: [],
-          divergentNodes: { initiator: [], participant: [] },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          negotiationLog: [],
-        },
-      ];
+    it('should return negotiations where current user is participant and status is proposed', () =>
+      new Promise<void>(done => {
+        const negotiations = [
+          {
+            id: 'neg-1',
+            initiatorId: 'other-agent',
+            participantId: AGENT_ID,
+            status: 'proposed' as NegotiationStatus,
+            consentId: 'c1',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+          {
+            id: 'neg-2',
+            initiatorId: AGENT_ID,
+            participantId: OTHER_AGENT_ID,
+            status: 'proposed' as NegotiationStatus,
+            consentId: 'c2',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+          {
+            id: 'neg-3',
+            initiatorId: 'another-agent',
+            participantId: AGENT_ID,
+            status: 'accepted' as NegotiationStatus,
+            consentId: 'c3',
+            requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+            validatingAttestationIds: [],
+            sharedAffinityNodes: [],
+            divergentNodes: { initiator: [], participant: [] },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            negotiationLog: [],
+          },
+        ];
 
-      (service as any).negotiationsSubject.next(negotiations);
+        (service as any).negotiationsSubject.next(negotiations);
 
-      service.getPendingNegotiations().subscribe({
-        next: result => {
-          expect(result.length).toBe(1);
-          expect(result[0].id).toBe('neg-1');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.getPendingNegotiations().subscribe({
+          next: result => {
+            expect(result.length).toBe(1);
+            expect(result[0].id).toBe('neg-1');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getNegotiation', () => {
-    it('should return specific negotiation by ID', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'proposed' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
+    it('should return specific negotiation by ID', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'proposed' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
 
-      (service as any).negotiationsSubject.next([mockNegotiation]);
+        (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service.getNegotiation('neg-123').subscribe({
-        next: negotiation => {
-          expect(negotiation).not.toBeNull();
-          expect(negotiation?.id).toBe('neg-123');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.getNegotiation('neg-123').subscribe({
+          next: negotiation => {
+            expect(negotiation).not.toBeNull();
+            expect(negotiation?.id).toBe('neg-123');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return null for non-existent ID', () => new Promise<void>(done => {
-      service.getNegotiation('nonexistent').subscribe({
-        next: negotiation => {
-          expect(negotiation).toBeNull();
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+    it('should return null for non-existent ID', () =>
+      new Promise<void>(done => {
+        service.getNegotiation('nonexistent').subscribe({
+          next: negotiation => {
+            expect(negotiation).toBeNull();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('acceptNegotiation error cases', () => {
-    it('should error when only initiator tries to accept', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+    it('should error when only initiator tries to accept', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: negotiation => {
-            // Initiator (current agent) tries to accept their own proposal
-            service.acceptNegotiation(negotiation.id).subscribe({
-              next: () => done.fail('Should have errored'),
-              error: err => {
-                expect(err.message).toContain('Only the participant can accept');
-                done();
-              },
-            });
-          },
-          error: done.fail,
-        });
-    }));
-
-    it('should error when negotiation is not in proposed state', () => new Promise<void>(done => {
-      const mockNegotiation = {
-        id: 'neg-123',
-        initiatorId: AGENT_ID,
-        participantId: OTHER_AGENT_ID,
-        status: 'accepted' as NegotiationStatus,
-        consentId: 'consent-123',
-        requiredIntimacyLevel: 'intimate' as IntimacyLevel,
-        validatingAttestationIds: [],
-        sharedAffinityNodes: [],
-        divergentNodes: { initiator: [], participant: [] },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        negotiationLog: [],
-      };
-
-      (service as any).negotiationsSubject.next([mockNegotiation]);
-      sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
-
-      service.acceptNegotiation('neg-123').subscribe({
-        next: () => done.fail('Should have errored'),
-        error: err => {
-          expect(err.message).toContain('not in proposed state');
-          done();
-        },
-      });
-    }));
-
-    it('should apply participant strategy preference when accepting', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
-
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-          preferredStrategy: 'shortest_path',
-        })
-        .subscribe({
-          next: negotiation => {
-            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
-
-            service
-              .acceptNegotiation(negotiation.id, {
-                negotiationId: negotiation.id,
-                accept: true,
-                preferredStrategy: 'complementary',
-                message: 'Lets do complementary learning',
-              })
-              .subscribe({
-                next: accepted => {
-                  expect(accepted.bridgingStrategy).toBe('complementary');
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: negotiation => {
+              // Initiator (current agent) tries to accept their own proposal
+              service.acceptNegotiation(negotiation.id).subscribe({
+                next: () => done.fail('Should have errored'),
+                error: err => {
+                  expect(err.message).toContain('Only the participant can accept');
                   done();
                 },
-                error: done.fail,
               });
+            },
+            error: done.fail,
+          });
+      }));
+
+    it('should error when negotiation is not in proposed state', () =>
+      new Promise<void>(done => {
+        const mockNegotiation = {
+          id: 'neg-123',
+          initiatorId: AGENT_ID,
+          participantId: OTHER_AGENT_ID,
+          status: 'accepted' as NegotiationStatus,
+          consentId: 'consent-123',
+          requiredIntimacyLevel: 'intimate' as IntimacyLevel,
+          validatingAttestationIds: [],
+          sharedAffinityNodes: [],
+          divergentNodes: { initiator: [], participant: [] },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          negotiationLog: [],
+        };
+
+        (service as any).negotiationsSubject.next([mockNegotiation]);
+        sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
+
+        service.acceptNegotiation('neg-123').subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('not in proposed state');
+            done();
           },
-          error: done.fail,
         });
-    }));
+      }));
+
+    it('should apply participant strategy preference when accepting', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+            preferredStrategy: 'shortest_path',
+          })
+          .subscribe({
+            next: negotiation => {
+              sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
+
+              service
+                .acceptNegotiation(negotiation.id, {
+                  negotiationId: negotiation.id,
+                  accept: true,
+                  preferredStrategy: 'complementary',
+                  message: 'Lets do complementary learning',
+                })
+                .subscribe({
+                  next: accepted => {
+                    expect(accepted.bridgingStrategy).toBe('complementary');
+                    done();
+                  },
+                  error: done.fail,
+                });
+            },
+            error: done.fail,
+          });
+      }));
   });
 
   describe('proposeNegotiation with active negotiation check', () => {
-    it('should error when active negotiation already exists with participant', () => new Promise<void>(done => {
-      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
+    it('should error when active negotiation already exists with participant', () =>
+      new Promise<void>(done => {
+        consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
-      // First proposal
-      service
-        .proposeNegotiation({
-          participantId: OTHER_AGENT_ID,
-          consentId: 'consent-123',
-        })
-        .subscribe({
-          next: () => {
-            // Second proposal to same participant
-            service
-              .proposeNegotiation({
-                participantId: OTHER_AGENT_ID,
-                consentId: 'consent-123',
-              })
-              .subscribe({
-                next: () => done.fail('Should have errored'),
-                error: err => {
-                  expect(err.message).toContain('active negotiation already exists');
-                  done();
-                },
-              });
-          },
-          error: done.fail,
-        });
-    }));
+        // First proposal
+        service
+          .proposeNegotiation({
+            participantId: OTHER_AGENT_ID,
+            consentId: 'consent-123',
+          })
+          .subscribe({
+            next: () => {
+              // Second proposal to same participant
+              service
+                .proposeNegotiation({
+                  participantId: OTHER_AGENT_ID,
+                  consentId: 'consent-123',
+                })
+                .subscribe({
+                  next: () => done.fail('Should have errored'),
+                  error: err => {
+                    expect(err.message).toContain('active negotiation already exists');
+                    done();
+                  },
+                });
+            },
+            error: done.fail,
+          });
+      }));
   });
 
   describe('error handling for uninitialized source chain', () => {
-    it('should throw when calling getCurrentAgentId with uninitialized source chain', () => new Promise<void>(done => {
-      sourceChainSpy.isInitialized.mockReturnValue(false);
+    it('should throw when calling getCurrentAgentId with uninitialized source chain', () =>
+      new Promise<void>(done => {
+        sourceChainSpy.isInitialized.mockReturnValue(false);
 
-      try {
-        (service as any).getCurrentAgentId();
-        done.fail('Should have thrown');
-      } catch (err: any) {
-        expect(err.message).toContain('Source chain not initialized');
-        done();
-      }
-    }));
+        try {
+          (service as any).getCurrentAgentId();
+          done.fail('Should have thrown');
+        } catch (err: any) {
+          expect(err.message).toContain('Source chain not initialized');
+          done();
+        }
+      }));
   });
 });

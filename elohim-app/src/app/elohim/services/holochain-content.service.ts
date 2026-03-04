@@ -812,7 +812,7 @@ export class HolochainContentService {
   // Custodian selection service for CDN-like content serving
   private readonly custodianSelection = inject(CustodianSelectionService);
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Get content by ID with request coalescing.

@@ -8,7 +8,12 @@ import { of } from 'rxjs';
 import { StewardedResourceService } from './stewarded-resources.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { EconomicService } from './economic.service';
-import { ConstitutionalLimit, FinancialAsset, IncomeStream, FinancialObligation } from '@app/shefa/models/stewarded-resources.model';
+import {
+  ConstitutionalLimit,
+  FinancialAsset,
+  IncomeStream,
+  FinancialObligation,
+} from '@app/shefa/models/stewarded-resources.model';
 import { vi } from 'vitest';
 
 describe('StewardedResourceService', () => {
@@ -18,11 +23,11 @@ describe('StewardedResourceService', () => {
 
   beforeEach(() => {
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
     mockEconomicService = {
-    createEvent: vi.fn(),
-  };
+      createEvent: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -455,9 +460,7 @@ describe('StewardedResourceService', () => {
   describe('Error Handling', () => {
     describe('getResource', () => {
       it('should return null when resource not found', async () => {
-        mockHolochain.callZome.mockReturnValue(
-          Promise.reject(new Error('Resource not found'))
-        );
+        mockHolochain.callZome.mockReturnValue(Promise.reject(new Error('Resource not found')));
 
         const result = await service.getResource('nonexistent-id');
 
@@ -466,9 +469,7 @@ describe('StewardedResourceService', () => {
 
       it('should log warning for unexpected errors', async () => {
         vi.spyOn(console, 'warn');
-        mockHolochain.callZome.mockReturnValue(
-          Promise.reject(new Error('Network error'))
-        );
+        mockHolochain.callZome.mockReturnValue(Promise.reject(new Error('Network error')));
 
         await service.getResource('test-id');
 
@@ -478,9 +479,7 @@ describe('StewardedResourceService', () => {
 
     describe('getStewardResources', () => {
       it('should return empty array on error', async () => {
-        mockHolochain.callZome.mockReturnValue(
-          Promise.reject(new Error('Connection failed'))
-        );
+        mockHolochain.callZome.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
         const result = await service.getStewardResources('steward-id');
 
@@ -489,9 +488,7 @@ describe('StewardedResourceService', () => {
 
       it('should log warning on error', async () => {
         vi.spyOn(console, 'warn');
-        mockHolochain.callZome.mockReturnValue(
-          Promise.reject(new Error('Connection failed'))
-        );
+        mockHolochain.callZome.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
         await service.getStewardResources('steward-id');
 
@@ -561,13 +558,10 @@ describe('StewardedResourceService', () => {
       mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
       mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
-      const result = await service.createResource(
-        'steward-1',
-        'compute',
-        'cpu',
-        'Primary Node',
-        { value: 8, unit: 'cores' }
-      );
+      const result = await service.createResource('steward-1', 'compute', 'cpu', 'Primary Node', {
+        value: 8,
+        unit: 'cores',
+      });
 
       expect(result.allocations).toEqual([]);
       expect(result.totalAllocated.value).toBe(0);
@@ -631,11 +625,10 @@ describe('StewardedResourceService', () => {
       mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
       mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
-      const result = await service.createAllocation(
-        'resource-1',
-        'Household Apps',
-        { value: 2, unit: 'cores' }
-      );
+      const result = await service.createAllocation('resource-1', 'Household Apps', {
+        value: 2,
+        unit: 'cores',
+      });
 
       expect(result).toBeDefined();
       expect(result.label).toBe('Household Apps');
@@ -665,11 +658,10 @@ describe('StewardedResourceService', () => {
       mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
       mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-123' }) as any);
 
-      const result = await service.recordUsage(
-        'resource-1',
-        'alloc-1',
-        { value: 0.5, unit: 'cores' }
-      );
+      const result = await service.recordUsage('resource-1', 'alloc-1', {
+        value: 0.5,
+        unit: 'cores',
+      });
 
       expect(result).toBeDefined();
       expect(result.quantity.value).toBe(0.5);
@@ -709,11 +701,10 @@ describe('StewardedResourceService', () => {
         Promise.resolve({ success: true, data: mockResource })
       );
 
-      const result = await service.updateAllocationUtilization(
-        'res-1',
-        'alloc-1',
-        { value: 7, unit: 'GB' }
-      );
+      const result = await service.updateAllocationUtilization('res-1', 'alloc-1', {
+        value: 7,
+        unit: 'GB',
+      });
 
       expect(result).toBeDefined();
       expect(result?.used.value).toBe(7);
@@ -723,11 +714,10 @@ describe('StewardedResourceService', () => {
     it('should return null when resource not found', async () => {
       mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
-      const result = await service.updateAllocationUtilization(
-        'nonexistent',
-        'alloc-1',
-        { value: 5, unit: 'GB' }
-      );
+      const result = await service.updateAllocationUtilization('nonexistent', 'alloc-1', {
+        value: 5,
+        unit: 'GB',
+      });
 
       expect(result).toBeNull();
     });
@@ -742,11 +732,10 @@ describe('StewardedResourceService', () => {
         Promise.resolve({ success: true, data: mockResource })
       );
 
-      const result = await service.updateAllocationUtilization(
-        'res-1',
-        'nonexistent-alloc',
-        { value: 5, unit: 'GB' }
-      );
+      const result = await service.updateAllocationUtilization('res-1', 'nonexistent-alloc', {
+        value: 5,
+        unit: 'GB',
+      });
 
       expect(result).toBeNull();
     });
@@ -1022,9 +1011,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: mockAssets })
-      );
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockAssets }));
 
       const result = await service.buildFinancialView('steward-1');
 
@@ -1054,9 +1041,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: mockAssets })
-      );
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockAssets }));
 
       const result = await service.buildFinancialView('steward-1');
 

@@ -359,7 +359,9 @@ describe('TrustBadgeService', () => {
       tick();
 
       expect(indicators.flags.length).toBe(1);
-      const negativeIndicators = indicators.indicators.filter((ind: any) => ind.polarity === 'negative');
+      const negativeIndicators = indicators.indicators.filter(
+        (ind: any) => ind.polarity === 'negative'
+      );
       expect(negativeIndicators.length).toBeGreaterThan(0);
     }));
 
@@ -478,7 +480,8 @@ describe('TrustBadgeService', () => {
     });
 
     it('should return empty array when all attestations obtained', () => {
-      const allAttestations: import('@app/lamad/models/content-attestation.model').ContentAttestationType[] = ['author-verified'];
+      const allAttestations: import('@app/lamad/models/content-attestation.model').ContentAttestationType[] =
+        ['author-verified'];
       const needed = service.getAttestationsNeededForNextLevel('private', allAttestations);
       expect(needed.length).toBe(0);
     });

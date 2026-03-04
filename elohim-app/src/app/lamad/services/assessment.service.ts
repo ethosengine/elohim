@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 98.5% (2026-02-24)
 
@@ -103,10 +103,8 @@ export class AssessmentService {
   // Active session (one at a time)
   private readonly activeSession$ = new BehaviorSubject<AssessmentSession | null>(null);
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly sessionUser: SessionHumanService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly sessionUser = inject(SessionHumanService);
 
   // =========================================================================
   // Assessment Discovery

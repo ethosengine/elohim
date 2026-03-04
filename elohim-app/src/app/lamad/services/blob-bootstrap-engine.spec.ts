@@ -219,9 +219,10 @@ describe('BlobBootstrapEngine', () => {
       expect(eventTypes).toContain('ready');
 
       // Verify status progression
-      const statusEvents = capturedEvents.filter(
-        e => e.type === 'status-changed'
-      ) as Extract<BlobBootstrapEvent, { type: 'status-changed' }>[];
+      const statusEvents = capturedEvents.filter(e => e.type === 'status-changed') as Extract<
+        BlobBootstrapEvent,
+        { type: 'status-changed' }
+      >[];
 
       expect(statusEvents.length).toBeGreaterThan(0);
       expect(statusEvents[0].status).toBe('initializing');
@@ -444,9 +445,10 @@ describe('BlobBootstrapEngine', () => {
       await waitForBootstrapReady(engine, 2000);
 
       // Assert: Event payload matches state
-      const metadataEvent = capturedEvents.find(
-        e => e.type === 'metadata-loaded'
-      ) as Extract<BlobBootstrapEvent, { type: 'metadata-loaded' }>;
+      const metadataEvent = capturedEvents.find(e => e.type === 'metadata-loaded') as Extract<
+        BlobBootstrapEvent,
+        { type: 'metadata-loaded' }
+      >;
 
       expect(metadataEvent).toBeDefined();
       expect(metadataEvent.contentIds).toEqual(['content-1', 'content-2']);

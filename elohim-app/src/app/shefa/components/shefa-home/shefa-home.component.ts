@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 98.6% (2026-02-24)
@@ -598,11 +598,9 @@ export class ShefaHomeComponent implements OnInit {
   // Connection status
   isConnected = computed(() => this.holochainClient.isConnected());
 
-  constructor(
-    private readonly economicService: EconomicService,
-    private readonly appreciationService: AppreciationService,
-    private readonly holochainClient: HolochainClientService
-  ) {}
+  private readonly economicService = inject(EconomicService);
+  private readonly appreciationService = inject(AppreciationService);
+  private readonly holochainClient = inject(HolochainClientService);
 
   ngOnInit(): void {
     void this.loadData();

@@ -232,9 +232,7 @@ describe('DataLoaderService', () => {
 
     describe('getContent', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.getContent.mockReturnValue(
-          throwError(() => new Error('Network error'))
-        );
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network error')));
         idbMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
         let result: ContentNode | undefined;
@@ -249,9 +247,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should return placeholder when both network and IDB fail', fakeAsync(() => {
-        contentServiceMock.getContent.mockReturnValue(
-          throwError(() => new Error('Network error'))
-        );
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network error')));
         idbMock.getContent.mockReturnValue(Promise.resolve(null));
 
         let result: ContentNode | undefined;
@@ -265,9 +261,7 @@ describe('DataLoaderService', () => {
 
       it('should return placeholder when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.getContent.mockReturnValue(
-          throwError(() => new Error('Network error'))
-        );
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network error')));
 
         let result: ContentNode | undefined;
         service.getContent('test-id').subscribe(content => {
@@ -280,9 +274,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should return placeholder when IDB itself throws', fakeAsync(() => {
-        contentServiceMock.getContent.mockReturnValue(
-          throwError(() => new Error('Network error'))
-        );
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network error')));
         idbMock.getContent.mockReturnValue(Promise.reject(new Error('IDB corrupt')));
 
         let result: ContentNode | undefined;
@@ -297,9 +289,7 @@ describe('DataLoaderService', () => {
 
     describe('getPath', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.getPath.mockReturnValue(
-          throwError(() => new Error('Network timeout'))
-        );
+        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
         idbMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
         let result: LearningPath | undefined;
@@ -329,9 +319,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should re-throw when IDB also misses', fakeAsync(() => {
-        contentServiceMock.getPath.mockReturnValue(
-          throwError(() => new Error('Network timeout'))
-        );
+        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
         idbMock.getPath.mockReturnValue(Promise.resolve(null));
 
         let error: Error | undefined;
@@ -348,9 +336,7 @@ describe('DataLoaderService', () => {
 
       it('should not attempt IDB when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.getPath.mockReturnValue(
-          throwError(() => new Error('Network timeout'))
-        );
+        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
 
         let error: Error | undefined;
         service.getPath('test-path').subscribe({
@@ -462,10 +448,7 @@ describe('DataLoaderService', () => {
 
       it('should fall back to localStorage when IDB misses', fakeAsync(() => {
         idbMock.getMetadata.mockReturnValue(Promise.resolve(null));
-        localStorage.setItem(
-          'lamad-progress-agent-1-path-1',
-          JSON.stringify(mockProgress)
-        );
+        localStorage.setItem('lamad-progress-agent-1-path-1', JSON.stringify(mockProgress));
 
         let result: AgentProgress | null | undefined;
         service.getAgentProgress('agent-1', 'path-1').subscribe(p => {
@@ -495,10 +478,7 @@ describe('DataLoaderService', () => {
 
       it('should use localStorage directly when IDB not initialized', () => {
         (service as any).idbInitialized = false;
-        localStorage.setItem(
-          'lamad-progress-agent-1-path-1',
-          JSON.stringify(mockProgress)
-        );
+        localStorage.setItem('lamad-progress-agent-1-path-1', JSON.stringify(mockProgress));
 
         let result: AgentProgress | null | undefined;
         service.getAgentProgress('agent-1', 'path-1').subscribe(p => {
@@ -510,13 +490,8 @@ describe('DataLoaderService', () => {
       });
 
       it('should fall back to localStorage when IDB throws', fakeAsync(() => {
-        idbMock.getMetadata.mockReturnValue(
-          Promise.reject(new Error('IDB error'))
-        );
-        localStorage.setItem(
-          'lamad-progress-agent-1-path-1',
-          JSON.stringify(mockProgress)
-        );
+        idbMock.getMetadata.mockReturnValue(Promise.reject(new Error('IDB error')));
+        localStorage.setItem('lamad-progress-agent-1-path-1', JSON.stringify(mockProgress));
 
         let result: AgentProgress | null | undefined;
         service.getAgentProgress('agent-1', 'path-1').subscribe(p => {
@@ -536,10 +511,7 @@ describe('DataLoaderService', () => {
         expect(lsData).toBeTruthy();
         expect(JSON.parse(lsData!).currentStepIndex).toBe(3);
 
-        expect(idbMock.setMetadata).toHaveBeenCalledWith(
-          'progress-agent-1-path-1',
-          mockProgress
-        );
+        expect(idbMock.setMetadata).toHaveBeenCalledWith('progress-agent-1-path-1', mockProgress);
       });
 
       it('should only write localStorage when IDB not initialized', () => {

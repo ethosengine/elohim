@@ -10,8 +10,8 @@ describe('CustodianCommitmentService', () => {
 
   beforeEach(() => {
     const holochainSpy = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -21,7 +21,9 @@ describe('CustodianCommitmentService', () => {
     });
 
     service = TestBed.inject(CustodianCommitmentService);
-    holochainMock = TestBed.inject(HolochainClientService) as { [K in keyof HolochainClientService]?: Mock };
+    holochainMock = TestBed.inject(HolochainClientService) as {
+      [K in keyof HolochainClientService]?: Mock;
+    };
   });
 
   it('should be created', () => {
@@ -231,14 +233,7 @@ describe('CustodianCommitmentService', () => {
         Promise.resolve({ success: true, data: 'commitment-123' })
       );
 
-      await service.createCommitment(
-        'custodian-1',
-        'content-1',
-        'full_replica',
-        1000000,
-        100,
-        7
-      );
+      await service.createCommitment('custodian-1', 'content-1', 'full_replica', 1000000, 100, 7);
 
       const call = holochainMock.callZome.mock.lastCall;
       const payload = call![0].payload as Record<string, any>;
@@ -549,9 +544,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 when no commitments', async () => {
-      holochainMock.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
       const result = await service.getActiveCommitmentCount('cust-1');
 
@@ -675,9 +668,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 when no commitments', async () => {
-      holochainMock.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
       const result = await service.getTotalCommittedStorage('cust-1');
 

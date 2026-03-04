@@ -1,4 +1,4 @@
-import { Injectable, Optional, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 
 // @coverage: 62.7% (2026-02-24)
 
@@ -58,10 +58,10 @@ export class AgentService implements OnDestroy {
   // Attestations set
   private readonly attestations = new Set<string>();
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    @Optional() private readonly sessionHumanService: SessionHumanService | null
-  ) {
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly sessionHumanService = inject(SessionHumanService, { optional: true });
+
+  constructor() {
     this.initializeAgent();
   }
 

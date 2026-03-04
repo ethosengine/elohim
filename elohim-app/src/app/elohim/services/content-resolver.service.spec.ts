@@ -62,17 +62,17 @@ describe('ContentResolverService', () => {
 
   beforeEach(() => {
     const idbSpy = {
-    init: vi.fn(),
-    isAvailable: vi.fn(),
-    getStats: vi.fn(),
-    getContent: vi.fn(),
-    setContent: vi.fn(),
-    getPath: vi.fn(),
-    setPath: vi.fn(),
-    getContentBatch: vi.fn(),
-    setContentBatch: vi.fn(),
-    removeContent: vi.fn(),
-  };
+      init: vi.fn(),
+      isAvailable: vi.fn(),
+      getStats: vi.fn(),
+      getContent: vi.fn(),
+      setContent: vi.fn(),
+      getPath: vi.fn(),
+      setPath: vi.fn(),
+      getContentBatch: vi.fn(),
+      setContentBatch: vi.fn(),
+      removeContent: vi.fn(),
+    };
     const projectionSpy = {
       getContent: vi.fn(),
       batchGetContent: vi.fn(),
@@ -161,12 +161,13 @@ describe('ContentResolverService', () => {
       expect(service.isReady).toBe(true);
     });
 
-    it('should expose state observable', () => new Promise<void>(done => {
-      service.state$.subscribe(state => {
-        expect(typeof state).toBe('string');
-        done();
-      });
-    }));
+    it('should expose state observable', () =>
+      new Promise<void>(done => {
+        service.state$.subscribe(state => {
+          expect(typeof state).toBe('string');
+          done();
+        });
+      }));
 
     it('should expose current state synchronously', () => {
       expect(typeof service.state).toBe('string');
@@ -638,12 +639,13 @@ describe('ContentResolverService', () => {
       expect(service.isReady).toBe(true);
     });
 
-    it('should expose state observable', () => new Promise<void>(done => {
-      service.state$.subscribe(state => {
-        expect(state).toBeDefined();
-        done();
-      });
-    }));
+    it('should expose state observable', () =>
+      new Promise<void>(done => {
+        service.state$.subscribe(state => {
+          expect(state).toBeDefined();
+          done();
+        });
+      }));
 
     it('should expose current state', () => {
       const state = service.state;

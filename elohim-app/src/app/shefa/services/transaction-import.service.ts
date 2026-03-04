@@ -20,7 +20,7 @@
  * - Respect immutability of EconomicEvents
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 91.8% (2026-02-24)
 
@@ -99,13 +99,11 @@ export class TransactionImportService {
   // Staged transactions (in-memory)
   private readonly stagedTransactions = new Map<string, StagedTransaction>();
 
-  constructor(
-    private readonly plaid: PlaidIntegrationService,
-    private readonly duplicates: DuplicateDetectionService,
-    private readonly aiCategorization: AICategorizationService,
-    private readonly eventFactory: EconomicEventFactoryService,
-    private readonly budgetReconciliation: BudgetReconciliationService
-  ) {}
+  private readonly plaid = inject(PlaidIntegrationService);
+  private readonly duplicates = inject(DuplicateDetectionService);
+  private readonly aiCategorization = inject(AICategorizationService);
+  private readonly eventFactory = inject(EconomicEventFactoryService);
+  private readonly budgetReconciliation = inject(BudgetReconciliationService);
 
   /**
    * Observables for UI

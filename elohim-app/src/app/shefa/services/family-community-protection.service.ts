@@ -31,7 +31,7 @@
  * This cannot be changed without updating the Rust zomes and running a DNA migration.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 19.1% (2026-02-24)
 
@@ -126,7 +126,7 @@ export class FamilyCommunityProtectionService {
   );
   private readonly healthCheckInterval = 30000; // Check custodian health every 30 seconds
 
-  constructor(private readonly holochain: HolochainClientService) {}
+  private readonly holochain = inject(HolochainClientService);
 
   /**
    * Initialize protection monitoring for an operator

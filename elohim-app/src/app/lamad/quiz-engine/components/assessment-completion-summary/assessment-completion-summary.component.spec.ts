@@ -29,7 +29,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
   // ─── Fixtures ──────────────────────────────────────────────────────────────
 
   const buildPrimaryType = (
-    overrides: Partial<DiscoveryResultSummary> = {},
+    overrides: Partial<DiscoveryResultSummary> = {}
   ): DiscoveryResultSummary => ({
     typeId: 'secure',
     name: 'Secure',
@@ -156,7 +156,10 @@ describe('AssessmentCompletionSummaryComponent', () => {
       color: '#8B5CF6',
     });
 
-    mockMasteryStats = { recordDailyEngagement: vi.fn(), learnerProfile$: profileSubject.asObservable(), };
+    mockMasteryStats = {
+      recordDailyEngagement: vi.fn(),
+      learnerProfile$: profileSubject.asObservable(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, AssessmentCompletionSummaryComponent],
@@ -195,43 +198,33 @@ describe('AssessmentCompletionSummaryComponent', () => {
           assessmentTitle: 'Attachment Style Assessment',
           instrumentId: 'attachment-style-discovery',
           subscaleScores: { anxiety: 0.3, avoidance: 0.2 },
-        }),
+        })
       );
     });
 
     it('should show personalized headline', () => {
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain("You're a Secure!");
     });
 
     it('should show description with primary type name', () => {
-      const desc = fixture.nativeElement.querySelector(
-        '[data-testid="completion-description"]',
-      );
+      const desc = fixture.nativeElement.querySelector('[data-testid="completion-description"]');
       expect(desc.textContent).toContain('Secure');
     });
 
     it('should render hex badge preview', () => {
-      const badge = fixture.nativeElement.querySelector(
-        '[data-testid="completion-hex-badge"]',
-      );
+      const badge = fixture.nativeElement.querySelector('[data-testid="completion-hex-badge"]');
       expect(badge).toBeTruthy();
       expect(badge.textContent).toContain('Secure');
     });
 
     it('should set badge color via CSS custom property', () => {
-      const badge = fixture.nativeElement.querySelector(
-        '[data-testid="completion-hex-badge"]',
-      );
+      const badge = fixture.nativeElement.querySelector('[data-testid="completion-hex-badge"]');
       expect(badge.style.getPropertyValue('--badge-color')).toBe('#8B5CF6');
     });
 
     it('should render subscale bars', () => {
-      const subscales = fixture.nativeElement.querySelector(
-        '[data-testid="completion-subscales"]',
-      );
+      const subscales = fixture.nativeElement.querySelector('[data-testid="completion-subscales"]');
       expect(subscales).toBeTruthy();
     });
 
@@ -244,9 +237,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should show profile link for discovery mode', () => {
-      const link = fixture.nativeElement.querySelector(
-        '[data-testid="completion-profile-link"]',
-      );
+      const link = fixture.nativeElement.querySelector('[data-testid="completion-profile-link"]');
       expect(link.textContent).toContain('View on your profile');
     });
 
@@ -269,7 +260,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       expect(mockPresenceService.onDiscoveryCompleted).toHaveBeenCalledWith(
         'content-attachment-001',
         'Attachment Style Assessment',
-        'current-user',
+        'current-user'
       );
     });
 
@@ -279,16 +270,14 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should display insight message', () => {
-      const message = fixture.nativeElement.querySelector(
-        '[data-testid="elohim-insight-message"]',
-      );
+      const message = fixture.nativeElement.querySelector('[data-testid="elohim-insight-message"]');
       expect(message).toBeTruthy();
       expect(message.textContent).toContain('Attachment Style Assessment');
     });
 
     it('should include constitutional reasoning section', () => {
       const reasoning = fixture.nativeElement.querySelector(
-        '[data-testid="elohim-insight-reasoning"]',
+        '[data-testid="elohim-insight-reasoning"]'
       );
       expect(reasoning).toBeTruthy();
       expect(reasoning.textContent).toContain('Love as committed action toward flourishing');
@@ -296,7 +285,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
 
     it('should display computation cost in reasoning', () => {
       const reasoning = fixture.nativeElement.querySelector(
-        '[data-testid="elohim-insight-reasoning"]',
+        '[data-testid="elohim-insight-reasoning"]'
       );
       expect(reasoning.textContent).toContain('800');
       expect(reasoning.textContent).toContain('1200');
@@ -320,9 +309,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should show "Well Done!" for passing score', () => {
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain('Well Done!');
     });
 
@@ -342,9 +329,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       host.passed.set(false);
       fixture.detectChanges();
 
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain('Keep Learning');
     });
 
@@ -371,23 +356,17 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should show dashboard link', () => {
-      const link = fixture.nativeElement.querySelector(
-        '[data-testid="completion-profile-link"]',
-      );
+      const link = fixture.nativeElement.querySelector('[data-testid="completion-profile-link"]');
       expect(link.textContent).toContain('View your Dashboard');
     });
 
     it('should not show hex badge', () => {
-      const badge = fixture.nativeElement.querySelector(
-        '[data-testid="completion-badge-reveal"]',
-      );
+      const badge = fixture.nativeElement.querySelector('[data-testid="completion-badge-reveal"]');
       expect(badge).toBeNull();
     });
 
     it('should not show subscale breakdown', () => {
-      const subscales = fixture.nativeElement.querySelector(
-        '[data-testid="completion-subscales"]',
-      );
+      const subscales = fixture.nativeElement.querySelector('[data-testid="completion-subscales"]');
       expect(subscales).toBeNull();
     });
 
@@ -396,7 +375,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       fixture.detectChanges();
 
       const preview = fixture.nativeElement.querySelector(
-        '[data-testid="completion-mastery-preview"]',
+        '[data-testid="completion-mastery-preview"]'
       );
       expect(preview).toBeTruthy();
       expect(preview.textContent).toContain('450');
@@ -416,9 +395,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should show generic headline', () => {
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain('Assessment Complete');
     });
 
@@ -440,17 +417,13 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should emit continue when Continue button clicked', () => {
-      const btn = fixture.nativeElement.querySelector(
-        '[data-testid="completion-continue"]',
-      );
+      const btn = fixture.nativeElement.querySelector('[data-testid="completion-continue"]');
       btn.click();
       expect(host.continued).toBe(true);
     });
 
     it('should emit viewProfile when profile link clicked', () => {
-      const link = fixture.nativeElement.querySelector(
-        '[data-testid="completion-profile-link"]',
-      );
+      const link = fixture.nativeElement.querySelector('[data-testid="completion-profile-link"]');
       link.click();
       expect(host.profileViewed).toBe(true);
     });
@@ -463,9 +436,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       host.primaryType.set(null);
       fixture.detectChanges();
 
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain('Assessment Complete');
     });
 
@@ -473,9 +444,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       host.primaryType.set(buildPrimaryType({ name: 'Individualist' }));
       fixture.detectChanges();
 
-      const headline = fixture.nativeElement.querySelector(
-        '[data-testid="completion-headline"]',
-      );
+      const headline = fixture.nativeElement.querySelector('[data-testid="completion-headline"]');
       expect(headline.textContent).toContain("You're an Individualist!");
     });
 
@@ -483,9 +452,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       host.subscaleScores.set({});
       fixture.detectChanges();
 
-      const subscales = fixture.nativeElement.querySelector(
-        '[data-testid="completion-subscales"]',
-      );
+      const subscales = fixture.nativeElement.querySelector('[data-testid="completion-subscales"]');
       expect(subscales).toBeNull();
     });
 
@@ -493,9 +460,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       host.subscaleScores.set(null);
       fixture.detectChanges();
 
-      const subscales = fixture.nativeElement.querySelector(
-        '[data-testid="completion-subscales"]',
-      );
+      const subscales = fixture.nativeElement.querySelector('[data-testid="completion-subscales"]');
       expect(subscales).toBeNull();
     });
   });

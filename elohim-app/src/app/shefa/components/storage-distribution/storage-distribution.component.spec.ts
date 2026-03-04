@@ -16,8 +16,8 @@ describe('StorageDistributionComponent', () => {
 
   beforeEach(async () => {
     mockShefaCompute = {
-    getStorageContentDistribution: vi.fn(),
-  };
+      getStorageContentDistribution: vi.fn(),
+    };
     mockShefaCompute.getStorageContentDistribution.mockReturnValue(
       of({
         byContentType: [],

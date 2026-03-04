@@ -91,7 +91,9 @@ describe('LoginComponent', () => {
     // Mock localStorage
     localStorageGetItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
     localStorageSetItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-    localStorageRemoveItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
+    localStorageRemoveItemSpy = vi
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(() => {});
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
@@ -282,27 +284,29 @@ describe('LoginComponent', () => {
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('should get return URL from query params', () => new Promise<void>(done => {
-      mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
+    it('should get return URL from query params', () =>
+      new Promise<void>(done => {
+        mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect(component.returnUrl).toBe('/dashboard');
-        done();
-      }, 100);
-    }));
+        setTimeout(() => {
+          expect(component.returnUrl).toBe('/dashboard');
+          done();
+        }, 100);
+      }));
 
-    it('should default return URL to / when not in query params', () => new Promise<void>(done => {
-      mockActivatedRoute.queryParams = of({});
+    it('should default return URL to / when not in query params', () =>
+      new Promise<void>(done => {
+        mockActivatedRoute.queryParams = of({});
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect(component.returnUrl).toBe('/');
-        done();
-      }, 100);
-    }));
+        setTimeout(() => {
+          expect(component.returnUrl).toBe('/');
+          done();
+        }, 100);
+      }));
 
     it('should pre-fill identifier from localStorage if remembered', () => {
       localStorageGetItemSpy.mockReturnValue('user@example.com');
@@ -369,9 +373,7 @@ describe('LoginComponent', () => {
 
       component.onFederatedLogin();
 
-      expect(component.error()).toBe(
-        'Please enter a valid identity (e.g. you@your-doorway.host)'
-      );
+      expect(component.error()).toBe('Please enter a valid identity (e.g. you@your-doorway.host)');
       expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
     });
 

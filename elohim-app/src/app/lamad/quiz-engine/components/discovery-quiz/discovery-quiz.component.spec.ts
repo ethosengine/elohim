@@ -14,8 +14,8 @@ describe('DiscoveryQuizComponent', () => {
 
   beforeEach(async () => {
     mockQuestionPool = {
-    getPoolForContent: vi.fn(),
-  };
+      getPoolForContent: vi.fn(),
+    };
     mockQuestionPool.getPoolForContent.mockReturnValue(
       of({
         id: 'test-pool',
@@ -32,8 +32,8 @@ describe('DiscoveryQuizComponent', () => {
     );
 
     mockDiscoveryService = {
-    recordAttestation: vi.fn(),
-  };
+      recordAttestation: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [DiscoveryQuizComponent],

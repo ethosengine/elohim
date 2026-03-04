@@ -104,12 +104,15 @@ describe('InstrumentLoaderService', () => {
 
   beforeEach(() => {
     contentServiceSpy = {
-    queryContent: vi.fn(),
-    getContent: vi.fn(),
-  };
+      queryContent: vi.fn(),
+      getContent: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
-      providers: [InstrumentLoaderService, { provide: ContentService, useValue: contentServiceSpy }],
+      providers: [
+        InstrumentLoaderService,
+        { provide: ContentService, useValue: contentServiceSpy },
+      ],
     });
 
     service = TestBed.inject(InstrumentLoaderService);
@@ -620,7 +623,14 @@ describe('declarative scoring parity', () => {
   const buildAggregated = (
     totals: Record<string, number>,
     normalized: Record<string, number>
-  ): { subscaleTotals: Record<string, number>; subscaleCounts: Record<string, number>; normalizedScores: Record<string, number>; momentCount: number; momentIds: string[]; aggregatedAt: number } => ({
+  ): {
+    subscaleTotals: Record<string, number>;
+    subscaleCounts: Record<string, number>;
+    normalizedScores: Record<string, number>;
+    momentCount: number;
+    momentIds: string[];
+    aggregatedAt: number;
+  } => ({
     subscaleTotals: totals,
     subscaleCounts: Object.fromEntries(Object.keys(totals).map(k => [k, 1])),
     normalizedScores: normalized,
@@ -663,12 +673,36 @@ describe('declarative scoring parity', () => {
           { id: 'avoidance', name: 'Avoidance', description: '', dimension: 'att' },
         ],
         resultTypes: [
-          { id: 'secure', name: 'Secure', description: '', subscaleProfile: { anxiety: 0, avoidance: 0 } },
-          { id: 'anxious-preoccupied', name: 'Anxious', description: '', subscaleProfile: { anxiety: 1, avoidance: 0 } },
-          { id: 'dismissive-avoidant', name: 'Avoidant', description: '', subscaleProfile: { anxiety: 0, avoidance: 1 } },
-          { id: 'fearful-avoidant', name: 'Fearful', description: '', subscaleProfile: { anxiety: 1, avoidance: 1 } },
+          {
+            id: 'secure',
+            name: 'Secure',
+            description: '',
+            subscaleProfile: { anxiety: 0, avoidance: 0 },
+          },
+          {
+            id: 'anxious-preoccupied',
+            name: 'Anxious',
+            description: '',
+            subscaleProfile: { anxiety: 1, avoidance: 0 },
+          },
+          {
+            id: 'dismissive-avoidant',
+            name: 'Avoidant',
+            description: '',
+            subscaleProfile: { anxiety: 0, avoidance: 1 },
+          },
+          {
+            id: 'fearful-avoidant',
+            name: 'Fearful',
+            description: '',
+            subscaleProfile: { anxiety: 1, avoidance: 1 },
+          },
         ],
-        scoringConfig: { method: 'threshold-based', normalize: false, thresholds: { anxiety: 12, avoidance: 8 } },
+        scoringConfig: {
+          method: 'threshold-based',
+          normalize: false,
+          thresholds: { anxiety: 12, avoidance: 8 },
+        },
       });
       const entry = registerFromDefinition(def);
 
@@ -686,12 +720,36 @@ describe('declarative scoring parity', () => {
           { id: 'avoidance', name: 'Avoidance', description: '', dimension: 'att' },
         ],
         resultTypes: [
-          { id: 'secure', name: 'Secure', description: '', subscaleProfile: { anxiety: 0, avoidance: 0 } },
-          { id: 'anxious-preoccupied', name: 'Anxious', description: '', subscaleProfile: { anxiety: 1, avoidance: 0 } },
-          { id: 'dismissive-avoidant', name: 'Avoidant', description: '', subscaleProfile: { anxiety: 0, avoidance: 1 } },
-          { id: 'fearful-avoidant', name: 'Fearful', description: '', subscaleProfile: { anxiety: 1, avoidance: 1 } },
+          {
+            id: 'secure',
+            name: 'Secure',
+            description: '',
+            subscaleProfile: { anxiety: 0, avoidance: 0 },
+          },
+          {
+            id: 'anxious-preoccupied',
+            name: 'Anxious',
+            description: '',
+            subscaleProfile: { anxiety: 1, avoidance: 0 },
+          },
+          {
+            id: 'dismissive-avoidant',
+            name: 'Avoidant',
+            description: '',
+            subscaleProfile: { anxiety: 0, avoidance: 1 },
+          },
+          {
+            id: 'fearful-avoidant',
+            name: 'Fearful',
+            description: '',
+            subscaleProfile: { anxiety: 1, avoidance: 1 },
+          },
         ],
-        scoringConfig: { method: 'threshold-based', normalize: false, thresholds: { anxiety: 12, avoidance: 8 } },
+        scoringConfig: {
+          method: 'threshold-based',
+          normalize: false,
+          thresholds: { anxiety: 12, avoidance: 8 },
+        },
       });
       const entry = registerFromDefinition(def);
 
@@ -739,7 +797,14 @@ describe('declarative scoring parity', () => {
 
       const aggregated = buildAggregated(
         { creativity: 8, curiosity: 12, fairness: 6, kindness: 15, perseverance: 10, hope: 9 },
-        { creativity: 0.13, curiosity: 0.2, fairness: 0.1, kindness: 0.25, perseverance: 0.17, hope: 0.15 }
+        {
+          creativity: 0.13,
+          curiosity: 0.2,
+          fairness: 0.1,
+          kindness: 0.25,
+          perseverance: 0.17,
+          hope: 0.15,
+        }
       );
 
       const closureResult = staticEntry!.config.interpret!(aggregated) as InterpretResult;

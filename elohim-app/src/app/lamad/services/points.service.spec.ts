@@ -9,16 +9,13 @@ describe('PointsService', () => {
 
   beforeEach(() => {
     backendSpy = {
-    getMyLamadPointBalance: vi.fn(),
-    earnLamadPoints: vi.fn(),
-    getMyLamadPointHistory: vi.fn(),
-  };
+      getMyLamadPointBalance: vi.fn(),
+      earnLamadPoints: vi.fn(),
+      getMyLamadPointHistory: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
-      providers: [
-        PointsService,
-        { provide: LearnerBackendService, useValue: backendSpy },
-      ],
+      providers: [PointsService, { provide: LearnerBackendService, useValue: backendSpy }],
     });
     service = TestBed.inject(PointsService);
   });
@@ -86,32 +83,33 @@ describe('PointsService', () => {
       expect(typeof service.refreshBalance).toBe('function');
     });
 
-    it('should call backend getMyLamadPointBalance', () => new Promise<void>(done => {
-      backendSpy.getMyLamadPointBalance.mockReturnValue(
-        Promise.resolve({
-          action_hash: new Uint8Array(),
-          balance: {
-            id: 'balance-1',
-            agent_id: 'agent-1',
-            total_points: 100,
-            points_by_trigger_json: '{}',
-            total_earned: 100,
-            total_spent: 0,
-            last_point_event_id: null,
-            last_point_event_at: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        })
-      );
+    it('should call backend getMyLamadPointBalance', () =>
+      new Promise<void>(done => {
+        backendSpy.getMyLamadPointBalance.mockReturnValue(
+          Promise.resolve({
+            action_hash: new Uint8Array(),
+            balance: {
+              id: 'balance-1',
+              agent_id: 'agent-1',
+              total_points: 100,
+              points_by_trigger_json: '{}',
+              total_earned: 100,
+              total_spent: 0,
+              last_point_event_id: null,
+              last_point_event_at: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          })
+        );
 
-      service.refreshBalance();
+        service.refreshBalance();
 
-      setTimeout(() => {
-        expect(backendSpy.getMyLamadPointBalance).toHaveBeenCalled();
-        done();
-      }, 100);
-    }));
+        setTimeout(() => {
+          expect(backendSpy.getMyLamadPointBalance).toHaveBeenCalled();
+          done();
+        }, 100);
+      }));
   });
 
   describe('getBalanceSync()', () => {
@@ -156,14 +154,15 @@ describe('PointsService', () => {
       expect(result.subscribe).toBeDefined();
     });
 
-    it('should call backend earnLamadPoints', () => new Promise<void>(done => {
-      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
+    it('should call backend earnLamadPoints', () =>
+      new Promise<void>(done => {
+        backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
 
-      service.earnPoints('engagement_view', 'content-123').subscribe(() => {
-        expect(backendSpy.earnLamadPoints).toHaveBeenCalled();
-        done();
-      });
-    }));
+        service.earnPoints('engagement_view', 'content-123').subscribe(() => {
+          expect(backendSpy.earnLamadPoints).toHaveBeenCalled();
+          done();
+        });
+      }));
 
     it('should accept trigger parameter', () => {
       backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));

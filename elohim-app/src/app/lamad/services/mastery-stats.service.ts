@@ -16,7 +16,7 @@
  * - Idempotent daily streak records (one entry per day)
  */
 
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 
 // @coverage: 96.1% (2026-02-24)
 
@@ -71,13 +71,13 @@ export class MasteryStatsService implements OnDestroy {
   /** Recent level-up events */
   readonly recentLevelUps$: Observable<LevelUpEvent[]> = this.recentLevelUpsSubject.asObservable();
 
-  constructor(
-    private readonly contentMastery: ContentMasteryService,
-    private readonly points: PointsService,
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService,
-    private readonly practice: PracticeService
-  ) {
+  private readonly contentMastery = inject(ContentMasteryService);
+  private readonly points = inject(PointsService);
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly sessionHuman = inject(SessionHumanService);
+  private readonly practice = inject(PracticeService);
+
+  constructor() {
     this.initializeSubscriptions();
   }
 

@@ -15,11 +15,14 @@ describe('HolochainAvailabilityUiComponent', () => {
 
   beforeEach(async () => {
     // Create mock services with signal properties
-    mockHolochainClient = { connect: vi.fn(), state: vi.fn().mockReturnValue('disconnected'),
+    mockHolochainClient = {
+      connect: vi.fn(),
+      state: vi.fn().mockReturnValue('disconnected'),
       isConnected: vi.fn().mockReturnValue(false),
-      error: vi.fn().mockReturnValue(null), };
+      error: vi.fn().mockReturnValue(null),
+    };
 
-    mockHolochainContent = { available: vi.fn().mockReturnValue(false), };
+    mockHolochainContent = { available: vi.fn().mockReturnValue(false) };
 
     mockOperationQueue = { getQueueSize: vi.fn(), syncAll: vi.fn() };
     mockOperationQueue.getQueueSize.mockReturnValue(0);

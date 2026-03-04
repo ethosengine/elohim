@@ -25,11 +25,15 @@ describe('OAuthAuthProvider', () => {
     sessionStorage.clear();
 
     // Create mock doorway registry
-    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue('https://doorway.example.com'), };
+    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue('https://doorway.example.com') };
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), OAuthAuthProvider,
-        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        OAuthAuthProvider,
+        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
+      ],
     });
 
     provider = TestBed.inject(OAuthAuthProvider);

@@ -18,15 +18,12 @@ describe('EventService', () => {
 
   beforeEach(() => {
     storageApiMock = {
-    createEconomicEvent: vi.fn(),
-    getEconomicEvents: vi.fn(),
-  };
+      createEconomicEvent: vi.fn(),
+      getEconomicEvents: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
-      providers: [
-        EventService,
-        { provide: StorageApiService, useValue: storageApiMock },
-      ],
+      providers: [EventService, { provide: StorageApiService, useValue: storageApiMock }],
     });
     service = TestBed.inject(EventService);
   });

@@ -363,7 +363,7 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
-      expect(state.dataResidency.some((d) => d.locationLabel.includes('Browser'))).toBe(true);
+      expect(state.dataResidency.some(d => d.locationLabel.includes('Browser'))).toBe(true);
     });
 
     it('should return hosted data residency for hosted stage', () => {
@@ -382,7 +382,11 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
-      expect(state.dataResidency.some((d) => d.locationLabel.includes('Elohim Server') || d.locationLabel.includes('DHT Network'))).toBe(true);
+      expect(
+        state.dataResidency.some(
+          d => d.locationLabel.includes('Elohim Server') || d.locationLabel.includes('DHT Network')
+        )
+      ).toBe(true);
     });
 
     it('should return app-steward data residency for app-steward stage', () => {
@@ -401,7 +405,7 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
-      expect(state.dataResidency.some((d) => d.locationLabel.includes('Device'))).toBe(true);
+      expect(state.dataResidency.some(d => d.locationLabel.includes('Device'))).toBe(true);
     });
   });
 
@@ -443,7 +447,7 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.keys.length).toBeGreaterThan(0);
-      const agentKey = state.keys.find((k) => k.type === 'agent-pubkey');
+      const agentKey = state.keys.find(k => k.type === 'agent-pubkey');
       expect(agentKey).toBeDefined();
       expect(agentKey?.value).toBe('agent-pub-key-123456789');
     });
@@ -464,7 +468,7 @@ describe('AgencyService', () => {
       });
 
       const state = service.agencyState();
-      const agentKey = state.keys.find((k) => k.type === 'agent-pubkey');
+      const agentKey = state.keys.find(k => k.type === 'agent-pubkey');
       expect(agentKey?.truncated).toContain('...');
     });
 
@@ -484,7 +488,7 @@ describe('AgencyService', () => {
       });
 
       const state = service.agencyState();
-      const signingKey = state.keys.find((k) => k.type === 'signing-key');
+      const signingKey = state.keys.find(k => k.type === 'signing-key');
       expect(signingKey?.canExport).toBe(false);
     });
 
@@ -504,7 +508,7 @@ describe('AgencyService', () => {
       });
 
       const state = service.agencyState();
-      const signingKey = state.keys.find((k) => k.type === 'signing-key');
+      const signingKey = state.keys.find(k => k.type === 'signing-key');
       expect(signingKey?.canExport).toBe(true);
     });
   });

@@ -2,8 +2,9 @@
  * Angular Router mock factories for unit testing
  */
 import { ActivatedRouteSnapshot, ParamMap } from '@angular/router';
-import { type Mock, vi } from 'vitest';
+
 import { BehaviorSubject } from 'rxjs';
+import { type Mock, vi } from 'vitest';
 
 // ============================================================================
 // Router Mock

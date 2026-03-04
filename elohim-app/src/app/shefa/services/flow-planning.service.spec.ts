@@ -26,21 +26,21 @@ describe('FlowPlanningService', () => {
 
   beforeEach(() => {
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
     mockEconomic = {
-    createEvent: vi.fn(),
-  };
+      createEvent: vi.fn(),
+    };
     mockResource = {
-    getResource: vi.fn(),
-  };
+      getResource: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
         FlowPlanningService,
         { provide: HolochainClientService, useValue: mockHolochain },
         { provide: EconomicService, useValue: mockEconomic },
-        { provide: StewardedResourceService, useValue: mockResource }
+        { provide: StewardedResourceService, useValue: mockResource },
       ],
     });
     service = TestBed.inject(FlowPlanningService);
@@ -90,9 +90,11 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject createPlan when not implemented', async () => {
-      await await expect(service.createPlan('steward-1', 'Plan 1', 'monthly', '2024-01-01', '2024-12-31', [
-          'financial-asset'
-        ])).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.createPlan('steward-1', 'Plan 1', 'monthly', '2024-01-01', '2024-12-31', [
+          'financial-asset',
+        ])
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject updatePlan when not implemented', async () => {
@@ -104,11 +106,15 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject getPlansForSteward when not implemented', async () => {
-      await await expect(service.getPlansForSteward('steward-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.getPlansForSteward('steward-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject archivePlan when not implemented', async () => {
-      await await expect(service.archivePlan('plan-1', 'completed')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.archivePlan('plan-1', 'completed')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject reviewPlan when not implemented', async () => {
@@ -152,7 +158,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject createBudget when not implemented', async () => {
-      await await expect(service.createBudget('plan-1', 'Monthly Budget', 'monthly', [], '2024-01-01', '2024-01-31')).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.createBudget('plan-1', 'Monthly Budget', 'monthly', [], '2024-01-01', '2024-01-31')
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject getBudget when not implemented', async () => {
@@ -160,19 +168,27 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject updateBudgetCategory when not implemented', async () => {
-      await await expect(service.updateBudgetCategory('budget-1', 'cat-1', { value: 100, unit: 'USD' })).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.updateBudgetCategory('budget-1', 'cat-1', { value: 100, unit: 'USD' })
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject compareBudgetToActual when not implemented', async () => {
-      await await expect(service.compareBudgetToActual('budget-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.compareBudgetToActual('budget-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject rebalanceBudget when not implemented', async () => {
-      await await expect(service.rebalanceBudget('budget-1', [])).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.rebalanceBudget('budget-1', [])).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject reconcileBudget when not implemented', async () => {
-      await await expect(service.reconcileBudget('budget-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.reconcileBudget('budget-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 
@@ -211,7 +227,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject updateGoalProgress when not implemented', async () => {
-      await await expect(service.updateGoalProgress('goal-1', 50)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.updateGoalProgress('goal-1', 50)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject evaluateGoal when not implemented', async () => {
@@ -223,7 +241,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject linkGoalToResources when not implemented', async () => {
-      await await expect(service.linkGoalToResources('goal-1', [])).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.linkGoalToResources('goal-1', [])).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 
@@ -258,23 +278,33 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject projectFinancialHealth when not implemented', async () => {
-      await await expect(service.projectFinancialHealth('steward-1', 12)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.projectFinancialHealth('steward-1', 12)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject projectResourceUtilization when not implemented', async () => {
-      await await expect(service.projectResourceUtilization('resource-1', 12)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.projectResourceUtilization('resource-1', 12)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject projectGoalCompletion when not implemented', async () => {
-      await await expect(service.projectGoalCompletion('goal-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.projectGoalCompletion('goal-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject identifyBreakpoints when not implemented', async () => {
-      await await expect(service.identifyBreakpoints('projection-1', 'balance', 0)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.identifyBreakpoints('projection-1', 'balance', 0)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject extendTrendForward when not implemented', async () => {
-      await await expect(service.extendTrendForward('resource-1', 12, 6)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.extendTrendForward('resource-1', 12, 6)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 
@@ -304,7 +334,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject createScenario when not implemented', async () => {
-      await await expect(service.createScenario('plan-1', 'Scenario', [], 'what-if')).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.createScenario('plan-1', 'Scenario', [], 'what-if')
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject runScenario when not implemented', async () => {
@@ -316,7 +348,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject optimizeAllocation when not implemented', async () => {
-      await await expect(service.optimizeAllocation('plan-1', [], 'maximize-surplus')).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.optimizeAllocation('plan-1', [], 'maximize-surplus')
+      ).rejects.toThrow(/Not yet implemented/);
     });
   });
 
@@ -351,15 +385,20 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject createRecurringPattern when not implemented', async () => {
-      await await expect(service.createRecurringPattern('steward-1', {})).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.createRecurringPattern('steward-1', {})).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject generateRecurringEvents when not implemented', async () => {
-      await await expect(service.generateRecurringEvents('pattern-1', 12)).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.generateRecurringEvents('pattern-1', 12)).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject calculateNextDue when not implemented', async () => {
-      await await expect(service.calculateNextDue({
+      await await expect(
+        service.calculateNextDue({
           id: 'pattern-1',
           patternNumber: 'RP-001',
           stewardId: 'steward-1',
@@ -371,16 +410,21 @@ describe('FlowPlanningService', () => {
           nextDueDate: '2024-02-01',
           occurrences: 0,
           reliability: 0,
-          createdAt: new Date().toISOString()
-        } as any)).rejects.toThrow(/Not yet implemented/);
+          createdAt: new Date().toISOString(),
+        } as any)
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject identifyPatternsFromHistory when not implemented', async () => {
-      await await expect(service.identifyPatternsFromHistory('steward-1', 'financial-asset', 12)).rejects.toThrow(/Not yet implemented/);
+      await await expect(
+        service.identifyPatternsFromHistory('steward-1', 'financial-asset', 12)
+      ).rejects.toThrow(/Not yet implemented/);
     });
 
     it('should reject updatePatternFromActual when not implemented', async () => {
-      await await expect(service.updatePatternFromActual('pattern-1', 'event-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.updatePatternFromActual('pattern-1', 'event-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 
@@ -410,19 +454,27 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject buildFlowDashboard when not implemented', async () => {
-      await await expect(service.buildFlowDashboard('steward-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.buildFlowDashboard('steward-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject analyzeFlowHealth when not implemented', async () => {
-      await await expect(service.analyzeFlowHealth('plan-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.analyzeFlowHealth('plan-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject generatePlanningInsights when not implemented', async () => {
-      await await expect(service.generatePlanningInsights('steward-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.generatePlanningInsights('steward-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
 
     it('should reject detectAnomalies when not implemented', async () => {
-      await await expect(service.detectAnomalies('resource-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.detectAnomalies('resource-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 
@@ -437,7 +489,9 @@ describe('FlowPlanningService', () => {
     });
 
     it('should reject checkPlanCompliance when not implemented', async () => {
-      await await expect(service.checkPlanCompliance('plan-1')).rejects.toThrow(/Not yet implemented/);
+      await await expect(service.checkPlanCompliance('plan-1')).rejects.toThrow(
+        /Not yet implemented/
+      );
     });
   });
 });

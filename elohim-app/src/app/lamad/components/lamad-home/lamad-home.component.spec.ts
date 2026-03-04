@@ -52,31 +52,33 @@ describe('LamadHomeComponent', () => {
 
   beforeEach(async () => {
     const pathServiceSpy = {
-    listPaths: vi.fn(),
-  };
+      listPaths: vi.fn(),
+    };
     const pathFilterServiceSpy = {
-    getFeaturedPaths: vi.fn(),
-  };
+      getFeaturedPaths: vi.fn(),
+    };
     const routerSpy = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
     const profileServiceSpy = {
-    getCurrentFocus: vi.fn(),
-  };
+      getCurrentFocus: vi.fn(),
+    };
     const agentServiceSpy = {
-    getCurrentAgentId: vi.fn(),
-    getAgentProgress: vi.fn(),
-  };
+      getCurrentAgentId: vi.fn(),
+      getAgentProgress: vi.fn(),
+    };
     const identityServiceSpy = {
-    mode: vi.fn(),
-  };
+      mode: vi.fn(),
+    };
     // mode() returns 'anonymous' by default (unauthenticated)
     identityServiceSpy.mode.mockReturnValue('anonymous');
 
     // Mock localStorage with stable vi.fn() references (spyOn native Storage is unreliable)
     localStorageMock = {};
     localStorageGetItem = vi.fn((key: string) => localStorageMock[key] ?? null);
-    localStorageSetItem = vi.fn((key: string, value: string) => { localStorageMock[key] = value; });
+    localStorageSetItem = vi.fn((key: string, value: string) => {
+      localStorageMock[key] = value;
+    });
     Object.defineProperty(window, 'localStorage', {
       value: {
         getItem: localStorageGetItem,
@@ -101,7 +103,9 @@ describe('LamadHomeComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    pathFilterService = TestBed.inject(PathFilterService) as { [K in keyof PathFilterService]?: Mock };
+    pathFilterService = TestBed.inject(PathFilterService) as {
+      [K in keyof PathFilterService]?: Mock;
+    };
     router = TestBed.inject(Router) as { [K in keyof Router]?: Mock };
     profileService = TestBed.inject(ProfileService) as { [K in keyof ProfileService]?: Mock };
     agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };

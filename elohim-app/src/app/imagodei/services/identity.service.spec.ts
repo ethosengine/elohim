@@ -108,7 +108,9 @@ function buildMockAuthService(authStateOverrides: Record<string, unknown> = {}) 
   };
 }
 
-function buildMockSessionHumanService(session: ReturnType<typeof createMockSessionHuman> | null = null) {
+function buildMockSessionHumanService(
+  session: ReturnType<typeof createMockSessionHuman> | null = null
+) {
   return {
     getSession: vi.fn().mockReturnValue(session),
     getSessionId: vi.fn().mockReturnValue(session?.sessionId ?? 'session-anon'),
@@ -386,7 +388,11 @@ describe('IdentityService', () => {
     });
 
     it('should return failure result from auth service', async () => {
-      const mockResult = { success: false, error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' };
+      const mockResult = {
+        success: false,
+        error: 'Invalid credentials',
+        code: 'INVALID_CREDENTIALS',
+      };
       mockAuthService.login.mockResolvedValue(mockResult);
 
       const result = await service.loginWithPassword('bad@example.com', 'wrong');

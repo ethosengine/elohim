@@ -15,7 +15,9 @@ describe('SessionHumanService', () => {
     localStorageMock = {};
 
     // Use Storage.prototype to intercept all localStorage calls (works in jsdom/vitest)
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
+      (key: string) => localStorageMock[key] ?? null
+    );
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
@@ -452,19 +454,20 @@ describe('SessionHumanService', () => {
   });
 
   describe('session observable', () => {
-    it('should emit session changes', () => new Promise<void>(done => {
-      const emissions: (SessionHuman | null)[] = [];
+    it('should emit session changes', () =>
+      new Promise<void>(done => {
+        const emissions: (SessionHuman | null)[] = [];
 
-      service.session$.subscribe(session => {
-        emissions.push(session);
-        if (emissions.length === 2) {
-          expect(emissions[1]?.displayName).toBe('Updated Name');
-          done();
-        }
-      });
+        service.session$.subscribe(session => {
+          emissions.push(session);
+          if (emissions.length === 2) {
+            expect(emissions[1]?.displayName).toBe('Updated Name');
+            done();
+          }
+        });
 
-      service.setDisplayName('Updated Name');
-    }));
+        service.setDisplayName('Updated Name');
+      }));
   });
 
   describe('touch', () => {

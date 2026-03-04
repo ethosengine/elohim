@@ -30,7 +30,13 @@ describe('LearnerDashboardComponent', () => {
   let masterySubject: BehaviorSubject<ContentMastery[]>;
 
   const buildProfile = (overrides: Partial<LearnerMasteryProfile> = {}): LearnerMasteryProfile => ({
-    learnerLevel: { level: 3, label: 'Student', icon: 'school', xpThreshold: 500, color: '#ffc107' },
+    learnerLevel: {
+      level: 3,
+      label: 'Student',
+      icon: 'school',
+      xpThreshold: 500,
+      color: '#ffc107',
+    },
     levelProgress: 40,
     totalXP: 700,
     earnedPoints: 600,

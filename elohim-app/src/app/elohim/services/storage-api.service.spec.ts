@@ -69,9 +69,7 @@ describe('StorageApiService', () => {
         expect(rels[0].id).toBe('rel-1');
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/relationships')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/relationships'));
       expect(req.request.params.get('appId')).toBe('lamad');
       req.flush(mockRelationships);
       tick();
@@ -108,9 +106,7 @@ describe('StorageApiService', () => {
         },
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/relationships')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/relationships'));
       req.error(new ProgressEvent('error'), { status: 500 });
       tick();
 
@@ -121,17 +117,13 @@ describe('StorageApiService', () => {
 
   describe('getRelationshipsForContent', () => {
     it('should fetch outgoing relationships for content', fakeAsync(() => {
-      const mockRelationships = [
-        { id: 'rel-1', sourceId: 'content-1', targetId: 'content-2' },
-      ];
+      const mockRelationships = [{ id: 'rel-1', sourceId: 'content-1', targetId: 'content-2' }];
 
       service.getRelationshipsForContent('content-1').subscribe(rels => {
         expect(rels.length).toBe(1);
       });
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('sourceId') === 'content-1'
-      );
+      const req = httpMock.expectOne(request => request.params.get('sourceId') === 'content-1');
       req.flush(mockRelationships);
       tick();
     }));
@@ -150,10 +142,7 @@ describe('StorageApiService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/db/relationships') &&
-          request.method === 'POST'
-        );
+        return request.url.includes('/db/relationships') && request.method === 'POST';
       });
 
       expect(req.request.body.confidence).toBe(1);
@@ -179,9 +168,7 @@ describe('StorageApiService', () => {
 
       service.createRelationship(input).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'POST'
-      );
+      const req = httpMock.expectOne(request => request.method === 'POST');
 
       expect(req.request.body.confidence).toBe(0.9);
       expect(req.request.body.createInverse).toBe(true);
@@ -231,8 +218,7 @@ describe('StorageApiService', () => {
 
       const req = httpMock.expectOne(request => {
         return (
-          request.params.get('appId') === 'imagodei' &&
-          request.params.get('partyId') === 'human-1'
+          request.params.get('appId') === 'imagodei' && request.params.get('partyId') === 'human-1'
         );
       });
       req.flush(mockRelationships);
@@ -330,9 +316,7 @@ describe('StorageApiService', () => {
         expect(presences[0].establishingContentIds).toEqual(['content-1']);
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/presences')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/presences'));
       req.flush(mockPresences);
       tick();
     }));
@@ -376,9 +360,7 @@ describe('StorageApiService', () => {
         expect(presence?.establishingContentIds).toEqual(['content-1']);
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/presences/presence-1')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/presences/presence-1'));
       req.flush(mockPresence);
       tick();
     }));
@@ -388,9 +370,7 @@ describe('StorageApiService', () => {
         expect(presence).toBeNull();
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/presences/not-found')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/presences/not-found'));
       req.error(new ProgressEvent('error'), { status: 404 });
       tick();
     }));
@@ -407,8 +387,8 @@ describe('StorageApiService', () => {
         expect(presence.displayName).toBe('New Contributor');
       });
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'POST' && request.url.includes('/db/presences')
+      const req = httpMock.expectOne(
+        request => request.method === 'POST' && request.url.includes('/db/presences')
       );
 
       expect(req.request.body.displayName).toBe('New Contributor');
@@ -443,10 +423,7 @@ describe('StorageApiService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/db/events') &&
-          request.params.get('appId') === 'shefa'
-        );
+        return request.url.includes('/db/events') && request.params.get('appId') === 'shefa';
       });
       req.flush(mockEvents);
       tick();
@@ -484,9 +461,7 @@ describe('StorageApiService', () => {
         })
         .subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('receiver') === 'agent-1'
-      );
+      const req = httpMock.expectOne(request => request.params.get('receiver') === 'agent-1');
       req.flush([]);
       tick();
     }));
@@ -502,8 +477,8 @@ describe('StorageApiService', () => {
 
       service.createEconomicEvent(input).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'POST' && request.url.includes('/db/events')
+      const req = httpMock.expectOne(
+        request => request.method === 'POST' && request.url.includes('/db/events')
       );
 
       expect(req.request.body.action).toBe('work');
@@ -533,9 +508,7 @@ describe('StorageApiService', () => {
         expect(records.length).toBe(1);
       });
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('humanId') === 'human-1'
-      );
+      const req = httpMock.expectOne(request => request.params.get('humanId') === 'human-1');
       req.flush(mockMastery);
       tick();
     }));
@@ -545,9 +518,7 @@ describe('StorageApiService', () => {
     it('should fetch mastery for specific human', fakeAsync(() => {
       service.getMasteryForHuman('human-1').subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/db/mastery/human/human-1')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/db/mastery/human/human-1'));
       req.flush([]);
       tick();
     }));
@@ -583,8 +554,8 @@ describe('StorageApiService', () => {
 
       service.upsertMastery(input).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'POST' && request.url.includes('/db/mastery')
+      const req = httpMock.expectOne(
+        request => request.method === 'POST' && request.url.includes('/db/mastery')
       );
 
       expect(req.request.body.masteryLevel).toBe('seen');
@@ -615,9 +586,7 @@ describe('StorageApiService', () => {
         expect(allocs.length).toBe(1);
       });
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('contentId') === 'content-1'
-      );
+      const req = httpMock.expectOne(request => request.params.get('contentId') === 'content-1');
       req.flush(mockAllocations);
       tick();
     }));
@@ -632,8 +601,8 @@ describe('StorageApiService', () => {
 
       service.createStewardshipAllocation(input).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'POST' && request.url.includes('/db/allocations')
+      const req = httpMock.expectOne(
+        request => request.method === 'POST' && request.url.includes('/db/allocations')
       );
 
       expect(req.request.body.allocationRatio).toBe(1);
@@ -655,8 +624,8 @@ describe('StorageApiService', () => {
 
       service.updateStewardshipAllocation('alloc-1', update).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'PUT' && request.url.includes('/db/allocations/alloc-1')
+      const req = httpMock.expectOne(
+        request => request.method === 'PUT' && request.url.includes('/db/allocations/alloc-1')
       );
 
       expect(req.request.body.allocationRatio).toBe(0.75);
@@ -672,8 +641,8 @@ describe('StorageApiService', () => {
     it('should delete allocation', fakeAsync(() => {
       service.deleteStewardshipAllocation('alloc-1').subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.method === 'DELETE' && request.url.includes('/db/allocations/alloc-1')
+      const req = httpMock.expectOne(
+        request => request.method === 'DELETE' && request.url.includes('/db/allocations/alloc-1')
       );
 
       req.flush(null);

@@ -28,23 +28,23 @@ describe('AuthCallbackComponent', () => {
 
     // Create mocks with correct methods
     mockAuthService = {
-    setAuthFromResult: vi.fn(),
-  };
+      setAuthFromResult: vi.fn(),
+    };
 
     mockOAuthProvider = {
-    getCallbackParams: vi.fn(),
-    handleCallback: vi.fn(),
-    clearCallbackParams: vi.fn(),
-    consumeReturnUrl: vi.fn(),
-  };
+      getCallbackParams: vi.fn(),
+      handleCallback: vi.fn(),
+      clearCallbackParams: vi.fn(),
+      consumeReturnUrl: vi.fn(),
+    };
     mockOAuthProvider.consumeReturnUrl.mockReturnValue(null);
 
     mockSeoService = {
-    setTitle: vi.fn(),
-  };
+      setTitle: vi.fn(),
+    };
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
 
     // Configure default mock returns
     mockOAuthProvider.getCallbackParams.mockReturnValue(null);
@@ -288,9 +288,7 @@ describe('AuthCallbackComponent', () => {
         state: 'test-state',
       });
 
-      mockOAuthProvider.handleCallback.mockReturnValue(
-        Promise.reject(new Error('Network error'))
-      );
+      mockOAuthProvider.handleCallback.mockReturnValue(Promise.reject(new Error('Network error')));
 
       fixture.detectChanges();
       await fixture.whenStable();

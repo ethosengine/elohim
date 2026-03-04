@@ -14,7 +14,7 @@
  * This cannot be changed without updating the Rust zomes.
  */
 
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 
 // @coverage: 86.4% (2026-02-24)
 
@@ -136,11 +136,9 @@ export class BlobManagerService {
   /** Storage client for strategy-aware blob URLs (lazy injected) */
   private storageClient: StorageClientService | null = null;
 
-  constructor(
-    private readonly verificationService: BlobVerificationService,
-    private readonly fallbackService: BlobFallbackService,
-    private readonly injector: Injector
-  ) {}
+  private readonly verificationService = inject(BlobVerificationService);
+  private readonly fallbackService = inject(BlobFallbackService);
+  private readonly injector = inject(Injector);
 
   // =========================================================================
   // Strategy-Aware Blob URL Methods

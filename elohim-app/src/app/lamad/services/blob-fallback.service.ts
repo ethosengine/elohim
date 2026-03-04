@@ -11,7 +11,7 @@
  */
 
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 88.6% (2026-02-24)
 
@@ -87,7 +87,7 @@ export class BlobFallbackService {
   /** Track URL health for prioritization */
   private readonly urlHealthMap = new Map<string, UrlHealth>();
 
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
 
   /**
    * Fetch blob with fallback URLs.

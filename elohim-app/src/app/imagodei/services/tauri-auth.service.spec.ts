@@ -160,11 +160,13 @@ describe('TauriAuthService', () => {
     it('should check for existing session on initialization', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(mockSession),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockSession),
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -176,10 +178,12 @@ describe('TauriAuthService', () => {
     it('should set needs_login when no session exists', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -202,10 +206,12 @@ describe('TauriAuthService', () => {
     it('should set up event listeners', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -227,11 +233,13 @@ describe('TauriAuthService', () => {
 
   describe('getActiveSession', () => {
     it('should fetch active session from storage', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(mockSession),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockSession),
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -240,10 +248,12 @@ describe('TauriAuthService', () => {
     });
 
     it('should return null when no session exists (404)', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -259,10 +269,12 @@ describe('TauriAuthService', () => {
     });
 
     it('should handle non-404 errors', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 500,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 500,
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -298,25 +310,33 @@ describe('TauriAuthService', () => {
       // Mock fetch responses in order
       fetchSpy
         // 1. initialize() → getActiveSession() (no existing session)
-        .mockReturnValueOnce(Promise.resolve({
-          ok: false,
-          status: 404,
-        } as Response))
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: false,
+            status: 404,
+          } as Response)
+        )
         // 2. Token exchange
-        .mockReturnValueOnce(Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockTokenResponse),
-        } as Response))
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockTokenResponse),
+          } as Response)
+        )
         // 3. Native handoff
-        .mockReturnValueOnce(Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockHandoffResponse),
-        } as Response))
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockHandoffResponse),
+          } as Response)
+        )
         // 4. Create session
-        .mockReturnValueOnce(Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSession),
-        } as Response));
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockSession),
+          } as Response)
+        );
 
       // Set up event listener and capture the callback
       let oauthCallbackHandler: any;
@@ -344,11 +364,13 @@ describe('TauriAuthService', () => {
     });
 
     it('should handle token exchange failure', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 400,
-        text: () => Promise.resolve('Invalid grant'),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('Invalid grant'),
+        } as Response)
+      );
 
       let oauthCallbackHandler: any;
       mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
@@ -376,10 +398,12 @@ describe('TauriAuthService', () => {
       (mockDoorwayRegistry.selected as Mock).mockReturnValue(null);
 
       // Mock 404 for initial session check during initialize()
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       let oauthCallbackHandler: any;
       mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
@@ -422,10 +446,12 @@ describe('TauriAuthService', () => {
         return Promise.resolve(() => {});
       });
 
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -448,9 +474,11 @@ describe('TauriAuthService', () => {
 
   describe('logout', () => {
     it('should delete session and redirect to identity page', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: true,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+        } as Response)
+      );
 
       service.currentSession.set(mockSession);
       service.status.set('authenticated');
@@ -508,10 +536,12 @@ describe('TauriAuthService', () => {
         .mockReturnValueOnce(Promise.resolve(unsubscribeOAuth))
         .mockReturnValueOnce(Promise.resolve(unsubscribeError));
 
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -551,15 +581,15 @@ describe('TauriAuthService', () => {
       const result = await service.confirmStewardship('password123');
 
       expect(result).toBe(true);
-      expect(mockInvoke).toHaveBeenCalledWith('doorway_confirm_stewardship', { password: 'password123' });
+      expect(mockInvoke).toHaveBeenCalledWith('doorway_confirm_stewardship', {
+        password: 'password123',
+      });
       expect(service.graduationStatus()).toBe('confirmed');
       expect(service.status()).toBe('authenticated');
     });
 
     it('should set error status on IPC failure', async () => {
-      const mockInvoke = vi.fn().mockReturnValue(
-        Promise.reject(new Error('Invalid password'))
-      );
+      const mockInvoke = vi.fn().mockReturnValue(Promise.reject(new Error('Invalid password')));
       (window as any).__TAURI__ = {
         ...mockTauriWindow.__TAURI__,
         core: { invoke: mockInvoke },
@@ -574,7 +604,9 @@ describe('TauriAuthService', () => {
 
     it('should set confirming status during IPC call', async () => {
       let resolveInvoke: () => void;
-      const invokePromise = new Promise<void>(resolve => { resolveInvoke = resolve; });
+      const invokePromise = new Promise<void>(resolve => {
+        resolveInvoke = resolve;
+      });
       const mockInvoke = vi.fn().mockReturnValue(invokePromise);
       (window as any).__TAURI__ = {
         ...mockTauriWindow.__TAURI__,
@@ -638,10 +670,12 @@ describe('TauriAuthService', () => {
 
   describe('storage URL configuration', () => {
     it('should use default storage URL', async () => {
-      fetchSpy.mockReturnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.getActiveSession();
 

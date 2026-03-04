@@ -34,8 +34,8 @@ describe('SearchComponent', () => {
     queryParamsSubject = new Subject();
 
     const searchSpyObj = {
-    search: vi.fn(),
-  };
+      search: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SearchComponent],

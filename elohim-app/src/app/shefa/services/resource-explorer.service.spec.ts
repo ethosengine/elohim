@@ -22,9 +22,27 @@ describe('ResourceExplorerService', () => {
           useValue: {
             searchContent: vi.fn().mockReturnValue(
               of([
-                { id: 'node-1', title: 'Article One', description: 'Desc', contentType: 'concept', tags: [] },
-                { id: 'node-2', title: 'Quiz One', description: 'Desc', contentType: 'assessment', tags: [] },
-                { id: 'node-3', title: 'Video One', description: 'Desc', contentType: 'video', tags: [] },
+                {
+                  id: 'node-1',
+                  title: 'Article One',
+                  description: 'Desc',
+                  contentType: 'concept',
+                  tags: [],
+                },
+                {
+                  id: 'node-2',
+                  title: 'Quiz One',
+                  description: 'Desc',
+                  contentType: 'assessment',
+                  tags: [],
+                },
+                {
+                  id: 'node-3',
+                  title: 'Video One',
+                  description: 'Desc',
+                  contentType: 'video',
+                  tags: [],
+                },
               ])
             ),
             getAllContentTypes: getAllContentTypesSpy,

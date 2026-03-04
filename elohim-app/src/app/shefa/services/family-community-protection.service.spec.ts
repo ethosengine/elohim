@@ -15,8 +15,8 @@ describe('FamilyCommunityProtectionService', () => {
 
   beforeEach(() => {
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
     mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: [] }));
 
     TestBed.configureTestingModule({
@@ -42,22 +42,24 @@ describe('FamilyCommunityProtectionService', () => {
       expect(typeof service.initializeProtectionMonitoring).toBe('function');
     });
 
-    it('should return observable', () => new Promise<void>(done => {
-      const result = service.initializeProtectionMonitoring('operator-1');
-      expect(result).toBeDefined();
-      result.pipe(take(1)).subscribe(() => {
-        done();
-      });
-    }));
+    it('should return observable', () =>
+      new Promise<void>(done => {
+        const result = service.initializeProtectionMonitoring('operator-1');
+        expect(result).toBeDefined();
+        result.pipe(take(1)).subscribe(() => {
+          done();
+        });
+      }));
 
-    it('should return protection status observable', () => new Promise<void>(done => {
-      const result = service.initializeProtectionMonitoring('operator-1', 100);
-      result.pipe(take(1)).subscribe((status) => {
-        expect(status).toBeDefined();
-        expect(status.custodians).toEqual([]);
-        done();
-      });
-    }));
+    it('should return protection status observable', () =>
+      new Promise<void>(done => {
+        const result = service.initializeProtectionMonitoring('operator-1', 100);
+        result.pipe(take(1)).subscribe(status => {
+          expect(status).toBeDefined();
+          expect(status.custodians).toEqual([]);
+          done();
+        });
+      }));
   });
 
   describe('getProtectionStatus', () => {
@@ -78,14 +80,15 @@ describe('FamilyCommunityProtectionService', () => {
       expect(typeof service.getProtectionStatus$).toBe('function');
     });
 
-    it('should return observable', () => new Promise<void>(done => {
-      const result = service.getProtectionStatus$();
-      expect(result).toBeDefined();
-      result.subscribe((status) => {
-        expect(status).toBeNull();
-        done();
-      });
-    }));
+    it('should return observable', () =>
+      new Promise<void>(done => {
+        const result = service.getProtectionStatus$();
+        expect(result).toBeDefined();
+        result.subscribe(status => {
+          expect(status).toBeNull();
+          done();
+        });
+      }));
   });
 
   describe('getCustodiansByType', () => {

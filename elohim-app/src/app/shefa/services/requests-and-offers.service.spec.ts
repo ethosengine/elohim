@@ -15,17 +15,16 @@ describe('RequestsAndOffersService', () => {
 
   beforeEach(() => {
     mockEconomic = {
-    createEvent: vi.fn(),
-    getEventsForAgent: vi.fn(),
-  };
-    mockEconomic.createEvent.mockReturnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
+      createEvent: vi.fn(),
+      getEventsForAgent: vi.fn(),
+    };
+    mockEconomic.createEvent.mockReturnValue(
+      of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any)
+    );
     mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
     TestBed.configureTestingModule({
-      providers: [
-        RequestsAndOffersService,
-        { provide: EconomicService, useValue: mockEconomic },
-      ],
+      providers: [RequestsAndOffersService, { provide: EconomicService, useValue: mockEconomic }],
     });
     service = TestBed.inject(RequestsAndOffersService);
   });
@@ -45,87 +44,95 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should throw error when title is empty', async () => {
-      await expect(service.createRequest('user-1', {
-        title: '',
-        description: 'Test description for request',
-        serviceTypeIds: ['service-1'],
-        mediumOfExchangeIds: ['exchange-1'],
-        requesterId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'take',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        requiredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/required/);
+      await expect(
+        service.createRequest('user-1', {
+          title: '',
+          description: 'Test description for request',
+          serviceTypeIds: ['service-1'],
+          mediumOfExchangeIds: ['exchange-1'],
+          requesterId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'take',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          requiredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/required/);
     });
 
     it('should throw error when description is too short', async () => {
-      await expect(service.createRequest('user-1', {
-        title: 'Request Title',
-        description: 'Short',
-        serviceTypeIds: ['service-1'],
-        mediumOfExchangeIds: ['exchange-1'],
-        requesterId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'take',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        requiredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/20 characters/);
+      await expect(
+        service.createRequest('user-1', {
+          title: 'Request Title',
+          description: 'Short',
+          serviceTypeIds: ['service-1'],
+          mediumOfExchangeIds: ['exchange-1'],
+          requesterId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'take',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          requiredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/20 characters/);
     });
 
     it('should throw error when serviceTypeIds is empty', async () => {
-      await expect(service.createRequest('user-1', {
-        title: 'Request Title',
-        description: 'Test description for request',
-        serviceTypeIds: [],
-        mediumOfExchangeIds: ['exchange-1'],
-        requesterId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'take',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        requiredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/service type/);
+      await expect(
+        service.createRequest('user-1', {
+          title: 'Request Title',
+          description: 'Test description for request',
+          serviceTypeIds: [],
+          mediumOfExchangeIds: ['exchange-1'],
+          requesterId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'take',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          requiredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/service type/);
     });
 
     it('should throw error when mediumOfExchangeIds is empty', async () => {
-      await expect(service.createRequest('user-1', {
-        title: 'Request Title',
-        description: 'Test description for request',
-        serviceTypeIds: ['service-1'],
-        mediumOfExchangeIds: [],
-        requesterId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'take',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        requiredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/payment method/);
+      await expect(
+        service.createRequest('user-1', {
+          title: 'Request Title',
+          description: 'Test description for request',
+          serviceTypeIds: ['service-1'],
+          mediumOfExchangeIds: [],
+          requesterId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'take',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          requiredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/payment method/);
     });
   });
 
@@ -193,45 +200,49 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should throw error when title is empty', async () => {
-      await expect(service.createOffer('user-1', {
-        title: '',
-        description: 'Test description for offer',
-        serviceTypeIds: ['service-1'],
-        mediumOfExchangeIds: ['exchange-1'],
-        offererId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'give',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        offeredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/required/);
+      await expect(
+        service.createOffer('user-1', {
+          title: '',
+          description: 'Test description for offer',
+          serviceTypeIds: ['service-1'],
+          mediumOfExchangeIds: ['exchange-1'],
+          offererId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'give',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          offeredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/required/);
     });
 
     it('should throw error when description is too short', async () => {
-      await expect(service.createOffer('user-1', {
-        title: 'Offer Title',
-        description: 'Short',
-        serviceTypeIds: ['service-1'],
-        mediumOfExchangeIds: ['exchange-1'],
-        offererId: 'user-1',
-        status: 'active',
-        links: [],
-        action: 'give',
-        interactionType: 'virtual',
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        dateRange: { flexibleDates: true },
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        offeredSkills: [],
-        isPublic: true
-      } as any)).rejects.toThrow(/20 characters/);
+      await expect(
+        service.createOffer('user-1', {
+          title: 'Offer Title',
+          description: 'Short',
+          serviceTypeIds: ['service-1'],
+          mediumOfExchangeIds: ['exchange-1'],
+          offererId: 'user-1',
+          status: 'active',
+          links: [],
+          action: 'give',
+          interactionType: 'virtual',
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          dateRange: { flexibleDates: true },
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          offeredSkills: [],
+          isPublic: true,
+        } as any)
+      ).rejects.toThrow(/20 characters/);
     });
   });
 
@@ -300,12 +311,14 @@ describe('RequestsAndOffersService', () => {
 
     it('should return paginated result', async () => {
       const result = await service.searchRequests({});
-      expect(result).toEqual(expect.objectContaining({
-        requests: expect.any(Array),
-        totalCount: 0,
-        page: 1,
-        pageSize: 20,
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          requests: expect.any(Array),
+          totalCount: 0,
+          page: 1,
+          pageSize: 20,
+        })
+      );
     });
   });
 
@@ -317,12 +330,14 @@ describe('RequestsAndOffersService', () => {
 
     it('should return paginated result', async () => {
       const result = await service.searchOffers({});
-      expect(result).toEqual(expect.objectContaining({
-        offers: expect.any(Array),
-        totalCount: 0,
-        page: 1,
-        pageSize: 20,
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          offers: expect.any(Array),
+          totalCount: 0,
+          page: 1,
+          pageSize: 20,
+        })
+      );
     });
   });
 
@@ -469,11 +484,13 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.settlePayment('match-1', {
-        amount: { hasNumericalValue: 100, hasUnit: 'token' },
-        mediumOfExchangeId: 'exchange-1',
-        paymentMethod: 'mutual-credit',
-      })).rejects.toBeDefined();
+      await expect(
+        service.settlePayment('match-1', {
+          amount: { hasNumericalValue: 100, hasUnit: 'token' },
+          mediumOfExchangeId: 'exchange-1',
+          paymentMethod: 'mutual-credit',
+        })
+      ).rejects.toBeDefined();
     });
   });
 
@@ -484,16 +501,18 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.setUserPreferences('user-1', {
-        contactPreference: 'email',
-        contactValue: 'user@example.com',
-        timeZone: 'UTC',
-        timePreference: 'flexible',
-        interactionType: 'virtual',
-        languages: [],
-        skillsToLearn: [],
-        skillsToShare: []
-      } as any)).rejects.toBeDefined();
+      await expect(
+        service.setUserPreferences('user-1', {
+          contactPreference: 'email',
+          contactValue: 'user@example.com',
+          timeZone: 'UTC',
+          timePreference: 'flexible',
+          interactionType: 'virtual',
+          languages: [],
+          skillsToLearn: [],
+          skillsToShare: [],
+        } as any)
+      ).rejects.toBeDefined();
     });
   });
 
@@ -603,13 +622,15 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.createServiceType('user-1', {
-        name: 'Test Service',
-        description: 'A test service type',
-        isTechnical: false,
-        creatorId: 'user-1',
-        isAuthorOnly: false
-      } as any)).rejects.toBeDefined();
+      await expect(
+        service.createServiceType('user-1', {
+          name: 'Test Service',
+          description: 'A test service type',
+          isTechnical: false,
+          creatorId: 'user-1',
+          isAuthorOnly: false,
+        } as any)
+      ).rejects.toBeDefined();
     });
   });
 
@@ -653,13 +674,15 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.createMediumOfExchange('user-1', {
-        code: 'TEST',
-        name: 'Test Currency',
-        creatorId: 'user-1',
-        isAuthorOnly: false,
-        exchangeType: 'currency'
-      } as any)).rejects.toBeDefined();
+      await expect(
+        service.createMediumOfExchange('user-1', {
+          code: 'TEST',
+          name: 'Test Currency',
+          creatorId: 'user-1',
+          isAuthorOnly: false,
+          exchangeType: 'currency',
+        } as any)
+      ).rejects.toBeDefined();
     });
   });
 
@@ -747,7 +770,9 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.rejectRequest('request-1', 'admin-1', 'Not appropriate')).rejects.toBeDefined();
+      await expect(
+        service.rejectRequest('request-1', 'admin-1', 'Not appropriate')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -758,7 +783,9 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.rejectOffer('offer-1', 'admin-1', 'Not appropriate')).rejects.toBeDefined();
+      await expect(
+        service.rejectOffer('offer-1', 'admin-1', 'Not appropriate')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -769,7 +796,9 @@ describe('RequestsAndOffersService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.suspendRequest('request-1', 'admin-1', 'Violation')).rejects.toBeDefined();
+      await expect(
+        service.suspendRequest('request-1', 'admin-1', 'Violation')
+      ).rejects.toBeDefined();
     });
   });
 

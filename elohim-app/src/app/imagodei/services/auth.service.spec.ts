@@ -66,7 +66,9 @@ describe('AuthService', () => {
   beforeEach(() => {
     // Setup localStorage mock using Storage.prototype (works reliably in jsdom/vitest)
     localStorageMock = {};
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
+      (key: string) => localStorageMock[key] ?? null
+    );
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
@@ -75,9 +77,13 @@ describe('AuthService', () => {
     });
 
     // Create mock doorway registry
-    mockDoorwayRegistry = { selectDoorway: vi.fn(), clearSelection: vi.fn(), selected: vi.fn().mockReturnValue(null),
-        selectedUrl: vi.fn().mockReturnValue(null),
-        hasSelection: vi.fn().mockReturnValue(false), };
+    mockDoorwayRegistry = {
+      selectDoorway: vi.fn(),
+      clearSelection: vi.fn(),
+      selected: vi.fn().mockReturnValue(null),
+      selectedUrl: vi.fn().mockReturnValue(null),
+      hasSelection: vi.fn().mockReturnValue(false),
+    };
 
     TestBed.configureTestingModule({
       providers: [AuthService, { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry }],
@@ -240,7 +246,8 @@ describe('AuthService', () => {
 
     it('should handle login failure', async () => {
       const provider = createMockProvider('password', {
-        login: vi.fn()
+        login: vi
+          .fn()
           .mockReturnValue(Promise.resolve({ success: false, error: 'Invalid credentials' })),
       });
       service.registerProvider(provider);
@@ -258,8 +265,7 @@ describe('AuthService', () => {
 
     it('should handle login network error', async () => {
       const provider = createMockProvider('password', {
-        login: vi.fn()
-          .mockReturnValue(Promise.reject(new Error('Network error'))),
+        login: vi.fn().mockReturnValue(Promise.reject(new Error('Network error'))),
       });
       service.registerProvider(provider);
 
@@ -289,7 +295,10 @@ describe('AuthService', () => {
 
       expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'test-token-123');
       expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY, 'password');
-      expect(Storage.prototype.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'test@example.com');
+      expect(Storage.prototype.setItem).toHaveBeenCalledWith(
+        AUTH_IDENTIFIER_KEY,
+        'test@example.com'
+      );
     });
   });
 
@@ -359,7 +368,8 @@ describe('AuthService', () => {
 
     it('should handle registration failure', async () => {
       const provider = createMockProvider('password', {
-        register: vi.fn()
+        register: vi
+          .fn()
           .mockReturnValue(Promise.resolve({ success: false, error: 'User already exists' })),
       });
       service.registerProvider(provider);
@@ -377,8 +387,7 @@ describe('AuthService', () => {
 
     it('should handle registration network error', async () => {
       const provider = createMockProvider('password', {
-        register: vi.fn()
-          .mockReturnValue(Promise.reject(new Error('Connection failed'))),
+        register: vi.fn().mockReturnValue(Promise.reject(new Error('Connection failed'))),
       });
       service.registerProvider(provider);
 
@@ -457,8 +466,7 @@ describe('AuthService', () => {
 
     it('should handle provider logout error gracefully', async () => {
       const provider = createMockProvider('password', {
-        logout: vi.fn()
-          .mockReturnValue(Promise.reject(new Error('Logout failed'))),
+        logout: vi.fn().mockReturnValue(Promise.reject(new Error('Logout failed'))),
       });
       service.registerProvider(provider);
       await service.login('password', {
@@ -526,8 +534,7 @@ describe('AuthService', () => {
 
     it('should handle refresh failure', async () => {
       const provider = createMockProvider('password', {
-        refreshToken: vi.fn()
-          .mockReturnValue(Promise.reject(new Error('Refresh token expired'))),
+        refreshToken: vi.fn().mockReturnValue(Promise.reject(new Error('Refresh token expired'))),
       });
       service.registerProvider(provider);
       await service.login('password', {
@@ -703,8 +710,7 @@ describe('AuthService', () => {
     it('should clear error state', async () => {
       // Create an error
       const provider = createMockProvider('password', {
-        login: vi.fn()
-          .mockReturnValue(Promise.resolve({ success: false, error: 'Test error' })),
+        login: vi.fn().mockReturnValue(Promise.resolve({ success: false, error: 'Test error' })),
       });
       service.registerProvider(provider);
       await service.login('password', {

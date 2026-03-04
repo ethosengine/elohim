@@ -14,8 +14,8 @@ describe('MasteryGateComponent', () => {
 
   beforeEach(async () => {
     mockAdaptationService = {
-    getGateStatus$: vi.fn(),
-  };
+      getGateStatus$: vi.fn(),
+    };
     mockAdaptationService.getGateStatus$.mockReturnValue(
       of({
         sectionId: 'test-section',
@@ -28,8 +28,8 @@ describe('MasteryGateComponent', () => {
     );
 
     mockCooldownService = {
-    getCooldownStatus$: vi.fn(),
-  };
+      getCooldownStatus$: vi.fn(),
+    };
     mockCooldownService.getCooldownStatus$.mockReturnValue(
       of({
         inCooldown: false,

@@ -409,7 +409,9 @@ describe('RunningContextService', () => {
 
       tick(60000); // Wait 60 seconds
 
-      expect(service.context().detectedAt.getTime()).toBeGreaterThanOrEqual(initialDetectedAt.getTime());
+      expect(service.context().detectedAt.getTime()).toBeGreaterThanOrEqual(
+        initialDetectedAt.getTime()
+      );
       discardPeriodicTasks();
     }));
 
@@ -429,13 +431,14 @@ describe('RunningContextService', () => {
   });
 
   describe('context$ observable', () => {
-    it('should emit current context immediately', () => new Promise<void>(done => {
-      service.context$.pipe(take(1)).subscribe(context => {
-        expect(context).toBeTruthy();
-        expect(context.hasRegisteredNodes).toBe(false);
-        done();
-      });
-    }));
+    it('should emit current context immediately', () =>
+      new Promise<void>(done => {
+        service.context$.pipe(take(1)).subscribe(context => {
+          expect(context).toBeTruthy();
+          expect(context.hasRegisteredNodes).toBe(false);
+          done();
+        });
+      }));
   });
 
   describe('display name generation', () => {

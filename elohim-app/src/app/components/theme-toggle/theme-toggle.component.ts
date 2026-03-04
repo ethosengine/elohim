@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 
 // @coverage: 84.2% (2026-02-24)
 
@@ -18,7 +18,7 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   currentTheme: Theme = 'device';
   private themeSubscription?: Subscription;
 
-  constructor(private readonly themeService: ThemeService) {}
+  private readonly themeService = inject(ThemeService);
 
   ngOnInit(): void {
     this.themeSubscription = this.themeService.getTheme().subscribe(theme => {

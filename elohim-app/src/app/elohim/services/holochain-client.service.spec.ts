@@ -36,7 +36,12 @@ describe('HolochainClientService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), HolochainClientService, { provide: CONNECTION_STRATEGY, useValue: mockStrategy }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        HolochainClientService,
+        { provide: CONNECTION_STRATEGY, useValue: mockStrategy },
+      ],
     });
     service = TestBed.inject(HolochainClientService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -557,7 +562,9 @@ describe('HolochainClientService', () => {
 
     it('should handle localStorage errors gracefully', () => {
       // Mock localStorage to throw
-      vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw 'Storage error'; });
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+        throw 'Storage error';
+      });
 
       expect(service.hasStoredCredentials()).toBe(false);
     });

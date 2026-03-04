@@ -50,8 +50,12 @@ describe('HumanConsentService', () => {
     });
 
     service = TestBed.inject(HumanConsentService);
-    sourceChainMock = TestBed.inject(LocalSourceChainService) as { [K in keyof LocalSourceChainService]?: Mock };
-    sessionHumanMock = TestBed.inject(SessionHumanService) as { [K in keyof SessionHumanService]?: Mock };
+    sourceChainMock = TestBed.inject(LocalSourceChainService) as {
+      [K in keyof LocalSourceChainService]?: Mock;
+    };
+    sessionHumanMock = TestBed.inject(SessionHumanService) as {
+      [K in keyof SessionHumanService]?: Mock;
+    };
   });
 
   // ===========================================================================
@@ -456,7 +460,7 @@ describe('HumanConsentService', () => {
         .proposeElevation({
           consentId: 'consent-1',
           newLevel: 'trusted',
-          message: 'Let\'s deepen our relationship',
+          message: "Let's deepen our relationship",
         })
         .subscribe(consent => {
           result = consent;

@@ -22,7 +22,7 @@
  * @see ContributorService for Lamad-specific contributor recognition
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 // @coverage: 92.6% (2026-02-24)
 
@@ -122,7 +122,7 @@ export class AppreciationService {
   /** Cache for appreciations given */
   private readonly appreciationsByCache = new Map<string, Observable<AppreciationDisplay[]>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if appreciation service is available.

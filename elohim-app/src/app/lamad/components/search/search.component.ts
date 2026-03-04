@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -142,10 +142,8 @@ export class SearchComponent implements OnInit {
   hasSearched = false;
   isLoading = false;
 
-  constructor(
-    private readonly route: ActivatedRoute,
-    private readonly searchService: SearchService
-  ) {}
+  private readonly route = inject(ActivatedRoute);
+  private readonly searchService = inject(SearchService);
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {

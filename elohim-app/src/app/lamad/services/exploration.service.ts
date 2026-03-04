@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 92.5% (2026-02-24)
 
@@ -83,7 +83,7 @@ export class ExplorationService {
   private readonly rateLimitStatusSubject = new BehaviorSubject<RateLimitStatus | null>(null);
   public readonly rateLimitStatus$ = this.rateLimitStatusSubject.asObservable();
 
-  constructor(private readonly dataLoader: DataLoaderService) {}
+  private readonly dataLoader = inject(DataLoaderService);
 
   // =========================================================================
   // Core Exploration Methods

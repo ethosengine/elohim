@@ -155,18 +155,19 @@ describe('BlobCacheTiersService', () => {
       expect(service.getBlob('hash2')).toBeNull(); // Should be evicted
     });
 
-    it('should remove expired blobs on access', () => new Promise<void>(done => {
-      const blob = new Blob(['test']);
-      service.setBlob('hash1', blob);
+    it('should remove expired blobs on access', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
+        service.setBlob('hash1', blob);
 
-      // Manually set expiration time to past
-      (service['blobCache'] as any).cache.get('hash1')!.createdAt =
-        Date.now() - 25 * 60 * 60 * 1000;
+        // Manually set expiration time to past
+        (service['blobCache'] as any).cache.get('hash1')!.createdAt =
+          Date.now() - 25 * 60 * 60 * 1000;
 
-      const retrieved = service.getBlob('hash1');
-      expect(retrieved).toBeNull();
-      done();
-    }));
+        const retrieved = service.getBlob('hash1');
+        expect(retrieved).toBeNull();
+        done();
+      }));
   });
 
   describe('Tier 3: Chunk Cache (10 GB, Time-Based Cleanup)', () => {

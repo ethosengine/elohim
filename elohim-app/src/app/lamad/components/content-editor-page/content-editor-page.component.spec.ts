@@ -18,21 +18,21 @@ describe('ContentEditorPageComponent', () => {
 
   beforeEach(async () => {
     mockDataLoader = {
-    getContent: vi.fn(),
-  };
+      getContent: vi.fn(),
+    };
     mockDataLoader.getContent.mockReturnValue(of(null as any));
 
     mockEditorService = {
-    canEdit: vi.fn(),
-    createNewDraft: vi.fn(),
-    saveContent: vi.fn(),
-  };
+      canEdit: vi.fn(),
+      createNewDraft: vi.fn(),
+      saveContent: vi.fn(),
+    };
     mockEditorService.canEdit.mockReturnValue(false);
 
     mockRegistry = {
-    getEditorComponent: vi.fn(),
-    getEditorConfig: vi.fn(),
-  };
+      getEditorComponent: vi.fn(),
+      getEditorConfig: vi.fn(),
+    };
     mockRegistry.getEditorComponent.mockReturnValue(null);
     mockRegistry.getEditorConfig.mockReturnValue({
       editorMode: 'visual',
@@ -40,8 +40,8 @@ describe('ContentEditorPageComponent', () => {
     });
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ContentEditorPageComponent],

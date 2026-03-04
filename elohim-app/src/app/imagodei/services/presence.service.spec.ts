@@ -92,9 +92,11 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expect(service.createPresence({
-        displayName: 'New Contributor',
-      })).rejects.toThrow('Not connected to network');
+      await expect(
+        service.createPresence({
+          displayName: 'New Contributor',
+        })
+      ).rejects.toThrow('Not connected to network');
     });
 
     it('should create presence when connected', async () => {
@@ -163,7 +165,9 @@ describe('PresenceService', () => {
         error: 'Network error',
       });
 
-      await expect(service.createPresence({ displayName: 'Test' })).rejects.toThrow('Network error');
+      await expect(service.createPresence({ displayName: 'Test' })).rejects.toThrow(
+        'Network error'
+      );
 
       expect(service.error()).toBe('Network error');
     });
@@ -173,14 +177,18 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expect(service.beginStewardship('presence-123')).rejects.toThrow('Not connected to network');
+      await expect(service.beginStewardship('presence-123')).rejects.toThrow(
+        'Not connected to network'
+      );
     });
 
     it('should throw when not authenticated', async () => {
       mockHolochainClient.isConnected.mockReturnValue(true);
       (mockIdentityService.agentPubKey as Mock).mockReturnValue(null);
 
-      await expect(service.beginStewardship('presence-123')).rejects.toThrow('Must be authenticated to begin stewardship');
+      await expect(service.beginStewardship('presence-123')).rejects.toThrow(
+        'Must be authenticated to begin stewardship'
+      );
     });
 
     it('should begin stewardship when authenticated', async () => {
@@ -258,11 +266,13 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expect(service.initiateClaim({
-        presenceId: 'presence-123',
-        claimEvidence: { proof: 'test' },
-        verificationMethod: 'email',
-      })).rejects.toThrow('Not connected to network');
+      await expect(
+        service.initiateClaim({
+          presenceId: 'presence-123',
+          claimEvidence: { proof: 'test' },
+          verificationMethod: 'email',
+        })
+      ).rejects.toThrow('Not connected to network');
     });
 
     it('should initiate claim', async () => {

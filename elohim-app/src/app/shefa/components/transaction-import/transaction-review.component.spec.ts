@@ -22,22 +22,22 @@ describe('TransactionReviewComponent', () => {
 
   beforeEach(async () => {
     mockImportService = {
-    getBatch: vi.fn(),
-    getStagedTransactionsForBatch: vi.fn(),
-    approveTransaction: vi.fn(),
-    rejectTransaction: vi.fn(),
-    approveBatch: vi.fn(),
-  };
+      getBatch: vi.fn(),
+      getStagedTransactionsForBatch: vi.fn(),
+      approveTransaction: vi.fn(),
+      rejectTransaction: vi.fn(),
+      approveBatch: vi.fn(),
+    };
     mockImportService.getBatch.mockReturnValue(undefined);
     mockImportService.getStagedTransactionsForBatch.mockReturnValue([]);
 
     mockAIService = {
-    categorize: vi.fn(),
-  };
+      categorize: vi.fn(),
+    };
 
     mockBudgetService = {
-    reconcile: vi.fn(),
-  };
+      reconcile: vi.fn(),
+    };
 
     mockActivatedRoute = {
       snapshot: {

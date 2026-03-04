@@ -15,8 +15,8 @@ describe('AnalyticsService', () => {
 
   beforeEach(() => {
     const configServiceSpy = {
-    getConfig: vi.fn(),
-  };
+      getConfig: vi.fn(),
+    };
 
     mockScript = {
       async: false,

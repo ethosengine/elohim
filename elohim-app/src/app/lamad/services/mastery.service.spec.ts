@@ -78,163 +78,176 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryForHuman', () => {
-    it('should fetch all mastery records for a human', () => new Promise<void>(done => {
-      const mockRecords = [
-        createMockMastery({ contentId: 'content-1' }),
-        createMockMastery({ contentId: 'content-2' }),
-      ];
-      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
+    it('should fetch all mastery records for a human', () =>
+      new Promise<void>(done => {
+        const mockRecords = [
+          createMockMastery({ contentId: 'content-1' }),
+          createMockMastery({ contentId: 'content-2' }),
+        ];
+        storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
-      service.getMasteryForHuman('human-1').subscribe(records => {
-        expect(records.length).toBe(2);
-        expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({ humanId: 'human-1' });
-        done();
-      });
-    }));
+        service.getMasteryForHuman('human-1').subscribe(records => {
+          expect(records.length).toBe(2);
+          expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({ humanId: 'human-1' });
+          done();
+        });
+      }));
   });
 
   describe('getMasteryForContent', () => {
-    it('should return mastery record when found', () => new Promise<void>(done => {
-      const mockRecord = createMockMastery();
-      storageApiSpy.getMasteryRecords.mockReturnValue(of([mockRecord]));
+    it('should return mastery record when found', () =>
+      new Promise<void>(done => {
+        const mockRecord = createMockMastery();
+        storageApiSpy.getMasteryRecords.mockReturnValue(of([mockRecord]));
 
-      service.getMasteryForContent('human-1', 'content-1').subscribe(record => {
-        expect(record).toEqual(mockRecord);
-        expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
-          humanId: 'human-1',
-          contentId: 'content-1',
+        service.getMasteryForContent('human-1', 'content-1').subscribe(record => {
+          expect(record).toEqual(mockRecord);
+          expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
+            humanId: 'human-1',
+            contentId: 'content-1',
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
 
-    it('should return null when no record found', () => new Promise<void>(done => {
-      storageApiSpy.getMasteryRecords.mockReturnValue(of([]));
+    it('should return null when no record found', () =>
+      new Promise<void>(done => {
+        storageApiSpy.getMasteryRecords.mockReturnValue(of([]));
 
-      service.getMasteryForContent('human-1', 'nonexistent').subscribe(record => {
-        expect(record).toBeNull();
-        done();
-      });
-    }));
+        service.getMasteryForContent('human-1', 'nonexistent').subscribe(record => {
+          expect(record).toBeNull();
+          done();
+        });
+      }));
   });
 
   describe('getMasteryState', () => {
-    it('should return map of contentId to mastery records', () => new Promise<void>(done => {
-      const mockRecords = [
-        createMockMastery({ contentId: 'content-1', masteryLevel: 'aware' }),
-        createMockMastery({ contentId: 'content-2', masteryLevel: 'mastered' }),
-        createMockMastery({ contentId: 'content-3', masteryLevel: 'understanding' }),
-      ];
-      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
+    it('should return map of contentId to mastery records', () =>
+      new Promise<void>(done => {
+        const mockRecords = [
+          createMockMastery({ contentId: 'content-1', masteryLevel: 'aware' }),
+          createMockMastery({ contentId: 'content-2', masteryLevel: 'mastered' }),
+          createMockMastery({ contentId: 'content-3', masteryLevel: 'understanding' }),
+        ];
+        storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
-      service.getMasteryState('human-1', ['content-1', 'content-2']).subscribe(result => {
-        expect(result.size).toBe(2);
-        expect(result.get('content-1')?.masteryLevel).toBe('aware');
-        expect(result.get('content-2')?.masteryLevel).toBe('mastered');
-        expect(result.has('content-3')).toBe(false);
-        done();
-      });
-    }));
+        service.getMasteryState('human-1', ['content-1', 'content-2']).subscribe(result => {
+          expect(result.size).toBe(2);
+          expect(result.get('content-1')?.masteryLevel).toBe('aware');
+          expect(result.get('content-2')?.masteryLevel).toBe('mastered');
+          expect(result.has('content-3')).toBe(false);
+          done();
+        });
+      }));
 
-    it('should return empty map for empty contentIds', () => new Promise<void>(done => {
-      service.getMasteryState('human-1', []).subscribe(result => {
-        expect(result.size).toBe(0);
-        expect(storageApiSpy.getMasteryRecords).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should return empty map for empty contentIds', () =>
+      new Promise<void>(done => {
+        service.getMasteryState('human-1', []).subscribe(result => {
+          expect(result.size).toBe(0);
+          expect(storageApiSpy.getMasteryRecords).not.toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('getMasteryAtLevel', () => {
-    it('should fetch mastery records at or above minimum level', () => new Promise<void>(done => {
-      const mockRecords = [createMockMastery({ masteryLevel: 'applying' })];
-      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
+    it('should fetch mastery records at or above minimum level', () =>
+      new Promise<void>(done => {
+        const mockRecords = [createMockMastery({ masteryLevel: 'applying' })];
+        storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
-      service.getMasteryAtLevel('human-1', 'understanding').subscribe(records => {
-        expect(records).toEqual(mockRecords);
-        expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
-          humanId: 'human-1',
-          minLevel: 'understanding',
+        service.getMasteryAtLevel('human-1', 'understanding').subscribe(records => {
+          expect(records).toEqual(mockRecords);
+          expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
+            humanId: 'human-1',
+            minLevel: 'understanding',
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
   });
 
   describe('getRefreshNeeded', () => {
-    it('should fetch content needing refresh', () => new Promise<void>(done => {
-      const mockRecords = [createMockMastery({ freshnessScore: 0.3 })];
-      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
+    it('should fetch content needing refresh', () =>
+      new Promise<void>(done => {
+        const mockRecords = [createMockMastery({ freshnessScore: 0.3 })];
+        storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
-      service.getRefreshNeeded('human-1').subscribe(records => {
-        expect(records).toEqual(mockRecords);
-        expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
-          humanId: 'human-1',
-          needsRefresh: true,
+        service.getRefreshNeeded('human-1').subscribe(records => {
+          expect(records).toEqual(mockRecords);
+          expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({
+            humanId: 'human-1',
+            needsRefresh: true,
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
   });
 
   describe('recordEngagement', () => {
-    it('should record engagement and return updated mastery', () => new Promise<void>(done => {
-      const updatedMastery = createMockMastery({ engagementCount: 6 });
-      storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
+    it('should record engagement and return updated mastery', () =>
+      new Promise<void>(done => {
+        const updatedMastery = createMockMastery({ engagementCount: 6 });
+        storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
 
-      service.recordEngagement('human-1', 'content-1', 'view').subscribe(result => {
-        expect(result).toEqual(updatedMastery);
-        expect(storageApiSpy.upsertMastery).toHaveBeenCalledWith({
-          humanId: 'human-1',
-          contentId: 'content-1',
-          engagementType: 'view',
+        service.recordEngagement('human-1', 'content-1', 'view').subscribe(result => {
+          expect(result).toEqual(updatedMastery);
+          expect(storageApiSpy.upsertMastery).toHaveBeenCalledWith({
+            humanId: 'human-1',
+            contentId: 'content-1',
+            engagementType: 'view',
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
   });
 
   describe('updateMasteryLevel', () => {
-    it('should update mastery level directly', () => new Promise<void>(done => {
-      const updatedMastery = createMockMastery({ masteryLevel: 'mastered' });
-      storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
+    it('should update mastery level directly', () =>
+      new Promise<void>(done => {
+        const updatedMastery = createMockMastery({ masteryLevel: 'mastered' });
+        storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
 
-      service.updateMasteryLevel('human-1', 'content-1', 'mastered').subscribe(result => {
-        expect(result.masteryLevel).toBe('mastered');
-        expect(storageApiSpy.upsertMastery).toHaveBeenCalledWith({
-          humanId: 'human-1',
-          contentId: 'content-1',
-          masteryLevel: 'mastered',
+        service.updateMasteryLevel('human-1', 'content-1', 'mastered').subscribe(result => {
+          expect(result.masteryLevel).toBe('mastered');
+          expect(storageApiSpy.upsertMastery).toHaveBeenCalledWith({
+            humanId: 'human-1',
+            contentId: 'content-1',
+            masteryLevel: 'mastered',
+          });
+          done();
         });
-        done();
-      });
-    }));
+      }));
   });
 
   describe('recordBulkEngagement', () => {
-    it('should record engagement for multiple content items', () => new Promise<void>(done => {
-      const mockResults = [
-        createMockMastery({ contentId: 'content-1' }),
-        createMockMastery({ contentId: 'content-2' }),
-      ];
-      storageApiSpy.upsertMastery.mockReturnValueOnce(of(mockResults[0])).mockReturnValueOnce(of(mockResults[1]));
+    it('should record engagement for multiple content items', () =>
+      new Promise<void>(done => {
+        const mockResults = [
+          createMockMastery({ contentId: 'content-1' }),
+          createMockMastery({ contentId: 'content-2' }),
+        ];
+        storageApiSpy.upsertMastery
+          .mockReturnValueOnce(of(mockResults[0]))
+          .mockReturnValueOnce(of(mockResults[1]));
 
-      service
-        .recordBulkEngagement('human-1', ['content-1', 'content-2'], 'view')
-        .subscribe(results => {
-          expect(results.length).toBe(2);
-          expect(storageApiSpy.upsertMastery).toHaveBeenCalledTimes(2);
+        service
+          .recordBulkEngagement('human-1', ['content-1', 'content-2'], 'view')
+          .subscribe(results => {
+            expect(results.length).toBe(2);
+            expect(storageApiSpy.upsertMastery).toHaveBeenCalledTimes(2);
+            done();
+          });
+      }));
+
+    it('should return empty array for empty contentIds', () =>
+      new Promise<void>(done => {
+        service.recordBulkEngagement('human-1', [], 'view').subscribe(results => {
+          expect(results).toEqual([]);
+          expect(storageApiSpy.upsertMastery).not.toHaveBeenCalled();
           done();
         });
-    }));
-
-    it('should return empty array for empty contentIds', () => new Promise<void>(done => {
-      service.recordBulkEngagement('human-1', [], 'view').subscribe(results => {
-        expect(results).toEqual([]);
-        expect(storageApiSpy.upsertMastery).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+      }));
   });
 
   describe('isMasteryAtLeast', () => {

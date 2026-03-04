@@ -246,9 +246,7 @@ describe('CommunityInsightsService', () => {
     });
 
     it('should use custom context when provided', () => {
-      const contextResults = [
-        buildPublicResult({ completedAt: '2025-03-15T12:00:00Z' }),
-      ];
+      const contextResults = [buildPublicResult({ completedAt: '2025-03-15T12:00:00Z' })];
       attestationSpy.getResultsForContext.mockReturnValue(contextResults);
 
       const context: AggregationContext = {

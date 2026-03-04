@@ -44,10 +44,14 @@ describe('ElohimConfigComponent', () => {
         type: 'mock' as const,
         isAvailable: () => Promise.resolve(true),
         invoke: () => of(),
-      }),
+      })
     );
 
-    mockPresenceService = { onContentCompleted: vi.fn(), onDiscoveryCompleted: vi.fn(), cost$: costSubject.asObservable(), };
+    mockPresenceService = {
+      onContentCompleted: vi.fn(),
+      onDiscoveryCompleted: vi.fn(),
+      cost$: costSubject.asObservable(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ElohimConfigComponent],
@@ -140,7 +144,7 @@ describe('ElohimConfigComponent', () => {
     it('should forward BYOK key to NativeBackend instance', () => {
       const nativeBackend = new NativeBackend();
       mockCatalog.get.mockImplementation((id: string) =>
-        id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined,
+        id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined
       );
 
       const event = { target: { value: 'sk-ant-test-key' } } as unknown as Event;
@@ -159,7 +163,7 @@ describe('ElohimConfigComponent', () => {
       const nativeBackend = new NativeBackend();
       nativeBackend.byokApiKey = 'old-key';
       mockCatalog.get.mockImplementation((id: string) =>
-        id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined,
+        id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined
       );
 
       component.clearApiKey();
@@ -205,7 +209,7 @@ describe('ElohimConfigComponent', () => {
           type: 'mock' as const,
           isAvailable: () => Promise.resolve(false),
           invoke: () => of(),
-        }),
+        })
       );
 
       await component.testBackend();

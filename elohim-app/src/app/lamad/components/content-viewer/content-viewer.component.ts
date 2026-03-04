@@ -164,7 +164,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
     // Listen for affinity changes
     this.affinityService.changes$.pipe(takeUntil(this.destroy$)).subscribe(change => {
-      if (change && change.nodeId === this.nodeId) {
+      if (change?.nodeId === this.nodeId) {
         this.affinity = change.newValue;
       }
     });

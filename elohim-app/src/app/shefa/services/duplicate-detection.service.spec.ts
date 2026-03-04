@@ -41,10 +41,12 @@ describe('DuplicateDetectionService', () => {
       } as any;
 
       const result = service.detect(transaction);
-      expect(result).toEqual(expect.objectContaining({
-        isDuplicate: expect.any(Boolean),
-        confidence: expect.any(Number),
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          isDuplicate: expect.any(Boolean),
+          confidence: expect.any(Number),
+        })
+      );
     });
 
     it('should detect exact match', () => {

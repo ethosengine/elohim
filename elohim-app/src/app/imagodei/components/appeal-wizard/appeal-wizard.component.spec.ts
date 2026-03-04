@@ -52,13 +52,13 @@ describe('AppealWizardComponent', () => {
 
   beforeEach(async () => {
     mockStewardshipService = {
-    getMyStewards: vi.fn(),
-    fileAppeal: vi.fn(),
-  };
+      getMyStewards: vi.fn(),
+      fileAppeal: vi.fn(),
+    };
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
 
     mockActivatedRoute = {
       snapshot: {
@@ -106,7 +106,9 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should handle load failure', async () => {
-      mockStewardshipService.getMyStewards.mockReturnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyStewards.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadGrant('grant-123');
 

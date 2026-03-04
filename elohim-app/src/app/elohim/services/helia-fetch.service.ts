@@ -78,9 +78,7 @@ export class HeliaFetchService implements IBlobFetcher {
       const response = await Promise.race([
         fetchFn(`ipfs://${cidStr}`),
         new Promise<never>((_, reject) => {
-          controller.signal.addEventListener('abort', () =>
-            reject(new Error('Helia timeout'))
-          );
+          controller.signal.addEventListener('abort', () => reject(new Error('Helia timeout')));
         }),
       ]);
 
@@ -95,9 +93,7 @@ export class HeliaFetchService implements IBlobFetcher {
   /** Fetch blob via doorway HTTP. */
   private async fetchViaHttp(cidStr: string): Promise<Uint8Array> {
     const blobUrl = this.storageClient.getBlobUrl(cidStr);
-    const response = await firstValueFrom(
-      this.http.get(blobUrl, { responseType: 'arraybuffer' })
-    );
+    const response = await firstValueFrom(this.http.get(blobUrl, { responseType: 'arraybuffer' }));
     return new Uint8Array(response);
   }
 

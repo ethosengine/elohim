@@ -10,12 +10,12 @@ describe('DomInteractionService', () => {
 
   beforeEach(() => {
     mockRenderer = {
-    listen: vi.fn(),
-    setStyle: vi.fn(),
-  };
+      listen: vi.fn(),
+      setStyle: vi.fn(),
+    };
     mockRendererFactory = {
-    createRenderer: vi.fn(),
-  };
+      createRenderer: vi.fn(),
+    };
     mockRendererFactory.createRenderer.mockReturnValue(mockRenderer);
 
     TestBed.configureTestingModule({
@@ -33,138 +33,147 @@ describe('DomInteractionService', () => {
   });
 
   describe('setupScrollIndicator', () => {
-    it('should setup scroll indicator click listener', () => new Promise<void>(done => {
-      const mockElement = document.createElement('div');
-      const scrollIndicator = document.createElement('div');
-      scrollIndicator.className = 'scroll-indicator';
-      mockElement.appendChild(scrollIndicator);
+    it('should setup scroll indicator click listener', () =>
+      new Promise<void>(done => {
+        const mockElement = document.createElement('div');
+        const scrollIndicator = document.createElement('div');
+        scrollIndicator.className = 'scroll-indicator';
+        mockElement.appendChild(scrollIndicator);
 
-      const elementRef = new ElementRef(mockElement);
-      const scrollSpy = vi.spyOn(window, 'scrollTo');
-      let clickHandler: (event: any) => void;
+        const elementRef = new ElementRef(mockElement);
+        const scrollSpy = vi.spyOn(window, 'scrollTo');
+        let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.mockImplementation(
-        (element: any, event: string, handler: (event: any) => void) => {
-          if (event === 'click') {
-            clickHandler = handler;
+        mockRenderer.listen.mockImplementation(
+          (element: any, event: string, handler: (event: any) => void) => {
+            if (event === 'click') {
+              clickHandler = handler;
+            }
+            return () => {};
           }
-          return () => {};
-        }
-      );
-
-      service.setupScrollIndicator(elementRef);
-
-      setTimeout(() => {
-        expect(mockRenderer.listen).toHaveBeenCalledWith(
-          scrollIndicator,
-          'click',
-          expect.any(Function)
         );
 
-        // Trigger the click handler
-        if (clickHandler!) {
-          clickHandler({});
-        }
+        service.setupScrollIndicator(elementRef);
 
-        expect(scrollSpy).toHaveBeenCalled();
-        const callArgs = scrollSpy.mock.lastCall[0] as ScrollToOptions;
-        expect(callArgs.top).toBe(window.innerHeight);
-        expect(callArgs.behavior).toBe('smooth');
+        setTimeout(() => {
+          expect(mockRenderer.listen).toHaveBeenCalledWith(
+            scrollIndicator,
+            'click',
+            expect.any(Function)
+          );
 
-        done();
-      }, 10);
-    }));
+          // Trigger the click handler
+          if (clickHandler!) {
+            clickHandler({});
+          }
 
-    it('should handle missing scroll indicator gracefully', () => new Promise<void>(done => {
-      const mockElement = document.createElement('div');
-      const elementRef = new ElementRef(mockElement);
+          expect(scrollSpy).toHaveBeenCalled();
+          const callArgs = scrollSpy.mock.lastCall[0] as ScrollToOptions;
+          expect(callArgs.top).toBe(window.innerHeight);
+          expect(callArgs.behavior).toBe('smooth');
 
-      service.setupScrollIndicator(elementRef);
+          done();
+        }, 10);
+      }));
 
-      setTimeout(() => {
-        expect(mockRenderer.listen).not.toHaveBeenCalled();
-        done();
-      }, 10);
-    }));
+    it('should handle missing scroll indicator gracefully', () =>
+      new Promise<void>(done => {
+        const mockElement = document.createElement('div');
+        const elementRef = new ElementRef(mockElement);
+
+        service.setupScrollIndicator(elementRef);
+
+        setTimeout(() => {
+          expect(mockRenderer.listen).not.toHaveBeenCalled();
+          done();
+        }, 10);
+      }));
   });
 
   describe('setupHeroTitleAnimation', () => {
-    it('should setup hero title click animation', () => new Promise<void>(done => {
-      const mockElement = document.createElement('div');
-      const heroSection = document.createElement('div');
-      heroSection.className = 'hero';
-      const heroTitle = document.createElement('h1');
-      heroSection.appendChild(heroTitle);
-      mockElement.appendChild(heroSection);
+    it('should setup hero title click animation', () =>
+      new Promise<void>(done => {
+        const mockElement = document.createElement('div');
+        const heroSection = document.createElement('div');
+        heroSection.className = 'hero';
+        const heroTitle = document.createElement('h1');
+        heroSection.appendChild(heroTitle);
+        mockElement.appendChild(heroSection);
 
-      const elementRef = new ElementRef(mockElement);
-      let clickHandler: (event: any) => void;
+        const elementRef = new ElementRef(mockElement);
+        let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.mockImplementation(
-        (element: any, event: string, handler: (event: any) => void) => {
-          if (event === 'click') {
-            clickHandler = handler;
+        mockRenderer.listen.mockImplementation(
+          (element: any, event: string, handler: (event: any) => void) => {
+            if (event === 'click') {
+              clickHandler = handler;
+            }
+            return () => {};
           }
-          return () => {};
-        }
-      );
+        );
 
-      service.setupHeroTitleAnimation(elementRef);
+        service.setupHeroTitleAnimation(elementRef);
 
-      setTimeout(() => {
-        expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'cursor', 'pointer');
-        expect(mockRenderer.listen).toHaveBeenCalledWith(heroTitle, 'click', expect.any(Function));
-
-        // Reset the spy to check calls within click handler
-        mockRenderer.setStyle.mockClear();
-
-        // Trigger the click handler
-        if (clickHandler!) {
-          clickHandler({});
-        }
-
-        expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'animation', 'none');
-
-        // Wait for the nested setTimeout
         setTimeout(() => {
-          expect(mockRenderer.setStyle).toHaveBeenCalledWith(
+          expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'cursor', 'pointer');
+          expect(mockRenderer.listen).toHaveBeenCalledWith(
             heroTitle,
-            'animation',
-            'float 6s ease-in-out infinite'
+            'click',
+            expect.any(Function)
           );
+
+          // Reset the spy to check calls within click handler
+          mockRenderer.setStyle.mockClear();
+
+          // Trigger the click handler
+          if (clickHandler!) {
+            clickHandler({});
+          }
+
+          expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'animation', 'none');
+
+          // Wait for the nested setTimeout
+          setTimeout(() => {
+            expect(mockRenderer.setStyle).toHaveBeenCalledWith(
+              heroTitle,
+              'animation',
+              'float 6s ease-in-out infinite'
+            );
+            done();
+          }, 20);
+        }, 10);
+      }));
+
+    it('should handle missing hero title gracefully', () =>
+      new Promise<void>(done => {
+        const mockElement = document.createElement('div');
+        const elementRef = new ElementRef(mockElement);
+
+        service.setupHeroTitleAnimation(elementRef);
+
+        setTimeout(() => {
+          expect(mockRenderer.setStyle).not.toHaveBeenCalled();
+          expect(mockRenderer.listen).not.toHaveBeenCalled();
           done();
-        }, 20);
-      }, 10);
-    }));
+        }, 10);
+      }));
 
-    it('should handle missing hero title gracefully', () => new Promise<void>(done => {
-      const mockElement = document.createElement('div');
-      const elementRef = new ElementRef(mockElement);
+    it('should handle hero section without h1', () =>
+      new Promise<void>(done => {
+        const mockElement = document.createElement('div');
+        const heroSection = document.createElement('div');
+        heroSection.className = 'hero';
+        mockElement.appendChild(heroSection);
 
-      service.setupHeroTitleAnimation(elementRef);
+        const elementRef = new ElementRef(mockElement);
 
-      setTimeout(() => {
-        expect(mockRenderer.setStyle).not.toHaveBeenCalled();
-        expect(mockRenderer.listen).not.toHaveBeenCalled();
-        done();
-      }, 10);
-    }));
+        service.setupHeroTitleAnimation(elementRef);
 
-    it('should handle hero section without h1', () => new Promise<void>(done => {
-      const mockElement = document.createElement('div');
-      const heroSection = document.createElement('div');
-      heroSection.className = 'hero';
-      mockElement.appendChild(heroSection);
-
-      const elementRef = new ElementRef(mockElement);
-
-      service.setupHeroTitleAnimation(elementRef);
-
-      setTimeout(() => {
-        expect(mockRenderer.setStyle).not.toHaveBeenCalled();
-        expect(mockRenderer.listen).not.toHaveBeenCalled();
-        done();
-      }, 10);
-    }));
+        setTimeout(() => {
+          expect(mockRenderer.setStyle).not.toHaveBeenCalled();
+          expect(mockRenderer.listen).not.toHaveBeenCalled();
+          done();
+        }, 10);
+      }));
   });
 });

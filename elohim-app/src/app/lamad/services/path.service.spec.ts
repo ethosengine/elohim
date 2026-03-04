@@ -123,22 +123,22 @@ describe('PathService', () => {
 
   beforeEach(() => {
     const dataLoaderSpyObj = {
-    getPath: vi.fn(),
-    getContent: vi.fn(),
-    getPathIndex: vi.fn(),
-  };
+      getPath: vi.fn(),
+      getContent: vi.fn(),
+      getPathIndex: vi.fn(),
+    };
     const agentServiceSpyObj = {
-    getProgressForPath: vi.fn(),
-    getAttestations: vi.fn(),
-  };
+      getProgressForPath: vi.fn(),
+      getAttestations: vi.fn(),
+    };
     const contentMasterySpyObj = {
-    getMasteryLevelSync: vi.fn(),
-  };
+      getMasteryLevelSync: vi.fn(),
+    };
     const learnerContextSpyObj = {
-    isMasteryUnlocked: vi.fn(),
-    isInSkippedSection: vi.fn(),
-    getDiscoveryProfile: vi.fn(),
-  };
+      isMasteryUnlocked: vi.fn(),
+      isInSkippedSection: vi.fn(),
+      getDiscoveryProfile: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -153,12 +153,12 @@ describe('PathService', () => {
     service = TestBed.inject(PathService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
     agentServiceSpy = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
-    contentMasterySpy = TestBed.inject(
-      ContentMasteryService
-    ) as { [K in keyof ContentMasteryService]?: Mock };
-    learnerContextSpy = TestBed.inject(
-      LearnerContextService
-    ) as { [K in keyof LearnerContextService]?: Mock };
+    contentMasterySpy = TestBed.inject(ContentMasteryService) as {
+      [K in keyof ContentMasteryService]?: Mock;
+    };
+    learnerContextSpy = TestBed.inject(LearnerContextService) as {
+      [K in keyof LearnerContextService]?: Mock;
+    };
 
     // Default spy return values
     dataLoaderSpy.getPath.mockReturnValue(of(mockPath));
@@ -176,108 +176,118 @@ describe('PathService', () => {
   });
 
   describe('getPath', () => {
-    it('should get path metadata', () => new Promise<void>(done => {
-      service.getPath('test-path').subscribe(path => {
-        expect(path).toEqual(mockPath);
-        expect(dataLoaderSpy.getPath).toHaveBeenCalledWith('test-path');
-        done();
-      });
-    }));
-
-    it('should handle path load error', () => new Promise<void>(done => {
-      dataLoaderSpy.getPath.mockReturnValue(throwError(() => new Error('Load error')));
-
-      service.getPath('test-path').subscribe({
-        error: err => {
-          expect(err.message).toBe('Load error');
+    it('should get path metadata', () =>
+      new Promise<void>(done => {
+        service.getPath('test-path').subscribe(path => {
+          expect(path).toEqual(mockPath);
+          expect(dataLoaderSpy.getPath).toHaveBeenCalledWith('test-path');
           done();
-        },
-      });
-    }));
+        });
+      }));
+
+    it('should handle path load error', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getPath.mockReturnValue(throwError(() => new Error('Load error')));
+
+        service.getPath('test-path').subscribe({
+          error: err => {
+            expect(err.message).toBe('Load error');
+            done();
+          },
+        });
+      }));
   });
 
   describe('getPathStep', () => {
-    it('should get step with resolved content', () => new Promise<void>(done => {
-      service.getPathStep('test-path', 0).subscribe(stepView => {
-        expect(stepView.step).toEqual(mockPath.steps[0]);
-        expect(stepView.content).toEqual(mockContent);
-        expect(stepView.hasPrevious).toBe(false);
-        expect(stepView.hasNext).toBe(true);
-        expect(stepView.previousStepIndex).toBeUndefined();
-        expect(stepView.nextStepIndex).toBe(1);
-        expect(stepView.isCompleted).toBe(true);
-        expect(stepView.affinity).toBe(0.8);
-        expect(stepView.notes).toBe('Great intro!');
-        done();
-      });
-    }));
-
-    it('should handle middle step navigation', () => new Promise<void>(done => {
-      service.getPathStep('test-path', 1).subscribe(stepView => {
-        expect(stepView.hasPrevious).toBe(true);
-        expect(stepView.hasNext).toBe(true);
-        expect(stepView.previousStepIndex).toBe(0);
-        expect(stepView.nextStepIndex).toBe(2);
-        expect(stepView.isCompleted).toBe(false);
-        done();
-      });
-    }));
-
-    it('should handle last step navigation', () => new Promise<void>(done => {
-      service.getPathStep('test-path', 4).subscribe(stepView => {
-        expect(stepView.hasPrevious).toBe(true);
-        expect(stepView.hasNext).toBe(false);
-        expect(stepView.previousStepIndex).toBe(3);
-        expect(stepView.nextStepIndex).toBeUndefined();
-        done();
-      });
-    }));
-
-    it('should handle step with no progress', () => new Promise<void>(done => {
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
-
-      service.getPathStep('test-path', 0).subscribe(stepView => {
-        expect(stepView.isCompleted).toBe(false);
-        expect(stepView.affinity).toBeUndefined();
-        expect(stepView.notes).toBeUndefined();
-        done();
-      });
-    }));
-
-    it('should throw error for invalid step index (negative)', () => new Promise<void>(done => {
-      service.getPathStep('test-path', -1).subscribe({
-        error: err => {
-          expect(err.message).toContain('out of range');
+    it('should get step with resolved content', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', 0).subscribe(stepView => {
+          expect(stepView.step).toEqual(mockPath.steps[0]);
+          expect(stepView.content).toEqual(mockContent);
+          expect(stepView.hasPrevious).toBe(false);
+          expect(stepView.hasNext).toBe(true);
+          expect(stepView.previousStepIndex).toBeUndefined();
+          expect(stepView.nextStepIndex).toBe(1);
+          expect(stepView.isCompleted).toBe(true);
+          expect(stepView.affinity).toBe(0.8);
+          expect(stepView.notes).toBe('Great intro!');
           done();
-        },
-      });
-    }));
+        });
+      }));
 
-    it('should throw error for invalid step index (too large)', () => new Promise<void>(done => {
-      service.getPathStep('test-path', 10).subscribe({
-        error: err => {
-          expect(err.message).toContain('out of range');
+    it('should handle middle step navigation', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', 1).subscribe(stepView => {
+          expect(stepView.hasPrevious).toBe(true);
+          expect(stepView.hasNext).toBe(true);
+          expect(stepView.previousStepIndex).toBe(0);
+          expect(stepView.nextStepIndex).toBe(2);
+          expect(stepView.isCompleted).toBe(false);
           done();
-        },
-      });
-    }));
+        });
+      }));
 
-    it('should load correct content for step', () => new Promise<void>(done => {
-      service.getPathStep('test-path', 1).subscribe(() => {
-        expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('content-2');
-        done();
-      });
-    }));
+    it('should handle last step navigation', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', 4).subscribe(stepView => {
+          expect(stepView.hasPrevious).toBe(true);
+          expect(stepView.hasNext).toBe(false);
+          expect(stepView.previousStepIndex).toBe(3);
+          expect(stepView.nextStepIndex).toBeUndefined();
+          done();
+        });
+      }));
+
+    it('should handle step with no progress', () =>
+      new Promise<void>(done => {
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
+
+        service.getPathStep('test-path', 0).subscribe(stepView => {
+          expect(stepView.isCompleted).toBe(false);
+          expect(stepView.affinity).toBeUndefined();
+          expect(stepView.notes).toBeUndefined();
+          done();
+        });
+      }));
+
+    it('should throw error for invalid step index (negative)', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', -1).subscribe({
+          error: err => {
+            expect(err.message).toContain('out of range');
+            done();
+          },
+        });
+      }));
+
+    it('should throw error for invalid step index (too large)', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', 10).subscribe({
+          error: err => {
+            expect(err.message).toContain('out of range');
+            done();
+          },
+        });
+      }));
+
+    it('should load correct content for step', () =>
+      new Promise<void>(done => {
+        service.getPathStep('test-path', 1).subscribe(() => {
+          expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('content-2');
+          done();
+        });
+      }));
   });
 
   describe('listPaths', () => {
-    it('should list all available paths', () => new Promise<void>(done => {
-      service.listPaths().subscribe(index => {
-        expect(index).toEqual(mockPathIndex);
-        expect(dataLoaderSpy.getPathIndex).toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should list all available paths', () =>
+      new Promise<void>(done => {
+        service.listPaths().subscribe(index => {
+          expect(index).toEqual(mockPathIndex);
+          expect(dataLoaderSpy.getPathIndex).toHaveBeenCalled();
+          done();
+        });
+      }));
   });
 
   describe('isStepAccessible', () => {
@@ -390,171 +400,188 @@ describe('PathService', () => {
   });
 
   describe('checkStepAccess', () => {
-    it('should check step access using current agent state', () => new Promise<void>(done => {
-      service.checkStepAccess('test-path', 0).subscribe(result => {
-        expect(result.accessible).toBe(true);
-        expect(agentServiceSpy.getProgressForPath).toHaveBeenCalledWith('test-path');
-        expect(agentServiceSpy.getAttestations).toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should check step access using current agent state', () =>
+      new Promise<void>(done => {
+        service.checkStepAccess('test-path', 0).subscribe(result => {
+          expect(result.accessible).toBe(true);
+          expect(agentServiceSpy.getProgressForPath).toHaveBeenCalledWith('test-path');
+          expect(agentServiceSpy.getAttestations).toHaveBeenCalled();
+          done();
+        });
+      }));
 
-    it('should deny access to locked step', () => new Promise<void>(done => {
-      service.checkStepAccess('test-path', 3).subscribe(result => {
-        expect(result.accessible).toBe(false);
-        done();
-      });
-    }));
+    it('should deny access to locked step', () =>
+      new Promise<void>(done => {
+        service.checkStepAccess('test-path', 3).subscribe(result => {
+          expect(result.accessible).toBe(false);
+          done();
+        });
+      }));
   });
 
   describe('getAccessibleSteps', () => {
-    it('should return all accessible step indices', () => new Promise<void>(done => {
-      service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0, 1, 2]);
-        done();
-      });
-    }));
+    it('should return all accessible step indices', () =>
+      new Promise<void>(done => {
+        service.getAccessibleSteps('test-path').subscribe(steps => {
+          expect(steps).toEqual([0, 1, 2]);
+          done();
+        });
+      }));
 
-    it('should return only step 0 with no progress', () => new Promise<void>(done => {
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
+    it('should return only step 0 with no progress', () =>
+      new Promise<void>(done => {
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
 
-      service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0]);
-        done();
-      });
-    }));
+        service.getAccessibleSteps('test-path').subscribe(steps => {
+          expect(steps).toEqual([0]);
+          done();
+        });
+      }));
 
-    it('should include step with attestation if agent has it', () => new Promise<void>(done => {
-      const fullProgress: AgentProgress = {
-        ...mockProgress,
-        completedStepIndices: [0, 1, 2, 3],
-      };
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(fullProgress));
-      agentServiceSpy.getAttestations.mockReturnValue(['test-attestation']);
+    it('should include step with attestation if agent has it', () =>
+      new Promise<void>(done => {
+        const fullProgress: AgentProgress = {
+          ...mockProgress,
+          completedStepIndices: [0, 1, 2, 3],
+        };
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(fullProgress));
+        agentServiceSpy.getAttestations.mockReturnValue(['test-attestation']);
 
-      service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0, 1, 2, 3, 4]);
-        done();
-      });
-    }));
+        service.getAccessibleSteps('test-path').subscribe(steps => {
+          expect(steps).toEqual([0, 1, 2, 3, 4]);
+          done();
+        });
+      }));
 
-    it('should exclude step with attestation if agent lacks it', () => new Promise<void>(done => {
-      const fullProgress: AgentProgress = {
-        ...mockProgress,
-        completedStepIndices: [0, 1, 2, 3],
-      };
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(fullProgress));
-      agentServiceSpy.getAttestations.mockReturnValue([]);
+    it('should exclude step with attestation if agent lacks it', () =>
+      new Promise<void>(done => {
+        const fullProgress: AgentProgress = {
+          ...mockProgress,
+          completedStepIndices: [0, 1, 2, 3],
+        };
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(fullProgress));
+        agentServiceSpy.getAttestations.mockReturnValue([]);
 
-      service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0, 1, 2, 3]);
-        done();
-      });
-    }));
+        service.getAccessibleSteps('test-path').subscribe(steps => {
+          expect(steps).toEqual([0, 1, 2, 3]);
+          done();
+        });
+      }));
   });
 
   describe('getStepCount', () => {
-    it('should return total number of steps', () => new Promise<void>(done => {
-      service.getStepCount('test-path').subscribe(count => {
-        expect(count).toBe(5);
-        done();
-      });
-    }));
+    it('should return total number of steps', () =>
+      new Promise<void>(done => {
+        service.getStepCount('test-path').subscribe(count => {
+          expect(count).toBe(5);
+          done();
+        });
+      }));
   });
 
   describe('getCompletionPercentage', () => {
-    it('should calculate completion percentage', () => new Promise<void>(done => {
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        // 1 completed out of 4 required steps (step 2 is optional) = 25%
-        expect(percentage).toBe(25);
-        done();
-      });
-    }));
+    it('should calculate completion percentage', () =>
+      new Promise<void>(done => {
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          // 1 completed out of 4 required steps (step 2 is optional) = 25%
+          expect(percentage).toBe(25);
+          done();
+        });
+      }));
 
-    it('should return 0 with no progress', () => new Promise<void>(done => {
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
+    it('should return 0 with no progress', () =>
+      new Promise<void>(done => {
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(null as any));
 
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        expect(percentage).toBe(0);
-        done();
-      });
-    }));
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          expect(percentage).toBe(0);
+          done();
+        });
+      }));
 
-    it('should return 100 when all required steps completed', () => new Promise<void>(done => {
-      const completeProgress: AgentProgress = {
-        ...mockProgress,
-        completedStepIndices: [0, 1, 3, 4], // All required steps (excluding optional step 2)
-      };
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(completeProgress));
+    it('should return 100 when all required steps completed', () =>
+      new Promise<void>(done => {
+        const completeProgress: AgentProgress = {
+          ...mockProgress,
+          completedStepIndices: [0, 1, 3, 4], // All required steps (excluding optional step 2)
+        };
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(completeProgress));
 
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        expect(percentage).toBe(100);
-        done();
-      });
-    }));
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          expect(percentage).toBe(100);
+          done();
+        });
+      }));
 
-    it('should return 100 for path with no required steps', () => new Promise<void>(done => {
-      const allOptionalPath: LearningPath = {
-        ...mockPath,
-        steps: mockPath.steps.map(s => ({ ...s, optional: true })),
-      };
-      dataLoaderSpy.getPath.mockReturnValue(of(allOptionalPath));
+    it('should return 100 for path with no required steps', () =>
+      new Promise<void>(done => {
+        const allOptionalPath: LearningPath = {
+          ...mockPath,
+          steps: mockPath.steps.map(s => ({ ...s, optional: true })),
+        };
+        dataLoaderSpy.getPath.mockReturnValue(of(allOptionalPath));
 
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        expect(percentage).toBe(100);
-        done();
-      });
-    }));
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          expect(percentage).toBe(100);
+          done();
+        });
+      }));
 
-    it('should only count required steps for percentage', () => new Promise<void>(done => {
-      const partialProgress: AgentProgress = {
-        ...mockProgress,
-        completedStepIndices: [0, 2], // Completed step 0 (required) and 2 (optional)
-      };
-      agentServiceSpy.getProgressForPath.mockReturnValue(of(partialProgress));
+    it('should only count required steps for percentage', () =>
+      new Promise<void>(done => {
+        const partialProgress: AgentProgress = {
+          ...mockProgress,
+          completedStepIndices: [0, 2], // Completed step 0 (required) and 2 (optional)
+        };
+        agentServiceSpy.getProgressForPath.mockReturnValue(of(partialProgress));
 
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        // 1 required completed out of 4 required total = 25%
-        expect(percentage).toBe(25);
-        done();
-      });
-    }));
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          // 1 required completed out of 4 required total = 25%
+          expect(percentage).toBe(25);
+          done();
+        });
+      }));
 
-    it('should handle empty path (no steps)', () => new Promise<void>(done => {
-      const emptyPath: LearningPath = {
-        ...mockPath,
-        steps: [],
-      };
-      dataLoaderSpy.getPath.mockReturnValue(of(emptyPath));
+    it('should handle empty path (no steps)', () =>
+      new Promise<void>(done => {
+        const emptyPath: LearningPath = {
+          ...mockPath,
+          steps: [],
+        };
+        dataLoaderSpy.getPath.mockReturnValue(of(emptyPath));
 
-      service.getCompletionPercentage('test-path').subscribe(percentage => {
-        expect(percentage).toBe(0);
-        done();
-      });
-    }));
+        service.getCompletionPercentage('test-path').subscribe(percentage => {
+          expect(percentage).toBe(0);
+          done();
+        });
+      }));
   });
 
   describe('additional coverage', () => {
-    it('should handle getPath errors in getPathStep', () => new Promise<void>(done => {
-      dataLoaderSpy.getPath.mockReturnValue(throwError(() => new Error('Path load failed')));
+    it('should handle getPath errors in getPathStep', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getPath.mockReturnValue(throwError(() => new Error('Path load failed')));
 
-      service.getPathStep('test-path', 0).subscribe({
-        error: err => {
-          expect(err.message).toContain('Path load failed');
-          done();
-        },
-      });
-    }));
+        service.getPathStep('test-path', 0).subscribe({
+          error: err => {
+            expect(err.message).toContain('Path load failed');
+            done();
+          },
+        });
+      }));
 
-    it('should handle getContent errors in getPathStep', () => new Promise<void>(done => {
-      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Content load failed')));
+    it('should handle getContent errors in getPathStep', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getContent.mockReturnValue(
+          throwError(() => new Error('Content load failed'))
+        );
 
-      service.getPathStep('test-path', 0).subscribe({
-        error: err => {
-          expect(err.message).toContain('Content load failed');
-          done();
-        },
-      });
-    }));
+        service.getPathStep('test-path', 0).subscribe({
+          error: err => {
+            expect(err.message).toContain('Content load failed');
+            done();
+          },
+        });
+      }));
   });
 });

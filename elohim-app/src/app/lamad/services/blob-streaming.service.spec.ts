@@ -73,43 +73,45 @@ describe('BlobStreamingService', () => {
   });
 
   describe('Chunked Download', () => {
-    it('should check Range request support', () => new Promise<void>(done => {
-      const url = 'https://example.com/blob.mp4';
+    it('should check Range request support', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
 
-      service['checkRangeSupport'](url).then(supported => {
-        expect(typeof supported).toBe('boolean');
-        done();
-      });
+        service['checkRangeSupport'](url).then(supported => {
+          expect(typeof supported).toBe('boolean');
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      expect(req.request.headers.has('Range')).toBe(true);
-      req.flush(null, { status: 206, statusText: 'Partial Content' });
-    }));
+        const req = httpMock.expectOne(url);
+        expect(req.request.headers.has('Range')).toBe(true);
+        req.flush(null, { status: 206, statusText: 'Partial Content' });
+      }));
 
-    it('should fallback to single request if Range not supported', () => new Promise<void>(done => {
-      const url = 'https://example.com/blob.mp4';
-      const blob = createMockContentBlob();
-      const testData = new Uint8Array(1024);
+    it('should fallback to single request if Range not supported', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const blob = createMockContentBlob();
+        const testData = new Uint8Array(1024);
 
-      service.downloadInChunks(blob, url).subscribe(result => {
-        expect(result.size).toBeGreaterThan(0);
-        done();
-      });
+        service.downloadInChunks(blob, url).subscribe(result => {
+          expect(result.size).toBeGreaterThan(0);
+          done();
+        });
 
-      // Give time for async performChunkedDownload to start
-      setTimeout(() => {
-        // Range check (HEAD request) returns 200 (Range not supported)
-        const rangeReq = httpMock.expectOne(req => req.method === 'HEAD' && req.url === url);
-        rangeReq.flush(null, { status: 200, statusText: 'OK' });
-
-        // Give time for fallback to trigger
+        // Give time for async performChunkedDownload to start
         setTimeout(() => {
-          // Single GET request for full download
-          const downloadReq = httpMock.expectOne(req => req.method === 'GET' && req.url === url);
-          downloadReq.flush(testData.buffer);
+          // Range check (HEAD request) returns 200 (Range not supported)
+          const rangeReq = httpMock.expectOne(req => req.method === 'HEAD' && req.url === url);
+          rangeReq.flush(null, { status: 200, statusText: 'OK' });
+
+          // Give time for fallback to trigger
+          setTimeout(() => {
+            // Single GET request for full download
+            const downloadReq = httpMock.expectOne(req => req.method === 'GET' && req.url === url);
+            downloadReq.flush(testData.buffer);
+          }, 10);
         }, 10);
-      }, 10);
-    }));
+      }));
   });
 
   describe('Bandwidth Probing', () => {

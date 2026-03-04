@@ -50,14 +50,14 @@ describe('AffinityCircleComponent', () => {
   describe('circumference', () => {
     it('should calculate circumference for default size', () => {
       component.size = 80;
-      const radius = (80 / 2) - 4;
+      const radius = 80 / 2 - 4;
       const expected = 2 * Math.PI * radius;
       expect(component.circumference).toBeCloseTo(expected, 2);
     });
 
     it('should calculate circumference for custom size', () => {
       component.size = 100;
-      const radius = (100 / 2) - 4;
+      const radius = 100 / 2 - 4;
       const expected = 2 * Math.PI * radius;
       expect(component.circumference).toBeCloseTo(expected, 2);
     });

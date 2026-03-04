@@ -19,7 +19,7 @@
  * @see EconomicService for underlying hREA primitives
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 // @coverage: 24.0% (2026-02-24)
 
@@ -210,7 +210,7 @@ export class StewardService {
   /** Cache for access checks */
   private readonly accessCheckCache = new Map<string, Observable<AccessGrant | null>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if steward service is available.

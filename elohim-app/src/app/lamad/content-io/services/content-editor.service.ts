@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { catchError, map } from 'rxjs/operators';
 
@@ -36,10 +36,8 @@ export class ContentEditorService {
   /** Draft storage for unsaved changes (prototype) */
   private readonly drafts = new Map<string, ContentDraft>();
 
-  constructor(
-    private readonly registry: ContentFormatRegistryService,
-    private readonly contextAssembly: ContextAssemblyService
-  ) {}
+  private readonly registry = inject(ContentFormatRegistryService);
+  private readonly contextAssembly = inject(ContextAssemblyService);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Permissions

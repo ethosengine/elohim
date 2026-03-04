@@ -15,30 +15,38 @@ describe('AgencyBadgeComponent', () => {
 
   beforeEach(async () => {
     routerSpy = {
-    navigate: vi.fn(),
-  };
-    agencySpy = { getStageSummary: vi.fn(), agencyState: signal({
-          currentStage: 'citizen',
-          networked: true,
-          edgeNodeConnected: true,
-        }),
-        stageInfo: signal({
-          stage: 'citizen',
-          description: 'Test stage',
-          capabilities: [],
-        }),
-        connectionStatus: signal({
-          state: 'connected',
-          message: 'Connected',
-          isOnline: true,
-        }),
-        canUpgrade: signal(false), };
+      navigate: vi.fn(),
+    };
+    agencySpy = {
+      getStageSummary: vi.fn(),
+      agencyState: signal({
+        currentStage: 'citizen',
+        networked: true,
+        edgeNodeConnected: true,
+      }),
+      stageInfo: signal({
+        stage: 'citizen',
+        description: 'Test stage',
+        capabilities: [],
+      }),
+      connectionStatus: signal({
+        state: 'connected',
+        message: 'Connected',
+        isOnline: true,
+      }),
+      canUpgrade: signal(false),
+    };
     agencySpy.getStageSummary.mockReturnValue({
       data: 'Test summary',
       progress: '0%',
     });
 
-    holochainSpy = { getDisplayInfo: vi.fn(), disconnect: vi.fn(), connect: vi.fn(), isConnected: signal(true), };
+    holochainSpy = {
+      getDisplayInfo: vi.fn(),
+      disconnect: vi.fn(),
+      connect: vi.fn(),
+      isConnected: signal(true),
+    };
     holochainSpy.getDisplayInfo.mockReturnValue({
       state: 'connected',
       mode: 'doorway',
@@ -155,13 +163,14 @@ describe('AgencyBadgeComponent', () => {
       expect(typeof component.onViewDetails).toBe('function');
     });
 
-    it('should emit viewDetails output', () => new Promise<void>(done => {
-      component.viewDetails.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
-      component.onViewDetails();
-    }));
+    it('should emit viewDetails output', () =>
+      new Promise<void>(done => {
+        component.viewDetails.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
+        component.onViewDetails();
+      }));
 
     it('should navigate to identity profile network section', () => {
       component.onViewDetails();
@@ -177,13 +186,14 @@ describe('AgencyBadgeComponent', () => {
       expect(typeof component.onUpgrade).toBe('function');
     });
 
-    it('should emit upgrade output', () => new Promise<void>(done => {
-      component.upgrade.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
-      component.onUpgrade();
-    }));
+    it('should emit upgrade output', () =>
+      new Promise<void>(done => {
+        component.upgrade.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
+        component.onUpgrade();
+      }));
 
     it('should navigate to profile upgrade section', () => {
       component.onUpgrade();

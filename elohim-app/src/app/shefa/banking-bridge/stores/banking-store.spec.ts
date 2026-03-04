@@ -10,7 +10,14 @@
  * - Correction records
  */
 
-import { BankingStore, PlaidConnectionLocal, ImportBatchLocal, StagedTransactionLocal, TransactionRuleLocal, CorrectionRecordLocal } from './banking-store';
+import {
+  BankingStore,
+  PlaidConnectionLocal,
+  ImportBatchLocal,
+  StagedTransactionLocal,
+  TransactionRuleLocal,
+  CorrectionRecordLocal,
+} from './banking-store';
 
 describe('BankingStore', () => {
   let store: BankingStore;

@@ -33,9 +33,9 @@ describe('AppreciationService', () => {
 
   beforeEach(() => {
     holochainClientMock = {
-    callZome: vi.fn(),
-    isConnected: vi.fn(),
-  };
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
 
     // Default: not connected
     holochainClientMock.isConnected.mockReturnValue(false);
@@ -112,13 +112,14 @@ describe('AppreciationService', () => {
   // ==========================================================================
 
   describe('getAppreciationsFor', () => {
-    it('should return empty array when service not available', () => new Promise<void>(done => {
-      service.getAppreciationsFor('entity-1').subscribe(result => {
-        expect(result).toEqual([]);
-        expect(holochainClientMock.callZome).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should return empty array when service not available', () =>
+      new Promise<void>(done => {
+        service.getAppreciationsFor('entity-1').subscribe(result => {
+          expect(result).toEqual([]);
+          expect(holochainClientMock.callZome).not.toHaveBeenCalled();
+          done();
+        });
+      }));
 
     it('should fetch appreciations when service is available', async () => {
       // Make service available
@@ -174,8 +175,9 @@ describe('AppreciationService', () => {
 
       // callZome should only be called for the availability test and once for data
       // (not twice for entity-1)
-      const dataCalls = holochainClientMock.callZome.mock.calls
-        .filter((args: any[]) => args[0].fnName === 'get_appreciations_for');
+      const dataCalls = holochainClientMock.callZome.mock.calls.filter(
+        (args: any[]) => args[0].fnName === 'get_appreciations_for'
+      );
       expect(dataCalls.length).toBe(2); // availability test + one data fetch
     });
 
@@ -249,12 +251,13 @@ describe('AppreciationService', () => {
   // ==========================================================================
 
   describe('getAppreciationsBy', () => {
-    it('should return empty array when service not available', () => new Promise<void>(done => {
-      service.getAppreciationsBy('agent-1').subscribe(result => {
-        expect(result).toEqual([]);
-        done();
-      });
-    }));
+    it('should return empty array when service not available', () =>
+      new Promise<void>(done => {
+        service.getAppreciationsBy('agent-1').subscribe(result => {
+          expect(result).toEqual([]);
+          done();
+        });
+      }));
 
     it('should fetch appreciations given by an agent', async () => {
       // Make service available
@@ -404,9 +407,11 @@ describe('AppreciationService', () => {
         Promise.resolve({ success: false, error: 'Validation failed' })
       );
 
-      await await expect(new Promise<AppreciationDisplay>((resolve, reject) => {
+      await await expect(
+        new Promise<AppreciationDisplay>((resolve, reject) => {
           service.appreciate(input).subscribe({ next: resolve, error: reject });
-        })).rejects.toThrow('Validation failed');
+        })
+      ).rejects.toThrow('Validation failed');
     });
   });
 
@@ -437,11 +442,10 @@ describe('AppreciationService', () => {
       });
 
       // Verify the zome was called again for entity-1
-      const entityCalls = holochainClientMock.callZome.mock.calls
-        .filter(
-          (args: any[]) =>
-            args[0].fnName === 'get_appreciations_for' && args[0].payload === 'entity-1'
-        );
+      const entityCalls = holochainClientMock.callZome.mock.calls.filter(
+        (args: any[]) =>
+          args[0].fnName === 'get_appreciations_for' && args[0].payload === 'entity-1'
+      );
       expect(entityCalls.length).toBe(2); // Before clear + after clear
     });
   });

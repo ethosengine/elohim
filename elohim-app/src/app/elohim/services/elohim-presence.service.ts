@@ -68,12 +68,12 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
     map(moments => moments.filter(m => !this.dismissed.has(m.id)).map(m => this.toBannerNotice(m)))
   );
 
-  constructor(
-    private readonly agentService: ElohimAgentService,
-    private readonly bannerService: BannerService,
-    private readonly pathRecommendation: PathRecommendationService,
-    private readonly learnerContext: LearnerContextService
-  ) {
+  private readonly agentService = inject(ElohimAgentService);
+  private readonly bannerService = inject(BannerService);
+  private readonly pathRecommendation = inject(PathRecommendationService);
+  private readonly learnerContext = inject(LearnerContextService);
+
+  constructor() {
     this.bannerService.registerProvider(this);
   }
 

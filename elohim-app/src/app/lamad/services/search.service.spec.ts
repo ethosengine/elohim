@@ -96,12 +96,12 @@ describe('SearchService', () => {
 
   beforeEach(() => {
     const dataLoaderSpyObj = {
-    getContentIndex: vi.fn(),
-    getPathIndex: vi.fn(),
-  };
+      getContentIndex: vi.fn(),
+      getPathIndex: vi.fn(),
+    };
     const trustBadgeSpyObj = {
-    getTrustBadges: vi.fn(),
-  };
+      getTrustBadges: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -129,77 +129,84 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('search', () => {
-    it('should return all results when no text query', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        // 5 content nodes + 1 path = 6 total
-        expect(results.totalCount).toBe(6);
-        expect(results.results.length).toBe(6);
-        done();
-      });
-    }));
+    it('should return all results when no text query', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          // 5 content nodes + 1 path = 6 total
+          expect(results.totalCount).toBe(6);
+          expect(results.results.length).toBe(6);
+          done();
+        });
+      }));
 
-    it('should filter by text query', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        expect(results.totalCount).toBeGreaterThan(0);
-        // Should match title "Governance Framework" and tag "governance"
-        expect(results.results.some(r => r.title.includes('Governance'))).toBe(true);
-        done();
-      });
-    }));
+    it('should filter by text query', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.totalCount).toBeGreaterThan(0);
+          // Should match title "Governance Framework" and tag "governance"
+          expect(results.results.some(r => r.title.includes('Governance'))).toBe(true);
+          done();
+        });
+      }));
 
-    it('should score title matches higher than description', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        // "Governance Framework" should be ranked higher than "Protocol Implementation"
-        // which only has governance in tags and description
-        const governanceIdx = results.results.findIndex(r => r.title === 'Governance Framework');
-        const protocolIdx = results.results.findIndex(r => r.title === 'Protocol Implementation');
+    it('should score title matches higher than description', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          // "Governance Framework" should be ranked higher than "Protocol Implementation"
+          // which only has governance in tags and description
+          const governanceIdx = results.results.findIndex(r => r.title === 'Governance Framework');
+          const protocolIdx = results.results.findIndex(r => r.title === 'Protocol Implementation');
 
-        if (governanceIdx >= 0 && protocolIdx >= 0) {
-          expect(governanceIdx).toBeLessThan(protocolIdx);
-        }
-        done();
-      });
-    }));
+          if (governanceIdx >= 0 && protocolIdx >= 0) {
+            expect(governanceIdx).toBeLessThan(protocolIdx);
+          }
+          done();
+        });
+      }));
 
-    it('should include relevance score', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        for (const result of results.results) {
-          expect(result.relevanceScore).toBeDefined();
-          expect(result.relevanceScore).toBeGreaterThan(0);
-        }
-        done();
-      });
-    }));
+    it('should include relevance score', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          for (const result of results.results) {
+            expect(result.relevanceScore).toBeDefined();
+            expect(result.relevanceScore).toBeGreaterThan(0);
+          }
+          done();
+        });
+      }));
 
-    it('should include matched fields', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        const governance = results.results.find(r => r.title === 'Governance Framework');
-        expect(governance?.matchedFields.some(f => f.field === 'title')).toBe(true);
-        done();
-      });
-    }));
+    it('should include matched fields', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          const governance = results.results.find(r => r.title === 'Governance Framework');
+          expect(governance?.matchedFields.some(f => f.field === 'title')).toBe(true);
+          done();
+        });
+      }));
 
-    it('should include highlights', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        const governance = results.results.find(r => r.title === 'Governance Framework');
-        expect(governance?.highlights.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should include highlights', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          const governance = results.results.find(r => r.title === 'Governance Framework');
+          expect(governance?.highlights.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should handle multi-word queries', () => new Promise<void>(done => {
-      service.search({ text: 'governance design' }).subscribe(results => {
-        // Should match content with both words
-        expect(
-          results.results.some(
-            r =>
-              r.title.toLowerCase().includes('governance') ||
-              r.title.toLowerCase().includes('design')
-          )
-        ).toBe(true);
-        done();
-      });
-    }));
+    it('should handle multi-word queries', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance design' }).subscribe(results => {
+          // Should match content with both words
+          expect(
+            results.results.some(
+              r =>
+                r.title.toLowerCase().includes('governance') ||
+                r.title.toLowerCase().includes('design')
+            )
+          ).toBe(true);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -207,79 +214,86 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('filtering', () => {
-    it('should filter by content type', () => new Promise<void>(done => {
-      service.search({ text: '', contentTypes: ['epic', 'feature'] }).subscribe(results => {
-        for (const result of results.results) {
-          expect(['epic', 'feature']).toContain(result.contentType);
-        }
-        done();
-      });
-    }));
-
-    it('should filter by reach level', () => new Promise<void>(done => {
-      service.search({ text: '', reachLevels: ['commons', 'regional'] }).subscribe(results => {
-        for (const result of results.results) {
-          expect(['commons', 'regional']).toContain(result.reach);
-        }
-        done();
-      });
-    }));
-
-    it('should filter by tags (OR logic)', () => new Promise<void>(done => {
-      service.search({ text: '', tags: ['governance', 'trust'] }).subscribe(results => {
-        for (const result of results.results) {
-          const hasMatchingTag = result.tags.some(
-            t => t.toLowerCase() === 'governance' || t.toLowerCase() === 'trust'
-          );
-          expect(hasMatchingTag).toBe(true);
-        }
-        done();
-      });
-    }));
-
-    it('should filter by required tags (AND logic)', () => new Promise<void>(done => {
-      service.search({ text: '', requiredTags: ['governance', 'design'] }).subscribe(results => {
-        for (const result of results.results) {
-          const tags = result.tags.map(t => t.toLowerCase());
-          expect(tags).toContain('governance');
-          expect(tags).toContain('design');
-        }
-        done();
-      });
-    }));
-
-    it('should filter by minimum trust score', () => new Promise<void>(done => {
-      service.search({ text: '', minTrustScore: 0.8 }).subscribe(results => {
-        for (const result of results.results) {
-          expect(result.trustScore).toBeGreaterThanOrEqual(0.8);
-        }
-        done();
-      });
-    }));
-
-    it('should exclude flagged content', () => new Promise<void>(done => {
-      service.search({ text: '', excludeFlagged: true }).subscribe(results => {
-        for (const result of results.results) {
-          expect(result.hasFlags).toBe(false);
-        }
-        done();
-      });
-    }));
-
-    it('should combine text search with filters', () => new Promise<void>(done => {
-      service
-        .search({
-          text: 'governance',
-          contentTypes: ['epic'],
-        })
-        .subscribe(results => {
-          expect(results.totalCount).toBeGreaterThan(0);
+    it('should filter by content type', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', contentTypes: ['epic', 'feature'] }).subscribe(results => {
           for (const result of results.results) {
-            expect(result.contentType).toBe('epic');
+            expect(['epic', 'feature']).toContain(result.contentType);
           }
           done();
         });
-    }));
+      }));
+
+    it('should filter by reach level', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', reachLevels: ['commons', 'regional'] }).subscribe(results => {
+          for (const result of results.results) {
+            expect(['commons', 'regional']).toContain(result.reach);
+          }
+          done();
+        });
+      }));
+
+    it('should filter by tags (OR logic)', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', tags: ['governance', 'trust'] }).subscribe(results => {
+          for (const result of results.results) {
+            const hasMatchingTag = result.tags.some(
+              t => t.toLowerCase() === 'governance' || t.toLowerCase() === 'trust'
+            );
+            expect(hasMatchingTag).toBe(true);
+          }
+          done();
+        });
+      }));
+
+    it('should filter by required tags (AND logic)', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', requiredTags: ['governance', 'design'] }).subscribe(results => {
+          for (const result of results.results) {
+            const tags = result.tags.map(t => t.toLowerCase());
+            expect(tags).toContain('governance');
+            expect(tags).toContain('design');
+          }
+          done();
+        });
+      }));
+
+    it('should filter by minimum trust score', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', minTrustScore: 0.8 }).subscribe(results => {
+          for (const result of results.results) {
+            expect(result.trustScore).toBeGreaterThanOrEqual(0.8);
+          }
+          done();
+        });
+      }));
+
+    it('should exclude flagged content', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', excludeFlagged: true }).subscribe(results => {
+          for (const result of results.results) {
+            expect(result.hasFlags).toBe(false);
+          }
+          done();
+        });
+      }));
+
+    it('should combine text search with filters', () =>
+      new Promise<void>(done => {
+        service
+          .search({
+            text: 'governance',
+            contentTypes: ['epic'],
+          })
+          .subscribe(results => {
+            expect(results.totalCount).toBeGreaterThan(0);
+            for (const result of results.results) {
+              expect(result.contentType).toBe('epic');
+            }
+            done();
+          });
+      }));
   });
 
   // =========================================================================
@@ -287,50 +301,54 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('sorting', () => {
-    it('should sort by relevance (default)', () => new Promise<void>(done => {
-      service.search({ text: 'governance' }).subscribe(results => {
-        // Results should be in descending relevance order
-        for (let i = 0; i < results.results.length - 1; i++) {
-          expect(results.results[i].relevanceScore).toBeGreaterThanOrEqual(
-            results.results[i + 1].relevanceScore
-          );
-        }
-        done();
-      });
-    }));
-
-    it('should sort by title ascending', () => new Promise<void>(done => {
-      service.search({ text: '', sortBy: 'title', sortDirection: 'asc' }).subscribe(results => {
-        for (let i = 0; i < results.results.length - 1; i++) {
-          expect(
-            results.results[i].title.localeCompare(results.results[i + 1].title)
-          ).toBeLessThanOrEqual(0);
-        }
-        done();
-      });
-    }));
-
-    it('should sort by trust score descending', () => new Promise<void>(done => {
-      service
-        .search({ text: '', sortBy: 'trustScore', sortDirection: 'desc' })
-        .subscribe(results => {
+    it('should sort by relevance (default)', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          // Results should be in descending relevance order
           for (let i = 0; i < results.results.length - 1; i++) {
-            expect(results.results[i].trustScore).toBeGreaterThanOrEqual(
-              results.results[i + 1].trustScore
+            expect(results.results[i].relevanceScore).toBeGreaterThanOrEqual(
+              results.results[i + 1].relevanceScore
             );
           }
           done();
         });
-    }));
+      }));
 
-    it('should sort by newest', () => new Promise<void>(done => {
-      service.search({ text: '', sortBy: 'newest', sortDirection: 'desc' }).subscribe(results => {
-        for (let i = 0; i < results.results.length - 1; i++) {
-          expect(results.results[i].createdAt! >= results.results[i + 1].createdAt!).toBe(true);
-        }
-        done();
-      });
-    }));
+    it('should sort by title ascending', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', sortBy: 'title', sortDirection: 'asc' }).subscribe(results => {
+          for (let i = 0; i < results.results.length - 1; i++) {
+            expect(
+              results.results[i].title.localeCompare(results.results[i + 1].title)
+            ).toBeLessThanOrEqual(0);
+          }
+          done();
+        });
+      }));
+
+    it('should sort by trust score descending', () =>
+      new Promise<void>(done => {
+        service
+          .search({ text: '', sortBy: 'trustScore', sortDirection: 'desc' })
+          .subscribe(results => {
+            for (let i = 0; i < results.results.length - 1; i++) {
+              expect(results.results[i].trustScore).toBeGreaterThanOrEqual(
+                results.results[i + 1].trustScore
+              );
+            }
+            done();
+          });
+      }));
+
+    it('should sort by newest', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', sortBy: 'newest', sortDirection: 'desc' }).subscribe(results => {
+          for (let i = 0; i < results.results.length - 1; i++) {
+            expect(results.results[i].createdAt! >= results.results[i + 1].createdAt!).toBe(true);
+          }
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -338,43 +356,48 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('pagination', () => {
-    it('should return first page by default', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        expect(results.page).toBe(1);
-        done();
-      });
-    }));
+    it('should return first page by default', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.page).toBe(1);
+          done();
+        });
+      }));
 
-    it('should paginate results', () => new Promise<void>(done => {
-      service.search({ text: '', pageSize: 2, page: 1 }).subscribe(results => {
-        expect(results.results.length).toBe(2);
-        expect(results.pageSize).toBe(2);
-        expect(results.hasMore).toBe(true);
-        done();
-      });
-    }));
+    it('should paginate results', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', pageSize: 2, page: 1 }).subscribe(results => {
+          expect(results.results.length).toBe(2);
+          expect(results.pageSize).toBe(2);
+          expect(results.hasMore).toBe(true);
+          done();
+        });
+      }));
 
-    it('should return correct page', () => new Promise<void>(done => {
-      service.search({ text: '', pageSize: 2, page: 2 }).subscribe(results => {
-        expect(results.page).toBe(2);
-        expect(results.results.length).toBeLessThanOrEqual(2);
-        done();
-      });
-    }));
+    it('should return correct page', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', pageSize: 2, page: 2 }).subscribe(results => {
+          expect(results.page).toBe(2);
+          expect(results.results.length).toBeLessThanOrEqual(2);
+          done();
+        });
+      }));
 
-    it('should calculate total pages correctly', () => new Promise<void>(done => {
-      service.search({ text: '', pageSize: 2 }).subscribe(results => {
-        expect(results.totalPages).toBe(3); // 5 items / 2 per page = 3 pages
-        done();
-      });
-    }));
+    it('should calculate total pages correctly', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', pageSize: 2 }).subscribe(results => {
+          expect(results.totalPages).toBe(3); // 5 items / 2 per page = 3 pages
+          done();
+        });
+      }));
 
-    it('should set hasMore correctly on last page', () => new Promise<void>(done => {
-      service.search({ text: '', pageSize: 2, page: 3 }).subscribe(results => {
-        expect(results.hasMore).toBe(false);
-        done();
-      });
-    }));
+    it('should set hasMore correctly on last page', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', pageSize: 2, page: 3 }).subscribe(results => {
+          expect(results.hasMore).toBe(false);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -382,49 +405,54 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('facets', () => {
-    it('should return facets with results', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        expect(results.facets).toBeDefined();
-        expect(results.facets.byContentType.length).toBeGreaterThan(0);
-        expect(results.facets.byReach.length).toBeGreaterThan(0);
-        expect(results.facets.byTag.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should return facets with results', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.facets).toBeDefined();
+          expect(results.facets.byContentType.length).toBeGreaterThan(0);
+          expect(results.facets.byReach.length).toBeGreaterThan(0);
+          expect(results.facets.byTag.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should count content types correctly', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        const epicCount = results.facets.byContentType.find(f => f.value === 'epic');
-        expect(epicCount?.count).toBe(1);
-        done();
-      });
-    }));
+    it('should count content types correctly', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          const epicCount = results.facets.byContentType.find(f => f.value === 'epic');
+          expect(epicCount?.count).toBe(1);
+          done();
+        });
+      }));
 
-    it('should count tags correctly', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        const governanceTag = results.facets.byTag.find(f => f.value === 'governance');
-        // 3 content items + 1 path have governance tag = 4 total
-        expect(governanceTag?.count).toBe(4);
-        done();
-      });
-    }));
+    it('should count tags correctly', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          const governanceTag = results.facets.byTag.find(f => f.value === 'governance');
+          // 3 content items + 1 path have governance tag = 4 total
+          expect(governanceTag?.count).toBe(4);
+          done();
+        });
+      }));
 
-    it('should count flag status', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        expect(results.facets.byFlagStatus.flagged).toBe(1);
-        // 4 content items + 1 path are unflagged = 5 total
-        expect(results.facets.byFlagStatus.unflagged).toBe(5);
-        done();
-      });
-    }));
+    it('should count flag status', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.facets.byFlagStatus.flagged).toBe(1);
+          // 4 content items + 1 path are unflagged = 5 total
+          expect(results.facets.byFlagStatus.unflagged).toBe(5);
+          done();
+        });
+      }));
 
-    it('should mark selected facet values', () => new Promise<void>(done => {
-      service.search({ text: '', contentTypes: ['epic'] }).subscribe(results => {
-        const epicFacet = results.facets.byContentType.find(f => f.value === 'epic');
-        expect(epicFacet?.selected).toBe(true);
-        done();
-      });
-    }));
+    it('should mark selected facet values', () =>
+      new Promise<void>(done => {
+        service.search({ text: '', contentTypes: ['epic'] }).subscribe(results => {
+          const epicFacet = results.facets.byContentType.find(f => f.value === 'epic');
+          expect(epicFacet?.selected).toBe(true);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -432,58 +460,65 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('suggest', () => {
-    it('should return empty for short queries', () => new Promise<void>(done => {
-      service.suggest('g').subscribe(suggestions => {
-        expect(suggestions.suggestions.length).toBe(0);
-        done();
-      });
-    }));
+    it('should return empty for short queries', () =>
+      new Promise<void>(done => {
+        service.suggest('g').subscribe(suggestions => {
+          expect(suggestions.suggestions.length).toBe(0);
+          done();
+        });
+      }));
 
-    it('should return title suggestions', () => new Promise<void>(done => {
-      service.suggest('gov').subscribe(suggestions => {
-        const titleSuggestions = suggestions.suggestions.filter(s => s.type === 'title');
-        expect(titleSuggestions.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should return title suggestions', () =>
+      new Promise<void>(done => {
+        service.suggest('gov').subscribe(suggestions => {
+          const titleSuggestions = suggestions.suggestions.filter(s => s.type === 'title');
+          expect(titleSuggestions.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should return tag suggestions', () => new Promise<void>(done => {
-      service.suggest('gov').subscribe(suggestions => {
-        const tagSuggestions = suggestions.suggestions.filter(s => s.type === 'tag');
-        expect(tagSuggestions.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should return tag suggestions', () =>
+      new Promise<void>(done => {
+        service.suggest('gov').subscribe(suggestions => {
+          const tagSuggestions = suggestions.suggestions.filter(s => s.type === 'tag');
+          expect(tagSuggestions.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should include result count for tag suggestions', () => new Promise<void>(done => {
-      service.suggest('gov').subscribe(suggestions => {
-        const tagSuggestion = suggestions.suggestions.find(s => s.type === 'tag');
-        expect(tagSuggestion?.resultCount).toBeGreaterThan(0);
-        done();
-      });
-    }));
+    it('should include result count for tag suggestions', () =>
+      new Promise<void>(done => {
+        service.suggest('gov').subscribe(suggestions => {
+          const tagSuggestion = suggestions.suggestions.find(s => s.type === 'tag');
+          expect(tagSuggestion?.resultCount).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should highlight matched text', () => new Promise<void>(done => {
-      service.suggest('gov').subscribe(suggestions => {
-        const suggestion = suggestions.suggestions[0];
-        expect(suggestion?.highlight).toContain('<mark>');
-        done();
-      });
-    }));
+    it('should highlight matched text', () =>
+      new Promise<void>(done => {
+        service.suggest('gov').subscribe(suggestions => {
+          const suggestion = suggestions.suggestions[0];
+          expect(suggestion?.highlight).toContain('<mark>');
+          done();
+        });
+      }));
 
-    it('should respect limit parameter', () => new Promise<void>(done => {
-      service.suggest('co', 2).subscribe(suggestions => {
-        expect(suggestions.suggestions.length).toBeLessThanOrEqual(2);
-        done();
-      });
-    }));
+    it('should respect limit parameter', () =>
+      new Promise<void>(done => {
+        service.suggest('co', 2).subscribe(suggestions => {
+          expect(suggestions.suggestions.length).toBeLessThanOrEqual(2);
+          done();
+        });
+      }));
 
-    it('should handle empty query', () => new Promise<void>(done => {
-      service.suggest('').subscribe(suggestions => {
-        expect(suggestions.suggestions.length).toBe(0);
-        done();
-      });
-    }));
+    it('should handle empty query', () =>
+      new Promise<void>(done => {
+        service.suggest('').subscribe(suggestions => {
+          expect(suggestions.suggestions.length).toBe(0);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -491,33 +526,36 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('getTagCloud', () => {
-    it('should return all tags with counts', () => new Promise<void>(done => {
-      service.getTagCloud().subscribe(cloud => {
-        expect(cloud.length).toBeGreaterThan(0);
-        for (const item of cloud) {
-          expect(item.tag).toBeDefined();
-          expect(item.count).toBeGreaterThan(0);
-        }
-        done();
-      });
-    }));
+    it('should return all tags with counts', () =>
+      new Promise<void>(done => {
+        service.getTagCloud().subscribe(cloud => {
+          expect(cloud.length).toBeGreaterThan(0);
+          for (const item of cloud) {
+            expect(item.tag).toBeDefined();
+            expect(item.count).toBeGreaterThan(0);
+          }
+          done();
+        });
+      }));
 
-    it('should sort by count descending', () => new Promise<void>(done => {
-      service.getTagCloud().subscribe(cloud => {
-        for (let i = 0; i < cloud.length - 1; i++) {
-          expect(cloud[i].count).toBeGreaterThanOrEqual(cloud[i + 1].count);
-        }
-        done();
-      });
-    }));
+    it('should sort by count descending', () =>
+      new Promise<void>(done => {
+        service.getTagCloud().subscribe(cloud => {
+          for (let i = 0; i < cloud.length - 1; i++) {
+            expect(cloud[i].count).toBeGreaterThanOrEqual(cloud[i + 1].count);
+          }
+          done();
+        });
+      }));
 
-    it('should have governance as most common tag', () => new Promise<void>(done => {
-      service.getTagCloud().subscribe(cloud => {
-        expect(cloud[0].tag).toBe('governance');
-        expect(cloud[0].count).toBe(3);
-        done();
-      });
-    }));
+    it('should have governance as most common tag', () =>
+      new Promise<void>(done => {
+        service.getTagCloud().subscribe(cloud => {
+          expect(cloud[0].tag).toBe('governance');
+          expect(cloud[0].count).toBe(3);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -525,43 +563,49 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('error handling', () => {
-    it('should handle data loader errors gracefully', () => new Promise<void>(done => {
-      dataLoaderSpy.getContentIndex.mockReturnValue(throwError(() => new Error('Network error')));
+    it('should handle data loader errors gracefully', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getContentIndex.mockReturnValue(throwError(() => new Error('Network error')));
 
-      service.search({ text: 'test' }).subscribe(results => {
-        expect(results.totalCount).toBe(0);
-        expect(results.results.length).toBe(0);
-        done();
-      });
-    }));
+        service.search({ text: 'test' }).subscribe(results => {
+          expect(results.totalCount).toBe(0);
+          expect(results.results.length).toBe(0);
+          done();
+        });
+      }));
 
-    it('should include execution time in results', () => new Promise<void>(done => {
-      service.search({ text: '' }).subscribe(results => {
-        expect(results.executionTimeMs).toBeDefined();
-        expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
-        done();
-      });
-    }));
+    it('should include execution time in results', () =>
+      new Promise<void>(done => {
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.executionTimeMs).toBeDefined();
+          expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
+          done();
+        });
+      }));
 
-    it('should handle empty content index', () => new Promise<void>(done => {
-      dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
+    it('should handle empty content index', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
 
-      service.search({ text: 'test' }).subscribe(results => {
-        expect(results.totalCount).toBe(0);
-        expect(results.results.length).toBe(0);
-        done();
-      });
-    }));
+        service.search({ text: 'test' }).subscribe(results => {
+          expect(results.totalCount).toBe(0);
+          expect(results.results.length).toBe(0);
+          done();
+        });
+      }));
 
-    it('should handle undefined nodes', () => new Promise<void>(done => {
-      dataLoaderSpy.getContentIndex.mockReturnValue(of({} as ContentIndex));
-      dataLoaderSpy.getPathIndex.mockReturnValue(of({ paths: [], totalCount: 0, lastUpdated: '' }));
+    it('should handle undefined nodes', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getContentIndex.mockReturnValue(of({} as ContentIndex));
+        dataLoaderSpy.getPathIndex.mockReturnValue(
+          of({ paths: [], totalCount: 0, lastUpdated: '' })
+        );
 
-      service.search({ text: '' }).subscribe(results => {
-        expect(results.totalCount).toBe(0);
-        done();
-      });
-    }));
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.totalCount).toBe(0);
+          done();
+        });
+      }));
   });
 
   // =========================================================================
@@ -569,43 +613,44 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('match scoring', () => {
-    it('should score exact matches higher than contains', () => new Promise<void>(done => {
-      // Add a node with exact word "trust" and one with "trustworthy"
-      const indexWithMatches = {
-        nodes: [
-          {
-            id: 'exact',
-            title: 'Building Trust',
-            description: 'About trust',
-            contentType: 'concept',
-            tags: [],
-            reach: 'commons',
-            trustScore: 1,
-            flags: [],
-          },
-          {
-            id: 'contains',
-            title: 'Trustworthy Systems',
-            description: 'About trustworthiness',
-            contentType: 'concept',
-            tags: [],
-            reach: 'commons',
-            trustScore: 1,
-            flags: [],
-          },
-        ],
-      };
-      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithMatches));
+    it('should score exact matches higher than contains', () =>
+      new Promise<void>(done => {
+        // Add a node with exact word "trust" and one with "trustworthy"
+        const indexWithMatches = {
+          nodes: [
+            {
+              id: 'exact',
+              title: 'Building Trust',
+              description: 'About trust',
+              contentType: 'concept',
+              tags: [],
+              reach: 'commons',
+              trustScore: 1,
+              flags: [],
+            },
+            {
+              id: 'contains',
+              title: 'Trustworthy Systems',
+              description: 'About trustworthiness',
+              contentType: 'concept',
+              tags: [],
+              reach: 'commons',
+              trustScore: 1,
+              flags: [],
+            },
+          ],
+        };
+        dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithMatches));
 
-      service.search({ text: 'trust' }).subscribe(results => {
-        const exactMatch = results.results.find(r => r.id === 'exact');
-        const containsMatch = results.results.find(r => r.id === 'contains');
+        service.search({ text: 'trust' }).subscribe(results => {
+          const exactMatch = results.results.find(r => r.id === 'exact');
+          const containsMatch = results.results.find(r => r.id === 'contains');
 
-        if (exactMatch && containsMatch) {
-          expect(exactMatch.relevanceScore).toBeGreaterThanOrEqual(containsMatch.relevanceScore);
-        }
-        done();
-      });
-    }));
+          if (exactMatch && containsMatch) {
+            expect(exactMatch.relevanceScore).toBeGreaterThanOrEqual(containsMatch.relevanceScore);
+          }
+          done();
+        });
+      }));
   });
 });

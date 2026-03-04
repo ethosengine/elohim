@@ -4,7 +4,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { CapabilitiesDashboardComponent } from './capabilities-dashboard.component';
 import { StewardshipService } from '../../services/stewardship.service';
-import type { ComputedPolicy, StewardshipGrant, TimeAccessDecision } from '../../models/stewardship.model';
+import type {
+  ComputedPolicy,
+  StewardshipGrant,
+  TimeAccessDecision,
+} from '../../models/stewardship.model';
 import { vi } from 'vitest';
 
 describe('CapabilitiesDashboardComponent', () => {
@@ -63,10 +67,10 @@ describe('CapabilitiesDashboardComponent', () => {
 
   beforeEach(async () => {
     mockStewardshipService = {
-    getMyPolicy: vi.fn(),
-    getMyStewards: vi.fn(),
-    checkTimeAccess: vi.fn(),
-  };
+      getMyPolicy: vi.fn(),
+      getMyStewards: vi.fn(),
+      checkTimeAccess: vi.fn(),
+    };
 
     mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve(mockPolicy));
     mockStewardshipService.getMyStewards.mockReturnValue(Promise.resolve([mockGrant]));
@@ -74,9 +78,7 @@ describe('CapabilitiesDashboardComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [CapabilitiesDashboardComponent],
-      providers: [
-        { provide: StewardshipService, useValue: mockStewardshipService },
-      ],
+      providers: [{ provide: StewardshipService, useValue: mockStewardshipService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CapabilitiesDashboardComponent);
@@ -100,7 +102,9 @@ describe('CapabilitiesDashboardComponent', () => {
     });
 
     it('should handle load error gracefully', async () => {
-      mockStewardshipService.getMyPolicy.mockReturnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyPolicy.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadData();
 
@@ -390,7 +394,9 @@ describe('CapabilitiesDashboardComponent', () => {
       component.policy.set(mockPolicy);
 
       const restrictions = component.restrictions();
-      const timeRestrictions = restrictions.filter(r => r.type === 'time' && r.label.includes('Session'));
+      const timeRestrictions = restrictions.filter(
+        r => r.type === 'time' && r.label.includes('Session')
+      );
 
       expect(timeRestrictions.length).toBe(1);
       expect(timeRestrictions[0].label).toContain('60 minutes');
@@ -400,7 +406,9 @@ describe('CapabilitiesDashboardComponent', () => {
       component.policy.set(mockPolicy);
 
       const restrictions = component.restrictions();
-      const timeRestrictions = restrictions.filter(r => r.type === 'time' && r.label.includes('Daily'));
+      const timeRestrictions = restrictions.filter(
+        r => r.type === 'time' && r.label.includes('Daily')
+      );
 
       expect(timeRestrictions.length).toBe(1);
       expect(timeRestrictions[0].label).toContain('120 minutes');

@@ -45,9 +45,8 @@ describe('AffinityTrackingService', () => {
       accessLevel: 'visitor',
       sessionState: 'active',
     };
-    const sessionObservable: Observable<SessionHuman | null> = new BehaviorSubject<SessionHuman | null>(
-      mockSession
-    ).asObservable();
+    const sessionObservable: Observable<SessionHuman | null> =
+      new BehaviorSubject<SessionHuman | null>(mockSession).asObservable();
     mockSessionHumanService = {
       getAffinityStorageKey: vi.fn(),
       getSessionId: vi.fn(),
@@ -540,7 +539,9 @@ describe('AffinityTrackingService', () => {
     });
 
     it('should handle localStorage read failure gracefully', () => {
-      vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw 'Storage error'; });
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+        throw 'Storage error';
+      });
 
       // Should not throw, should return default affinity
       expect(() => service.getAffinity('any-node')).not.toThrow();
@@ -548,7 +549,9 @@ describe('AffinityTrackingService', () => {
     });
 
     it('should handle localStorage write failure gracefully', () => {
-      vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw 'Storage error'; });
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw 'Storage error';
+      });
 
       // Should not throw
       expect(() => service.setAffinity('node-1', 0.5)).not.toThrow();

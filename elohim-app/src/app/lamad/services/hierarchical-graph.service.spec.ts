@@ -208,17 +208,13 @@ describe('HierarchicalGraphService', () => {
 
     it('should reload graph for different path', async () => {
       await firstValueFrom(service.initializeFromPath('test-path'));
-      dataLoaderSpy.getPathHierarchy.mockReturnValue(
-        of({ ...mockPath, id: 'other-path' })
-      );
+      dataLoaderSpy.getPathHierarchy.mockReturnValue(of({ ...mockPath, id: 'other-path' }));
       await firstValueFrom(service.initializeFromPath('other-path'));
       expect(dataLoaderSpy.getPathHierarchy).toHaveBeenCalledTimes(2);
     });
 
     it('should handle path load error gracefully', async () => {
-      dataLoaderSpy.getPathHierarchy.mockReturnValue(
-        throwError(() => new Error('Load failed'))
-      );
+      dataLoaderSpy.getPathHierarchy.mockReturnValue(throwError(() => new Error('Load failed')));
 
       const graph = await firstValueFrom(service.initializeFromPath('test-path'));
       expect(graph.root.id).toBe('empty');
@@ -280,7 +276,11 @@ describe('HierarchicalGraphService', () => {
 
     it('should load concepts from dataLoader for sections', async () => {
       await firstValueFrom(service.expandCluster('section-1-1-1'));
-      expect(dataLoaderSpy.getClusterConcepts).toHaveBeenCalledWith(['concept-1', 'concept-2', 'concept-3']);
+      expect(dataLoaderSpy.getClusterConcepts).toHaveBeenCalledWith([
+        'concept-1',
+        'concept-2',
+        'concept-3',
+      ]);
     });
 
     it('should handle concept load error', async () => {
@@ -374,9 +374,7 @@ describe('HierarchicalGraphService', () => {
       const visibleIds = new Set(visible.map(n => n.id));
       const edges = service.getVisibleEdges(visibleIds);
 
-      const moduleEdge = edges.find(
-        e => e.source === 'module-1-1' && e.target === 'module-1-2'
-      );
+      const moduleEdge = edges.find(e => e.source === 'module-1-1' && e.target === 'module-1-2');
       expect(moduleEdge).toBeDefined();
       expect(moduleEdge?.type).toBe('NEXT');
     });
@@ -513,7 +511,7 @@ describe('HierarchicalGraphService', () => {
             ...mockPath.chapters![0],
             modules: [
               {
-                ...(mockPath.chapters![0].modules![0]),
+                ...mockPath.chapters![0].modules![0],
                 sections: [
                   {
                     id: 'empty-section',

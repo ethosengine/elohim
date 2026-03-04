@@ -685,8 +685,20 @@ describe('Practice Model', () => {
       ];
 
       const responses: MasteryChallengeResponse[] = [
-        { content_id: 'content-1', question_index: 0, response: 'B', correct: true, time_taken_ms: 1500 },
-        { content_id: 'content-1', question_index: 1, response: 'Z', correct: false, time_taken_ms: 2000 },
+        {
+          content_id: 'content-1',
+          question_index: 0,
+          response: 'B',
+          correct: true,
+          time_taken_ms: 1500,
+        },
+        {
+          content_id: 'content-1',
+          question_index: 1,
+          response: 'Z',
+          correct: false,
+          time_taken_ms: 2000,
+        },
       ];
 
       const levelChanges: LevelChange[] = [

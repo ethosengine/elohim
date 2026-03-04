@@ -48,7 +48,9 @@ describe('DoorwayRegistryService', () => {
   beforeEach(() => {
     // Setup localStorage mock using Storage.prototype (works reliably in jsdom/vitest)
     localStorageMock = {};
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => localStorageMock[key] ?? null);
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
+      (key: string) => localStorageMock[key] ?? null
+    );
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });

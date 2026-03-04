@@ -15,7 +15,7 @@
  * - Delegates to LearnerBackendService for zome calls
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 76.7% (2026-02-24)
 
@@ -64,7 +64,7 @@ export class PointsService {
   /** Total points as observable */
   readonly totalPoints$ = this.balance$.pipe(map(balance => balance?.total_points ?? 0));
 
-  constructor(private readonly backend: LearnerBackendService) {}
+  private readonly backend = inject(LearnerBackendService);
 
   // ===========================================================================
   // Balance Management

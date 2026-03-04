@@ -132,7 +132,9 @@ describe('Html5AppFormatPlugin', () => {
     });
 
     it('should throw on invalid JSON', async () => {
-      await await expect(plugin.import('not json')).rejects.toThrow('Invalid HTML5 app JSON structure');
+      await await expect(plugin.import('not json')).rejects.toThrow(
+        'Invalid HTML5 app JSON structure'
+      );
     });
 
     it('should add default tags', async () => {

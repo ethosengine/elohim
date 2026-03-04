@@ -355,9 +355,7 @@ describe('SessionMigrationService', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('session');
       mockSessionHumanService.getSession.mockReturnValue(mockSession);
       mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(
-        Promise.reject(new Error('Network error'))
-      );
+      mockIdentityService.registerHuman.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await service.migrate();
 
@@ -378,9 +376,7 @@ describe('SessionMigrationService', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('session');
       mockSessionHumanService.getSession.mockReturnValue(mockSession);
       mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(
-        Promise.reject(new Error('Test error'))
-      );
+      mockIdentityService.registerHuman.mockReturnValue(Promise.reject(new Error('Test error')));
 
       await service.migrate();
 

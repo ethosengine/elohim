@@ -21,15 +21,15 @@ describe('ShefaComputeService', () => {
 
   beforeEach(() => {
     mockHolochain = {
-    callZome: vi.fn(),
-  };
+      callZome: vi.fn(),
+    };
     mockEconomic = {
-    getEventsForAgent: vi.fn(),
-    getEventsByLamadType: vi.fn(),
-  };
+      getEventsForAgent: vi.fn(),
+      getEventsByLamadType: vi.fn(),
+    };
     mockStewardedResources = {
-    getResourceById: vi.fn(),
-  };
+      getResourceById: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -471,86 +471,89 @@ describe('ShefaComputeService', () => {
   // ==========================================================================
 
   describe('getInfrastructureTokenBalance', () => {
-    it('should aggregate token events correctly', () => new Promise<void>(done => {
-      const mockEvents = [
-        {
-          id: 'evt1',
-          action: 'produce' as REAAction,
-          state: 'validated' as 'validated',
-          hasPointInTime: '2024-01-01T00:00:00Z',
-          provider: 'operator1',
-          receiver: 'operator1',
-          resourceQuantity: { hasNumericalValue: 100, hasUnit: 'infrastructure-token' },
-          metadata: { type: 'infrastructure-token-issued' },
-          note: 'Earned tokens',
-        },
-        {
-          id: 'evt2',
-          action: 'transfer' as REAAction,
-          state: 'validated' as 'validated',
-          hasPointInTime: '2024-01-02T00:00:00Z',
-          provider: 'operator1',
-          receiver: 'other',
-          resourceQuantity: { hasNumericalValue: 20, hasUnit: 'infrastructure-token' },
-          metadata: { type: 'token-transferred' },
-          note: 'Transferred tokens',
-        },
-      ];
+    it('should aggregate token events correctly', () =>
+      new Promise<void>(done => {
+        const mockEvents = [
+          {
+            id: 'evt1',
+            action: 'produce' as REAAction,
+            state: 'validated' as 'validated',
+            hasPointInTime: '2024-01-01T00:00:00Z',
+            provider: 'operator1',
+            receiver: 'operator1',
+            resourceQuantity: { hasNumericalValue: 100, hasUnit: 'infrastructure-token' },
+            metadata: { type: 'infrastructure-token-issued' },
+            note: 'Earned tokens',
+          },
+          {
+            id: 'evt2',
+            action: 'transfer' as REAAction,
+            state: 'validated' as 'validated',
+            hasPointInTime: '2024-01-02T00:00:00Z',
+            provider: 'operator1',
+            receiver: 'other',
+            resourceQuantity: { hasNumericalValue: 20, hasUnit: 'infrastructure-token' },
+            metadata: { type: 'token-transferred' },
+            note: 'Transferred tokens',
+          },
+        ];
 
-      mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
+        mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
 
-      (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
-        expect(result.balance.tokens).toBe(80); // 100 - 20
-        expect(result.transactions.length).toBe(2);
-        expect(result.transactions[0].type).toBe('transferred'); // Most recent first
-        expect(result.transactions[1].type).toBe('earned');
-        done();
-      });
-    }));
+        (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
+          expect(result.balance.tokens).toBe(80); // 100 - 20
+          expect(result.transactions.length).toBe(2);
+          expect(result.transactions[0].type).toBe('transferred'); // Most recent first
+          expect(result.transactions[1].type).toBe('earned');
+          done();
+        });
+      }));
 
-    it('should handle empty events', () => new Promise<void>(done => {
-      mockEconomic.getEventsForAgent.mockReturnValue(of([]));
+    it('should handle empty events', () =>
+      new Promise<void>(done => {
+        mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
-      (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
-        expect(result.balance.tokens).toBe(0);
-        expect(result.transactions.length).toBe(0);
-        done();
-      });
-    }));
+        (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
+          expect(result.balance.tokens).toBe(0);
+          expect(result.transactions.length).toBe(0);
+          done();
+        });
+      }));
 
-    it('should filter only token-related events', () => new Promise<void>(done => {
-      const mockEvents = [
-        {
-          id: 'evt1',
-          action: 'produce' as REAAction,
-          state: 'validated' as 'validated',
-          hasPointInTime: '2024-01-01T00:00:00Z',
-          provider: 'operator1',
-          receiver: 'operator1',
-          resourceQuantity: { hasNumericalValue: 100, hasUnit: 'infrastructure-token' },
-          metadata: { type: 'infrastructure-token-issued' },
-          note: '',
-        },
-        {
-          id: 'evt2',
-          action: 'produce' as REAAction,
-          state: 'validated' as 'validated',
-          hasPointInTime: '2024-01-02T00:00:00Z',
-          provider: 'operator1',
-          receiver: 'operator1',
-          resourceQuantity: { hasNumericalValue: 50, hasUnit: 'infrastructure-token' },
-          metadata: { type: 'some-other-event' },
-          note: '',
-        },
-      ];
+    it('should filter only token-related events', () =>
+      new Promise<void>(done => {
+        const mockEvents = [
+          {
+            id: 'evt1',
+            action: 'produce' as REAAction,
+            state: 'validated' as 'validated',
+            hasPointInTime: '2024-01-01T00:00:00Z',
+            provider: 'operator1',
+            receiver: 'operator1',
+            resourceQuantity: { hasNumericalValue: 100, hasUnit: 'infrastructure-token' },
+            metadata: { type: 'infrastructure-token-issued' },
+            note: '',
+          },
+          {
+            id: 'evt2',
+            action: 'produce' as REAAction,
+            state: 'validated' as 'validated',
+            hasPointInTime: '2024-01-02T00:00:00Z',
+            provider: 'operator1',
+            receiver: 'operator1',
+            resourceQuantity: { hasNumericalValue: 50, hasUnit: 'infrastructure-token' },
+            metadata: { type: 'some-other-event' },
+            note: '',
+          },
+        ];
 
-      mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
+        mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
 
-      (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
-        expect(result.balance.tokens).toBe(100); // Only infrastructure-token event counted
-        expect(result.transactions.length).toBe(1);
-        done();
-      });
-    }));
+        (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
+          expect(result.balance.tokens).toBe(100); // Only infrastructure-token event counted
+          expect(result.transactions.length).toBe(1);
+          done();
+        });
+      }));
   });
 });

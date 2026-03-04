@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 73.5% (2026-02-24)
 
@@ -21,7 +21,7 @@ import { ContentFormatRegistryService } from './content-format-registry.service'
   providedIn: 'root',
 })
 export class ContentIOService {
-  constructor(private readonly registry: ContentFormatRegistryService) {}
+  private readonly registry = inject(ContentFormatRegistryService);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Import Operations

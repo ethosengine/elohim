@@ -18,9 +18,9 @@ describe('EconomicService', () => {
 
   beforeEach(() => {
     holochainClientMock = {
-    callZome: vi.fn(),
-    isConnected: vi.fn(),
-  };
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
 
     // Default: not connected
     holochainClientMock.isConnected.mockReturnValue(false);
@@ -89,34 +89,37 @@ describe('EconomicService', () => {
   });
 
   describe('getEventsForAgent', () => {
-    it('should return empty array when service not available', () => new Promise<void>(done => {
-      service.getEventsForAgent('agent-1').subscribe(result => {
-        expect(result).toEqual([]);
-        expect(holochainClientMock.callZome).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should return empty array when service not available', () =>
+      new Promise<void>(done => {
+        service.getEventsForAgent('agent-1').subscribe(result => {
+          expect(result).toEqual([]);
+          expect(holochainClientMock.callZome).not.toHaveBeenCalled();
+          done();
+        });
+      }));
 
-    it('should return empty array for unavailable service with different directions', () => new Promise<void>(done => {
-      service.getEventsForAgent('agent-1', 'provider').subscribe(() => {
-        service.getEventsForAgent('agent-1', 'receiver').subscribe(() => {
-          service.getEventsForAgent('agent-1', 'both').subscribe(result => {
-            expect(result).toEqual([]);
-            done();
+    it('should return empty array for unavailable service with different directions', () =>
+      new Promise<void>(done => {
+        service.getEventsForAgent('agent-1', 'provider').subscribe(() => {
+          service.getEventsForAgent('agent-1', 'receiver').subscribe(() => {
+            service.getEventsForAgent('agent-1', 'both').subscribe(result => {
+              expect(result).toEqual([]);
+              done();
+            });
           });
         });
-      });
-    }));
+      }));
   });
 
   describe('getEventsByAction', () => {
-    it('should return empty array when service not available', () => new Promise<void>(done => {
-      service.getEventsByAction('use').subscribe(result => {
-        expect(result).toEqual([]);
-        expect(holochainClientMock.callZome).not.toHaveBeenCalled();
-        done();
-      });
-    }));
+    it('should return empty array when service not available', () =>
+      new Promise<void>(done => {
+        service.getEventsByAction('use').subscribe(result => {
+          expect(result).toEqual([]);
+          expect(holochainClientMock.callZome).not.toHaveBeenCalled();
+          done();
+        });
+      }));
 
     it('should have getEventsByAction method', () => {
       expect(service.getEventsByAction).toBeDefined();
@@ -125,12 +128,13 @@ describe('EconomicService', () => {
   });
 
   describe('getEventsByLamadType', () => {
-    it('should return empty array when service not available', () => new Promise<void>(done => {
-      service.getEventsByLamadType('content-view').subscribe(result => {
-        expect(result).toEqual([]);
-        done();
-      });
-    }));
+    it('should return empty array when service not available', () =>
+      new Promise<void>(done => {
+        service.getEventsByLamadType('content-view').subscribe(result => {
+          expect(result).toEqual([]);
+          done();
+        });
+      }));
 
     it('should have getEventsByLamadType method', () => {
       expect(service.getEventsByLamadType).toBeDefined();

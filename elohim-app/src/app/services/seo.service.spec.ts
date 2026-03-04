@@ -16,14 +16,14 @@ describe('SeoService', () => {
 
   beforeEach(() => {
     const titleSpy = {
-    setTitle: vi.fn(),
-    getTitle: vi.fn(),
-  };
+      setTitle: vi.fn(),
+      getTitle: vi.fn(),
+    };
     const metaSpy = {
-    updateTag: vi.fn(),
-    addTag: vi.fn(),
-    removeTag: vi.fn(),
-  };
+      updateTag: vi.fn(),
+      addTag: vi.fn(),
+      removeTag: vi.fn(),
+    };
 
     routerEventsSubject = new Subject();
 

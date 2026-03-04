@@ -46,80 +46,86 @@ describe('BannerService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should emit empty array when no providers registered', () => new Promise<void>(done => {
-    service.allNotices$.subscribe(notices => {
-      expect(notices).toEqual([]);
-      done();
-    });
-  }));
+  it('should emit empty array when no providers registered', () =>
+    new Promise<void>(done => {
+      service.allNotices$.subscribe(notices => {
+        expect(notices).toEqual([]);
+        done();
+      });
+    }));
 
-  it('should emit notices from a registered provider', () => new Promise<void>(done => {
-    const notice = makeNotice();
-    const provider = makeProvider('test', [notice]);
+  it('should emit notices from a registered provider', () =>
+    new Promise<void>(done => {
+      const notice = makeNotice();
+      const provider = makeProvider('test', [notice]);
 
-    service.registerProvider(provider);
+      service.registerProvider(provider);
 
-    service.allNotices$.subscribe(notices => {
-      expect(notices.length).toBe(1);
-      expect(notices[0].id).toBe('notice-1');
-      done();
-    });
-  }));
+      service.allNotices$.subscribe(notices => {
+        expect(notices.length).toBe(1);
+        expect(notices[0].id).toBe('notice-1');
+        done();
+      });
+    }));
 
-  it('should merge notices from multiple providers', () => new Promise<void>(done => {
-    const p1 = makeProvider('p1', [makeNotice({ id: 'n1', providerId: 'p1' })]);
-    const p2 = makeProvider('p2', [makeNotice({ id: 'n2', providerId: 'p2' })]);
+  it('should merge notices from multiple providers', () =>
+    new Promise<void>(done => {
+      const p1 = makeProvider('p1', [makeNotice({ id: 'n1', providerId: 'p1' })]);
+      const p2 = makeProvider('p2', [makeNotice({ id: 'n2', providerId: 'p2' })]);
 
-    service.registerProvider(p1);
-    service.registerProvider(p2);
+      service.registerProvider(p1);
+      service.registerProvider(p2);
 
-    service.allNotices$.subscribe(notices => {
-      expect(notices.length).toBe(2);
-      done();
-    });
-  }));
+      service.allNotices$.subscribe(notices => {
+        expect(notices.length).toBe(2);
+        done();
+      });
+    }));
 
-  it('should deduplicate notices by id', () => new Promise<void>(done => {
-    const notice = makeNotice({ id: 'dup' });
-    const p1 = makeProvider('p1', [{ ...notice, providerId: 'p1' }]);
-    const p2 = makeProvider('p2', [{ ...notice, providerId: 'p2' }]);
+  it('should deduplicate notices by id', () =>
+    new Promise<void>(done => {
+      const notice = makeNotice({ id: 'dup' });
+      const p1 = makeProvider('p1', [{ ...notice, providerId: 'p1' }]);
+      const p2 = makeProvider('p2', [{ ...notice, providerId: 'p2' }]);
 
-    service.registerProvider(p1);
-    service.registerProvider(p2);
+      service.registerProvider(p1);
+      service.registerProvider(p2);
 
-    service.allNotices$.subscribe(notices => {
-      expect(notices.length).toBe(1);
-      done();
-    });
-  }));
+      service.allNotices$.subscribe(notices => {
+        expect(notices.length).toBe(1);
+        done();
+      });
+    }));
 
-  it('should sort by priority then severity', () => new Promise<void>(done => {
-    const system = makeNotice({ id: 'sys', priority: 'system', severity: 'warning' });
-    const info = makeNotice({ id: 'inf', priority: 'info', severity: 'info' });
-    const agent = makeNotice({ id: 'agt', priority: 'agent', severity: 'error' });
+  it('should sort by priority then severity', () =>
+    new Promise<void>(done => {
+      const system = makeNotice({ id: 'sys', priority: 'system', severity: 'warning' });
+      const info = makeNotice({ id: 'inf', priority: 'info', severity: 'info' });
+      const agent = makeNotice({ id: 'agt', priority: 'agent', severity: 'error' });
 
-    const provider = makeProvider('p', [info, system, agent]);
-    service.registerProvider(provider);
+      const provider = makeProvider('p', [info, system, agent]);
+      service.registerProvider(provider);
 
-    service.allNotices$.subscribe(notices => {
-      expect(notices.map(n => n.id)).toEqual(['sys', 'agt', 'inf']);
-      done();
-    });
-  }));
+      service.allNotices$.subscribe(notices => {
+        expect(notices.map(n => n.id)).toEqual(['sys', 'agt', 'inf']);
+        done();
+      });
+    }));
 
-  it('should filter notices by context', () => new Promise<void>(done => {
-    const global = makeNotice({ id: 'g', contexts: ['global'] });
-    const lamad = makeNotice({ id: 'l', contexts: ['lamad'] });
-    const shefa = makeNotice({ id: 's', contexts: ['shefa'] });
+  it('should filter notices by context', () =>
+    new Promise<void>(done => {
+      const global = makeNotice({ id: 'g', contexts: ['global'] });
+      const lamad = makeNotice({ id: 'l', contexts: ['lamad'] });
+      const shefa = makeNotice({ id: 's', contexts: ['shefa'] });
 
-    const provider = makeProvider('p', [global, lamad, shefa]);
-    service.registerProvider(provider);
+      const provider = makeProvider('p', [global, lamad, shefa]);
+      service.registerProvider(provider);
 
-    service.noticesForContext$('lamad').subscribe(notices => {
-      expect(notices.map(n => n.id)).toEqual(['g', 'l']);
-      done();
-    });
-  }));
+      service.noticesForContext$('lamad').subscribe(notices => {
+        expect(notices.map(n => n.id)).toEqual(['g', 'l']);
+        done();
+      });
+    }));
 
   it('should delegate dismissNotice to the correct provider', () => {
     const notice = makeNotice({ providerId: 'p1' });
@@ -141,14 +147,15 @@ describe('BannerService', () => {
     expect(provider.handleAction).toHaveBeenCalledWith('notice-1', 'learn-more');
   });
 
-  it('should stop emitting notices when provider is unregistered', () => new Promise<void>(done => {
-    const provider = makeProvider('p1', [makeNotice()]);
-    service.registerProvider(provider);
-    service.unregisterProvider('p1');
+  it('should stop emitting notices when provider is unregistered', () =>
+    new Promise<void>(done => {
+      const provider = makeProvider('p1', [makeNotice()]);
+      service.registerProvider(provider);
+      service.unregisterProvider('p1');
 
-    service.allNotices$.subscribe(notices => {
-      expect(notices).toEqual([]);
-      done();
-    });
-  }));
+      service.allNotices$.subscribe(notices => {
+        expect(notices).toEqual([]);
+        done();
+      });
+    }));
 });

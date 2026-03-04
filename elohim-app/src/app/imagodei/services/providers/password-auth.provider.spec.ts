@@ -29,11 +29,15 @@ describe('PasswordAuthProvider', () => {
   };
 
   beforeEach(() => {
-    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue(null), };
+    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue(null) };
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), PasswordAuthProvider,
-        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        PasswordAuthProvider,
+        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
+      ],
     });
 
     provider = TestBed.inject(PasswordAuthProvider);
@@ -98,9 +102,7 @@ describe('PasswordAuthProvider', () => {
     });
 
     it('should use selected doorway URL when available', async () => {
-      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(
-        'https://my-doorway.example.com'
-      );
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue('https://my-doorway.example.com');
 
       const loginPromise = provider.login(validCredentials);
 
@@ -301,9 +303,7 @@ describe('PasswordAuthProvider', () => {
 
   describe('URL resolution', () => {
     it('should prioritize selected doorway URL', async () => {
-      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(
-        'https://custom-doorway.com'
-      );
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue('https://custom-doorway.com');
 
       const loginPromise = provider.login({
         type: 'password',

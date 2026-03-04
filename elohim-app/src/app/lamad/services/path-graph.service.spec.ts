@@ -22,10 +22,7 @@ describe('PathGraphService', () => {
     mockDataLoader.getPath.mockReturnValue(of(null as any));
 
     TestBed.configureTestingModule({
-      providers: [
-        PathGraphService,
-        { provide: DataLoaderService, useValue: mockDataLoader }
-      ],
+      providers: [PathGraphService, { provide: DataLoaderService, useValue: mockDataLoader }],
     });
     service = TestBed.inject(PathGraphService);
   });
@@ -35,355 +32,372 @@ describe('PathGraphService', () => {
   });
 
   describe('registerPathAsNode', () => {
-    it('should return observable with content node', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-123',
-        version: '1.0.0',
-        title: 'Test Path',
-        description: 'Test Description',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [
-          {
-            stepType: 'content',
-            resourceId: 'content-1',
-            stepTitle: 'Step 1',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 1
-          } as PathStep,
-        ],
-        difficulty: 'beginner',
-        estimatedDuration: '60 minutes',
-        tags: ['test'],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+    it('should return observable with content node', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-123',
+          version: '1.0.0',
+          title: 'Test Path',
+          description: 'Test Description',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [
+            {
+              stepType: 'content',
+              resourceId: 'content-1',
+              stepTitle: 'Step 1',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 1,
+            } as PathStep,
+          ],
+          difficulty: 'beginner',
+          estimatedDuration: '60 minutes',
+          tags: ['test'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      service.registerPathAsNode(mockPath).subscribe((node) => {
-        expect(node).toBeDefined();
-        expect(node.id).toBe('path-path-123');
-        expect(node.contentType).toBe('path');
-        expect(node.title).toBe('Test Path');
-        done();
-      });
-    }));
+        service.registerPathAsNode(mockPath).subscribe(node => {
+          expect(node).toBeDefined();
+          expect(node.id).toBe('path-path-123');
+          expect(node.contentType).toBe('path');
+          expect(node.title).toBe('Test Path');
+          done();
+        });
+      }));
 
-    it('should include path metadata with step count', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-456',
-        version: '1.0.0',
-        title: 'Multi-Step Path',
-        description: 'Test',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [
-          {
-            stepType: 'content',
-            resourceId: 'content-1',
-            stepTitle: 'Step 1',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 1
-          } as PathStep,
-          {
-            stepType: 'content',
-            resourceId: 'content-2',
-            stepTitle: 'Step 2',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 2
-          } as PathStep,
-        ],
-        difficulty: 'intermediate',
-        estimatedDuration: '120 minutes',
-        tags: ['test'],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+    it('should include path metadata with step count', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-456',
+          version: '1.0.0',
+          title: 'Multi-Step Path',
+          description: 'Test',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [
+            {
+              stepType: 'content',
+              resourceId: 'content-1',
+              stepTitle: 'Step 1',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 1,
+            } as PathStep,
+            {
+              stepType: 'content',
+              resourceId: 'content-2',
+              stepTitle: 'Step 2',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 2,
+            } as PathStep,
+          ],
+          difficulty: 'intermediate',
+          estimatedDuration: '120 minutes',
+          tags: ['test'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      service.registerPathAsNode(mockPath).subscribe((node) => {
-        expect(node.metadata).toBeDefined();
-        done();
-      });
-    }));
+        service.registerPathAsNode(mockPath).subscribe(node => {
+          expect(node.metadata).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should map visibility to reach level', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-789',
-        version: '1.0.0',
-        title: 'Private Path',
-        description: 'Test',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [],
-        difficulty: 'advanced',
-        estimatedDuration: '180 minutes',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'private',
-      };
+    it('should map visibility to reach level', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-789',
+          version: '1.0.0',
+          title: 'Private Path',
+          description: 'Test',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [],
+          difficulty: 'advanced',
+          estimatedDuration: '180 minutes',
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'private',
+        };
 
-      service.registerPathAsNode(mockPath).subscribe((node) => {
-        expect(node.reach).toBe('private');
-        done();
-      });
-    }));
+        service.registerPathAsNode(mockPath).subscribe(node => {
+          expect(node.reach).toBe('private');
+          done();
+        });
+      }));
   });
 
   describe('findPathsContainingNode', () => {
-    it('should return observable of path references', () => new Promise<void>(done => {
-      mockDataLoader.getPathIndex.mockReturnValue(
-        of({
-          paths: [{
-            id: 'path-1',
-            title: 'Path 1',
-            description: 'Test',
-            difficulty: 'beginner',
-            estimatedDuration: '60 minutes',
-            stepCount: 1,
-            tags: []
-          }],
-          lastUpdated: new Date().toISOString(),
-          totalCount: 1,
-        })
-      );
+    it('should return observable of path references', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getPathIndex.mockReturnValue(
+          of({
+            paths: [
+              {
+                id: 'path-1',
+                title: 'Path 1',
+                description: 'Test',
+                difficulty: 'beginner',
+                estimatedDuration: '60 minutes',
+                stepCount: 1,
+                tags: [],
+              },
+            ],
+            lastUpdated: new Date().toISOString(),
+            totalCount: 1,
+          })
+        );
 
-      const mockPath: LearningPath = {
-        id: 'path-1',
-        version: '1.0.0',
-        title: 'Path 1',
-        description: 'Test',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [
-          {
-            stepType: 'content',
-            resourceId: 'content-123',
-            stepTitle: 'Step',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 1
-          } as PathStep,
-        ],
-        difficulty: 'beginner',
-        estimatedDuration: '60 minutes',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+        const mockPath: LearningPath = {
+          id: 'path-1',
+          version: '1.0.0',
+          title: 'Path 1',
+          description: 'Test',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [
+            {
+              stepType: 'content',
+              resourceId: 'content-123',
+              stepTitle: 'Step',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 1,
+            } as PathStep,
+          ],
+          difficulty: 'beginner',
+          estimatedDuration: '60 minutes',
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      mockDataLoader.getPath.mockReturnValue(of(mockPath));
+        mockDataLoader.getPath.mockReturnValue(of(mockPath));
 
-      service.findPathsContainingNode('content-123').subscribe((results) => {
-        expect(results).toBeDefined();
-        expect(Array.isArray(results)).toBe(true);
-        done();
-      });
-    }));
+        service.findPathsContainingNode('content-123').subscribe(results => {
+          expect(results).toBeDefined();
+          expect(Array.isArray(results)).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('getPathContentNodes', () => {
-    it('should return observable of content node IDs', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-123',
-        version: '1.0.0',
-        title: 'Test Path',
-        description: 'Test',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [
-          {
-            stepType: 'content',
-            resourceId: 'content-1',
-            stepTitle: 'Step 1',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 1
-          } as PathStep,
-          {
-            stepType: 'content',
-            resourceId: 'content-2',
-            stepTitle: 'Step 2',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 2
-          } as PathStep,
-        ],
-        difficulty: 'beginner',
-        estimatedDuration: '60 minutes',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+    it('should return observable of content node IDs', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-123',
+          version: '1.0.0',
+          title: 'Test Path',
+          description: 'Test',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [
+            {
+              stepType: 'content',
+              resourceId: 'content-1',
+              stepTitle: 'Step 1',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 1,
+            } as PathStep,
+            {
+              stepType: 'content',
+              resourceId: 'content-2',
+              stepTitle: 'Step 2',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 2,
+            } as PathStep,
+          ],
+          difficulty: 'beginner',
+          estimatedDuration: '60 minutes',
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      mockDataLoader.getPath.mockReturnValue(of(mockPath));
+        mockDataLoader.getPath.mockReturnValue(of(mockPath));
 
-      service.getPathContentNodes('path-123').subscribe((nodeIds) => {
-        expect(Array.isArray(nodeIds)).toBe(true);
-        expect(nodeIds.length).toBeGreaterThan(0);
-        done();
-      });
-    }));
+        service.getPathContentNodes('path-123').subscribe(nodeIds => {
+          expect(Array.isArray(nodeIds)).toBe(true);
+          expect(nodeIds.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
   });
 
   describe('getRelatedPaths', () => {
-    it('should return observable of related path references', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-1',
-        version: '1.0.0',
-        title: 'Path 1',
-        description: 'Test',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [
-          {
-            stepType: 'content',
-            resourceId: 'content-1',
-            stepTitle: 'Step',
-            stepNarrative: 'Test narrative',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: [],
-            order: 1
-          } as PathStep,
-        ],
-        difficulty: 'beginner',
-        estimatedDuration: '60 minutes',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+    it('should return observable of related path references', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-1',
+          version: '1.0.0',
+          title: 'Path 1',
+          description: 'Test',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [
+            {
+              stepType: 'content',
+              resourceId: 'content-1',
+              stepTitle: 'Step',
+              stepNarrative: 'Test narrative',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+              order: 1,
+            } as PathStep,
+          ],
+          difficulty: 'beginner',
+          estimatedDuration: '60 minutes',
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      mockDataLoader.getPath.mockReturnValue(of(mockPath));
-      mockDataLoader.getPathIndex.mockReturnValue(
-        of({
-          paths: [{
-            id: 'path-1',
-            title: 'Path 1',
-            description: 'Test',
-            difficulty: 'beginner',
-            estimatedDuration: '60 minutes',
-            stepCount: 1,
-            tags: []
-          }],
-          lastUpdated: new Date().toISOString(),
-          totalCount: 1,
-        })
-      );
+        mockDataLoader.getPath.mockReturnValue(of(mockPath));
+        mockDataLoader.getPathIndex.mockReturnValue(
+          of({
+            paths: [
+              {
+                id: 'path-1',
+                title: 'Path 1',
+                description: 'Test',
+                difficulty: 'beginner',
+                estimatedDuration: '60 minutes',
+                stepCount: 1,
+                tags: [],
+              },
+            ],
+            lastUpdated: new Date().toISOString(),
+            totalCount: 1,
+          })
+        );
 
-      service.getRelatedPaths('path-1').subscribe((results) => {
-        expect(Array.isArray(results)).toBe(true);
-        done();
-      });
-    }));
+        service.getRelatedPaths('path-1').subscribe(results => {
+          expect(Array.isArray(results)).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('syncPathNode', () => {
-    it('should return observable with synced content node', () => new Promise<void>(done => {
-      const mockPath: LearningPath = {
-        id: 'path-123',
-        version: '1.0.0',
-        title: 'Updated Path',
-        description: 'Updated',
-        purpose: 'Test Purpose',
-        createdBy: 'test-agent',
-        contributors: [],
-        steps: [],
-        difficulty: 'intermediate',
-        estimatedDuration: '90 minutes',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        visibility: 'public',
-      };
+    it('should return observable with synced content node', () =>
+      new Promise<void>(done => {
+        const mockPath: LearningPath = {
+          id: 'path-123',
+          version: '1.0.0',
+          title: 'Updated Path',
+          description: 'Updated',
+          purpose: 'Test Purpose',
+          createdBy: 'test-agent',
+          contributors: [],
+          steps: [],
+          difficulty: 'intermediate',
+          estimatedDuration: '90 minutes',
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          visibility: 'public',
+        };
 
-      service.syncPathNode(mockPath).subscribe((node) => {
-        expect(node).toBeDefined();
-        expect(node.title).toBe('Updated Path');
-        done();
-      });
-    }));
+        service.syncPathNode(mockPath).subscribe(node => {
+          expect(node).toBeDefined();
+          expect(node.title).toBe('Updated Path');
+          done();
+        });
+      }));
   });
 
   describe('loadPathNodes', () => {
-    it('should return observable of path nodes map', () => new Promise<void>(done => {
-      service.loadPathNodes().subscribe((nodes) => {
-        expect(nodes instanceof Map).toBe(true);
-        done();
-      });
-    }));
-
-    it('should cache path nodes on second call', () => new Promise<void>(done => {
-      service.loadPathNodes().subscribe(() => {
-        service.loadPathNodes().subscribe(() => {
-          expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(1);
+    it('should return observable of path nodes map', () =>
+      new Promise<void>(done => {
+        service.loadPathNodes().subscribe(nodes => {
+          expect(nodes instanceof Map).toBe(true);
           done();
         });
-      });
-    }));
+      }));
+
+    it('should cache path nodes on second call', () =>
+      new Promise<void>(done => {
+        service.loadPathNodes().subscribe(() => {
+          service.loadPathNodes().subscribe(() => {
+            expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(1);
+            done();
+          });
+        });
+      }));
   });
 
   describe('clearCache', () => {
-    it('should clear path nodes cache', () => new Promise<void>(done => {
-      service.loadPathNodes().subscribe(() => {
-        service.clearCache();
+    it('should clear path nodes cache', () =>
+      new Promise<void>(done => {
         service.loadPathNodes().subscribe(() => {
-          expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(2);
-          done();
+          service.clearCache();
+          service.loadPathNodes().subscribe(() => {
+            expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(2);
+            done();
+          });
         });
-      });
-    }));
+      }));
   });
 
   describe('getPathNodesByTag', () => {
-    it('should return observable of content nodes with tag', () => new Promise<void>(done => {
-      service.getPathNodesByTag('test').subscribe((results) => {
-        expect(Array.isArray(results)).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of content nodes with tag', () =>
+      new Promise<void>(done => {
+        service.getPathNodesByTag('test').subscribe(results => {
+          expect(Array.isArray(results)).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('getPathNodesByDifficulty', () => {
-    it('should return observable of content nodes by difficulty', () => new Promise<void>(done => {
-      service.getPathNodesByDifficulty('beginner').subscribe((results) => {
-        expect(Array.isArray(results)).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of content nodes by difficulty', () =>
+      new Promise<void>(done => {
+        service.getPathNodesByDifficulty('beginner').subscribe(results => {
+          expect(Array.isArray(results)).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('linkPathToContent', () => {
-    it('should return observable of void', () => new Promise<void>(done => {
-      service.linkPathToContent('path-1', ['content-1', 'content-2']).subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of void', () =>
+      new Promise<void>(done => {
+        service.linkPathToContent('path-1', ['content-1', 'content-2']).subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
+      }));
   });
 });

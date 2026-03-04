@@ -25,9 +25,7 @@ describe('ElohimPresenceService', () => {
   let mockPathRecommendation: any;
   let mockLearnerContext: any;
 
-  const buildFulfilledResponse = (
-    overrides: Partial<ElohimResponse> = {},
-  ): ElohimResponse => ({
+  const buildFulfilledResponse = (overrides: Partial<ElohimResponse> = {}): ElohimResponse => ({
     requestId: 'req-test-1',
     elohimId: 'elohim-1',
     status: 'fulfilled',
@@ -63,35 +61,33 @@ describe('ElohimPresenceService', () => {
 
   beforeEach(() => {
     mockAgentService = {
-    invoke: vi.fn(),
-    requestAttestationRecommendation: vi.fn(),
-  };
+      invoke: vi.fn(),
+      requestAttestationRecommendation: vi.fn(),
+    };
     mockAgentService.invoke.mockReturnValue(of(buildFulfilledResponse()));
-    mockAgentService.requestAttestationRecommendation.mockReturnValue(
-      of(buildFulfilledResponse()),
-    );
+    mockAgentService.requestAttestationRecommendation.mockReturnValue(of(buildFulfilledResponse()));
 
     mockBannerService = {
-    registerProvider: vi.fn(),
-    unregisterProvider: vi.fn(),
-  };
+      registerProvider: vi.fn(),
+      unregisterProvider: vi.fn(),
+    };
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
     mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
     mockPathRecommendation = {
-    getTopRecommendation: vi.fn(),
-    getRecommendations: vi.fn(),
-  };
+      getTopRecommendation: vi.fn(),
+      getRecommendations: vi.fn(),
+    };
     mockPathRecommendation.getTopRecommendation.mockReturnValue(of(null));
 
     mockLearnerContext = {
-    getDiscoveryProfile: vi.fn(),
-    isMasteryUnlocked: vi.fn(),
-    getAdaptationState: vi.fn(),
-  };
+      getDiscoveryProfile: vi.fn(),
+      isMasteryUnlocked: vi.fn(),
+      getAdaptationState: vi.fn(),
+    };
     mockLearnerContext.getDiscoveryProfile.mockReturnValue(null);
 
     TestBed.configureTestingModule({
@@ -138,7 +134,7 @@ describe('ElohimPresenceService', () => {
         expect.objectContaining({
           capability: 'path-recommendation',
           requesterId: 'user-1',
-        }),
+        })
       );
     });
 
@@ -214,7 +210,7 @@ describe('ElohimPresenceService', () => {
 
       let moments: { metadata?: Record<string, unknown>; message: string }[] = [];
       service.presence$.subscribe(
-        m => (moments = m as { metadata?: Record<string, unknown>; message: string }[]),
+        m => (moments = m as { metadata?: Record<string, unknown>; message: string }[])
       );
 
       service.onDiscoveryCompleted('node-1', 'Values Hierarchy', 'user-1').subscribe();
@@ -237,9 +233,7 @@ describe('ElohimPresenceService', () => {
       mockPathRecommendation.getTopRecommendation.mockReturnValue(of(null));
 
       let moments: { metadata?: Record<string, unknown> }[] = [];
-      service.presence$.subscribe(
-        m => (moments = m as { metadata?: Record<string, unknown> }[]),
-      );
+      service.presence$.subscribe(m => (moments = m as { metadata?: Record<string, unknown> }[]));
 
       service.onDiscoveryCompleted('node-1', 'Test', 'user-1').subscribe();
       tick();
@@ -259,7 +253,7 @@ describe('ElohimPresenceService', () => {
       expect(mockAgentService.invoke).toHaveBeenCalledWith(
         expect.objectContaining({
           capability: 'knowledge-map-synthesis',
-        }),
+        })
       );
     });
 
@@ -275,9 +269,7 @@ describe('ElohimPresenceService', () => {
 
     it('should add nudge moment for non-mastered level', fakeAsync(() => {
       let moments: { type: string; message: string }[] = [];
-      service.presence$.subscribe(
-        m => (moments = m as { type: string; message: string }[]),
-      );
+      service.presence$.subscribe(m => (moments = m as { type: string; message: string }[]));
 
       service.onContentCompleted('content-1', 'practicing', 'user-1').subscribe();
       tick();
@@ -298,7 +290,7 @@ describe('ElohimPresenceService', () => {
       expect(mockAgentService.invoke).toHaveBeenCalledWith(
         expect.objectContaining({
           capability: 'spiral-detection',
-        }),
+        })
       );
     });
 
@@ -307,8 +299,8 @@ describe('ElohimPresenceService', () => {
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: true } as unknown as ElohimResponse['payload'],
-          }),
-        ),
+          })
+        )
       );
 
       let moments: { type: string }[] = [];
@@ -326,8 +318,8 @@ describe('ElohimPresenceService', () => {
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: false } as unknown as ElohimResponse['payload'],
-          }),
-        ),
+          })
+        )
       );
 
       let moments: unknown[] = [];
@@ -363,7 +355,7 @@ describe('ElohimPresenceService', () => {
       expect(mockAgentService.requestAttestationRecommendation).toHaveBeenCalledWith(
         'content-1',
         'fact-check',
-        'user-1',
+        'user-1'
       );
     });
   });
@@ -405,8 +397,8 @@ describe('ElohimPresenceService', () => {
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: true } as unknown as ElohimResponse['payload'],
-          }),
-        ),
+          })
+        )
       );
 
       let notices: { severity: string }[] = [];
@@ -523,9 +515,7 @@ describe('ElohimPresenceService', () => {
 
     it('should include recommendedPathId in discovery moment metadata', fakeAsync(() => {
       let moments: { metadata?: Record<string, unknown> }[] = [];
-      service.presence$.subscribe(
-        m => (moments = m as { metadata?: Record<string, unknown> }[]),
-      );
+      service.presence$.subscribe(m => (moments = m as { metadata?: Record<string, unknown> }[]));
 
       service.onDiscoveryCompleted('node-42', 'Big Five', 'user-1').subscribe();
       tick();

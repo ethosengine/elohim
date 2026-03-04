@@ -44,8 +44,12 @@ describe('HealthIndicatorComponent', () => {
   };
 
   beforeEach(async () => {
-    mockHealthService = { refresh: vi.fn(), getQuickStatus: vi.fn(), status: signal(mockHealthStatus),
-        isChecking: signal(false), };
+    mockHealthService = {
+      refresh: vi.fn(),
+      getQuickStatus: vi.fn(),
+      status: signal(mockHealthStatus),
+      isChecking: signal(false),
+    };
     mockHealthService.refresh.mockReturnValue(Promise.resolve(mockHealthStatus));
     mockHealthService.getQuickStatus.mockReturnValue({
       icon: '✓',

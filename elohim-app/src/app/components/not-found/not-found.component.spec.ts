@@ -14,8 +14,8 @@ describe('NotFoundComponent', () => {
 
   beforeEach(async () => {
     seoServiceSpy = {
-    updateSeo: vi.fn(),
-  };
+      updateSeo: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [NotFoundComponent],

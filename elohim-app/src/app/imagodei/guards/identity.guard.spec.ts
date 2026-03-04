@@ -65,9 +65,7 @@ describe('Identity Guards', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('hosted');
       mockIdentityService.isAuthenticated.mockReturnValue(true);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
     });
@@ -76,9 +74,7 @@ describe('Identity Guards', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('steward');
       mockIdentityService.isAuthenticated.mockReturnValue(true);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
     });
@@ -91,9 +87,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
@@ -107,9 +101,7 @@ describe('Identity Guards', () => {
       mockAuthService.isAuthenticated.mockReturnValue(true);
       mockIdentityService.waitForAuthenticatedState.mockResolvedValue(true);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
       expect(mockIdentityService.waitForAuthenticatedState).toHaveBeenCalledWith(5000);
@@ -124,9 +116,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockIdentityService.waitForAuthenticatedState).toHaveBeenCalledWith(5000);
@@ -152,9 +142,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
     });
@@ -169,9 +157,7 @@ describe('Identity Guards', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('hosted');
       mockIdentityService.isAuthenticated.mockReturnValue(true);
 
-      const result = TestBed.runInInjectionContext(() =>
-        sessionOrAuthGuard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => sessionOrAuthGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
     });
@@ -181,9 +167,7 @@ describe('Identity Guards', () => {
       mockIdentityService.isAuthenticated.mockReturnValue(false);
       mockSessionHumanService.hasSession.mockReturnValue(true);
 
-      const result = TestBed.runInInjectionContext(() =>
-        sessionOrAuthGuard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => sessionOrAuthGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
     });
@@ -196,9 +180,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
-        sessionOrAuthGuard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => sessionOrAuthGuard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login']);
@@ -209,9 +191,7 @@ describe('Identity Guards', () => {
       mockIdentityService.isAuthenticated.mockReturnValue(true);
       mockSessionHumanService.hasSession.mockReturnValue(true);
 
-      const result = TestBed.runInInjectionContext(() =>
-        sessionOrAuthGuard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => sessionOrAuthGuard(mockRoute, mockState));
 
       expect(result).toBe(true);
       // Session check should not be called if network auth succeeds
@@ -233,9 +213,7 @@ describe('Identity Guards', () => {
       ]);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       expect(result).toBe(true);
     });
@@ -248,9 +226,7 @@ describe('Identity Guards', () => {
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
@@ -266,9 +242,7 @@ describe('Identity Guards', () => {
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
     });
@@ -276,17 +250,13 @@ describe('Identity Guards', () => {
     it('should redirect to access-denied when missing attestation', () => {
       (mockIdentityService.mode as Mock).mockReturnValue('hosted');
       mockIdentityService.isAuthenticated.mockReturnValue(true);
-      (mockIdentityService.attestations as Mock).mockReturnValue([
-        'verified-human',
-      ]);
+      (mockIdentityService.attestations as Mock).mockReturnValue(['verified-human']);
 
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/access-denied'], {
@@ -306,9 +276,7 @@ describe('Identity Guards', () => {
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
       expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/access-denied'], {
@@ -331,9 +299,7 @@ describe('Identity Guards', () => {
       const moderatorGuard = attestationGuard('community-moderator');
       const creatorGuard = attestationGuard('content-creator');
 
-      const stewardResult = TestBed.runInInjectionContext(() =>
-        stewardGuard(mockRoute, mockState)
-      );
+      const stewardResult = TestBed.runInInjectionContext(() => stewardGuard(mockRoute, mockState));
       expect(stewardResult).toBe(true);
 
       const moderatorResult = TestBed.runInInjectionContext(() =>
@@ -344,9 +310,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const creatorResult = TestBed.runInInjectionContext(() =>
-        creatorGuard(mockRoute, mockState)
-      );
+      const creatorResult = TestBed.runInInjectionContext(() => creatorGuard(mockRoute, mockState));
       expect(creatorResult).toBe(mockUrlTree);
     });
   });
@@ -364,9 +328,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
-      const result = await TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
+      const result = await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
 
       expect(result).toBe(mockUrlTree);
     });
@@ -380,9 +342,7 @@ describe('Identity Guards', () => {
       mockRouter.createUrlTree.mockReturnValue(mockUrlTree);
 
       const guard = attestationGuard('content-creator');
-      const result = TestBed.runInInjectionContext(() =>
-        guard(mockRoute, mockState)
-      );
+      const result = TestBed.runInInjectionContext(() => guard(mockRoute, mockState));
 
       // Should redirect when attestations are undefined
       expect(result).toBe(mockUrlTree);

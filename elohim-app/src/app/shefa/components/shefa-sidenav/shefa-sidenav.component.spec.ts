@@ -130,8 +130,7 @@ describe('ShefaSidenavComponent', () => {
       const spy = vi.fn();
       component.collapseClicked.subscribe(spy);
 
-      const btn: HTMLButtonElement =
-        fixture.nativeElement.querySelector('.sidebar-collapse-btn');
+      const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.sidebar-collapse-btn');
       btn.click();
 
       expect(spy).toHaveBeenCalled();

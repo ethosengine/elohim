@@ -9,13 +9,10 @@ describe('ContributorService', () => {
   let holochainSpy: any;
 
   beforeEach(() => {
-    holochainSpy = { callZome: vi.fn(), isConnected: signal(true), };
+    holochainSpy = { callZome: vi.fn(), isConnected: signal(true) };
 
     TestBed.configureTestingModule({
-      providers: [
-        ContributorService,
-        { provide: HolochainClientService, useValue: holochainSpy },
-      ],
+      providers: [ContributorService, { provide: HolochainClientService, useValue: holochainSpy }],
     });
     service = TestBed.inject(ContributorService);
   });
@@ -148,9 +145,7 @@ describe('ContributorService', () => {
     });
 
     it('should cache requests', () => {
-      holochainSpy.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       service.getRecognitionHistory('contributor-123');
       service.getRecognitionHistory('contributor-123');
       // Cache should prevent multiple calls

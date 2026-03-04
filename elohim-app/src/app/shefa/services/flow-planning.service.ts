@@ -22,7 +22,7 @@
  * @see StewardedResourceService for pattern reference
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 48.8% (2026-02-24)
 
@@ -81,11 +81,9 @@ import { StewardedResourceService } from './stewarded-resources.service';
 export class FlowPlanningService {
   private static readonly NOT_IMPLEMENTED_ERROR = 'Not yet implemented';
 
-  constructor(
-    private readonly holochain: HolochainClientService,
-    private readonly economicService: EconomicService,
-    private readonly resourceService: StewardedResourceService
-  ) {}
+  private readonly holochain = inject(HolochainClientService);
+  private readonly economicService = inject(EconomicService);
+  private readonly resourceService = inject(StewardedResourceService);
 
   // =========================================================================
   // Plan Management

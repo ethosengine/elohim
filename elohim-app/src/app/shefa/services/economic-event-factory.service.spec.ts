@@ -383,7 +383,9 @@ describe('EconomicEventFactoryService', () => {
     });
 
     it('should reject correction event creation when not implemented', async () => {
-      await await expect(service.createCorrectionEvent('event-1', {}, 'Incorrect amount')).rejects.toThrow(/not yet implemented/i);
+      await await expect(
+        service.createCorrectionEvent('event-1', {}, 'Incorrect amount')
+      ).rejects.toThrow(/not yet implemented/i);
     });
   });
 
@@ -457,7 +459,7 @@ function createMockStagedTransaction(
     type,
     amount: {
       value: Math.abs(amount),
-      unit: 'USD'
+      unit: 'USD',
     },
     timestamp: new Date().toISOString(),
     description: 'Test transaction',
@@ -474,6 +476,6 @@ function createMockStagedTransaction(
     budgetId: undefined,
     budgetCategoryId: undefined,
     isDuplicate: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 96.1% (2026-02-24)
 
@@ -239,7 +239,7 @@ export class RelatedConceptsService {
   /** Relationship index for O(1) lookups (built when full graph is loaded) */
   private relationshipIndex: Map<string, ContentRelationship> | null = null;
 
-  constructor(private readonly dataLoader: DataLoaderService) {}
+  private readonly dataLoader = inject(DataLoaderService);
 
   /**
    * Get related concepts for a content node, grouped by relationship type.

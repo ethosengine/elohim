@@ -22,7 +22,7 @@
  * @see ContributorService for Lamad-specific contributor recognition
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 // @coverage: 29.7% (2026-02-24)
 
@@ -134,7 +134,7 @@ export class EconomicService {
   /** Cache for events by agent (provider/receiver) */
   private readonly eventsByAgentCache = new Map<string, Observable<EconomicEvent[]>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if economic service is available.

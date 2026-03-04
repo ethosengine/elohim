@@ -163,15 +163,13 @@ export class ContextAssemblyService {
 
   private readonly sessionHumanService = inject(SessionHumanService);
 
-  constructor(
-    private readonly agentService: AgentService,
-    private readonly elohimAgentService: ElohimAgentService,
-    private readonly governanceService: GovernanceService,
-    private readonly dataLoader: DataLoaderService,
-    private readonly relatedConceptsService: RelatedConceptsService,
-    private readonly pathContextService: PathContextService,
-    private readonly identityService: IdentityService
-  ) {}
+  private readonly agentService = inject(AgentService);
+  private readonly elohimAgentService = inject(ElohimAgentService);
+  private readonly governanceService = inject(GovernanceService);
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly relatedConceptsService = inject(RelatedConceptsService);
+  private readonly pathContextService = inject(PathContextService);
+  private readonly identityService = inject(IdentityService);
 
   // ==========================================================================
   // Public API

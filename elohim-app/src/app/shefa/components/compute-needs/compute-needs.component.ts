@@ -11,7 +11,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 
 // @coverage: 23.5% (2026-02-24)
 
@@ -48,7 +48,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly shefaCompute: ShefaComputeService) {}
+  private readonly shefaCompute = inject(ShefaComputeService);
 
   ngOnInit(): void {
     if (!this.operatorId) {

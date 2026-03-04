@@ -72,11 +72,17 @@ describe('ProjectionAPIService', () => {
     mockStorageClient = {
       getBlobUrl: vi.fn(),
     };
-    mockStorageClient.getBlobUrl.mockImplementation((hash: string) => `https://blob.example.com/${hash}`);
+    mockStorageClient.getBlobUrl.mockImplementation(
+      (hash: string) => `https://blob.example.com/${hash}`
+    );
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), ProjectionAPIService,
-        { provide: StorageClientService, useValue: mockStorageClient },],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        ProjectionAPIService,
+        { provide: StorageClientService, useValue: mockStorageClient },
+      ],
     });
 
     service = TestBed.inject(ProjectionAPIService);
@@ -483,10 +489,7 @@ describe('ProjectionAPIService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/Content') &&
-          request.params.get('limit') === '25'
-        );
+        return request.url.includes('/Content') && request.params.get('limit') === '25';
       });
       req.flush([mockContentData]);
       tick();
@@ -657,10 +660,7 @@ describe('ProjectionAPIService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/LearningPath') &&
-          request.params.get('limit') === '100'
-        );
+        return request.url.includes('/LearningPath') && request.params.get('limit') === '100';
       });
       req.flush([mockPathData]);
       tick();
@@ -671,9 +671,7 @@ describe('ProjectionAPIService', () => {
     it('should accept custom limit', fakeAsync(() => {
       service.getAllPaths(50).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '50'
-      );
+      const req = httpMock.expectOne(request => request.params.get('limit') === '50');
       req.flush([]);
       tick();
     }));
@@ -883,9 +881,7 @@ describe('ProjectionAPIService', () => {
     it('should encode special characters in IDs', fakeAsync(() => {
       service.getContent('content/with/slashes').subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('content%2Fwith%2Fslashes')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('content%2Fwith%2Fslashes'));
       req.flush(mockContentData);
       tick();
     }));

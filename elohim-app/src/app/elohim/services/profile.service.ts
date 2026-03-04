@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 44.2% (2026-02-24)
 
@@ -52,13 +52,11 @@ import type { LearningPath } from '@app/lamad/models/learning-path.model';
  */
 @Injectable({ providedIn: 'root' })
 export class ProfileService {
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly pathService: PathService,
-    private readonly affinityService: AffinityTrackingService,
-    private readonly agentService: AgentService,
-    @Optional() private readonly sessionHumanService: SessionHumanService | null
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly pathService = inject(PathService);
+  private readonly affinityService = inject(AffinityTrackingService);
+  private readonly agentService = inject(AgentService);
+  private readonly sessionHumanService = inject(SessionHumanService, { optional: true });
 
   // =========================================================================
   // Core Profile (imagodei-core)

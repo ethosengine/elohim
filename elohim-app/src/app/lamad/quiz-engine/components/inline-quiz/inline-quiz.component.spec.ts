@@ -18,11 +18,11 @@ describe('InlineQuizComponent', () => {
 
   beforeEach(async () => {
     mockStreakTracker = {
-    startTracking: vi.fn(),
-    recordAnswer: vi.fn(),
-    onAchieved: vi.fn(),
-    offAchieved: vi.fn(),
-  };
+      startTracking: vi.fn(),
+      recordAnswer: vi.fn(),
+      onAchieved: vi.fn(),
+      offAchieved: vi.fn(),
+    };
     mockStreakTracker.startTracking.mockReturnValue({
       contentId: 'test-content',
       humanId: 'test-human',
@@ -38,14 +38,14 @@ describe('InlineQuizComponent', () => {
     });
 
     mockSoundService = {
-    playCorrectAnswerFeedback: vi.fn(),
-    playIncorrectAnswerFeedback: vi.fn(),
-    playStreakAchieved: vi.fn(),
-  };
+      playCorrectAnswerFeedback: vi.fn(),
+      playIncorrectAnswerFeedback: vi.fn(),
+      playStreakAchieved: vi.fn(),
+    };
 
     mockPoolService = {
-    getPoolForContent: vi.fn(),
-  };
+      getPoolForContent: vi.fn(),
+    };
     mockPoolService.getPoolForContent.mockReturnValue(
       of({
         contentId: 'test-content',
@@ -77,8 +77,8 @@ describe('InlineQuizComponent', () => {
     );
 
     mockGovernanceSignal = {
-    recordLearningSignal: vi.fn(),
-  };
+      recordLearningSignal: vi.fn(),
+    };
     mockGovernanceSignal.recordLearningSignal.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({

@@ -12,12 +12,12 @@ describe('CustodianSelectionService', () => {
 
   beforeEach(() => {
     const shefaSpy = {
-    getMetrics: vi.fn(),
-    getAllMetrics: vi.fn(),
-  };
+      getMetrics: vi.fn(),
+      getAllMetrics: vi.fn(),
+    };
     const commitmentsSpy = {
-    getCommitmentsForContent: vi.fn(),
-  };
+      getCommitmentsForContent: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -29,9 +29,9 @@ describe('CustodianSelectionService', () => {
 
     service = TestBed.inject(CustodianSelectionService);
     shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
-    commitmentsMock = TestBed.inject(
-      CustodianCommitmentService
-    ) as { [K in keyof CustodianCommitmentService]?: Mock };
+    commitmentsMock = TestBed.inject(CustodianCommitmentService) as {
+      [K in keyof CustodianCommitmentService]?: Mock;
+    };
   });
 
   it('should be created', () => {
@@ -72,7 +72,12 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics1 = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
@@ -80,13 +85,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics2 = {
         custodianId: 'cust-2',
-        health: { uptimePercent: 90, availability: true, responseTimeP95Ms: 150, slaCompliance: false },
+        health: {
+          uptimePercent: 90,
+          availability: true,
+          responseTimeP95Ms: 150,
+          slaCompliance: false,
+        },
         bandwidth: { currentUsageMbps: 60, declaredMbps: 100 },
         reputation: { specializationBonus: 0.02 },
         economic: { stewardTier: 2 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics1 as any);
         return Promise.resolve(mockMetrics2 as any);
@@ -112,13 +124,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 40, availability: false, responseTimeP95Ms: 100, slaCompliance: false },
+        health: {
+          uptimePercent: 40,
+          availability: false,
+          responseTimeP95Ms: 100,
+          slaCompliance: false,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -149,13 +168,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result1 = await service.selectBestCustodian('content-1');
@@ -179,14 +205,24 @@ describe('CustodianSelectionService', () => {
       const mockMetrics = [
         {
           custodianId: 'cust-1',
-          health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+          health: {
+            uptimePercent: 95,
+            availability: true,
+            responseTimeP95Ms: 100,
+            slaCompliance: true,
+          },
           bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
           reputation: { specializationBonus: 0.05 },
           economic: { stewardTier: 3 },
         },
         {
           custodianId: 'cust-2',
-          health: { uptimePercent: 85, availability: true, responseTimeP95Ms: 150, slaCompliance: false },
+          health: {
+            uptimePercent: 85,
+            availability: true,
+            responseTimeP95Ms: 150,
+            slaCompliance: false,
+          },
           bandwidth: { currentUsageMbps: 60, declaredMbps: 100 },
           reputation: { specializationBonus: 0.02 },
           economic: { stewardTier: 2 },
@@ -222,21 +258,36 @@ describe('CustodianSelectionService', () => {
       const mockMetrics = [
         {
           custodianId: 'cust-1',
-          health: { uptimePercent: 99, availability: true, responseTimeP95Ms: 50, slaCompliance: true },
+          health: {
+            uptimePercent: 99,
+            availability: true,
+            responseTimeP95Ms: 50,
+            slaCompliance: true,
+          },
           bandwidth: { currentUsageMbps: 30, declaredMbps: 100 },
           reputation: { specializationBonus: 0.1 },
           economic: { stewardTier: 4 },
         },
         {
           custodianId: 'cust-2',
-          health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+          health: {
+            uptimePercent: 95,
+            availability: true,
+            responseTimeP95Ms: 100,
+            slaCompliance: true,
+          },
           bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
           reputation: { specializationBonus: 0.05 },
           economic: { stewardTier: 3 },
         },
         {
           custodianId: 'cust-3',
-          health: { uptimePercent: 90, availability: true, responseTimeP95Ms: 150, slaCompliance: false },
+          health: {
+            uptimePercent: 90,
+            availability: true,
+            responseTimeP95Ms: 150,
+            slaCompliance: false,
+          },
           bandwidth: { currentUsageMbps: 70, declaredMbps: 100 },
           reputation: { specializationBonus: 0.02 },
           economic: { stewardTier: 2 },
@@ -279,13 +330,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       await service.selectBestCustodian('content-1');
@@ -332,13 +390,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const statsBefore = service.getStatistics();
@@ -393,13 +458,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -426,13 +498,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 99, availability: true, responseTimeP95Ms: 50, slaCompliance: true },
+        health: {
+          uptimePercent: 99,
+          availability: true,
+          responseTimeP95Ms: 50,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -454,13 +533,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -482,13 +568,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 25, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -510,13 +603,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.08 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -545,13 +645,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 4 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics as any);
         return Promise.resolve({
@@ -580,13 +687,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 2500, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 2500,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -607,13 +721,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 99, declaredMbps: 100 },
         reputation: { specializationBonus: 0 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
@@ -634,7 +755,9 @@ describe('CustodianSelectionService', () => {
         },
       ];
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.reject(new Error('Metrics unavailable')));
 
       const result = await service.selectBestCustodian('content-1');
@@ -672,13 +795,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics1 = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics1 as any);
         return Promise.reject(new Error('Metrics unavailable'));
@@ -705,13 +835,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const statsBefore = service.getStatistics();
@@ -734,13 +871,20 @@ describe('CustodianSelectionService', () => {
 
       const mockMetrics = {
         custodianId: 'cust-1',
-        health: { uptimePercent: 95, availability: true, responseTimeP95Ms: 100, slaCompliance: true },
+        health: {
+          uptimePercent: 95,
+          availability: true,
+          responseTimeP95Ms: 100,
+          slaCompliance: true,
+        },
         bandwidth: { currentUsageMbps: 50, declaredMbps: 100 },
         reputation: { specializationBonus: 0.05 },
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
+        Promise.resolve(mockCommitments as any)
+      );
       shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       await service.selectBestCustodian('content-1');

@@ -228,7 +228,9 @@ describe('SophiaFormatPlugin', () => {
     });
 
     it('should throw on invalid structure', async () => {
-      await await expect(plugin.import(JSON.stringify({ invalid: true }))).rejects.toThrow('Invalid Sophia assessment format');
+      await await expect(plugin.import(JSON.stringify({ invalid: true }))).rejects.toThrow(
+        'Invalid Sophia assessment format'
+      );
     });
 
     it('should detect discovery mode from discoveryMode flag', async () => {

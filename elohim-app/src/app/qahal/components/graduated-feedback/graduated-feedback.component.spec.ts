@@ -93,7 +93,11 @@ describe('GraduatedFeedbackComponent', () => {
   describe('scales', () => {
     it('should have 5 contexts defined', () => {
       const contexts: FeedbackContext[] = [
-        'accuracy', 'usefulness', 'proposal', 'clarity', 'relevance',
+        'accuracy',
+        'usefulness',
+        'proposal',
+        'clarity',
+        'relevance',
       ];
       contexts.forEach(ctx => {
         expect(component.scales[ctx]).toBeDefined();

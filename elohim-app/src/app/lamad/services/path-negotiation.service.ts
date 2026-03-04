@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 94.2% (2026-02-24)
 
@@ -48,11 +48,9 @@ export class PathNegotiationService {
   private readonly negotiationsSubject = new BehaviorSubject<PathNegotiation[]>([]);
   public negotiations$ = this.negotiationsSubject.asObservable();
 
-  constructor(
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly consentService: HumanConsentService,
-    private readonly affinityService: AffinityTrackingService
-  ) {}
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly consentService = inject(HumanConsentService);
+  private readonly affinityService = inject(AffinityTrackingService);
 
   // =========================================================================
   // INITIALIZATION

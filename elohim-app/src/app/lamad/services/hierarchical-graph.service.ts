@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 92.2% (2026-02-24)
 
@@ -100,10 +100,8 @@ export class HierarchicalGraphService {
   /** Snapshot of current graph for synchronous access */
   private currentGraphSnapshot: ClusterGraphData | null = null;
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly affinityService: AffinityTrackingService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly affinityService = inject(AffinityTrackingService);
 
   /**
    * Initialize cluster graph from a learning path.

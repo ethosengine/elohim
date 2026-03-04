@@ -29,7 +29,11 @@ class MockRelatedConceptsPanelComponent {
 }
 
 // Mock renderer component
-@Component({ selector: 'app-mock-renderer', standalone: true, template: '<div>Mock Renderer</div>' })
+@Component({
+  selector: 'app-mock-renderer',
+  standalone: true,
+  template: '<div>Mock Renderer</div>',
+})
 class MockRendererComponent {
   @Input() node!: ContentNode;
   @Input() embedded = false;
@@ -65,8 +69,8 @@ describe('LessonViewComponent', () => {
 
   beforeEach(async () => {
     rendererRegistrySpy = {
-    getRenderer: vi.fn(),
-  };
+      getRenderer: vi.fn(),
+    };
     rendererRegistrySpy.getRenderer.mockReturnValue(null);
 
     await TestBed.configureTestingModule({
@@ -341,51 +345,56 @@ describe('LessonViewComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should emit exploreContent when related concept clicked', () => new Promise<void>(done => {
-      component.exploreContent.subscribe(conceptId => {
-        expect(conceptId).toBe('related-1');
-        done();
-      });
+    it('should emit exploreContent when related concept clicked', () =>
+      new Promise<void>(done => {
+        component.exploreContent.subscribe(conceptId => {
+          expect(conceptId).toBe('related-1');
+          done();
+        });
 
-      component.onRelatedConceptClick('related-1');
-    }));
+        component.onRelatedConceptClick('related-1');
+      }));
 
-    it('should emit exploreContent when graph node clicked', () => new Promise<void>(done => {
-      component.exploreContent.subscribe(nodeId => {
-        expect(nodeId).toBe('node-123');
-        done();
-      });
+    it('should emit exploreContent when graph node clicked', () =>
+      new Promise<void>(done => {
+        component.exploreContent.subscribe(nodeId => {
+          expect(nodeId).toBe('node-123');
+          done();
+        });
 
-      component.onGraphNodeClick('node-123');
-    }));
+        component.onGraphNodeClick('node-123');
+      }));
 
-    it('should emit exploreInGraph when explore button clicked', () => new Promise<void>(done => {
-      component.exploreInGraph.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
+    it('should emit exploreInGraph when explore button clicked', () =>
+      new Promise<void>(done => {
+        component.exploreInGraph.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
 
-      component.onExploreInGraphClick();
-    }));
+        component.onExploreInGraphClick();
+      }));
 
-    it('should emit quizCompleted when inline quiz completes', () => new Promise<void>(done => {
-      const quizEvent = { streak: 3, totalCorrect: 5 };
-      component.quizCompleted.subscribe(event => {
-        expect(event).toEqual(quizEvent);
-        done();
-      });
+    it('should emit quizCompleted when inline quiz completes', () =>
+      new Promise<void>(done => {
+        const quizEvent = { streak: 3, totalCorrect: 5 };
+        component.quizCompleted.subscribe(event => {
+          expect(event).toEqual(quizEvent);
+          done();
+        });
 
-      component.onInlineQuizCompleted(quizEvent);
-    }));
+        component.onInlineQuizCompleted(quizEvent);
+      }));
 
-    it('should emit practicedEarned when attestation earned', () => new Promise<void>(done => {
-      component.practicedEarned.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
+    it('should emit practicedEarned when attestation earned', () =>
+      new Promise<void>(done => {
+        component.practicedEarned.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
 
-      component.onPracticedAttestation();
-    }));
+        component.onPracticedAttestation();
+      }));
   });
 
   describe('renderer lifecycle', () => {

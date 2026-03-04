@@ -3,7 +3,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { PolicyConsoleComponent } from './policy-console.component';
 import { StewardshipService } from '../../services/stewardship.service';
-import type { DevicePolicy, ComputedPolicy, StewardshipGrant } from '../../models/stewardship.model';
+import type {
+  DevicePolicy,
+  ComputedPolicy,
+  StewardshipGrant,
+} from '../../models/stewardship.model';
 import { vi, Mock } from 'vitest';
 
 describe('PolicyConsoleComponent', () => {
@@ -51,14 +55,14 @@ describe('PolicyConsoleComponent', () => {
 
   beforeEach(async () => {
     mockStewardshipService = {
-    getMyPolicy: vi.fn(),
-    getSubjectPolicy: vi.fn(),
-    getGrantForSubject: vi.fn(),
-    getPolicyChain: vi.fn(),
-    getMyPolicyChain: vi.fn(),
-    getParentPolicy: vi.fn(),
-    upsertPolicy: vi.fn(),
-  };
+      getMyPolicy: vi.fn(),
+      getSubjectPolicy: vi.fn(),
+      getGrantForSubject: vi.fn(),
+      getPolicyChain: vi.fn(),
+      getMyPolicyChain: vi.fn(),
+      getParentPolicy: vi.fn(),
+      upsertPolicy: vi.fn(),
+    };
 
     mockRouter = vi.fn() as any;
 
@@ -279,7 +283,9 @@ describe('PolicyConsoleComponent', () => {
         requireApproval: [],
         sessionMaxMinutes: 90,
         dailyMaxMinutes: 180,
-        timeWindows: [{ startHour: 9, startMinute: 0, endHour: 17, endMinute: 0, daysOfWeek: [1, 2, 3, 4, 5] }],
+        timeWindows: [
+          { startHour: 9, startMinute: 0, endHour: 17, endMinute: 0, daysOfWeek: [1, 2, 3, 4, 5] },
+        ],
         cooldownMinutes: 15,
         ageRatingMax: 'PG-13',
         reachLevelMax: 5,
@@ -304,7 +310,9 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should handle load error gracefully', async () => {
-      mockStewardshipService.getMyPolicy.mockReturnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyPolicy.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadData();
 
@@ -358,7 +366,9 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should populate editing state from subject policy', async () => {
-      mockStewardshipService.getGrantForSubject.mockReturnValue(Promise.resolve({} as StewardshipGrant));
+      mockStewardshipService.getGrantForSubject.mockReturnValue(
+        Promise.resolve({} as StewardshipGrant)
+      );
       mockStewardshipService.getSubjectPolicy.mockReturnValue(Promise.resolve(mockPolicy));
       mockStewardshipService.getPolicyChain.mockReturnValue(Promise.resolve([]));
       mockStewardshipService.getParentPolicy.mockReturnValue(Promise.resolve(null));
@@ -512,7 +522,11 @@ describe('PolicyConsoleComponent', () => {
 
     it('should not disable inalienable features', () => {
       const inalienable = component.inalienableFeatures[0];
-      component.editingFeatureRules.set({ disabledFeatures: [], disabledRoutes: [], requireApproval: [] });
+      component.editingFeatureRules.set({
+        disabledFeatures: [],
+        disabledRoutes: [],
+        requireApproval: [],
+      });
 
       component.toggleFeature(inalienable);
 

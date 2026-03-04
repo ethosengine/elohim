@@ -54,7 +54,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private isDestroyed = false;
   private holochainInitialized = false;
 
-  constructor(private readonly router: Router) {
+  private readonly router = inject(Router);
+
+  constructor() {
     // Post-unlock trigger (Tauri): when status transitions to 'authenticated' after needs_unlock,
     // initialize Holochain connection (which was deferred during lock gate)
     effect(() => {

@@ -18,8 +18,8 @@ describe('CustodianViewComponent', () => {
 
   beforeEach(async () => {
     mockShefaCompute = {
-    getBidirectionalCustodianView: vi.fn(),
-  };
+      getBidirectionalCustodianView: vi.fn(),
+    };
     mockShefaCompute.getBidirectionalCustodianView.mockReturnValue(
       of({
         helping: [],

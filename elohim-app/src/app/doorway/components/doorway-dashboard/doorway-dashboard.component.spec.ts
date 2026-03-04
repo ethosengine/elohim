@@ -121,10 +121,7 @@ describe('DoorwayDashboardComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DoorwayDashboardComponent],
-      providers: [
-        { provide: DoorwayAdminService, useValue: mockAdminService },
-        DecimalPipe,
-      ],
+      providers: [{ provide: DoorwayAdminService, useValue: mockAdminService }, DecimalPipe],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DoorwayDashboardComponent);
@@ -168,7 +165,9 @@ describe('DoorwayDashboardComponent', () => {
       fixture.detectChanges();
       // Flush Promise microtasks so loadData() completes
       // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
-      await nextTick(); await nextTick(); await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
       expect(component.loading()).toBe(false);
     });
@@ -176,7 +175,9 @@ describe('DoorwayDashboardComponent', () => {
     it('should populate nodes signal with fetched data', async () => {
       fixture.detectChanges();
       // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
-      await nextTick(); await nextTick(); await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
       expect(component.nodes().length).toBe(3);
       expect(component.nodes()[0].nodeId).toBe('node-1');
@@ -185,7 +186,9 @@ describe('DoorwayDashboardComponent', () => {
     it('should populate cluster signal with fetched data', async () => {
       fixture.detectChanges();
       // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
-      await nextTick(); await nextTick(); await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
       expect(component.cluster()?.totalNodes).toBe(3);
     });
@@ -425,7 +428,9 @@ describe('DoorwayDashboardComponent', () => {
   describe('error handling', () => {
     it('should set error signal on load failure', fakeAsync(() => {
       mockAdminService.getNodes.mockReturnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
-      mockAdminService.getClusterMetrics.mockImplementation(() => { throw 'Network error'; });
+      mockAdminService.getClusterMetrics.mockImplementation(() => {
+        throw 'Network error';
+      });
 
       fixture.detectChanges();
       tick();

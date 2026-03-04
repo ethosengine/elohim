@@ -98,7 +98,14 @@ describe('ReactionBarComponent', () => {
   describe('reaction types', () => {
     it('should have 8 reaction types defined', () => {
       const reactionTypes: EmotionalReactionType[] = [
-        'moved', 'grateful', 'inspired', 'hopeful', 'grieving', 'challenged', 'concerned', 'uncomfortable',
+        'moved',
+        'grateful',
+        'inspired',
+        'hopeful',
+        'grieving',
+        'challenged',
+        'concerned',
+        'uncomfortable',
       ];
       reactionTypes.forEach(type => {
         expect((component as any).reactionIcons[type]).toBeDefined();

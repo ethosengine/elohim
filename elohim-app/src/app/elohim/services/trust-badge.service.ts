@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 93.1% (2026-03-03)
 
@@ -75,11 +75,9 @@ const ATT_AUTHOR_VERIFIED: ContentAttestationType = 'author-verified';
 
 @Injectable({ providedIn: 'root' })
 export class TrustBadgeService {
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly contentService: ContentService,
-    private readonly agentService: AgentService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly contentService = inject(ContentService);
+  private readonly agentService = inject(AgentService);
 
   /**
    * Get full trust badge for a content node.

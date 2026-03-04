@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 96.2% (2026-02-24)
 
@@ -25,7 +25,7 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
  */
 @Injectable({ providedIn: 'root' })
 export class ProgressMigrationService {
-  constructor(private readonly dataLoader: DataLoaderService) {}
+  private readonly dataLoader = inject(DataLoaderService);
 
   /**
    * Migrate all progress records for all agents in localStorage.

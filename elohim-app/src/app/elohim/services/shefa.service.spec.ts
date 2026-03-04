@@ -33,11 +33,15 @@ describe('ShefaService', () => {
     });
 
     service = TestBed.inject(ShefaService);
-    clientMock = TestBed.inject(HolochainClientService) as { [K in keyof HolochainClientService]?: Mock };
-    perfMock = TestBed.inject(PerformanceMetricsService) as { [K in keyof PerformanceMetricsService]?: Mock };
-    commitmentMock = TestBed.inject(
-      CustodianCommitmentService
-    ) as { [K in keyof CustodianCommitmentService]?: Mock };
+    clientMock = TestBed.inject(HolochainClientService) as {
+      [K in keyof HolochainClientService]?: Mock;
+    };
+    perfMock = TestBed.inject(PerformanceMetricsService) as {
+      [K in keyof PerformanceMetricsService]?: Mock;
+    };
+    commitmentMock = TestBed.inject(CustodianCommitmentService) as {
+      [K in keyof CustodianCommitmentService]?: Mock;
+    };
   });
 
   afterEach(() => {
@@ -175,7 +179,7 @@ describe('ShefaService', () => {
       },
       economic: {
         stewardTier: 2 as 1 | 2 | 3 | 4,
-        pricePerGb: 0.50,
+        pricePerGb: 0.5,
         monthlyEarnings: 15000,
         lifetimeEarnings: 150000,
         activeCommitments: 5,
@@ -252,7 +256,7 @@ describe('ShefaService', () => {
       },
       economic: {
         stewardTier: 1 as 1 | 2 | 3 | 4,
-        pricePerGb: 0.50,
+        pricePerGb: 0.5,
         monthlyEarnings: 15000,
         lifetimeEarnings: 150000,
         activeCommitments: 5,
@@ -325,7 +329,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 2,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -336,9 +340,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockAllMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockAllMetrics }));
 
     const result = await service.getAllMetrics();
 
@@ -485,9 +487,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: false, error: 'Storage full' })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: false, error: 'Storage full' }));
 
     const result = await service.reportMetrics(mockMetrics);
 
@@ -550,7 +550,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 1 as 1 | 2 | 3 | 4,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -561,9 +561,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getRankedByHealth();
 
@@ -621,7 +619,7 @@ describe('ShefaService', () => {
       },
       economic: {
         stewardTier: 1 as 1 | 2 | 3 | 4,
-        pricePerGb: 0.50,
+        pricePerGb: 0.5,
         monthlyEarnings: 15000,
         lifetimeEarnings: 150000,
         activeCommitments: 5,
@@ -631,9 +629,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     }));
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getRankedByHealth(5);
 
@@ -691,7 +687,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 1 as 1 | 2 | 3 | 4,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -702,9 +698,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getRankedBySpeed();
 
@@ -763,7 +757,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 1 as 1 | 2 | 3 | 4,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -774,9 +768,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getRankedByReputation();
 
@@ -839,7 +831,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 1 as 1 | 2 | 3 | 4,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -850,9 +842,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getAvailableCustodians();
 
@@ -915,7 +905,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 1 as 1 | 2 | 3 | 4,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 5000,
           lifetimeEarnings: 50000,
           activeCommitments: 2,
@@ -926,9 +916,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getAlerts();
 
@@ -991,7 +979,7 @@ describe('ShefaService', () => {
         },
         economic: {
           stewardTier: 2,
-          pricePerGb: 0.50,
+          pricePerGb: 0.5,
           monthlyEarnings: 15000,
           lifetimeEarnings: 150000,
           activeCommitments: 5,
@@ -1002,9 +990,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.mockReturnValue(
-      Promise.resolve({ success: true, data: mockMetrics })
-    );
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getRecommendations();
 
@@ -1066,7 +1052,7 @@ describe('ShefaService', () => {
       },
       economic: {
         stewardTier: 1 as 1 | 2 | 3 | 4,
-        pricePerGb: 0.50,
+        pricePerGb: 0.5,
         monthlyEarnings: 15000,
         lifetimeEarnings: 150000,
         activeCommitments: 5,

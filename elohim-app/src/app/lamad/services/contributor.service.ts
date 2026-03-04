@@ -23,7 +23,7 @@
  * @see StewardService for steward economy operations
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 // @coverage: 37.7% (2026-02-24)
 
@@ -141,7 +141,7 @@ export class ContributorService {
   /** Cache for recognition history */
   private readonly recognitionCache = new Map<string, Observable<LamadContributorRecognition[]>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if contributor service is available.

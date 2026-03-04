@@ -144,9 +144,7 @@ describe('FooterComponent (with version.json)', () => {
     const req = httpTesting.expectOne('/version.json');
     req.flush(mockBuildInfo);
 
-    expect(component.githubCommitUrl).toBe(
-      'https://github.com/ethosengine/elohim/commit/abc1234f',
-    );
+    expect(component.githubCommitUrl).toBe('https://github.com/ethosengine/elohim/commit/abc1234f');
   });
 
   it('should render enhanced build info when version.json loads', () => {

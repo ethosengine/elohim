@@ -3,7 +3,12 @@ import { firstValueFrom, of } from 'rxjs';
 
 import { ElohimAgentService } from './elohim-agent.service';
 import { DataLoaderService } from './data-loader.service';
-import { ElohimRequest, ElohimResponse, ElohimIndexEntry, ElohimAgent } from '../models/elohim-agent.model';
+import {
+  ElohimRequest,
+  ElohimResponse,
+  ElohimIndexEntry,
+  ElohimAgent,
+} from '../models/elohim-agent.model';
 import { vi } from 'vitest';
 
 describe('ElohimAgentService', () => {
@@ -32,8 +37,8 @@ describe('ElohimAgentService', () => {
 
   beforeEach(() => {
     mockDataLoader = {
-    getAgentIndex: vi.fn(),
-  };
+      getAgentIndex: vi.fn(),
+    };
     mockDataLoader.getAgentIndex.mockReturnValue(
       of({
         agents: [
@@ -54,10 +59,7 @@ describe('ElohimAgentService', () => {
     );
 
     TestBed.configureTestingModule({
-      providers: [
-        ElohimAgentService,
-        { provide: DataLoaderService, useValue: mockDataLoader },
-      ],
+      providers: [ElohimAgentService, { provide: DataLoaderService, useValue: mockDataLoader }],
     });
 
     service = TestBed.inject(ElohimAgentService);
@@ -118,42 +120,46 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('getElohimIndex', () => {
-    it('should return observable of Elohim index entries', () => new Promise<void>(done => {
-      service.getElohimIndex().subscribe((index) => {
-        expect(index).toBeDefined();
-        expect(Array.isArray(index)).toBe(true);
-        done();
-      });
-    }));
+    it('should return observable of Elohim index entries', () =>
+      new Promise<void>(done => {
+        service.getElohimIndex().subscribe(index => {
+          expect(index).toBeDefined();
+          expect(Array.isArray(index)).toBe(true);
+          done();
+        });
+      }));
 
-    it('should filter only elohim agents', () => new Promise<void>(done => {
-      service.getElohimIndex().subscribe((index) => {
-        expect(index.length).toBeGreaterThan(0);
-        expect(index[0].id).toBe('elohim-1');
-        done();
-      });
-    }));
+    it('should filter only elohim agents', () =>
+      new Promise<void>(done => {
+        service.getElohimIndex().subscribe(index => {
+          expect(index.length).toBeGreaterThan(0);
+          expect(index[0].id).toBe('elohim-1');
+          done();
+        });
+      }));
 
-    it('should return index with required fields', () => new Promise<void>(done => {
-      service.getElohimIndex().subscribe((index) => {
-        const entry = index[0];
-        expect(entry.id).toBeDefined();
-        expect(entry.displayName).toBeDefined();
-        expect(entry.layer).toBeDefined();
-        expect(entry.capabilities).toBeDefined();
-        expect(entry.visibility).toBeDefined();
-        done();
-      });
-    }));
+    it('should return index with required fields', () =>
+      new Promise<void>(done => {
+        service.getElohimIndex().subscribe(index => {
+          const entry = index[0];
+          expect(entry.id).toBeDefined();
+          expect(entry.displayName).toBeDefined();
+          expect(entry.layer).toBeDefined();
+          expect(entry.capabilities).toBeDefined();
+          expect(entry.visibility).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should return empty array when no Elohim available', () => new Promise<void>(done => {
-      mockDataLoader.getAgentIndex.mockReturnValue(of({ agents: [] }));
+    it('should return empty array when no Elohim available', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getAgentIndex.mockReturnValue(of({ agents: [] }));
 
-      service.getElohimIndex().subscribe((index) => {
-        expect(index).toEqual([]);
-        done();
-      });
-    }));
+        service.getElohimIndex().subscribe(index => {
+          expect(index).toEqual([]);
+          done();
+        });
+      }));
   });
 
   // ===========================================================================
@@ -161,51 +167,56 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('getElohim', () => {
-    it('should return Elohim by ID', () => new Promise<void>(done => {
-      service.getElohim('elohim-1').subscribe((elohim) => {
-        expect(elohim).toBeDefined();
-        expect(elohim?.id).toBe('elohim-1');
-        done();
-      });
-    }));
+    it('should return Elohim by ID', () =>
+      new Promise<void>(done => {
+        service.getElohim('elohim-1').subscribe(elohim => {
+          expect(elohim).toBeDefined();
+          expect(elohim?.id).toBe('elohim-1');
+          done();
+        });
+      }));
 
-    it('should return Elohim with full agent data', () => new Promise<void>(done => {
-      service.getElohim('elohim-1').subscribe((elohim) => {
-        expect(elohim?.displayName).toBe('Wisdom Guardian');
-        expect(elohim?.layer).toBe('family');
-        expect(elohim?.bio).toBeDefined();
-        expect(elohim?.capabilities).toBeDefined();
-        done();
-      });
-    }));
+    it('should return Elohim with full agent data', () =>
+      new Promise<void>(done => {
+        service.getElohim('elohim-1').subscribe(elohim => {
+          expect(elohim?.displayName).toBe('Wisdom Guardian');
+          expect(elohim?.layer).toBe('family');
+          expect(elohim?.bio).toBeDefined();
+          expect(elohim?.capabilities).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should return null for non-existent Elohim', () => new Promise<void>(done => {
-      service.getElohim('nonexistent').subscribe((elohim) => {
-        expect(elohim).toBeNull();
-        done();
-      });
-    }));
+    it('should return null for non-existent Elohim', () =>
+      new Promise<void>(done => {
+        service.getElohim('nonexistent').subscribe(elohim => {
+          expect(elohim).toBeNull();
+          done();
+        });
+      }));
 
-    it('should cache Elohim after first fetch', () => new Promise<void>(done => {
-      service.getElohim('elohim-1').subscribe(() => {
-        expect(mockDataLoader.getAgentIndex).toHaveBeenCalledTimes(1);
-
-        // Second call should use cache
+    it('should cache Elohim after first fetch', () =>
+      new Promise<void>(done => {
         service.getElohim('elohim-1').subscribe(() => {
           expect(mockDataLoader.getAgentIndex).toHaveBeenCalledTimes(1);
-          done();
-        });
-      });
-    }));
 
-    it('should not cache non-existent Elohim', () => new Promise<void>(done => {
-      service.getElohim('nonexistent').subscribe(() => {
-        service.getElohim('nonexistent').subscribe(() => {
-          expect(mockDataLoader.getAgentIndex).toHaveBeenCalledTimes(2);
-          done();
+          // Second call should use cache
+          service.getElohim('elohim-1').subscribe(() => {
+            expect(mockDataLoader.getAgentIndex).toHaveBeenCalledTimes(1);
+            done();
+          });
         });
-      });
-    }));
+      }));
+
+    it('should not cache non-existent Elohim', () =>
+      new Promise<void>(done => {
+        service.getElohim('nonexistent').subscribe(() => {
+          service.getElohim('nonexistent').subscribe(() => {
+            expect(mockDataLoader.getAgentIndex).toHaveBeenCalledTimes(2);
+            done();
+          });
+        });
+      }));
   });
 
   // ===========================================================================
@@ -213,92 +224,94 @@ describe('ElohimAgentService', () => {
   // ===========================================================================
 
   describe('selectElohim', () => {
-    it('should select Elohim by capability', () => new Promise<void>(done => {
-      service.selectElohim({ capability: 'content-safety-review' }).subscribe((elohim) => {
-        expect(elohim).toBeDefined();
-        expect(elohim?.id).toBe('elohim-1');
-        done();
-      });
-    }));
+    it('should select Elohim by capability', () =>
+      new Promise<void>(done => {
+        service.selectElohim({ capability: 'content-safety-review' }).subscribe(elohim => {
+          expect(elohim).toBeDefined();
+          expect(elohim?.id).toBe('elohim-1');
+          done();
+        });
+      }));
 
-    it('should return null if no Elohim has capability', () => new Promise<void>(done => {
-      service
-        .selectElohim({ capability: 'unknown-capability' as any })
-        .subscribe((elohim) => {
+    it('should return null if no Elohim has capability', () =>
+      new Promise<void>(done => {
+        service.selectElohim({ capability: 'unknown-capability' as any }).subscribe(elohim => {
           expect(elohim).toBeNull();
           done();
         });
-    }));
+      }));
 
-    it('should prefer specified layer', () => new Promise<void>(done => {
-      mockDataLoader.getAgentIndex.mockReturnValue(
-        of({
-          agents: [
-            {
-              id: 'elohim-family',
-              type: 'elohim',
-              displayName: 'Family Guardian',
-              layer: 'family',
-              capabilities: ['content-safety-review'],
-              visibility: 'public',
-            },
-            {
-              id: 'elohim-global',
-              type: 'elohim',
-              displayName: 'Global Guardian',
-              layer: 'global',
-              capabilities: ['content-safety-review'],
-              visibility: 'public',
-            },
-          ],
-        } as any)
-      );
+    it('should prefer specified layer', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getAgentIndex.mockReturnValue(
+          of({
+            agents: [
+              {
+                id: 'elohim-family',
+                type: 'elohim',
+                displayName: 'Family Guardian',
+                layer: 'family',
+                capabilities: ['content-safety-review'],
+                visibility: 'public',
+              },
+              {
+                id: 'elohim-global',
+                type: 'elohim',
+                displayName: 'Global Guardian',
+                layer: 'global',
+                capabilities: ['content-safety-review'],
+                visibility: 'public',
+              },
+            ],
+          } as any)
+        );
 
-      service
-        .selectElohim({
-          capability: 'content-safety-review',
-          preferredLayer: 'global',
-        })
-        .subscribe((elohim) => {
-          expect(elohim?.layer).toBe('global');
-          done();
-        });
-    }));
+        service
+          .selectElohim({
+            capability: 'content-safety-review',
+            preferredLayer: 'global',
+          })
+          .subscribe(elohim => {
+            expect(elohim?.layer).toBe('global');
+            done();
+          });
+      }));
 
-    it('should prefer family layer for family context', () => new Promise<void>(done => {
-      mockDataLoader.getAgentIndex.mockReturnValue(
-        of({
-          agents: [
-            {
-              id: 'elohim-family',
-              type: 'elohim',
-              displayName: 'Family Guardian',
-              layer: 'family',
-              capabilities: ['content-safety-review'],
-              visibility: 'public',
-            },
-            {
-              id: 'elohim-global',
-              type: 'elohim',
-              displayName: 'Global Guardian',
-              layer: 'global',
-              capabilities: ['content-safety-review'],
-              visibility: 'public',
-            },
-          ],
-        } as any)
-      );
+    it('should prefer family layer for family context', () =>
+      new Promise<void>(done => {
+        mockDataLoader.getAgentIndex.mockReturnValue(
+          of({
+            agents: [
+              {
+                id: 'elohim-family',
+                type: 'elohim',
+                displayName: 'Family Guardian',
+                layer: 'family',
+                capabilities: ['content-safety-review'],
+                visibility: 'public',
+              },
+              {
+                id: 'elohim-global',
+                type: 'elohim',
+                displayName: 'Global Guardian',
+                layer: 'global',
+                capabilities: ['content-safety-review'],
+                visibility: 'public',
+              },
+            ],
+          } as any)
+        );
 
-      service
-        .selectElohim({
-          capability: 'content-safety-review',
-          contextFamilyId: 'family-123',
-        })
-        .subscribe((elohim) => {
-          expect(elohim?.layer).toBe('family');
-          done();
-        });
-    }));
+        service
+          .selectElohim({
+            capability: 'content-safety-review',
+            contextFamilyId: 'family-123',
+          })
+          .subscribe(elohim => {
+            expect(elohim?.layer).toBe('family');
+            done();
+          });
+      }));
   });
 
   // ===========================================================================
@@ -388,7 +401,7 @@ describe('ElohimAgentService', () => {
       };
 
       let response: ElohimResponse | undefined;
-      service.invoke(request).subscribe((r) => {
+      service.invoke(request).subscribe(r => {
         response = r;
       });
 
@@ -429,7 +442,7 @@ describe('ElohimAgentService', () => {
       };
 
       let response: ElohimResponse | undefined;
-      service.invoke(request).subscribe((r) => {
+      service.invoke(request).subscribe(r => {
         response = r;
       });
 
@@ -490,9 +503,7 @@ describe('ElohimAgentService', () => {
     });
 
     it('should set correct capability', fakeAsync(() => {
-      service
-        .requestAttestationRecommendation('content-123', 'fact-check', 'user-123')
-        .subscribe();
+      service.requestAttestationRecommendation('content-123', 'fact-check', 'user-123').subscribe();
 
       tick(2000);
 
@@ -502,12 +513,7 @@ describe('ElohimAgentService', () => {
 
     it('should include optional evidence', fakeAsync(() => {
       service
-        .requestAttestationRecommendation(
-          'content-123',
-          'fact-check',
-          'user-123',
-          'peer reviewed'
-        )
+        .requestAttestationRecommendation('content-123', 'fact-check', 'user-123', 'peer reviewed')
         .subscribe();
 
       tick(2000);

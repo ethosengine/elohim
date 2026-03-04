@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 // @coverage: 99.0% (2026-02-24)
@@ -100,7 +100,7 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly governanceService: GovernanceService) {}
+  private readonly governanceService = inject(GovernanceService);
 
   ngOnInit(): void {
     this.loadExistingVote();

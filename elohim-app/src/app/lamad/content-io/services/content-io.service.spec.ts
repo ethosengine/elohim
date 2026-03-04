@@ -53,11 +53,9 @@ describe('ContentIOService', () => {
     canImport: false,
     canExport: true,
     canValidate: false,
-    import: vi.fn()
-      .mockImplementation(() => Promise.reject(new Error('Not supported'))),
+    import: vi.fn().mockImplementation(() => Promise.reject(new Error('Not supported'))),
     export: vi.fn().mockReturnValue(Promise.resolve('exported')),
-    validate: vi.fn()
-      .mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+    validate: vi.fn().mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({
       formatId: 'readonly',
       displayName: 'Read Only',
@@ -74,13 +72,13 @@ describe('ContentIOService', () => {
 
   beforeEach(() => {
     const registrySpyObj = {
-    detectFormat: vi.fn(),
-    detectFormatFromContent: vi.fn(),
-    getPlugin: vi.fn(),
-    getImportableFormats: vi.fn(),
-    getExportableFormats: vi.fn(),
-    getExportableFormatsForContent: vi.fn(),
-  };
+      detectFormat: vi.fn(),
+      detectFormatFromContent: vi.fn(),
+      getPlugin: vi.fn(),
+      getImportableFormats: vi.fn(),
+      getExportableFormats: vi.fn(),
+      getExportableFormatsForContent: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -90,9 +88,9 @@ describe('ContentIOService', () => {
     });
 
     service = TestBed.inject(ContentIOService);
-    registrySpy = TestBed.inject(
-      ContentFormatRegistryService
-    ) as { [K in keyof ContentFormatRegistryService]?: Mock };
+    registrySpy = TestBed.inject(ContentFormatRegistryService) as {
+      [K in keyof ContentFormatRegistryService]?: Mock;
+    };
 
     // Default spy returns
     registrySpy.getPlugin.mockReturnValue(mockPlugin as ContentFormatPlugin);
@@ -118,7 +116,9 @@ describe('ContentIOService', () => {
       registrySpy.detectFormat.mockReturnValue(Promise.resolve(null));
       const file = new File(['unknown'], 'test.xyz', { type: 'application/octet-stream' });
 
-      await await expect(service.importFile(file)).rejects.toThrow('Cannot detect format for file: test.xyz');
+      await await expect(service.importFile(file)).rejects.toThrow(
+        'Cannot detect format for file: test.xyz'
+      );
     });
   });
 
@@ -137,14 +137,18 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.mockReturnValue(undefined);
       const file = new File(['content'], 'test.xyz');
 
-      await await expect(service.importFileAs(file, 'unknown')).rejects.toThrow('No plugin found for format: unknown');
+      await await expect(service.importFileAs(file, 'unknown')).rejects.toThrow(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support import', async () => {
       registrySpy.getPlugin.mockReturnValue(mockPluginNoImport as ContentFormatPlugin);
       const file = new File(['content'], 'test.ro');
 
-      await await expect(service.importFileAs(file, 'readonly')).rejects.toThrow("Plugin 'readonly' does not support import");
+      await await expect(service.importFileAs(file, 'readonly')).rejects.toThrow(
+        "Plugin 'readonly' does not support import"
+      );
     });
   });
 
@@ -159,13 +163,17 @@ describe('ContentIOService', () => {
     it('should throw error if plugin not found', async () => {
       registrySpy.getPlugin.mockReturnValue(undefined);
 
-      await await expect(service.importString('content', 'unknown')).rejects.toThrow('No plugin found for format: unknown');
+      await await expect(service.importString('content', 'unknown')).rejects.toThrow(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support import', async () => {
       registrySpy.getPlugin.mockReturnValue(mockPluginNoImport as ContentFormatPlugin);
 
-      await await expect(service.importString('content', 'readonly')).rejects.toThrow("Plugin 'readonly' does not support import");
+      await await expect(service.importString('content', 'readonly')).rejects.toThrow(
+        "Plugin 'readonly' does not support import"
+      );
     });
   });
 
@@ -180,7 +188,9 @@ describe('ContentIOService', () => {
     it('should throw error if format cannot be detected', async () => {
       registrySpy.detectFormatFromContent.mockReturnValue(null);
 
-      await await expect(service.importStringAutoDetect('unknown')).rejects.toThrow('Cannot detect format from content');
+      await await expect(service.importStringAutoDetect('unknown')).rejects.toThrow(
+        'Cannot detect format from content'
+      );
     });
   });
 
@@ -197,7 +207,9 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.mockReturnValue(undefined);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'unknown' };
 
-      await await expect(service.exportToFormat(node, 'unknown')).rejects.toThrow('No plugin found for format: unknown');
+      await await expect(service.exportToFormat(node, 'unknown')).rejects.toThrow(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support export', async () => {
@@ -205,7 +217,9 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.mockReturnValue(noExportPlugin as ContentFormatPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
-      await await expect(service.exportToFormat(node, 'markdown')).rejects.toThrow("Plugin 'markdown' does not support export");
+      await await expect(service.exportToFormat(node, 'markdown')).rejects.toThrow(
+        "Plugin 'markdown' does not support export"
+      );
     });
 
     it('should return Blob directly if export returns Blob', async () => {
@@ -236,7 +250,9 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.mockReturnValue(undefined);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'unknown' };
 
-      await await expect(service.exportToString(node, 'unknown')).rejects.toThrow('No plugin found for format: unknown');
+      await await expect(service.exportToString(node, 'unknown')).rejects.toThrow(
+        'No plugin found for format: unknown'
+      );
     });
   });
 

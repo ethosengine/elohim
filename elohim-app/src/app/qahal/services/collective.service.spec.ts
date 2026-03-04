@@ -11,7 +11,11 @@ import { provideHttpClient } from '@angular/common/http';
 
 import { CollectiveService } from './collective.service';
 
-import type { CollectiveParticipationView, CollectiveView, CreateCollectiveInputView } from '@elohim/storage-client';
+import type {
+  CollectiveParticipationView,
+  CollectiveView,
+  CreateCollectiveInputView,
+} from '@elohim/storage-client';
 
 describe('CollectiveService', () => {
   let service: CollectiveService;

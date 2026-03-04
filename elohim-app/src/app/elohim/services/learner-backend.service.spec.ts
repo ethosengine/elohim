@@ -81,9 +81,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on zome call failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.initializeMastery('content-123');
 
@@ -91,9 +89,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when zome returns no data', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: null })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.initializeMastery('content-123');
 
@@ -130,9 +126,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on engagement failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.recordEngagement({
         content_id: 'content-123',
@@ -177,9 +171,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on assessment failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.recordAssessment({
         content_id: 'content-123',
@@ -219,9 +211,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when mastery not found', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMyMastery('content-123');
 
@@ -252,9 +242,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMyAllMastery();
 
@@ -262,9 +250,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: null })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.getMyAllMastery();
 
@@ -300,9 +286,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMasteryBatch(['c1', 'c2']);
 
@@ -334,9 +318,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when overview not available', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getPathMasteryOverview('path-1');
 
@@ -368,9 +350,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when stats unavailable', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMyMasteryStats();
 
@@ -404,9 +384,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on privilege check failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.checkPrivilege({
         content_id: 'content-123',
@@ -447,9 +425,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on pool creation failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getOrCreatePracticePool({
         contributing_path_ids: ['path-1'],
@@ -483,9 +459,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on refresh failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.refreshPracticePool();
 
@@ -517,9 +491,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on add failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.addPathToPool('path-1');
 
@@ -551,9 +523,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on recommendation failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getPoolRecommendations();
 
@@ -585,9 +555,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on cooldown check failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.checkChallengeCooldown();
 
@@ -625,9 +593,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on challenge start failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.startMasteryChallenge({
         question_count: 5,
@@ -649,7 +615,13 @@ describe('LearnerBackendService', () => {
       const submitInput = {
         challenge_id: 'challenge-1',
         responses: [
-          { content_id: 'c1', question_index: 0, response: 'A', correct: true, time_taken_ms: 5000 },
+          {
+            content_id: 'c1',
+            question_index: 0,
+            response: 'A',
+            correct: true,
+            time_taken_ms: 5000,
+          },
         ],
         actual_time_seconds: 120,
       };
@@ -670,9 +642,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on challenge submission failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.submitMasteryChallenge({
         challenge_id: 'challenge-1',
@@ -707,9 +677,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on history fetch failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getChallengeHistory();
 
@@ -717,9 +685,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: null })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.getChallengeHistory();
 
@@ -760,9 +726,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on point earning failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.earnLamadPoints({
         trigger: 'engagement_practice' as const,
@@ -797,9 +761,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on balance fetch failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMyLamadPointBalance();
 
@@ -864,9 +826,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on history fetch failure', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: false })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getMyLamadPointHistory();
 
@@ -874,9 +834,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.mockReturnValue(
-        Promise.resolve({ success: true, data: null })
-      );
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.getMyLamadPointHistory();
 

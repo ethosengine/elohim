@@ -10,7 +10,7 @@
  * Uses StorageApiService for HTTP communication with elohim-storage.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -31,7 +31,7 @@ import {
   providedIn: 'root',
 })
 export class HumanRelationshipService {
-  constructor(private readonly storageApi: StorageApiService) {}
+  private readonly storageApi = inject(StorageApiService);
 
   // ===========================================================================
   // Query Methods

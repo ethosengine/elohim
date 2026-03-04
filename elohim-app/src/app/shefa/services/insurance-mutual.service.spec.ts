@@ -15,17 +15,16 @@ describe('InsuranceMutualService', () => {
 
   beforeEach(() => {
     mockEconomic = {
-    createEvent: vi.fn(),
-    getEventsForAgent: vi.fn(),
-  };
-    mockEconomic.createEvent.mockReturnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
+      createEvent: vi.fn(),
+      getEventsForAgent: vi.fn(),
+    };
+    mockEconomic.createEvent.mockReturnValue(
+      of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any)
+    );
     mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
     TestBed.configureTestingModule({
-      providers: [
-        InsuranceMutualService,
-        { provide: EconomicService, useValue: mockEconomic }
-      ],
+      providers: [InsuranceMutualService, { provide: EconomicService, useValue: mockEconomic }],
     });
     service = TestBed.inject(InsuranceMutualService);
   });
@@ -89,7 +88,9 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.updateCoveragePolicy('member-1', {}, 'individual')).rejects.toBeDefined();
+      await expect(
+        service.updateCoveragePolicy('member-1', {}, 'individual')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -122,13 +123,15 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should throw error when coverage policy not found', async () => {
-      await expect(service.fileClaim('member-1', 'policy-1', {
+      await expect(
+        service.fileClaim('member-1', 'policy-1', {
           lossType: 'health',
           lossDate: new Date().toISOString(),
           description: 'Test claim',
           estimatedLossAmount: { hasNumericalValue: 5000, hasUnit: 'token' },
           observerAttestationIds: [],
-        })).rejects.toThrow(/not yet implemented/i);
+        })
+      ).rejects.toThrow(/not yet implemented/i);
     });
   });
 
@@ -258,7 +261,10 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should return empty array', async () => {
-      const result = await service.getHighValueClaims({ hasNumericalValue: 50000, hasUnit: 'token' });
+      const result = await service.getHighValueClaims({
+        hasNumericalValue: 50000,
+        hasUnit: 'token',
+      });
       expect(result).toEqual([]);
     });
   });
@@ -293,20 +299,22 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should throw error when claim not found', async () => {
-      await expect(service.adjustClaim('claim-1', 'adjuster-1', {
-        constitutionalCitation: 'coverage-policy.md',
-        plainLanguageExplanation: 'Approved',
-        generosityInterpretationApplied: false,
-        determinations: {
-          coverageApplies: true,
-          policyCoverageAmount: { hasNumericalValue: 10000, hasUnit: 'token' },
-          verifiedLossAmount: { hasNumericalValue: 5000, hasUnit: 'token' },
-          deductibleApplied: { hasNumericalValue: 500, hasUnit: 'token' },
-          coinsuranceApplied: { hasNumericalValue: 0, hasUnit: 'token' },
-          outOfPocketMaximumMet: false,
-          finalApprovedAmount: { hasNumericalValue: 4500, hasUnit: 'token' }
-        }
-      } as any)).rejects.toThrow(/not found/);
+      await expect(
+        service.adjustClaim('claim-1', 'adjuster-1', {
+          constitutionalCitation: 'coverage-policy.md',
+          plainLanguageExplanation: 'Approved',
+          generosityInterpretationApplied: false,
+          determinations: {
+            coverageApplies: true,
+            policyCoverageAmount: { hasNumericalValue: 10000, hasUnit: 'token' },
+            verifiedLossAmount: { hasNumericalValue: 5000, hasUnit: 'token' },
+            deductibleApplied: { hasNumericalValue: 500, hasUnit: 'token' },
+            coinsuranceApplied: { hasNumericalValue: 0, hasUnit: 'token' },
+            outOfPocketMaximumMet: false,
+            finalApprovedAmount: { hasNumericalValue: 4500, hasUnit: 'token' },
+          },
+        } as any)
+      ).rejects.toThrow(/not found/);
     });
   });
 
@@ -339,7 +347,13 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should throw error when claim not found', async () => {
-      await expect(service.settleClaim('claim-1', { hasNumericalValue: 5000, hasUnit: 'token' }, 'mutual-credit')).rejects.toThrow(/not found/);
+      await expect(
+        service.settleClaim(
+          'claim-1',
+          { hasNumericalValue: 5000, hasUnit: 'token' },
+          'mutual-credit'
+        )
+      ).rejects.toThrow(/not found/);
     });
   });
 
@@ -350,7 +364,9 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.appealClaimDecision('claim-1', 'member-1', 'Disagree with decision')).rejects.toBeDefined();
+      await expect(
+        service.appealClaimDecision('claim-1', 'member-1', 'Disagree with decision')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -361,7 +377,9 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.resolveAppeal('claim-1', 'adjuster-1', 'upheld', 'Confirmed')).rejects.toBeDefined();
+      await expect(
+        service.resolveAppeal('claim-1', 'adjuster-1', 'upheld', 'Confirmed')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -372,7 +390,9 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.recordRiskMitigation('member-1', 'health', 'attestation-1', 'completed-course')).rejects.toBeDefined();
+      await expect(
+        service.recordRiskMitigation('member-1', 'health', 'attestation-1', 'completed-course')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -394,7 +414,9 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.flagClaimForGovernanceReview('claim-1', 'large-claim')).rejects.toBeDefined();
+      await expect(
+        service.flagClaimForGovernanceReview('claim-1', 'large-claim')
+      ).rejects.toBeDefined();
     });
   });
 
@@ -460,7 +482,14 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should reject with not implemented error', async () => {
-      await expect(service.recordPremiumPayment('member-1', { hasNumericalValue: 500, hasUnit: 'token' }, 'mutual-credit', { from: '2026-01-01', to: '2027-01-01' })).rejects.toBeDefined();
+      await expect(
+        service.recordPremiumPayment(
+          'member-1',
+          { hasNumericalValue: 500, hasUnit: 'token' },
+          'mutual-credit',
+          { from: '2026-01-01', to: '2027-01-01' }
+        )
+      ).rejects.toBeDefined();
     });
   });
 

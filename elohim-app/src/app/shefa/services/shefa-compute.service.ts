@@ -19,7 +19,7 @@
  * running a DNA migration.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 36.0% (2026-02-24)
 
@@ -295,11 +295,9 @@ export class ShefaComputeService {
   private static readonly EVENT_TYPE_TOKEN_DECAYED = 'token-decayed';
   private static readonly HELP_FLOW_URL = '/shefa/help-flow/compute-needs';
 
-  constructor(
-    private readonly holochain: HolochainClientService,
-    private readonly economicService: EconomicService,
-    private readonly stewaredResources: StewardedResourceService
-  ) {}
+  private readonly holochain = inject(HolochainClientService);
+  private readonly economicService = inject(EconomicService);
+  private readonly stewaredResources = inject(StewardedResourceService);
 
   /**
    * Initialize dashboard for a specific operator and node

@@ -41,20 +41,20 @@ describe('TransactionImportService', () => {
 
   beforeEach(() => {
     mockPlaid = {
-    fetchTransactions: vi.fn(),
-  };
+      fetchTransactions: vi.fn(),
+    };
     mockDuplicates = {
-    filterDuplicates: vi.fn(),
-  };
+      filterDuplicates: vi.fn(),
+    };
     mockCategorization = {
-    categorizeBatch: vi.fn(),
-  };
+      categorizeBatch: vi.fn(),
+    };
     mockEventFactory = {
-    createFromStaged: vi.fn(),
-  };
+      createFromStaged: vi.fn(),
+    };
     mockBudgetReconciliation = {
-    reconcileBudget: vi.fn(),
-  };
+      reconcileBudget: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -78,16 +78,17 @@ describe('TransactionImportService', () => {
   // ==========================================================================
 
   describe('observables', () => {
-    it('should provide progress observable', () => new Promise<void>(done => {
-      const progress$ = service.getProgress$();
-      expect(progress$).toBeDefined();
+    it('should provide progress observable', () =>
+      new Promise<void>(done => {
+        const progress$ = service.getProgress$();
+        expect(progress$).toBeDefined();
 
-      progress$.subscribe(progress => {
-        expect(progress.stage).toBe('created');
-        expect(progress.progress).toBe(0);
-        done();
-      });
-    }));
+        progress$.subscribe(progress => {
+          expect(progress.stage).toBe('created');
+          expect(progress.progress).toBe(0);
+          done();
+        });
+      }));
 
     it('should provide errors observable', () => {
       const errors$ = service.getErrors$();
@@ -125,9 +126,7 @@ describe('TransactionImportService', () => {
 
       mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(mockPlaidTransactions));
       mockDuplicates.filterDuplicates.mockReturnValue(mockPlaidTransactions);
-      mockCategorization.categorizeBatch.mockReturnValue(
-        mockCategorizationResponse as any
-      );
+      mockCategorization.categorizeBatch.mockReturnValue(mockCategorizationResponse as any);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -206,9 +205,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should propagate errors from Plaid fetch', async () => {
-      mockPlaid.fetchTransactions.mockReturnValue(
-        Promise.reject(new Error('Plaid API error'))
-      );
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.reject(new Error('Plaid API error')));
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -402,7 +399,9 @@ describe('TransactionImportService', () => {
     });
 
     it('should throw error for non-existent transaction', async () => {
-      await await expect(service.approveTransaction('non-existent-id')).rejects.toThrow(/not found/);
+      await await expect(service.approveTransaction('non-existent-id')).rejects.toThrow(
+        /not found/
+      );
     });
 
     it('should handle idempotent approval', async () => {
@@ -422,7 +421,9 @@ describe('TransactionImportService', () => {
         Promise.reject(new Error('Event creation failed'))
       );
 
-      await await expect(service.approveTransaction(stagedId)).rejects.toThrow(/Event creation failed/);
+      await await expect(service.approveTransaction(stagedId)).rejects.toThrow(
+        /Event creation failed/
+      );
     });
   });
 
@@ -605,7 +606,9 @@ describe('TransactionImportService', () => {
     });
 
     it('should throw error when updating non-existent transaction', async () => {
-      await await expect(service.updateStagedTransactionCategory('non-existent', 'Category')).rejects.toThrow(/not found/);
+      await await expect(
+        service.updateStagedTransactionCategory('non-existent', 'Category')
+      ).rejects.toThrow(/not found/);
     });
   });
 
@@ -704,24 +707,25 @@ describe('TransactionImportService', () => {
   // ==========================================================================
 
   describe('error handling', () => {
-    it('should emit error on progress stream', () => new Promise<void>(done => {
-      mockPlaid.fetchTransactions.mockReturnValue(Promise.reject(new Error('API Error')));
+    it('should emit error on progress stream', () =>
+      new Promise<void>(done => {
+        mockPlaid.fetchTransactions.mockReturnValue(Promise.reject(new Error('API Error')));
 
-      service.getErrors$().subscribe(error => {
-        expect(error.stage).toBe('pipeline');
-        expect(error.error).toContain('API Error');
-        done();
-      });
+        service.getErrors$().subscribe(error => {
+          expect(error.stage).toBe('pipeline');
+          expect(error.error).toContain('API Error');
+          done();
+        });
 
-      const request: ImportRequest = {
-        connectionId: 'conn-1',
-        dateRange: { start: '2024-01-01', end: '2024-01-31' },
-      };
+        const request: ImportRequest = {
+          connectionId: 'conn-1',
+          dateRange: { start: '2024-01-01', end: '2024-01-31' },
+        };
 
-      service.executeImport(request).catch(() => {
-        // Expected to fail
-      });
-    }));
+        service.executeImport(request).catch(() => {
+          // Expected to fail
+        });
+      }));
   });
 
   // ==========================================================================
@@ -790,11 +794,7 @@ describe('TransactionImportService', () => {
 // Test Helpers
 // ==========================================================================
 
-function createMockPlaidTransaction(
-  id: string,
-  amount: number,
-  name: string
-): PlaidTransaction {
+function createMockPlaidTransaction(id: string, amount: number, name: string): PlaidTransaction {
   return {
     transaction_id: id,
     account_id: 'acct-test',

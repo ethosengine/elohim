@@ -18,9 +18,9 @@ describe('OfflineNodeAlertComponent', () => {
 
   beforeEach(async () => {
     mockShefaCompute = {
-    getNodeTopology: vi.fn(),
-    getComputeNeedsAssessment: vi.fn(),
-  };
+      getNodeTopology: vi.fn(),
+      getComputeNeedsAssessment: vi.fn(),
+    };
     mockShefaCompute.getNodeTopology.mockReturnValue(
       of({
         nodes: [],
@@ -51,8 +51,8 @@ describe('OfflineNodeAlertComponent', () => {
     );
 
     mockRouter = {
-    navigate: vi.fn(),
-  };
+      navigate: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [OfflineNodeAlertComponent],

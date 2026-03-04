@@ -14,9 +14,9 @@ describe('ThemeToggleComponent', () => {
 
   beforeEach(async () => {
     mockThemeService = {
-    getTheme: vi.fn(),
-    cycleTheme: vi.fn(),
-  };
+      getTheme: vi.fn(),
+      cycleTheme: vi.fn(),
+    };
     mockThemeService.getTheme.mockReturnValue(of('device'));
 
     await TestBed.configureTestingModule({

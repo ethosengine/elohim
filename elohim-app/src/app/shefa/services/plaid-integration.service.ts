@@ -11,7 +11,7 @@
  */
 
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 34.2% (2026-02-24)
 
@@ -115,7 +115,9 @@ export class PlaidIntegrationService {
   // Webhook event subject
   private readonly webhookReceived = new Subject<PlaidWebhookPayload>();
 
-  constructor(private readonly http: HttpClient) {
+  private readonly http = inject(HttpClient);
+
+  constructor() {
     this.validateEnvironmentConfig();
   }
 

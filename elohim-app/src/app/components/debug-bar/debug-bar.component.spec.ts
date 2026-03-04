@@ -31,53 +31,56 @@ describe('DebugBarComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should show debug bar for staging environment', () => new Promise<void>(done => {
-    vi.spyOn(configService, 'getConfig').mockReturnValue(
-      of({
-        logLevel: 'debug',
-        environment: 'staging',
-      })
-    );
+  it('should show debug bar for staging environment', () =>
+    new Promise<void>(done => {
+      vi.spyOn(configService, 'getConfig').mockReturnValue(
+        of({
+          logLevel: 'debug',
+          environment: 'staging',
+        })
+      );
 
-    component.ngOnInit();
+      component.ngOnInit();
 
-    configService.getConfig().subscribe(() => {
-      expect(component.showDebugBar).toBe(true);
-      expect(component.environmentLabel).toBe('STAGING');
-      done();
-    });
-  }));
+      configService.getConfig().subscribe(() => {
+        expect(component.showDebugBar).toBe(true);
+        expect(component.environmentLabel).toBe('STAGING');
+        done();
+      });
+    }));
 
-  it('should show debug bar for alpha environment', () => new Promise<void>(done => {
-    vi.spyOn(configService, 'getConfig').mockReturnValue(
-      of({
-        logLevel: 'debug',
-        environment: 'alpha',
-      })
-    );
+  it('should show debug bar for alpha environment', () =>
+    new Promise<void>(done => {
+      vi.spyOn(configService, 'getConfig').mockReturnValue(
+        of({
+          logLevel: 'debug',
+          environment: 'alpha',
+        })
+      );
 
-    component.ngOnInit();
+      component.ngOnInit();
 
-    configService.getConfig().subscribe(() => {
-      expect(component.showDebugBar).toBe(true);
-      expect(component.environmentLabel).toBe('ALPHA');
-      done();
-    });
-  }));
+      configService.getConfig().subscribe(() => {
+        expect(component.showDebugBar).toBe(true);
+        expect(component.environmentLabel).toBe('ALPHA');
+        done();
+      });
+    }));
 
-  it('should not show debug bar for production environment', () => new Promise<void>(done => {
-    vi.spyOn(configService, 'getConfig').mockReturnValue(
-      of({
-        logLevel: 'error',
-        environment: 'production',
-      })
-    );
+  it('should not show debug bar for production environment', () =>
+    new Promise<void>(done => {
+      vi.spyOn(configService, 'getConfig').mockReturnValue(
+        of({
+          logLevel: 'error',
+          environment: 'production',
+        })
+      );
 
-    component.ngOnInit();
+      component.ngOnInit();
 
-    configService.getConfig().subscribe(() => {
-      expect(component.showDebugBar).toBe(false);
-      done();
-    });
-  }));
+      configService.getConfig().subscribe(() => {
+        expect(component.showDebugBar).toBe(false);
+        done();
+      });
+    }));
 });

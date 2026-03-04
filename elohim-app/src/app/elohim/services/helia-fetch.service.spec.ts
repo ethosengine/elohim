@@ -22,8 +22,7 @@ describe('HeliaFetchService (mock)', () => {
   let httpMock: HttpTestingController;
 
   const mockStorageClient = {
-    getBlobUrl: vi.fn()
-      .mockImplementation((cid: string) => `http://localhost:8888/store/${cid}`),
+    getBlobUrl: vi.fn().mockImplementation((cid: string) => `http://localhost:8888/store/${cid}`),
   };
 
   /**
@@ -45,7 +44,11 @@ describe('HeliaFetchService (mock)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: StorageClientService, useValue: mockStorageClient }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StorageClientService, useValue: mockStorageClient },
+      ],
     });
     httpMock = TestBed.inject(HttpTestingController);
     service = new MockHeliaFetchService(mockStorageClient);

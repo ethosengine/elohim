@@ -255,10 +255,10 @@ export class DataLoaderService {
   /** Structured logger */
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
-  constructor(
-    private readonly holochainContent: HolochainContentService,
-    private readonly idbCache: IndexedDBCacheService
-  ) {
+  private readonly holochainContent = inject(HolochainContentService);
+  private readonly idbCache = inject(IndexedDBCacheService);
+
+  constructor() {
     // Defer cache initialization until after first render to avoid async in constructor.
     // Conductor is only used for agent-centric data (identity, attestations, points).
     afterNextRender(() => void this.initCaches());

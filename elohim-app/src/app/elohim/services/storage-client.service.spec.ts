@@ -20,8 +20,12 @@ describe('StorageClientService', () => {
     strategySpy.getStorageBaseUrl.mockReturnValue('http://localhost:8888');
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), StorageClientService,
-        { provide: CONNECTION_STRATEGY, useValue: strategySpy },],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        StorageClientService,
+        { provide: CONNECTION_STRATEGY, useValue: strategySpy },
+      ],
     });
 
     service = TestBed.inject(StorageClientService);
@@ -100,7 +104,9 @@ describe('StorageClientService', () => {
       let errorThrown = false;
 
       service.fetchBlob('sha256-missing').subscribe({
-        next: () => { throw new Error('Should have errored'); },
+        next: () => {
+          throw new Error('Should have errored');
+        },
         error: () => {
           errorThrown = true;
         },

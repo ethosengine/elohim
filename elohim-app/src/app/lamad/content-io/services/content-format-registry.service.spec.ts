@@ -36,11 +36,9 @@ describe('ContentFormatRegistryService', () => {
     canValidate: false,
     canRender: true,
     canEdit: false,
-    import: vi.fn()
-      .mockReturnValue(Promise.resolve({ nodes: [], warnings: [] })),
+    import: vi.fn().mockReturnValue(Promise.resolve({ nodes: [], warnings: [] })),
     export: vi.fn().mockReturnValue(Promise.resolve('exported')),
-    validate: vi.fn()
-      .mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+    validate: vi.fn().mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({
       formatId: overrides.formatId ?? 'test-format',
       displayName: overrides.displayName ?? 'Test Format',
@@ -54,8 +52,7 @@ describe('ContentFormatRegistryService', () => {
       category: 'document',
       supportsRoundTrip: true,
     }),
-    getRendererComponent: vi.fn()
-      .mockReturnValue(MockRendererComponent),
+    getRendererComponent: vi.fn().mockReturnValue(MockRendererComponent),
     getRendererPriority: () => 0,
     getEditorComponent: vi.fn().mockReturnValue(null),
     getEditorConfig: vi.fn().mockReturnValue(DEFAULT_EDITOR_CONFIG),

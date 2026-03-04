@@ -211,7 +211,9 @@ describe('DiscoveryAttestationService', () => {
     });
 
     it('should handle localStorage.getItem throwing', () => {
-      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw 'storage unavailable'; });
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw 'storage unavailable';
+      });
       const svc = createService();
       expect(svc.results()).toEqual([]);
       expect(svc.attestations()).toEqual([]);
@@ -363,8 +365,14 @@ describe('DiscoveryAttestationService', () => {
       // latent bug in the format function — tracked separately.
       const autoFeatured: DiscoveryFramework[] = ['enneagram', 'mbti', 'big-five'];
       const notAutoFeatured: DiscoveryFramework[] = [
-        'via-strengths', 'disc', 'love-languages', 'attachment-style',
-        'learning-style', 'political-compass', 'values-hierarchy', 'custom',
+        'via-strengths',
+        'disc',
+        'love-languages',
+        'attachment-style',
+        'learning-style',
+        'political-compass',
+        'values-hierarchy',
+        'custom',
       ];
 
       for (const fw of autoFeatured) {
@@ -971,7 +979,6 @@ describe('DiscoveryAttestationService', () => {
         expect(service.featuredResults().length).toBe(0);
       });
     });
-
   });
 
   // ===========================================================================
@@ -1082,7 +1089,9 @@ describe('DiscoveryAttestationService', () => {
 
   describe('Storage Error Handling', () => {
     it('should handle localStorage write failure silently', () => {
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw 'quota exceeded'; });
+      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw 'quota exceeded';
+      });
       expect(() => recordDefault()).not.toThrow();
       // The result should still be in the signal even if storage failed
       expect(service.results().length).toBe(1);
@@ -1090,7 +1099,9 @@ describe('DiscoveryAttestationService', () => {
     });
 
     it('should handle localStorage read failure on construction silently', () => {
-      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw 'storage unavailable'; });
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw 'storage unavailable';
+      });
       const svc = createService();
       expect(svc.results()).toEqual([]);
       expect(svc.attestations()).toEqual([]);

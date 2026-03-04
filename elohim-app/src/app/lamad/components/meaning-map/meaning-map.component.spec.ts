@@ -73,7 +73,10 @@ describe('MeaningMapComponent', () => {
         distribution: { unseen: 1, low: 0, medium: 1, high: 1 },
         byCategory: new Map([
           ['core', { category: 'core', nodeCount: 2, engagedCount: 2, averageAffinity: 0.6 }],
-          ['deployment', { category: 'deployment', nodeCount: 1, engagedCount: 0, averageAffinity: 0.4 }],
+          [
+            'deployment',
+            { category: 'deployment', nodeCount: 1, engagedCount: 0, averageAffinity: 0.4 },
+          ],
         ]),
         byType: new Map(),
       }),
@@ -263,7 +266,9 @@ describe('MeaningMapComponent', () => {
         },
       ];
 
-      dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: nodesWithoutCategory } as ContentIndex));
+      dataLoaderSpy.getContentIndex.mockReturnValue(
+        of({ nodes: nodesWithoutCategory } as ContentIndex)
+      );
       affinityServiceSpy.getStats.mockReturnValue({
         totalNodes: 1,
         averageAffinity: 0,

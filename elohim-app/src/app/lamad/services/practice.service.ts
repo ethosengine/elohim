@@ -16,7 +16,7 @@
  * - Delegates to LearnerBackendService for zome calls
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -72,7 +72,7 @@ export class PracticeService {
   /** Challenge history */
   readonly challengeHistory$ = this.challengeHistorySubject.asObservable();
 
-  constructor(private readonly backend: LearnerBackendService) {}
+  private readonly backend = inject(LearnerBackendService);
 
   // ===========================================================================
   // Pool Management

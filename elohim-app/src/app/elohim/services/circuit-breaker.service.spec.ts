@@ -23,14 +23,14 @@ describe('CircuitBreakerService', () => {
 
   beforeEach(() => {
     mockChildLogger = {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  };
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
     mockLogger = {
-    createChild: vi.fn(),
-  };
+      createChild: vi.fn(),
+    };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockLogger.createChild.mockReturnValue(mockChildLogger);
 

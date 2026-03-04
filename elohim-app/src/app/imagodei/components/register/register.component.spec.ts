@@ -62,9 +62,7 @@ describe('RegisterComponent', () => {
       canMigrate: signal(false),
       state: signal(null),
     };
-    mockMigrationService.migrate.mockReturnValue(
-      Promise.resolve({ success: true })
-    );
+    mockMigrationService.migrate.mockReturnValue(Promise.resolve({ success: true }));
 
     mockDoorwayRegistry = {
       selectDoorway: vi.fn(),
@@ -315,27 +313,29 @@ describe('RegisterComponent', () => {
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('should get return URL from query params', () => new Promise<void>(resolve => {
-      mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
+    it('should get return URL from query params', () =>
+      new Promise<void>(resolve => {
+        mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/dashboard');
-        resolve();
-      }, 100);
-    }));
+        setTimeout(() => {
+          expect((component as any).returnUrl).toBe('/dashboard');
+          resolve();
+        }, 100);
+      }));
 
-    it('should default return URL to / when not in query params', () => new Promise<void>(resolve => {
-      mockActivatedRoute.queryParams = of({});
+    it('should default return URL to / when not in query params', () =>
+      new Promise<void>(resolve => {
+        mockActivatedRoute.queryParams = of({});
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/');
-        resolve();
-      }, 100);
-    }));
+        setTimeout(() => {
+          expect((component as any).returnUrl).toBe('/');
+          resolve();
+        }, 100);
+      }));
 
     it('should auto-select doorway from environment when none selected', () => {
       // Default mock has hasSelection = signal(false), environment has localhost doorwayUrl
@@ -566,7 +566,7 @@ describe('RegisterComponent', () => {
     it('should set registering state during registration', async () => {
       let resolveRegister: any;
       mockIdentityService.registerHuman.mockReturnValue(
-        new Promise((resolve) => {
+        new Promise(resolve => {
           resolveRegister = resolve;
         })
       );

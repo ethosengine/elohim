@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 // @coverage: 90.9% (2026-02-24)
@@ -17,7 +17,7 @@ export class DebugBarComponent implements OnInit {
   showDebugBar = false;
   environmentLabel = '';
 
-  constructor(private readonly configService: ConfigService) {}
+  private readonly configService = inject(ConfigService);
 
   ngOnInit() {
     this.configService.getConfig().subscribe({

@@ -43,9 +43,7 @@ describe('ShefaHomeComponent', () => {
       testAdminConnection: vi.fn(),
       isConnected: vi.fn(),
     };
-    mockHolochainClient.testAdminConnection.mockReturnValue(
-      Promise.resolve({ success: false })
-    );
+    mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: false }));
     mockHolochainClient.isConnected.mockReturnValue(false);
 
     await TestBed.configureTestingModule({
@@ -100,8 +98,22 @@ describe('ShefaHomeComponent', () => {
   describe('Computed Stats', () => {
     it('should calculate total events count', () => {
       component.events.set([
-        { id: '1', action: 'use', provider: 'a', receiver: 'b', hasPointInTime: '', state: 'validated' },
-        { id: '2', action: 'produce', provider: 'c', receiver: 'd', hasPointInTime: '', state: 'validated' },
+        {
+          id: '1',
+          action: 'use',
+          provider: 'a',
+          receiver: 'b',
+          hasPointInTime: '',
+          state: 'validated',
+        },
+        {
+          id: '2',
+          action: 'produce',
+          provider: 'c',
+          receiver: 'd',
+          hasPointInTime: '',
+          state: 'validated',
+        },
       ] as any);
 
       expect(component.totalEvents()).toBe(2);
@@ -109,8 +121,26 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate total appreciations count', () => {
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'a', appreciationTo: 'b', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '2', appreciationOf: 'y', appreciatedBy: 'c', appreciationTo: 'd', quantityValue: 20, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'a',
+          appreciationTo: 'b',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '2',
+          appreciationOf: 'y',
+          appreciatedBy: 'c',
+          appreciationTo: 'd',
+          quantityValue: 20,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.totalAppreciations()).toBe(2);
@@ -118,12 +148,35 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate unique agents from events and appreciations', () => {
       component.events.set([
-        { id: '1', action: 'use', provider: 'agent-1', receiver: 'agent-2', hasPointInTime: '', state: 'validated' },
-        { id: '2', action: 'produce', provider: 'agent-2', receiver: 'agent-3', hasPointInTime: '', state: 'validated' },
+        {
+          id: '1',
+          action: 'use',
+          provider: 'agent-1',
+          receiver: 'agent-2',
+          hasPointInTime: '',
+          state: 'validated',
+        },
+        {
+          id: '2',
+          action: 'produce',
+          provider: 'agent-2',
+          receiver: 'agent-3',
+          hasPointInTime: '',
+          state: 'validated',
+        },
       ] as any);
 
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'agent-1', appreciationTo: 'agent-4', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'agent-1',
+          appreciationTo: 'agent-4',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.uniqueAgents()).toBe(4);
@@ -131,9 +184,36 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate total recognition points', () => {
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'a', appreciationTo: 'b', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '2', appreciationOf: 'y', appreciatedBy: 'c', appreciationTo: 'd', quantityValue: 25, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '3', appreciationOf: 'z', appreciatedBy: 'e', appreciationTo: 'f', quantityValue: 15, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'a',
+          appreciationTo: 'b',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '2',
+          appreciationOf: 'y',
+          appreciatedBy: 'c',
+          appreciationTo: 'd',
+          quantityValue: 25,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '3',
+          appreciationOf: 'z',
+          appreciatedBy: 'e',
+          appreciationTo: 'f',
+          quantityValue: 15,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.totalRecognition()).toBe(50);
@@ -169,7 +249,10 @@ describe('ShefaHomeComponent', () => {
         }
       }, 5);
       // Timeout safety
-      setTimeout(() => { clearInterval(interval); resolve(); }, 2000);
+      setTimeout(() => {
+        clearInterval(interval);
+        resolve();
+      }, 2000);
     });
   }
 
@@ -177,15 +260,35 @@ describe('ShefaHomeComponent', () => {
     beforeEach(() => {
       mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
       mockEconomicService.isAvailable.mockReturnValue(true);
-      mockEconomicService.getEventsForAgent.mockReturnValue(of([
-        { id: 'event-1', action: 'use', provider: 'p1', receiver: 'r1', hasPointInTime: new Date().toISOString(), state: 'validated' },
-      ] as any));
+      mockEconomicService.getEventsForAgent.mockReturnValue(
+        of([
+          {
+            id: 'event-1',
+            action: 'use',
+            provider: 'p1',
+            receiver: 'r1',
+            hasPointInTime: new Date().toISOString(),
+            state: 'validated',
+          },
+        ] as any)
+      );
 
       mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
       mockAppreciationService.isAvailable.mockReturnValue(true);
-      mockAppreciationService.getAppreciationsFor.mockReturnValue(of([
-        { id: 'app-1', appreciationOf: 'content', appreciatedBy: 'user1', appreciationTo: 'user2', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: new Date().toISOString() },
-      ]));
+      mockAppreciationService.getAppreciationsFor.mockReturnValue(
+        of([
+          {
+            id: 'app-1',
+            appreciationOf: 'content',
+            appreciatedBy: 'user1',
+            appreciationTo: 'user2',
+            quantityValue: 10,
+            quantityUnit: 'points',
+            note: null,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      );
     });
 
     it('should load events when service is available', async () => {
@@ -235,7 +338,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error message when connection fails', async () => {
-      mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Connection failed')));
+      mockEconomicService.testAvailability.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
 
       fixture.detectChanges();
       await waitForLoadData();
@@ -323,7 +428,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should handle exception in testConnection', async () => {
-      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.reject(new Error('Network error')));
+      mockHolochainClient.testAdminConnection.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.testConnection();
 

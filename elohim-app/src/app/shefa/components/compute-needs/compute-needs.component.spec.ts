@@ -16,8 +16,8 @@ describe('ComputeNeedsComponent', () => {
 
   beforeEach(async () => {
     mockShefaCompute = {
-    getComputeNeedsAssessment: vi.fn(),
-  };
+      getComputeNeedsAssessment: vi.fn(),
+    };
     mockShefaCompute.getComputeNeedsAssessment.mockReturnValue(
       of({
         operatorId: 'test-operator',

@@ -117,18 +117,21 @@ describe('UpgradeBannerProvider', () => {
   });
 
   it('should delegate dismissNotice to SessionHumanService', () => {
-    const mockService = TestBed.inject(SessionHumanService) as { [K in keyof SessionHumanService]?: Mock };
+    const mockService = TestBed.inject(SessionHumanService) as {
+      [K in keyof SessionHumanService]?: Mock;
+    };
     provider.dismissNotice('prompt-1');
     expect(mockService.dismissUpgradePrompt).toHaveBeenCalledWith('prompt-1');
   });
 
-  it('should emit on upgradeModalRequested$ when learn-more action is handled', () => new Promise<void>(done => {
-    provider.upgradeModalRequested$.subscribe(() => {
-      done();
-    });
+  it('should emit on upgradeModalRequested$ when learn-more action is handled', () =>
+    new Promise<void>(done => {
+      provider.upgradeModalRequested$.subscribe(() => {
+        done();
+      });
 
-    provider.handleAction('prompt-1', 'learn-more');
-  }));
+      provider.handleAction('prompt-1', 'learn-more');
+    }));
 
   it('should not emit on upgradeModalRequested$ for unknown actions', () => {
     let emitted = false;

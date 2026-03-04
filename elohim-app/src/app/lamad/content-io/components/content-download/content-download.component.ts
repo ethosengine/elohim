@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, Input, inject } from '@angular/core';
 
 // @coverage: 46.7% (2026-02-24)
 
@@ -74,10 +74,8 @@ export class ContentDownloadComponent {
 
   downloading = false;
 
-  constructor(
-    private readonly contentIO: ContentIOService,
-    private readonly registry: ContentFormatRegistryService
-  ) {}
+  private readonly contentIO = inject(ContentIOService);
+  private readonly registry = inject(ContentFormatRegistryService);
 
   /**
    * Whether download is available for this content.

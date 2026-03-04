@@ -49,17 +49,17 @@ describe('ContentEditorService', () => {
 
   beforeEach(() => {
     mockRegistry = {
-    getPlugin: vi.fn(),
-    getEditorComponent: vi.fn(),
-    getEditorConfig: vi.fn(),
-  };
+      getPlugin: vi.fn(),
+      getEditorComponent: vi.fn(),
+      getEditorConfig: vi.fn(),
+    };
     mockRegistry.getPlugin.mockReturnValue(undefined);
     mockRegistry.getEditorComponent.mockReturnValue(null);
     mockRegistry.getEditorConfig.mockReturnValue(DEFAULT_EDITOR_CONFIG);
 
     mockContextAssembly = {
-    assembleAndNegotiate: vi.fn(),
-  };
+      assembleAndNegotiate: vi.fn(),
+    };
     mockContextAssembly.assembleAndNegotiate.mockReturnValue(of(buildAssemblyResult()));
 
     TestBed.configureTestingModule({
@@ -312,7 +312,8 @@ describe('ContentEditorService', () => {
     it('should use plugin validation when available', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
         canValidate: true,
-        validate: vi.fn()
+        validate: vi
+          .fn()
           .mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
       };
       mockRegistry.getPlugin.mockReturnValue(mockPlugin as ContentFormatPlugin);
@@ -337,164 +338,174 @@ describe('ContentEditorService', () => {
   });
 
   describe('saveContent', () => {
-    it('should mark draft as saved', () => new Promise<void>(done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
-      service.updateDraft(draft.id, { title: 'Changed' });
+    it('should mark draft as saved', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+        service.updateDraft(draft.id, { title: 'Changed' });
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.success).toBe(true);
-          expect(draft.isDirty).toBe(false);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(draft.isDirty).toBe(false);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return error for unknown draft', () => new Promise<void>(done => {
-      service.saveContent('nonexistent').subscribe({
-        next: () => done.fail('Should have thrown'),
-        error: err => {
-          expect(err.message).toContain('Draft not found');
-          done();
-        },
-      });
-    }));
+    it('should return error for unknown draft', () =>
+      new Promise<void>(done => {
+        service.saveContent('nonexistent').subscribe({
+          next: () => done.fail('Should have thrown'),
+          error: err => {
+            expect(err.message).toContain('Draft not found');
+            done();
+          },
+        });
+      }));
 
-    it('should return node ID in save result', () => new Promise<void>(done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+    it('should return node ID in save result', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.nodeId).toBe(node.id);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.nodeId).toBe(node.id);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
     // ═════════════════════════════════════════════════════════════════════════
     // Context assembly integration
     // ═════════════════════════════════════════════════════════════════════════
 
-    it('should call assembleAndNegotiate with CreatePayload', () => new Promise<void>(done => {
-      const node = createMockNode({ contentType: 'concept', contentFormat: 'markdown' });
-      const draft = service.createDraft(node);
-      service.updateDraft(draft.id, { title: 'Changed' });
+    it('should call assembleAndNegotiate with CreatePayload', () =>
+      new Promise<void>(done => {
+        const node = createMockNode({ contentType: 'concept', contentFormat: 'markdown' });
+        const draft = service.createDraft(node);
+        service.updateDraft(draft.id, { title: 'Changed' });
 
-      service.saveContent(draft.id).subscribe({
-        next: () => {
-          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              actionType: 'content-create',
-              contentType: 'concept',
-              contentFormat: 'markdown',
-            })
-          );
-          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledTimes(1);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledWith(
+              expect.objectContaining({
+                actionType: 'content-create',
+                contentType: 'concept',
+                contentFormat: 'markdown',
+              })
+            );
+            expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledTimes(1);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should include birthContext in save result', () => new Promise<void>(done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+    it('should include birthContext in save result', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.birthContext).toBeDefined();
-          expect(result.birthContext!.negotiatedReach).toBe('local');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.birthContext).toBeDefined();
+            expect(result.birthContext!.negotiatedReach).toBe('local');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should include contextAssembly in save result', () => new Promise<void>(done => {
-      const assemblyResult = buildAssemblyResult();
-      mockContextAssembly.assembleAndNegotiate.mockReturnValue(of(assemblyResult));
+    it('should include contextAssembly in save result', () =>
+      new Promise<void>(done => {
+        const assemblyResult = buildAssemblyResult();
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(of(assemblyResult));
 
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.contextAssembly).toBe(assemblyResult);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.contextAssembly).toBe(assemblyResult);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should succeed even when assembly fails', () => new Promise<void>(done => {
-      mockContextAssembly.assembleAndNegotiate.mockReturnValue(
-        throwError(() => new Error('Assembly failed'))
-      );
+    it('should succeed even when assembly fails', () =>
+      new Promise<void>(done => {
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(
+          throwError(() => new Error('Assembly failed'))
+        );
 
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.success).toBe(true);
-          expect(result.contextAssembly).toBeUndefined();
-          expect(result.message).toContain('unavailable');
-          done();
-        },
-        error: () => done.fail('Should not error — assembly failure is caught'),
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(result.contextAssembly).toBeUndefined();
+            expect(result.message).toContain('unavailable');
+            done();
+          },
+          error: () => done.fail('Should not error — assembly failure is caught'),
+        });
+      }));
 
-    it('should reflect timeout in message', () => new Promise<void>(done => {
-      mockContextAssembly.assembleAndNegotiate.mockReturnValue(
-        of(buildAssemblyResult({ timedOut: true }))
-      );
+    it('should reflect timeout in message', () =>
+      new Promise<void>(done => {
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(
+          of(buildAssemblyResult({ timedOut: true }))
+        );
 
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.success).toBe(true);
-          expect(result.message).toContain('timed out');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('timed out');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should map requestedReach from draft', () => new Promise<void>(done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
-      draft.requestedReach = 'commons';
+    it('should map requestedReach from draft', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+        draft.requestedReach = 'commons';
 
-      service.saveContent(draft.id).subscribe({
-        next: () => {
-          const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
-          expect(payload.requestedReach).toBe('commons');
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
+            expect(payload.requestedReach).toBe('commons');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should map relatedNodeIds to citedContentIds', () => new Promise<void>(done => {
-      const node = createMockNode({ relatedNodeIds: ['ref-1', 'ref-2'] });
-      const draft = service.createDraft(node);
+    it('should map relatedNodeIds to citedContentIds', () =>
+      new Promise<void>(done => {
+        const node = createMockNode({ relatedNodeIds: ['ref-1', 'ref-2'] });
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: () => {
-          const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
-          expect(payload.citedContentIds).toEqual(['ref-1', 'ref-2']);
-          done();
-        },
-        error: done.fail,
-      });
-    }));
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
+            expect(payload.citedContentIds).toEqual(['ref-1', 'ref-2']);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('exportContent', () => {

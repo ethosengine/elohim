@@ -22,11 +22,7 @@ describe('SeedingService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        SeedingService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [SeedingService, provideHttpClient(), provideHttpClientTesting()],
     });
 
     service = TestBed.inject(SeedingService);

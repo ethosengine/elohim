@@ -89,7 +89,9 @@ describe('BudgetReconciliationService', () => {
         stewardId: 'steward-1',
       });
 
-      await await expect(service.reconcileBudget(staged, 'event-123')).rejects.toThrow(/Budget category non-existent-category not found/);
+      await await expect(service.reconcileBudget(staged, 'event-123')).rejects.toThrow(
+        /Budget category non-existent-category not found/
+      );
     });
 
     it('should calculate variance correctly', async () => {

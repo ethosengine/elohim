@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 96.9% (2026-02-24)
 
@@ -37,10 +37,10 @@ export class ElohimAgentService {
   private readonly elohimCache = new Map<string, ElohimAgent>();
   private requestLog: ElohimRequest[] = [];
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly catalog: ElohimBackendCatalog
-  ) {
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly catalog = inject(ElohimBackendCatalog);
+
+  constructor() {
     // Register MockBackend as default fallback.
     // NativeBackend is registered lazily by ElohimConfigComponent
     // when native backend is selected, to avoid network calls at init time.

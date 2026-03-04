@@ -27,7 +27,7 @@
  * zomes and running a DNA migration.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 83.7% (2026-02-24)
 
@@ -108,10 +108,8 @@ type CategoryComplianceStatus = 'compliant' | 'at-risk' | 'exceeds-ceiling';
   providedIn: 'root',
 })
 export class StewardedResourceService {
-  constructor(
-    private readonly holochain: HolochainClientService,
-    private readonly economicService: EconomicService
-  ) {}
+  private readonly holochain = inject(HolochainClientService);
+  private readonly economicService = inject(EconomicService);
 
   // =========================================================================
   // Resource Creation & Management

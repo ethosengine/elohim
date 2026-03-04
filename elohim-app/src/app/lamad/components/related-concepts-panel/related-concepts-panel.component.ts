@@ -9,6 +9,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   OnDestroy,
+  inject,
 } from '@angular/core';
 
 // @coverage: 87.5% (2026-02-24)
@@ -294,10 +295,8 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly relatedConceptsService: RelatedConceptsService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly relatedConceptsService = inject(RelatedConceptsService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['contentId'] && this.contentId) {

@@ -10,6 +10,7 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
 // @coverage: 48.8% (2026-02-24)
@@ -596,13 +597,11 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   private readonly sophiaWrapper: SophiaWrapperComponent | null = null;
   private pendingRecognition: Recognition | null = null;
 
-  constructor(
-    private readonly streakTracker: StreakTrackerService,
-    private readonly soundService: QuizSoundService,
-    private readonly poolService: QuestionPoolService,
-    private readonly governanceSignalService: GovernanceSignalService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly streakTracker = inject(StreakTrackerService);
+  private readonly soundService = inject(QuizSoundService);
+  private readonly poolService = inject(QuestionPoolService);
+  private readonly governanceSignalService = inject(GovernanceSignalService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadQuestions();
