@@ -32,3 +32,6 @@ export type { LamadEventType, REAAction } from './event.service';
 
 // Device stewardship (unified device view)
 export { DeviceStewardshipService } from './device-stewardship.service';
+
+// Resource explorer (Drive-like resource browsing)
+export { ResourceExplorerService } from './resource-explorer.service';

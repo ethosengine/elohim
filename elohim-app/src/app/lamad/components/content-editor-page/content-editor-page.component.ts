@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 29.3% (2026-02-24)
+// @coverage: 29.3% (2026-03-03)
 
 import { takeUntil, switchMap, catchError } from 'rxjs/operators';
 
@@ -133,7 +133,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
    * Navigate back to the resource view.
    */
   navigateBack(): void {
-    void this.router.navigate(['/lamad/resource', this.resourceId]);
+    void this.router.navigate(['/resource', this.resourceId]);
   }
 
   /**

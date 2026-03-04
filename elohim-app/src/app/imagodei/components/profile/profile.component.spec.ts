@@ -298,7 +298,7 @@ describe('ProfileComponent', () => {
     it('should navigate to resource by contentNodeId', () => {
       component.navigateToResource('content-enneagram-001');
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/resource', 'content-enneagram-001']);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/resource', 'content-enneagram-001']);
     });
   });
 

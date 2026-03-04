@@ -30,7 +30,7 @@ export class EprResolveRedirectComponent implements OnInit {
     const cleaned = uri.replace(/^web\+epr:/, 'epr:');
 
     const ref = parseEpr(cleaned);
-    const appRoute = eprToRoute(ref) ?? ['/lamad/resource', ref.id];
+    const appRoute = eprToRoute(ref) ?? ['/resource', ref.id];
 
     void this.router.navigate(appRoute);
   }

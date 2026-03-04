@@ -1,7 +1,7 @@
 import { Component, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-24)
+// @coverage: 100.0% (2026-03-03)
 
 export interface NavItem {
   label: string;
@@ -23,6 +23,7 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
       { label: 'Accounts', icon: 'account_balance', route: '/shefa/accounts' },
       { label: 'Transactions', icon: 'receipt_long', route: '/shefa/transactions' },
       { label: 'Devices', icon: 'devices', route: '/shefa/devices' },
+      { label: 'Resources', icon: 'folder_open', route: '/shefa/resources' },
     ],
   },
   {

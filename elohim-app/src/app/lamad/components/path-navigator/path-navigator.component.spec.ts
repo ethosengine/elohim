@@ -605,7 +605,7 @@ describe('PathNavigatorComponent', () => {
           detourType: 'related',
         })
       );
-      expect(router.navigate).toHaveBeenCalledWith(['/lamad/resource', 'related-node-1']);
+      expect(router.navigate).toHaveBeenCalledWith(['/resource', 'related-node-1']);
     });
 
     it('should handle explore in graph event', () => {

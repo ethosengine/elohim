@@ -161,7 +161,7 @@ export function eprToRoute(ref: EprRef): string[] | null {
 
   // Path detection: IDs ending with -path or known path IDs
   // Caller should use the content's type to decide; this is a convenience heuristic
-  return ['/lamad/resource', ref.id];
+  return ['/resource', ref.id];
 }
 
 /**

@@ -124,13 +124,13 @@ describe('EprResolverService', () => {
     it('resolves to standalone when no path context', () => {
       const result = service.resolveInContext('epr:rea-foundations', null, []);
       expect(result.resolution).toBe('standalone');
-      expect(result.route).toEqual(['/lamad/resource', 'rea-foundations']);
+      expect(result.route).toEqual(['/resource', 'rea-foundations']);
     });
 
     it('resolves to standalone when target not in current path', () => {
       const result = service.resolveInContext('epr:unknown-content', 'my-path', steps);
       expect(result.resolution).toBe('standalone');
-      expect(result.route).toEqual(['/lamad/resource', 'unknown-content']);
+      expect(result.route).toEqual(['/resource', 'unknown-content']);
     });
 
     it('resolves to cross-path when matches provided', () => {

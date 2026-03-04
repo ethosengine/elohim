@@ -29,7 +29,7 @@ describe('EprLinkComponent', () => {
       tags: ['protocol', 'manifesto'],
     } as any,
     blobUrl: null,
-    route: ['/lamad/resource', 'manifesto'],
+    route: ['/resource', 'manifesto'],
   };
 
   beforeEach(async () => {
@@ -38,7 +38,7 @@ describe('EprLinkComponent', () => {
       resolveUrl: vi.fn().mockReturnValue({
         ref: { id: 'manifesto', tier: 'doc' },
         url: 'https://doorway.host/db/content/manifesto',
-        route: ['/lamad/resource', 'manifesto'],
+        route: ['/resource', 'manifesto'],
       }),
       resolveEprHead: vi.fn().mockReturnValue(of(null)),
     };

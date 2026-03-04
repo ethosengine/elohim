@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 82.9% (2026-02-24)
+// @coverage: 82.9% (2026-03-03)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -864,7 +864,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     });
 
     // Navigate to the content
-    this.router.navigate(['/lamad/resource', contentId]).catch((err: unknown) => {
+    this.router.navigate(['/resource', contentId]).catch((err: unknown) => {
       console.error(NAV_FAILED_MSG, err);
     });
   }

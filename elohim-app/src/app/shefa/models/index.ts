@@ -15,3 +15,6 @@ export * from '@app/elohim/models/contributor-presence.model';
 
 // Device stewardship
 export * from './device-stewardship.model';
+
+// Resource explorer (Drive-like resource browsing)
+export * from './resource-explorer.model';

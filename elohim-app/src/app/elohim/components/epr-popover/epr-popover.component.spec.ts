@@ -122,7 +122,7 @@ describe('EprPopoverComponent', () => {
 
   it('should render "Open resource" link when route is provided', () => {
     component.head = mockHead;
-    component.route = ['/lamad/resource', 'test-concept'];
+    component.route = ['/resource', 'test-concept'];
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

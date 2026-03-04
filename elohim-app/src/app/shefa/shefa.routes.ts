@@ -102,6 +102,20 @@ export const SHEFA_ROUTES: Routes = [
         },
       },
       {
+        path: 'resources',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: {
+          title: 'Shefa - My Resources',
+          seo: {
+            title: 'Resource Explorer',
+            description: 'Browse and manage your stewarded resources across all categories.',
+          },
+        },
+      },
+      {
         path: 'resources/property',
         loadComponent: async () =>
           import('./components/shared/shefa-placeholder.component').then(
@@ -163,6 +177,22 @@ export const SHEFA_ROUTES: Routes = [
             ],
           },
         },
+      },
+      {
+        path: 'resources/:lensType',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: { title: 'Shefa - Resources' },
+      },
+      {
+        path: 'resources/:lensType/:folderId',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: { title: 'Shefa - Resources' },
       },
       {
         path: 'exchange',

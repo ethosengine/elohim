@@ -260,7 +260,7 @@ describe('GraphExplorerComponent', () => {
 
     component.handleNodeDoubleClick(conceptNode);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad/resource', 'concept-1']);
+    expect(router.navigate).toHaveBeenCalledWith(['/resource', 'concept-1']);
   });
 
   it('should not navigate for locked nodes', () => {
@@ -756,7 +756,7 @@ describe('GraphExplorerComponent', () => {
 
       component.navigateToContent('node-123');
 
-      expect(router.navigate).toHaveBeenCalledWith(['/lamad/resource', 'node-123']);
+      expect(router.navigate).toHaveBeenCalledWith(['/resource', 'node-123']);
     });
   });
 

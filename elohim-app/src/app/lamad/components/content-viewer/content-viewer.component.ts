@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 90.5% (2026-02-24)
+// @coverage: 90.5% (2026-03-03)
 
 import { catchError, takeUntil } from 'rxjs/operators';
 
@@ -832,7 +832,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     // Navigate to the selected content
-    void this.router.navigate(['/lamad/resource', nodeId]);
+    void this.router.navigate(['/resource', nodeId]);
   }
 
   /**

@@ -131,10 +131,7 @@ describe('EprRef', () => {
 
   describe('eprToRoute', () => {
     it('returns resource route for head tier', () => {
-      expect(eprToRoute({ id: 'manifesto', tier: 'head' })).toEqual([
-        '/lamad/resource',
-        'manifesto',
-      ]);
+      expect(eprToRoute({ id: 'manifesto', tier: 'head' })).toEqual(['/resource', 'manifesto']);
     });
 
     it('returns path step route for step fragment', () => {

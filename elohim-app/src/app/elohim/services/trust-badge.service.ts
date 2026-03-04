@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 93.1% (2026-02-24)
+// @coverage: 93.1% (2026-03-03)
 
 import { catchError, map } from 'rxjs/operators';
 
@@ -459,7 +459,7 @@ export class TrustBadgeService {
       label: 'View Trust Profile',
       icon: '🔍',
       available: true,
-      route: `/lamad/resource/${content.id}/trust`,
+      route: `/resource/${content.id}/trust`,
     });
 
     // Endorse - available to community members
@@ -486,7 +486,7 @@ export class TrustBadgeService {
         label: 'Request Review',
         icon: '📝',
         available: true,
-        route: `/lamad/resource/${content.id}/attestation/request`,
+        route: `/resource/${content.id}/attestation/request`,
       });
     }
 
@@ -535,7 +535,7 @@ export class TrustBadgeService {
           label: 'View Trust Profile',
           icon: '🔍',
           available: true,
-          route: `/lamad/resource/${contentId}/trust`,
+          route: `/resource/${contentId}/trust`,
         },
       ],
     };

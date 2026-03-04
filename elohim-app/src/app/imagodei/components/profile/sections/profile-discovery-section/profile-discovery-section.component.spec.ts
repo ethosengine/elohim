@@ -182,7 +182,7 @@ describe('ProfileDiscoverySectionComponent', () => {
       component.navigateToResult(buildResult({ contentNodeId: 'content-enneagram-001' }));
 
       expect(mockRouter.navigate).toHaveBeenCalledWith([
-        '/lamad/resource',
+        '/resource',
         'content-enneagram-001',
       ]);
     });

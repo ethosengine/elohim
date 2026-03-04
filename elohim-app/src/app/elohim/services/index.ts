@@ -53,3 +53,6 @@ export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';
 export { GovernanceService } from './governance.service';
 export { AffinityTrackingService } from './affinity-tracking.service';
+
+// Lens registry (cross-pillar resource exploration)
+export { LensRegistryService } from './lens-registry.service';

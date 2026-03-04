@@ -13,7 +13,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 
-// @coverage: 68.2% (2026-02-24)
+// @coverage: 69.2% (2026-03-03)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -362,7 +362,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   navigateToResource(contentNodeId: string): void {
-    void this.router.navigate(['/lamad/resource', contentNodeId]);
+    void this.router.navigate(['/resource', contentNodeId]);
   }
 
   getBadgeColor(result: DiscoveryResult): string {

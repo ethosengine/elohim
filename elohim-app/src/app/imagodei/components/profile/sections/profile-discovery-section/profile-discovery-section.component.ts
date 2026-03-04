@@ -1,7 +1,7 @@
 import { Component, inject, input, output } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 20.0% (2026-02-24)
+// @coverage: 100.0% (2026-03-03)
 
 import {
   type DiscoveryResult,
@@ -42,7 +42,7 @@ export class ProfileDiscoverySectionComponent {
 
   navigateToResult(result: DiscoveryResult): void {
     if (result.contentNodeId) {
-      void this.router.navigate(['/lamad/resource', result.contentNodeId]);
+      void this.router.navigate(['/resource', result.contentNodeId]);
     } else {
       this.navigateToDiscovery.emit();
     }

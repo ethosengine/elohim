@@ -2,7 +2,7 @@ import { AsyncPipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 38.5% (2026-02-24)
+// @coverage: 38.5% (2026-03-03)
 
 import { Observable, map } from 'rxjs';
 
@@ -43,7 +43,7 @@ import type { ContentMastery } from '../../../models';
                   </div>
                 </div>
                 <a
-                  [routerLink]="['/lamad/resource', item.contentId]"
+                  [routerLink]="['/resource', item.contentId]"
                   class="practice-link"
                   title="Practice this content"
                 >

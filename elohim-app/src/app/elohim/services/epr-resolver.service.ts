@@ -17,6 +17,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 68.6% (2026-03-03)
+
 import { Observable, of, switchMap, map, catchError } from 'rxjs';
 
 import {
@@ -128,7 +130,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    *   resolver.resolve('epr:manifesto-foundations').subscribe(resolved => {
    *     // resolved.content  → { id, title, description, contentType, blobHash, ... }
    *     // resolved.blobUrl  → "https://doorway.host/store/sha256-abc..." or null
-   *     // resolved.route    → ['/lamad/resource', 'manifesto-foundations']
+   *     // resolved.route    → ['/resource', 'manifesto-foundations']
    *   });
    */
   resolve(input: string): Observable<ResolvedContent | null> {
@@ -140,7 +142,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
 
         const blobHash = this.extractBlobHash(content);
         const blobUrl = blobHash ? this.storage.getBlobUrl(blobHash) : null;
-        const route = eprToRoute(ref) ?? ['/lamad/resource', ref.id];
+        const route = eprToRoute(ref) ?? ['/resource', ref.id];
 
         return of({ ref, content, blobUrl, route });
       })
@@ -206,7 +208,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
 
     // 3. Standalone resource view (fallback)
     return {
-      route: eprToRoute(ref) ?? ['/lamad/resource', targetId],
+      route: eprToRoute(ref) ?? ['/resource', targetId],
       resolution: 'standalone',
     };
   }

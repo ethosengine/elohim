@@ -628,7 +628,7 @@ describe('ContentViewerComponent', () => {
           detourType: 'related',
         })
       );
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/resource', 'related-node']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/resource', 'related-node']);
     });
 
     it('should track detour when exploring in graph', () => {
@@ -670,7 +670,7 @@ describe('ContentViewerComponent', () => {
       component.onGraphNodeSelected('related-node');
 
       expect(pathContextServiceSpy.startDetour).not.toHaveBeenCalled();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/resource', 'related-node']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/resource', 'related-node']);
     });
 
     it('should not explore in graph if no nodeId', () => {

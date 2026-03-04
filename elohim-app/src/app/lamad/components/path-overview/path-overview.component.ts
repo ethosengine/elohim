@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 45.1% (2026-02-24)
+// @coverage: 45.1% (2026-03-03)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -706,7 +706,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
       // Fallback to direct resource view if no matching step found
-      void this.router.navigate(['/lamad/resource', conceptId]);
+      void this.router.navigate(['/resource', conceptId]);
     }
   }
 

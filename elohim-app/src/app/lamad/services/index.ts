@@ -84,3 +84,6 @@ export { ContributorService } from './contributor.service';
 
 // Steward economy (credentials, gates, access, revenue)
 export { StewardService } from './steward.service';
+
+// Scope & Sequence lens (path hierarchy for resource explorer)
+export { ScopeSequenceLensProvider } from './scope-sequence-lens.provider';
