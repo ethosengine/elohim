@@ -57,6 +57,8 @@ import {
   getHealthStatus,
 } from '@app/shefa/models/stewarded-resources.model';
 
+import { type IStewardedResources } from '../interfaces/stewarded-resources.interface';
+
 import { EconomicService } from './economic.service';
 
 // =============================================================================
@@ -107,7 +109,7 @@ type CategoryComplianceStatus = 'compliant' | 'at-risk' | 'exceeds-ceiling';
 @Injectable({
   providedIn: 'root',
 })
-export class StewardedResourceService {
+export class StewardedResourceService implements IStewardedResources {
   private readonly holochain = inject(HolochainClientService);
   private readonly economicService = inject(EconomicService);
 

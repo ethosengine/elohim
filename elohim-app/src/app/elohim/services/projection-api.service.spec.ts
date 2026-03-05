@@ -120,7 +120,7 @@ describe('ProjectionAPIService', () => {
   describe('getContent', () => {
     it('should fetch content by ID', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -138,7 +138,7 @@ describe('ProjectionAPIService', () => {
 
     it('should transform content data correctly', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -154,7 +154,7 @@ describe('ProjectionAPIService', () => {
 
     it('should resolve blob URLs via StorageClientService', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -173,7 +173,7 @@ describe('ProjectionAPIService', () => {
       };
 
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -186,7 +186,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle 404 errors gracefully', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('not-found').subscribe(data => {
+      service.getContentNode('not-found').subscribe(data => {
         result = data;
       });
 
@@ -199,7 +199,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle timeout errors', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -214,7 +214,7 @@ describe('ProjectionAPIService', () => {
     it('should return null when API is disabled', fakeAsync(() => {
       // This would require mocking environment, so we test the observable completes
       let result: ContentNode | null | undefined = undefined;
-      const obs = service.getContent('content-1');
+      const obs = service.getContentNode('content-1');
       obs.subscribe(data => {
         result = data;
       });
@@ -230,7 +230,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should use shareReplay for caching', fakeAsync(() => {
-      const obs = service.getContent('content-1');
+      const obs = service.getContentNode('content-1');
 
       // Subscribe twice
       let result1: ContentNode | null = null;
@@ -505,7 +505,7 @@ describe('ProjectionAPIService', () => {
   describe('getPath', () => {
     it('should fetch path by ID', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('path-1').subscribe(data => {
+      service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
 
@@ -523,7 +523,7 @@ describe('ProjectionAPIService', () => {
 
     it('should transform path data correctly', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('path-1').subscribe(data => {
+      service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
 
@@ -539,7 +539,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle path 404 errors gracefully', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('not-found').subscribe(data => {
+      service.getPathNode('not-found').subscribe(data => {
         result = data;
       });
 
@@ -784,7 +784,7 @@ describe('ProjectionAPIService', () => {
       delete (dataWithDocId as any).id;
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -800,7 +800,7 @@ describe('ProjectionAPIService', () => {
       delete (dataWithAuthor as any).authorId;
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -817,7 +817,7 @@ describe('ProjectionAPIService', () => {
       };
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -836,7 +836,7 @@ describe('ProjectionAPIService', () => {
       const dataWithNullThumb = { ...mockContentData, thumbnailUrl: null };
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -860,7 +860,7 @@ describe('ProjectionAPIService', () => {
         const data = { ...mockContentData, thumbnailUrl: testCase.input };
         let result: ContentNode | null = null;
 
-        service.getContent('test').subscribe(d => {
+        service.getContentNode('test').subscribe(d => {
           result = d;
         });
 
@@ -879,7 +879,7 @@ describe('ProjectionAPIService', () => {
 
   describe('URL building', () => {
     it('should encode special characters in IDs', fakeAsync(() => {
-      service.getContent('content/with/slashes').subscribe();
+      service.getContentNode('content/with/slashes').subscribe();
 
       const req = httpMock.expectOne(request => request.url.includes('content%2Fwith%2Fslashes'));
       req.flush(mockContentData);
@@ -887,7 +887,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should build proper cache endpoint URLs', fakeAsync(() => {
-      service.getContent('test-id').subscribe();
+      service.getContentNode('test-id').subscribe();
 
       const req = httpMock.expectOne(request => {
         return request.url.includes('/api/v1/cache/Content/test-id');

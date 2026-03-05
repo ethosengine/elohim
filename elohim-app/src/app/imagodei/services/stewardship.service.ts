@@ -18,6 +18,8 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
+import { type IStewardshipPolicy } from '../interfaces/stewardship-policy.interface';
+
 import type {
   StewardshipGrant,
   CreateGrantInput,
@@ -343,7 +345,7 @@ function toPolicyDecision(raw: RawPolicyDecision): PolicyDecision {
 // =============================================================================
 
 @Injectable({ providedIn: 'root' })
-export class StewardshipService {
+export class StewardshipService implements IStewardshipPolicy {
   // ===========================================================================
   // Dependencies
   // ===========================================================================

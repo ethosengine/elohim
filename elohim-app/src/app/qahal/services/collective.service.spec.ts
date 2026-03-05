@@ -2,7 +2,7 @@
  * CollectiveService Tests
  *
  * Tests governance context CRUD and participation management
- * via the /db/collectives and /db/participations APIs.
+ * via the /api/v1/collectives and /db/participations APIs.
  */
 
 import { TestBed } from '@angular/core/testing';
@@ -66,14 +66,14 @@ describe('CollectiveService', () => {
   });
 
   describe('listCollectives', () => {
-    it('should GET /db/collectives and return items', () => {
+    it('should GET /api/v1/collectives and return items', () => {
       service.listCollectives().subscribe(collectives => {
         expect(collectives).toHaveLength(1);
         expect(collectives[0].id).toBe('household-dowell');
         expect(collectives[0].governanceLayer).toBe('family');
       });
 
-      const req = httpMock.expectOne(request => request.url.endsWith('/db/collectives'));
+      const req = httpMock.expectOne(request => request.url.endsWith('/api/v1/collectives'));
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockCollective], count: 1 });
     });
@@ -83,7 +83,7 @@ describe('CollectiveService', () => {
 
       const req = httpMock.expectOne(
         request =>
-          request.url.endsWith('/db/collectives') &&
+          request.url.endsWith('/api/v1/collectives') &&
           request.params.get('governanceLayer') === 'neighborhood' &&
           request.params.get('activeOnly') === 'true'
       );
@@ -93,14 +93,14 @@ describe('CollectiveService', () => {
   });
 
   describe('getCollective', () => {
-    it('should GET /db/collectives/{id}', () => {
+    it('should GET /api/v1/collectives/{id}', () => {
       service.getCollective('household-dowell').subscribe(collective => {
         expect(collective.id).toBe('household-dowell');
         expect(collective.name).toBe('Dowell Household');
       });
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/collectives/household-dowell')
+        request.url.endsWith('/api/v1/collectives/household-dowell')
       );
       expect(req.request.method).toBe('GET');
       req.flush(mockCollective);
@@ -108,7 +108,7 @@ describe('CollectiveService', () => {
   });
 
   describe('createCollective', () => {
-    it('should POST to /db/collectives', () => {
+    it('should POST to /api/v1/collectives', () => {
       const input: CreateCollectiveInputView = {
         id: 'comm-new',
         name: 'New Community',
@@ -124,7 +124,7 @@ describe('CollectiveService', () => {
         expect(collective.id).toBe('comm-new');
       });
 
-      const req = httpMock.expectOne(request => request.url.endsWith('/db/collectives'));
+      const req = httpMock.expectOne(request => request.url.endsWith('/api/v1/collectives'));
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(input);
       req.flush({ ...mockCollective, id: 'comm-new', name: 'New Community' });
@@ -132,7 +132,7 @@ describe('CollectiveService', () => {
   });
 
   describe('getParticipants', () => {
-    it('should GET /db/collectives/{id}/participants and return items', () => {
+    it('should GET /api/v1/collectives/{id}/participants and return items', () => {
       service.getParticipants('household-dowell').subscribe(participants => {
         expect(participants).toHaveLength(1);
         expect(participants[0].humanId).toBe('human-matthew-manager');
@@ -140,7 +140,7 @@ describe('CollectiveService', () => {
       });
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/collectives/household-dowell/participants')
+        request.url.endsWith('/api/v1/collectives/household-dowell/participants')
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockParticipation], count: 1 });
@@ -148,7 +148,7 @@ describe('CollectiveService', () => {
   });
 
   describe('addParticipant', () => {
-    it('should POST to /db/collectives/{id}/participants', () => {
+    it('should POST to /api/v1/collectives/{id}/participants', () => {
       service
         .addParticipant('household-dowell', 'human-susan-spouse', {
           intimacyLevel: 'intimate',
@@ -159,7 +159,7 @@ describe('CollectiveService', () => {
         });
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/collectives/household-dowell/participants')
+        request.url.endsWith('/api/v1/collectives/household-dowell/participants')
       );
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({
@@ -174,7 +174,7 @@ describe('CollectiveService', () => {
       service.addParticipant('household-dowell', 'human-traveler').subscribe();
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/collectives/household-dowell/participants')
+        request.url.endsWith('/api/v1/collectives/household-dowell/participants')
       );
       expect(req.request.body).toEqual({
         humanId: 'human-traveler',
@@ -186,11 +186,11 @@ describe('CollectiveService', () => {
   });
 
   describe('departCollective', () => {
-    it('should DELETE /db/collectives/{id}/participants/{humanId}', () => {
+    it('should DELETE /api/v1/collectives/{id}/participants/{humanId}', () => {
       service.departCollective('household-dowell', 'human-traveler').subscribe();
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/collectives/household-dowell/participants/human-traveler')
+        request.url.endsWith('/api/v1/collectives/household-dowell/participants/human-traveler')
       );
       expect(req.request.method).toBe('DELETE');
       req.flush(null);
@@ -198,14 +198,14 @@ describe('CollectiveService', () => {
   });
 
   describe('getCollectivesForHuman', () => {
-    it('should GET /db/participations/{humanId} and return items', () => {
+    it('should GET /api/v1/humans/{humanId}/collectives and return items', () => {
       service.getCollectivesForHuman('human-matthew-manager').subscribe(participations => {
         expect(participations).toHaveLength(1);
         expect(participations[0].collectiveId).toBe('household-dowell');
       });
 
       const req = httpMock.expectOne(request =>
-        request.url.endsWith('/db/participations/human-matthew-manager')
+        request.url.endsWith('/api/v1/humans/human-matthew-manager/collectives')
       );
       expect(req.request.method).toBe('GET');
       req.flush({ items: [mockParticipation], count: 1 });

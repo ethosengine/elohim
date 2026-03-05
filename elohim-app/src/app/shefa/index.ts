@@ -8,6 +8,9 @@
  * - /shefa/human - Economy-specific profile (future)
  */
 
+// Interfaces (abstract contracts for IoC)
+export * from './interfaces';
+
 // Models
 export * from './models';
 

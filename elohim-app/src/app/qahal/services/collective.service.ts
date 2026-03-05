@@ -12,7 +12,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, map } from 'rxjs';
 
-import { environment } from '../../../environments/environment';
+import { type ICollective } from '../interfaces/collective.interface';
 
 import type { GovernanceLayer } from '@app/qahal/models/collective.model';
 import type {
@@ -29,17 +29,8 @@ interface ListResponse<T> {
 @Injectable({
   providedIn: 'root',
 })
-export class CollectiveService {
-  private readonly baseUrl: string;
-
+export class CollectiveService implements ICollective {
   private readonly http = inject(HttpClient);
-
-  constructor() {
-    this.baseUrl =
-      environment.holochain?.storageUrl ??
-      (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??
-      '';
-  }
 
   // ===========================================================================
   // Collective CRUD
@@ -57,7 +48,7 @@ export class CollectiveService {
     if (params?.activeOnly !== undefined) queryParams['activeOnly'] = String(params.activeOnly);
 
     return this.http
-      .get<ListResponse<CollectiveView>>(`${this.baseUrl}/db/collectives`, {
+      .get<ListResponse<CollectiveView>>('/api/v1/collectives', {
         params: queryParams,
       })
       .pipe(map((res): CollectiveView[] => res.items));
@@ -65,12 +56,12 @@ export class CollectiveService {
 
   /** Get a single collective by ID */
   getCollective(id: string): Observable<CollectiveView> {
-    return this.http.get<CollectiveView>(`${this.baseUrl}/db/collectives/${id}`);
+    return this.http.get<CollectiveView>(`/api/v1/collectives/${id}`);
   }
 
   /** Create a collective */
   createCollective(input: CreateCollectiveInputView): Observable<CollectiveView> {
-    return this.http.post<CollectiveView>(`${this.baseUrl}/db/collectives`, input);
+    return this.http.post<CollectiveView>('/api/v1/collectives', input);
   }
 
   // ===========================================================================
@@ -82,7 +73,7 @@ export class CollectiveService {
     return this.http
       .get<
         ListResponse<CollectiveParticipationView>
-      >(`${this.baseUrl}/db/collectives/${collectiveId}/participants`)
+      >(`/api/v1/collectives/${collectiveId}/participants`)
       .pipe(map((res): CollectiveParticipationView[] => res.items));
   }
 
@@ -93,7 +84,7 @@ export class CollectiveService {
     options?: { intimacyLevel?: string; roleContext?: string }
   ): Observable<CollectiveParticipationView> {
     return this.http.post<CollectiveParticipationView>(
-      `${this.baseUrl}/db/collectives/${collectiveId}/participants`,
+      `/api/v1/collectives/${collectiveId}/participants`,
       {
         humanId,
         intimacyLevel: options?.intimacyLevel,
@@ -104,17 +95,13 @@ export class CollectiveService {
 
   /** Depart from a collective (soft exit) */
   departCollective(collectiveId: string, humanId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.baseUrl}/db/collectives/${collectiveId}/participants/${humanId}`
-    );
+    return this.http.delete<void>(`/api/v1/collectives/${collectiveId}/participants/${humanId}`);
   }
 
   /** Get all collectives a human participates in */
   getCollectivesForHuman(humanId: string): Observable<CollectiveParticipationView[]> {
     return this.http
-      .get<
-        ListResponse<CollectiveParticipationView>
-      >(`${this.baseUrl}/db/participations/${humanId}`)
+      .get<ListResponse<CollectiveParticipationView>>(`/api/v1/humans/${humanId}/collectives`)
       .pipe(map((res): CollectiveParticipationView[] => res.items));
   }
 }

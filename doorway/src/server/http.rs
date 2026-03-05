@@ -1184,6 +1184,59 @@ async fn handle_request(
             }
         }
 
+        // ====================================================================
+        // Domain API Routes (v1) — business logic layer
+        // ====================================================================
+
+        // Collective governance
+        (_, p) if p.starts_with("/api/v1/collectives") => {
+            return Ok(to_boxed(
+                routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Human-scoped collectives (cross-domain route)
+        (Method::GET, p) if p.starts_with("/api/v1/humans/") && p.ends_with("/collectives") => {
+            return Ok(to_boxed(
+                routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Presence lifecycle
+        (_, p) if p.starts_with("/api/v1/presence") => {
+            return Ok(to_boxed(
+                routes::handle_presence_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Stewardship policy
+        (_, p) if p.starts_with("/api/v1/stewardship") => {
+            return Ok(to_boxed(
+                routes::handle_stewardship_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Economic events
+        (_, p) if p.starts_with("/api/v1/economic-events") => {
+            return Ok(to_boxed(
+                routes::handle_economic_events_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Stewarded resources
+        (_, p) if p.starts_with("/api/v1/resources") => {
+            return Ok(to_boxed(
+                routes::handle_stewarded_resources_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Requests and offers
+        (_, p) if p.starts_with("/api/v1/requests-offers") => {
+            return Ok(to_boxed(
+                routes::handle_requests_offers_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };

@@ -50,6 +50,8 @@ import {
   InteractionType,
 } from '@app/shefa/models/requests-and-offers.model';
 
+import { type IRequestsAndOffers } from '../interfaces/requests-and-offers.interface';
+
 import { EconomicService } from './economic.service';
 
 // ============================================================================
@@ -63,7 +65,7 @@ const NOT_YET_IMPLEMENTED = 'Not yet implemented';
 @Injectable({
   providedIn: 'root',
 })
-export class RequestsAndOffersService {
+export class RequestsAndOffersService implements IRequestsAndOffers {
   private readonly economicService = inject(EconomicService);
 
   // ============================================================================

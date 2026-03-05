@@ -15,6 +15,7 @@ import { Injectable, inject, signal } from '@angular/core';
 // @coverage: 83.7% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import { type IPresenceLifecycle } from '../interfaces/presence.interface';
 import {
   type ContributorPresenceView,
   type PresenceState,
@@ -168,7 +169,7 @@ function parseJsonArray(json: string): string[] {
 const NOT_CONNECTED = 'Not connected to network';
 
 @Injectable({ providedIn: 'root' })
-export class PresenceService {
+export class PresenceService implements IPresenceLifecycle {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly identityService = inject(IdentityService);
 

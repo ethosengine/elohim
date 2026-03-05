@@ -18,6 +18,7 @@ import { Injectable } from '@angular/core';
 
 // @coverage: 90.2% (2026-02-24)
 
+import { type IEconomicEventFactory } from '../interfaces/economic-event-factory.interface';
 import { StagedTransaction } from '../models/transaction-import.model';
 
 /**
@@ -91,7 +92,7 @@ interface CreateEventRequest {
 @Injectable({
   providedIn: 'root',
 })
-export class EconomicEventFactoryService {
+export class EconomicEventFactoryService implements IEconomicEventFactory {
   // Action types as constants
   private static readonly TRANSFER_ACTION = 'transfer';
   private static readonly CONSUME_ACTION = 'consume';

@@ -662,7 +662,7 @@ export class ContentResolverService implements OnDestroy {
 
       case 'projection':
         if (!this.projectionApi.enabled) return null;
-        return await firstValueFrom(this.projectionApi.getContent(contentId));
+        return await firstValueFrom(this.projectionApi.getContentNode(contentId));
 
       case 'conductor':
         // Conductor no longer handles content - use projection instead
@@ -753,7 +753,7 @@ export class ContentResolverService implements OnDestroy {
 
       case 'projection':
         if (!this.projectionApi.enabled) return null;
-        return await firstValueFrom(this.projectionApi.getPath(pathId));
+        return await firstValueFrom(this.projectionApi.getPathNode(pathId));
 
       case 'conductor':
         // Conductor no longer handles paths - use projection instead

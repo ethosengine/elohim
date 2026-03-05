@@ -47,3 +47,6 @@ export * from './source-chain.model';
 export * from './json-ld.model';
 export * from './open-graph.model';
 export * from './verifiable-credential.model';
+
+// Zome Wire Types - Centralized Holochain zome response types
+export * from './zome-wire-types';

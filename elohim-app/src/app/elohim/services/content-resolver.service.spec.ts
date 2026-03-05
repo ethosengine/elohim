@@ -74,9 +74,9 @@ describe('ContentResolverService', () => {
       removeContent: vi.fn(),
     };
     const projectionSpy = {
-      getContent: vi.fn(),
+      getContentNode: vi.fn(),
       batchGetContent: vi.fn(),
-      getPath: vi.fn(),
+      getPathNode: vi.fn(),
       isHealthy: vi.fn(),
       enabled: true,
     };
@@ -99,9 +99,9 @@ describe('ContentResolverService', () => {
       Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: true })
     );
 
-    projectionSpy.getContent.mockReturnValue(of(null));
+    projectionSpy.getContentNode.mockReturnValue(of(null));
     projectionSpy.batchGetContent.mockReturnValue(of(new Map()));
-    projectionSpy.getPath.mockReturnValue(of(null));
+    projectionSpy.getPathNode.mockReturnValue(of(null));
     projectionSpy.isHealthy.mockReturnValue(Promise.resolve(true));
 
     holochainSpy.isAvailable.mockReturnValue(true);
@@ -257,26 +257,26 @@ describe('ContentResolverService', () => {
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
       expect(idbCacheMock.getContent).toHaveBeenCalledWith('test-content');
-      expect(projectionMock.getContent).not.toHaveBeenCalled();
+      expect(projectionMock.getContentNode).not.toHaveBeenCalled();
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should fall back to Projection API (Tier 2) when IndexedDB misses', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(mockContent));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
       expect(idbCacheMock.getContent).toHaveBeenCalled();
-      expect(projectionMock.getContent).toHaveBeenCalledWith('test-content');
+      expect(projectionMock.getContentNode).toHaveBeenCalledWith('test-content');
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should fall back to Holochain (Tier 3) when Projection API misses', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
       holochainMock.getContent.mockReturnValue(of(mockContent));
       // Mark Holochain as available so it's consulted
       holochainMock.isAvailable.mockReturnValue(true);
@@ -286,14 +286,14 @@ describe('ContentResolverService', () => {
       // Service skips conductor for content (line 641-643), returns null
       expect(result).toBeNull();
       expect(idbCacheMock.getContent).toHaveBeenCalled();
-      expect(projectionMock.getContent).toHaveBeenCalled();
+      expect(projectionMock.getContentNode).toHaveBeenCalled();
       // Conductor is skipped for content, Holochain not called
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should return null when all tiers miss', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
       holochainMock.getContent.mockReturnValue(of(null));
 
       const result = await service.resolveContent('missing-content');
@@ -303,7 +303,7 @@ describe('ContentResolverService', () => {
 
     it('should cache result from Projection API to IndexedDB', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(mockContent));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
@@ -315,7 +315,7 @@ describe('ContentResolverService', () => {
 
     it('should cache result from Holochain to IndexedDB', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
       holochainMock.getContent.mockReturnValue(of(mockContent));
       holochainMock.isAvailable.mockReturnValue(true);
 
@@ -349,18 +349,18 @@ describe('ContentResolverService', () => {
 
     it('should fall back to Projection API for paths', async () => {
       idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
-      projectionMock.getPath.mockReturnValue(of(mockPath));
+      projectionMock.getPathNode.mockReturnValue(of(mockPath));
 
       const result = await service.resolvePath('test-path');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockPath);
-      expect(projectionMock.getPath).toHaveBeenCalledWith('test-path');
+      expect(projectionMock.getPathNode).toHaveBeenCalledWith('test-path');
     });
 
     it('should fall back to Holochain for paths', async () => {
       idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
-      projectionMock.getPath.mockReturnValue(of(null));
+      projectionMock.getPathNode.mockReturnValue(of(null));
       const pathWithSteps: any = mockPath;
       holochainMock.getPathWithSteps.mockReturnValue(Promise.resolve(pathWithSteps));
       holochainMock.isAvailable.mockReturnValue(true);
@@ -374,7 +374,7 @@ describe('ContentResolverService', () => {
 
     it('should cache path results', async () => {
       idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
-      projectionMock.getPath.mockReturnValue(of(mockPath));
+      projectionMock.getPathNode.mockReturnValue(of(mockPath));
 
       const result = await service.resolvePath('test-path');
 
@@ -515,18 +515,18 @@ describe('ContentResolverService', () => {
 
     it('should handle IndexedDB errors and fall back', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.reject(new Error('IndexedDB unavailable')));
-      projectionMock.getContent.mockReturnValue(of(mockContent));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
-      expect(projectionMock.getContent).toHaveBeenCalled();
+      expect(projectionMock.getContentNode).toHaveBeenCalled();
     });
 
     it('should handle Projection API errors and fall back', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(throwError(() => new Error('API error')));
+      projectionMock.getContentNode.mockReturnValue(throwError(() => new Error('API error')));
       holochainMock.getContent.mockReturnValue(of(mockContent));
       holochainMock.isAvailable.mockReturnValue(true);
 
@@ -539,7 +539,7 @@ describe('ContentResolverService', () => {
 
     it('should handle Holochain errors gracefully', async () => {
       idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
-      projectionMock.getContent.mockReturnValue(of(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
       holochainMock.getContent.mockReturnValue(throwError(() => new Error('Holochain error')));
 
       const result = await service.resolveContent('test-content');

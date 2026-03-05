@@ -344,7 +344,7 @@ describe('StewardshipDashboardComponent', () => {
           allocationRatio: 0.5,
           allocationMethod: 'computed' as const,
           contributionType: 'author' as const,
-          contributionEvidenceJson: null,
+          contributionEvidence: null,
           governanceState: 'active' as const,
           disputeId: null,
           disputeReason: null,
@@ -359,7 +359,7 @@ describe('StewardshipDashboardComponent', () => {
           recognitionAccumulated: 100,
           lastRecognitionAt: null,
           note: null,
-          metadataJson: null,
+          metadata: null,
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-01T00:00:00Z',
         };
