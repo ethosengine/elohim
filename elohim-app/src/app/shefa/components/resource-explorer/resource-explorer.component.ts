@@ -165,9 +165,12 @@ export class ResourceExplorerComponent implements OnInit {
     }
 
     if (folderId) {
-      provider.getChildren(folderId).subscribe(children => {
-        this.currentChildren.set(children);
-        this.isLoading.set(false);
+      provider.getChildren(folderId).subscribe({
+        next: children => {
+          this.currentChildren.set(children);
+          this.isLoading.set(false);
+        },
+        error: () => this.isLoading.set(false),
       });
       provider.getBreadcrumbs(folderId).subscribe(crumbs => {
         this.breadcrumbs.set(crumbs);
@@ -175,9 +178,12 @@ export class ResourceExplorerComponent implements OnInit {
     } else {
       // Navigate to root
       this.breadcrumbs.set([ROOT_BREADCRUMB]);
-      provider.getTree().subscribe(nodes => {
-        this.currentChildren.set(nodes);
-        this.isLoading.set(false);
+      provider.getTree().subscribe({
+        next: nodes => {
+          this.currentChildren.set(nodes);
+          this.isLoading.set(false);
+        },
+        error: () => this.isLoading.set(false),
       });
     }
 
@@ -201,20 +207,26 @@ export class ResourceExplorerComponent implements OnInit {
       return;
     }
 
-    provider.getTree().subscribe(nodes => {
-      this.tree.set(nodes);
+    provider.getTree().subscribe({
+      next: nodes => {
+        this.tree.set(nodes);
 
-      // If no folder is selected, show root items in grid
-      if (this.currentFolderId()) {
-        // Load the selected folder's children
-        provider.getChildren(this.currentFolderId()!).subscribe(children => {
-          this.currentChildren.set(children);
+        // If no folder is selected, show root items in grid
+        if (this.currentFolderId()) {
+          // Load the selected folder's children
+          provider.getChildren(this.currentFolderId()!).subscribe({
+            next: children => {
+              this.currentChildren.set(children);
+              this.isLoading.set(false);
+            },
+            error: () => this.isLoading.set(false),
+          });
+        } else {
+          this.currentChildren.set(nodes);
           this.isLoading.set(false);
-        });
-      } else {
-        this.currentChildren.set(nodes);
-        this.isLoading.set(false);
-      }
+        }
+      },
+      error: () => this.isLoading.set(false),
     });
   }
 
