@@ -66,7 +66,7 @@ impl ResourceCategory {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "energy" => Some(ResourceCategory::Energy),
             "compute" => Some(ResourceCategory::Compute),
@@ -826,7 +826,7 @@ impl ResourceService {
                     .map(|r| r.total_capacity.unit.clone())
                     .unwrap_or_default();
                 let category =
-                    ResourceCategory::from_str(&cat_str).unwrap_or(ResourceCategory::Inventory);
+                    ResourceCategory::parse(&cat_str).unwrap_or(ResourceCategory::Inventory);
 
                 CategorySummary {
                     category,
@@ -901,7 +901,7 @@ impl ResourceService {
 
     /// Get the constitutional limit for a given category string.
     pub fn get_constitutional_limit(category: &str) -> Option<ConstitutionalLimit> {
-        let cat = ResourceCategory::from_str(category)?;
+        let cat = ResourceCategory::parse(category)?;
         constitutional_limit_for(&cat)
     }
 }

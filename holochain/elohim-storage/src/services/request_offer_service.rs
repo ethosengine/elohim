@@ -350,7 +350,7 @@ impl RequestOfferService {
         let events = list_economic_events(conn, ctx, &event_query)?;
         let mut requests: Vec<ServiceRequest> = events
             .into_iter()
-            .filter(|e| is_service_request_event(e))
+            .filter(is_service_request_event)
             .filter_map(|e| request_from_event(&e))
             .collect();
 
@@ -656,7 +656,7 @@ impl RequestOfferService {
         let events = list_economic_events(conn, ctx, &event_query)?;
         let mut offers: Vec<ServiceOffer> = events
             .into_iter()
-            .filter(|e| is_service_offer_event(e))
+            .filter(is_service_offer_event)
             .filter_map(|e| offer_from_event(&e))
             .collect();
 
@@ -1026,9 +1026,8 @@ impl RequestOfferService {
         let type_score = shared.len() as f64 / request.service_type_ids.len().max(1) as f64;
         let time_score = if time_compatible { 1.0 } else { 0.3 };
         let exchange_score = if exchange_compatible { 1.0 } else { 0.2 };
-        let match_quality = (type_score * 0.5 + time_score * 0.3 + exchange_score * 0.2)
-            .min(1.0)
-            .max(0.0);
+        let match_quality =
+            (type_score * 0.5 + time_score * 0.3 + exchange_score * 0.2).clamp(0.0, 1.0);
 
         // Only return matches above minimal threshold
         if match_quality < 0.1 {

@@ -27,9 +27,10 @@ use super::{get_conn, parse_body};
 // Request types (controller-local, not exported to TS)
 // =============================================================================
 
-/// Request to create a stewardship grant
+/// Request to create a stewardship grant (acknowledged-only, data lives in Holochain zome)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct CreateGrantRequest {
     pub subject_id: String,
     pub authority_basis: String,
@@ -59,9 +60,10 @@ fn default_30u32() -> u32 {
     30
 }
 
-/// Request to delegate a grant to another steward
+/// Request to delegate a grant to another steward (acknowledged-only)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct DelegateGrantRequest {
     pub parent_grant_id: String,
     pub new_steward_id: String,
@@ -79,9 +81,10 @@ struct DelegateGrantRequest {
     pub expires_in_days: u32,
 }
 
-/// Request to file an appeal
+/// Request to file an appeal (acknowledged-only)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct FileAppealRequest {
     pub grant_id: String,
     #[serde(default)]
@@ -94,9 +97,10 @@ struct FileAppealRequest {
     pub advocate_id: Option<String>,
 }
 
-/// Request to log session activity
+/// Request to log session activity (acknowledged-only)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct LogActivityRequest {
     pub session_id: String,
     pub session_duration_minutes: u32,
@@ -627,7 +631,7 @@ fn extract_query_param(query: Option<&str>, key: &str) -> Option<String> {
         let mut parts = pair.splitn(2, '=');
         let k = parts.next()?;
         if k == key {
-            return parts.next().map(|v| percent_decode(v));
+            return parts.next().map(percent_decode);
         }
     }
     None
