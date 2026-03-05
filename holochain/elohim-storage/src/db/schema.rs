@@ -121,21 +121,30 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
 /// Create all pillar tables (contributor_presences, economic_events, etc.)
 /// Uses IF NOT EXISTS for idempotency.
 fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
-    conn.execute_batch(CONTRIBUTOR_PRESENCES_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create contributor_presences table: {}", e))
-    })?;
+    conn.execute_batch(CONTRIBUTOR_PRESENCES_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to create contributor_presences table: {}",
+                e
+            ))
+        })?;
     conn.execute_batch(ECONOMIC_EVENTS_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create economic_events table: {}", e))
     })?;
     conn.execute_batch(CONTENT_MASTERY_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create content_mastery table: {}", e))
     })?;
-    conn.execute_batch(STEWARDSHIP_ALLOCATIONS_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create stewardship_allocations table: {}", e))
-    })?;
-    conn.execute_batch(HUMAN_RELATIONSHIPS_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create human_relationships table: {}", e))
-    })?;
+    conn.execute_batch(STEWARDSHIP_ALLOCATIONS_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to create stewardship_allocations table: {}",
+                e
+            ))
+        })?;
+    conn.execute_batch(HUMAN_RELATIONSHIPS_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!("Failed to create human_relationships table: {}", e))
+        })?;
     conn.execute_batch(LOCAL_SESSIONS_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create local_sessions table: {}", e))
     })?;
