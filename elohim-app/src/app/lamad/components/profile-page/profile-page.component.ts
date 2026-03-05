@@ -95,7 +95,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     const mode = this.identityMode();
     switch (mode) {
       case 'hosted':
-        return 'cloud_done';
+        return 'backup';
       case 'steward':
         return 'verified_user';
       case 'session':
