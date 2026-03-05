@@ -36,12 +36,19 @@ function folderKey(title: string): string {
 const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: ContentType[] }[] = [
   { title: 'Articles', icon: 'article', types: ['concept', 'epic', 'feature', 'book-chapter'] },
   { title: 'Assessments', icon: 'quiz', types: ['assessment', 'discovery-assessment'] },
-  { title: 'Videos', icon: 'videocam', types: ['video'] },
+  { title: 'Videos', icon: 'videocam', types: ['video', 'documentary', 'podcast'] },
   { title: 'Simulations', icon: 'sports_esports', types: ['simulation'] },
   { title: 'Tools', icon: 'build', types: ['tool'] },
   { title: 'Learning Paths', icon: 'route', types: ['path'] },
   { title: 'Scenarios', icon: 'checklist', types: ['scenario'] },
   { title: 'Instruments', icon: 'science', types: ['instrument'] },
+  { title: 'Scripture', icon: 'menu_book', types: ['bible-verse'] },
+  { title: 'Organizations', icon: 'business', types: ['organization', 'community'] },
+  { title: 'Books', icon: 'auto_stories', types: ['book'] },
+  { title: 'People', icon: 'people', types: ['human', 'contributor', 'role'] },
+  { title: 'Activities', icon: 'directions_run', types: ['activity', 'practice', 'exercise'] },
+  { title: 'Narratives', icon: 'history_edu', types: ['narrative'] },
+  { title: 'Courses', icon: 'school', types: ['course-module', 'module', 'lesson'] },
 ];
 
 /**
@@ -145,8 +152,9 @@ export class ResourceExplorerService implements LensProvider {
 
   private buildRootTree(): Observable<ExplorerNode[]> {
     return this.contentService.getAllContentTypes().pipe(
-      map(availableTypes =>
-        RESOURCE_CATEGORY_FOLDERS.map((cat, index) => {
+      map(raw => {
+        const availableTypes = Array.isArray(raw) ? raw : [];
+        return RESOURCE_CATEGORY_FOLDERS.map((cat, index) => {
           const hasContent = cat.category === 'content' && availableTypes.length > 0;
           return {
             id: `category:${cat.category}`,
@@ -160,15 +168,16 @@ export class ResourceExplorerService implements LensProvider {
             icon: cat.icon,
             order: index,
           };
-        })
-      )
+        });
+      })
     );
   }
 
   private buildContentTypeFolders(): Observable<ExplorerNode[]> {
     return this.contentService.getAllContentTypes().pipe(
       map(availableTypes => {
-        const typeSet = new Set(availableTypes);
+        const safe = Array.isArray(availableTypes) ? availableTypes : [];
+        const typeSet = new Set(safe);
         return CONTENT_TYPE_FOLDERS.filter(folder => folder.types.some(t => typeSet.has(t))).map(
           (folder, index) => ({
             id: `type:${folderKey(folder.title)}`,
@@ -193,8 +202,9 @@ export class ResourceExplorerService implements LensProvider {
   ): Observable<ExplorerNode[]> {
     return this.contentService.searchContent('').pipe(
       map(entries => {
+        const safe = Array.isArray(entries) ? entries : [];
         const typeSet = new Set<string>(types);
-        return entries
+        return safe
           .filter(entry => typeSet.has(entry.contentType))
           .map((entry, index) => ({
             id: `file:${entry.id}`,
