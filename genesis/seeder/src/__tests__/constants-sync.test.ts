@@ -20,6 +20,16 @@ const __dirname = path.dirname(__filename);
 const SEEDER_DIR = path.resolve(__dirname, '..', '..');
 const GENESIS_DIR = path.resolve(SEEDER_DIR, '..');
 const CONTENT_DIR = path.join(GENESIS_DIR, 'data', 'lamad', 'content');
+const APP_GENERATED = path.resolve(
+  GENESIS_DIR,
+  '..',
+  'elohim-app',
+  'src',
+  'app',
+  'generated',
+  'schema-enums.ts',
+);
+const SEEDER_GENERATED = path.resolve(SEEDER_DIR, 'src', 'generated', 'schema-enums.ts');
 const HEALING_RS = path.resolve(
   GENESIS_DIR,
   '..',
@@ -166,5 +176,26 @@ describe('Constants Sync: content JSONs ↔ CONTENT_FORMATS', () => {
     expect(
       unrecognized,
     ).toEqual([]);
+  });
+});
+
+describe('Constants Sync: seeder generated ↔ app generated', () => {
+  it('app-side schema-enums.ts should match seeder-side schema-enums.ts', () => {
+    if (!fs.existsSync(APP_GENERATED)) {
+      throw new Error(
+        `App-side generated file not found at ${APP_GENERATED}. ` +
+          'Run: cd genesis/seeder && npx tsx src/generate-schema-types.ts',
+      );
+    }
+    if (!fs.existsSync(SEEDER_GENERATED)) {
+      throw new Error(`Seeder-side generated file not found at ${SEEDER_GENERATED}`);
+    }
+
+    const appContent = fs.readFileSync(APP_GENERATED, 'utf8');
+    const seederContent = fs.readFileSync(SEEDER_GENERATED, 'utf8');
+
+    // Strip timestamp line (differs per run) before comparing
+    const stripTimestamp = (s: string) => s.replace(/^\/\/ Generated at:.*$/m, '');
+    expect(stripTimestamp(appContent)).toEqual(stripTimestamp(seederContent));
   });
 });

@@ -19,7 +19,7 @@ pub const CONTENT_TYPES: &[&str] = &[
     "lesson",         // Digestible learning session (AI-derived from concepts)
     "scenario",       // Gherkin feature/scenario
     "assessment",     // Quiz or test
-    "resource",       // Supporting material
+
     "reflection",     // Journaling/reflection prompt
     "discussion",     // Discussion topic
     "exercise",       // Practice activity

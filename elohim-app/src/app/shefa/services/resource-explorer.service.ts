@@ -33,10 +33,14 @@ function folderKey(title: string): string {
  * Content type groupings for the folders lens.
  * Maps a display folder to the content types it contains.
  */
-const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: ContentType[] }[] = [
-  { title: 'Articles', icon: 'article', types: ['concept', 'epic', 'feature', 'book-chapter'] },
-  { title: 'Assessments', icon: 'quiz', types: ['assessment', 'discovery-assessment'] },
-  { title: 'Videos', icon: 'videocam', types: ['video', 'documentary', 'podcast'] },
+export const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: ContentType[] }[] = [
+  {
+    title: 'Articles',
+    icon: 'article',
+    types: ['concept', 'epic', 'feature', 'book-chapter', 'article', 'reference', 'example'],
+  },
+  { title: 'Assessments', icon: 'quiz', types: ['assessment', 'discovery-assessment', 'quiz'] },
+  { title: 'Videos', icon: 'videocam', types: ['video', 'documentary', 'podcast', 'audio'] },
   { title: 'Simulations', icon: 'sports_esports', types: ['simulation'] },
   { title: 'Tools', icon: 'build', types: ['tool'] },
   { title: 'Learning Paths', icon: 'route', types: ['path'] },
@@ -46,7 +50,11 @@ const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: ContentType[] 
   { title: 'Organizations', icon: 'business', types: ['organization', 'community'] },
   { title: 'Books', icon: 'auto_stories', types: ['book'] },
   { title: 'People', icon: 'people', types: ['human', 'contributor', 'role'] },
-  { title: 'Activities', icon: 'directions_run', types: ['activity', 'practice', 'exercise'] },
+  {
+    title: 'Activities',
+    icon: 'directions_run',
+    types: ['activity', 'practice', 'exercise', 'reflection', 'discussion'],
+  },
   { title: 'Narratives', icon: 'history_edu', types: ['narrative'] },
   { title: 'Courses', icon: 'school', types: ['course-module', 'module', 'lesson'] },
 ];

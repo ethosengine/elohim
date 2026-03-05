@@ -13,14 +13,14 @@ import { ContentType, ContentFormat } from '../models/content-node.model';
  * Icon mappings for content types.
  * These represent the semantic category of content.
  */
-const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
+export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   // Wire types (from healing.rs)
   epic: '📖',
   concept: '💡',
   lesson: '📝',
   scenario: '✓',
   assessment: '📝',
-  resource: '📎',
+
   reflection: '🪞',
   discussion: '💬',
   exercise: '🏋️',
@@ -59,7 +59,7 @@ const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
  * Icon mappings for content formats.
  * These represent how content is rendered/consumed.
  */
-const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
+export const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
   // Wire formats (from healing.rs)
   markdown: '📄',
   html: '📄',
