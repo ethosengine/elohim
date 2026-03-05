@@ -19,15 +19,15 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 use std::sync::Arc;
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::{response, Services};
 use crate::services::resource_service::{
     CreateAllocationRequest, CreateResourceRequest, RecordUsageRequest, ResourceService,
 };
+use crate::services::{response, Services};
 
 use super::parse_body;
 

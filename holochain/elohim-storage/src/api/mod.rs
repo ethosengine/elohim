@@ -22,7 +22,7 @@ pub mod stewardship;
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
@@ -61,7 +61,10 @@ pub async fn handle_api_request(
         let resource_path = sub_path.strip_prefix("requests-offers").unwrap_or("");
         requests_offers::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
-        Ok(response::not_found(&format!("Unknown API route: /api/v1/{}", sub_path)))
+        Ok(response::not_found(&format!(
+            "Unknown API route: /api/v1/{}",
+            sub_path
+        )))
     }
 }
 
@@ -93,7 +96,6 @@ pub async fn parse_body<T: serde::de::DeserializeOwned>(
         .await
         .map_err(|e| StorageError::InvalidInput(format!("Failed to read body: {}", e)))?
         .to_bytes();
-    serde_json::from_slice(&body_bytes).map_err(|e| {
-        StorageError::InvalidInput(format!("Invalid JSON: {}", e))
-    })
+    serde_json::from_slice(&body_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))
 }

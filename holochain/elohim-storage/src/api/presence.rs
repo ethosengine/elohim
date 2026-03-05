@@ -7,11 +7,14 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 use serde::Deserialize;
 
+use crate::db::contributor_presences::{
+    ContributorPresenceQuery, CreateContributorPresenceInput, InitiateClaimInput,
+    InitiateStewardshipInput,
+};
 use crate::db::{AppContext, DbPool};
-use crate::db::contributor_presences::{ContributorPresenceQuery, CreateContributorPresenceInput, InitiateClaimInput, InitiateStewardshipInput};
 use crate::error::StorageError;
 use crate::services::response;
 use crate::services::PresenceService;
@@ -68,7 +71,11 @@ fn extract_id(path: &str) -> Option<&str> {
     }
     // Split on '/' — the first segment is the ID
     let id = trimmed.split('/').next()?;
-    if id.is_empty() { None } else { Some(id) }
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 /// Extract sub-action after `/{id}/` from a resource path
@@ -90,13 +97,14 @@ async fn list_presences(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Parse query params from URL
     let query_str = req.uri().query().unwrap_or("");
-    let query: ContributorPresenceQuery =
-        serde_urlencoded::from_str(query_str).unwrap_or_default();
+    let query: ContributorPresenceQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
     let mut conn = get_conn(pool)?;
     let presences = PresenceService::list_presences(&mut conn, ctx, &query)?;
-    let views: Vec<ContributorPresenceView> =
-        presences.into_iter().map(ContributorPresenceView::from).collect();
+    let views: Vec<ContributorPresenceView> = presences
+        .into_iter()
+        .map(ContributorPresenceView::from)
+        .collect();
     Ok(response::ok(&views))
 }
 
@@ -233,10 +241,12 @@ pub async fn handle(
         _ => {
             let id = match extract_id(trimmed) {
                 Some(id) => id,
-                None => return Ok(response::not_found(&format!(
-                    "Unknown presence route: {} {}",
-                    method, resource_path
-                ))),
+                None => {
+                    return Ok(response::not_found(&format!(
+                        "Unknown presence route: {} {}",
+                        method, resource_path
+                    )))
+                }
             };
             let action = extract_action(trimmed);
 
@@ -248,9 +258,7 @@ pub async fn handle(
                 (&Method::DELETE, None) => delete_presence(id, pool, ctx).await,
 
                 // POST /api/v1/presence/{id}/stewardship
-                (&Method::POST, Some("stewardship")) => {
-                    begin_stewardship(id, req, pool, ctx).await
-                }
+                (&Method::POST, Some("stewardship")) => begin_stewardship(id, req, pool, ctx).await,
 
                 // POST /api/v1/presence/{id}/claim
                 (&Method::POST, Some("claim")) => initiate_claim(id, req, pool, ctx).await,

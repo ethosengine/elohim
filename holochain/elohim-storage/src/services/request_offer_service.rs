@@ -389,9 +389,7 @@ impl RequestOfferService {
             ));
         }
         if input.title.trim().is_empty() {
-            return Err(StorageError::InvalidInput(
-                "title must not be empty".into(),
-            ));
+            return Err(StorageError::InvalidInput("title must not be empty".into()));
         }
 
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -429,10 +427,7 @@ impl RequestOfferService {
                 .date_range
                 .as_ref()
                 .and_then(|dr| dr.start_date.clone()),
-            has_end: input
-                .date_range
-                .as_ref()
-                .and_then(|dr| dr.end_date.clone()),
+            has_end: input.date_range.as_ref().and_then(|dr| dr.end_date.clone()),
             finished: false,
             note: input.description.clone(),
         };
@@ -699,9 +694,7 @@ impl RequestOfferService {
             ));
         }
         if input.title.trim().is_empty() {
-            return Err(StorageError::InvalidInput(
-                "title must not be empty".into(),
-            ));
+            return Err(StorageError::InvalidInput("title must not be empty".into()));
         }
 
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -737,10 +730,7 @@ impl RequestOfferService {
                 .date_range
                 .as_ref()
                 .and_then(|dr| dr.start_date.clone()),
-            has_end: input
-                .date_range
-                .as_ref()
-                .and_then(|dr| dr.end_date.clone()),
+            has_end: input.date_range.as_ref().and_then(|dr| dr.end_date.clone()),
             finished: false,
             note: input.description.clone(),
         };
@@ -965,9 +955,7 @@ impl RequestOfferService {
 
         let matches: Vec<ServiceMatch> = offers
             .into_iter()
-            .filter_map(|offer| {
-                Self::compute_match_request_offer(&request, &offer)
-            })
+            .filter_map(|offer| Self::compute_match_request_offer(&request, &offer))
             .collect();
 
         Ok(matches)
@@ -993,9 +981,7 @@ impl RequestOfferService {
 
         let matches: Vec<ServiceMatch> = requests
             .into_iter()
-            .filter_map(|req| {
-                Self::compute_match_request_offer(&req, &offer)
-            })
+            .filter_map(|req| Self::compute_match_request_offer(&req, &offer))
             .collect();
 
         Ok(matches)
@@ -1022,10 +1008,8 @@ impl RequestOfferService {
         }
 
         // Time compatibility check
-        let time_compatible = check_date_range_overlap(
-            request.date_range.as_ref(),
-            offer.date_range.as_ref(),
-        );
+        let time_compatible =
+            check_date_range_overlap(request.date_range.as_ref(), offer.date_range.as_ref());
 
         // Interaction type compatibility
         let exchange_compatible = match (
@@ -1033,18 +1017,13 @@ impl RequestOfferService {
             offer.interaction_type.as_deref(),
         ) {
             (Some(r), Some(o)) => {
-                r == o
-                    || r == "either"
-                    || o == "either"
-                    || r == "hybrid"
-                    || o == "hybrid"
+                r == o || r == "either" || o == "either" || r == "hybrid" || o == "hybrid"
             }
             _ => true, // No preference specified = compatible
         };
 
         // Calculate quality score (0.0–1.0)
-        let type_score =
-            shared.len() as f64 / request.service_type_ids.len().max(1) as f64;
+        let type_score = shared.len() as f64 / request.service_type_ids.len().max(1) as f64;
         let time_score = if time_compatible { 1.0 } else { 0.3 };
         let exchange_score = if exchange_compatible { 1.0 } else { 0.2 };
         let match_quality = (type_score * 0.5 + time_score * 0.3 + exchange_score * 0.2)

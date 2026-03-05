@@ -7,7 +7,7 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -140,7 +140,6 @@ struct AcknowledgedResponse {
     pub message: String,
 }
 
-
 // =============================================================================
 // Main dispatcher
 // =============================================================================
@@ -214,12 +213,16 @@ pub async fn handle(
         }
 
         (&Method::POST, p) if p.starts_with("allocations/") && p.ends_with("/dispute") => {
-            let inner = p.trim_start_matches("allocations/").trim_end_matches("/dispute");
+            let inner = p
+                .trim_start_matches("allocations/")
+                .trim_end_matches("/dispute");
             handle_file_dispute(req, inner, pool, ctx).await
         }
 
         (&Method::POST, p) if p.starts_with("allocations/") && p.ends_with("/resolve") => {
-            let inner = p.trim_start_matches("allocations/").trim_end_matches("/resolve");
+            let inner = p
+                .trim_start_matches("allocations/")
+                .trim_end_matches("/resolve");
             handle_resolve_dispute(req, inner, pool, ctx).await
         }
 
@@ -450,11 +453,7 @@ async fn handle_list_allocations(
     }
 }
 
-async fn handle_get_allocation(
-    id: &str,
-    pool: &DbPool,
-    ctx: &AppContext,
-) -> Response<Full<Bytes>> {
+async fn handle_get_allocation(id: &str, pool: &DbPool, ctx: &AppContext) -> Response<Full<Bytes>> {
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
@@ -628,9 +627,7 @@ fn extract_query_param(query: Option<&str>, key: &str) -> Option<String> {
         let mut parts = pair.splitn(2, '=');
         let k = parts.next()?;
         if k == key {
-            return parts.next().map(|v| {
-                percent_decode(v)
-            });
+            return parts.next().map(|v| percent_decode(v));
         }
     }
     None

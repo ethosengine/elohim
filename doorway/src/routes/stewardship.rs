@@ -154,7 +154,10 @@ mod tests {
         let path = "/api/v1/stewardship/policy";
         let query = "collective=abc";
         let url = format!("{}{}?{}", base.trim_end_matches('/'), path, query);
-        assert_eq!(url, "http://localhost:8090/api/v1/stewardship/policy?collective=abc");
+        assert_eq!(
+            url,
+            "http://localhost:8090/api/v1/stewardship/policy?collective=abc"
+        );
     }
 
     #[test]

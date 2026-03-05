@@ -11,12 +11,12 @@ use chrono::Utc;
 use serde_json::Value;
 
 use crate::db::models::governance_states;
+use crate::db::models::{ContentStewardship, StewardshipAllocation};
 use crate::db::stewardship_allocations::{
     self, AllocationQuery, CreateAllocationInput, UpdateAllocationInput,
 };
 use crate::db::{AppContext, PooledConn};
 use crate::error::StorageError;
-use crate::db::models::{ContentStewardship, StewardshipAllocation};
 
 /// Stewardship service for governance and policy management
 pub struct StewardshipService;
@@ -156,7 +156,14 @@ impl StewardshipService {
         let random_suffix = format!("{:x}", now_ms & 0xFFFF);
         let dispute_id = format!("dispute-{}-{}", now_ms, random_suffix);
 
-        stewardship_allocations::file_dispute(conn, ctx, allocation_id, &dispute_id, disputed_by, reason)
+        stewardship_allocations::file_dispute(
+            conn,
+            ctx,
+            allocation_id,
+            &dispute_id,
+            disputed_by,
+            reason,
+        )
     }
 
     /// Resolve a dispute (Elohim ratification).
@@ -202,7 +209,9 @@ impl StewardshipService {
     pub fn transform_cached_policy(agent_id: &str, policy_json: &str) -> Value {
         let raw: Value = match serde_json::from_str(policy_json) {
             Ok(v) => v,
-            Err(_) => return serde_json::json!({ "subjectId": agent_id, "error": "invalid policy" }),
+            Err(_) => {
+                return serde_json::json!({ "subjectId": agent_id, "error": "invalid policy" })
+            }
         };
 
         let obj = match raw.as_object() {
@@ -219,16 +228,21 @@ impl StewardshipService {
         let time_windows = parse_json_string_field(obj, "timeWindowsJson");
 
         // Optional scalar fields (omit if null)
-        let age_rating_max = obj.get("ageRatingMax")
-            .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
-        let reach_level_max = obj.get("reachLevelMax")
-            .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
-        let session_max_minutes = obj.get("sessionMaxMinutes")
-            .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
-        let daily_max_minutes = obj.get("dailyMaxMinutes")
-            .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
-        let cooldown_minutes = obj.get("cooldownMinutes")
-            .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
+        let age_rating_max =
+            obj.get("ageRatingMax")
+                .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
+        let reach_level_max =
+            obj.get("reachLevelMax")
+                .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
+        let session_max_minutes =
+            obj.get("sessionMaxMinutes")
+                .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
+        let daily_max_minutes =
+            obj.get("dailyMaxMinutes")
+                .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
+        let cooldown_minutes =
+            obj.get("cooldownMinutes")
+                .and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
 
         // Build nested contentRules
         let mut content_rules = serde_json::json!({
@@ -283,11 +297,21 @@ impl StewardshipService {
         });
 
         // Append optional scalar fields
-        if let Some(v) = age_rating_max { out["ageRatingMax"] = v; }
-        if let Some(v) = reach_level_max { out["reachLevelMax"] = v; }
-        if let Some(v) = session_max_minutes { out["sessionMaxMinutes"] = v; }
-        if let Some(v) = daily_max_minutes { out["dailyMaxMinutes"] = v; }
-        if let Some(v) = cooldown_minutes { out["cooldownMinutes"] = v; }
+        if let Some(v) = age_rating_max {
+            out["ageRatingMax"] = v;
+        }
+        if let Some(v) = reach_level_max {
+            out["reachLevelMax"] = v;
+        }
+        if let Some(v) = session_max_minutes {
+            out["sessionMaxMinutes"] = v;
+        }
+        if let Some(v) = daily_max_minutes {
+            out["dailyMaxMinutes"] = v;
+        }
+        if let Some(v) = cooldown_minutes {
+            out["cooldownMinutes"] = v;
+        }
 
         out
     }
@@ -305,7 +329,8 @@ impl StewardshipService {
         ctx: &AppContext,
         content_id: &str,
     ) -> Result<Vec<StewardshipAllocation>, StorageError> {
-        let allocations = stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
+        let allocations =
+            stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
 
         if allocations.is_empty() {
             return Ok(allocations);

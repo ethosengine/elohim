@@ -14,13 +14,13 @@ use diesel::SqliteConnection;
 use sha2::{Digest, Sha256};
 use tracing::info;
 
-use crate::db::AppContext;
 use crate::db::economic_events::{
-    BulkEconomicEventResult, CreateEconomicEventInput, EconomicEventQuery, bulk_record_events,
-    get_economic_event, get_events_for_agent, get_events_for_content, list_economic_events,
-    record_event,
+    bulk_record_events, get_economic_event, get_events_for_agent, get_events_for_content,
+    list_economic_events, record_event, BulkEconomicEventResult, CreateEconomicEventInput,
+    EconomicEventQuery,
 };
 use crate::db::models::EconomicEvent;
+use crate::db::AppContext;
 use crate::error::StorageError;
 use crate::views::EconomicEventView;
 
@@ -196,10 +196,7 @@ impl EconomicEventService {
         // Step 7: generate ID and persist
         let now = Utc::now();
         let id = Self::generate_event_id(&staged.id, now.timestamp_millis());
-        let timestamp = staged
-            .timestamp
-            .clone()
-            .unwrap_or_else(|| now.to_rfc3339());
+        let timestamp = staged.timestamp.clone().unwrap_or_else(|| now.to_rfc3339());
 
         info!(event_id = %id, staged_id = %staged.id, "Building economic event from staged transaction");
 
@@ -357,8 +354,7 @@ impl EconomicEventService {
             meta.insert(
                 "categoryConfidence".to_string(),
                 serde_json::Value::Number(
-                    serde_json::Number::from_f64(confidence)
-                        .unwrap_or(serde_json::Number::from(0)),
+                    serde_json::Number::from_f64(confidence).unwrap_or(serde_json::Number::from(0)),
                 ),
             );
         }

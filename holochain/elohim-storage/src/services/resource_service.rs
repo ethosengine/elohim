@@ -568,7 +568,11 @@ impl ResourceService {
         let dimension = dimension_for_category(&req.category);
         let unit = dimension.unit.clone();
         let allocatable = req.total_capacity.value
-            - req.permanent_reserve.as_ref().map(|r| r.value).unwrap_or(0.0);
+            - req
+                .permanent_reserve
+                .as_ref()
+                .map(|r| r.value)
+                .unwrap_or(0.0);
 
         let resource = StewardedResource {
             id: id.clone(),
@@ -585,10 +589,22 @@ impl ResourceService {
                 value: allocatable,
                 unit: unit.clone(),
             },
-            total_allocated: ResourceMeasure { value: 0.0, unit: unit.clone() },
-            total_reserved: ResourceMeasure { value: 0.0, unit: unit.clone() },
-            total_used: ResourceMeasure { value: 0.0, unit: unit.clone() },
-            available: ResourceMeasure { value: allocatable, unit: unit.clone() },
+            total_allocated: ResourceMeasure {
+                value: 0.0,
+                unit: unit.clone(),
+            },
+            total_reserved: ResourceMeasure {
+                value: 0.0,
+                unit: unit.clone(),
+            },
+            total_used: ResourceMeasure {
+                value: 0.0,
+                unit: unit.clone(),
+            },
+            available: ResourceMeasure {
+                value: allocatable,
+                unit: unit.clone(),
+            },
             allocations: vec![],
             allocation_strategy: AllocationStrategy::Manual,
             allocation_notes: None,
@@ -655,9 +671,18 @@ impl ResourceService {
             resource_id: resource_id.to_string(),
             label: req.label,
             description: req.description,
-            allocated: ResourceMeasure { value: amount, unit: unit.clone() },
-            used: ResourceMeasure { value: 0.0, unit: unit.clone() },
-            reserved: ResourceMeasure { value: 0.0, unit: unit.clone() },
+            allocated: ResourceMeasure {
+                value: amount,
+                unit: unit.clone(),
+            },
+            used: ResourceMeasure {
+                value: 0.0,
+                unit: unit.clone(),
+            },
+            reserved: ResourceMeasure {
+                value: 0.0,
+                unit: unit.clone(),
+            },
             governance_level: req.governance_level,
             governed_by: None,
             commitment_id: None,
@@ -756,7 +781,10 @@ impl ResourceService {
             economic_event_id: Some(event_id),
             allocation_block_id: req.allocation_block_id,
             action: req.action.unwrap_or_else(|| "use".to_string()),
-            quantity: ResourceMeasure { value: amount, unit },
+            quantity: ResourceMeasure {
+                value: amount,
+                unit,
+            },
             duration: None,
             observer_attestation_id: req.observer_attestation_id,
             timestamp: now.clone(),
@@ -793,16 +821,28 @@ impl ResourceService {
                 let total_alloc: f64 = cat_resources.iter().map(|r| r.total_allocated.value).sum();
                 let total_used: f64 = cat_resources.iter().map(|r| r.total_used.value).sum();
                 let util = utilization_percent(total_used, total_cap);
-                let unit = cat_resources.first().map(|r| r.total_capacity.unit.clone()).unwrap_or_default();
-                let category = ResourceCategory::from_str(&cat_str)
-                    .unwrap_or(ResourceCategory::Inventory);
+                let unit = cat_resources
+                    .first()
+                    .map(|r| r.total_capacity.unit.clone())
+                    .unwrap_or_default();
+                let category =
+                    ResourceCategory::from_str(&cat_str).unwrap_or(ResourceCategory::Inventory);
 
                 CategorySummary {
                     category,
                     resources: cat_resources,
-                    total_capacity: ResourceMeasure { value: total_cap, unit: unit.clone() },
-                    total_allocated: ResourceMeasure { value: total_alloc, unit: unit.clone() },
-                    total_used: ResourceMeasure { value: total_used, unit },
+                    total_capacity: ResourceMeasure {
+                        value: total_cap,
+                        unit: unit.clone(),
+                    },
+                    total_allocated: ResourceMeasure {
+                        value: total_alloc,
+                        unit: unit.clone(),
+                    },
+                    total_used: ResourceMeasure {
+                        value: total_used,
+                        unit,
+                    },
                     utilization_percent: util,
                     health_status: health_status(util),
                 }

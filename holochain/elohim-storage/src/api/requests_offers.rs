@@ -7,16 +7,16 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::RequestOfferService;
 use crate::services::request_offer_service::{
     CreateOfferInput, CreateRequestInput, OfferQuery, RequestQuery, UpdateOfferInput,
     UpdateRequestInput,
 };
 use crate::services::response;
+use crate::services::RequestOfferService;
 
 use super::{get_conn, parse_body};
 
@@ -31,7 +31,11 @@ fn extract_id(path: &str) -> Option<&str> {
         return None;
     }
     let id = trimmed.split('/').next()?;
-    if id.is_empty() { None } else { Some(id) }
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 /// Extract sub-action after `/{id}/` from a resource path
@@ -102,9 +106,9 @@ async fn update_request(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let body: UpdateRequestInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(
-        RequestOfferService::update_request(&mut conn, ctx, id, body),
-    ))
+    Ok(response::from_result(RequestOfferService::update_request(
+        &mut conn, ctx, id, body,
+    )))
 }
 
 async fn archive_request(
@@ -131,9 +135,9 @@ async fn match_request(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(
-        RequestOfferService::match_request(&mut conn, ctx, id),
-    ))
+    Ok(response::from_result(RequestOfferService::match_request(
+        &mut conn, ctx, id,
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -185,9 +189,9 @@ async fn update_offer(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let body: UpdateOfferInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(
-        RequestOfferService::update_offer(&mut conn, ctx, id, body),
-    ))
+    Ok(response::from_result(RequestOfferService::update_offer(
+        &mut conn, ctx, id, body,
+    )))
 }
 
 async fn archive_offer(
@@ -214,9 +218,9 @@ async fn match_offer(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(
-        RequestOfferService::match_offer(&mut conn, ctx, id),
-    ))
+    Ok(response::from_result(RequestOfferService::match_offer(
+        &mut conn, ctx, id,
+    )))
 }
 
 // ---------------------------------------------------------------------------

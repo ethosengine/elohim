@@ -7,15 +7,15 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Method, Request, Response, body::Incoming};
+use hyper::{body::Incoming, Method, Request, Response};
 use serde::Serialize;
 
-use crate::db::{AppContext, DbPool};
 use crate::db::economic_events::{CreateEconomicEventInput, EconomicEventQuery};
+use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::EconomicEventService;
 use crate::services::economic_event_service::StagedTransaction;
 use crate::services::response::{self, from_create_result, from_option, from_result};
+use crate::services::EconomicEventService;
 use crate::views::{CreateEconomicEventInputView, EconomicEventView};
 
 use super::{get_conn, parse_body};
@@ -130,8 +130,7 @@ async fn handle_bulk_create(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let input_views: Vec<CreateEconomicEventInputView> = parse_body(req).await?;
-    let inputs: Vec<CreateEconomicEventInput> =
-        input_views.into_iter().map(|v| v.into()).collect();
+    let inputs: Vec<CreateEconomicEventInput> = input_views.into_iter().map(|v| v.into()).collect();
     let mut conn = get_conn(pool)?;
     Ok(from_result(EconomicEventService::bulk_create_events(
         &mut conn, ctx, inputs,
@@ -163,10 +162,8 @@ async fn handle_from_staged(
 
     if is_array {
         // Bulk from-staged
-        let staged_list: Vec<StagedTransaction> =
-            serde_json::from_slice(&body_bytes).map_err(|e| {
-                StorageError::InvalidInput(format!("Invalid request body: {}", e))
-            })?;
+        let staged_list: Vec<StagedTransaction> = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid request body: {}", e)))?;
 
         let (events, submitted, skipped) =
             EconomicEventService::bulk_from_staged(&mut conn, ctx, staged_list)?;
@@ -180,9 +177,8 @@ async fn handle_from_staged(
         Ok(response::ok(&resp))
     } else {
         // Single from-staged
-        let staged: StagedTransaction = serde_json::from_slice(&body_bytes).map_err(|e| {
-            StorageError::InvalidInput(format!("Invalid request body: {}", e))
-        })?;
+        let staged: StagedTransaction = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid request body: {}", e)))?;
 
         Ok(from_create_result(
             EconomicEventService::build_event_from_staged(&mut conn, ctx, &staged),
@@ -210,9 +206,7 @@ async fn handle_events_for_content(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(from_result(EconomicEventService::events_for_content(
-        &mut conn,
-        ctx,
-        content_id,
+        &mut conn, ctx, content_id,
     )))
 }
 
