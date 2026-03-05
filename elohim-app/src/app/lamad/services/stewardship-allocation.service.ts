@@ -27,14 +27,17 @@ import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import {
-  StewardshipAllocation,
-  ContentStewardship,
   CreateAllocationInput,
   UpdateAllocationInput,
   BulkAllocationResult,
   GovernanceState,
   ContributionType,
 } from '../models/stewardship-allocation.model';
+
+import type {
+  StewardshipAllocationView,
+  ContentStewardshipView,
+} from '@elohim/storage-client/generated';
 
 // =============================================================================
 // Service Types
@@ -45,7 +48,7 @@ import {
  */
 export interface StewardPortfolio {
   stewardPresenceId: string;
-  allocations: StewardshipAllocation[];
+  allocations: StewardshipAllocationView[];
   totalRecognition: number;
   contentCount: number;
   activeDisputeCount: number;
@@ -79,7 +82,7 @@ export class StewardshipAllocationService {
   readonly currentPortfolio$ = this._currentPortfolio$.asObservable();
 
   /** Currently viewed content's stewardship */
-  private readonly _currentStewardship$ = new BehaviorSubject<ContentStewardship | null>(null);
+  private readonly _currentStewardship$ = new BehaviorSubject<ContentStewardshipView | null>(null);
   readonly currentStewardship$ = this._currentStewardship$.asObservable();
 
   /** Loading state */
@@ -98,7 +101,7 @@ export class StewardshipAllocationService {
    * - Primary steward identification
    * - Dispute status
    */
-  getContentStewardship(contentId: string): Observable<ContentStewardship> {
+  getContentStewardship(contentId: string): Observable<ContentStewardshipView> {
     this._loading.set(true);
 
     return this.storageApi.getContentStewardship(contentId).pipe(
@@ -115,7 +118,7 @@ export class StewardshipAllocationService {
           totalAllocation: 0,
           hasDisputes: false,
           primarySteward: null,
-        });
+        } as ContentStewardshipView);
       })
     );
   }
@@ -125,7 +128,7 @@ export class StewardshipAllocationService {
    *
    * The primary steward is the one with the highest allocation ratio.
    */
-  getPrimarySteward(contentId: string): Observable<StewardshipAllocation | null> {
+  getPrimarySteward(contentId: string): Observable<StewardshipAllocationView | null> {
     return this.getContentStewardship(contentId).pipe(
       map(stewardship => stewardship.primarySteward)
     );
@@ -200,7 +203,7 @@ export class StewardshipAllocationService {
   /**
    * Create a new stewardship allocation.
    */
-  createAllocation(input: CreateAllocationInput): Observable<StewardshipAllocation> {
+  createAllocation(input: CreateAllocationInput): Observable<StewardshipAllocationView> {
     return this.storageApi.createStewardshipAllocation(input);
   }
 
@@ -210,7 +213,7 @@ export class StewardshipAllocationService {
   updateAllocation(
     allocationId: string,
     input: UpdateAllocationInput
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     return this.storageApi.updateStewardshipAllocation(allocationId, input);
   }
 
@@ -246,7 +249,7 @@ export class StewardshipAllocationService {
     allocationId: string,
     disputedBy: string,
     reason: string
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     const disputeId = `dispute-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`;
 
     return this.storageApi.fileAllocationDispute(allocationId, {
@@ -265,7 +268,7 @@ export class StewardshipAllocationService {
     allocationId: string,
     ratifierId: string,
     newState: GovernanceState
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     return this.storageApi.resolveAllocationDispute(allocationId, {
       ratifierId,
       newState,
@@ -275,7 +278,7 @@ export class StewardshipAllocationService {
   /**
    * Get all disputed allocations (for governance review).
    */
-  getDisputedAllocations(): Observable<StewardshipAllocation[]> {
+  getDisputedAllocations(): Observable<StewardshipAllocationView[]> {
     return this.storageApi.getStewardshipAllocations({
       governanceState: 'disputed',
     });
@@ -297,11 +300,11 @@ export class StewardshipAllocationService {
     return this.getContentStewardship(contentId).pipe(
       map(stewardship => {
         const distributions = stewardship.allocations
-          .filter(a => a.allocation.governanceState === 'active')
+          .filter(a => a.governanceState === 'active')
           .map(a => ({
-            stewardPresenceId: a.allocation.stewardPresenceId,
-            amount: totalAmount * a.allocation.allocationRatio,
-            ratio: a.allocation.allocationRatio,
+            stewardPresenceId: a.stewardPresenceId,
+            amount: totalAmount * a.allocationRatio,
+            ratio: a.allocationRatio,
           }));
 
         return {
@@ -345,7 +348,7 @@ export class StewardshipAllocationService {
    *
    * Call this after adding/removing allocations to ensure ratios are valid.
    */
-  normalizeRatios(allocations: StewardshipAllocation[]): StewardshipAllocation[] {
+  normalizeRatios(allocations: StewardshipAllocationView[]): StewardshipAllocationView[] {
     const activeAllocations = allocations.filter(a => a.governanceState === 'active');
     const totalRatio = activeAllocations.reduce((sum, a) => sum + a.allocationRatio, 0);
 

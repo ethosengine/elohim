@@ -18,10 +18,7 @@ import { RouterModule } from '@angular/router';
 
 // @coverage: 98.0% (2026-02-24)
 
-import {
-  type StewardshipAllocation,
-  type GovernanceState,
-} from '@app/lamad/models/stewardship-allocation.model';
+import { type GovernanceState } from '@app/lamad/models/stewardship-allocation.model';
 import {
   StewardshipAllocationService,
   type StewardPortfolio,
@@ -30,9 +27,11 @@ import {
 import { IdentityService } from '../../services/identity.service';
 import { PresenceService } from '../../services/presence.service';
 
+import type { StewardshipAllocationView } from '@elohim/storage-client/generated';
+
 /** Display-ready allocation with content info */
 interface AllocationDisplay {
-  allocation: StewardshipAllocation;
+  allocation: StewardshipAllocationView;
   contentTitle: string;
   stateLabel: string;
   stateColor: string;
@@ -148,12 +147,12 @@ export class StewardshipDashboardComponent implements OnInit {
   /**
    * Convert allocation to display format.
    */
-  private toAllocationDisplay(allocation: StewardshipAllocation): AllocationDisplay {
+  private toAllocationDisplay(allocation: StewardshipAllocationView): AllocationDisplay {
     return {
       allocation,
       contentTitle: this.formatContentId(allocation.contentId),
-      stateLabel: this.getStateLabel(allocation.governanceState),
-      stateColor: this.getStateColor(allocation.governanceState),
+      stateLabel: this.getStateLabel(allocation.governanceState as GovernanceState),
+      stateColor: this.getStateColor(allocation.governanceState as GovernanceState),
     };
   }
 

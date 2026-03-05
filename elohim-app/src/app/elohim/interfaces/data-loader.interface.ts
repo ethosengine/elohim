@@ -22,11 +22,9 @@
  * ```
  */
 
-import { InjectionToken, inject } from '@angular/core';
+import { InjectionToken } from '@angular/core';
 
 import { Observable } from 'rxjs';
-
-import { DataLoaderService } from '../services/data-loader.service';
 
 import type { ContentFilters } from './storage-api.interface';
 import type { ContentWithTagsView, PathWithDetailsView } from '@elohim/storage-client/generated';
@@ -60,7 +58,4 @@ export interface IDataLoader {
  * { provide: DATA_LOADER, useValue: mockDataLoader }
  * ```
  */
-export const DATA_LOADER = new InjectionToken<IDataLoader>('DataLoader', {
-  providedIn: 'root',
-  factory: () => inject(DataLoaderService),
-});
+export const DATA_LOADER = new InjectionToken<IDataLoader>('DataLoader');

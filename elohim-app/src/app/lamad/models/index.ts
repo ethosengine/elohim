@@ -33,7 +33,11 @@ export type {
   ContentReach,
   ContentFlag,
 } from './content-node.model';
-export { ContentRelationshipType } from './content-node.model';
+export {
+  ContentRelationshipType,
+  ALL_CONTENT_TYPES,
+  ALL_CONTENT_FORMATS,
+} from './content-node.model';
 
 // Content Attestation models (Trust credentials granted TO content)
 export * from './content-attestation.model';

@@ -29,8 +29,12 @@
 
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
-
-// @coverage: 91.7% (2026-02-24)
+import {
+  CONTENT_TYPES as WIRE_CONTENT_TYPES,
+  CONTENT_FORMATS as WIRE_CONTENT_FORMATS,
+  type ContentType as WireContentType,
+  type ContentFormat as WireContentFormat,
+} from '@app/generated/schema-enums';
 
 import type { Place } from '@app/qahal/models/place.model';
 
@@ -405,23 +409,32 @@ export interface ContentFlag {
 /**
  * ContentType - The semantic type of content in the Territory.
  * Maps to different rendering strategies and metadata schemas.
+ *
+ * Wire types are generated from healing.rs (Rust source of truth).
+ * App-layer extensions add types needed only by the frontend.
  */
-export type ContentType =
-  | 'epic'
-  | 'feature'
-  | 'scenario'
-  | 'concept'
-  | 'simulation'
-  | 'video'
-  | 'assessment'
-  | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.) - visible path steps
-  | 'organization'
-  | 'book-chapter'
-  | 'tool'
-  | 'role' // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
-  | 'path' // Learning path - curated journey through content nodes
+
+/** App-layer content type extensions beyond protocol primitives */
+type AppContentTypeExtension =
+  | 'community' // Community group or collective
+  | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.)
   | 'instrument' // Psychometric instrument definition (subscales, scoring, display)
+  | 'tool' // External tools and utilities
+  | 'path' // Learning path - curated journey through content nodes
   | 'placeholder'; // Missing/errored content - shown when content can't be loaded
+
+export type ContentType = WireContentType | AppContentTypeExtension;
+
+/** All content types (wire + app extensions) as runtime array */
+export const ALL_CONTENT_TYPES = [
+  ...WIRE_CONTENT_TYPES,
+  'community',
+  'discovery-assessment',
+  'instrument',
+  'tool',
+  'path',
+  'placeholder',
+] as const;
 
 /**
  * RoleMetadata - Extended metadata for role-type ContentNodes.
@@ -501,43 +514,25 @@ export interface RoleMetadata {
  * ContentFormat - How the content payload should be interpreted and rendered.
  * Maps to specific renderer components via RendererRegistryService.
  *
- * Multimedia formats:
- * - 'markdown': Rich text with embedded media (default for most content)
- * - 'html': Raw HTML content
- * - 'plaintext': Unformatted text
- * - 'gherkin': Behavior-driven development scenarios
- *
- * Interactive formats:
- * - 'html5-app': Interactive web applications (e.g., https://github.com/ncase/trust)
- *   Rendered via iframe with sandbox. Ideal for simulations, games, explorable explanations.
- *   Can have attestation quizzes built to verify understanding.
- * - 'perseus-quiz-json': Legacy Khan Academy Perseus quiz format
- * - 'sophia-quiz-json': Sophia Moment format with purpose-based assessment (mastery/discovery/reflection)
- *   Uses psyche-core for psychometric aggregation and interpretation
- *
- * Media formats:
- * - 'video-embed': Embedded video (YouTube, Vimeo, etc.)
- * - 'video-file': Direct video file (blob-based streaming)
- * - 'audio-file': Direct audio file (podcasts, lectures, music)
- * - 'epub': E-book format
- *
- * Navigation:
- * - 'external-link': Link to external resource
+ * Wire formats are generated from healing.rs (Rust source of truth).
+ * App-layer extensions add formats needed only by the frontend.
  */
-export type ContentFormat =
-  | 'markdown'
-  | 'html5-app'
-  | 'video-embed'
-  | 'video-file'
-  | 'audio-file'
-  | 'perseus-quiz-json' // Khan Academy Perseus quiz format (legacy)
-  | 'sophia-quiz-json' // Sophia Moment format with purpose-based assessment
+type AppFormatExtension =
+  | 'video-file' // Direct video file (blob-based streaming)
   | 'instrument-json' // Psychometric instrument definition (subscales, scoring, display config)
-  | 'external-link'
-  | 'epub'
-  | 'gherkin'
-  | 'html'
-  | 'plaintext';
+  | 'external-link' // Link to external resource
+  | 'epub'; // E-book format
+
+export type ContentFormat = WireContentFormat | AppFormatExtension;
+
+/** All content formats (wire + app extensions) as runtime array */
+export const ALL_CONTENT_FORMATS = [
+  ...WIRE_CONTENT_FORMATS,
+  'video-file',
+  'instrument-json',
+  'external-link',
+  'epub',
+] as const;
 
 /**
  * ContentPreview - Lightweight preview data for listing/composing content.
