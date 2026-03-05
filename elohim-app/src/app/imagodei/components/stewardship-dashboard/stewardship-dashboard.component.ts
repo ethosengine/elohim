@@ -25,7 +25,6 @@ import {
 } from '@app/lamad/services/stewardship-allocation.service';
 
 import { IdentityService } from '../../services/identity.service';
-import { PresenceService } from '../../services/presence.service';
 
 import type { StewardshipAllocationView } from '@elohim/storage-client/generated';
 
@@ -46,7 +45,6 @@ interface AllocationDisplay {
 })
 export class StewardshipDashboardComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
-  private readonly presenceService = inject(PresenceService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
 
   // ===========================================================================

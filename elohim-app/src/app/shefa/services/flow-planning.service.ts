@@ -27,6 +27,7 @@ import { Injectable, inject } from '@angular/core';
 // @coverage: 48.8% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import { STEWARDED_RESOURCES } from '../interfaces';
 import {
   FlowPlan,
   FlowBudget,
@@ -61,7 +62,6 @@ import {
 import { ResourceCategory } from '../models/stewarded-resources.model';
 
 import { EconomicService } from './economic.service';
-import { StewardedResourceService } from './stewarded-resources.service';
 
 /**
  * Flow Planning Service
@@ -83,7 +83,7 @@ export class FlowPlanningService {
 
   private readonly holochain = inject(HolochainClientService);
   private readonly economicService = inject(EconomicService);
-  private readonly resourceService = inject(StewardedResourceService);
+  private readonly resourceService = inject(STEWARDED_RESOURCES);
 
   // =========================================================================
   // Plan Management

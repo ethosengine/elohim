@@ -8,7 +8,9 @@ import { of } from 'rxjs';
 import { ShefaComputeService } from './shefa-compute.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { EconomicService } from './economic.service';
-import { StewardedResourceService } from './stewarded-resources.service';
+import { STEWARDED_RESOURCES } from '../interfaces/stewarded-resources.interface';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import type { ComputeGap } from '../models/shefa-dashboard.model';
 import { REAAction } from '@app/elohim/models/rea-bridge.model';
 import { vi } from 'vitest';
@@ -36,7 +38,9 @@ describe('ShefaComputeService', () => {
         ShefaComputeService,
         { provide: HolochainClientService, useValue: mockHolochain },
         { provide: EconomicService, useValue: mockEconomic },
-        { provide: StewardedResourceService, useValue: mockStewardedResources },
+        { provide: STEWARDED_RESOURCES, useValue: mockStewardedResources },
+        provideHttpClient(),
+        provideHttpClientTesting(),
       ],
     });
     service = TestBed.inject(ShefaComputeService);

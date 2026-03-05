@@ -20,19 +20,29 @@
 //! ```
 
 pub mod content_service;
+pub mod economic_event_service;
 pub mod events;
 pub mod knowledge_service;
 pub mod path_service;
+pub mod presence_service;
 pub mod relationship_service;
+pub mod request_offer_service;
+pub mod resource_service;
 pub mod response;
+pub mod stewardship_service;
 
 // Re-exports
 pub use content_service::ContentService;
+pub use economic_event_service::EconomicEventService;
 pub use events::{EventBus, EventListener, StorageEvent};
 pub use knowledge_service::KnowledgeService;
 pub use path_service::PathService;
+pub use presence_service::PresenceService;
 pub use relationship_service::RelationshipService;
+pub use request_offer_service::RequestOfferService;
+pub use resource_service::ResourceService;
 pub use response::*;
+pub use stewardship_service::StewardshipService;
 
 use crate::db::ContentDb;
 use std::sync::Arc;

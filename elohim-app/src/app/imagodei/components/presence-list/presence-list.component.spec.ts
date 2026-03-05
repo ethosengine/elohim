@@ -2,8 +2,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
 import { PresenceListComponent } from './presence-list.component';
-import { PresenceService } from '../../services/presence.service';
+import { PRESENCE_LIFECYCLE } from '../../interfaces/presence.interface';
 import { IdentityService } from '../../services/identity.service';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import type { ContributorPresenceView } from '../../models/presence.model';
 import { vi } from 'vitest';
 
@@ -87,8 +89,10 @@ describe('PresenceListComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PresenceListComponent],
       providers: [
-        { provide: PresenceService, useValue: mockPresenceService },
+        { provide: PRESENCE_LIFECYCLE, useValue: mockPresenceService },
         { provide: IdentityService, useValue: mockIdentityService },
+        provideHttpClient(),
+        provideHttpClientTesting(),
       ],
     }).compileComponents();
 

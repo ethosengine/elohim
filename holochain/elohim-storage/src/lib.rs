@@ -37,6 +37,9 @@
 // (must be declared before any modules that use randomness)
 mod getrandom_custom;
 
+// Enriched API endpoints (controller layer for /api/v1/*)
+pub mod api;
+
 // Core modules (always available)
 pub mod blob_store;
 pub mod conductor; // Custom conductor connection (unsigned - deprecated)

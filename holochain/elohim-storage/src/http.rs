@@ -388,6 +388,28 @@ impl HttpServer {
                 }
             }
 
+            // Enriched API: Business logic endpoints
+            (method, p) if p.starts_with("/api/v1/") => {
+                if let Some(ref pool) = self.db_pool {
+                    crate::api::handle_api_request(
+                        req,
+                        method,
+                        &path,
+                        pool.clone(),
+                        self.services.clone(),
+                    )
+                    .await
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "API not available - database pool not configured"}"#,
+                        )))
+                        .unwrap())
+                }
+            }
+
             // Database API: Content, Paths, Stats
             (method, p) if p.starts_with("/db/") => {
                 if let Some(ref content_db) = self.content_db {

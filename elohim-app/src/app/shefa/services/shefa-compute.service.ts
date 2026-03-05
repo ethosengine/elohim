@@ -30,6 +30,7 @@ import { BehaviorSubject, Observable, combineLatest, interval, of, from } from '
 import { LamadEventType } from '@app/elohim/models/economic-event.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
+import { STEWARDED_RESOURCES } from '../interfaces';
 import {
   SheafaDashboardState,
   ComputeMetrics,
@@ -68,7 +69,6 @@ import {
 // ResourceMeasure not needed - using Measure.hasNumericalValue directly
 
 import { EconomicService } from './economic.service';
-import { StewardedResourceService } from './stewarded-resources.service';
 
 /**
  * Configuration for ShefaComputeService
@@ -297,7 +297,7 @@ export class ShefaComputeService {
 
   private readonly holochain = inject(HolochainClientService);
   private readonly economicService = inject(EconomicService);
-  private readonly stewaredResources = inject(StewardedResourceService);
+  private readonly stewaredResources = inject(STEWARDED_RESOURCES);
 
   /**
    * Initialize dashboard for a specific operator and node

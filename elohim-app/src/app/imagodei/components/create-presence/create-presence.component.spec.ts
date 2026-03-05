@@ -6,8 +6,10 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CreatePresenceComponent } from './create-presence.component';
-import { PresenceService } from '../../services/presence.service';
+import { PRESENCE_LIFECYCLE } from '../../interfaces/presence.interface';
 import { ContentService } from '@app/lamad/services/content.service';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
@@ -36,7 +38,9 @@ describe('CreatePresenceComponent', () => {
     await TestBed.configureTestingModule({
       imports: [CreatePresenceComponent],
       providers: [
-        { provide: PresenceService, useValue: mockPresenceService },
+        { provide: PRESENCE_LIFECYCLE, useValue: mockPresenceService },
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ContentService, useValue: mockContentService },
         { provide: Router, useValue: mockRouter },
       ],
