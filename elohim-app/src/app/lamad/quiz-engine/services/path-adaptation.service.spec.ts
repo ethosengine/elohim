@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
 import { PathAdaptationService } from './path-adaptation.service';
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
+import { RelationshipService } from '@app/lamad/services/relationship.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import type { QuizResult, ContentScore } from '../models/quiz-session.model';
 import { vi } from 'vitest';
@@ -66,6 +68,7 @@ describe('PathAdaptationService (story-first)', () => {
   let cooldownSpy: any;
   let poolSpy: any;
   let streakSpy: any;
+  let relationshipSpy: any;
 
   const PATH_ID = 'elohim-protocol';
   const HUMAN_ID = 'matthew';
@@ -99,6 +102,11 @@ describe('PathAdaptationService (story-first)', () => {
     };
     streakSpy.isAchieved.mockReturnValue(false);
 
+    relationshipSpy = {
+      getRelationshipsByType: vi.fn().mockReturnValue(of([])),
+      getBidirectionalRelationships: vi.fn().mockReturnValue(of([])),
+    };
+
     const mockElohimClient = {
       getContent: vi.fn(),
       listContent: vi.fn(),
@@ -118,6 +126,7 @@ describe('PathAdaptationService (story-first)', () => {
         { provide: AttemptCooldownService, useValue: cooldownSpy },
         { provide: QuestionPoolService, useValue: poolSpy },
         { provide: StreakTrackerService, useValue: streakSpy },
+        { provide: RelationshipService, useValue: relationshipSpy },
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
       ],
     });
@@ -521,6 +530,152 @@ describe('PathAdaptationService (story-first)', () => {
       const gate = service.getGateStatus(PATH_ID, 'section-a', HUMAN_ID);
       expect(gate.locked).toBe(false);
       expect(gate.mastered).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Scenario: Graph-aware recommendations resolve prerequisites
+  // Design: 2026-03-06-graph-aware-recommendations-design.md
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('Graph-aware recommendations resolve prerequisite content', () => {
+    it('should look up PREREQUISITE relationships for struggling concepts', () => {
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      expect(relationshipSpy.getRelationshipsByType).toHaveBeenCalledWith(
+        'concept-trust',
+        'PREREQUISITE'
+      );
+    });
+
+    it('should include prerequisite content in recommendations with reason prerequisite_gap', () => {
+      relationshipSpy.getRelationshipsByType.mockImplementation(
+        (contentId: string, type: string) => {
+          if (type === 'PREREQUISITE') {
+            return of([
+              {
+                id: 'rel-1',
+                sourceId: contentId,
+                targetId: 'prereq-foundations',
+                relationshipType: 'PREREQUISITE',
+                confidence: 0.9,
+              },
+            ]);
+          }
+          return of([]);
+        }
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const prereqRec = recs.find(r => r.contentId === 'prereq-foundations');
+      expect(prereqRec).toBeDefined();
+      expect(prereqRec!.reason).toBe('prerequisite_gap');
+    });
+
+    it('should include REINFORCES content with reason reinforcement', () => {
+      relationshipSpy.getRelationshipsByType.mockImplementation(
+        (contentId: string, type: string) => {
+          if (type === 'REINFORCES') {
+            return of([
+              {
+                id: 'rel-2',
+                sourceId: contentId,
+                targetId: 'alt-perspective',
+                relationshipType: 'REINFORCES',
+                confidence: 0.7,
+              },
+            ]);
+          }
+          return of([]);
+        }
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const reinforceRec = recs.find(r => r.contentId === 'alt-perspective');
+      expect(reinforceRec).toBeDefined();
+      expect(reinforceRec!.reason).toBe('reinforcement');
+    });
+
+    it('should fall back to struggled_with_concept when no graph relationships exist', () => {
+      // Default mock returns empty arrays — no graph relationships
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      expect(recs.length).toBeGreaterThan(0);
+      expect(recs[0].reason).toBe('struggled_with_concept');
+    });
+
+    it('should rank prerequisite_gap above reinforcement', () => {
+      relationshipSpy.getRelationshipsByType.mockImplementation(
+        (_contentId: string, type: string) => {
+          if (type === 'PREREQUISITE') {
+            return of([
+              {
+                id: 'rel-1',
+                sourceId: 'concept-trust',
+                targetId: 'prereq-foundations',
+                relationshipType: 'PREREQUISITE',
+                confidence: 0.7,
+              },
+            ]);
+          }
+          if (type === 'REINFORCES') {
+            return of([
+              {
+                id: 'rel-2',
+                sourceId: 'concept-trust',
+                targetId: 'alt-perspective',
+                relationshipType: 'REINFORCES',
+                confidence: 0.9,
+              },
+            ]);
+          }
+          return of([]);
+        }
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const prereqIdx = recs.findIndex(r => r.reason === 'prerequisite_gap');
+      const reinforceIdx = recs.findIndex(r => r.reason === 'reinforcement');
+      if (prereqIdx >= 0 && reinforceIdx >= 0) {
+        expect(prereqIdx).toBeLessThan(reinforceIdx);
+      }
     });
   });
 
