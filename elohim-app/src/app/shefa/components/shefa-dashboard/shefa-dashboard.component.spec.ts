@@ -15,7 +15,7 @@ import { ShefaService } from '@app/elohim/services/shefa.service';
 import { PerformanceMetricsService } from '@app/elohim/services/performance-metrics.service';
 import { CustodianCommitmentService } from '@app/elohim/services/custodian-commitment.service';
 import { EconomicService } from '../../services/economic.service';
-import { StewardedResourceService } from '../../services/stewarded-resources.service';
+import { STEWARDED_RESOURCES } from '../../interfaces/stewarded-resources.interface';
 import { ComputeEventService } from '../../services/compute-event.service';
 import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
@@ -91,7 +91,7 @@ describe('ShefaDashboardComponent', () => {
         { provide: PerformanceMetricsService, useValue: performanceMetricsMock },
         { provide: CustodianCommitmentService, useValue: custodianCommitmentMock },
         { provide: EconomicService, useValue: economicServiceMock },
-        { provide: StewardedResourceService, useValue: stewardedResourceMock },
+        { provide: STEWARDED_RESOURCES, useValue: stewardedResourceMock },
         { provide: ShefaComputeService, useValue: shefaComputeMock },
         { provide: FamilyCommunityProtectionService, useValue: familyProtectionMock },
         { provide: ComputeEventService, useValue: computeEventsMock },

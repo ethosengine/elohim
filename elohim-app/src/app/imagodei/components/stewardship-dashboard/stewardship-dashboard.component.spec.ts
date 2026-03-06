@@ -7,7 +7,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { StewardshipDashboardComponent } from './stewardship-dashboard.component';
 import { IdentityService } from '../../services/identity.service';
-import { PresenceService } from '../../services/presence.service';
 import { StewardshipAllocationService } from '@app/lamad/services/stewardship-allocation.service';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
@@ -16,17 +15,12 @@ describe('StewardshipDashboardComponent', () => {
   let component: StewardshipDashboardComponent;
   let fixture: ComponentFixture<StewardshipDashboardComponent>;
   let mockIdentityService: any;
-  let mockPresenceService: any;
   let mockStewardshipService: any;
 
   beforeEach(async () => {
     mockIdentityService = {
       profile: signal(null),
       humanId: signal(null),
-    };
-
-    mockPresenceService = {
-      loadPresences: vi.fn(),
     };
 
     mockStewardshipService = {
@@ -37,7 +31,6 @@ describe('StewardshipDashboardComponent', () => {
       imports: [StewardshipDashboardComponent],
       providers: [
         { provide: IdentityService, useValue: mockIdentityService },
-        { provide: PresenceService, useValue: mockPresenceService },
         { provide: StewardshipAllocationService, useValue: mockStewardshipService },
       ],
     }).compileComponents();
