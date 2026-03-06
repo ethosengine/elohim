@@ -32,7 +32,9 @@ import {
   getCategoryIcon,
 } from '../../models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
+import { RecommendationListComponent } from '../recommendation-list/recommendation-list.component';
 
+import type { ContentRecommendation } from '../../services/path-adaptation.service';
 import type { ElohimPresenceMoment } from '@app/elohim/models/elohim-presence.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ export interface SubscaleBar {
 @Component({
   selector: 'app-assessment-completion-summary',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RecommendationListComponent],
   template: `
     <div class="completion-summary" [attr.data-mode]="mode()" data-testid="completion-summary">
       <!-- Result Card -->
@@ -153,6 +155,15 @@ export interface SubscaleBar {
             </div>
           </div>
         }
+      }
+
+      <!-- Mastery: Graph-Aware Recommendations (shown on failure) -->
+      @if (mode() === 'mastery' && passed() === false && recommendations().length > 0) {
+        <app-recommendation-list
+          [recommendations]="recommendations()"
+          (dismiss)="dismissRecommendation.emit($event)"
+          data-testid="completion-recommendations"
+        ></app-recommendation-list>
       }
 
       <!-- Elohim Presence Insight -->
@@ -665,6 +676,9 @@ export class AssessmentCompletionSummaryComponent implements OnInit {
   /** Total question count */
   readonly totalCount = input<number>(0);
 
+  /** Active recommendations for failed mastery quizzes */
+  readonly recommendations = input<ContentRecommendation[]>([]);
+
   // ─── Outputs ─────────────────────────────────────────────────────────────────
 
   /** User clicks Continue */
@@ -672,6 +686,9 @@ export class AssessmentCompletionSummaryComponent implements OnInit {
 
   /** User clicks profile/dashboard link */
   readonly viewProfile = output<void>();
+
+  /** Emitted when a recommendation is dismissed */
+  readonly dismissRecommendation = output<string>();
 
   // ─── Observables ─────────────────────────────────────────────────────────────
 
