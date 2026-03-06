@@ -70,7 +70,34 @@ Feature: Adaptive Path Progression
     And the section should show a "Skipped via pre-assessment" indicator
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # Layer 3: Discovery-Informed Recommendations
+  # Layer 3: Graph-Aware Recommendations
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  @graph-recommendation @wip
+  Scenario: Failed quiz surfaces prerequisite content from content graph
+    Given Matthew is on step 4 of the "Elohim Protocol" path
+    And the content for step 4 has a PREREQUISITE relationship to "foundations-of-trust"
+    When Matthew fails the mastery quiz for the current section with score 30%
+    Then a "Strengthen Your Foundations" section should appear
+    And it should contain an EPR-linked card for "foundations-of-trust"
+    And the card should show context "Foundation for concepts you need"
+    And the recommendation should also appear in the path overview
+
+  @graph-recommendation @dismiss @wip
+  Scenario: Dismissing a recommendation removes it from both surfaces
+    Given Matthew has an active recommendation for "foundations-of-trust"
+    When Matthew dismisses the recommendation
+    Then the recommendation should not appear in the quiz result
+    And the recommendation should not appear in the path overview
+
+  @graph-recommendation @gate-clear @wip
+  Scenario: Passing the gate clears recommendations for that section
+    Given Matthew has active recommendations from a failed quiz
+    When Matthew passes the mastery quiz for the section
+    Then all recommendations from that section should be cleared
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Layer 4: Discovery-Informed Recommendations
   # ═══════════════════════════════════════════════════════════════════════════
 
   @discovery @recommendation
