@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
 import { PathAdaptationService } from './path-adaptation.service';
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
+import { ContentService } from '@app/elohim/services/content.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import type { QuizResult, ContentScore } from '../models/quiz-session.model';
 import { vi } from 'vitest';
@@ -66,6 +68,7 @@ describe('PathAdaptationService (story-first)', () => {
   let cooldownSpy: any;
   let poolSpy: any;
   let streakSpy: any;
+  let contentServiceSpy: any;
 
   const PATH_ID = 'elohim-protocol';
   const HUMAN_ID = 'matthew';
@@ -99,6 +102,10 @@ describe('PathAdaptationService (story-first)', () => {
     };
     streakSpy.isAchieved.mockReturnValue(false);
 
+    contentServiceSpy = {
+      getContentGraph: vi.fn().mockReturnValue(of(null)),
+    };
+
     const mockElohimClient = {
       getContent: vi.fn(),
       listContent: vi.fn(),
@@ -119,6 +126,7 @@ describe('PathAdaptationService (story-first)', () => {
         { provide: QuestionPoolService, useValue: poolSpy },
         { provide: StreakTrackerService, useValue: streakSpy },
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+        { provide: ContentService, useValue: contentServiceSpy },
       ],
     });
     service = TestBed.inject(PathAdaptationService);
@@ -521,6 +529,154 @@ describe('PathAdaptationService (story-first)', () => {
       const gate = service.getGateStatus(PATH_ID, 'section-a', HUMAN_ID);
       expect(gate.locked).toBe(false);
       expect(gate.mastered).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Scenario: Graph-aware recommendations resolve prerequisites
+  // Design: 2026-03-06-graph-aware-recommendations-design.md
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('Graph-aware recommendations resolve prerequisite content', () => {
+    it('should call ContentService.getContentGraph for struggling concepts', () => {
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      expect(contentServiceSpy.getContentGraph).toHaveBeenCalledWith(
+        'concept-trust',
+        ['PREREQUISITE', 'REINFORCES']
+      );
+    });
+
+    it('should include prerequisite content with reason prerequisite_gap', () => {
+      contentServiceSpy.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-trust',
+          related: [
+            {
+              contentId: 'prereq-foundations',
+              relationshipType: 'PREREQUISITE',
+              confidence: 0.9,
+              children: [],
+            },
+          ],
+          totalNodes: 1,
+        })
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const prereqRec = recs.find(r => r.contentId === 'prereq-foundations');
+      expect(prereqRec).toBeDefined();
+      expect(prereqRec!.reason).toBe('prerequisite_gap');
+    });
+
+    it('should include REINFORCES content with reason reinforcement', () => {
+      contentServiceSpy.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-trust',
+          related: [
+            {
+              contentId: 'alt-perspective',
+              relationshipType: 'REINFORCES',
+              confidence: 0.7,
+              children: [],
+            },
+          ],
+          totalNodes: 1,
+        })
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const reinforceRec = recs.find(r => r.contentId === 'alt-perspective');
+      expect(reinforceRec).toBeDefined();
+      expect(reinforceRec!.reason).toBe('reinforcement');
+    });
+
+    it('should fall back to struggled_with_concept when graph returns null', () => {
+      contentServiceSpy.getContentGraph.mockReturnValue(of(null));
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      expect(recs.length).toBeGreaterThan(0);
+      expect(recs[0].reason).toBe('struggled_with_concept');
+    });
+
+    it('should rank prerequisite_gap above reinforcement', () => {
+      contentServiceSpy.getContentGraph.mockReturnValue(
+        of({
+          rootId: 'concept-trust',
+          related: [
+            {
+              contentId: 'alt-perspective',
+              relationshipType: 'REINFORCES',
+              confidence: 0.9,
+              children: [],
+            },
+            {
+              contentId: 'prereq-foundations',
+              relationshipType: 'PREREQUISITE',
+              confidence: 0.7,
+              children: [],
+            },
+          ],
+          totalNodes: 2,
+        })
+      );
+
+      const result = makeQuizResult({
+        passed: false,
+        score: 0.3,
+        contentScores: [makeContentScore('concept-trust', 0.2)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      const recs = service.getRecommendations(PATH_ID, HUMAN_ID);
+      const prereqIdx = recs.findIndex(r => r.reason === 'prerequisite_gap');
+      const reinforceIdx = recs.findIndex(r => r.reason === 'reinforcement');
+      if (prereqIdx >= 0 && reinforceIdx >= 0) {
+        expect(prereqIdx).toBeLessThan(reinforceIdx);
+      }
+    });
+
+    it('should not call graph endpoint when quiz passes', () => {
+      const result = makeQuizResult({
+        passed: true,
+        score: 0.95,
+        contentScores: [makeContentScore('concept-trust', 0.95)],
+      });
+
+      service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
+
+      expect(contentServiceSpy.getContentGraph).not.toHaveBeenCalled();
     });
   });
 
