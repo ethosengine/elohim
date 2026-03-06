@@ -712,7 +712,7 @@ export class PathAdaptationService {
     contentScore: import('../models/quiz-session.model').ContentScore,
     result: QuizResult
   ): ContentRecommendation[] {
-    const quizType = result.type === 'mastery' ? 'mastery' : ('practice' as const);
+    const quizType: 'mastery' | 'practice' = result.type === 'mastery' ? 'mastery' : 'practice';
     const triggerContext = {
       quizType,
       conceptIds: [contentScore.contentId],
