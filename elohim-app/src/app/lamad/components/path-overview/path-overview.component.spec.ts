@@ -3,6 +3,7 @@ import { provideRouter, ActivatedRoute, Router } from '@angular/router';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
+import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -159,6 +160,11 @@ describe('PathOverviewComponent', () => {
     };
     const agentServiceSpy = {
       getProgressForPath: vi.fn(),
+      getCurrentAgentId: vi.fn().mockReturnValue('test-agent'),
+    };
+    const adaptationServiceSpy = {
+      getRecommendations$: vi.fn().mockReturnValue(of([])),
+      dismissRecommendation: vi.fn(),
     };
     const seoServiceSpy = {
       updateForPath: vi.fn(),
@@ -178,6 +184,7 @@ describe('PathOverviewComponent', () => {
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
+        { provide: PathAdaptationService, useValue: adaptationServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
         {

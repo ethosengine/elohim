@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 45.1% (2026-03-03)
@@ -13,6 +13,11 @@ import { AgentService } from '@app/elohim/services/agent.service';
 
 import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
+import { RecommendationListComponent } from '../../quiz-engine/components/recommendation-list/recommendation-list.component';
+import {
+  PathAdaptationService,
+  type ContentRecommendation,
+} from '../../quiz-engine/services/path-adaptation.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { PathService, type AccessType } from '../../services/path.service';
 import {
@@ -123,7 +128,7 @@ interface ChapterDisplay {
 @Component({
   selector: 'app-path-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
   styleUrls: ['./path-overview.component.css'],
 })
@@ -156,10 +161,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
+  /** Active recommendations from PathAdaptationService. */
+  recommendations = signal<ContentRecommendation[]>([]);
+
   private readonly destroy$ = new Subject<void>();
 
   private readonly seoService = inject(SeoService);
   private readonly contentMasteryService = inject(ContentMasteryService);
+  private readonly adaptationService = inject(PathAdaptationService);
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
@@ -278,6 +287,15 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           }
 
           this.isLoading = false;
+
+          // Load active recommendations for this path/agent
+          const humanId = this.agentService.getCurrentAgentId();
+          this.adaptationService
+            .getRecommendations$(this.pathId, humanId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(recs => {
+              this.recommendations.set(recs);
+            });
         },
         error: (err: unknown) => {
           const errorMsg = err instanceof Error ? err.message : 'Failed to load path';
@@ -285,6 +303,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         },
       });
+  }
+
+  /**
+   * Dismiss a recommendation and remove it from the active list.
+   */
+  onDismissRecommendation(contentId: string): void {
+    const humanId = this.agentService.getCurrentAgentId();
+    this.adaptationService.dismissRecommendation(this.pathId, humanId, contentId);
   }
 
   /**

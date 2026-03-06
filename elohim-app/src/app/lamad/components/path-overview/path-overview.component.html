@@ -366,6 +366,16 @@
       }
     </div>
 
+    <!-- Active Recommendations -->
+    @if (recommendations().length > 0) {
+      <app-recommendation-list
+        [recommendations]="recommendations()"
+        heading="Recommended Content"
+        (dismiss)="onDismissRecommendation($event)"
+        data-testid="path-overview-recommendations"
+      ></app-recommendation-list>
+    }
+
     <div class="overview-sidebar">
       <!-- Action Buttons -->
       <section class="action-section">
