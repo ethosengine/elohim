@@ -172,6 +172,12 @@ export interface PathAdaptationConfig {
 
   /** Whether inline quiz completion is required before mastery gate */
   requireInlineBeforeMastery: boolean;
+
+  /** Maximum graph traversal depth for recommendations (1 = direct relationships only) */
+  maxGraphDepth: number;
+
+  /** Relationship types to query for recommendations */
+  graphRelationshipTypes: string[];
 }
 
 const DEFAULT_CONFIG: PathAdaptationConfig = {
@@ -181,6 +187,8 @@ const DEFAULT_CONFIG: PathAdaptationConfig = {
   maxRecommendations: 3,
   recommendationThreshold: 0.6,
   requireInlineBeforeMastery: true,
+  maxGraphDepth: 1,
+  graphRelationshipTypes: ['PREREQUISITE', 'REINFORCES'],
 };
 
 /**

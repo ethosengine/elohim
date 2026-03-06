@@ -465,6 +465,16 @@ describe('PathAdaptationService (story-first)', () => {
       service.configure({ masteryPassingScore: 0.9 });
       expect(service.getConfig().masteryPassingScore).toBe(0.9);
     });
+
+    it('default maxGraphDepth should be 1', () => {
+      const config = service.getConfig();
+      expect(config.maxGraphDepth).toBe(1);
+    });
+
+    it('default graphRelationshipTypes should include PREREQUISITE and REINFORCES', () => {
+      const config = service.getConfig();
+      expect(config.graphRelationshipTypes).toEqual(['PREREQUISITE', 'REINFORCES']);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
