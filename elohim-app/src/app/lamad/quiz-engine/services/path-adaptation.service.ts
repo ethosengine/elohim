@@ -4,8 +4,6 @@ import { Injectable, inject } from '@angular/core';
 
 import { BehaviorSubject, Observable, map } from 'rxjs';
 
-import { RelationshipService } from '@app/lamad/services/relationship.service';
-
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
@@ -229,7 +227,6 @@ export class PathAdaptationService {
   private readonly cooldownService = inject(AttemptCooldownService);
   private readonly poolService = inject(QuestionPoolService);
   private readonly streakService = inject(StreakTrackerService);
-  private readonly relationshipService = inject(RelationshipService);
 
   /** Cached adaptation states by path:human key */
   private readonly states = new Map<string, PathAdaptationState>();
@@ -688,18 +685,10 @@ export class PathAdaptationService {
     const newRecs: ContentRecommendation[] = [];
 
     // Find concepts with low scores
-    const strugglingConcepts = result.contentScores.filter(
-      cs => cs.averageScore < this.config.recommendationThreshold
-    );
-
-    for (const contentScore of strugglingConcepts) {
-      const graphRecs = this.lookupGraphRecommendations(
-        contentScore.contentId,
-        contentScore.averageScore
-      );
-
-      if (graphRecs.length === 0) {
-        // Fallback: flag the concept itself when no graph relationships exist
+    for (const contentScore of result.contentScores) {
+      if (contentScore.averageScore < 0.6) {
+        // TODO: Look up related/prerequisite content from graph
+        // For now, just flag the concept itself
         newRecs.push({
           contentId: contentScore.contentId,
           reason: 'struggled_with_concept',
@@ -710,26 +699,13 @@ export class PathAdaptationService {
             score: contentScore.averageScore,
           },
         });
-      } else {
-        newRecs.push(...graphRecs);
       }
     }
 
-    // Sort: prerequisites first, then by confidence
-    const reasonPriority: Record<RecommendationReason, number> = {
-      prerequisite_gap: 0,
-      struggled_with_concept: 1,
-      reinforcement: 2,
-      exploration_interest: 3,
-      advanced_option: 4,
-    };
-
+    // Filter by threshold and limit
     const filtered = newRecs
       .filter(r => r.confidence >= this.config.recommendationThreshold)
-      .sort((a, b) => {
-        const priorityDiff = (reasonPriority[a.reason] ?? 99) - (reasonPriority[b.reason] ?? 99);
-        return priorityDiff === 0 ? b.confidence - a.confidence : priorityDiff;
-      })
+      .sort((a, b) => b.confidence - a.confidence)
       .slice(0, this.config.maxRecommendations);
 
     // Merge with existing, avoiding duplicates
@@ -744,41 +720,6 @@ export class PathAdaptationService {
     state.recommendations = state.recommendations.slice(0, this.config.maxRecommendations);
 
     this.saveState(pathId, humanId, state);
-  }
-
-  /**
-   * Look up prerequisite and reinforcing content from the content graph.
-   * Uses depth-1 traversal (configurable via maxGraphDepth for future ElohimAgent integration).
-   */
-  private lookupGraphRecommendations(contentId: string, score: number): ContentRecommendation[] {
-    const recs: ContentRecommendation[] = [];
-
-    for (const relType of this.config.graphRelationshipTypes) {
-      try {
-        let relationships: { targetId: string; confidence: number; relationshipType: string }[] =
-          [];
-        this.relationshipService.getRelationshipsByType(contentId, relType).subscribe(rels => {
-          relationships = rels;
-        });
-
-        for (const rel of relationships) {
-          recs.push({
-            contentId: rel.targetId,
-            reason: relType === 'PREREQUISITE' ? 'prerequisite_gap' : 'reinforcement',
-            confidence: rel.confidence,
-            triggerContext: {
-              quizType: 'mastery',
-              conceptIds: [contentId],
-              score,
-            },
-          });
-        }
-      } catch {
-        // Graph lookup failure is non-critical
-      }
-    }
-
-    return recs;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
