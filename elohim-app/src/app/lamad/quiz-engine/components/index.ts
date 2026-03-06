@@ -31,3 +31,5 @@ export type {
   DiscoveryQuizCompletionEvent,
   EPIC_SUBSCALES,
 } from './discovery-quiz/discovery-quiz.component';
+
+export { RecommendationListComponent } from './recommendation-list/recommendation-list.component';
