@@ -90,14 +90,12 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            - name: DEV_MODE
-              value: "true"
             - name: RUST_LOG
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless:8445"
+              value: "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-2.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-3.elohim-edgenode-alpha-headless:8445"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-edgenode-alpha:4444"
             - name: STORAGE_URL
