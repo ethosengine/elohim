@@ -28,6 +28,13 @@ export class NativeBackend implements ElohimBackend {
   /** BYOK API key — forwarded to the Rust backend, never used for direct API calls. */
   byokApiKey: string | null = null;
 
+  /** Token provider — returns current JWT for doorway auth. */
+  private readonly tokenProvider: () => string | null;
+
+  constructor(tokenProvider?: () => string | null) {
+    this.tokenProvider = tokenProvider ?? (() => null);
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
       const response = await fetch(`${DOORWAY_ELOHIM_ENDPOINT}/health`, {
@@ -48,9 +55,15 @@ export class NativeBackend implements ElohimBackend {
     const startTime = Date.now();
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const token = this.tokenProvider();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(DOORWAY_ELOHIM_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           requestId: request.requestId,
           elohimId: elohim.id,

@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { BehaviorSubject, of } from 'rxjs';
 
+import { AuthService } from '@app/imagodei';
+
 import { ElohimBackendCatalog } from '../../services/elohim-backend';
 import type { ElohimBackend } from '../../services/elohim-backend';
 import { ElohimPresenceService } from '../../services/elohim-presence.service';
@@ -53,9 +55,15 @@ describe('ElohimConfigComponent', () => {
       cost$: costSubject.asObservable(),
     };
 
+    const mockAuthService = {
+      token: () => 'mock-jwt-token',
+      isAuthenticated: () => true,
+    };
+
     await TestBed.configureTestingModule({
       imports: [ElohimConfigComponent],
       providers: [
+        { provide: AuthService, useValue: mockAuthService },
         { provide: ElohimBackendCatalog, useValue: mockCatalog },
         { provide: ElohimPresenceService, useValue: mockPresenceService },
       ],

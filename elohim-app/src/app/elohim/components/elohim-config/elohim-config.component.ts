@@ -17,6 +17,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
+import { AuthService } from '@app/imagodei';
+
 import { NativeBackend } from '../../services/backends/native-backend';
 import { ElohimBackendCatalog } from '../../services/elohim-backend';
 import { ElohimPresenceService } from '../../services/elohim-presence.service';
@@ -276,6 +278,7 @@ import type { ElohimBackendType } from '../../services/elohim-backend';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ElohimConfigComponent {
+  private readonly auth = inject(AuthService);
   private readonly catalog = inject(ElohimBackendCatalog);
   private readonly presenceService = inject(ElohimPresenceService);
   private readonly destroyRef = inject(DestroyRef);
@@ -311,7 +314,7 @@ export class ElohimConfigComponent {
 
     // Lazily register NativeBackend when first selected
     if (type === 'native' && !this.catalog.get('native')) {
-      this.catalog.register(new NativeBackend());
+      this.catalog.register(new NativeBackend(() => this.auth.token()));
     }
 
     this.catalog.setPreferred(type);
