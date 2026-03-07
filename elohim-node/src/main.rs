@@ -10,6 +10,7 @@
 
 mod config;
 mod dashboard;
+mod elohim_service;
 mod network;
 mod pod;
 mod update;
@@ -222,36 +223,71 @@ async fn main() -> anyhow::Result<()> {
         info!(%addr, "Storage HTTP server listening");
         // TODO: Initialize full HttpServer with ContentDb, services, etc.
         // For now, start a minimal blob-serving endpoint.
-        let app = axum::Router::new()
-            .route(
-                "/blob/{hash}",
-                axum::routing::get({
-                    let store = blob_store_http.clone();
-                    move |axum::extract::Path(hash): axum::extract::Path<String>| {
-                        let store = store.clone();
-                        async move {
-                            match store.get_by_address(&hash).await {
-                                Ok(data) => axum::response::Response::builder()
-                                    .header("content-type", "application/octet-stream")
-                                    .body(axum::body::Body::from(data))
-                                    .unwrap(),
-                                Err(_) => axum::response::Response::builder()
-                                    .status(404)
-                                    .body(axum::body::Body::from("not found"))
-                                    .unwrap(),
-                            }
+        let app = axum::Router::new().route(
+            "/blob/{hash}",
+            axum::routing::get({
+                let store = blob_store_http.clone();
+                move |axum::extract::Path(hash): axum::extract::Path<String>| {
+                    let store = store.clone();
+                    async move {
+                        match store.get_by_address(&hash).await {
+                            Ok(data) => axum::response::Response::builder()
+                                .header("content-type", "application/octet-stream")
+                                .body(axum::body::Body::from(data))
+                                .unwrap(),
+                            Err(_) => axum::response::Response::builder()
+                                .status(404)
+                                .body(axum::body::Body::from("not found"))
+                                .unwrap(),
                         }
                     }
-                }),
-            );
+                }
+            }),
+        );
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         if let Err(e) = axum::serve(listener, app).await {
             tracing::error!(error = %e, "Storage HTTP server failed");
         }
     });
 
+    // --- Elohim Agent Service ---
+    // Initialize AI agent service with admission control and REA accounting.
+    // Training-wheels phase: MockBackend, no live LLM required.
+    let elohim_init_config = elohim_service::AgentInitConfig {
+        node_id: config.node.id.clone(),
+        ..Default::default()
+    };
+
+    let elohim_state = match elohim_service::initialize_agent_service(elohim_init_config).await {
+        Ok(state) => {
+            info!("Elohim agent service initialized");
+            Some(Arc::new(state))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to initialize Elohim agent service, running without it");
+            None
+        }
+    };
+
     // Create dashboard router with pod
-    let app = create_router(dashboard_state);
+    let mut app = create_router(dashboard_state);
+
+    // Merge elohim invoke/health routes if agent service initialized
+    if let Some(elohim_state) = elohim_state {
+        let elohim_router = axum::Router::new()
+            .route(
+                "/elohim/invoke",
+                axum::routing::post(elohim_service::handle_invoke),
+            )
+            .route(
+                "/elohim/health",
+                axum::routing::get(elohim_service::handle_health),
+            )
+            .with_state(elohim_state);
+
+        app = app.merge(elohim_router);
+        info!("Elohim invoke/health routes registered");
+    }
 
     // Bind to HTTP port
     let addr = SocketAddr::from(([0, 0, 0, 0], config.api.http_port));

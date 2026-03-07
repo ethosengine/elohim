@@ -140,6 +140,12 @@ pub struct Args {
     )]
     pub elohim_agent_url: String,
 
+    /// URL of the elohim-node compute endpoint (e.g., "http://localhost:8091")
+    /// When set, doorway tries elohim-node first for /api/v1/elohim/* requests,
+    /// falling back to elohim-agent-sdk sidecar if node is unreachable.
+    #[arg(long, env = "ELOHIM_NODE_URL", default_value = "")]
+    pub elohim_node_url: String,
+
     /// URL of doorway-app for operator dashboard
     /// (e.g., "http://localhost:8081")
     /// Doorway proxies /threshold/* requests here

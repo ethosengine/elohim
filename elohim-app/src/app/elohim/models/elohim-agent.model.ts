@@ -346,6 +346,15 @@ export interface ElohimResponse {
   /** If declined: why */
   declineReason?: string;
 
+  /** If deferred: why (e.g. 'BudgetExhausted', 'QueueFull') */
+  deferReason?: string;
+
+  /** If deferred: suggested alternative nodes to try */
+  meshHints?: MeshHint[];
+
+  /** If deferred: how long to wait before retrying (milliseconds) */
+  retryAfterMs?: number;
+
   /** If escalated: to which Elohim/layer */
   escalatedTo?: string;
 
@@ -450,6 +459,23 @@ export interface PathAnalysisResult {
     suggestions?: string[];
   }[];
   overallAssessment: string;
+}
+
+/**
+ * MeshHint - A neighbor node that may have capacity to serve a deferred request.
+ *
+ * Mirrors the Rust `MeshHint` struct from elohim-node admission control.
+ * Training-wheels: initially empty, populated when gossip neighbor table is built.
+ */
+export interface MeshHint {
+  /** Neighbor node identifier */
+  nodeId: string;
+  /** Remaining compute budget on the neighbor */
+  budgetRemaining: number;
+  /** Estimated wait time in milliseconds */
+  estimatedWaitMs: number;
+  /** Capabilities the neighbor can serve */
+  capabilities: string[];
 }
 
 /**
