@@ -33,6 +33,48 @@ function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
   return getDevice(world);
 }
 
+/** Complete an assessment by interacting with likert/radio widgets until done. */
+async function completeAssessment(device: PlaywrightDevice): Promise<void> {
+  let maxQuestions = 30;
+  while (maxQuestions-- > 0) {
+    const likertTrack = device.page.locator('[data-testid="likert-scale-track"]').first();
+    const radioGroup = device.page.locator('[role="radiogroup"]').first();
+
+    const hasLikert = await likertTrack.isVisible().catch(() => false);
+    const hasRadio = !hasLikert && (await radioGroup.isVisible().catch(() => false));
+
+    if (hasLikert) {
+      const ticks = device.page.locator(
+        '[data-testid="likert-scale-tick"], [data-testid="likert-scale-thumb"]'
+      );
+      const count = await ticks.count();
+      if (count > 0) {
+        await ticks.nth(Math.floor(count / 2)).click();
+      }
+    } else if (hasRadio) {
+      const choices = device.page.locator('[role="radio"]');
+      const count = await choices.count();
+      if (count > 0) {
+        await choices.first().click();
+      }
+    } else {
+      break;
+    }
+
+    const continueBtn = device.page
+      .locator('[data-testid="sophia-continue"], [data-testid="quiz-continue"]')
+      .first();
+    if (await continueBtn.isVisible().catch(() => false)) {
+      await continueBtn.click();
+      await device.page.waitForTimeout(500);
+    } else {
+      break;
+    }
+  }
+
+  await device.page.waitForTimeout(1000);
+}
+
 // ---------------------------------------------------------------------------
 // Navigation & Setup
 // ---------------------------------------------------------------------------
@@ -74,57 +116,14 @@ When('the learner completes the assessment', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  // Answer all visible questions by clicking through interactive widgets
-  let maxQuestions = 30;
-  while (maxQuestions-- > 0) {
-    // Look for likert, radio, or other interactive widgets
-    const likertTrack = device.page.locator('[data-testid="likert-scale-track"]').first();
-    const radioGroup = device.page.locator('[role="radiogroup"]').first();
-
-    const hasLikert = await likertTrack.isVisible().catch(() => false);
-    const hasRadio = !hasLikert && (await radioGroup.isVisible().catch(() => false));
-
-    if (hasLikert) {
-      // Click a middle-ish tick mark
-      const ticks = device.page.locator(
-        '[data-testid="likert-scale-tick"], [data-testid="likert-scale-thumb"]'
-      );
-      const count = await ticks.count();
-      if (count > 0) {
-        const idx = Math.floor(count / 2);
-        await ticks.nth(idx).click();
-      }
-    } else if (hasRadio) {
-      const choices = device.page.locator('[role="radio"]');
-      const count = await choices.count();
-      if (count > 0) {
-        await choices.first().click();
-      }
-    } else {
-      break; // No more interactive widgets — assessment complete
-    }
-
-    // Advance to next question
-    const continueBtn = device.page
-      .locator('[data-testid="sophia-continue"], [data-testid="quiz-continue"]')
-      .first();
-    if (await continueBtn.isVisible().catch(() => false)) {
-      await continueBtn.click();
-      await device.page.waitForTimeout(500);
-    } else {
-      break;
-    }
-  }
-
-  // Wait for completion/results to render
-  await device.page.waitForTimeout(1000);
+  await completeAssessment(device);
 });
 
 Given('the learner has completed a discovery assessment', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  // Navigate to discovery and complete it (reuses the navigation + completion logic)
+  // Navigate to discovery and complete it
   await device.navigate('/lamad');
   await device.page.waitForLoadState('networkidle');
 
@@ -136,45 +135,7 @@ Given('the learner has completed a discovery assessment', async function (this: 
     await device.page.waitForLoadState('networkidle');
   }
 
-  // Complete the assessment (same logic as "the learner completes the assessment")
-  let maxQuestions = 30;
-  while (maxQuestions-- > 0) {
-    const likertTrack = device.page.locator('[data-testid="likert-scale-track"]').first();
-    const radioGroup = device.page.locator('[role="radiogroup"]').first();
-
-    const hasLikert = await likertTrack.isVisible().catch(() => false);
-    const hasRadio = !hasLikert && (await radioGroup.isVisible().catch(() => false));
-
-    if (hasLikert) {
-      const ticks = device.page.locator(
-        '[data-testid="likert-scale-tick"], [data-testid="likert-scale-thumb"]'
-      );
-      const count = await ticks.count();
-      if (count > 0) {
-        await ticks.nth(Math.floor(count / 2)).click();
-      }
-    } else if (hasRadio) {
-      const choices = device.page.locator('[role="radio"]');
-      const count = await choices.count();
-      if (count > 0) {
-        await choices.first().click();
-      }
-    } else {
-      break;
-    }
-
-    const continueBtn = device.page
-      .locator('[data-testid="sophia-continue"], [data-testid="quiz-continue"]')
-      .first();
-    if (await continueBtn.isVisible().catch(() => false)) {
-      await continueBtn.click();
-      await device.page.waitForTimeout(500);
-    } else {
-      break;
-    }
-  }
-
-  await device.page.waitForTimeout(1000);
+  await completeAssessment(device);
 });
 
 // ---------------------------------------------------------------------------

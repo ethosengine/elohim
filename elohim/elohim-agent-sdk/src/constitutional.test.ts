@@ -11,40 +11,41 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('INTERPRETIVE GUIDANCE');
   });
 
-  it('contains global principles', () => {
+  it('contains global principles synced from Rust global.rs', () => {
     const prompt = buildSystemPrompt();
 
     expect(prompt).toContain('Human Dignity');
-    expect(prompt).toContain('Ecological Integrity');
-    expect(prompt).toContain('Knowledge Accessibility');
-    expect(prompt).toContain('Transparency of Power');
-    expect(prompt).toContain('Non-Domination');
+    expect(prompt).toContain('Human Flourishing');
+    expect(prompt).toContain('Meaningful Consent');
+    expect(prompt).toContain('Love as Foundation');
+    expect(prompt).toContain('Subsidiarity');
   });
 
-  it('contains boundaries with enforcement markers', () => {
+  it('contains boundaries with enforcement markers (all HARD BLOCK at global level)', () => {
     const prompt = buildSystemPrompt();
 
     expect(prompt).toContain('[HARD BLOCK]');
-    expect(prompt).toContain('[REQUIRES GOVERNANCE]');
-    expect(prompt).toContain('[SOFT LIMIT]');
-    expect(prompt).toContain('No Existential Harm');
-    expect(prompt).toContain('Dignity Preservation');
+    expect(prompt).toContain('Extinction Prevention');
+    expect(prompt).toContain('Genocide Prevention');
+    expect(prompt).toContain('Slavery Prohibition');
+    expect(prompt).toContain('Recursive Control Prevention');
+    expect(prompt).toContain('Child Protection');
   });
 
-  it('contains interpretive guidance rules', () => {
+  it('contains interpretive guidance rules synced from Rust global.rs', () => {
     const prompt = buildSystemPrompt();
 
     expect(prompt).toContain(
-      'Higher layer principles override lower layers when in conflict',
+      'When principles conflict, dignity and flourishing take precedence',
     );
     expect(prompt).toContain(
-      'Dignity and flourishing take precedence when uncertain',
+      'Uncertainty should be resolved in favor of human agency',
     );
     expect(prompt).toContain(
       'Flag ambiguous cases for human deliberation rather than deciding',
     );
     expect(prompt).toContain(
-      'Log your reasoning for audit and precedent building',
+      'some harms are so severe that no benefit justifies them',
     );
   });
 
@@ -58,15 +59,13 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt();
 
     const dignityIndex = prompt.indexOf('Human Dignity');
-    const ecologicalIndex = prompt.indexOf('Ecological Integrity');
-    const knowledgeIndex = prompt.indexOf('Knowledge Accessibility');
-    const transparencyIndex = prompt.indexOf('Transparency of Power');
-    const nonDominationIndex = prompt.indexOf('Non-Domination');
+    const flourishingIndex = prompt.indexOf('Human Flourishing');
+    const consentIndex = prompt.indexOf('Meaningful Consent');
+    const subsidiaryIndex = prompt.indexOf('Subsidiarity');
 
-    expect(dignityIndex).toBeLessThan(ecologicalIndex);
-    expect(ecologicalIndex).toBeLessThan(knowledgeIndex);
-    expect(knowledgeIndex).toBeLessThan(transparencyIndex);
-    expect(transparencyIndex).toBeLessThan(nonDominationIndex);
+    expect(dignityIndex).toBeLessThan(flourishingIndex);
+    expect(flourishingIndex).toBeLessThan(consentIndex);
+    expect(consentIndex).toBeLessThan(subsidiaryIndex);
   });
 
   it('tags principles with [GLOBAL] layer', () => {

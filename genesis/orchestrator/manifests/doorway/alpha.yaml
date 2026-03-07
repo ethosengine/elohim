@@ -40,6 +40,8 @@ stringData:
   api-key-authenticated: "dev-elohim-auth-2024"
   api-key-admin: "dev-elohim-admin-2024"
   jwt-secret: "dev-jwt-secret-change-in-production-2024"
+  # Anthropic API key for elohim-agent-sdk sidecar (set via sealed-secret in production)
+  anthropic-api-key: "REPLACE_WITH_REAL_KEY"
 ---
 apiVersion: apps/v1
 kind: Deployment

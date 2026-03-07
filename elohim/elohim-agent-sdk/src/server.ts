@@ -57,6 +57,7 @@ app.post<{ Body: InvokeRequest }>('/invoke', async (request, reply) => {
     }
     return result;
   } catch (err) {
+    request.log.error({ err: err instanceof Error ? err.message : String(err) }, 'Invoke handler error');
     reply.header('X-Elohim-Budget-Remaining', budget.remaining().toString());
     reply.status(500);
     return {
@@ -69,7 +70,7 @@ app.post<{ Body: InvokeRequest }>('/invoke', async (request, reply) => {
         valuesWeighed: [] as { value: string; weight: number; direction: 'for' | 'against' }[],
         confidence: 1,
       },
-      declineReason: `Internal error: ${err instanceof Error ? err.message : String(err)}`,
+      declineReason: 'Internal processing error',
       respondedAt: new Date().toISOString(),
     };
   }

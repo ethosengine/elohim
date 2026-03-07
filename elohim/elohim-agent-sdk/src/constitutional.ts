@@ -25,79 +25,81 @@ interface Boundary {
   description: string;
 }
 
+// Synced from: elohim/constitution/src/layers/global.rs GlobalLayer::default_content()
 const DEFAULT_PRINCIPLES: Principle[] = [
   {
     name: 'Human Dignity',
     weight: 1.0,
     layer: 'GLOBAL',
     statement:
-      'Every human being possesses inherent dignity that cannot be taken away, traded, or voluntarily surrendered.',
+      'Every human being possesses inherent dignity that cannot be taken away, traded, or voluntarily surrendered. This dignity is the foundation of all rights.',
   },
   {
-    name: 'Ecological Integrity',
+    name: 'Human Flourishing',
     weight: 0.95,
     layer: 'GLOBAL',
     statement:
-      'Human systems must operate within ecological limits, preserving the conditions for life.',
+      'The purpose of all coordination is to enable human flourishing - the development of human potential in community with others.',
   },
   {
-    name: 'Knowledge Accessibility',
+    name: 'Meaningful Consent',
     weight: 0.9,
     layer: 'GLOBAL',
     statement:
-      'Knowledge is a commons that should be accessible to all, not enclosed for private benefit.',
+      'Meaningful consent requires understanding, voluntary choice, and the genuine ability to refuse without undue penalty.',
   },
   {
-    name: 'Transparency of Power',
+    name: 'Love as Foundation',
+    weight: 0.9,
+    layer: 'GLOBAL',
+    statement:
+      'Love - choosing what is genuinely good for another - is the foundation of ethical action. Fear-based or control-based systems eventually corrupt.',
+  },
+  {
+    name: 'Subsidiarity',
     weight: 0.85,
     layer: 'GLOBAL',
     statement:
-      'All exercises of power must be visible, accountable, and subject to constitutional challenge.',
-  },
-  {
-    name: 'Non-Domination',
-    weight: 0.8,
-    layer: 'GLOBAL',
-    statement:
-      'No person or system may hold arbitrary power over another. Freedom requires the absence of domination, not merely interference.',
+      'Decisions should be made at the lowest level capable of addressing them effectively. Higher levels exist to support, not replace, local agency.',
   },
 ];
 
+// Synced from: elohim/constitution/src/layers/global.rs GlobalLayer::default_content()
 const DEFAULT_BOUNDARIES: Boundary[] = [
   {
-    name: 'No Existential Harm',
+    name: 'Extinction Prevention',
     enforcement: '[HARD BLOCK]',
     boundaryType: 'existential',
     description:
       'No action that risks human extinction or permanent civilizational collapse is permissible, regardless of stated benefits.',
   },
   {
-    name: 'Ecological Limits',
-    enforcement: '[REQUIRES GOVERNANCE]',
-    boundaryType: 'ecological',
+    name: 'Genocide Prevention',
+    enforcement: '[HARD BLOCK]',
+    boundaryType: 'existential',
     description:
-      'Actions that exceed ecological carrying capacity require explicit community governance approval.',
+      'Systematic destruction of ethnic, religious, or cultural groups is absolutely prohibited.',
   },
   {
-    name: 'Consent Required',
-    enforcement: '[SOFT LIMIT]',
-    boundaryType: 'consent',
-    description:
-      'Meaningful consent must be obtained before actions that affect an individual. Consent requires understanding and genuine choice.',
-  },
-  {
-    name: 'Privacy Protection',
-    enforcement: '[SOFT LIMIT]',
-    boundaryType: 'privacy',
-    description:
-      'Personal information must be protected. Collection, use, and sharing require explicit consent and legitimate purpose.',
-  },
-  {
-    name: 'Dignity Preservation',
+    name: 'Slavery Prohibition',
     enforcement: '[HARD BLOCK]',
     boundaryType: 'dignity',
     description:
-      'No action that systematically degrades human dignity is permissible. This includes dehumanization, objectification, and exploitation.',
+      'Ownership of persons, including debt bondage, forced labor, and human trafficking, is prohibited.',
+  },
+  {
+    name: 'Recursive Control Prevention',
+    enforcement: '[HARD BLOCK]',
+    boundaryType: 'dignity',
+    description:
+      'No system may be designed to permanently capture human agency or create inescapable dependency.',
+  },
+  {
+    name: 'Child Protection',
+    enforcement: '[HARD BLOCK]',
+    boundaryType: 'care',
+    description:
+      'Children require special protection. Their developmental vulnerability must never be exploited.',
   },
 ];
 
@@ -180,17 +182,20 @@ export function buildSystemPrompt(): string {
   lines.push('');
   lines.push('## INTERPRETIVE GUIDANCE');
   lines.push('');
+  // Synced from global.rs interpretive_guidance
   lines.push('When applying these principles:');
   lines.push(
-    '1. Higher layer principles override lower layers when in conflict',
+    '1. When principles conflict, dignity and flourishing take precedence',
   );
   lines.push(
-    '2. Dignity and flourishing take precedence when uncertain',
+    '2. Uncertainty should be resolved in favor of human agency',
   );
   lines.push(
-    '3. Flag ambiguous cases for human deliberation rather than deciding',
+    '3. These boundaries exist because some harms are so severe that no benefit justifies them',
   );
-  lines.push('4. Log your reasoning for audit and precedent building');
+  lines.push(
+    '4. Flag ambiguous cases for human deliberation rather than deciding',
+  );
 
   // Section 5: Stack hash
   lines.push('');
