@@ -37,7 +37,7 @@ export const SHEFA_NAV_GROUPS: NavGroup[] = [
   {
     title: 'Community',
     items: [
-      { label: 'Requests & Offers', icon: 'swap_horiz', route: '/shefa/exchange' },
+      { label: 'Exchange', icon: 'swap_horiz', route: '/shefa/exchange' },
       { label: 'Insurance', icon: 'shield', route: '/shefa/insurance' },
       { label: 'Constitutional', icon: 'gavel', route: '/shefa/constitutional' },
     ],
