@@ -1202,6 +1202,13 @@ async fn handle_request(
             ));
         }
 
+        // Elohim Agent invocation
+        (_, p) if p.starts_with("/api/v1/elohim") => {
+            return Ok(to_boxed(
+                routes::handle_elohim_agent_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
         // Presence lifecycle
         (_, p) if p.starts_with("/api/v1/presence") => {
             return Ok(to_boxed(
