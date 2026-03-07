@@ -38,6 +38,10 @@ elohim-bitswap = { path = "../holochain/elohim-bitswap" }
 sled = "0.34"
 cid = "0.11"
 
+# AI agent orchestration
+elohim-agent = { path = "../elohim/elohim-agent", default-features = false }
+constitution = { path = "../elohim/constitution" }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -72,6 +76,7 @@ thiserror = "1"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
 hostname = "0.3"
 num_cpus = "1.16"
 async-trait = "0.1"
