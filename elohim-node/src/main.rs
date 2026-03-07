@@ -10,6 +10,7 @@
 
 mod config;
 mod dashboard;
+mod elohim_service;
 mod network;
 mod pod;
 mod update;
@@ -222,28 +223,27 @@ async fn main() -> anyhow::Result<()> {
         info!(%addr, "Storage HTTP server listening");
         // TODO: Initialize full HttpServer with ContentDb, services, etc.
         // For now, start a minimal blob-serving endpoint.
-        let app = axum::Router::new()
-            .route(
-                "/blob/{hash}",
-                axum::routing::get({
-                    let store = blob_store_http.clone();
-                    move |axum::extract::Path(hash): axum::extract::Path<String>| {
-                        let store = store.clone();
-                        async move {
-                            match store.get_by_address(&hash).await {
-                                Ok(data) => axum::response::Response::builder()
-                                    .header("content-type", "application/octet-stream")
-                                    .body(axum::body::Body::from(data))
-                                    .unwrap(),
-                                Err(_) => axum::response::Response::builder()
-                                    .status(404)
-                                    .body(axum::body::Body::from("not found"))
-                                    .unwrap(),
-                            }
+        let app = axum::Router::new().route(
+            "/blob/{hash}",
+            axum::routing::get({
+                let store = blob_store_http.clone();
+                move |axum::extract::Path(hash): axum::extract::Path<String>| {
+                    let store = store.clone();
+                    async move {
+                        match store.get_by_address(&hash).await {
+                            Ok(data) => axum::response::Response::builder()
+                                .header("content-type", "application/octet-stream")
+                                .body(axum::body::Body::from(data))
+                                .unwrap(),
+                            Err(_) => axum::response::Response::builder()
+                                .status(404)
+                                .body(axum::body::Body::from("not found"))
+                                .unwrap(),
                         }
                     }
-                }),
-            );
+                }
+            }),
+        );
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         if let Err(e) = axum::serve(listener, app).await {
             tracing::error!(error = %e, "Storage HTTP server failed");
