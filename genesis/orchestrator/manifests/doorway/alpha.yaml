@@ -100,6 +100,9 @@ spec:
               value: "ws://elohim-edgenode-alpha:4444"
             - name: STORAGE_URL
               value: "http://elohim-edgenode-alpha:8090"
+            # Elohim Agent SDK sidecar (runs in same pod)
+            - name: ELOHIM_AGENT_URL
+              value: "http://localhost:8095"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
             - name: NATS_URL
@@ -185,6 +188,44 @@ spec:
             httpGet:
               path: /health
               port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+        # Elohim Agent SDK - TypeScript sidecar for Claude-powered constitutional reasoning
+        # Calls Anthropic API with constitutional prompts, 10-call budget cap
+        - name: elohim-agent-sdk
+          image: harbor.ethosengine.com/ethosengine/elohim-agent-sdk:AGENT_SDK_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          ports:
+            - name: agent-sdk
+              containerPort: 8095
+              protocol: TCP
+          env:
+            - name: ELOHIM_AGENT_PORT
+              value: "8095"
+            - name: ELOHIM_BUDGET_LIMIT
+              value: "10"
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-alpha-secrets
+                  key: anthropic-api-key
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8095
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8095
             initialDelaySeconds: 10
             periodSeconds: 30
 ---
