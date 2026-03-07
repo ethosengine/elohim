@@ -466,3 +466,25 @@ export const COMPLETION = {
   CONTINUE: 'completion-continue',
   NAV: 'completion-nav',
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Elohim App — Elohim Presence (elohim insight & transparency)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Elohim insight panel (elohim-app: elohim-insight components)
+export const ELOHIM_PRESENCE = {
+  INSIGHT_SECTION: 'elohim-insight-section',
+  RECOMMENDATION_MESSAGE: 'elohim-recommendation-message',
+  REASONING_EXPANDABLE: 'elohim-reasoning-expandable',
+  REASONING_PRINCIPLE: 'elohim-reasoning-principle',
+  REASONING_INTERPRETATION: 'elohim-reasoning-interpretation',
+  COST_TOKENS: 'elohim-cost-tokens',
+  COST_TIME: 'elohim-cost-time',
+  TEST_CONNECTION_BTN: 'elohim-test-connection-btn',
+  TEST_RESULT: 'elohim-test-result',
+} as const;
+
+// Banner notification (elohim-app: banner-notification.component.ts)
+export const BANNER = {
+  NOTIFICATION: 'banner-notification',
+} as const;
