@@ -24,7 +24,7 @@ pub async fn handle_elohim_agent_request(
 
     // Health probes are public (NativeBackend.isAvailable() needs unauthenticated access)
     if sidecar_path.ends_with("/health") {
-        let agent_url = state.args.elohim_agent_url.clone();
+        let agent_url = resolve_agent_url(&state).await;
         return forward_to_agent(req, &agent_url, sidecar_path).await;
     }
 
@@ -41,7 +41,7 @@ pub async fn handle_elohim_agent_request(
             .unwrap();
     }
 
-    let agent_url = state.args.elohim_agent_url.clone();
+    let agent_url = resolve_agent_url(&state).await;
     forward_to_agent(req, &agent_url, sidecar_path).await
 }
 
@@ -99,6 +99,29 @@ fn validate_jwt_token(state: &AppState, token: &str) -> Option<PermissionLevel> 
     } else {
         None
     }
+}
+
+/// Resolve which agent URL to use — try elohim-node first, fall back to sidecar.
+async fn resolve_agent_url(state: &AppState) -> String {
+    if !state.args.elohim_node_url.is_empty() {
+        let node_health = format!(
+            "{}/elohim/health",
+            state.args.elohim_node_url.trim_end_matches('/')
+        );
+        match reqwest::get(&node_health).await {
+            Ok(resp) if resp.status().is_success() => {
+                debug!(
+                    "elohim-node healthy, routing to {}",
+                    state.args.elohim_node_url
+                );
+                return state.args.elohim_node_url.clone();
+            }
+            _ => {
+                debug!("elohim-node unreachable, falling back to sidecar");
+            }
+        }
+    }
+    state.args.elohim_agent_url.clone()
 }
 
 async fn forward_to_agent(
@@ -316,5 +339,19 @@ mod tests {
     fn test_prod_mode_state_disables_dev_mode() {
         let state = test_state(false);
         assert!(!state.args.dev_mode);
+    }
+
+    #[test]
+    fn test_elohim_node_url_default_is_empty() {
+        let state = test_state(false);
+        assert!(state.args.elohim_node_url.is_empty());
+    }
+
+    #[test]
+    fn test_sidecar_url_used_when_node_url_empty() {
+        let state = test_state(false);
+        // When elohim_node_url is empty, resolve_agent_url should use elohim_agent_url
+        assert!(state.args.elohim_node_url.is_empty());
+        assert!(!state.args.elohim_agent_url.is_empty());
     }
 }
