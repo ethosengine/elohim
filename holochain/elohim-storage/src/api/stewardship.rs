@@ -17,8 +17,8 @@ use crate::error::StorageError;
 use crate::services::response;
 use crate::services::StewardshipService;
 use crate::views::{
-    ContentStewardshipView, CreateAllocationInputView, DevicePolicyView,
-    StewardshipAllocationView, UpdateAllocationInputView, UpsertPolicyInputView,
+    ContentStewardshipView, CreateAllocationInputView, DevicePolicyView, StewardshipAllocationView,
+    UpdateAllocationInputView, UpsertPolicyInputView,
 };
 
 use super::{get_conn, parse_body};
@@ -260,9 +260,7 @@ pub async fn handle(
         }
 
         (&Method::GET, p) if p.starts_with("policies/") && p.ends_with("/chain") => {
-            let subject_id = p
-                .trim_start_matches("policies/")
-                .trim_end_matches("/chain");
+            let subject_id = p.trim_start_matches("policies/").trim_end_matches("/chain");
             handle_get_policy_chain(subject_id, pool).await
         }
 
@@ -674,10 +672,7 @@ fn extract_query_param(query: Option<&str>, key: &str) -> Option<String> {
 // Device Policy handlers
 // =============================================================================
 
-async fn handle_upsert_policy(
-    req: Request<Incoming>,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_upsert_policy(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
     let input_view: UpsertPolicyInputView = match parse_body(req).await {
         Ok(v) => v,
         Err(_) => return response::bad_request("Invalid JSON body for upsert policy"),
@@ -697,10 +692,7 @@ async fn handle_upsert_policy(
     }
 }
 
-async fn handle_list_policies(
-    req: Request<Incoming>,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_list_policies(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
     let subject_id = extract_query_param(req.uri().query(), "subjectId");
     let subject_id = match subject_id {
         Some(id) if !id.is_empty() => id,
@@ -721,10 +713,7 @@ async fn handle_list_policies(
     }
 }
 
-async fn handle_get_subject_policy(
-    subject_id: &str,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_get_subject_policy(subject_id: &str, pool: &DbPool) -> Response<Full<Bytes>> {
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
@@ -737,10 +726,7 @@ async fn handle_get_subject_policy(
     }
 }
 
-async fn handle_get_parent_policy(
-    subject_id: &str,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_get_parent_policy(subject_id: &str, pool: &DbPool) -> Response<Full<Bytes>> {
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
@@ -753,10 +739,7 @@ async fn handle_get_parent_policy(
     }
 }
 
-async fn handle_get_policy_chain(
-    subject_id: &str,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_get_policy_chain(subject_id: &str, pool: &DbPool) -> Response<Full<Bytes>> {
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
@@ -768,10 +751,7 @@ async fn handle_get_policy_chain(
     }
 }
 
-async fn handle_my_policy_chain(
-    req: Request<Incoming>,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_my_policy_chain(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
     let agent_id = extract_query_param(req.uri().query(), "agentId");
     let agent_id = match agent_id {
         Some(id) if !id.is_empty() => id,
@@ -789,10 +769,7 @@ async fn handle_my_policy_chain(
     }
 }
 
-async fn handle_check_time_access(
-    req: Request<Incoming>,
-    pool: &DbPool,
-) -> Response<Full<Bytes>> {
+async fn handle_check_time_access(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
     let agent_id = extract_query_param(req.uri().query(), "agentId");
     let agent_id = match agent_id {
         Some(id) if !id.is_empty() => id,

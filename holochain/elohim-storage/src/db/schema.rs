@@ -117,13 +117,9 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
     // Migration: v4 -> v5: Add device_policies table
     if current == 4 {
         info!("Migrating v4 -> v5: Adding device_policies table");
-        conn.execute_batch(DEVICE_POLICIES_SCHEMA)
-            .map_err(|e| {
-                StorageError::Internal(format!(
-                    "Failed to create device_policies table: {}",
-                    e
-                ))
-            })?;
+        conn.execute_batch(DEVICE_POLICIES_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create device_policies table: {}", e))
+        })?;
         current = 5;
     }
 
@@ -165,10 +161,7 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
         StorageError::Internal(format!("Failed to create collectives tables: {}", e))
     })?;
     conn.execute_batch(DEVICE_POLICIES_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!(
-            "Failed to create device_policies table: {}",
-            e
-        ))
+        StorageError::Internal(format!("Failed to create device_policies table: {}", e))
     })?;
     Ok(())
 }

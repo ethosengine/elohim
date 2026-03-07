@@ -27,12 +27,14 @@ use crate::config::{BitswapConfig as NodeBitswapConfig, P2PConfig};
 use crate::sync::protocol::SyncMessage;
 
 // Re-export storage protocol types for the event loop
-pub use elohim_storage::p2p::shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
+pub use elohim_storage::p2p::kad_store::SledRecordStore;
+pub use elohim_storage::p2p::shard_protocol::{
+    ShardCodec, ShardProtocol, ShardRequest, ShardResponse,
+};
 pub use elohim_storage::p2p::sync_protocol::{
     SyncCodec as StorageSyncCodec, SyncProtocol as StorageSyncProtocol,
     SyncRequest as StorageSyncRequest, SyncResponse as StorageSyncResponse,
 };
-pub use elohim_storage::p2p::kad_store::SledRecordStore;
 
 /// Combined libp2p behaviour for the unified Elohim node.
 ///
@@ -424,15 +426,15 @@ pub fn build_swarm(
             );
 
             // --- Storage protocols ---
-            let shard_config = request_response::Config::default()
-                .with_request_timeout(Duration::from_secs(60));
+            let shard_config =
+                request_response::Config::default().with_request_timeout(Duration::from_secs(60));
             let shard_protocol = request_response::Behaviour::new(
                 [(ShardProtocol, request_response::ProtocolSupport::Full)],
                 shard_config,
             );
 
-            let storage_sync_config = request_response::Config::default()
-                .with_request_timeout(Duration::from_secs(30));
+            let storage_sync_config =
+                request_response::Config::default().with_request_timeout(Duration::from_secs(30));
             let storage_sync = request_response::Behaviour::new(
                 [(StorageSyncProtocol, request_response::ProtocolSupport::Full)],
                 storage_sync_config,

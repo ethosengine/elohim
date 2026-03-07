@@ -1796,10 +1796,8 @@ impl UpsertPolicyInputView {
             )
             .unwrap_or_else(|_| "[]".into()),
             cooldown_minutes: self.time_rules.cooldown_minutes,
-            disabled_features_json: serde_json::to_string(
-                &self.feature_rules.disabled_features,
-            )
-            .unwrap_or_else(|_| "[]".into()),
+            disabled_features_json: serde_json::to_string(&self.feature_rules.disabled_features)
+                .unwrap_or_else(|_| "[]".into()),
             disabled_routes_json: serde_json::to_string(&self.feature_rules.disabled_routes)
                 .unwrap_or_else(|_| "[]".into()),
             require_approval_json: serde_json::to_string(&self.feature_rules.require_approval)

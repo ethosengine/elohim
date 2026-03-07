@@ -141,10 +141,7 @@ pub fn get_policies_for_subject(
 }
 
 /// Get a policy by ID
-pub fn get_policy_by_id(
-    conn: &mut PooledConn,
-    id: &str,
-) -> Result<DevicePolicy, StorageError> {
+pub fn get_policy_by_id(conn: &mut PooledConn, id: &str) -> Result<DevicePolicy, StorageError> {
     device_policies::table
         .filter(device_policies::id.eq(id))
         .first::<DevicePolicy>(conn)

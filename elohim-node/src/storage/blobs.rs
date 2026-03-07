@@ -33,7 +33,11 @@ impl BlobManager {
 impl elohim_bitswap::BitswapStore for BlobManager {
     async fn contains(&self, cid: &Cid) -> anyhow::Result<bool> {
         let cid_str = cid.to_string();
-        Ok(self.store.exists_by_address(&cid_str).await.unwrap_or(false))
+        Ok(self
+            .store
+            .exists_by_address(&cid_str)
+            .await
+            .unwrap_or(false))
     }
 
     async fn get(&self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
