@@ -9,3 +9,4 @@ packages:
   - genesis/orchestrator
   - holochain/sdk/storage-client-ts
   - mcp-servers/elohim-content
+  - elohim/elohim-agent-sdk
