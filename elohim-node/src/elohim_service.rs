@@ -331,8 +331,11 @@ pub async fn handle_invoke(
                 "Invoke deferred"
             );
 
+            // Return 200 with status:"deferred" in body — the JSON status field
+            // discriminates all outcomes. Using 503 would cause NativeBackend
+            // (which checks response.ok) to treat deferred as an error.
             (
-                StatusCode::SERVICE_UNAVAILABLE,
+                StatusCode::OK,
                 Json(InvokeResponse {
                     request_id,
                     result: InvokeResult::Deferred {
@@ -351,8 +354,10 @@ pub async fn handle_invoke(
                 "Invoke declined by admission"
             );
 
+            // Return 200 with status:"declined" — same principle as deferred:
+            // the JSON status field discriminates, not the HTTP status code.
             (
-                StatusCode::UNPROCESSABLE_ENTITY,
+                StatusCode::OK,
                 Json(InvokeResponse {
                     request_id,
                     result: InvokeResult::Declined { reason },

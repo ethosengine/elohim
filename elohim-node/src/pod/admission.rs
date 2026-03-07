@@ -121,7 +121,11 @@ impl AdmissionController {
             };
         }
 
-        if self.budget_remaining.load(Ordering::Relaxed) == 0 {
+        // Acquire queue lock before budget check to prevent TOCTOU race
+        // where concurrent requests all see budget > 0 before any enqueues
+        let mut queue = self.queue.lock().unwrap();
+
+        if self.budget_remaining.load(Ordering::Acquire) == 0 {
             return AdmissionDecision::Deferred {
                 reason: DeferReason::BudgetExhausted,
                 mesh_hints: vec![],
@@ -129,7 +133,6 @@ impl AdmissionController {
             };
         }
 
-        let mut queue = self.queue.lock().unwrap();
         if queue.len() as u32 >= self.config.max_queue_depth {
             return AdmissionDecision::Deferred {
                 reason: DeferReason::QueueFull,
@@ -139,7 +142,6 @@ impl AdmissionController {
         }
 
         let commitment_id = format!("commit-{}", uuid::Uuid::new_v4());
-        let position = queue.len() as u32;
 
         queue.push(QueuedRequest {
             request_id: request_id.into(),
@@ -150,7 +152,12 @@ impl AdmissionController {
             enqueued_at: chrono::Utc::now().to_rfc3339(),
         });
 
+        // Sort by priority (urgent first), then find actual position post-sort
         queue.sort_by(|a, b| b.priority.cmp(&a.priority));
+        let position = queue
+            .iter()
+            .position(|r| r.commitment_id == commitment_id)
+            .unwrap_or(0) as u32;
 
         AdmissionDecision::Accepted {
             commitment_id,
@@ -160,10 +167,18 @@ impl AdmissionController {
     }
 
     pub fn record_usage(&self, tokens: u32) {
-        self.budget_remaining.fetch_sub(
-            tokens.min(self.budget_remaining.load(Ordering::Relaxed)),
-            Ordering::Relaxed,
-        );
+        // CAS loop to prevent underflow — saturates at 0
+        loop {
+            let current = self.budget_remaining.load(Ordering::Acquire);
+            let new = current.saturating_sub(tokens);
+            if self
+                .budget_remaining
+                .compare_exchange_weak(current, new, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
+            {
+                break;
+            }
+        }
     }
 
     pub fn dequeue(&self) -> Option<QueuedRequest> {
