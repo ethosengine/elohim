@@ -133,7 +133,11 @@ pub struct Args {
     /// URL of elohim-agent-sdk sidecar for AI agent invocation
     /// (e.g., "http://localhost:8095")
     /// Doorway proxies /api/v1/elohim/invoke requests here
-    #[arg(long, env = "ELOHIM_AGENT_URL", default_value = "http://localhost:8095")]
+    #[arg(
+        long,
+        env = "ELOHIM_AGENT_URL",
+        default_value = "http://localhost:8095"
+    )]
     pub elohim_agent_url: String,
 
     /// URL of doorway-app for operator dashboard
