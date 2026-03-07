@@ -743,18 +743,14 @@ spec:
                             echo "🔍 Analyzing changesets since last build..."
                             changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
 
-                            // Bootstrap safeguard: if no per-pipeline baselines exist and the
-                            // changeset is very large, the global baseline is stale (e.g. first
-                            // run after adding baselines, or after repeated failures). Fall back
-                            // to HEAD~1 to avoid rebuilding the entire history.
+                            // Log advisory when baseline appears stale (no per-pipeline
+                            // baselines and large diff). We still use the full changeset —
+                            // those are real accumulated changes that need building. The
+                            // one-time full rebuild after baseline loss is correct; the
+                            // previous HEAD~1 fallback silently discarded real changes.
                             if (!pipelineBaselines && changedFiles.size() > 50) {
-                                echo "⚠️ Stale baseline detected (${changedFiles.size()} files, no per-pipeline baselines)"
-                                echo "   Falling back to HEAD~1 to avoid unnecessary rebuilds"
-                                changedFiles = sh(
-                                    script: 'git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD',
-                                    returnStdout: true
-                                ).trim().split('\n').findAll { it }
-                                echo "   Narrowed changeset to ${changedFiles.size()} files"
+                                echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
+                                echo "   Building all matching pipelines (baselines will be saved after this run)"
                             }
 
                             analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
