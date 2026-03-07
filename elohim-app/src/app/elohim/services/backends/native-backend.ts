@@ -1,8 +1,9 @@
 /**
- * Native Backend — Doorway proxy to the Rust elohim-agent crate.
+ * Native Backend — Doorway proxy to the elohim-agent-sdk sidecar (via doorway).
  *
- * Production path: Angular → doorway /api/v1/elohim/invoke → Rust ElohimAgentService.
- * Stub until the doorway HTTP route is implemented.
+ * Production path: Angular → doorway /api/v1/elohim/invoke → Agent SDK sidecar → Claude.
+ * Alpha: server-side ANTHROPIC_API_KEY with 10-call budget cap.
+ * Production: BYOK keys forwarded from frontend.
  */
 
 import { Observable, from } from 'rxjs';
@@ -14,13 +15,10 @@ const DOORWAY_ELOHIM_ENDPOINT = '/api/v1/elohim/invoke';
 const DECLINED_PRINCIPLE = 'Capability boundaries';
 
 /**
- * Native backend — calls the Rust elohim-agent via doorway HTTP route.
+ * Native backend — calls the Agent SDK sidecar via doorway HTTP route.
  *
- * This is the production path. The Rust crate handles constitutional
- * reasoning natively with its own LlmBackend (vLLM/Ollama/Anthropic BYOK).
- *
- * Currently a stub — isAvailable() probes the endpoint and returns
- * false until the doorway route exists.
+ * The sidecar handles constitutional reasoning and Claude invocation.
+ * isAvailable() probes the /health endpoint; returns true when sidecar is running.
  */
 export class NativeBackend implements ElohimBackend {
   readonly id = 'native';
@@ -79,7 +77,6 @@ export class NativeBackend implements ElohimBackend {
       const data = (await response.json()) as ElohimResponse;
       const timeMs = Date.now() - startTime;
 
-      // The Rust crate returns ElohimResponse directly (camelCase via serde)
       return { ...data, cost: { ...data.cost, timeMs } } as ElohimResponse;
     } catch (err) {
       return this.declinedResponse(
