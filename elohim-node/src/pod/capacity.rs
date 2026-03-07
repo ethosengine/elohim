@@ -140,14 +140,7 @@ mod tests {
 
     #[test]
     fn test_build_announcement() {
-        let ann = build_announcement(
-            "node-test",
-            42,
-            2,
-            5,
-            &["path-recommendation".into()],
-            true,
-        );
+        let ann = build_announcement("node-test", 42, 2, 5, &["path-recommendation".into()], true);
         assert_eq!(ann.node_id, "node-test");
         assert_eq!(ann.budget_remaining, 42);
         assert_eq!(ann.active_requests, 2);

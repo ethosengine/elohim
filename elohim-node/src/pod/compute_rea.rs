@@ -53,12 +53,7 @@ impl ComputeCommitment {
         }
     }
 
-    pub fn fulfill(
-        &mut self,
-        tokens_used: u32,
-        model: String,
-        time_ms: u64,
-    ) -> ComputeEvent {
+    pub fn fulfill(&mut self, tokens_used: u32, model: String, time_ms: u64) -> ComputeEvent {
         self.status = CommitmentStatus::Fulfilled;
         self.fulfilled_at = Some(chrono::Utc::now().to_rfc3339());
 

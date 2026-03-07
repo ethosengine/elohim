@@ -312,9 +312,7 @@ mod tests {
         );
         match decision {
             AdmissionDecision::Deferred {
-                reason,
-                mesh_hints,
-                ..
+                reason, mesh_hints, ..
             } => {
                 assert_eq!(reason, DeferReason::BudgetExhausted);
                 assert!(mesh_hints.is_empty());

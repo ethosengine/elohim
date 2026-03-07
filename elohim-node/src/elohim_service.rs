@@ -17,7 +17,7 @@ use tracing::{error, info, warn};
 
 use constitution::StackContext;
 use elohim_agent::backend::MockBackend;
-use elohim_agent::request::{RequestParams, ElohimRequest};
+use elohim_agent::request::{ElohimRequest, RequestParams};
 use elohim_agent::response::ResponseStatus;
 use elohim_agent::service::{ElohimAgentService, ServiceConfig};
 use elohim_agent::ElohimCapability;
@@ -98,12 +98,14 @@ pub struct InvokeResponse {
 
 /// Outcome of an invoke request — three-variant tagged enum.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "status", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "status",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum InvokeResult {
     /// Request was processed and a response is available.
-    Fulfilled {
-        response: serde_json::Value,
-    },
+    Fulfilled { response: serde_json::Value },
     /// Request cannot be served right now — try later or elsewhere.
     Deferred {
         defer_reason: String,
@@ -111,9 +113,7 @@ pub enum InvokeResult {
         retry_after_ms: u64,
     },
     /// Request was permanently declined.
-    Declined {
-        reason: String,
-    },
+    Declined { reason: String },
 }
 
 // ============================================================================
@@ -167,10 +167,7 @@ pub async fn handle_invoke(
                         Json(InvokeResponse {
                             request_id,
                             result: InvokeResult::Declined {
-                                reason: format!(
-                                    "Unknown capability: '{}'",
-                                    request.capability
-                                ),
+                                reason: format!("Unknown capability: '{}'", request.capability),
                             },
                         }),
                     );
@@ -195,8 +192,8 @@ pub async fn handle_invoke(
             // Pass the full params object as extra for anything else
             params.extra = request.params.clone();
 
-            let agent_request = ElohimRequest::new(capability, &request.requester_id)
-                .with_params(params);
+            let agent_request =
+                ElohimRequest::new(capability, &request.requester_id).with_params(params);
 
             // 5. Mark active and invoke
             state.admission.mark_active();
@@ -211,8 +208,8 @@ pub async fn handle_invoke(
                     // 6. Determine outcome from ElohimResponse status
                     match response.status {
                         ResponseStatus::Fulfilled => {
-                            let tokens_used = response.cost.input_tokens
-                                + response.cost.output_tokens;
+                            let tokens_used =
+                                response.cost.input_tokens + response.cost.output_tokens;
                             let time_ms = response.cost.processing_time_ms;
 
                             // Fulfill the REA commitment
@@ -248,10 +245,7 @@ pub async fn handle_invoke(
                         }
                         ResponseStatus::Declined => {
                             commitment.cancel();
-                            let reason = response
-                                .constitutional_reasoning
-                                .interpretation
-                                .clone();
+                            let reason = response.constitutional_reasoning.interpretation.clone();
 
                             warn!(
                                 request_id = %request_id,
@@ -370,9 +364,7 @@ pub async fn handle_invoke(
 /// Axum handler for `GET /elohim/health`.
 ///
 /// Returns node health including admission controller metrics.
-pub async fn handle_health(
-    State(state): State<Arc<ElohimNodeState>>,
-) -> Json<serde_json::Value> {
+pub async fn handle_health(State(state): State<Arc<ElohimNodeState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
         "nodeId": state.node_id,
@@ -449,7 +441,9 @@ pub async fn initialize_agent_service(
     })?;
 
     // 4. Register capabilities
-    service.register_capabilities(config.capabilities.clone()).await;
+    service
+        .register_capabilities(config.capabilities.clone())
+        .await;
 
     info!(
         capabilities = config.capabilities.len(),
@@ -460,7 +454,13 @@ pub async fn initialize_agent_service(
     let capability_strings: Vec<String> = config
         .capabilities
         .iter()
-        .map(|c| serde_json::to_value(c).unwrap().as_str().unwrap().to_string())
+        .map(|c| {
+            serde_json::to_value(c)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
         .collect();
 
     let admission_config = AdmissionConfig {
@@ -568,10 +568,22 @@ mod tests {
 
     #[test]
     fn test_priority_conversion() {
-        assert_eq!(RequestPriority::from(InvokePriority::Low), RequestPriority::Low);
-        assert_eq!(RequestPriority::from(InvokePriority::Normal), RequestPriority::Normal);
-        assert_eq!(RequestPriority::from(InvokePriority::High), RequestPriority::High);
-        assert_eq!(RequestPriority::from(InvokePriority::Urgent), RequestPriority::Urgent);
+        assert_eq!(
+            RequestPriority::from(InvokePriority::Low),
+            RequestPriority::Low
+        );
+        assert_eq!(
+            RequestPriority::from(InvokePriority::Normal),
+            RequestPriority::Normal
+        );
+        assert_eq!(
+            RequestPriority::from(InvokePriority::High),
+            RequestPriority::High
+        );
+        assert_eq!(
+            RequestPriority::from(InvokePriority::Urgent),
+            RequestPriority::Urgent
+        );
     }
 
     #[tokio::test]
