@@ -201,11 +201,11 @@ export const SHEFA_ROUTES: Routes = [
             m => m.ShefaPlaceholderComponent
           ),
         data: {
-          title: 'Shefa - Requests & Offers',
+          title: 'Shefa - Exchange',
           placeholder: {
-            title: 'Requests & Offers',
+            title: 'Exchange',
             description:
-              'Create and browse requests and offers within your community using ValueFlows intent patterns.',
+              'Create and browse exchanges within your community using ValueFlows intent patterns.',
             features: [
               'Post requests and offers',
               'Matching algorithm',

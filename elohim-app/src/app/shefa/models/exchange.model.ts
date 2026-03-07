@@ -1,15 +1,20 @@
 /**
- * Requests and Offers Domain Models
+ * Exchange Domain Models
  *
- * Lifted from /research/requests-and-offers and integrated with Shefa REA/ValueFlows
+ * Peer-to-peer exchange coordination integrated with Shefa REA/ValueFlows.
+ *
+ * The exchange system follows the gemach (גמ"ח — gemilut chasadim) pattern:
+ * mutual aid networks where care work is made visible, value flows circularly,
+ * and financial capital accumulation is set apart from capture. Gemachim are
+ * the Jewish tradition of free-loan societies, tool libraries, meal trains,
+ * and interest-free lending — the original mutual aid infrastructure. As the
+ * protocol matures, market exchange is progressively subsumed by these
+ * circular, care-first flows.
  *
  * Key Insight: A Request/Offer is an Intent in REA/ValueFlows vocabulary.
  * - Request = "I intend to receive this service/resource"
  * - Offer = "I intend to provide this service/resource"
  * - Matching = Creating a Proposal that links request + offer intents
- *
- * This module builds on top of existing Intent/Proposal models in rea-bridge.model.ts
- * and adds the preference, timing, and contact patterns from requests-and-offers.
  *
  * Integration Points:
  * - Extends REAAgent (users, organizations)
@@ -19,7 +24,6 @@
  * - Uses MediumOfExchange (already links to hREA ResourceSpec)
  *
  * References:
- * - /research/requests-and-offers - Source domain model
  * - rea-bridge.model.ts - REA/ValueFlows foundation
  * - protocol-core.model.ts - Token types
  */
@@ -221,7 +225,7 @@ export interface MediumOfExchange {
  * - resourceConformsTo: The service being requested
  * - resourceQuantity: How much (hours, units, etc.)
  *
- * In requests-and-offers terms:
+ * In exchange terms:
  * - title: What they want
  * - description: Details and requirements
  * - preferences: When, how, contact method
@@ -341,7 +345,7 @@ export interface ServiceRequest extends Omit<Intent, 'id' | 'createdAt'> {
  * - resourceConformsTo: The service being offered
  * - resourceQuantity: How much they can provide
  *
- * In requests-and-offers terms:
+ * In exchange terms:
  * - title: What they offer
  * - description: Expertise, capability, what they can do
  * - preferences: When, how, contact method

@@ -4,7 +4,7 @@
 
 This module implements a peer-to-peer marketplace/bulletin board for coordinating work, services, and resource exchange.
 
-**Lifted from:** `/research/requests-and-offers` - A production-grade Holochain application
+**Lifted from:** `/research/exchange` - A production-grade Holochain application
 **Integrated with:** Shefa REA/ValueFlows economic infrastructure
 
 **Core Principle:** ServiceRequest and ServiceOffer are **REA Intents** - forward-looking economic flows.
@@ -16,7 +16,7 @@ This module implements a peer-to-peer marketplace/bulletin board for coordinatin
 ```
 shefa/
 ├── models/
-│   └── requests-and-offers.model.ts
+│   └── exchange.model.ts
 │       ├── ServiceRequest (extends Intent)
 │       ├── ServiceOffer (extends Intent)
 │       ├── ServiceMatch (request + offer pair)
@@ -27,7 +27,7 @@ shefa/
 │       └── SavedRequest/SavedOffer (favorites)
 │
 └── services/
-    └── requests-and-offers.service.ts
+    └── exchange.service.ts
         ├── Request management
         ├── Offer management
         ├── Search & discovery

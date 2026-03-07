@@ -8139,7 +8139,7 @@
   },
   {
     "id": "lint-0627",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/models/requests-and-offers.model.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/models/exchange.model.ts",
     "line": 152,
     "column": 11,
     "ruleId": "sonarjs/use-type-alias",
@@ -9439,7 +9439,7 @@
   },
   {
     "id": "lint-0727",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 386,
     "column": 7,
     "ruleId": "@typescript-eslint/no-unsafe-assignment",
@@ -9452,7 +9452,7 @@
   },
   {
     "id": "lint-0728",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 428,
     "column": 9,
     "ruleId": "@typescript-eslint/no-unsafe-assignment",
@@ -9465,7 +9465,7 @@
   },
   {
     "id": "lint-0729",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 579,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9478,7 +9478,7 @@
   },
   {
     "id": "lint-0730",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 595,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9491,7 +9491,7 @@
   },
   {
     "id": "lint-0731",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 723,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9504,7 +9504,7 @@
   },
   {
     "id": "lint-0732",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 740,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9517,7 +9517,7 @@
   },
   {
     "id": "lint-0733",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 784,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9530,7 +9530,7 @@
   },
   {
     "id": "lint-0734",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 810,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9543,7 +9543,7 @@
   },
   {
     "id": "lint-0735",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 847,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9556,7 +9556,7 @@
   },
   {
     "id": "lint-0736",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 861,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9569,7 +9569,7 @@
   },
   {
     "id": "lint-0737",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 896,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9582,7 +9582,7 @@
   },
   {
     "id": "lint-0738",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 919,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9595,7 +9595,7 @@
   },
   {
     "id": "lint-0739",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 942,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9608,7 +9608,7 @@
   },
   {
     "id": "lint-0740",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 972,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9621,7 +9621,7 @@
   },
   {
     "id": "lint-0741",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 995,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9634,7 +9634,7 @@
   },
   {
     "id": "lint-0742",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1027,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9647,7 +9647,7 @@
   },
   {
     "id": "lint-0743",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1060,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9660,7 +9660,7 @@
   },
   {
     "id": "lint-0744",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1074,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9673,7 +9673,7 @@
   },
   {
     "id": "lint-0745",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1085,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9686,7 +9686,7 @@
   },
   {
     "id": "lint-0746",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1094,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9699,7 +9699,7 @@
   },
   {
     "id": "lint-0747",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1109,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9712,7 +9712,7 @@
   },
   {
     "id": "lint-0748",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1118,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9725,7 +9725,7 @@
   },
   {
     "id": "lint-0749",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1127,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9738,7 +9738,7 @@
   },
   {
     "id": "lint-0750",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1136,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9751,7 +9751,7 @@
   },
   {
     "id": "lint-0751",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1145,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9764,7 +9764,7 @@
   },
   {
     "id": "lint-0752",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1154,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9777,7 +9777,7 @@
   },
   {
     "id": "lint-0753",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1169,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9790,7 +9790,7 @@
   },
   {
     "id": "lint-0754",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1181,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9803,7 +9803,7 @@
   },
   {
     "id": "lint-0755",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1194,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9816,7 +9816,7 @@
   },
   {
     "id": "lint-0756",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1203,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9829,7 +9829,7 @@
   },
   {
     "id": "lint-0757",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1218,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9842,7 +9842,7 @@
   },
   {
     "id": "lint-0758",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1230,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9855,7 +9855,7 @@
   },
   {
     "id": "lint-0759",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1243,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9868,7 +9868,7 @@
   },
   {
     "id": "lint-0760",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1254,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9881,7 +9881,7 @@
   },
   {
     "id": "lint-0761",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1267,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9894,7 +9894,7 @@
   },
   {
     "id": "lint-0762",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1276,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9907,7 +9907,7 @@
   },
   {
     "id": "lint-0763",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1287,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9920,7 +9920,7 @@
   },
   {
     "id": "lint-0764",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1302,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9933,7 +9933,7 @@
   },
   {
     "id": "lint-0765",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1319,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9946,7 +9946,7 @@
   },
   {
     "id": "lint-0766",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1335,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9959,7 +9959,7 @@
   },
   {
     "id": "lint-0767",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1351,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9972,7 +9972,7 @@
   },
   {
     "id": "lint-0768",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1365,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9985,7 +9985,7 @@
   },
   {
     "id": "lint-0769",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1385,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -9998,7 +9998,7 @@
   },
   {
     "id": "lint-0770",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1403,
     "column": 9,
     "ruleId": "sonarjs/no-identical-functions",
@@ -10011,7 +10011,7 @@
   },
   {
     "id": "lint-0771",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1421,
     "column": 3,
     "ruleId": "@typescript-eslint/require-await",
@@ -10024,7 +10024,7 @@
   },
   {
     "id": "lint-0772",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1422,
     "column": 8,
     "ruleId": "sonarjs/todo-tag",
@@ -10037,7 +10037,7 @@
   },
   {
     "id": "lint-0773",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1423,
     "column": 5,
     "ruleId": "no-console",
@@ -10050,7 +10050,7 @@
   },
   {
     "id": "lint-0774",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1426,
     "column": 3,
     "ruleId": "@typescript-eslint/require-await",
@@ -10063,7 +10063,7 @@
   },
   {
     "id": "lint-0775",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1427,
     "column": 8,
     "ruleId": "sonarjs/todo-tag",
@@ -10076,7 +10076,7 @@
   },
   {
     "id": "lint-0776",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1428,
     "column": 5,
     "ruleId": "no-console",
@@ -10089,7 +10089,7 @@
   },
   {
     "id": "lint-0777",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1443,
     "column": 18,
     "ruleId": "sonarjs/pseudo-random",
@@ -10102,7 +10102,7 @@
   },
   {
     "id": "lint-0778",
-    "file": "/projects/elohim/elohim-app/src/app/shefa/services/requests-and-offers.service.ts",
+    "file": "/projects/elohim/elohim-app/src/app/shefa/services/exchange.service.ts",
     "line": 1452,
     "column": 18,
     "ruleId": "sonarjs/pseudo-random",

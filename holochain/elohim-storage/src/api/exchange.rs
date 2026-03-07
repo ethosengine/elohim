@@ -1,8 +1,8 @@
-//! Requests & Offers API controller
+//! Exchange API controller
 //!
-//! Routes: `/api/v1/requests-offers[/requests|/offers][/{id}][/match]`
+//! Routes: `/api/v1/exchange[/requests|/offers][/{id}][/match]`
 //!
-//! Delegates to `RequestOfferService` for business logic, which wraps
+//! Delegates to `ExchangeService` for business logic, which wraps
 //! compound 3-write operations (request + intent + event) in Diesel transactions.
 
 use bytes::Bytes;
@@ -11,12 +11,12 @@ use hyper::{body::Incoming, Method, Request, Response};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::request_offer_service::{
+use crate::services::exchange_service::{
     CreateOfferInput, CreateRequestInput, OfferQuery, RequestQuery, UpdateOfferInput,
     UpdateRequestInput,
 };
 use crate::services::response;
-use crate::services::RequestOfferService;
+use crate::services::ExchangeService;
 
 use super::{get_conn, parse_body};
 
@@ -70,7 +70,7 @@ async fn list_requests(
     let query: RequestQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
     let mut conn = get_conn(pool)?;
-    let requests = RequestOfferService::list_requests(&mut conn, ctx, &query)?;
+    let requests = ExchangeService::list_requests(&mut conn, ctx, &query)?;
     Ok(response::ok(&requests))
 }
 
@@ -81,7 +81,7 @@ async fn get_request(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(response::from_option(
-        RequestOfferService::get_request(&mut conn, ctx, id),
+        ExchangeService::get_request(&mut conn, ctx, id),
         &format!("Request {} not found", id),
     ))
 }
@@ -94,7 +94,7 @@ async fn create_request(
     let body: CreateRequestInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
     Ok(response::from_create_result(
-        RequestOfferService::create_request(&mut conn, ctx, body),
+        ExchangeService::create_request(&mut conn, ctx, body),
     ))
 }
 
@@ -106,7 +106,7 @@ async fn update_request(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let body: UpdateRequestInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(RequestOfferService::update_request(
+    Ok(response::from_result(ExchangeService::update_request(
         &mut conn, ctx, id, body,
     )))
 }
@@ -123,7 +123,7 @@ async fn archive_request(
         .ok_or_else(|| StorageError::InvalidInput("requesterId is required".into()))?;
 
     let mut conn = get_conn(pool)?;
-    match RequestOfferService::archive_request(&mut conn, ctx, id, &requester_id) {
+    match ExchangeService::archive_request(&mut conn, ctx, id, &requester_id) {
         Ok(()) => Ok(response::no_content()),
         Err(e) => Ok(response::error_response(e)),
     }
@@ -135,7 +135,7 @@ async fn match_request(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(RequestOfferService::match_request(
+    Ok(response::from_result(ExchangeService::match_request(
         &mut conn, ctx, id,
     )))
 }
@@ -153,7 +153,7 @@ async fn list_offers(
     let query: OfferQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
     let mut conn = get_conn(pool)?;
-    let offers = RequestOfferService::list_offers(&mut conn, ctx, &query)?;
+    let offers = ExchangeService::list_offers(&mut conn, ctx, &query)?;
     Ok(response::ok(&offers))
 }
 
@@ -164,7 +164,7 @@ async fn get_offer(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(response::from_option(
-        RequestOfferService::get_offer(&mut conn, ctx, id),
+        ExchangeService::get_offer(&mut conn, ctx, id),
         &format!("Offer {} not found", id),
     ))
 }
@@ -176,9 +176,9 @@ async fn create_offer(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let body: CreateOfferInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
-    Ok(response::from_create_result(
-        RequestOfferService::create_offer(&mut conn, ctx, body),
-    ))
+    Ok(response::from_create_result(ExchangeService::create_offer(
+        &mut conn, ctx, body,
+    )))
 }
 
 async fn update_offer(
@@ -189,7 +189,7 @@ async fn update_offer(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let body: UpdateOfferInput = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(RequestOfferService::update_offer(
+    Ok(response::from_result(ExchangeService::update_offer(
         &mut conn, ctx, id, body,
     )))
 }
@@ -206,7 +206,7 @@ async fn archive_offer(
         .ok_or_else(|| StorageError::InvalidInput("offerorId is required".into()))?;
 
     let mut conn = get_conn(pool)?;
-    match RequestOfferService::archive_offer(&mut conn, ctx, id, &offeror_id) {
+    match ExchangeService::archive_offer(&mut conn, ctx, id, &offeror_id) {
         Ok(()) => Ok(response::no_content()),
         Err(e) => Ok(response::error_response(e)),
     }
@@ -218,7 +218,7 @@ async fn match_offer(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
-    Ok(response::from_result(RequestOfferService::match_offer(
+    Ok(response::from_result(ExchangeService::match_offer(
         &mut conn, ctx, id,
     )))
 }
@@ -227,11 +227,11 @@ async fn match_offer(
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-/// Handle `/api/v1/requests-offers*` requests
+/// Handle `/api/v1/exchange*` requests
 ///
 /// Sub-routes:
-/// - `/requests-offers/requests[/{id}[/match]]`
-/// - `/requests-offers/offers[/{id}[/match]]`
+/// - `/exchange/requests[/{id}[/match]]`
+/// - `/exchange/offers[/{id}[/match]]`
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
@@ -241,16 +241,16 @@ pub async fn handle(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let trimmed = resource_path.trim_end_matches('/');
 
-    // Route: /requests-offers/requests...
+    // Route: /exchange/requests...
     if trimmed.starts_with("/requests") {
         let after_requests = trimmed.strip_prefix("/requests").unwrap_or("");
         let after_trimmed = after_requests.trim_end_matches('/');
 
         return match (&method, after_trimmed) {
-            // GET /requests-offers/requests  — list
+            // GET /exchange/requests  — list
             (&Method::GET, "") | (&Method::GET, "/") => list_requests(req, pool, ctx).await,
 
-            // POST /requests-offers/requests — create
+            // POST /exchange/requests — create
             (&Method::POST, "") | (&Method::POST, "/") => create_request(req, pool, ctx).await,
 
             _ => {
@@ -266,16 +266,16 @@ pub async fn handle(
                 let action = extract_action(after_trimmed);
 
                 match (&method, action) {
-                    // GET /requests-offers/requests/{id}
+                    // GET /exchange/requests/{id}
                     (&Method::GET, None) => get_request(id, pool, ctx).await,
 
-                    // PATCH /requests-offers/requests/{id}
+                    // PATCH /exchange/requests/{id}
                     (&Method::PATCH, None) => update_request(id, req, pool, ctx).await,
 
-                    // DELETE /requests-offers/requests/{id}
+                    // DELETE /exchange/requests/{id}
                     (&Method::DELETE, None) => archive_request(id, req, pool, ctx).await,
 
-                    // POST /requests-offers/requests/{id}/match
+                    // POST /exchange/requests/{id}/match
                     (&Method::POST, Some("match")) => match_request(id, pool, ctx).await,
 
                     _ => Ok(response::not_found(&format!(
@@ -287,16 +287,16 @@ pub async fn handle(
         };
     }
 
-    // Route: /requests-offers/offers...
+    // Route: /exchange/offers...
     if trimmed.starts_with("/offers") {
         let after_offers = trimmed.strip_prefix("/offers").unwrap_or("");
         let after_trimmed = after_offers.trim_end_matches('/');
 
         return match (&method, after_trimmed) {
-            // GET /requests-offers/offers  — list
+            // GET /exchange/offers  — list
             (&Method::GET, "") | (&Method::GET, "/") => list_offers(req, pool, ctx).await,
 
-            // POST /requests-offers/offers — create
+            // POST /exchange/offers — create
             (&Method::POST, "") | (&Method::POST, "/") => create_offer(req, pool, ctx).await,
 
             _ => {
@@ -312,16 +312,16 @@ pub async fn handle(
                 let action = extract_action(after_trimmed);
 
                 match (&method, action) {
-                    // GET /requests-offers/offers/{id}
+                    // GET /exchange/offers/{id}
                     (&Method::GET, None) => get_offer(id, pool, ctx).await,
 
-                    // PATCH /requests-offers/offers/{id}
+                    // PATCH /exchange/offers/{id}
                     (&Method::PATCH, None) => update_offer(id, req, pool, ctx).await,
 
-                    // DELETE /requests-offers/offers/{id}
+                    // DELETE /exchange/offers/{id}
                     (&Method::DELETE, None) => archive_offer(id, req, pool, ctx).await,
 
-                    // POST /requests-offers/offers/{id}/match
+                    // POST /exchange/offers/{id}/match
                     (&Method::POST, Some("match")) => match_offer(id, pool, ctx).await,
 
                     _ => Ok(response::not_found(&format!(
@@ -334,7 +334,7 @@ pub async fn handle(
     }
 
     Ok(response::not_found(&format!(
-        "Unknown requests-offers route: {} {}",
+        "Unknown exchange route: {} {}",
         method, resource_path
     )))
 }

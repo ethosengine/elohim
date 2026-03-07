@@ -135,7 +135,7 @@ Services in `elohim-app/src/app/shefa/services/`:
 
 | Service | Status | Purpose |
 |---------|--------|---------|
-| `RequestsAndOffersService` | Implemented | P2P service marketplace |
+| `ExchangeService` | Implemented | P2P service marketplace |
 | `FlowPlanningService` | Stub | Multi-step economic flow planning |
 
 ### Banking Bridge

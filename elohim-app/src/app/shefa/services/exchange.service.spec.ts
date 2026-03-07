@@ -1,16 +1,16 @@
 /**
- * Requests-and-offers Service Tests
+ * Exchange Service Tests
  */
 
 import { TestBed } from '@angular/core/testing';
 
-import { RequestsAndOffersService } from './requests-and-offers.service';
+import { ExchangeService } from './exchange.service';
 import { EconomicService } from './economic.service';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-describe('RequestsAndOffersService', () => {
-  let service: RequestsAndOffersService;
+describe('ExchangeService', () => {
+  let service: ExchangeService;
   let mockEconomic: any;
 
   beforeEach(() => {
@@ -24,9 +24,9 @@ describe('RequestsAndOffersService', () => {
     mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
     TestBed.configureTestingModule({
-      providers: [RequestsAndOffersService, { provide: EconomicService, useValue: mockEconomic }],
+      providers: [ExchangeService, { provide: EconomicService, useValue: mockEconomic }],
     });
-    service = TestBed.inject(RequestsAndOffersService);
+    service = TestBed.inject(ExchangeService);
   });
 
   it('should be created', () => {

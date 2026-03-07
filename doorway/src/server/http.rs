@@ -1238,9 +1238,9 @@ async fn handle_request(
         }
 
         // Requests and offers
-        (_, p) if p.starts_with("/api/v1/requests-offers") => {
+        (_, p) if p.starts_with("/api/v1/exchange") => {
             return Ok(to_boxed(
-                routes::handle_requests_offers_request(req, Arc::clone(&state), p).await,
+                routes::handle_exchange_request(req, Arc::clone(&state), p).await,
             ));
         }
 

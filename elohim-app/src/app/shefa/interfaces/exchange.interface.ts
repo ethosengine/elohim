@@ -1,20 +1,20 @@
 /**
- * IRequestsAndOffers -- Abstract interface for peer-to-peer request/offer
+ * IExchange -- Abstract interface for peer-to-peer request/offer
  * coordination in Shefa.
  *
  * Decouples the request/offer lifecycle, matching, and coordination from
  * the concrete REA-integrated implementation. Consumers inject the
- * REQUESTS_AND_OFFERS token; the default factory resolves to
- * RequestsAndOffersService.
+ * EXCHANGE token; the default factory resolves to
+ * ExchangeService.
  *
- * Tests provide a mock IRequestsAndOffers via the same token -- no
+ * Tests provide a mock IExchange via the same token -- no
  * concrete service import needed.
  *
  * @example
  * ```typescript
  * @Injectable({ providedIn: 'root' })
  * export class MarketplaceService {
- *   private readonly marketplace = inject(REQUESTS_AND_OFFERS);
+ *   private readonly marketplace = inject(EXCHANGE);
  *
  *   async postRequest(userId: string, details: Omit<ServiceRequest, 'id' | 'requestNumber' | 'createdAt' | 'updatedAt'>) {
  *     return this.marketplace.createRequest(userId, details);
@@ -25,7 +25,7 @@
 
 import { InjectionToken, inject } from '@angular/core';
 
-import { RequestsOffersApiService } from '../services/requests-offers-api.service';
+import { ExchangeApiService } from '../services/exchange-api.service';
 
 import type { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import type { Intent } from '@app/elohim/models/rea-bridge.model';
@@ -33,16 +33,16 @@ import type {
   ServiceRequest,
   ServiceOffer,
   ServiceMatch,
-} from '@app/shefa/models/requests-and-offers.model';
+} from '@app/shefa/models/exchange.model';
 
 /**
- * Abstract request/offer coordinator -- manages the lifecycle of service
+ * Abstract exchange coordinator -- manages the lifecycle of service
  * requests and offers, matching, and discovery.
  *
  * Implementations handle REA intent creation, economic event tracking,
  * DHT persistence, and matching algorithms.
  */
-export interface IRequestsAndOffers {
+export interface IExchange {
   // ==========================================================================
   // Request Lifecycle
   // ==========================================================================
@@ -238,9 +238,9 @@ export interface IRequestsAndOffers {
 }
 
 /**
- * Injection token for requests and offers coordination.
+ * Injection token for exchange coordination.
  *
- * Default factory resolves to RequestsAndOffersService which provides:
+ * Default factory resolves to ExchangeService which provides:
  * - Request/offer CRUD with REA Intent + EconomicEvent creation
  * - DHT-backed persistence and search
  * - Matching algorithm with fairness and transparency guarantees
@@ -248,10 +248,10 @@ export interface IRequestsAndOffers {
  *
  * Override in tests:
  * ```typescript
- * { provide: REQUESTS_AND_OFFERS, useValue: mockRequestsAndOffers }
+ * { provide: EXCHANGE, useValue: mockExchange }
  * ```
  */
-export const REQUESTS_AND_OFFERS = new InjectionToken<IRequestsAndOffers>('RequestsAndOffers', {
+export const EXCHANGE = new InjectionToken<IExchange>('Exchange', {
   providedIn: 'root',
-  factory: () => inject(RequestsOffersApiService),
+  factory: () => inject(ExchangeApiService),
 });

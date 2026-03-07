@@ -15,8 +15,8 @@
 //! ```
 
 pub mod economic_events;
+pub mod exchange;
 pub mod presence;
-pub mod requests_offers;
 pub mod resources;
 pub mod stewardship;
 
@@ -57,9 +57,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("resources") {
         let resource_path = sub_path.strip_prefix("resources").unwrap_or("");
         resources::handle(req, method, resource_path, &pool, &app_ctx, services).await
-    } else if sub_path.starts_with("requests-offers") {
-        let resource_path = sub_path.strip_prefix("requests-offers").unwrap_or("");
-        requests_offers::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("exchange") {
+        let resource_path = sub_path.strip_prefix("exchange").unwrap_or("");
+        exchange::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",

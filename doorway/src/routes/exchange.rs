@@ -1,4 +1,4 @@
-//! Requests and offers routes — transparent proxy to elohim-storage `/api/v1/requests-offers/*`
+//! Exchange routes — transparent proxy to elohim-storage `/api/v1/exchange/*`
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 
 use crate::server::AppState;
 
-pub async fn handle_requests_offers_request(
+pub async fn handle_exchange_request(
     req: Request<Incoming>,
     state: Arc<AppState>,
     path: &str,
@@ -17,7 +17,7 @@ pub async fn handle_requests_offers_request(
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
-            warn!("Requests-offers proxy called but STORAGE_URL not configured");
+            warn!("Exchange proxy called but STORAGE_URL not configured");
             return service_unavailable("Storage service not configured. Set STORAGE_URL env var.");
         }
     };
@@ -38,7 +38,7 @@ async fn forward_to_storage(
     };
 
     let method = req.method().clone();
-    debug!(method = %method, url = %full_url, "Forwarding requests-offers request to elohim-storage");
+    debug!(method = %method, url = %full_url, "Forwarding exchange request to elohim-storage");
 
     let client = reqwest::Client::new();
     let mut builder = match method {
@@ -117,7 +117,7 @@ async fn forward_to_storage(
             }
         }
         Err(e) => {
-            warn!(error = %e, path = %path, "Failed to forward requests-offers request to storage");
+            warn!(error = %e, path = %path, "Failed to forward exchange request to storage");
             Response::builder()
                 .status(StatusCode::BAD_GATEWAY)
                 .header("Content-Type", "application/json")
@@ -151,20 +151,17 @@ mod tests {
     #[test]
     fn storage_url_built_with_query() {
         let base = "http://localhost:8090";
-        let path = "/api/v1/requests-offers";
+        let path = "/api/v1/exchange";
         let query = "state=open";
         let url = format!("{}{}?{}", base.trim_end_matches('/'), path, query);
-        assert_eq!(
-            url,
-            "http://localhost:8090/api/v1/requests-offers?state=open"
-        );
+        assert_eq!(url, "http://localhost:8090/api/v1/exchange?state=open");
     }
 
     #[test]
     fn storage_url_trailing_slash_trimmed() {
         let base = "http://localhost:8090/";
-        let path = "/api/v1/requests-offers/abc-123";
+        let path = "/api/v1/exchange/abc-123";
         let url = format!("{}{}", base.trim_end_matches('/'), path);
-        assert_eq!(url, "http://localhost:8090/api/v1/requests-offers/abc-123");
+        assert_eq!(url, "http://localhost:8090/api/v1/exchange/abc-123");
     }
 }

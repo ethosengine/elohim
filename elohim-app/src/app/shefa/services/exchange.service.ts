@@ -1,9 +1,9 @@
 /**
- * Requests and Offers Service
+ * Exchange Service
  *
  * Service layer for peer-to-peer request/offer coordination in Shefa.
  *
- * Operationalizes the bulletin board pattern from /research/requests-and-offers
+ * Operationalizes the bulletin board pattern from /research/exchange
  * and integrates it with REA/ValueFlows for economic tracking.
  *
  * Core Workflows:
@@ -48,9 +48,9 @@ import {
   SavedOffer,
   ListingAdminStatus,
   InteractionType,
-} from '@app/shefa/models/requests-and-offers.model';
+} from '@app/shefa/models/exchange.model';
 
-import { type IRequestsAndOffers } from '../interfaces/requests-and-offers.interface';
+import { type IExchange } from '../interfaces/exchange.interface';
 
 import { EconomicService } from './economic.service';
 
@@ -65,7 +65,7 @@ const NOT_YET_IMPLEMENTED = 'Not yet implemented';
 @Injectable({
   providedIn: 'root',
 })
-export class RequestsAndOffersService implements IRequestsAndOffers {
+export class ExchangeService implements IExchange {
   private readonly economicService = inject(EconomicService);
 
   // ============================================================================

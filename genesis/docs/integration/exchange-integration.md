@@ -8,7 +8,7 @@
 
 ## Overview
 
-The `/research/requests-and-offers` project demonstrates a mature peer-to-peer bulletin board system. We've lifted its core domain concepts and integrated them with Shefa's REA/ValueFlows infrastructure.
+The `/research/exchange` project demonstrates a mature peer-to-peer bulletin board system. We've lifted its core domain concepts and integrated them with Shefa's REA/ValueFlows infrastructure.
 
 **Key Architecture Decision:** Requests and Offers are **REA Intents** in the economic vocabulary.
 
@@ -686,7 +686,7 @@ After Phase 2:
 
 ## Connection to Elohim Mutual
 
-This requests-and-offers system can coordinate work for:
+This exchange system can coordinate work for:
 - Adjusters helping members with insurance claims
 - Prevention specialists coordinating risk mitigation
 - Arbiters resolving disputes

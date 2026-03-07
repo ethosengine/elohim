@@ -1,8 +1,8 @@
 /**
- * RequestsOffersApiService — Thin HTTP client for request/offer coordination.
+ * ExchangeApiService — Thin HTTP client for request/offer coordination.
  *
- * Calls doorway `/api/v1/requests-offers/*` endpoints, implementing
- * IRequestsAndOffers. Replaces the fat RequestsAndOffersService when the
+ * Calls doorway `/api/v1/exchange/*` endpoints, implementing
+ * IExchange. Replaces the fat ExchangeService when the
  * business logic lives behind the Rust API boundary.
  */
 
@@ -13,19 +13,19 @@ import { catchError } from 'rxjs/operators';
 
 import { firstValueFrom, of } from 'rxjs';
 
-import type { IRequestsAndOffers } from '../interfaces/requests-and-offers.interface';
+import type { IExchange } from '../interfaces/exchange.interface';
 import type { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import type { Intent } from '@app/elohim/models/rea-bridge.model';
 import type {
   ServiceMatch,
   ServiceOffer,
   ServiceRequest,
-} from '@app/shefa/models/requests-and-offers.model';
+} from '@app/shefa/models/exchange.model';
 
-const BASE = '/api/v1/requests-offers';
+const BASE = '/api/v1/exchange';
 
 @Injectable({ providedIn: 'root' })
-export class RequestsOffersApiService implements IRequestsAndOffers {
+export class ExchangeApiService implements IExchange {
   private readonly http = inject(HttpClient);
 
   // ==========================================================================

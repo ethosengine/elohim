@@ -1,4 +1,4 @@
-//! Request/Offer service - business logic for compound service request operations
+//! Exchange service - business logic for compound service request operations
 //!
 //! Encapsulates the 3-write compound operations (request + intent + event),
 //! ownership validation, status transitions, and matching logic.
@@ -6,7 +6,7 @@
 //!
 //! ## Architecture
 //!
-//! Controller (api/requests_offers.rs) → **Service (this file)** → Model (db/economic_events.rs)
+//! Controller (api/exchange.rs) → **Service (this file)** → Model (db/economic_events.rs)
 
 use chrono::Utc;
 use diesel::Connection;
@@ -324,10 +324,10 @@ fn generate_intent_id(prefix: &str) -> String {
 // Service implementation
 // ============================================================================
 
-/// Request/Offer service for compound REA operations
-pub struct RequestOfferService;
+/// Exchange service for compound REA operations (gemach — giving and receiving)
+pub struct ExchangeService;
 
-impl RequestOfferService {
+impl ExchangeService {
     // -------------------------------------------------------------------------
     // REQUESTS
     // -------------------------------------------------------------------------

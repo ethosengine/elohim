@@ -32,7 +32,7 @@ This assessment is based on reading the actual source code, not documentation al
 
 
 ### Modeled Only (0-30% functional)
-- **REA Economics (shefa)**: Massive model files (stewarded-resources: 47KB, shefa-compute: 70KB, insurance-mutual: 56KB, requests-and-offers: 41KB). Services have elaborate method signatures but most are stub implementations -- `requests-and-offers.service.ts` has 15+ methods that `return await Promise.reject(new Error('Not yet implemented'))`. Insurance mutual has 30+ TODO comments for "In production, query Holochain DHT." The ElohimStubService explicitly exists as a development mock for AI agent calls.
+- **REA Economics (shefa)**: Massive model files (stewarded-resources: 47KB, shefa-compute: 70KB, insurance-mutual: 56KB, exchange: 41KB). Services have elaborate method signatures but most are stub implementations -- `exchange.service.ts` has 15+ methods that `return await Promise.reject(new Error('Not yet implemented'))`. Insurance mutual has 30+ TODO comments for "In production, query Holochain DHT." The ElohimStubService explicitly exists as a development mock for AI agent calls.
 - **Governance (qahal)**: Models defined (governance-deliberation, governance-feedback, collective-research, place). Community home shows "Coming Soon." Services re-export from elohim core (affinity-tracking, human-consent, governance). The governance service reads from DataLoaderService but there is no write path.
 - **Token Circulation**: shefa-compute references token types, exchange rates, allocation -- all hardcoded placeholders (`value: totalTokens * 0.5, // TODO: Get actual exchange rate`).
 - **Attribution Workflow**: No implementation found.
@@ -383,7 +383,7 @@ Token generation from economic events. Insurance mutual claim filing. P2P sync b
 
 1. **As a community member, I want to make a request for help, so that the community can respond.**
    - Acceptance: Create request form works. Request appears in community feed. Another member can see it.
-   - Implement core create/read methods in requests-and-offers service (replace Promise.reject stubs)
+   - Implement core create/read methods in exchange service (replace Promise.reject stubs)
    - Create request form component
    - Size: L (3 points)
 
