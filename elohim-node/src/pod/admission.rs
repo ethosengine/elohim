@@ -53,23 +53,19 @@ pub struct MeshHint {
 }
 
 /// Priority levels for queue ordering. Maps to ElohimRequest.priority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RequestPriority {
     Low = 0,
+    #[default]
     Normal = 1,
     High = 2,
     Urgent = 3,
 }
 
-impl Default for RequestPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 /// Configuration for the admission controller.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Training-wheels: max_concurrent and node_id used when mesh routing is wired
 pub struct AdmissionConfig {
     pub budget_limit: u32,
     pub max_queue_depth: u32,
@@ -80,6 +76,7 @@ pub struct AdmissionConfig {
 
 /// Queued request entry.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Training-wheels: fields used when dequeue processing is wired
 pub struct QueuedRequest {
     pub request_id: String,
     pub requester_id: String,

@@ -107,12 +107,14 @@ pub enum SwarmEvent {
 
     // --- Storage events ---
     /// Incoming shard request from a peer.
+    #[allow(dead_code)]
     ShardRequest {
         peer_id: PeerId,
         request: ShardRequest,
         channel: request_response::ResponseChannel<ShardResponse>,
     },
     /// Incoming storage-sync request from a peer.
+    #[allow(dead_code)]
     StorageSyncRequest {
         peer_id: PeerId,
         request: StorageSyncRequest,
@@ -269,40 +271,42 @@ impl ElohimSwarm {
 
                 // Shard protocol events (storage protocol)
                 LibSwarmEvent::Behaviour(ElohimBehaviourEvent::ShardProtocol(
-                    request_response::Event::Message { peer, message },
+                    request_response::Event::Message {
+                        peer,
+                        message:
+                            request_response::Message::Request {
+                                request, channel, ..
+                            },
+                    },
                 )) => {
-                    if let request_response::Message::Request {
-                        request, channel, ..
-                    } = message
-                    {
-                        debug!(%peer, "Incoming shard request");
-                        let _ = event_tx
-                            .send(SwarmEvent::ShardRequest {
-                                peer_id: peer,
-                                request,
-                                channel,
-                            })
-                            .await;
-                    }
+                    debug!(%peer, "Incoming shard request");
+                    let _ = event_tx
+                        .send(SwarmEvent::ShardRequest {
+                            peer_id: peer,
+                            request,
+                            channel,
+                        })
+                        .await;
                 }
 
                 // Storage-sync events (storage protocol)
                 LibSwarmEvent::Behaviour(ElohimBehaviourEvent::StorageSync(
-                    request_response::Event::Message { peer, message },
+                    request_response::Event::Message {
+                        peer,
+                        message:
+                            request_response::Message::Request {
+                                request, channel, ..
+                            },
+                    },
                 )) => {
-                    if let request_response::Message::Request {
-                        request, channel, ..
-                    } = message
-                    {
-                        debug!(%peer, "Incoming storage-sync request");
-                        let _ = event_tx
-                            .send(SwarmEvent::StorageSyncRequest {
-                                peer_id: peer,
-                                request,
-                                channel,
-                            })
-                            .await;
-                    }
+                    debug!(%peer, "Incoming storage-sync request");
+                    let _ = event_tx
+                        .send(SwarmEvent::StorageSyncRequest {
+                            peer_id: peer,
+                            request,
+                            channel,
+                        })
+                        .await;
                 }
 
                 // Bitswap events

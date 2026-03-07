@@ -311,7 +311,7 @@ pub enum AgentMessage {
     },
 
     // Consensus for risky actions
-    ConsensusRequest(ConsensusRequest),
+    ConsensusRequest(Box<ConsensusRequest>),
     ConsensusResponse(ConsensusResponse),
 
     // Capability discovery
