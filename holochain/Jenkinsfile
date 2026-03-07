@@ -462,11 +462,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder') {
                     script {
                         try {
-                            dir('doorway') {
-                                sh 'cargo fmt --check'
-                                sh 'RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all'
-                                sh 'RUSTFLAGS="" cargo test --lib --bins'
-                            }
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                # Run fmt/clippy/test inside the Dockerfile's 'check' target
+                                # Reuses BuildKit dep cache — no Rust needed in CI builder image
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    --target check \\
+                                    -f doorway/Dockerfile .
+                            """
                         } catch (Exception e) {
                             echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
                             unstable('Doorway quality gate has warnings')

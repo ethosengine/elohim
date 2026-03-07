@@ -1,7 +1,7 @@
-# Build stage
+# Dependency stage — cached layer shared by check and build targets
 # NOTE: Build context should be repo root directory
 # Run: docker build -f doorway/Dockerfile -t doorway .
-FROM rust:1.93-slim-bookworm AS builder
+FROM rust:1.93-slim-bookworm AS deps
 
 WORKDIR /app
 
@@ -29,6 +29,17 @@ RUN sed -i 's|path = "../holochain/crates/doorway-client"|path = "holochain/crat
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
+
+# Quality check stage — CI quality gate (build with --target check)
+FROM deps AS check
+RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
+COPY doorway/src ./src
+RUN cargo fmt --check
+RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
+RUN RUSTFLAGS="" cargo test --lib --bins
+
+# Build stage
+FROM deps AS builder
 
 # Remove placeholder source and binaries to force rebuild
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
