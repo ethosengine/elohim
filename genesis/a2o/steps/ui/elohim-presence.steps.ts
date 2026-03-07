@@ -88,25 +88,20 @@ Given('the learner navigates to a discovery assessment', async function (this: E
   await device.page.waitForLoadState('networkidle');
 
   // Look for a discovery assessment link/card
-  const discoveryLink = device.page
-    .getByText('discovery', { exact: false })
-    .first();
+  const discoveryLink = device.page.getByText('discovery', { exact: false }).first();
   await discoveryLink.waitFor({ state: 'visible', timeout: 15_000 });
   await discoveryLink.click();
   await device.page.waitForLoadState('networkidle');
 });
 
-Given(
-  'the learner navigates to {string}',
-  async function (this: E2EWorld, path: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Given('the learner navigates to {string}', async function (this: E2EWorld, path: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    await device.navigate(normalizedPath);
-    await device.page.waitForLoadState('networkidle');
-  }
-);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  await device.navigate(normalizedPath);
+  await device.page.waitForLoadState('networkidle');
+});
 
 // ---------------------------------------------------------------------------
 // Assessment Completion
@@ -127,9 +122,7 @@ Given('the learner has completed a discovery assessment', async function (this: 
   await device.navigate('/lamad');
   await device.page.waitForLoadState('networkidle');
 
-  const discoveryLink = device.page
-    .getByText('discovery', { exact: false })
-    .first();
+  const discoveryLink = device.page.getByText('discovery', { exact: false }).first();
   if (await discoveryLink.isVisible().catch(() => false)) {
     await discoveryLink.click();
     await device.page.waitForLoadState('networkidle');
@@ -146,9 +139,7 @@ Given('the elohim insight is visible', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const insight = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`
-  );
+  const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
   await insight.waitFor({ state: 'visible', timeout: 15_000 });
 });
 
@@ -156,9 +147,7 @@ Given('the elohim has responded with an insight', async function (this: E2EWorld
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const insight = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`
-  );
+  const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
   await insight.waitFor({ state: 'visible', timeout: 15_000 });
 });
 
@@ -166,9 +155,7 @@ Then('an elohim insight section appears below the results', async function (this
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const insight = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`
-  );
+  const insight = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.INSIGHT_SECTION}"]`);
   await insight.waitFor({ state: 'visible', timeout: 15_000 });
 });
 
@@ -187,10 +174,7 @@ Then(
     );
     await message.waitFor({ state: 'visible', timeout: 10_000 });
     const text = await message.textContent();
-    assert.ok(
-      text && text.trim().length > 0,
-      'Expected recommendation message to have content'
-    );
+    assert.ok(text && text.trim().length > 0, 'Expected recommendation message to have content');
   }
 );
 
@@ -215,9 +199,7 @@ When('the learner expands the reasoning details', async function (this: E2EWorld
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const expandable = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.REASONING_EXPANDABLE}"]`
-  );
+  const expandable = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.REASONING_EXPANDABLE}"]`);
   await expandable.waitFor({ state: 'visible', timeout: 10_000 });
   await expandable.click();
   await device.page.waitForTimeout(300);
@@ -227,15 +209,10 @@ Then('the primary constitutional principle is visible', async function (this: E2
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const principle = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.REASONING_PRINCIPLE}"]`
-  );
+  const principle = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.REASONING_PRINCIPLE}"]`);
   await principle.waitFor({ state: 'visible', timeout: 10_000 });
   const text = await principle.textContent();
-  assert.ok(
-    text && text.trim().length > 0,
-    'Expected constitutional principle to have content'
-  );
+  assert.ok(text && text.trim().length > 0, 'Expected constitutional principle to have content');
 });
 
 Then('the interpretation of the principle is visible', async function (this: E2EWorld) {
@@ -247,10 +224,7 @@ Then('the interpretation of the principle is visible', async function (this: E2E
   );
   await interpretation.waitFor({ state: 'visible', timeout: 10_000 });
   const text = await interpretation.textContent();
-  assert.ok(
-    text && text.trim().length > 0,
-    'Expected interpretation to have content'
-  );
+  assert.ok(text && text.trim().length > 0, 'Expected interpretation to have content');
 });
 
 // ---------------------------------------------------------------------------
@@ -263,12 +237,8 @@ Then(
     const device = requirePlaywright(this);
     if (!device) return 'pending';
 
-    const tokens = device.page.locator(
-      `[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`
-    );
-    const time = device.page.locator(
-      `[data-testid="${ELOHIM_PRESENCE.COST_TIME}"]`
-    );
+    const tokens = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`);
+    const time = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TIME}"]`);
     await tokens.waitFor({ state: 'visible', timeout: 10_000 });
     await time.waitFor({ state: 'visible', timeout: 10_000 });
   }
@@ -278,36 +248,22 @@ Then('the insight shows tokens processed', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const tokens = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`
-  );
+  const tokens = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TOKENS}"]`);
   await tokens.waitFor({ state: 'visible', timeout: 10_000 });
   const text = await tokens.textContent();
-  assert.ok(
-    text && text.trim().length > 0,
-    'Expected tokens processed to have content'
-  );
+  assert.ok(text && text.trim().length > 0, 'Expected tokens processed to have content');
 });
 
 Then('the insight shows processing time in milliseconds', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  const time = device.page.locator(
-    `[data-testid="${ELOHIM_PRESENCE.COST_TIME}"]`
-  );
+  const time = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.COST_TIME}"]`);
   await time.waitFor({ state: 'visible', timeout: 10_000 });
   const text = await time.textContent();
-  assert.ok(
-    text && text.trim().length > 0,
-    'Expected processing time to have content'
-  );
+  assert.ok(text && text.trim().length > 0, 'Expected processing time to have content');
   // Verify it contains a numeric value (milliseconds)
-  assert.match(
-    text,
-    /\d/u,
-    `Expected processing time to contain a number, got: "${text}"`
-  );
+  assert.match(text, /\d/u, `Expected processing time to contain a number, got: "${text}"`);
 });
 
 // ---------------------------------------------------------------------------
@@ -322,9 +278,7 @@ When(
 
     // First try by data-testid for known buttons, then fall back to role
     if (buttonLabel === 'Test Connection') {
-      const btn = device.page.locator(
-        `[data-testid="${ELOHIM_PRESENCE.TEST_CONNECTION_BTN}"]`
-      );
+      const btn = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.TEST_CONNECTION_BTN}"]`);
       await btn.waitFor({ state: 'visible', timeout: 10_000 });
       await btn.click();
     } else {
@@ -336,38 +290,22 @@ When(
   }
 );
 
-Then(
-  'the test result shows the mock backend is available',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('the test result shows the mock backend is available', async function (this: E2EWorld) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const result = device.page.locator(
-      `[data-testid="${ELOHIM_PRESENCE.TEST_RESULT}"]`
-    );
-    await result.waitFor({ state: 'visible', timeout: 15_000 });
-    const text = await result.textContent();
-    assert.ok(
-      text && text.trim().length > 0,
-      'Expected test result to have content'
-    );
-  }
-);
+  const result = device.page.locator(`[data-testid="${ELOHIM_PRESENCE.TEST_RESULT}"]`);
+  await result.waitFor({ state: 'visible', timeout: 15_000 });
+  const text = await result.textContent();
+  assert.ok(text && text.trim().length > 0, 'Expected test result to have content');
+});
 
-Then(
-  'a banner notification appears confirming the connection',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('a banner notification appears confirming the connection', async function (this: E2EWorld) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const banner = device.page.locator(
-      `[data-testid="${BANNER.NOTIFICATION}"]`
-    );
-    await banner.waitFor({ state: 'visible', timeout: 10_000 });
-    const text = await banner.textContent();
-    assert.ok(
-      text && text.trim().length > 0,
-      'Expected banner notification to have content'
-    );
-  }
-);
+  const banner = device.page.locator(`[data-testid="${BANNER.NOTIFICATION}"]`);
+  await banner.waitFor({ state: 'visible', timeout: 10_000 });
+  const text = await banner.textContent();
+  assert.ok(text && text.trim().length > 0, 'Expected banner notification to have content');
+});
