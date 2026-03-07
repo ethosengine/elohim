@@ -11,6 +11,45 @@ pub const CAPACITY_TOPIC: &str = "/elohim/compute/capacity/1.0.0";
 /// Broadcast interval in seconds.
 pub const CAPACITY_BROADCAST_INTERVAL_SECS: u64 = 30;
 
+/// Build a capacity announcement from current node state.
+///
+/// This constructs the announcement that would be published to the
+/// `/elohim/compute/capacity/1.0.0` gossipsub topic every 30 seconds.
+///
+/// # TODO: Wire into gossipsub broadcast loop
+///
+/// The current `ElohimBehaviour` (in `p2p/transport.rs`) does not include a
+/// gossipsub behaviour. To enable capacity broadcasts:
+///
+/// 1. Add `pub gossipsub: gossipsub::Behaviour` to `ElohimBehaviour`
+/// 2. Subscribe to `CAPACITY_TOPIC` in `build_swarm()`
+/// 3. Spawn a 30-second interval task in `main.rs` that calls
+///    `swarm.behaviour_mut().gossipsub.publish(topic, announcement.encode())`
+/// 4. Handle incoming `GossipsubEvent::Message` in the swarm event loop to
+///    populate the neighbor capacity table (Task 9+)
+pub fn build_announcement(
+    node_id: &str,
+    budget_remaining: u32,
+    active_requests: u32,
+    queue_depth: u32,
+    capabilities: &[String],
+    ready: bool,
+) -> CapacityAnnouncement {
+    CapacityAnnouncement {
+        node_id: node_id.into(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        budget_remaining,
+        active_requests,
+        queue_depth,
+        estimated_tokens_per_sec: 0.0, // TODO: measure actual throughput
+        capabilities: capabilities.to_vec(),
+        ready,
+    }
+}
+
 /// A node's compute capacity announcement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,10 +96,7 @@ mod tests {
             active_requests: 2,
             queue_depth: 5,
             estimated_tokens_per_sec: 150.0,
-            capabilities: vec![
-                "path-recommendation".into(),
-                "content-safety-review".into(),
-            ],
+            capabilities: vec!["path-recommendation".into(), "content-safety-review".into()],
             ready: true,
         }
     }
@@ -100,5 +136,47 @@ mod tests {
     #[test]
     fn test_topic_constant() {
         assert_eq!(CAPACITY_TOPIC, "/elohim/compute/capacity/1.0.0");
+    }
+
+    #[test]
+    fn test_build_announcement() {
+        let ann = build_announcement(
+            "node-test",
+            42,
+            2,
+            5,
+            &["path-recommendation".into()],
+            true,
+        );
+        assert_eq!(ann.node_id, "node-test");
+        assert_eq!(ann.budget_remaining, 42);
+        assert_eq!(ann.active_requests, 2);
+        assert_eq!(ann.queue_depth, 5);
+        assert_eq!(ann.capabilities, vec!["path-recommendation"]);
+        assert!(ann.ready);
+        assert!(ann.timestamp > 0);
+        // estimated_tokens_per_sec is 0.0 until actual throughput measurement
+        assert_eq!(ann.estimated_tokens_per_sec, 0.0);
+    }
+
+    #[test]
+    fn test_build_announcement_encodes_correctly() {
+        let ann = build_announcement(
+            "node-abc",
+            100,
+            0,
+            0,
+            &["content-safety-review".into(), "path-recommendation".into()],
+            false,
+        );
+        // Verify the announcement round-trips through encode/decode
+        let encoded = ann.encode().unwrap();
+        let decoded = CapacityAnnouncement::decode(&encoded).unwrap();
+        assert_eq!(decoded.node_id, "node-abc");
+        assert_eq!(decoded.budget_remaining, 100);
+        assert_eq!(decoded.active_requests, 0);
+        assert_eq!(decoded.queue_depth, 0);
+        assert_eq!(decoded.capabilities.len(), 2);
+        assert!(!decoded.ready);
     }
 }
