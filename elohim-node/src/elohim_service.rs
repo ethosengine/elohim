@@ -1,24 +1,31 @@
-//! ElohimAgentService initialization and HTTP contract types.
+//! ElohimAgentService initialization, HTTP contract types, and axum handlers.
 //!
 //! This module wires the `elohim-agent` crate into elohim-node by:
 //! 1. Defining the HTTP request/response contract (`InvokeRequest`, `InvokeResponse`)
 //! 2. Providing `ElohimNodeState` — shared state for axum handlers
 //! 3. Providing `initialize_agent_service()` — async startup that configures
 //!    backends, constitutional stack, and capability registration
-//!
-//! The actual HTTP handler wiring lives in a separate module (Task 7).
+//! 4. Providing axum handlers for `POST /elohim/invoke` and `GET /elohim/health`
 
 use std::sync::Arc;
 
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Json;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{error, info, warn};
 
 use constitution::StackContext;
 use elohim_agent::backend::MockBackend;
+use elohim_agent::request::{RequestParams, ElohimRequest};
+use elohim_agent::response::ResponseStatus;
 use elohim_agent::service::{ElohimAgentService, ServiceConfig};
 use elohim_agent::ElohimCapability;
 
-use crate::pod::admission::{AdmissionController, AdmissionConfig, RequestPriority};
+use crate::pod::admission::{
+    AdmissionConfig, AdmissionController, AdmissionDecision, DeferReason, RequestPriority,
+};
+use crate::pod::compute_rea::ComputeCommitment;
 
 // ============================================================================
 // Shared state for axum handlers
@@ -110,6 +117,267 @@ pub enum InvokeResult {
 }
 
 // ============================================================================
+// Axum HTTP handlers
+// ============================================================================
+
+/// Axum handler for `POST /elohim/invoke`.
+///
+/// Orchestrates admission control, agent invocation, and REA accounting:
+/// 1. Parse capability and priority from the request
+/// 2. Evaluate admission (budget, queue, capability check)
+/// 3. On Accepted: invoke agent service, record REA event, return result
+/// 4. On Deferred: return defer reason with mesh hints
+/// 5. On Declined: return decline reason
+pub async fn handle_invoke(
+    State(state): State<Arc<ElohimNodeState>>,
+    Json(request): Json<InvokeRequest>,
+) -> (StatusCode, Json<InvokeResponse>) {
+    let request_id = request.request_id.clone();
+
+    // 1. Evaluate admission
+    let priority: RequestPriority = request.priority.into();
+    let decision = state.admission.evaluate(
+        &request.request_id,
+        &request.requester_id,
+        &request.capability,
+        priority,
+    );
+
+    match decision {
+        AdmissionDecision::Accepted { commitment_id, .. } => {
+            // 2. Create REA commitment
+            let mut commitment = ComputeCommitment::new(
+                request.request_id.clone(),
+                state.node_id.clone(),
+                request.requester_id.clone(),
+                request.capability.clone(),
+                1500, // estimated tokens — training-wheels default
+            );
+
+            // 3. Parse capability string into ElohimCapability
+            let capability_json = format!("\"{}\"", request.capability);
+            let capability: ElohimCapability = match serde_json::from_str(&capability_json) {
+                Ok(cap) => cap,
+                Err(_) => {
+                    commitment.cancel();
+                    // Dequeue the request we just enqueued
+                    state.admission.cancel(&request.request_id);
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(InvokeResponse {
+                            request_id,
+                            result: InvokeResult::Declined {
+                                reason: format!(
+                                    "Unknown capability: '{}'",
+                                    request.capability
+                                ),
+                            },
+                        }),
+                    );
+                }
+            };
+
+            // 4. Build ElohimRequest from the HTTP request
+            let mut params = RequestParams::default();
+            // Map well-known fields from the opaque params JSON
+            if let Some(content) = request.params.get("content").and_then(|v| v.as_str()) {
+                params.content = Some(content.to_string());
+            }
+            if let Some(content_id) = request.params.get("contentId").and_then(|v| v.as_str()) {
+                params.content_id = Some(content_id.to_string());
+            }
+            if let Some(path_id) = request.params.get("pathId").and_then(|v| v.as_str()) {
+                params.path_id = Some(path_id.to_string());
+            }
+            if let Some(query) = request.params.get("query").and_then(|v| v.as_str()) {
+                params.query = Some(query.to_string());
+            }
+            // Pass the full params object as extra for anything else
+            params.extra = request.params.clone();
+
+            let agent_request = ElohimRequest::new(capability, &request.requester_id)
+                .with_params(params);
+
+            // 5. Mark active and invoke
+            state.admission.mark_active();
+            let invoke_result = state.agent_service.invoke(agent_request).await;
+            state.admission.mark_complete();
+
+            // Dequeue the processed request
+            state.admission.dequeue();
+
+            match invoke_result {
+                Ok(response) => {
+                    // 6. Determine outcome from ElohimResponse status
+                    match response.status {
+                        ResponseStatus::Fulfilled => {
+                            let tokens_used = response.cost.input_tokens
+                                + response.cost.output_tokens;
+                            let time_ms = response.cost.processing_time_ms;
+
+                            // Fulfill the REA commitment
+                            let _event = commitment.fulfill(
+                                tokens_used,
+                                "mock".to_string(), // training-wheels model name
+                                time_ms,
+                            );
+
+                            // Record budget usage
+                            state.admission.record_usage(tokens_used);
+
+                            info!(
+                                request_id = %request_id,
+                                commitment_id = %commitment_id,
+                                tokens = tokens_used,
+                                "Invoke fulfilled"
+                            );
+
+                            // Serialize the response payload as the response value
+                            let response_value =
+                                serde_json::to_value(&response.payload).unwrap_or_default();
+
+                            (
+                                StatusCode::OK,
+                                Json(InvokeResponse {
+                                    request_id,
+                                    result: InvokeResult::Fulfilled {
+                                        response: response_value,
+                                    },
+                                }),
+                            )
+                        }
+                        ResponseStatus::Declined => {
+                            commitment.cancel();
+                            let reason = response
+                                .constitutional_reasoning
+                                .interpretation
+                                .clone();
+
+                            warn!(
+                                request_id = %request_id,
+                                reason = %reason,
+                                "Invoke declined by agent"
+                            );
+
+                            (
+                                StatusCode::OK,
+                                Json(InvokeResponse {
+                                    request_id,
+                                    result: InvokeResult::Declined { reason },
+                                }),
+                            )
+                        }
+                        _ => {
+                            // Escalated or Deferred at agent level — treat as fulfilled
+                            // with the full response serialized
+                            let response_value =
+                                serde_json::to_value(&response.payload).unwrap_or_default();
+
+                            (
+                                StatusCode::OK,
+                                Json(InvokeResponse {
+                                    request_id,
+                                    result: InvokeResult::Fulfilled {
+                                        response: response_value,
+                                    },
+                                }),
+                            )
+                        }
+                    }
+                }
+                Err(e) => {
+                    commitment.cancel();
+
+                    error!(
+                        request_id = %request_id,
+                        error = %e,
+                        "Invoke failed"
+                    );
+
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(InvokeResponse {
+                            request_id,
+                            result: InvokeResult::Declined {
+                                reason: format!("Internal error: {}", e),
+                            },
+                        }),
+                    )
+                }
+            }
+        }
+
+        AdmissionDecision::Deferred {
+            reason,
+            mesh_hints,
+            retry_after_ms,
+        } => {
+            let defer_reason = match reason {
+                DeferReason::BudgetExhausted => "budgetExhausted".to_string(),
+                DeferReason::QueueFull => "queueFull".to_string(),
+                DeferReason::CapabilityUnavailable => "capabilityUnavailable".to_string(),
+                DeferReason::SystemPressure => "systemPressure".to_string(),
+            };
+
+            let hints: Vec<serde_json::Value> = mesh_hints
+                .iter()
+                .map(|h| serde_json::to_value(h).unwrap_or_default())
+                .collect();
+
+            info!(
+                request_id = %request_id,
+                reason = %defer_reason,
+                retry_after_ms,
+                "Invoke deferred"
+            );
+
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(InvokeResponse {
+                    request_id,
+                    result: InvokeResult::Deferred {
+                        defer_reason,
+                        mesh_hints: hints,
+                        retry_after_ms,
+                    },
+                }),
+            )
+        }
+
+        AdmissionDecision::Declined { reason } => {
+            warn!(
+                request_id = %request_id,
+                reason = %reason,
+                "Invoke declined by admission"
+            );
+
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(InvokeResponse {
+                    request_id,
+                    result: InvokeResult::Declined { reason },
+                }),
+            )
+        }
+    }
+}
+
+/// Axum handler for `GET /elohim/health`.
+///
+/// Returns node health including admission controller metrics.
+pub async fn handle_health(
+    State(state): State<Arc<ElohimNodeState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "ok",
+        "nodeId": state.node_id,
+        "budgetRemaining": state.admission.budget_remaining(),
+        "activeRequests": state.admission.active_requests(),
+        "queueDepth": state.admission.queue_depth(),
+    }))
+}
+
+// ============================================================================
 // Service initialization
 // ============================================================================
 
@@ -169,10 +437,10 @@ pub async fn initialize_agent_service(
     // 3. Initialize with constitutional stack (agent-only context for now)
     let context = StackContext::agent_only(&config.node_id);
     service.initialize(context).await.map_err(|e| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to initialize agent service: {}", e),
-        )) as Box<dyn std::error::Error + Send + Sync>
+        Box::new(std::io::Error::other(format!(
+            "Failed to initialize agent service: {}",
+            e
+        ))) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
     // 4. Register capabilities
