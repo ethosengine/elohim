@@ -317,6 +317,117 @@ impl StewardshipService {
     }
 
     // =========================================================================
+    // Device Policy Operations
+    // =========================================================================
+
+    /// Upsert a device policy for a subject
+    pub fn upsert_device_policy(
+        conn: &mut PooledConn,
+        input: &crate::db::device_policies::CreateDevicePolicyInput,
+    ) -> Result<crate::db::models::DevicePolicy, StorageError> {
+        if input.subject_id.trim().is_empty() {
+            return Err(StorageError::InvalidInput(
+                "subjectId must not be empty".into(),
+            ));
+        }
+        if input.author_id.trim().is_empty() {
+            return Err(StorageError::InvalidInput(
+                "authorId must not be empty".into(),
+            ));
+        }
+        crate::db::device_policies::upsert_policy(conn, input)
+    }
+
+    /// Get all policies for a subject
+    pub fn get_policies_for_subject(
+        conn: &mut PooledConn,
+        subject_id: &str,
+    ) -> Result<Vec<crate::db::models::DevicePolicy>, StorageError> {
+        crate::db::device_policies::get_policies_for_subject(conn, subject_id)
+    }
+
+    /// Get the most recent active policy for a subject
+    pub fn get_subject_policy(
+        conn: &mut PooledConn,
+        subject_id: &str,
+    ) -> Result<Option<crate::db::models::DevicePolicy>, StorageError> {
+        let policies = crate::db::device_policies::get_policies_for_subject(conn, subject_id)?;
+        Ok(policies.into_iter().next())
+    }
+
+    /// Get the parent's computed policy for a subject.
+    /// Walks the inherits_from chain to find the parent policy.
+    pub fn get_parent_policy(
+        conn: &mut PooledConn,
+        subject_id: &str,
+    ) -> Result<Option<Value>, StorageError> {
+        let policies = crate::db::device_policies::get_policies_for_subject(conn, subject_id)?;
+        let parent_id = policies.iter().find_map(|p| p.inherits_from.clone());
+        match parent_id {
+            Some(pid) => match crate::db::device_policies::get_policy_by_id(conn, &pid) {
+                Ok(parent) => Ok(Some(Self::policy_to_computed_json(&parent))),
+                Err(_) => Ok(None),
+            },
+            None => Ok(None),
+        }
+    }
+
+    /// Get the policy chain for a subject as PolicyChainLinks
+    pub fn get_policy_chain(
+        conn: &mut PooledConn,
+        subject_id: &str,
+    ) -> Result<Vec<Value>, StorageError> {
+        let policies = crate::db::device_policies::get_policies_for_subject(conn, subject_id)?;
+        Ok(policies
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "policyId": p.id,
+                    "authorTier": p.author_tier,
+                    "layerOrder": tier_to_layer_order(&p.author_tier),
+                })
+            })
+            .collect())
+    }
+
+    /// Convert a DevicePolicy to computed policy JSON
+    fn policy_to_computed_json(p: &crate::db::models::DevicePolicy) -> Value {
+        let blocked_categories: Value =
+            serde_json::from_str(&p.blocked_categories_json).unwrap_or(Value::Array(vec![]));
+        let blocked_hashes: Value =
+            serde_json::from_str(&p.blocked_hashes_json).unwrap_or(Value::Array(vec![]));
+        let disabled_features: Value =
+            serde_json::from_str(&p.disabled_features_json).unwrap_or(Value::Array(vec![]));
+        let disabled_routes: Value =
+            serde_json::from_str(&p.disabled_routes_json).unwrap_or(Value::Array(vec![]));
+        let require_approval: Value =
+            serde_json::from_str(&p.require_approval_json).unwrap_or(Value::Array(vec![]));
+        let time_windows: Value =
+            serde_json::from_str(&p.time_windows_json).unwrap_or(Value::Array(vec![]));
+
+        serde_json::json!({
+            "subjectId": p.subject_id,
+            "computedAt": p.updated_at,
+            "blockedCategories": blocked_categories,
+            "blockedHashes": blocked_hashes,
+            "ageRatingMax": p.age_rating_max,
+            "reachLevelMax": p.reach_level_max,
+            "sessionMaxMinutes": p.session_max_minutes,
+            "dailyMaxMinutes": p.daily_max_minutes,
+            "timeWindows": time_windows,
+            "cooldownMinutes": p.cooldown_minutes,
+            "disabledFeatures": disabled_features,
+            "disabledRoutes": disabled_routes,
+            "requireApproval": require_approval,
+            "logSessions": p.log_sessions != 0,
+            "logCategories": p.log_categories != 0,
+            "logPolicyEvents": p.log_policy_events != 0,
+            "retentionDays": p.retention_days,
+            "subjectCanView": p.subject_can_view != 0,
+        })
+    }
+
+    // =========================================================================
     // Normalization helpers
     // =========================================================================
 
@@ -378,6 +489,18 @@ impl StewardshipService {
 // =============================================================================
 // Internal helpers
 // =============================================================================
+
+/// Map author tier to layer order for policy chain
+fn tier_to_layer_order(tier: &str) -> i32 {
+    match tier {
+        "self" => 0,
+        "guide" => 1,
+        "guardian" => 2,
+        "coordinator" => 3,
+        "constitutional" => 4,
+        _ => 0,
+    }
+}
 
 /// Parse a field that may be either a JSON string or an already-parsed JSON value.
 /// Returns the parsed value or an empty array on failure.

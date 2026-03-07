@@ -6,7 +6,7 @@ use tracing::info;
 use crate::error::StorageError;
 
 /// Current schema version for migrations
-pub const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// Initialize the database schema
 pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
@@ -114,6 +114,19 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         current = 4;
     }
 
+    // Migration: v4 -> v5: Add device_policies table
+    if current == 4 {
+        info!("Migrating v4 -> v5: Adding device_policies table");
+        conn.execute_batch(DEVICE_POLICIES_SCHEMA)
+            .map_err(|e| {
+                StorageError::Internal(format!(
+                    "Failed to create device_policies table: {}",
+                    e
+                ))
+            })?;
+        current = 5;
+    }
+
     set_schema_version(conn, current)?;
     Ok(())
 }
@@ -150,6 +163,12 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     })?;
     conn.execute_batch(COLLECTIVES_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create collectives tables: {}", e))
+    })?;
+    conn.execute_batch(DEVICE_POLICIES_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!(
+            "Failed to create device_policies table: {}",
+            e
+        ))
     })?;
     Ok(())
 }
@@ -654,4 +673,40 @@ CREATE INDEX IF NOT EXISTS idx_collectives_layer ON collectives(governance_layer
 CREATE INDEX IF NOT EXISTS idx_participations_app ON collective_participations(app_id);
 CREATE INDEX IF NOT EXISTS idx_participations_collective ON collective_participations(app_id, collective_id);
 CREATE INDEX IF NOT EXISTS idx_participations_human ON collective_participations(app_id, human_id);
+"#;
+
+/// Device policies — per-subject/per-device policy rules set by stewards
+const DEVICE_POLICIES_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS device_policies (
+    id TEXT PRIMARY KEY NOT NULL,
+    subject_id TEXT NOT NULL,
+    device_id TEXT,
+    author_id TEXT NOT NULL,
+    author_tier TEXT NOT NULL DEFAULT 'self',
+    inherits_from TEXT,
+    blocked_categories_json TEXT NOT NULL DEFAULT '[]',
+    blocked_hashes_json TEXT NOT NULL DEFAULT '[]',
+    age_rating_max TEXT,
+    reach_level_max INTEGER,
+    session_max_minutes INTEGER,
+    daily_max_minutes INTEGER,
+    time_windows_json TEXT NOT NULL DEFAULT '[]',
+    cooldown_minutes INTEGER,
+    disabled_features_json TEXT NOT NULL DEFAULT '[]',
+    disabled_routes_json TEXT NOT NULL DEFAULT '[]',
+    require_approval_json TEXT NOT NULL DEFAULT '[]',
+    log_sessions INTEGER NOT NULL DEFAULT 0,
+    log_categories INTEGER NOT NULL DEFAULT 0,
+    log_policy_events INTEGER NOT NULL DEFAULT 1,
+    retention_days INTEGER NOT NULL DEFAULT 30,
+    subject_can_view INTEGER NOT NULL DEFAULT 1,
+    effective_from TEXT NOT NULL DEFAULT (datetime('now')),
+    effective_until TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_device_policies_subject ON device_policies(subject_id);
+CREATE INDEX IF NOT EXISTS idx_device_policies_author ON device_policies(author_id);
+CREATE INDEX IF NOT EXISTS idx_device_policies_tier ON device_policies(author_tier);
 "#;

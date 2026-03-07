@@ -308,6 +308,38 @@ diesel::table! {
 }
 
 diesel::table! {
+    device_policies (id) {
+        id -> Text,
+        subject_id -> Text,
+        device_id -> Nullable<Text>,
+        author_id -> Text,
+        author_tier -> Text,
+        inherits_from -> Nullable<Text>,
+        blocked_categories_json -> Text,
+        blocked_hashes_json -> Text,
+        age_rating_max -> Nullable<Text>,
+        reach_level_max -> Nullable<Integer>,
+        session_max_minutes -> Nullable<Integer>,
+        daily_max_minutes -> Nullable<Integer>,
+        time_windows_json -> Text,
+        cooldown_minutes -> Nullable<Integer>,
+        disabled_features_json -> Text,
+        disabled_routes_json -> Text,
+        require_approval_json -> Text,
+        log_sessions -> Integer,
+        log_categories -> Integer,
+        log_policy_events -> Integer,
+        retention_days -> Integer,
+        subject_can_view -> Integer,
+        effective_from -> Text,
+        effective_until -> Nullable<Text>,
+        version -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     steps (id) {
         id -> Text,
         app_id -> Text,
@@ -341,6 +373,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     content_mastery,
     content_tags,
     contributor_presences,
+    device_policies,
     economic_events,
     human_relationships,
     local_sessions,

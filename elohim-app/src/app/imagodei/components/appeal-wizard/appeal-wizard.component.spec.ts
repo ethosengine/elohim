@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { AppealWizardComponent } from './appeal-wizard.component';
-import { StewardshipService } from '../../services/stewardship.service';
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import type { StewardshipGrant, StewardshipAppeal } from '../../models/stewardship.model';
 import { vi, Mock } from 'vitest';
 
@@ -74,7 +74,7 @@ describe('AppealWizardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AppealWizardComponent],
       providers: [
-        { provide: StewardshipService, useValue: mockStewardshipService },
+        { provide: STEWARDSHIP_POLICY, useValue: mockStewardshipService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],

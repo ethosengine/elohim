@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { CommunityInterventionComponent } from './community-intervention.component';
-import { StewardshipService } from '../../services/stewardship.service';
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import type { CommunityIntervention } from '../../models/stewardship.model';
 import { vi, Mock } from 'vitest';
 
@@ -49,7 +49,7 @@ describe('CommunityInterventionComponent', () => {
     await TestBed.configureTestingModule({
       imports: [CommunityInterventionComponent],
       providers: [
-        { provide: StewardshipService, useValue: mockStewardshipService },
+        { provide: STEWARDSHIP_POLICY, useValue: mockStewardshipService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],

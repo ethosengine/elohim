@@ -972,6 +972,108 @@ impl From<ContentStewardship> for ContentStewardshipView {
 }
 
 // ============================================================================
+// Device Policy Views (Stewardship v5)
+// ============================================================================
+
+use crate::db::models::DevicePolicy;
+
+/// Device policy view — camelCase API boundary
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DevicePolicyView {
+    pub id: String,
+    pub subject_id: String,
+    pub device_id: Option<String>,
+    pub author_id: String,
+    pub author_tier: String,
+    pub inherits_from: Option<String>,
+    pub blocked_categories: JsonVal,
+    pub blocked_hashes: JsonVal,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    pub time_windows: JsonVal,
+    pub cooldown_minutes: Option<i32>,
+    pub disabled_features: JsonVal,
+    pub disabled_routes: JsonVal,
+    pub require_approval: JsonVal,
+    pub log_sessions: bool,
+    pub log_categories: bool,
+    pub log_policy_events: bool,
+    pub retention_days: i32,
+    pub subject_can_view: bool,
+    pub effective_from: String,
+    pub effective_until: Option<String>,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<DevicePolicy> for DevicePolicyView {
+    fn from(p: DevicePolicy) -> Self {
+        Self {
+            id: p.id,
+            subject_id: p.subject_id,
+            device_id: p.device_id,
+            author_id: p.author_id,
+            author_tier: p.author_tier,
+            inherits_from: p.inherits_from,
+            blocked_categories: parse_json(&p.blocked_categories_json),
+            blocked_hashes: parse_json(&p.blocked_hashes_json),
+            age_rating_max: p.age_rating_max,
+            reach_level_max: p.reach_level_max,
+            session_max_minutes: p.session_max_minutes,
+            daily_max_minutes: p.daily_max_minutes,
+            time_windows: parse_json(&p.time_windows_json),
+            cooldown_minutes: p.cooldown_minutes,
+            disabled_features: parse_json(&p.disabled_features_json),
+            disabled_routes: parse_json(&p.disabled_routes_json),
+            require_approval: parse_json(&p.require_approval_json),
+            log_sessions: p.log_sessions != 0,
+            log_categories: p.log_categories != 0,
+            log_policy_events: p.log_policy_events != 0,
+            retention_days: p.retention_days,
+            subject_can_view: p.subject_can_view != 0,
+            effective_from: p.effective_from,
+            effective_until: p.effective_until,
+            version: p.version,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+        }
+    }
+}
+
+/// Policy chain link — one layer in the policy inheritance chain
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PolicyChainLinkView {
+    pub policy_id: String,
+    pub author_tier: String,
+    pub layer_order: i32,
+}
+
+/// Time access decision — result of time-based policy check
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase", tag = "status")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum TimeAccessView {
+    #[serde(rename = "allowed")]
+    Allowed {
+        remaining_session: Option<u32>,
+        remaining_daily: Option<u32>,
+    },
+    #[serde(rename = "outside_window")]
+    OutsideWindow,
+    #[serde(rename = "session_limit")]
+    SessionLimit,
+    #[serde(rename = "daily_limit")]
+    DailyLimit,
+}
+
+// ============================================================================
 // Local Session Views
 // ============================================================================
 
@@ -1579,6 +1681,139 @@ impl From<UpdateAllocationInputView> for UpdateAllocationInput {
 }
 
 // ============================================================================
+// Device Policy Input Views
+// ============================================================================
+
+/// Input for upserting a device policy — camelCase API boundary type
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpsertPolicyInputView {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    pub subject_id: Option<String>,
+    pub device_id: Option<String>,
+    pub content_rules: ContentRulesInput,
+    pub time_rules: TimeRulesInput,
+    pub feature_rules: FeatureRulesInput,
+    #[serde(default)]
+    pub monitoring_rules: Option<MonitoringRulesInput>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentRulesInput {
+    #[serde(default)]
+    pub blocked_categories: Vec<String>,
+    #[serde(default)]
+    pub blocked_hashes: Vec<String>,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TimeRulesInput {
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    #[serde(default)]
+    pub time_windows: Vec<JsonVal>,
+    pub cooldown_minutes: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FeatureRulesInput {
+    #[serde(default)]
+    pub disabled_features: Vec<String>,
+    #[serde(default)]
+    pub disabled_routes: Vec<String>,
+    #[serde(default)]
+    pub require_approval: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct MonitoringRulesInput {
+    #[serde(default)]
+    pub log_sessions: bool,
+    #[serde(default)]
+    pub log_categories: bool,
+    #[serde(default = "default_true")]
+    pub log_policy_events: bool,
+    #[serde(default = "default_30i32")]
+    pub retention_days: i32,
+    #[serde(default = "default_true")]
+    pub subject_can_view: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_30i32() -> i32 {
+    30
+}
+
+impl UpsertPolicyInputView {
+    /// Convert to DB input with author context
+    pub fn to_db_input(
+        self,
+        author_id: &str,
+        author_tier: &str,
+    ) -> crate::db::device_policies::CreateDevicePolicyInput {
+        let monitoring = self.monitoring_rules.unwrap_or(MonitoringRulesInput {
+            log_sessions: false,
+            log_categories: false,
+            log_policy_events: true,
+            retention_days: 30,
+            subject_can_view: true,
+        });
+        crate::db::device_policies::CreateDevicePolicyInput {
+            subject_id: self.subject_id.unwrap_or_default(),
+            device_id: self.device_id,
+            author_id: author_id.to_string(),
+            author_tier: author_tier.to_string(),
+            inherits_from: None,
+            blocked_categories_json: serde_json::to_string(&self.content_rules.blocked_categories)
+                .unwrap_or_else(|_| "[]".into()),
+            blocked_hashes_json: serde_json::to_string(&self.content_rules.blocked_hashes)
+                .unwrap_or_else(|_| "[]".into()),
+            age_rating_max: self.content_rules.age_rating_max,
+            reach_level_max: self.content_rules.reach_level_max,
+            session_max_minutes: self.time_rules.session_max_minutes,
+            daily_max_minutes: self.time_rules.daily_max_minutes,
+            time_windows_json: serde_json::to_string(
+                &self
+                    .time_rules
+                    .time_windows
+                    .iter()
+                    .map(|v| &v.0)
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap_or_else(|_| "[]".into()),
+            cooldown_minutes: self.time_rules.cooldown_minutes,
+            disabled_features_json: serde_json::to_string(
+                &self.feature_rules.disabled_features,
+            )
+            .unwrap_or_else(|_| "[]".into()),
+            disabled_routes_json: serde_json::to_string(&self.feature_rules.disabled_routes)
+                .unwrap_or_else(|_| "[]".into()),
+            require_approval_json: serde_json::to_string(&self.feature_rules.require_approval)
+                .unwrap_or_else(|_| "[]".into()),
+            log_sessions: monitoring.log_sessions,
+            log_categories: monitoring.log_categories,
+            log_policy_events: monitoring.log_policy_events,
+            retention_days: monitoring.retention_days,
+            subject_can_view: monitoring.subject_can_view,
+        }
+    }
+}
+
+// ============================================================================
 // Content Mastery Input View
 // ============================================================================
 
@@ -2117,6 +2352,10 @@ mod schema_version_tests {
             serde_json::json!({"identity":{"humanId":"h","displayName":"Test"}}),
         )
         .unwrap();
+        let upsert_policy: UpsertPolicyInputView = serde_json::from_value(
+            serde_json::json!({"contentRules":{"blockedCategories":[],"blockedHashes":[]},"timeRules":{},"featureRules":{}}),
+        )
+        .unwrap();
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);
@@ -2132,6 +2371,7 @@ mod schema_version_tests {
         assert_eq!(update_alloc.schema_version, 1);
         assert_eq!(mastery.schema_version, 1);
         assert_eq!(account_pkg.schema_version, 1);
+        assert_eq!(upsert_policy.schema_version, 1);
     }
 
     #[test]

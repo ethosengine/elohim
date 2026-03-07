@@ -17,8 +17,8 @@ use crate::error::StorageError;
 use crate::services::response;
 use crate::services::StewardshipService;
 use crate::views::{
-    ContentStewardshipView, CreateAllocationInputView, StewardshipAllocationView,
-    UpdateAllocationInputView,
+    ContentStewardshipView, CreateAllocationInputView, DevicePolicyView,
+    StewardshipAllocationView, UpdateAllocationInputView, UpsertPolicyInputView,
 };
 
 use super::{get_conn, parse_body};
@@ -244,6 +244,39 @@ pub async fn handle(
             let id = p.trim_start_matches("allocations/");
             handle_delete_allocation(id, pool, ctx).await
         }
+
+        // -----------------------------------------------------------------
+        // Device Policies (backed by device_policies table)
+        // -----------------------------------------------------------------
+        (&Method::POST, "policies") => handle_upsert_policy(req, pool).await,
+
+        (&Method::GET, "policies/me/chain") => handle_my_policy_chain(req, pool).await,
+
+        (&Method::GET, p) if p.starts_with("policies/") && p.ends_with("/parent") => {
+            let subject_id = p
+                .trim_start_matches("policies/")
+                .trim_end_matches("/parent");
+            handle_get_parent_policy(subject_id, pool).await
+        }
+
+        (&Method::GET, p) if p.starts_with("policies/") && p.ends_with("/chain") => {
+            let subject_id = p
+                .trim_start_matches("policies/")
+                .trim_end_matches("/chain");
+            handle_get_policy_chain(subject_id, pool).await
+        }
+
+        (&Method::GET, "policies") => handle_list_policies(req, pool).await,
+
+        (&Method::GET, p) if p.starts_with("policies/") => {
+            let subject_id = p.trim_start_matches("policies/");
+            handle_get_subject_policy(subject_id, pool).await
+        }
+
+        // -----------------------------------------------------------------
+        // Time access check (uses existing PolicyEnforcement)
+        // -----------------------------------------------------------------
+        (&Method::GET, "access/time") => handle_check_time_access(req, pool).await,
 
         _ => response::not_found(&format!(
             "Unknown stewardship route: {} /api/v1/stewardship/{}",
@@ -635,6 +668,167 @@ fn extract_query_param(query: Option<&str>, key: &str) -> Option<String> {
         }
     }
     None
+}
+
+// =============================================================================
+// Device Policy handlers
+// =============================================================================
+
+async fn handle_upsert_policy(
+    req: Request<Incoming>,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let input_view: UpsertPolicyInputView = match parse_body(req).await {
+        Ok(v) => v,
+        Err(_) => return response::bad_request("Invalid JSON body for upsert policy"),
+    };
+
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    // In v0, author_id defaults to "self" (no auth context yet)
+    let db_input = input_view.to_db_input("self", "self");
+
+    match StewardshipService::upsert_device_policy(&mut conn, &db_input) {
+        Ok(policy) => response::ok(&DevicePolicyView::from(policy)),
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_list_policies(
+    req: Request<Incoming>,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let subject_id = extract_query_param(req.uri().query(), "subjectId");
+    let subject_id = match subject_id {
+        Some(id) if !id.is_empty() => id,
+        _ => return response::bad_request("subjectId query parameter is required"),
+    };
+
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    match StewardshipService::get_policies_for_subject(&mut conn, &subject_id) {
+        Ok(policies) => {
+            let views: Vec<DevicePolicyView> = policies.into_iter().map(|p| p.into()).collect();
+            response::ok(&views)
+        }
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_get_subject_policy(
+    subject_id: &str,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    match StewardshipService::get_subject_policy(&mut conn, subject_id) {
+        Ok(Some(policy)) => response::ok(&DevicePolicyView::from(policy)),
+        Ok(None) => response::not_found(&format!("No policy found for subject {}", subject_id)),
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_get_parent_policy(
+    subject_id: &str,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    match StewardshipService::get_parent_policy(&mut conn, subject_id) {
+        Ok(Some(policy)) => response::ok(&policy),
+        Ok(None) => response::ok(&serde_json::json!(null)),
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_get_policy_chain(
+    subject_id: &str,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    match StewardshipService::get_policy_chain(&mut conn, subject_id) {
+        Ok(chain) => response::ok(&chain),
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_my_policy_chain(
+    req: Request<Incoming>,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let agent_id = extract_query_param(req.uri().query(), "agentId");
+    let agent_id = match agent_id {
+        Some(id) if !id.is_empty() => id,
+        _ => return response::bad_request("agentId query parameter is required"),
+    };
+
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(e) => return response::error_response(e),
+    };
+
+    match StewardshipService::get_policy_chain(&mut conn, &agent_id) {
+        Ok(chain) => response::ok(&chain),
+        Err(e) => response::error_response(e),
+    }
+}
+
+async fn handle_check_time_access(
+    req: Request<Incoming>,
+    pool: &DbPool,
+) -> Response<Full<Bytes>> {
+    let agent_id = extract_query_param(req.uri().query(), "agentId");
+    let agent_id = match agent_id {
+        Some(id) if !id.is_empty() => id,
+        _ => return response::bad_request("agentId query parameter is required"),
+    };
+
+    // Use existing PolicyEnforcement from policy_cache
+    let policy_cache = crate::db::policy_cache::PolicyCache::new(pool.clone());
+    let enforcement = crate::db::policy_cache::PolicyEnforcement::new(policy_cache);
+
+    match enforcement.check_time_access(&agent_id) {
+        Ok(decision) => {
+            let view = match decision {
+                crate::db::policy_cache::TimeAccessDecision::Allowed {
+                    remaining_session,
+                    remaining_daily,
+                } => {
+                    serde_json::json!({ "status": "allowed", "remainingSession": remaining_session, "remainingDaily": remaining_daily })
+                }
+                crate::db::policy_cache::TimeAccessDecision::OutsideWindow => {
+                    serde_json::json!({ "status": "outside_window" })
+                }
+                crate::db::policy_cache::TimeAccessDecision::SessionLimit => {
+                    serde_json::json!({ "status": "session_limit" })
+                }
+                crate::db::policy_cache::TimeAccessDecision::DailyLimit => {
+                    serde_json::json!({ "status": "daily_limit" })
+                }
+            };
+            response::ok(&view)
+        }
+        Err(_) => {
+            // Fail open — return allowed if check fails
+            response::ok(&serde_json::json!({ "status": "allowed" }))
+        }
+    }
 }
 
 /// Minimal percent-decode for query parameter values (replaces %XX and + → space).

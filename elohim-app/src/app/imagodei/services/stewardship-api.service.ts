@@ -18,10 +18,14 @@ import type {
   ComputedPolicy,
   CreateGrantInput,
   DelegateGrantInput,
+  DevicePolicy,
   FileAppealInput,
+  PolicyChainLink,
   PolicyDecision,
   StewardshipAppeal,
   StewardshipGrant,
+  TimeAccessDecision,
+  UpsertPolicyInput,
 } from '../models/stewardship.model';
 
 @Injectable({ providedIn: 'root' })
@@ -125,6 +129,59 @@ export class StewardshipApiService implements IStewardshipPolicy {
       this.http
         .get<StewardshipAppeal[]>('/api/v1/stewardship/appeals')
         .pipe(catchError(() => of([])))
+    );
+  }
+
+  async checkTimeAccess(): Promise<TimeAccessDecision> {
+    return firstValueFrom(
+      this.http
+        .get<TimeAccessDecision>('/api/v1/stewardship/access/time')
+        .pipe(catchError(() => of({ status: 'allowed' as const })))
+    );
+  }
+
+  async getGrantForSubject(subjectId: string): Promise<StewardshipGrant | null> {
+    const subjects = await this.getMySubjects();
+    return subjects.find(g => g.subjectId === subjectId) ?? null;
+  }
+
+  async getSubjectPolicy(subjectId: string): Promise<DevicePolicy | null> {
+    return firstValueFrom(
+      this.http
+        .get<DevicePolicy>(`/api/v1/stewardship/policies/${subjectId}`)
+        .pipe(catchError(() => of(null)))
+    );
+  }
+
+  async getParentPolicy(subjectId: string): Promise<ComputedPolicy | null> {
+    return firstValueFrom(
+      this.http
+        .get<ComputedPolicy>(`/api/v1/stewardship/policies/${subjectId}/parent`)
+        .pipe(catchError(() => of(null)))
+    );
+  }
+
+  async getPolicyChain(subjectId: string): Promise<PolicyChainLink[]> {
+    return firstValueFrom(
+      this.http
+        .get<PolicyChainLink[]>(`/api/v1/stewardship/policies/${subjectId}/chain`)
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async getMyPolicyChain(): Promise<PolicyChainLink[]> {
+    return firstValueFrom(
+      this.http
+        .get<PolicyChainLink[]>('/api/v1/stewardship/policies/me/chain')
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async upsertPolicy(input: UpsertPolicyInput): Promise<DevicePolicy | null> {
+    return firstValueFrom(
+      this.http
+        .post<DevicePolicy>('/api/v1/stewardship/policies', input)
+        .pipe(catchError(() => of(null)))
     );
   }
 }

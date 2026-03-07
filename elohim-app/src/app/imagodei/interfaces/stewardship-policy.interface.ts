@@ -29,10 +29,14 @@ import type {
   ComputedPolicy,
   CreateGrantInput,
   DelegateGrantInput,
+  DevicePolicy,
   FileAppealInput,
+  PolicyChainLink,
   PolicyDecision,
   StewardshipAppeal,
   StewardshipGrant,
+  TimeAccessDecision,
+  UpsertPolicyInput,
 } from '../models/stewardship.model';
 
 /**
@@ -91,15 +95,40 @@ export interface IStewardshipPolicy {
 
   /** Get my appeals (where I am appellant) */
   getMyAppeals(): Promise<StewardshipAppeal[]>;
+
+  // ===========================================================================
+  // Policy Management
+  // ===========================================================================
+
+  /** Check time-based access status */
+  checkTimeAccess(): Promise<TimeAccessDecision>;
+
+  /** Get my grant for a specific subject */
+  getGrantForSubject(subjectId: string): Promise<StewardshipGrant | null>;
+
+  /** Get the active device policy for a subject */
+  getSubjectPolicy(subjectId: string): Promise<DevicePolicy | null>;
+
+  /** Get the parent's computed policy for a subject */
+  getParentPolicy(subjectId: string): Promise<ComputedPolicy | null>;
+
+  /** Get the policy inheritance chain for a subject */
+  getPolicyChain(subjectId: string): Promise<PolicyChainLink[]>;
+
+  /** Get my own policy inheritance chain */
+  getMyPolicyChain(): Promise<PolicyChainLink[]>;
+
+  /** Create or update a device policy */
+  upsertPolicy(input: UpsertPolicyInput): Promise<DevicePolicy | null>;
 }
 
 /**
  * Injection token for the stewardship policy service.
  *
- * Default factory resolves to StewardshipService which provides:
- * - Holochain zome calls for grants, policies, and appeals via imagodei DNA
+ * Default factory resolves to StewardshipApiService which provides:
+ * - HTTP calls to `/api/v1/stewardship/*` endpoints on elohim-storage
  * - Computed policy merging from all layers
- * - Local signal-based caching with fail-open defaults
+ * - Fail-open defaults for all policy checks
  *
  * Override in tests:
  * ```typescript

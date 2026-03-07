@@ -14,8 +14,8 @@ use ts_rs::TS;
 
 use super::diesel_schema::{
     apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
-    contributor_presences, economic_events, human_relationships, local_sessions, path_attestations,
-    path_tags, paths, relationships, steps, stewardship_allocations,
+    contributor_presences, device_policies, economic_events, human_relationships, local_sessions,
+    path_attestations, path_tags, paths, relationships, steps, stewardship_allocations,
 };
 
 // ============================================================================
@@ -955,6 +955,77 @@ pub struct ContentStewardship {
     pub total_allocation: f32,
     pub has_disputes: bool,
     pub primary_steward: Option<StewardshipAllocation>,
+}
+
+// ============================================================================
+// Device Policy Models (Stewardship v5)
+// ============================================================================
+
+/// Device policy row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = device_policies)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct DevicePolicy {
+    pub id: String,
+    pub subject_id: String,
+    pub device_id: Option<String>,
+    pub author_id: String,
+    pub author_tier: String,
+    pub inherits_from: Option<String>,
+    pub blocked_categories_json: String,
+    pub blocked_hashes_json: String,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    pub time_windows_json: String,
+    pub cooldown_minutes: Option<i32>,
+    pub disabled_features_json: String,
+    pub disabled_routes_json: String,
+    pub require_approval_json: String,
+    pub log_sessions: i32,
+    pub log_categories: i32,
+    pub log_policy_events: i32,
+    pub retention_days: i32,
+    pub subject_can_view: i32,
+    pub effective_from: String,
+    pub effective_until: Option<String>,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New device policy for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = device_policies)]
+pub struct NewDevicePolicy {
+    pub id: String,
+    pub subject_id: String,
+    pub device_id: Option<String>,
+    pub author_id: String,
+    pub author_tier: String,
+    pub inherits_from: Option<String>,
+    pub blocked_categories_json: String,
+    pub blocked_hashes_json: String,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    pub time_windows_json: String,
+    pub cooldown_minutes: Option<i32>,
+    pub disabled_features_json: String,
+    pub disabled_routes_json: String,
+    pub require_approval_json: String,
+    pub log_sessions: i32,
+    pub log_categories: i32,
+    pub log_policy_events: i32,
+    pub retention_days: i32,
+    pub subject_can_view: i32,
+    pub effective_from: String,
+    pub effective_until: Option<String>,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // ============================================================================

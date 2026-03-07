@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { CapabilitiesDashboardComponent } from './capabilities-dashboard.component';
-import { StewardshipService } from '../../services/stewardship.service';
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import type {
   ComputedPolicy,
   StewardshipGrant,
@@ -78,7 +78,7 @@ describe('CapabilitiesDashboardComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [CapabilitiesDashboardComponent],
-      providers: [{ provide: StewardshipService, useValue: mockStewardshipService }],
+      providers: [{ provide: STEWARDSHIP_POLICY, useValue: mockStewardshipService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CapabilitiesDashboardComponent);

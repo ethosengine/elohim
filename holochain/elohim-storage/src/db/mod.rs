@@ -42,6 +42,7 @@ pub mod paths_diesel;
 pub mod collectives;
 pub mod content_mastery;
 pub mod contributor_presences;
+pub mod device_policies;
 pub mod economic_events;
 pub mod human_relationships;
 pub mod local_sessions;
