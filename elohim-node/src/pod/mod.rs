@@ -28,12 +28,12 @@
 //! - **Debug & Diagnostics**: Log levels, heap dumps, bug reports
 //! - **Health Recovery**: Restart services, failover, quarantine
 
-pub mod admission;
 pub mod actions;
-pub mod capacity;
-pub mod compute_rea;
+pub mod admission;
 pub mod analyzer;
+pub mod capacity;
 pub mod cli;
+pub mod compute_rea;
 pub mod consensus;
 pub mod decider;
 pub mod executor;
