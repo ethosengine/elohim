@@ -45,6 +45,7 @@ pub mod contributor_presences;
 pub mod device_policies;
 pub mod economic_events;
 pub mod human_relationships;
+pub mod humans;
 pub mod local_sessions;
 pub mod relationships_diesel;
 pub mod stewardship_allocations;

@@ -14,6 +14,7 @@ import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { DoorwayRegistryService } from './doorway-registry.service';
 import { signal } from '@angular/core';
 import type { RegisterHumanRequest, HumanProfile } from '../models/identity.model';
+import { IDENTITY_API, type IIdentityApi } from '../interfaces/identity.interface';
 import type {
   EdgeNodeDisplayInfo,
   HolochainConnectionState,
@@ -159,6 +160,14 @@ function buildMockDoorwayRegistry() {
   };
 }
 
+function buildMockIdentityApi(): IIdentityApi {
+  return {
+    createHuman: vi.fn().mockResolvedValue(createMockHumanSessionResult()),
+    getMyHuman: vi.fn().mockResolvedValue(null),
+    updateHuman: vi.fn(),
+  };
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -171,6 +180,7 @@ describe('IdentityService', () => {
   let mockAgencyService: ReturnType<typeof buildMockAgencyService>;
   let mockPasswordProvider: ReturnType<typeof buildMockPasswordProvider>;
   let mockDoorwayRegistry: ReturnType<typeof buildMockDoorwayRegistry>;
+  let mockIdentityApi: IIdentityApi;
 
   function setupTestBed() {
     TestBed.configureTestingModule({
@@ -180,6 +190,7 @@ describe('IdentityService', () => {
         { provide: SessionHumanService, useValue: mockSessionHumanService },
         { provide: AgencyService, useValue: mockAgencyService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
+        { provide: IDENTITY_API, useValue: mockIdentityApi },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
       ],
@@ -195,6 +206,7 @@ describe('IdentityService', () => {
     mockAgencyService = buildMockAgencyService();
     mockPasswordProvider = buildMockPasswordProvider();
     mockDoorwayRegistry = buildMockDoorwayRegistry();
+    mockIdentityApi = buildMockIdentityApi();
   });
 
   afterEach(() => {
@@ -588,32 +600,22 @@ describe('IdentityService', () => {
       );
     });
 
-    it('should call imagodei zome create_human', async () => {
-      const mockResult = {
-        success: true,
-        data: createMockHumanSessionResult(),
-        error: null,
-      };
-      mockHolochainClient.callZome.mockResolvedValue(mockResult);
+    it('should call identityApi.createHuman', async () => {
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
 
       await service.registerHumanNative(mockRequest);
 
-      expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
+      expect(mockIdentityApi.createHuman).toHaveBeenCalledWith(
         expect.objectContaining({
-          zomeName: 'imagodei',
-          fnName: 'create_human',
-          roleName: 'imagodei',
+          displayName: 'Steward User',
+          affinities: ['governance'],
+          profileReach: 'public',
         })
       );
     });
 
     it('should return profile on success', async () => {
-      const mockResult = {
-        success: true,
-        data: createMockHumanSessionResult(),
-        error: null,
-      };
-      mockHolochainClient.callZome.mockResolvedValue(mockResult);
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
 
       const profile = await service.registerHumanNative(mockRequest);
 
@@ -622,12 +624,7 @@ describe('IdentityService', () => {
     });
 
     it('should update state to steward mode on success (local conductor)', async () => {
-      const mockResult = {
-        success: true,
-        data: createMockHumanSessionResult(),
-        error: null,
-      };
-      mockHolochainClient.callZome.mockResolvedValue(mockResult);
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
 
       // Local conductor has localhost URL
       mockHolochainClient.getDisplayInfo.mockReturnValue({
@@ -640,18 +637,14 @@ describe('IdentityService', () => {
       expect(service.mode()).toBe('steward');
     });
 
-    it('should throw if zome call returns failure', async () => {
-      mockHolochainClient.callZome.mockResolvedValue({
-        success: false,
-        data: null,
-        error: 'Zome error',
-      });
+    it('should throw if identity API returns failure', async () => {
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Zome error'));
 
       await expect(service.registerHumanNative(mockRequest)).rejects.toThrow('Zome error');
     });
 
     it('should set error state if registration fails', async () => {
-      mockHolochainClient.callZome.mockRejectedValue(new Error('Conductor offline'));
+      (mockIdentityApi.createHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Conductor offline'));
 
       await expect(service.registerHumanNative(mockRequest)).rejects.toThrow('Conductor offline');
       expect(service.error()).toBe('Conductor offline');
@@ -674,9 +667,9 @@ describe('IdentityService', () => {
         expect(result).toBeNull();
       });
 
-      it('should not call zome', async () => {
+      it('should not call identity API', async () => {
         await service.getCurrentHuman();
-        expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+        expect(mockIdentityApi.getMyHuman).not.toHaveBeenCalled();
       });
     });
 
@@ -686,30 +679,16 @@ describe('IdentityService', () => {
         setupTestBed();
       });
 
-      it('should call get_my_human zome function', async () => {
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: true,
-          data: createMockHumanSessionResult(),
-          error: null,
-        });
+      it('should call identityApi.getMyHuman', async () => {
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
 
         await service.getCurrentHuman();
 
-        expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-          expect.objectContaining({
-            zomeName: 'imagodei',
-            fnName: 'get_my_human',
-            roleName: 'imagodei',
-          })
-        );
+        expect(mockIdentityApi.getMyHuman).toHaveBeenCalled();
       });
 
       it('should return mapped profile on success', async () => {
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: true,
-          data: createMockHumanSessionResult(),
-          error: null,
-        });
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(createMockHumanSessionResult());
 
         const profile = await service.getCurrentHuman();
 
@@ -718,19 +697,15 @@ describe('IdentityService', () => {
         expect(profile?.id).toBe('human-456');
       });
 
-      it('should return null if zome returns no data', async () => {
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: false,
-          data: null,
-          error: 'Not found',
-        });
+      it('should return null if identity API returns null', async () => {
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
         const result = await service.getCurrentHuman();
         expect(result).toBeNull();
       });
 
-      it('should return null and not throw on expected zome errors', async () => {
-        mockHolochainClient.callZome.mockRejectedValue(new Error('User not found'));
+      it('should return null and not throw on expected errors', async () => {
+        (mockIdentityApi.getMyHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('User not found'));
 
         const result = await service.getCurrentHuman();
         expect(result).toBeNull();
@@ -800,55 +775,49 @@ describe('IdentityService', () => {
         });
       });
 
-      it('should call update_human zome function', async () => {
-        const mockHumanEntry = {
-          id: 'human-999',
-          displayName: 'Updated Name',
-          bio: 'Updated bio',
-          affinities: ['learning', 'governance'],
-          profileReach: 'public',
-          location: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+      it('should call identityApi.updateHuman', async () => {
+        const mockUpdateResult = {
+          actionHash: new Uint8Array([1, 2, 3]),
+          human: {
+            id: 'human-999',
+            displayName: 'Updated Name',
+            bio: 'Updated bio',
+            affinities: ['learning', 'governance'],
+            profileReach: 'public',
+            location: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
         };
 
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: true,
-          data: {
-            actionHash: new Uint8Array([1, 2, 3]),
-            human: mockHumanEntry,
-          },
-          error: null,
-        });
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdateResult);
 
         await service.updateProfile(mockUpdateRequest);
 
-        expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
+        expect(mockIdentityApi.updateHuman).toHaveBeenCalledWith(
           expect.objectContaining({
-            zomeName: 'imagodei',
-            fnName: 'update_human',
-            roleName: 'imagodei',
+            displayName: 'Updated Name',
+            bio: 'Updated bio',
           })
         );
       });
 
       it('should return updated profile on success', async () => {
-        const updatedEntry = {
-          id: 'human-999',
-          displayName: 'Updated Name',
-          bio: 'Updated bio',
-          affinities: ['learning', 'governance'],
-          profileReach: 'public',
-          location: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+        const mockUpdateResult = {
+          actionHash: new Uint8Array([1, 2, 3]),
+          human: {
+            id: 'human-999',
+            displayName: 'Updated Name',
+            bio: 'Updated bio',
+            affinities: ['learning', 'governance'],
+            profileReach: 'public',
+            location: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
         };
 
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: true,
-          data: { actionHash: new Uint8Array([1, 2, 3]), human: updatedEntry },
-          error: null,
-        });
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdateResult);
 
         const profile = await service.updateProfile(mockUpdateRequest);
 
@@ -856,12 +825,8 @@ describe('IdentityService', () => {
         expect(profile.bio).toBe('Updated bio');
       });
 
-      it('should throw if zome returns failure', async () => {
-        mockHolochainClient.callZome.mockResolvedValue({
-          success: false,
-          data: null,
-          error: 'Update failed',
-        });
+      it('should throw if identity API returns failure', async () => {
+        (mockIdentityApi.updateHuman as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Update failed'));
 
         await expect(service.updateProfile(mockUpdateRequest)).rejects.toThrow('Update failed');
       });

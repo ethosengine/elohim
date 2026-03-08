@@ -14,8 +14,9 @@ use ts_rs::TS;
 
 use super::diesel_schema::{
     apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
-    contributor_presences, device_policies, economic_events, human_relationships, local_sessions,
-    path_attestations, path_tags, paths, relationships, steps, stewardship_allocations,
+    contributor_presences, device_policies, economic_events, human_relationships, humans,
+    local_sessions, path_attestations, path_tags, paths, relationships, steps,
+    stewardship_allocations,
 };
 
 // ============================================================================
@@ -698,6 +699,42 @@ pub mod presence_states {
     pub fn is_valid(state: &str) -> bool {
         ALL.contains(&state)
     }
+}
+
+// ============================================================================
+// Human Identity Models (imagodei pillar)
+// ============================================================================
+
+/// Human identity row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = humans)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Human {
+    pub id: String,
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    pub bio: Option<String>,
+    /// JSON array of affinity strings stored as TEXT
+    pub affinities: String,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub app_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New human for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = humans)]
+pub struct NewHuman {
+    pub id: String,
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    pub bio: Option<String>,
+    pub affinities: String,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub app_id: String,
 }
 
 // ============================================================================

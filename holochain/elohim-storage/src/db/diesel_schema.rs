@@ -340,6 +340,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    humans (id) {
+        id -> Text,
+        agent_pub_key -> Nullable<Text>,
+        display_name -> Text,
+        bio -> Nullable<Text>,
+        affinities -> Text,
+        profile_reach -> Text,
+        location -> Nullable<Text>,
+        app_id -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     steps (id) {
         id -> Text,
         app_id -> Text,
@@ -376,6 +391,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     device_policies,
     economic_events,
     human_relationships,
+    humans,
     local_sessions,
     path_attestations,
     path_tags,

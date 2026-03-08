@@ -6,7 +6,7 @@ use tracing::info;
 use crate::error::StorageError;
 
 /// Current schema version for migrations
-pub const SCHEMA_VERSION: i32 = 5;
+pub const SCHEMA_VERSION: i32 = 6;
 
 /// Initialize the database schema
 pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
@@ -123,6 +123,15 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         current = 5;
     }
 
+    // Migration: v5 -> v6: Add humans table
+    if current == 5 {
+        info!("Migrating v5 -> v6: Adding humans table");
+        conn.execute_batch(HUMANS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create humans table: {}", e))
+        })?;
+        current = 6;
+    }
+
     set_schema_version(conn, current)?;
     Ok(())
 }
@@ -162,6 +171,9 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     })?;
     conn.execute_batch(DEVICE_POLICIES_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create device_policies table: {}", e))
+    })?;
+    conn.execute_batch(HUMANS_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create humans table: {}", e))
     })?;
     Ok(())
 }
@@ -702,4 +714,26 @@ CREATE TABLE IF NOT EXISTS device_policies (
 CREATE INDEX IF NOT EXISTS idx_device_policies_subject ON device_policies(subject_id);
 CREATE INDEX IF NOT EXISTS idx_device_policies_author ON device_policies(author_id);
 CREATE INDEX IF NOT EXISTS idx_device_policies_tier ON device_policies(author_tier);
+"#;
+
+// ============================================================================
+// Schema V6: Human Identity Table
+// ============================================================================
+
+/// Human identity — mutable profile data for imagodei pillar
+const HUMANS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS humans (
+    id TEXT PRIMARY KEY NOT NULL,
+    agent_pub_key TEXT,
+    display_name TEXT NOT NULL,
+    bio TEXT,
+    affinities TEXT NOT NULL DEFAULT '[]',
+    profile_reach TEXT NOT NULL DEFAULT 'community',
+    location TEXT,
+    app_id TEXT NOT NULL DEFAULT 'imagodei',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_humans_agent_pub_key ON humans(agent_pub_key);
+CREATE INDEX IF NOT EXISTS idx_humans_app_id ON humans(app_id);
 "#;

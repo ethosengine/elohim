@@ -16,6 +16,7 @@
 
 pub mod economic_events;
 pub mod exchange;
+pub mod identity;
 pub mod presence;
 pub mod resources;
 pub mod stewardship;
@@ -60,6 +61,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("exchange") {
         let resource_path = sub_path.strip_prefix("exchange").unwrap_or("");
         exchange::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("identity") {
+        let resource_path = sub_path.strip_prefix("identity").unwrap_or("");
+        identity::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",

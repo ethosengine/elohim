@@ -1,18 +1,19 @@
 /**
- * IdentityApiService — Data boundary for human identity operations.
+ * IdentityApiService — Thin HTTP client for human identity operations.
  *
- * Transitional implementation: wraps Holochain zome calls to imagodei DNA.
- * Target state: thin HTTP client calling /api/v1/identity/* via doorway,
- * matching the pattern established by PresenceApiService and StewardshipApiService.
+ * Calls doorway `/api/v1/identity/*` endpoints, implementing IIdentityApi.
+ * Mutable profile data lives in elohim-storage's Diesel layer. The Holochain
+ * DNA retains its role for cryptographic provenance (attestations, agent keys).
  *
- * The Holochain DNA retains its role for cryptographic provenance (attestations,
- * agent keys, immutable proofs). Mutable profile data (display name, bio, etc.)
- * will move to elohim-storage's Diesel layer.
+ * Attestations are not yet served by storage — they remain empty here
+ * until the provenance query endpoint is built.
  */
 
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import { firstValueFrom } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import type { IIdentityApi } from '../interfaces/identity.interface';
 import type {
@@ -22,52 +23,85 @@ import type {
   UpdateHumanPayload,
 } from '../models/identity.model';
 
+/** Response shape from /api/v1/identity endpoints (matches HumanView in storage) */
+interface HumanApiResponse {
+  id: string;
+  agentPubKey: string | null;
+  displayName: string;
+  bio: string | null;
+  affinities: string[];
+  profileReach: string;
+  location: string | null;
+  appId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Map storage HumanView to the HumanSessionResult shape identity.service expects */
+function toSessionResult(response: HumanApiResponse): HumanSessionResult {
+  return {
+    agentPubkey: response.agentPubKey ?? '',
+    actionHash: new Uint8Array(0), // Not applicable for storage-backed identity
+    human: {
+      id: response.id,
+      displayName: response.displayName,
+      bio: response.bio,
+      affinities: response.affinities,
+      profileReach: response.profileReach,
+      location: response.location,
+      createdAt: response.createdAt,
+      updatedAt: response.updatedAt,
+    },
+    sessionStartedAt: response.createdAt,
+    attestations: [], // Attestations live in the provenance layer (DNA), not storage
+  };
+}
+
+/** Map storage HumanView to the HumanUpdateResult shape */
+function toUpdateResult(response: HumanApiResponse): HumanUpdateResult {
+  return {
+    actionHash: new Uint8Array(0),
+    human: {
+      id: response.id,
+      displayName: response.displayName,
+      bio: response.bio,
+      affinities: response.affinities,
+      profileReach: response.profileReach,
+      location: response.location,
+      createdAt: response.createdAt,
+      updatedAt: response.updatedAt,
+    },
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class IdentityApiService implements IIdentityApi {
-  private readonly holochainClient = inject(HolochainClientService);
+  private readonly http = inject(HttpClient);
 
   async createHuman(payload: RegisterHumanPayload): Promise<HumanSessionResult> {
-    const result = await this.holochainClient.callZome<HumanSessionResult>({
-      zomeName: 'imagodei',
-      fnName: 'create_human',
-      payload,
-      roleName: 'imagodei',
-    });
-
-    if (!result.success || !result.data) {
-      throw new Error(result.error ?? 'Failed to create human identity');
-    }
-
-    return result.data;
+    const response = await firstValueFrom(
+      this.http.post<HumanApiResponse>('/api/v1/identity/register', payload)
+    );
+    return toSessionResult(response);
   }
 
   async getMyHuman(): Promise<HumanSessionResult | null> {
-    const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-      zomeName: 'imagodei',
-      fnName: 'get_my_human',
-      payload: null,
-      roleName: 'imagodei',
-    });
-
-    if (result.success && result.data) {
-      return result.data;
+    try {
+      const response = await firstValueFrom(
+        this.http
+          .get<HumanApiResponse>('/api/v1/identity/me')
+          .pipe(catchError(() => [null as unknown as HumanApiResponse]))
+      );
+      return response ? toSessionResult(response) : null;
+    } catch {
+      return null;
     }
-
-    return null;
   }
 
   async updateHuman(payload: UpdateHumanPayload): Promise<HumanUpdateResult> {
-    const result = await this.holochainClient.callZome<HumanUpdateResult>({
-      zomeName: 'imagodei',
-      fnName: 'update_human',
-      payload,
-      roleName: 'imagodei',
-    });
-
-    if (!result.success || !result.data) {
-      throw new Error(result.error ?? 'Failed to update human profile');
-    }
-
-    return result.data;
+    const response = await firstValueFrom(
+      this.http.put<HumanApiResponse>('/api/v1/identity/me', payload)
+    );
+    return toUpdateResult(response);
   }
 }

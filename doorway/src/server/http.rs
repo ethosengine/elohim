@@ -1209,6 +1209,13 @@ async fn handle_request(
             ));
         }
 
+        // Identity API proxy — must come before /identity/did to avoid shadowing
+        (_, p) if p.starts_with("/api/v1/identity") => {
+            return Ok(to_boxed(
+                routes::handle_identity_api_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
         // Presence lifecycle
         (_, p) if p.starts_with("/api/v1/presence") => {
             return Ok(to_boxed(

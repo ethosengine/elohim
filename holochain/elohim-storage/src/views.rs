@@ -85,8 +85,8 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 
 use crate::db::models::{
     App, Chapter, ChapterWithSteps, Content, ContentMastery, ContentStewardship, ContentWithTags,
-    ContributorPresence, EconomicEvent, HumanRelationship, LocalSession, Path, PathAttestation,
-    PathWithDetails, PathWithSteps, Relationship, RelationshipWithContent, Step,
+    ContributorPresence, EconomicEvent, Human, HumanRelationship, LocalSession, Path,
+    PathAttestation, PathWithDetails, PathWithSteps, Relationship, RelationshipWithContent, Step,
     StewardshipAllocation, StewardshipAllocationWithPresence,
 };
 
@@ -2250,6 +2250,88 @@ impl From<EprHead> for EprHeadView {
             cid: None,
         }
     }
+}
+
+// ============================================================================
+// Human Identity Views (imagodei pillar)
+// ============================================================================
+
+/// Output view for a human identity record — camelCase for TypeScript clients.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HumanView {
+    pub id: String,
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    pub bio: Option<String>,
+    /// Parsed affinities array (stored as JSON text in DB)
+    pub affinities: Vec<String>,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub app_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<Human> for HumanView {
+    fn from(h: Human) -> Self {
+        let affinities: Vec<String> =
+            serde_json::from_str(&h.affinities).unwrap_or_default();
+        Self {
+            id: h.id,
+            agent_pub_key: h.agent_pub_key,
+            display_name: h.display_name,
+            bio: h.bio,
+            affinities,
+            profile_reach: h.profile_reach,
+            location: h.location,
+            app_id: h.app_id,
+            created_at: h.created_at,
+            updated_at: h.updated_at,
+        }
+    }
+}
+
+/// Input for registering a new human — camelCase API boundary type.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateHumanInputView {
+    /// Caller-supplied stable ID (e.g. UUID derived from agent key)
+    pub id: String,
+    #[serde(default)]
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    #[serde(default)]
+    pub bio: Option<String>,
+    #[serde(default)]
+    pub affinities: Vec<String>,
+    #[serde(default = "default_profile_reach")]
+    pub profile_reach: String,
+    #[serde(default)]
+    pub location: Option<String>,
+}
+
+fn default_profile_reach() -> String {
+    "community".to_string()
+}
+
+/// Input for updating a human's mutable profile fields — camelCase API boundary type.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateHumanInputView {
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub bio: Option<String>,
+    #[serde(default)]
+    pub affinities: Option<Vec<String>>,
+    #[serde(default)]
+    pub profile_reach: Option<String>,
+    #[serde(default)]
+    pub location: Option<String>,
 }
 
 // ============================================================================
