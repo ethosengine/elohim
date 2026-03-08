@@ -11,6 +11,7 @@ use hyper::{body::Incoming, Method, Request, Response};
 use serde::Serialize;
 
 use crate::db::economic_events::{CreateEconomicEventInput, EconomicEventQuery};
+use crate::db::models::rea_actions;
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::economic_event_service::StagedTransaction;
@@ -74,6 +75,16 @@ pub async fn handle(
         (&Method::GET, content_path) if content_path.starts_with("content/") => {
             let content_id = content_path.trim_start_matches("content/");
             handle_events_for_content(content_id, pool, ctx).await
+        }
+
+        // GET /api/v1/economic-events/appreciations?for={id}&by={id}
+        (&Method::GET, p) if p.starts_with("appreciations") => {
+            handle_appreciations_query(req, pool, ctx).await
+        }
+
+        // POST /api/v1/economic-events/appreciations
+        (&Method::POST, "appreciations") => {
+            handle_create_appreciation(req, pool, ctx).await
         }
 
         _ => Ok(response::not_found(&format!(
@@ -207,6 +218,66 @@ async fn handle_events_for_content(
     let mut conn = get_conn(pool)?;
     Ok(from_result(EconomicEventService::events_for_content(
         &mut conn, ctx, content_id,
+    )))
+}
+
+/// GET /api/v1/economic-events/appreciations
+///
+/// Query params:
+/// - `?for={id}` — appreciations directed at an entity (receiver = id)
+/// - `?by={id}` — appreciations sent by an agent (provider = id)
+///
+/// Both params may be combined. action='appreciate' is always applied.
+async fn handle_appreciations_query(
+    req: Request<Incoming>,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    #[derive(serde::Deserialize, Default)]
+    struct AppreciationQueryParams {
+        #[serde(rename = "for")]
+        for_id: Option<String>,
+        by: Option<String>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    }
+
+    let raw = req.uri().query().unwrap_or("");
+    let params: AppreciationQueryParams =
+        serde_urlencoded::from_str(raw).unwrap_or_default();
+
+    let query = EconomicEventQuery {
+        action: Some(rea_actions::APPRECIATE.to_string()),
+        receiver: params.for_id,
+        provider: params.by,
+        limit: params.limit.unwrap_or(100),
+        offset: params.offset.unwrap_or(0),
+        ..Default::default()
+    };
+
+    let mut conn = get_conn(pool)?;
+    Ok(from_result(EconomicEventService::list_events(
+        &mut conn, ctx, &query,
+    )))
+}
+
+/// POST /api/v1/economic-events/appreciations
+///
+/// Creates an economic event with action='appreciate'. The request body
+/// follows `CreateEconomicEventInputView` — `action` is forced to 'appreciate'
+/// server-side so callers may omit it.
+async fn handle_create_appreciation(
+    req: Request<Incoming>,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut input_view: CreateEconomicEventInputView = parse_body(req).await?;
+    // Force action regardless of what the client sent
+    input_view.action = rea_actions::APPRECIATE.to_string();
+    let input: CreateEconomicEventInput = input_view.into();
+    let mut conn = get_conn(pool)?;
+    Ok(from_create_result(EconomicEventService::create_event(
+        &mut conn, ctx, input,
     )))
 }
 

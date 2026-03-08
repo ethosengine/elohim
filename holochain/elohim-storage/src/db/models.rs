@@ -858,8 +858,11 @@ pub mod rea_actions {
     pub const TAKE: &str = "take";
     pub const ACCEPT: &str = "accept";
 
+    // Social actions
+    pub const APPRECIATE: &str = "appreciate";
+
     /// All supported hREA actions
-    pub const ALL: [&str; 16] = [
+    pub const ALL: [&str; 17] = [
         USE,
         CONSUME,
         CITE,
@@ -876,6 +879,7 @@ pub mod rea_actions {
         WORK,
         DELIVER_SERVICE,
         ACCEPT,
+        APPRECIATE,
     ];
 
     /// Check if an action is valid
