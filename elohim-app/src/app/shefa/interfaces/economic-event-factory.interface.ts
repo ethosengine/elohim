@@ -27,6 +27,7 @@ import { InjectionToken, inject } from '@angular/core';
 import { EconomicEventsApiService } from '../services/economic-events-api.service';
 
 import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
+import type { REAAction, LamadEventType } from '@app/elohim/models';
 
 /**
  * EconomicEvent -- Immutable transaction record based on REA/ValueFlows.
@@ -52,6 +53,72 @@ export interface EconomicEvent {
   };
   createdAt: string;
   createdBy: string;
+}
+
+/**
+ * AppreciationDisplay -- Flattened appreciation record for UI consumption.
+ *
+ * Locally defined to decouple the interface from the concrete AppreciationService.
+ * Matches the shape returned by the appreciation zome calls.
+ */
+export interface AppreciationDisplay {
+  id: string;
+  /** What is being appreciated (event ID, content ID, etc.) */
+  appreciationOf: string;
+  /** Who is expressing appreciation */
+  appreciatedBy: string;
+  /** Who receives the appreciation */
+  appreciationTo: string;
+  /** Quantity of appreciation */
+  quantityValue: number;
+  /** Unit of appreciation (e.g., 'recognition-points', 'affinity') */
+  quantityUnit: string;
+  /** Optional note */
+  note: string | null;
+  /** When created */
+  createdAt: string;
+}
+
+/**
+ * Input for creating an appreciation.
+ */
+export interface CreateAppreciationInput {
+  /** What is being appreciated */
+  appreciationOf: string;
+  /** Who receives the appreciation */
+  appreciationTo: string;
+  /** Quantity of appreciation */
+  quantityValue: number;
+  /** Unit of appreciation */
+  quantityUnit: string;
+  /** Optional note */
+  note?: string;
+}
+
+/**
+ * Input for creating an economic event.
+ */
+export interface CreateEconomicEventInput {
+  action: REAAction;
+  providerId: string;
+  receiverId: string;
+  resourceConformsTo?: string;
+  resourceInventoriedAs?: string;
+  toResourceInventoriedAs?: string;
+  resourceClassifiedAs?: string[];
+  resourceQuantityValue?: number;
+  resourceQuantityUnit?: string;
+  effortQuantityValue?: number;
+  effortQuantityUnit?: string;
+  inputOf?: string;
+  outputOf?: string;
+  fulfills?: string[];
+  realizationOf?: string;
+  agreedIn?: string;
+  satisfies?: string[];
+  inScopeOf?: string[];
+  note?: string;
+  lamadEventType?: LamadEventType;
 }
 
 /**
@@ -105,6 +172,54 @@ export interface IEconomicEventFactory {
     }>,
     reason: string
   ): Promise<EconomicEvent>;
+
+  // ===========================================================================
+  // Query Methods (from EconomicService)
+  // ===========================================================================
+
+  /**
+   * Get economic events where the agent is the provider.
+   */
+  getEventsByProvider(agentId: string): Promise<EconomicEvent[]>;
+
+  /**
+   * Get economic events where the agent is the receiver.
+   */
+  getEventsByReceiver(agentId: string): Promise<EconomicEvent[]>;
+
+  /**
+   * Get economic events filtered by REA action type.
+   */
+  getEventsByAction(action: string): Promise<EconomicEvent[]>;
+
+  /**
+   * Get economic events filtered by Lamad event type.
+   */
+  getEventsByLamadType(lamadType: string): Promise<EconomicEvent[]>;
+
+  /**
+   * Create a new economic event from raw input.
+   */
+  createEconomicEvent(payload: CreateEconomicEventInput): Promise<EconomicEvent>;
+
+  // ===========================================================================
+  // Appreciation Methods (from AppreciationService)
+  // ===========================================================================
+
+  /**
+   * Get appreciations received by an entity.
+   */
+  getAppreciationsFor(appreciatedId: string): Promise<AppreciationDisplay[]>;
+
+  /**
+   * Get appreciations given by an agent.
+   */
+  getAppreciationsBy(appreciatorId: string): Promise<AppreciationDisplay[]>;
+
+  /**
+   * Create a new appreciation record.
+   */
+  createAppreciation(payload: CreateAppreciationInput): Promise<AppreciationDisplay>;
 }
 
 /**
