@@ -1251,6 +1251,27 @@ async fn handle_request(
             ));
         }
 
+        // Custodian metrics and data protection
+        (_, p) if p.starts_with("/api/v1/custodians") => {
+            return Ok(to_boxed(
+                routes::handle_custodians_api_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Compute dashboard
+        (_, p) if p.starts_with("/api/v1/compute") => {
+            return Ok(to_boxed(
+                routes::handle_compute_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Flow planning
+        (_, p) if p.starts_with("/api/v1/flow-planning") => {
+            return Ok(to_boxed(
+                routes::handle_flow_planning_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };
