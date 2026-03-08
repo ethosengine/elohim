@@ -167,6 +167,69 @@ export interface UpdateProfileRequest {
 }
 
 // =============================================================================
+// Wire Format Types (data boundary — will be replaced by generated types)
+// =============================================================================
+
+/** Human entry as returned from conductor / storage API */
+export interface HumanEntry {
+  id: string;
+  displayName: string;
+  bio: string | null;
+  affinities: string[];
+  profileReach: string;
+  location: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Attestation as returned from conductor / storage API */
+export interface AttestationEntry {
+  actionHash: Uint8Array;
+  attestation: {
+    id: string;
+    attestationType: string;
+    attesterId: string;
+    recipientId: string;
+    evidenceJson: string;
+    issuedAt: string;
+  };
+}
+
+/** Session result from get_my_human / create_human */
+export interface HumanSessionResult {
+  agentPubkey: string;
+  actionHash: Uint8Array;
+  human: HumanEntry;
+  sessionStartedAt: string;
+  attestations: AttestationEntry[];
+}
+
+/** Result from update_human */
+export interface HumanUpdateResult {
+  actionHash: Uint8Array;
+  human: HumanEntry;
+}
+
+/** Payload for registering a human */
+export interface RegisterHumanPayload {
+  id: string;
+  displayName: string;
+  bio?: string;
+  affinities: string[];
+  profileReach: string;
+  location?: string;
+}
+
+/** Payload for updating human profile */
+export interface UpdateHumanPayload {
+  displayName?: string;
+  bio?: string;
+  affinities?: string[];
+  profileReach?: string;
+  location?: string;
+}
+
+// =============================================================================
 // Identity State
 // =============================================================================
 
