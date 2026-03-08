@@ -154,10 +154,7 @@ mod tests {
         let path = "/api/v1/flow-planning";
         let query = "agent=abc";
         let url = format!("{}{}?{}", base.trim_end_matches('/'), path, query);
-        assert_eq!(
-            url,
-            "http://localhost:8090/api/v1/flow-planning?agent=abc"
-        );
+        assert_eq!(url, "http://localhost:8090/api/v1/flow-planning?agent=abc");
     }
 
     #[test]
