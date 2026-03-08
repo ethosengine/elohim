@@ -51,7 +51,7 @@ import groovy.transform.Field
         jenkinsPath: 'Jenkinsfile',
         changePatterns: ['elohim-app/', 'elohim-library/', 'holochain/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
-        dependsOn: [],
+        dependsOn: ['elohim-sophia'],  // rebuild app when sophia UMD bundle changes
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://alpha.elohim.host',
@@ -455,14 +455,18 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
     echo "▶️ Triggering ${name}/${branch}..."
 
     try {
+        // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
+        def config = PIPELINES[name]
+        def params = [booleanParam(name: 'FORCE_BUILD', value: true)]
+        if (config?.deploymentCheck) {
+            params.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
+        }
+
         def result = build(
             job: "${name}/${branch}",
             wait: wait,
             propagate: false,
-            parameters: [
-                booleanParam(name: 'FORCE_BUILD', value: true),
-                booleanParam(name: 'FORCE_DEPLOY', value: true)
-            ]
+            parameters: params
         )
 
         return [
