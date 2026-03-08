@@ -7,7 +7,7 @@
  * - Querying events for analytics
  *
  * NOTE: This service uses the elohim-storage SQLite backend via StorageApiService.
- * For Holochain-backed events, see EconomicService.
+ * For Holochain-backed events, see IEconomicEventFactory.
  *
  * ValueFlows/hREA Action Types:
  * - 'use': Consuming a resource (e.g., viewing content)

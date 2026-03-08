@@ -19,7 +19,7 @@
  * - Analyze content impact
  * - Get current agent's contributor stats
  *
- * @see AppreciationService for the underlying recognition primitives
+ * @see IEconomicEventFactory for the underlying recognition primitives
  * @see StewardService for steward economy operations
  */
 

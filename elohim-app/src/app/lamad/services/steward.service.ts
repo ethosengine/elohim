@@ -16,7 +16,7 @@
  *   StewardService → HolochainClientService → Holochain Conductor → DHT
  *
  * @see ContributorService for contributor dashboards and recognition
- * @see EconomicService for underlying hREA primitives
+ * @see IEconomicEventFactory for underlying hREA primitives
  */
 
 import { Injectable, computed, inject, signal } from '@angular/core';
