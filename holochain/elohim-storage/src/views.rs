@@ -2543,6 +2543,49 @@ impl From<CustodianMetrics> for CustodianMetricsView {
     }
 }
 
+/// Input view for a node reporting its own metrics snapshot.
+///
+/// The sub-metric groups are accepted as raw JSON values and stored verbatim
+/// (serialised back to String for the `UpsertCustodianMetrics` insertable).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ReportCustodianMetricsInputView {
+    pub custodian_id: String,
+    pub tier: u32,
+    pub health: CustodianHealthView,
+    pub storage: CustodianStorageMetricsView,
+    pub bandwidth: CustodianBandwidthView,
+    pub computation: CustodianComputationView,
+    pub reputation: CustodianReputationView,
+    pub economic: CustodianEconomicView,
+    /// Unix timestamp (ms) when metrics were collected — defaults to now if absent
+    pub collected_at: Option<i64>,
+}
+
+impl ReportCustodianMetricsInputView {
+    /// Convert to the insertable DB type, stamping `app_id` and `last_updated_at`.
+    pub fn into_upsert(
+        self,
+        app_id: impl Into<String>,
+        now_ms: i64,
+    ) -> crate::db::models::UpsertCustodianMetrics {
+        crate::db::models::UpsertCustodianMetrics {
+            custodian_id: self.custodian_id,
+            app_id: app_id.into(),
+            tier: self.tier as i32,
+            health_json: serde_json::to_string(&self.health).unwrap_or_default(),
+            storage_json: serde_json::to_string(&self.storage).unwrap_or_default(),
+            bandwidth_json: serde_json::to_string(&self.bandwidth).unwrap_or_default(),
+            computation_json: serde_json::to_string(&self.computation).unwrap_or_default(),
+            reputation_json: serde_json::to_string(&self.reputation).unwrap_or_default(),
+            economic_json: serde_json::to_string(&self.economic).unwrap_or_default(),
+            collected_at: self.collected_at.unwrap_or(now_ms),
+            last_updated_at: now_ms,
+        }
+    }
+}
+
 // ============================================================================
 // Data Protection Views
 //

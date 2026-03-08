@@ -50,6 +50,9 @@ pub mod local_sessions;
 pub mod relationships_diesel;
 pub mod stewardship_allocations;
 
+// Custodian node metrics
+pub mod custodian_metrics;
+
 // Policy cache for stewardship enforcement
 pub mod policy_cache;
 
