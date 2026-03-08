@@ -20,7 +20,7 @@ import { TransactionImportService } from './transaction-import.service';
 import { AICategorizationService } from './ai-categorization.service';
 import { BudgetReconciliationService } from './budget-reconciliation.service';
 import { DuplicateDetectionService } from './duplicate-detection.service';
-import { EconomicEventFactoryService } from './economic-event-factory.service';
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import { PlaidIntegrationService } from './plaid-integration.service';
 import {
   ImportRequest,
@@ -62,7 +62,7 @@ describe('TransactionImportService', () => {
         { provide: PlaidIntegrationService, useValue: mockPlaid },
         { provide: DuplicateDetectionService, useValue: mockDuplicates },
         { provide: AICategorizationService, useValue: mockCategorization },
-        { provide: EconomicEventFactoryService, useValue: mockEventFactory },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEventFactory },
         { provide: BudgetReconciliationService, useValue: mockBudgetReconciliation },
       ],
     });

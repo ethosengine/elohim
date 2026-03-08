@@ -16,7 +16,7 @@ import { PerformanceMetricsService } from '@app/elohim/services/performance-metr
 import { CustodianCommitmentService } from '@app/elohim/services/custodian-commitment.service';
 import { EconomicService } from '../../services/economic.service';
 import { STEWARDED_RESOURCES } from '../../interfaces/stewarded-resources.interface';
-import { ComputeEventService } from '../../services/compute-event.service';
+import { COMPUTE_EVENT } from '../../interfaces';
 import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
@@ -94,7 +94,7 @@ describe('ShefaDashboardComponent', () => {
         { provide: STEWARDED_RESOURCES, useValue: stewardedResourceMock },
         { provide: ShefaComputeService, useValue: shefaComputeMock },
         { provide: FamilyCommunityProtectionService, useValue: familyProtectionMock },
-        { provide: ComputeEventService, useValue: computeEventsMock },
+        { provide: COMPUTE_EVENT, useValue: computeEventsMock },
       ],
       schemas: [NO_ERRORS_SCHEMA],
       teardown: { destroyAfterEach: true },

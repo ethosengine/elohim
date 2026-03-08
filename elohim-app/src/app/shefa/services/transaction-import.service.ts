@@ -26,6 +26,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, Subject, BehaviorSubject, firstValueFrom } from 'rxjs';
 
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import {
   PlaidConnection,
   ImportBatch,
@@ -38,7 +39,6 @@ import {
 import { AICategorizationService } from './ai-categorization.service';
 import { BudgetReconciliationService } from './budget-reconciliation.service';
 import { DuplicateDetectionService } from './duplicate-detection.service';
-import { EconomicEventFactoryService } from './economic-event-factory.service';
 import { PlaidIntegrationService } from './plaid-integration.service';
 
 /**
@@ -102,7 +102,7 @@ export class TransactionImportService {
   private readonly plaid = inject(PlaidIntegrationService);
   private readonly duplicates = inject(DuplicateDetectionService);
   private readonly aiCategorization = inject(AICategorizationService);
-  private readonly eventFactory = inject(EconomicEventFactoryService);
+  private readonly eventFactory = inject(ECONOMIC_EVENT_FACTORY);
   private readonly budgetReconciliation = inject(BudgetReconciliationService);
 
   /**

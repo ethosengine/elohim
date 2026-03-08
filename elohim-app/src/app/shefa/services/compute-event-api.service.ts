@@ -1,5 +1,5 @@
 /**
- * Compute Event Service
+ * Compute Event API Service (thin)
  *
  * Generates immutable EconomicEvent entries for compute-related activities:
  * - CPU hours provided to family-community
@@ -7,46 +7,38 @@
  * - Bandwidth provided (Mbps-hours)
  * - Infrastructure-token issuance based on compute contribution
  *
- * Works in conjunction with:
- * - ShefaComputeService: Provides real-time metrics
- * - EconomicService: Records immutable events to Holochain DHT
- * - AllocationSnapshot: Tracks what compute is allocated to each governance level
+ * Keeps ALL the UX logic from the original fat ComputeEventService:
+ * - Interval-based sampling from ShefaComputeService
+ * - Metric-to-usage conversion (CPU core-hours, storage GB-hours, bandwidth Mbps-hours)
+ * - Token calculation formula
+ * - Aggregation strategies (per-governance-level, per-custodian, aggregate)
+ * - Configuration management
+ *
+ * Replaces the direct zome call (`callZome('content_store', 'create_economic_events_batch')`)
+ * with `ECONOMIC_EVENT_FACTORY.createMultipleFromStaged()` which hits the HTTP bulk endpoint.
  *
  * Token Issuance Formula:
- * tokens = (cpu_hours * cpu_rate + storage_gb_hours * storage_rate + bandwidth_mbps_hours * bandwidth_rate) / 3600
- *
- * Where rates are from infrastructure-token pricing model (TBD in Unyt swimlane spec).
+ * tokens = (cpu_hours * cpu_rate + storage_gb_hours * storage_rate + bandwidth_mbps_hours * bandwidth_rate)
  */
 
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 79.4% (2026-02-24)
-
 import { switchMap, tap, catchError, startWith, map } from 'rxjs/operators';
 
-import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, interval, of, from } from 'rxjs';
 
 import { LamadEventType } from '@app/elohim/models/economic-event.model';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import { AllocationSnapshot, ComputeMetrics } from '../models/shefa-dashboard.model';
 
-import { EconomicService, CreateEconomicEventInput } from './economic.service';
 import { ShefaComputeService } from './shefa-compute.service';
 
-// CreateEventRequest is an alias for the EconomicEvent creation input
-type CreateEventRequest = CreateEconomicEventInput;
-
-/**
- * Configuration for compute event generation
- */
-interface ComputeEventConfig {
-  cpuHourRate: number; // Tokens per CPU-hour
-  storageGBHourRate: number; // Tokens per GB-hour (monthly rate normalized to hourly)
-  bandwidthMbpsHourRate: number; // Tokens per Mbps-hour
-  eventEmissionInterval: number; // Milliseconds between event batches (default: 3600000 = 1 hour)
-  aggregationStrategy: 'per-governance-level' | 'per-custodian' | 'aggregate'; // How to group events
-}
+import type {
+  IComputeEvent,
+  ComputeEventConfig,
+  ComputeEventPayload,
+} from '../interfaces/compute-event.interface';
 
 const DEFAULT_CONFIG: ComputeEventConfig = {
   cpuHourRate: 0.1, // 0.1 tokens per CPU-hour (TBD with Unyt)
@@ -56,35 +48,11 @@ const DEFAULT_CONFIG: ComputeEventConfig = {
   aggregationStrategy: 'per-governance-level',
 };
 
-/**
- * Compute usage snapshot (what we consumed in last period)
- */
-interface ComputeUsageSnapshot {
-  timestamp: string;
-  cpuCoreHours: number; // Core-hours used
-  storageGBHours: number; // GB-hours used
-  bandwidthMbpsHours: number; // Mbps-hours used
-  governanceLevel?: 'individual' | 'household' | 'community' | 'network';
-  custodianId?: string;
-}
-
-/**
- * Computed event with all details
- */
-interface ComputeEventPayload {
-  eventId: string;
-  timestamp: string;
-  operatorId: string;
-  usage: ComputeUsageSnapshot;
-  tokensEarned: number;
-  economicEventId?: string;
-}
-
 @Injectable({
   providedIn: 'root',
 })
-export class ComputeEventService {
-  private config: ComputeEventConfig = DEFAULT_CONFIG;
+export class ComputeEventApiService implements IComputeEvent {
+  private config: ComputeEventConfig = { ...DEFAULT_CONFIG };
 
   // Track last usage metrics to calculate delta
   private readonly lastMetrics$ = new BehaviorSubject<ComputeMetrics | null>(null);
@@ -96,19 +64,17 @@ export class ComputeEventService {
   // Track emission to avoid duplicates
   private lastEmissionTime = Date.now();
 
-  private readonly holochain = inject(HolochainClientService);
-  private readonly economicService = inject(EconomicService);
+  private readonly eventFactory = inject(ECONOMIC_EVENT_FACTORY);
   private readonly shefaCompute = inject(ShefaComputeService);
 
   /**
-   * Initialize event emission for an operator
-   * Starts tracking compute usage and emitting events on interval
+   * Initialize event emission for an operator.
+   * Starts tracking compute usage and emitting events on interval.
    */
   initializeEventEmission(
     operatorId: string,
     _stewardedResourceId: string
   ): Observable<ComputeEventPayload> {
-    // Emit events on configured interval
     return interval(this.config.eventEmissionInterval).pipe(
       startWith(0), // Emit immediately
       switchMap(() => {
@@ -127,15 +93,33 @@ export class ComputeEventService {
   }
 
   /**
-   * Get stream of compute events
+   * Get stream of compute events.
    */
   getComputeEvents$(): Observable<ComputeEventPayload> {
     return this.computeEvents$.asObservable();
   }
 
   /**
-   * Generate compute events from current metrics and allocations
-   * Returns Observable array of generated events
+   * Update compute event configuration.
+   */
+  setConfig(config: Partial<ComputeEventConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Get current configuration.
+   */
+  getConfig(): ComputeEventConfig {
+    return this.config;
+  }
+
+  // ===========================================================================
+  // Event Generation
+  // ===========================================================================
+
+  /**
+   * Generate compute events from current metrics and allocations.
+   * Returns Observable of the first generated event (or empty payload).
    */
   private generateComputeEvents(
     operatorId: string,
@@ -143,7 +127,6 @@ export class ComputeEventService {
     allocations: AllocationSnapshot
   ): Observable<ComputeEventPayload> {
     const lastMetrics = this.lastMetrics$.value;
-    // Allocations baseline stored for future delta calculation - updated but not read yet
 
     // Calculate usage delta since last measurement
     const cpuCoreHours = this.calculateCpuCoreHours(lastMetrics, metrics);
@@ -154,7 +137,7 @@ export class ComputeEventService {
     this.lastMetrics$.next(metrics);
     this.lastAllocations$.next(allocations);
 
-    // Generate events per governance level
+    // Generate events per aggregation strategy
     const events: ComputeEventPayload[] = [];
 
     switch (this.config.aggregationStrategy) {
@@ -196,7 +179,7 @@ export class ComputeEventService {
         break;
     }
 
-    // Persist all events to Holochain
+    // Persist all events via ECONOMIC_EVENT_FACTORY
     return this.persistComputeEvents(operatorId, events).pipe(
       map(persistedEvents => {
         // Emit each event
@@ -206,8 +189,12 @@ export class ComputeEventService {
     );
   }
 
+  // ===========================================================================
+  // Aggregation Strategies
+  // ===========================================================================
+
   /**
-   * Generate separate events for each governance level
+   * Generate separate events for each governance level.
    */
   private generatePerGovernanceLevelEvents(
     operatorId: string,
@@ -248,7 +235,7 @@ export class ComputeEventService {
   }
 
   /**
-   * Generate separate events per custodian protecting data
+   * Generate separate events per custodian protecting data.
    */
   private generatePerCustodianEvents(
     operatorId: string,
@@ -259,7 +246,6 @@ export class ComputeEventService {
   ): ComputeEventPayload[] {
     const events: ComputeEventPayload[] = [];
 
-    // For each custodian in allocations
     allocations.allocationBlocks.forEach(block => {
       if (block.relatedAgents && block.relatedAgents.length > 0) {
         const perCustodian = {
@@ -296,7 +282,7 @@ export class ComputeEventService {
   }
 
   /**
-   * Generate single aggregate event for all compute
+   * Generate single aggregate event for all compute.
    */
   private generateAggregateEvent(
     operatorId: string,
@@ -325,8 +311,15 @@ export class ComputeEventService {
     };
   }
 
+  // ===========================================================================
+  // Persistence (via ECONOMIC_EVENT_FACTORY)
+  // ===========================================================================
+
   /**
-   * Persist compute events to Holochain as EconomicEvent entries
+   * Persist compute events via ECONOMIC_EVENT_FACTORY.createMultipleFromStaged().
+   *
+   * Converts ComputeEventPayloads to a staged-transaction-compatible format
+   * and delegates to the HTTP bulk endpoint.
    */
   private persistComputeEvents(
     operatorId: string,
@@ -342,26 +335,11 @@ export class ComputeEventService {
 
     this.lastEmissionTime = Date.now();
 
-    // Convert to EconomicEvent requests and create via EconomicService
-    const eventRequests = events.map(e => this.convertToEconomicEvent(operatorId, e));
+    // Convert to staged-transaction-compatible format for the factory
+    const stagedEvents = events.map(e => this.convertToStagedFormat(operatorId, e));
 
-    // Batch create events
-    interface BatchResult {
-      success: boolean;
-      data?: { id: string }[];
-    }
-    return from(
-      this.holochain.callZome<BatchResult>({
-        zomeName: 'content_store',
-        fnName: 'create_economic_events_batch',
-        payload: { events: eventRequests },
-      })
-    ).pipe(
-      map(response => {
-        const batchResult: BatchResult = response.success
-          ? (response.data ?? { success: false })
-          : { success: false };
-        const results: { id: string }[] = batchResult.success ? (batchResult.data ?? []) : [];
+    return from(this.eventFactory.createMultipleFromStaged(stagedEvents)).pipe(
+      map(results => {
         // Link persisted event IDs back to payloads
         return events.map((e, i) => ({
           ...e,
@@ -375,44 +353,79 @@ export class ComputeEventService {
   }
 
   /**
-   * Convert ComputeEventPayload to EconomicEvent request
+   * Convert a ComputeEventPayload to staged-transaction-compatible format.
+   *
+   * The ECONOMIC_EVENT_FACTORY expects StagedTransaction-shaped objects.
+   * Compute events aren't literally staged bank transactions -- the API
+   * handles the transformation server-side. We use `as any` for the type
+   * cast since the shapes differ.
    */
-  private convertToEconomicEvent(
-    operatorId: string,
-    payload: ComputeEventPayload
-  ): CreateEventRequest {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private convertToStagedFormat(operatorId: string, payload: ComputeEventPayload): any {
     const { cpuHours, storageHours, bandwidthHours } = this.getUsageSummary(payload);
 
-    // Determine action and quantity based on primary resource type
-    const action: 'produce' | 'use' | 'transfer' = 'produce';
+    // Determine primary resource type for the event
     let quantity: number = cpuHours;
     let unit = 'cpu-hour';
-    let lamadEventType = 'compute-provided';
+    let lamadEventType: LamadEventType = 'compute-provided' as LamadEventType;
 
     if (storageHours > cpuHours && storageHours > bandwidthHours) {
       quantity = storageHours;
       unit = 'gb-hour';
-      lamadEventType = 'storage-provided';
+      lamadEventType = 'storage-provided' as LamadEventType;
     } else if (bandwidthHours > cpuHours) {
       quantity = bandwidthHours;
       unit = 'mbps-hour';
-      lamadEventType = 'bandwidth-provided';
+      lamadEventType = 'bandwidth-provided' as LamadEventType;
     }
 
+    const receiver =
+      payload.usage.governanceLevel ?? payload.usage.custodianId ?? 'family-community';
+    const note = `Compute provided to ${receiver}: ${cpuHours.toFixed(2)} CPU-hours, ${storageHours.toFixed(2)} GB-hours, ${bandwidthHours.toFixed(2)} Mbps-hours`;
+
+    // Shape as a staged transaction for the factory
     return {
-      action,
-      providerId: operatorId, // My node is the provider
-      receiverId: payload.usage.governanceLevel ?? payload.usage.custodianId ?? 'family-community',
-      resourceQuantityValue: quantity,
-      resourceQuantityUnit: unit,
-      resourceClassifiedAs: ['compute', 'infrastructure'],
-      note: `Compute provided to ${payload.usage.governanceLevel ?? 'family-community'}: ${cpuHours.toFixed(2)} CPU-hours, ${storageHours.toFixed(2)} GB-hours, ${bandwidthHours.toFixed(2)} Mbps-hours`,
-      lamadEventType: lamadEventType as LamadEventType,
+      id: payload.eventId,
+      batchId: `compute-${Date.now()}`,
+      stewardId: operatorId,
+      plaidTransactionId: payload.eventId, // Reuse event ID (no Plaid source)
+      plaidAccountId: 'compute-node',
+      financialAssetId: 'infrastructure-compute',
+      timestamp: payload.timestamp,
+      type: 'credit' as const,
+      amount: { value: quantity, unit },
+      description: note,
+      category: lamadEventType,
+      categoryConfidence: 100,
+      categorySource: 'rule' as const,
+      isDuplicate: false,
+      reviewStatus: 'approved' as const,
+      economicEventId: undefined,
+      metadata: {
+        action: 'produce',
+        providerId: operatorId,
+        receiverId: receiver,
+        resourceClassifiedAs: ['compute', 'infrastructure'],
+        lamadEventType,
+        computeUsage: {
+          cpuCoreHours: cpuHours,
+          storageGBHours: storageHours,
+          bandwidthMbpsHours: bandwidthHours,
+          governanceLevel: payload.usage.governanceLevel,
+          custodianId: payload.usage.custodianId,
+        },
+        tokensEarned: payload.tokensEarned,
+      },
+      createdAt: payload.timestamp,
     };
   }
 
+  // ===========================================================================
+  // Metric Calculations
+  // ===========================================================================
+
   /**
-   * Helper: Get usage summary from payload
+   * Get usage summary from payload.
    */
   private getUsageSummary(payload: ComputeEventPayload) {
     return {
@@ -423,7 +436,7 @@ export class ComputeEventService {
   }
 
   /**
-   * Helper: Calculate CPU core-hours from metrics
+   * Calculate CPU core-hours from metrics delta.
    */
   private calculateCpuCoreHours(
     lastMetrics: ComputeMetrics | null,
@@ -447,18 +460,16 @@ export class ComputeEventService {
   }
 
   /**
-   * Helper: Calculate storage GB-hours
+   * Calculate storage GB-hours.
    */
   private calculateStorageGBHours(
     lastMetrics: ComputeMetrics | null,
     currentMetrics: ComputeMetrics
   ): number {
     if (!lastMetrics) {
-      // First measurement
       return currentMetrics.storage.usedGB * (this.config.eventEmissionInterval / 3600000);
     }
 
-    // Average storage over period
     const avgUsedGB = (lastMetrics.storage.usedGB + currentMetrics.storage.usedGB) / 2;
     const hoursElapsed = this.config.eventEmissionInterval / 3600000;
 
@@ -466,7 +477,7 @@ export class ComputeEventService {
   }
 
   /**
-   * Helper: Calculate bandwidth Mbps-hours
+   * Calculate bandwidth Mbps-hours.
    */
   private calculateBandwidthMbpsHours(
     lastMetrics: ComputeMetrics | null,
@@ -493,8 +504,8 @@ export class ComputeEventService {
   }
 
   /**
-   * Helper: Calculate tokens earned from compute
-   * Formula: (cpu_hours * cpu_rate + storage_gb_hours * storage_rate + bandwidth_mbps_hours * bandwidth_rate)
+   * Calculate tokens earned from compute.
+   * Formula: cpu_hours * cpu_rate + storage_gb_hours * storage_rate + bandwidth_mbps_hours * bandwidth_rate
    */
   private calculateTokensEarned(
     cpuHours: number,
@@ -509,23 +520,9 @@ export class ComputeEventService {
   }
 
   /**
-   * Helper: Generate unique event ID
+   * Generate unique event ID.
    */
   private generateEventId(): string {
     return `ce-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`;
-  }
-
-  /**
-   * Update compute event configuration
-   */
-  setConfig(config: Partial<ComputeEventConfig>): void {
-    this.config = { ...this.config, ...config };
-  }
-
-  /**
-   * Get current configuration
-   */
-  getConfig(): ComputeEventConfig {
-    return this.config;
   }
 }

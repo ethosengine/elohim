@@ -5,7 +5,7 @@
  * Decouples the request/offer lifecycle, matching, and coordination from
  * the concrete REA-integrated implementation. Consumers inject the
  * EXCHANGE token; the default factory resolves to
- * ExchangeService.
+ * ExchangeApiService.
  *
  * Tests provide a mock IExchange via the same token -- no
  * concrete service import needed.
@@ -240,7 +240,7 @@ export interface IExchange {
 /**
  * Injection token for exchange coordination.
  *
- * Default factory resolves to ExchangeService which provides:
+ * Default factory resolves to ExchangeApiService which provides:
  * - Request/offer CRUD with REA Intent + EconomicEvent creation
  * - DHT-backed persistence and search
  * - Matching algorithm with fairness and transparency guarantees
