@@ -12,7 +12,9 @@ RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
 
 COPY package.json ./
-RUN pnpm install --frozen-lockfile
+# No lockfile — this package is a pnpm workspace member (root lockfile)
+# but builds standalone in Docker
+RUN pnpm install
 
 COPY tsconfig.json ./
 COPY src ./src
@@ -25,7 +27,7 @@ WORKDIR /app
 
 COPY package.json ./
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate \
-    && pnpm install --frozen-lockfile --prod
+    && pnpm install --prod
 
 COPY --from=builder /app/dist ./dist
 
