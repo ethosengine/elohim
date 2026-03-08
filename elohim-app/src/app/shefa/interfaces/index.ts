@@ -17,3 +17,18 @@ export type {
   ComputeEventPayload,
 } from './compute-event.interface';
 export { COMPUTE_EVENT } from './compute-event.interface';
+export type {
+  ICustodianMetrics,
+  CustodianMetrics,
+  CustodianAlert,
+  CustodianRecommendation,
+} from './custodian-metrics.interface';
+export { CUSTODIAN_METRICS } from './custodian-metrics.interface';
+export type {
+  IDataProtection,
+  FamilyCommunityProtectionStatus,
+  CustodianNode,
+  RegionalPresence,
+  TrustRelationship,
+} from './data-protection.interface';
+export { DATA_PROTECTION } from './data-protection.interface';
