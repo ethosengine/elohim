@@ -8,7 +8,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 
 import { CustodianViewComponent } from './custodian-view.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import { vi } from 'vitest';
 
 describe('CustodianViewComponent', () => {
@@ -42,7 +42,7 @@ describe('CustodianViewComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ShefaComputeService, useValue: mockShefaCompute },
+        { provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute },
       ],
     }).compileComponents();
 

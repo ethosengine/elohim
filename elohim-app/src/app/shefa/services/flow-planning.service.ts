@@ -9,13 +9,13 @@
  * - Life cadence modeling
  *
  * Architecture:
- *   FlowPlanningService → EconomicService → HolochainClientService → Holochain
+ *   FlowPlanningService → ECONOMIC_EVENT_FACTORY → doorway HTTP API
  *   FlowPlanningService → StewardedResourceService (for resource data)
  *
  * All operations create immutable EconomicEvents for audit trail.
  *
  * Integration Points:
- * - EconomicService: Create events for all plan/budget/goal operations
+ * - ECONOMIC_EVENT_FACTORY: Create events for all plan/budget/goal operations
  * - StewardedResourceService: Get resource availability and financial views
  * - HolochainClientService: Persist entities to DHT
  *
@@ -61,7 +61,7 @@ import {
 } from '../models/flow-planning.model';
 import { ResourceCategory } from '../models/stewarded-resources.model';
 
-import { EconomicService } from './economic.service';
+import { ECONOMIC_EVENT_FACTORY, type IEconomicEventFactory } from '../interfaces';
 
 /**
  * Flow Planning Service
@@ -82,7 +82,7 @@ export class FlowPlanningService {
   private static readonly NOT_IMPLEMENTED_ERROR = 'Not yet implemented';
 
   private readonly holochain = inject(HolochainClientService);
-  private readonly economicService = inject(EconomicService);
+  private readonly economicService = inject(ECONOMIC_EVENT_FACTORY);
   private readonly resourceService = inject(STEWARDED_RESOURCES);
 
   // =========================================================================

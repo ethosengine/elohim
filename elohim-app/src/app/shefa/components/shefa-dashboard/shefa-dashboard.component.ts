@@ -22,10 +22,9 @@ import { takeUntil, tap } from 'rxjs/operators';
 
 import { Observable, Subject } from 'rxjs';
 
-import { COMPUTE_EVENT } from '../../interfaces';
+import { COMPUTE_DASHBOARD, COMPUTE_EVENT } from '../../interfaces';
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
 import { DATA_PROTECTION, type IDataProtection } from '../../interfaces';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 /**
  * Display mode type
@@ -102,7 +101,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   // Cleanup
   private readonly destroy$ = new Subject<void>();
 
-  private readonly shefaCompute = inject(ShefaComputeService);
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
   private readonly familyProtection = inject(DATA_PROTECTION);
   private readonly computeEvents = inject(COMPUTE_EVENT);
 

@@ -18,7 +18,7 @@ import { ECONOMIC_EVENT_FACTORY } from '../../interfaces';
 import { STEWARDED_RESOURCES } from '../../interfaces/stewarded-resources.interface';
 import { COMPUTE_EVENT } from '../../interfaces';
 import { DATA_PROTECTION } from '../../interfaces';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
 import { vi } from 'vitest';
 
@@ -92,7 +92,7 @@ describe('ShefaDashboardComponent', () => {
         { provide: CustodianCommitmentService, useValue: custodianCommitmentMock },
         { provide: ECONOMIC_EVENT_FACTORY, useValue: economicServiceMock },
         { provide: STEWARDED_RESOURCES, useValue: stewardedResourceMock },
-        { provide: ShefaComputeService, useValue: shefaComputeMock },
+        { provide: COMPUTE_DASHBOARD, useValue: shefaComputeMock },
         { provide: DATA_PROTECTION, useValue: familyProtectionMock },
         { provide: COMPUTE_EVENT, useValue: computeEventsMock },
       ],

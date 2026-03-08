@@ -5,8 +5,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { InsuranceMutualService } from './insurance-mutual.service';
-import { EconomicService } from './economic.service';
-import { of } from 'rxjs';
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import { vi } from 'vitest';
 
 describe('InsuranceMutualService', () => {
@@ -15,16 +14,16 @@ describe('InsuranceMutualService', () => {
 
   beforeEach(() => {
     mockEconomic = {
-      createEvent: vi.fn(),
-      getEventsForAgent: vi.fn(),
+      createEconomicEvent: vi.fn(),
+      getEventsByProvider: vi.fn(),
     };
-    mockEconomic.createEvent.mockReturnValue(
-      of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any)
+    mockEconomic.createEconomicEvent.mockReturnValue(
+      Promise.resolve({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any)
     );
-    mockEconomic.getEventsForAgent.mockReturnValue(of([]));
+    mockEconomic.getEventsByProvider.mockReturnValue(Promise.resolve([]));
 
     TestBed.configureTestingModule({
-      providers: [InsuranceMutualService, { provide: EconomicService, useValue: mockEconomic }],
+      providers: [InsuranceMutualService, { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomic }],
     });
     service = TestBed.inject(InsuranceMutualService);
   });

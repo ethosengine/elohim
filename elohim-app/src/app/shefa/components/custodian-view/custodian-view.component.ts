@@ -22,7 +22,7 @@ import {
   BidirectionalCustodianView,
   CustodianRelationship,
 } from '../../models/shefa-dashboard.model';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 
 @Component({
   selector: 'app-custodian-view',
@@ -49,7 +49,7 @@ export class CustodianViewComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  private readonly shefaCompute = inject(ShefaComputeService);
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
 
   ngOnInit(): void {
     if (!this.operatorId) {

@@ -5,11 +5,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
-
 import { ShefaHomeComponent } from './shefa-home.component';
-import { AppreciationService } from '../../services/appreciation.service';
-import { EconomicService } from '../../services/economic.service';
+import { ECONOMIC_EVENT_FACTORY } from '../../interfaces';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { vi } from 'vitest';
 
@@ -17,27 +14,17 @@ describe('ShefaHomeComponent', () => {
   let component: ShefaHomeComponent;
   let fixture: ComponentFixture<ShefaHomeComponent>;
   let mockEconomicService: any;
-  let mockAppreciationService: any;
   let mockHolochainClient: any;
 
   beforeEach(async () => {
     mockEconomicService = {
-      testAvailability: vi.fn(),
-      isAvailable: vi.fn(),
-      getEventsForAgent: vi.fn(),
-    };
-    mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
-    mockEconomicService.isAvailable.mockReturnValue(false);
-    mockEconomicService.getEventsForAgent.mockReturnValue(of([]));
-
-    mockAppreciationService = {
-      testAvailability: vi.fn(),
-      isAvailable: vi.fn(),
+      getEventsByProvider: vi.fn(),
+      getEventsByReceiver: vi.fn(),
       getAppreciationsFor: vi.fn(),
     };
-    mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
-    mockAppreciationService.isAvailable.mockReturnValue(false);
-    mockAppreciationService.getAppreciationsFor.mockReturnValue(of([]));
+    mockEconomicService.getEventsByProvider.mockReturnValue(Promise.resolve([]));
+    mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
+    mockEconomicService.getAppreciationsFor.mockReturnValue(Promise.resolve([]));
 
     mockHolochainClient = {
       testAdminConnection: vi.fn(),
@@ -50,8 +37,7 @@ describe('ShefaHomeComponent', () => {
       imports: [ShefaHomeComponent],
       providers: [
         provideRouter([]),
-        { provide: EconomicService, useValue: mockEconomicService },
-        { provide: AppreciationService, useValue: mockAppreciationService },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomicService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
       ],
     }).compileComponents();
@@ -74,8 +60,8 @@ describe('ShefaHomeComponent', () => {
       fixture.detectChanges(); // Triggers ngOnInit
       await fixture.whenStable();
 
-      expect(mockEconomicService.testAvailability).toHaveBeenCalled();
-      expect(mockAppreciationService.testAvailability).toHaveBeenCalled();
+      expect(mockEconomicService.getEventsByProvider).toHaveBeenCalled();
+      expect(mockEconomicService.getAppreciationsFor).toHaveBeenCalled();
     });
 
     it('should set loading state during init', () => {
@@ -258,10 +244,8 @@ describe('ShefaHomeComponent', () => {
 
   describe('Data Loading - Success', () => {
     beforeEach(() => {
-      mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
-      mockEconomicService.isAvailable.mockReturnValue(true);
-      mockEconomicService.getEventsForAgent.mockReturnValue(
-        of([
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.resolve([
           {
             id: 'event-1',
             action: 'use',
@@ -272,11 +256,10 @@ describe('ShefaHomeComponent', () => {
           },
         ] as any)
       );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
 
-      mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
-      mockAppreciationService.isAvailable.mockReturnValue(true);
-      mockAppreciationService.getAppreciationsFor.mockReturnValue(
-        of([
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
+        Promise.resolve([
           {
             id: 'app-1',
             appreciationOf: 'content',
@@ -327,8 +310,9 @@ describe('ShefaHomeComponent', () => {
   describe('Data Loading - Errors', () => {
     it('should load demo data when not connected', async () => {
       mockHolochainClient.isConnected.mockReturnValue(false);
-      mockEconomicService.isAvailable.mockReturnValue(false);
-      mockAppreciationService.isAvailable.mockReturnValue(false);
+      mockEconomicService.getEventsByProvider.mockReturnValue(Promise.resolve([]));
+      mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
+      mockEconomicService.getAppreciationsFor.mockReturnValue(Promise.resolve([]));
 
       fixture.detectChanges();
       await waitForLoadData();
@@ -337,19 +321,37 @@ describe('ShefaHomeComponent', () => {
       expect(component.appreciations().length).toBeGreaterThan(0);
     });
 
-    it('should show error message when connection fails', async () => {
-      mockEconomicService.testAvailability.mockReturnValue(
+    it('should load demo data when all API calls fail silently', async () => {
+      mockHolochainClient.isConnected.mockReturnValue(false);
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
         Promise.reject(new Error('Connection failed'))
       );
 
       fixture.detectChanges();
       await waitForLoadData();
 
-      expect(component.error()).toContain('Failed to connect');
+      // Individual .catch() handlers swallow errors, returning empty arrays.
+      // Empty data + not connected = demo data loaded.
+      expect(component.events().length).toBeGreaterThan(0);
+      expect(component.loading()).toBe(false);
     });
 
     it('should set loading to false even on error', async () => {
-      mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Error')));
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
 
       fixture.detectChanges();
       await waitForLoadData();
@@ -399,16 +401,17 @@ describe('ShefaHomeComponent', () => {
       fixture.detectChanges();
       await waitForLoadData();
 
-      mockEconomicService.testAvailability.mockClear();
-      mockAppreciationService.testAvailability.mockClear();
+      mockEconomicService.getEventsByProvider.mockClear();
+      mockEconomicService.getAppreciationsFor.mockClear();
+      mockEconomicService.getEventsByReceiver.mockClear();
 
       // refreshData() calls `void this.loadData()` - hook loadData to detect when it runs
       component.refreshData();
       // loadData sets loading=true synchronously, so we wait for it to complete
       await waitForLoadData();
 
-      expect(mockEconomicService.testAvailability).toHaveBeenCalled();
-      expect(mockAppreciationService.testAvailability).toHaveBeenCalled();
+      expect(mockEconomicService.getEventsByProvider).toHaveBeenCalled();
+      expect(mockEconomicService.getAppreciationsFor).toHaveBeenCalled();
     });
 
     it('should test connection when testConnection is called', async () => {

@@ -8,7 +8,7 @@
  * - Infrastructure-token issuance based on compute contribution
  *
  * Keeps ALL the UX logic from the original fat ComputeEventService:
- * - Interval-based sampling from ShefaComputeService
+ * - Interval-based sampling from COMPUTE_DASHBOARD
  * - Metric-to-usage conversion (CPU core-hours, storage GB-hours, bandwidth Mbps-hours)
  * - Token calculation formula
  * - Aggregation strategies (per-governance-level, per-custodian, aggregate)
@@ -32,7 +32,7 @@ import { LamadEventType } from '@app/elohim/models/economic-event.model';
 import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import { AllocationSnapshot, ComputeMetrics } from '../models/shefa-dashboard.model';
 
-import { ShefaComputeService } from './shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../interfaces';
 
 import type {
   IComputeEvent,
@@ -65,7 +65,7 @@ export class ComputeEventApiService implements IComputeEvent {
   private lastEmissionTime = Date.now();
 
   private readonly eventFactory = inject(ECONOMIC_EVENT_FACTORY);
-  private readonly shefaCompute = inject(ShefaComputeService);
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
 
   /**
    * Initialize event emission for an operator.

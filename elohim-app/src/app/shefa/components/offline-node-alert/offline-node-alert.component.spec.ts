@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { OfflineNodeAlertComponent } from './offline-node-alert.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import { vi } from 'vitest';
 
 describe('OfflineNodeAlertComponent', () => {
@@ -57,7 +57,7 @@ describe('OfflineNodeAlertComponent', () => {
     await TestBed.configureTestingModule({
       imports: [OfflineNodeAlertComponent],
       providers: [
-        { provide: ShefaComputeService, useValue: mockShefaCompute },
+        { provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute },
         { provide: Router, useValue: mockRouter },
       ],
     }).compileComponents();

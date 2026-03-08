@@ -14,7 +14,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { FlowPlanningService } from './flow-planning.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { EconomicService } from './economic.service';
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 import { STEWARDED_RESOURCES } from '../interfaces/stewarded-resources.interface';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -41,7 +41,7 @@ describe('FlowPlanningService', () => {
       providers: [
         FlowPlanningService,
         { provide: HolochainClientService, useValue: mockHolochain },
-        { provide: EconomicService, useValue: mockEconomic },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomic },
         { provide: STEWARDED_RESOURCES, useValue: mockResource },
         provideHttpClient(),
         provideHttpClientTesting(),

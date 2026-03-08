@@ -6,7 +6,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { ComputeNeedsComponent } from './compute-needs.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import { vi } from 'vitest';
 
 describe('ComputeNeedsComponent', () => {
@@ -34,7 +34,7 @@ describe('ComputeNeedsComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ComputeNeedsComponent],
-      providers: [{ provide: ShefaComputeService, useValue: mockShefaCompute }],
+      providers: [{ provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ComputeNeedsComponent);

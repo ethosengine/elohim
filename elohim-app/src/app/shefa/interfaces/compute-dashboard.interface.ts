@@ -61,7 +61,15 @@ export type {
   SheafaDashboardConfig,
 } from '../models/shefa-dashboard.model';
 
-import type { SheafaDashboardState } from '../models/shefa-dashboard.model';
+import type {
+  SheafaDashboardState,
+  NodeTopologyState,
+  ComputeNeedsAssessment,
+  StorageContentDistribution,
+  BidirectionalCustodianView,
+} from '../models/shefa-dashboard.model';
+
+import { Observable } from 'rxjs';
 
 // =============================================================================
 // INTERFACE
@@ -96,6 +104,41 @@ export interface IComputeDashboard {
    * @returns Freshly computed dashboard state
    */
   refreshDashboard(): Promise<SheafaDashboardState>;
+
+  /**
+   * Initialize a real-time dashboard stream for an operator + resource pair.
+   * Returns an Observable that emits updated state on each refresh interval.
+   */
+  initializeDashboard(
+    operatorId: string,
+    stewardedResourceId: string
+  ): Observable<SheafaDashboardState>;
+
+  /**
+   * Get the last-known dashboard state synchronously (cached from most recent fetch).
+   * Returns null if no dashboard has been fetched yet.
+   */
+  getDashboardState(): SheafaDashboardState | null;
+
+  /**
+   * Get node topology for an operator (owned nodes, cluster health, alerts).
+   */
+  getNodeTopology(operatorId: string): Observable<NodeTopologyState>;
+
+  /**
+   * Get compute needs assessment (gaps, recommendations, help-flow CTA).
+   */
+  getComputeNeedsAssessment(operatorId: string): Observable<ComputeNeedsAssessment>;
+
+  /**
+   * Get storage content distribution breakdown (by type, reach, node).
+   */
+  getStorageContentDistribution(operatorId: string): Observable<StorageContentDistribution>;
+
+  /**
+   * Get bidirectional custodian view (who I help, who helps me).
+   */
+  getBidirectionalCustodianView(operatorId: string): Observable<BidirectionalCustodianView>;
 }
 
 // =============================================================================

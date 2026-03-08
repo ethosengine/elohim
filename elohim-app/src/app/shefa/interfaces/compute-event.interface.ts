@@ -76,7 +76,7 @@ export interface ComputeEventPayload {
  * Abstract compute event manager -- generates, tracks, and emits
  * compute-related economic events on a configured interval.
  *
- * Implementations handle metric sampling from ShefaComputeService,
+ * Implementations handle metric sampling from COMPUTE_DASHBOARD,
  * token calculation, aggregation strategy, and persistence delegation.
  */
 export interface IComputeEvent {
@@ -123,7 +123,7 @@ export interface IComputeEvent {
  * Injection token for compute event management.
  *
  * Default factory resolves to ComputeEventApiService which provides:
- * - Interval-based compute metric sampling from ShefaComputeService
+ * - Interval-based compute metric sampling from COMPUTE_DASHBOARD
  * - Token calculation from CPU, storage, bandwidth metrics
  * - Aggregation strategies (per-governance-level, per-custodian, aggregate)
  * - Persistence via ECONOMIC_EVENT_FACTORY (HTTP bulk endpoint)

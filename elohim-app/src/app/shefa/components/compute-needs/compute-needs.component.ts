@@ -18,7 +18,7 @@ import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } fro
 import { Subject, takeUntil } from 'rxjs';
 
 import { ComputeNeedsAssessment, NodeRecommendation } from '../../models/shefa-dashboard.model';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 
 @Component({
   selector: 'app-compute-needs',
@@ -48,7 +48,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  private readonly shefaCompute = inject(ShefaComputeService);
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
 
   ngOnInit(): void {
     if (!this.operatorId) {

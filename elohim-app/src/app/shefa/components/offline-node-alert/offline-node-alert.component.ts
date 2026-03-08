@@ -13,7 +13,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, Inject, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 
 // @coverage: 44.8% (2026-02-24)
@@ -31,7 +31,7 @@ import {
   NodeTopologyState,
   ComputeNeedsAssessment,
 } from '../../models/shefa-dashboard.model';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../../interfaces';
 
 @Component({
   selector: 'app-offline-node-alert',
@@ -107,7 +107,7 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
   private rawAlerts: OfflineNodeAlert[] = [];
 
   constructor(
-    private readonly shefaCompute: ShefaComputeService,
+    @Inject(COMPUTE_DASHBOARD) private readonly shefaCompute: IComputeDashboard,
     private readonly router: Router
   ) {}
 

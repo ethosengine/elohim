@@ -4,7 +4,7 @@
  * Signal-based Angular service that aggregates device data from:
  * - IdentityService: current identity mode, agencyStage, agentPubKey
  * - TauriAuthService: Tauri environment detection
- * - ShefaComputeService: node topology for node-steward devices
+ * - COMPUTE_DASHBOARD: node topology for node-steward devices
  *
  * Produces a unified DeviceStewardshipState for the device stewardship view.
  */
@@ -28,7 +28,7 @@ import {
   detectPlatform,
 } from '../models/device-stewardship.model';
 
-import { ShefaComputeService } from './shefa-compute.service';
+import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../interfaces';
 
 import type { OwnedNode } from '../models/shefa-dashboard.model';
 
@@ -41,7 +41,7 @@ const CATEGORY_NODE_STEWARD: DeviceCategory = 'node-steward';
 export class DeviceStewardshipService {
   private readonly identityService = inject(IdentityService);
   private readonly tauriAuthService = inject(TauriAuthService);
-  private readonly shefaComputeService = inject(ShefaComputeService);
+  private readonly shefaComputeService = inject(COMPUTE_DASHBOARD);
   private readonly holochainClient = inject(HolochainClientService);
 
   // Internal state
