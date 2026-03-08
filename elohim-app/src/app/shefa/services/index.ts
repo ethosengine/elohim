@@ -26,3 +26,9 @@ export { DeviceStewardshipService } from './device-stewardship.service';
 
 // Resource explorer (Drive-like resource browsing)
 export { ResourceExplorerService } from './resource-explorer.service';
+
+// Custodian metrics API (thin HTTP client)
+export { CustodianMetricsApiService } from './custodian-metrics-api.service';
+
+// Data protection API (protection monitoring + derived accessors)
+export { DataProtectionApiService } from './data-protection-api.service';
