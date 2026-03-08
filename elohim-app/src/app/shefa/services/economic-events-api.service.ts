@@ -15,9 +15,9 @@ import type {
   AppreciationDisplay,
   CreateAppreciationInput,
   CreateEconomicEventInput,
-  EconomicEvent,
   IEconomicEventFactory,
 } from '../interfaces/economic-event-factory.interface';
+import type { EconomicEvent } from '@app/elohim/models';
 import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
 
 @Injectable({ providedIn: 'root' })

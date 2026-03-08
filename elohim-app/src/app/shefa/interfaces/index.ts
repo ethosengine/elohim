@@ -1,6 +1,5 @@
 export type {
   IEconomicEventFactory,
-  EconomicEvent,
   AppreciationDisplay,
   CreateAppreciationInput,
   CreateEconomicEventInput,

@@ -27,33 +27,7 @@ import { InjectionToken, inject } from '@angular/core';
 import { EconomicEventsApiService } from '../services/economic-events-api.service';
 
 import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
-import type { REAAction, LamadEventType } from '@app/elohim/models';
-
-/**
- * EconomicEvent -- Immutable transaction record based on REA/ValueFlows.
- *
- * Locally defined to avoid coupling the interface to the concrete service's
- * internal type. Matches the shape returned by EconomicEventFactoryService.
- */
-export interface EconomicEvent {
-  id: string;
-  eventType: string;
-  timestamp: string;
-  providerId: string;
-  receiverId: string;
-  quantity: number;
-  unit: string;
-  action: 'produce' | 'consume' | 'transfer' | 'use';
-  note?: string;
-  metadata: Record<string, unknown>;
-  state: {
-    status: 'pending' | 'validated' | 'countersigned' | 'disputed' | 'corrected';
-    timestamp: string;
-    reasonCode?: string;
-  };
-  createdAt: string;
-  createdBy: string;
-}
+import type { EconomicEvent, REAAction, LamadEventType } from '@app/elohim/models';
 
 /**
  * AppreciationDisplay -- Flattened appreciation record for UI consumption.
