@@ -12,6 +12,9 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import type {
+  AppreciationDisplay,
+  CreateAppreciationInput,
+  CreateEconomicEventInput,
   EconomicEvent,
   IEconomicEventFactory,
 } from '../interfaces/economic-event-factory.interface';
@@ -51,6 +54,66 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
         correction,
         reason,
       })
+    );
+  }
+
+  // ===========================================================================
+  // Query Methods
+  // ===========================================================================
+
+  async getEventsByProvider(agentId: string): Promise<EconomicEvent[]> {
+    return firstValueFrom(
+      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { provider: agentId } })
+    );
+  }
+
+  async getEventsByReceiver(agentId: string): Promise<EconomicEvent[]> {
+    return firstValueFrom(
+      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { receiver: agentId } })
+    );
+  }
+
+  async getEventsByAction(action: string): Promise<EconomicEvent[]> {
+    return firstValueFrom(
+      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { action } })
+    );
+  }
+
+  async getEventsByLamadType(lamadType: string): Promise<EconomicEvent[]> {
+    return firstValueFrom(
+      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { lamadType } })
+    );
+  }
+
+  async createEconomicEvent(payload: CreateEconomicEventInput): Promise<EconomicEvent> {
+    return firstValueFrom(
+      this.http.post<EconomicEvent>('/api/v1/economic-events', payload)
+    );
+  }
+
+  // ===========================================================================
+  // Appreciation Methods
+  // ===========================================================================
+
+  async getAppreciationsFor(appreciatedId: string): Promise<AppreciationDisplay[]> {
+    return firstValueFrom(
+      this.http.get<AppreciationDisplay[]>('/api/v1/economic-events/appreciations', {
+        params: { for: appreciatedId },
+      })
+    );
+  }
+
+  async getAppreciationsBy(appreciatorId: string): Promise<AppreciationDisplay[]> {
+    return firstValueFrom(
+      this.http.get<AppreciationDisplay[]>('/api/v1/economic-events/appreciations', {
+        params: { by: appreciatorId },
+      })
+    );
+  }
+
+  async createAppreciation(payload: CreateAppreciationInput): Promise<AppreciationDisplay> {
+    return firstValueFrom(
+      this.http.post<AppreciationDisplay>('/api/v1/economic-events/appreciations', payload)
     );
   }
 }
