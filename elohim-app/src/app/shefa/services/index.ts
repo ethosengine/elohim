@@ -32,3 +32,6 @@ export { CustodianMetricsApiService } from './custodian-metrics-api.service';
 
 // Data protection API (protection monitoring + derived accessors)
 export { DataProtectionApiService } from './data-protection-api.service';
+
+// Compute dashboard API (thin HTTP client for unified dashboard state)
+export { ComputeDashboardApiService } from './compute-dashboard-api.service';
