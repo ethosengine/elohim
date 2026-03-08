@@ -35,3 +35,6 @@ export { DataProtectionApiService } from './data-protection-api.service';
 
 // Compute dashboard API (thin HTTP client for unified dashboard state)
 export { ComputeDashboardApiService } from './compute-dashboard-api.service';
+
+// Flow planning API (thin HTTP client for planning, budgets, goals, scenarios)
+export { FlowPlanningApiService } from './flow-planning-api.service';
