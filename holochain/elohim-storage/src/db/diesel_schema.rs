@@ -371,6 +371,27 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    /// Custodian metrics snapshots — one row per custodian (upsert on report).
+    ///
+    /// Metric groups are stored as JSON TEXT blobs to stay within Diesel's
+    /// 32-column limit. The service layer deserialises them into typed structs
+    /// before building the CustodianMetricsView.
+    custodian_metrics (custodian_id) {
+        custodian_id -> Text,
+        app_id -> Text,
+        tier -> Integer,
+        health_json -> Text,
+        storage_json -> Text,
+        bandwidth_json -> Text,
+        computation_json -> Text,
+        reputation_json -> Text,
+        economic_json -> Text,
+        collected_at -> BigInt,
+        last_updated_at -> BigInt,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -388,6 +409,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     content_mastery,
     content_tags,
     contributor_presences,
+    custodian_metrics,
     device_policies,
     economic_events,
     human_relationships,

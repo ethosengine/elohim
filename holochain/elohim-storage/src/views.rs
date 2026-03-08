@@ -85,9 +85,9 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 
 use crate::db::models::{
     App, Chapter, ChapterWithSteps, Content, ContentMastery, ContentStewardship, ContentWithTags,
-    ContributorPresence, EconomicEvent, Human, HumanRelationship, LocalSession, Path,
-    PathAttestation, PathWithDetails, PathWithSteps, Relationship, RelationshipWithContent, Step,
-    StewardshipAllocation, StewardshipAllocationWithPresence,
+    ContributorPresence, CustodianMetrics, EconomicEvent, Human, HumanRelationship, LocalSession,
+    Path, PathAttestation, PathWithDetails, PathWithSteps, Relationship, RelationshipWithContent,
+    Step, StewardshipAllocation, StewardshipAllocationWithPresence,
 };
 
 // Legacy rusqlite types (used by services until migration complete)
@@ -2331,6 +2331,859 @@ pub struct UpdateHumanInputView {
     pub profile_reach: Option<String>,
     #[serde(default)]
     pub location: Option<String>,
+}
+
+// ============================================================================
+// Custodian Metrics Views
+// ============================================================================
+
+/// Health metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianHealthView {
+    pub uptime_percent: f64,
+    pub availability: bool,
+    pub response_time_p50_ms: f64,
+    pub response_time_p95_ms: f64,
+    pub response_time_p99_ms: f64,
+    pub error_rate: f64,
+    pub sla_compliance: bool,
+}
+
+/// Storage metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianStorageMetricsView {
+    pub total_capacity_bytes: i64,
+    pub used_bytes: i64,
+    pub free_bytes: i64,
+    pub utilization_percent: f64,
+    /// Parsed by-domain map (was JSON string in storage)
+    pub by_domain: Option<JsonVal>,
+    pub full_replica_bytes: i64,
+    pub threshold_bytes: i64,
+    pub erasure_coded_bytes: i64,
+}
+
+/// Bandwidth metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianBandwidthView {
+    pub declared_mbps: f64,
+    pub current_usage_mbps: f64,
+    pub peak_usage_mbps: f64,
+    pub average_usage_mbps: f64,
+    pub utilization_percent: f64,
+    pub inbound_mbps: f64,
+    pub outbound_mbps: f64,
+    /// Parsed by-domain map (was JSON string in storage)
+    pub by_domain: Option<JsonVal>,
+}
+
+/// Computation metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianComputationView {
+    pub cpu_cores: u32,
+    pub cpu_usage_percent: f64,
+    pub memory_gb: f64,
+    pub memory_usage_percent: f64,
+    pub zome_ops_per_second: f64,
+    pub reconstruction_workload_percent: f64,
+}
+
+/// Reputation metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianReputationView {
+    pub reliability_rating: f64,
+    pub speed_rating: f64,
+    pub reputation_score: f64,
+    pub specialization_bonus: f64,
+    pub commitment_fulfillment: f64,
+}
+
+/// Economic metrics for a custodian node
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianEconomicView {
+    pub steward_tier: u32,
+    pub price_per_gb: f64,
+    pub monthly_earnings: f64,
+    pub lifetime_earnings: f64,
+    pub active_commitments: u32,
+    pub total_committed_bytes: i64,
+}
+
+/// Complete metrics snapshot for a single custodian node.
+///
+/// Assembled from the custodian_metrics table (reported by the node) and
+/// used by the shefa dashboard and operator tooling.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianMetricsView {
+    pub custodian_id: String,
+    pub tier: u32,
+    pub health: CustodianHealthView,
+    pub storage: CustodianStorageMetricsView,
+    pub bandwidth: CustodianBandwidthView,
+    pub computation: CustodianComputationView,
+    pub reputation: CustodianReputationView,
+    pub economic: CustodianEconomicView,
+    /// Unix timestamp (milliseconds) when metrics were collected
+    pub collected_at: i64,
+    /// Unix timestamp (milliseconds) of last update
+    pub last_updated_at: i64,
+}
+
+/// Alert for custodian operators.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianAlertView {
+    pub custodian_id: String,
+    /// "warning" | "critical"
+    pub severity: String,
+    pub category: String,
+    pub message: String,
+    pub suggestion: Option<String>,
+}
+
+/// Recommendation for custodian operators.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianRecommendationView {
+    pub custodian_id: String,
+    pub category: String,
+    pub opportunity: String,
+    pub potential_revenue: Option<f64>,
+}
+
+impl From<CustodianMetrics> for CustodianMetricsView {
+    fn from(m: CustodianMetrics) -> Self {
+        // Metric groups are stored as JSON blobs; parse or fall back to defaults.
+        let health: CustodianHealthView = serde_json::from_str(&m.health_json)
+            .unwrap_or_else(|_| CustodianHealthView {
+                uptime_percent: 0.0,
+                availability: false,
+                response_time_p50_ms: 0.0,
+                response_time_p95_ms: 0.0,
+                response_time_p99_ms: 0.0,
+                error_rate: 0.0,
+                sla_compliance: false,
+            });
+        let storage: CustodianStorageMetricsView = serde_json::from_str(&m.storage_json)
+            .unwrap_or_else(|_| CustodianStorageMetricsView {
+                total_capacity_bytes: 0,
+                used_bytes: 0,
+                free_bytes: 0,
+                utilization_percent: 0.0,
+                by_domain: None,
+                full_replica_bytes: 0,
+                threshold_bytes: 0,
+                erasure_coded_bytes: 0,
+            });
+        let bandwidth: CustodianBandwidthView = serde_json::from_str(&m.bandwidth_json)
+            .unwrap_or_else(|_| CustodianBandwidthView {
+                declared_mbps: 0.0,
+                current_usage_mbps: 0.0,
+                peak_usage_mbps: 0.0,
+                average_usage_mbps: 0.0,
+                utilization_percent: 0.0,
+                inbound_mbps: 0.0,
+                outbound_mbps: 0.0,
+                by_domain: None,
+            });
+        let computation: CustodianComputationView = serde_json::from_str(&m.computation_json)
+            .unwrap_or_else(|_| CustodianComputationView {
+                cpu_cores: 0,
+                cpu_usage_percent: 0.0,
+                memory_gb: 0.0,
+                memory_usage_percent: 0.0,
+                zome_ops_per_second: 0.0,
+                reconstruction_workload_percent: 0.0,
+            });
+        let reputation: CustodianReputationView = serde_json::from_str(&m.reputation_json)
+            .unwrap_or_else(|_| CustodianReputationView {
+                reliability_rating: 0.0,
+                speed_rating: 0.0,
+                reputation_score: 0.0,
+                specialization_bonus: 0.0,
+                commitment_fulfillment: 0.0,
+            });
+        let economic: CustodianEconomicView = serde_json::from_str(&m.economic_json)
+            .unwrap_or_else(|_| CustodianEconomicView {
+                steward_tier: 0,
+                price_per_gb: 0.0,
+                monthly_earnings: 0.0,
+                lifetime_earnings: 0.0,
+                active_commitments: 0,
+                total_committed_bytes: 0,
+            });
+        Self {
+            custodian_id: m.custodian_id,
+            tier: m.tier as u32,
+            health,
+            storage,
+            bandwidth,
+            computation,
+            reputation,
+            economic,
+            collected_at: m.collected_at,
+            last_updated_at: m.last_updated_at,
+        }
+    }
+}
+
+// ============================================================================
+// Data Protection Views
+//
+// Read-only aggregation views — assembled from custodian commitment data
+// and DHT queries. No dedicated DB tables required.
+// ============================================================================
+
+/// A node protecting the operator's data.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianNodeView {
+    pub id: String,
+    pub name: String,
+    /// "family" | "friend" | "community" | "professional" | "institution"
+    pub custodian_type: String,
+    pub location_region: Option<String>,
+    pub location_country: Option<String>,
+    // dataStored
+    pub data_stored_total_gb: f64,
+    pub data_stored_shard_count: u32,
+    pub data_stored_redundancy_level: u32,
+    // health
+    pub health_up_percent: f64,
+    pub health_last_heartbeat: String,
+    pub health_response_time_ms: f64,
+    // commitment
+    pub commitment_id: String,
+    /// "active" | "pending" | "breached" | "expired"
+    pub commitment_status: String,
+    pub commitment_start_date: String,
+    pub commitment_expiry_date: String,
+    /// "auto-renew" | "manual" | "expired"
+    pub commitment_renewal_status: String,
+    pub trust_level: f64,
+    pub relationship: String,
+}
+
+/// Geographic distribution of custodians in a region.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RegionalPresenceView {
+    pub region: String,
+    pub custodian_count: u32,
+    pub data_shards: u32,
+    pub redundancy: u32,
+    pub risk_factors: Vec<String>,
+}
+
+/// Trust relationship in the trust graph.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TrustRelationshipView {
+    pub from: String,
+    pub to: String,
+    /// "family-member" | "friend" | "community-peer" | "professional" | "institution"
+    pub relationship_type: String,
+    pub trust_score: f64,
+    pub depth: u32,
+    /// "weak" | "moderate" | "strong"
+    pub strength: String,
+}
+
+/// Complete family-community protection status.
+///
+/// Assembled from CustodianCommitment entries and DHT health data.
+/// No dedicated DB table — assembled by the data protection service.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FamilyCommunityProtectionStatusView {
+    // Redundancy model
+    /// "full_replica" | "threshold_split" | "erasure_coded"
+    pub redundancy_strategy: String,
+    pub redundancy_factor: f64,
+    pub recovery_threshold: u32,
+    // Custodian network
+    pub custodians: Vec<CustodianNodeView>,
+    pub total_custodians: u32,
+    // Geographic distribution
+    pub geographic_regions: Vec<RegionalPresenceView>,
+    /// "centralized" | "distributed" | "geo-redundant"
+    pub geographic_risk_profile: String,
+    // Trust graph
+    pub trust_graph: Vec<TrustRelationshipView>,
+    // Overall protection status
+    /// "vulnerable" | "protected" | "highly-protected"
+    pub protection_level: String,
+    pub estimated_recovery_time: String,
+    pub last_verification: String,
+    /// "verified" | "pending" | "failed"
+    pub verification_status: String,
+}
+
+// ============================================================================
+// Shefa Dashboard Views
+//
+// Read-only aggregation views assembled from multiple sources by the
+// compute handler. No dedicated DB tables.
+// ============================================================================
+
+/// Time-series data point for metric history charts.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct MetricHistoryView {
+    pub timestamp: String,
+    pub value: f64,
+}
+
+/// Node availability tracking.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpTimeMetricsView {
+    pub up_percent: f64,
+    pub downtime_hours_24: f64,
+    pub downtime_hours_7d: f64,
+    pub downtime_hours_30d: f64,
+    pub last_failure: Option<String>,
+    pub consecutive_uptime: String,
+    /// "excellent" | "good" | "fair" | "poor"
+    pub reliability: String,
+}
+
+/// Real-time node performance and capacity.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ComputeMetricsView {
+    // CPU
+    pub cpu_total_cores: u32,
+    pub cpu_available: u32,
+    pub cpu_usage_percent: f64,
+    pub cpu_usage_history: Vec<MetricHistoryView>,
+    pub cpu_temperature: Option<f64>,
+    // Memory
+    pub memory_total_gb: f64,
+    pub memory_used_gb: f64,
+    pub memory_available_gb: f64,
+    pub memory_usage_percent: f64,
+    pub memory_usage_history: Vec<MetricHistoryView>,
+    // Storage
+    pub storage_total_gb: f64,
+    pub storage_used_gb: f64,
+    pub storage_available_gb: f64,
+    pub storage_usage_percent: f64,
+    pub storage_usage_history: Vec<MetricHistoryView>,
+    pub storage_breakdown_holochain_gb: f64,
+    pub storage_breakdown_cache_gb: f64,
+    pub storage_breakdown_custodian_data_gb: f64,
+    pub storage_breakdown_user_applications_gb: f64,
+    // Network
+    pub network_upstream_mbps: f64,
+    pub network_downstream_mbps: f64,
+    pub network_used_upstream_mbps: f64,
+    pub network_used_downstream_mbps: f64,
+    pub network_latency_p50: f64,
+    pub network_latency_p95: f64,
+    pub network_latency_p99: f64,
+    pub network_connections_total: u32,
+    pub network_connections_holochain: u32,
+    pub network_connections_cache: u32,
+    pub network_connections_custodian: u32,
+    // Load
+    pub load_average_one_minute: f64,
+    pub load_average_five_minutes: f64,
+    pub load_average_fifteen_minutes: f64,
+    // Power (optional)
+    pub power_consumption_watts: Option<f64>,
+    pub power_thermal_output: Option<f64>,
+}
+
+/// Resource allocation percentages for a single governance level.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceLevelAllocationView {
+    pub cpu_percent: f64,
+    pub memory_percent: f64,
+    pub storage_percent: f64,
+    pub bandwidth_percent: f64,
+}
+
+/// A specific allocation block for a purpose (e.g., "10% CPU for Lamad family learning").
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AllocationBlockView {
+    pub id: String,
+    pub label: String,
+    /// "individual" | "household" | "community" | "network"
+    pub governance_level: String,
+    pub priority: u32,
+    pub cpu_cores: f64,
+    pub cpu_percent: f64,
+    pub memory_gb: f64,
+    pub memory_percent: f64,
+    pub storage_gb: f64,
+    pub storage_percent: f64,
+    pub bandwidth_mbps: f64,
+    pub bandwidth_percent: f64,
+    pub utilized_cpu_percent: f64,
+    pub utilized_memory_percent: f64,
+    pub utilized_storage_percent: f64,
+    pub utilized_bandwidth_percent: f64,
+    pub commitment_id: Option<String>,
+    pub related_agents: Vec<String>,
+}
+
+/// How much compute is allocated to family-community.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AllocationSnapshotView {
+    pub by_governance_individual: GovernanceLevelAllocationView,
+    pub by_governance_household: GovernanceLevelAllocationView,
+    pub by_governance_community: GovernanceLevelAllocationView,
+    pub by_governance_network: GovernanceLevelAllocationView,
+    pub total_allocated_cpu_percent: f64,
+    pub total_allocated_memory_percent: f64,
+    pub total_allocated_storage_percent: f64,
+    pub total_allocated_bandwidth_percent: f64,
+    pub allocation_blocks: Vec<AllocationBlockView>,
+}
+
+/// Infrastructure-token balance and earnings.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct InfrastructureTokenBalanceView {
+    pub balance_tokens: f64,
+    pub balance_estimated_value: f64,
+    pub balance_currency: String,
+    pub earning_rate_tokens_per_hour: f64,
+    pub earning_rate_cpu_allocation: f64,
+    pub earning_rate_storage_allocation: f64,
+    pub earning_rate_bandwidth_allocation: f64,
+    pub earning_rate_estimated_monthly: f64,
+    pub decay_demurrage_rate: f64,
+    pub decay_last_calculated: String,
+    pub decay_projected_next_month_tokens: f64,
+    pub decay_projected_next_month_value_usd: f64,
+    pub token_history_last_24h: f64,
+    pub token_history_last_7d: f64,
+    pub token_history_last_30d: f64,
+    pub token_history_all_time: f64,
+    pub transactions: Vec<TokenTransactionView>,
+    pub exchange_rates: Vec<ExchangeRateView>,
+}
+
+/// A token earning or spending event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TokenTransactionView {
+    pub id: String,
+    pub timestamp: String,
+    /// "earned" | "transferred" | "exchanged" | "decayed" | "claimed"
+    pub transaction_type: String,
+    pub amount: f64,
+    pub related_agent: Option<String>,
+    pub description: String,
+    pub economic_event_id: Option<String>,
+}
+
+/// Cross-swimlane token exchange rate.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ExchangeRateView {
+    pub from: String,
+    pub to: String,
+    pub rate: f64,
+    /// "market" | "consensus" | "algorithm"
+    pub source: String,
+    pub last_updated: String,
+}
+
+/// A single compute-related hREA economic event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecentEconomicEventView {
+    pub id: String,
+    pub timestamp: String,
+    pub event_type: String,
+    pub provider: Option<String>,
+    pub receiver: Option<String>,
+    pub quantity_has_unit: String,
+    pub quantity_has_numerical_value: f64,
+    pub tokens_minted: Option<f64>,
+    pub note: String,
+}
+
+/// Dignity floor enforcement status.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DignityFloorView {
+    pub compute_min_cores: f64,
+    pub compute_min_memory_gb: f64,
+    pub compute_min_storage_gb: f64,
+    pub compute_min_bandwidth_mbps: f64,
+    /// "met" | "warning" | "breached"
+    pub status: String,
+    pub percent_of_floor: f64,
+    /// "voluntary" | "progressive" | "hard"
+    pub enforcement: String,
+}
+
+/// Ceiling limit enforcement status.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CeilingLimitView {
+    pub compute_max_cores: f64,
+    pub compute_max_memory_gb: f64,
+    pub compute_max_storage_gb: f64,
+    pub compute_max_bandwidth_mbps: f64,
+    pub token_accumulation_ceiling: f64,
+    pub current_accumulation: f64,
+    pub percent_of_ceiling: f64,
+    /// "safe" | "warning" | "breached"
+    pub status: String,
+    /// "voluntary" | "progressive" | "hard"
+    pub enforcement: String,
+}
+
+/// A constitutional limit violation alert.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ConstitutionalAlertView {
+    pub id: String,
+    /// "info" | "warning" | "critical"
+    pub severity: String,
+    /// "floor-breach" | "ceiling-breach" | "redistribution-required"
+    pub alert_type: String,
+    pub message: String,
+    pub affected_resource: String,
+    pub current_value: f64,
+    pub threshold: f64,
+    pub recommended_action: String,
+    pub timestamp: String,
+}
+
+/// Dignity floor and ceiling enforcement status.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ConstitutionalLimitsStatusView {
+    pub dignity_floor: DignityFloorView,
+    pub ceiling_limit: CeilingLimitView,
+    pub safe_zone_cpu: f64,
+    pub safe_zone_memory: f64,
+    pub safe_zone_storage: f64,
+    pub safe_zone_bandwidth: f64,
+    pub safe_zone_tokens: f64,
+    pub alerts: Vec<ConstitutionalAlertView>,
+}
+
+/// A node in the user's cluster.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OwnedNodeView {
+    pub node_id: String,
+    pub display_name: String,
+    /// "holoport" | "holoport-plus" | "holoport-nano" | "self-hosted" | "cloud"
+    pub node_type: String,
+    /// "online" | "offline" | "degraded" | "maintenance" | "provisioning" | "unknown"
+    pub status: String,
+    pub last_heartbeat: String,
+    pub consecutive_uptime: String,
+    pub location_label: Option<String>,
+    pub location_region: Option<String>,
+    pub location_country: Option<String>,
+    pub roles: Vec<NodeRoleView>,
+    pub resources_cpu_percent: f64,
+    pub resources_memory_percent: f64,
+    pub resources_storage_used_gb: f64,
+    pub resources_storage_total_gb: f64,
+    pub resources_bandwidth_mbps: f64,
+    pub custodian_activity_items_custodied: u32,
+    pub custodian_activity_items_being_custodied: u32,
+    pub custodian_activity_total_custodied_gb: f64,
+    pub is_primary: bool,
+}
+
+/// A role a node is playing in the cluster.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeRoleView {
+    /// "storage" | "compute" | "gateway" | "custodian" | "archive"
+    pub role: String,
+    pub description: String,
+    pub utilization_percent: f64,
+}
+
+/// Node topology overview for an operator.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeTopologyStateView {
+    pub nodes: Vec<OwnedNodeView>,
+    pub total_nodes: u32,
+    pub online_nodes: u32,
+    pub offline_nodes: u32,
+    pub degraded_nodes: u32,
+    pub primary_node_id: Option<String>,
+    pub primary_node_status: Option<String>,
+    pub primary_node_is_online: Option<bool>,
+    /// "healthy" | "degraded" | "critical" | "offline"
+    pub cluster_health: String,
+    pub alerts: Vec<OfflineNodeAlertView>,
+    pub last_updated: String,
+}
+
+/// Alert when a node goes offline.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OfflineNodeAlertView {
+    pub id: String,
+    /// "info" | "warning" | "critical"
+    pub severity: String,
+    pub node_id: String,
+    pub node_name: String,
+    pub is_primary_node: bool,
+    /// "went-offline" | "degraded" | "heartbeat-missed" | "recovery-needed"
+    pub event_type: String,
+    pub message: String,
+    pub detected_at: String,
+    pub last_seen_online: String,
+    pub offline_duration: String,
+    pub impact_affected_content: u32,
+    pub impact_affected_custodians: u32,
+    pub impact_compute_gap_percent: f64,
+    pub impact_storage_gap_percent: f64,
+    pub recommended_actions: Vec<String>,
+    pub help_flow_url: Option<String>,
+    pub dismissed_at: Option<String>,
+}
+
+/// A single custodian relationship (helping or being helped).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CustodianRelationshipView {
+    pub agent_id: String,
+    pub display_name: String,
+    /// "family" | "friend" | "community" | "professional"
+    pub relationship_type: String,
+    pub trust_score: f64,
+    /// "i-help-them" | "they-help-me"
+    pub direction: String,
+    pub content_summary_total_items: u32,
+    pub content_summary_total_gb: f64,
+    /// Parsed content types breakdown (was JSON string in storage)
+    pub content_summary_content_types: Vec<JsonVal>,
+    /// "active" | "pending" | "at-risk" | "expired"
+    pub status: String,
+    pub last_activity: String,
+    pub reliability: f64,
+}
+
+/// Bidirectional custodian view (who I help vs who helps me).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct BidirectionalCustodianView {
+    pub helping: Vec<CustodianRelationshipView>,
+    pub helping_count: u32,
+    pub helping_total_gb: f64,
+    pub being_helped_by: Vec<CustodianRelationshipView>,
+    pub being_helped_by_count: u32,
+    pub being_helped_by_total_gb: f64,
+    pub mutual_aid_balance_ratio: f64,
+    /// "giving-more" | "balanced" | "receiving-more"
+    pub mutual_aid_balance_status: String,
+    pub mutual_aid_balance_message: String,
+    /// "strong" | "moderate" | "weak"
+    pub community_strength: String,
+}
+
+/// Storage breakdown by content type.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentTypeStorageView {
+    /// "video" | "audio" | "image" | "document" | "application" | "learning" | "other"
+    pub content_type: String,
+    pub display_label: String,
+    pub icon: Option<String>,
+    pub item_count: u32,
+    pub size_gb: f64,
+    pub percent_of_total: f64,
+    pub fully_replicated: u32,
+    pub under_replicated: u32,
+    pub average_replicas: f64,
+}
+
+/// Storage breakdown by reach level (0–7).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ReachLevelStorageView {
+    pub reach_level: u32,
+    pub reach_label: String,
+    pub item_count: u32,
+    pub size_gb: f64,
+    pub target_replicas: u32,
+    pub current_replicas: f64,
+    /// "met" | "under" | "over"
+    pub replication_status: String,
+}
+
+/// Storage breakdown for a single node.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeStorageBreakdownView {
+    pub node_id: String,
+    pub node_name: String,
+    pub node_status: String,
+    pub total_gb: f64,
+    pub used_gb: f64,
+    pub available_gb: f64,
+    pub my_content_gb: f64,
+    pub custodied_content_gb: f64,
+    pub cache_content_gb: f64,
+    /// Parsed content-type list (was JSON string in storage)
+    pub content_types: Vec<JsonVal>,
+}
+
+/// What types of content are stored where.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StorageContentDistributionView {
+    pub by_content_type: Vec<ContentTypeStorageView>,
+    pub by_reach_level: Vec<ReachLevelStorageView>,
+    pub by_node: Vec<NodeStorageBreakdownView>,
+    pub total_items: u32,
+    pub total_size_gb: f64,
+    pub total_replica_count: u32,
+}
+
+/// A specific compute deficiency.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ComputeGapView {
+    /// "cpu" | "memory" | "storage" | "bandwidth" | "redundancy"
+    pub resource: String,
+    pub current_value: f64,
+    pub target_value: f64,
+    pub gap_percent: f64,
+    /// "minor" | "moderate" | "critical"
+    pub severity: String,
+    pub description: String,
+    pub impact: String,
+}
+
+/// Suggested node to address compute gaps.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeRecommendationView {
+    /// "holoport" | "holoport-plus" | "holoport-nano" | "self-hosted" | "cloud"
+    pub node_type: String,
+    pub display_name: String,
+    pub description: String,
+    pub addresses_gaps: Vec<String>,
+    pub improvement_percent: f64,
+    pub estimated_cost_value: Option<f64>,
+    pub estimated_cost_currency: Option<String>,
+    pub estimated_cost_period: Option<String>,
+    pub order_url: Option<String>,
+    /// "recommended" | "optional" | "future"
+    pub priority: String,
+}
+
+/// Compute needs assessment — gaps and recommendations for the help-flow.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ComputeNeedsAssessmentView {
+    pub current_capacity_cpu_cores: u32,
+    pub current_capacity_memory_gb: f64,
+    pub current_capacity_storage_gb: f64,
+    pub current_capacity_bandwidth_mbps: f64,
+    pub gaps: Vec<ComputeGapView>,
+    pub has_gaps: bool,
+    /// "none" | "minor" | "moderate" | "critical"
+    pub overall_gap_severity: String,
+    pub recommendations: Vec<NodeRecommendationView>,
+    pub help_flow_url: String,
+    pub help_flow_cta: String,
+}
+
+/// Complete state for the operator's Shefa compute dashboard.
+///
+/// Assembled server-side from compute metrics, allocations, protection
+/// status, token economics, and constitutional limits. Angular is a thin
+/// display client — no aggregation happens in TypeScript.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SheafaDashboardStateView {
+    // Identity
+    pub operator_id: String,
+    pub operator_name: String,
+    pub stewarded_resource_id: String,
+    pub node_id: String,
+    pub node_location_region: Option<String>,
+    pub node_location_country: Option<String>,
+    pub node_location_latitude: Option<f64>,
+    pub node_location_longitude: Option<f64>,
+    // Status
+    /// "online" | "offline" | "degraded" | "maintenance"
+    pub status: String,
+    pub last_heartbeat: String,
+    pub uptime: UpTimeMetricsView,
+    // Compute
+    pub compute_metrics: ComputeMetricsView,
+    pub allocations: AllocationSnapshotView,
+    // Protection
+    pub family_community_protection: FamilyCommunityProtectionStatusView,
+    // Economics
+    pub infrastructure_tokens: InfrastructureTokenBalanceView,
+    pub economic_events: Vec<RecentEconomicEventView>,
+    // Constitutional
+    pub constitutional_limits: ConstitutionalLimitsStatusView,
+    // Timestamps
+    pub last_updated: String,
+    pub update_frequency_ms: u32,
 }
 
 // ============================================================================

@@ -14,8 +14,8 @@ use ts_rs::TS;
 
 use super::diesel_schema::{
     apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
-    contributor_presences, device_policies, economic_events, human_relationships, humans,
-    local_sessions, path_attestations, path_tags, paths, relationships, steps,
+    contributor_presences, custodian_metrics, device_policies, economic_events, human_relationships,
+    humans, local_sessions, path_attestations, path_tags, paths, relationships, steps,
     stewardship_allocations,
 };
 
@@ -1288,4 +1288,59 @@ pub mod consent_states {
     pub fn is_valid(state: &str) -> bool {
         ALL.contains(&state)
     }
+}
+
+// ============================================================================
+// Custodian Metrics Models
+// ============================================================================
+
+/// Persisted custodian metrics snapshot — reported by custodian nodes via
+/// the storage API and queried by the shefa dashboard and operator tooling.
+///
+/// The primary key is `custodian_id` (agent pub key); each node upserts its
+/// own row so the table holds the most-recent snapshot per custodian.
+///
+/// Metric groups are stored as JSON TEXT blobs to stay within Diesel's
+/// 32-column limit. The service layer deserialises them before building
+/// `CustodianMetricsView`.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = custodian_metrics)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct CustodianMetrics {
+    pub custodian_id: String,
+    pub app_id: String,
+    pub tier: i32,
+    /// JSON: CustodianHealthView fields
+    pub health_json: String,
+    /// JSON: CustodianStorageMetricsView fields
+    pub storage_json: String,
+    /// JSON: CustodianBandwidthView fields
+    pub bandwidth_json: String,
+    /// JSON: CustodianComputationView fields
+    pub computation_json: String,
+    /// JSON: CustodianReputationView fields
+    pub reputation_json: String,
+    /// JSON: CustodianEconomicView fields
+    pub economic_json: String,
+    /// Unix timestamp (milliseconds) when metrics were collected
+    pub collected_at: i64,
+    /// Unix timestamp (milliseconds) of last update
+    pub last_updated_at: i64,
+}
+
+/// New or updated custodian metrics for INSERT OR REPLACE.
+#[derive(Debug, Clone, Insertable, Deserialize)]
+#[diesel(table_name = custodian_metrics)]
+pub struct UpsertCustodianMetrics {
+    pub custodian_id: String,
+    pub app_id: String,
+    pub tier: i32,
+    pub health_json: String,
+    pub storage_json: String,
+    pub bandwidth_json: String,
+    pub computation_json: String,
+    pub reputation_json: String,
+    pub economic_json: String,
+    pub collected_at: i64,
+    pub last_updated_at: i64,
 }
