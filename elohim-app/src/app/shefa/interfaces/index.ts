@@ -63,3 +63,5 @@ export type {
   SheafaDashboardConfig,
 } from './compute-dashboard.interface';
 export { COMPUTE_DASHBOARD } from './compute-dashboard.interface';
+export type { IFlowPlanning } from './flow-planning.interface';
+export { FLOW_PLANNING } from './flow-planning.interface';
