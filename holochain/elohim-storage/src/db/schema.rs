@@ -126,9 +126,8 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
     // Migration: v5 -> v6: Add humans table
     if current == 5 {
         info!("Migrating v5 -> v6: Adding humans table");
-        conn.execute_batch(HUMANS_SCHEMA).map_err(|e| {
-            StorageError::Internal(format!("Failed to create humans table: {}", e))
-        })?;
+        conn.execute_batch(HUMANS_SCHEMA)
+            .map_err(|e| StorageError::Internal(format!("Failed to create humans table: {}", e)))?;
         current = 6;
     }
 
@@ -172,9 +171,8 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     conn.execute_batch(DEVICE_POLICIES_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create device_policies table: {}", e))
     })?;
-    conn.execute_batch(HUMANS_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create humans table: {}", e))
-    })?;
+    conn.execute_batch(HUMANS_SCHEMA)
+        .map_err(|e| StorageError::Internal(format!("Failed to create humans table: {}", e)))?;
     Ok(())
 }
 

@@ -11,8 +11,8 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
 
-use crate::db::{humans, AppContext, DbPool};
 use crate::db::humans::{CreateHumanInput, UpdateHumanInput};
+use crate::db::{humans, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
 use crate::views::{CreateHumanInputView, HumanView, UpdateHumanInputView};

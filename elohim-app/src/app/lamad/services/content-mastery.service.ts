@@ -4,10 +4,10 @@ import { Injectable, effect, inject } from '@angular/core';
 
 import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 'rxjs';
 
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
@@ -74,7 +74,7 @@ export class ContentMasteryService {
 
   private readonly sourceChain = inject(LocalSourceChainService);
   private readonly sessionHuman = inject(SessionHumanService);
-  private readonly backend = inject(LearnerBackendService);
+  private readonly backend = inject(LEARNER_BACKEND);
   private readonly holochainClient = inject(HolochainClientService);
 
   constructor() {

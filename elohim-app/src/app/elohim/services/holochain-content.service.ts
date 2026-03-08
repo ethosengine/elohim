@@ -1,15 +1,13 @@
 /**
  * Holochain Content Service
  *
- * Provides Holochain zome call wrappers.
+ * Provides Holochain zome call wrappers for agent-centric data.
  * Uses the HolochainClientService for WebSocket communication.
  *
- * DEPRECATION NOTICE:
- * Content methods (getContent, batchGetContent, getPathIndex, etc.) are DEPRECATED.
- * Content is now served from doorway projection (SQLite), not DHT.
- * Use ContentService instead for all content operations.
+ * Content CRUD methods were removed — content is now served from
+ * doorway projection (SQLite) via ContentService / StorageApiService.
  *
- * This service remains active for AGENT-CENTRIC DATA ONLY:
+ * This service handles AGENT-CENTRIC DATA ONLY:
  * - Identity and agent profiles
  * - Attestations (trust claims about humans/content)
  * - Points and participation metrics
@@ -24,9 +22,9 @@ import { Injectable, computed, signal, inject } from '@angular/core';
 
 // @coverage: 4.5% (2026-02-24)
 
-import { catchError, shareReplay } from 'rxjs/operators';
+import { shareReplay } from 'rxjs/operators';
 
-import { Observable, of, from, defer, firstValueFrom } from 'rxjs';
+import { Observable, of, firstValueFrom } from 'rxjs';
 
 import {
   ContentNode,
@@ -35,7 +33,6 @@ import {
   ContentMetadata,
 } from '../../lamad/models/content-node.model';
 
-import { CustodianSelectionService } from './custodian-selection.service';
 import { HolochainClientService } from './holochain-client.service';
 
 import type {
@@ -798,9 +795,6 @@ export class HolochainContentService {
   /** Cache for content by ID */
   private readonly contentCache = new Map<string, Observable<ContentNode | null>>();
 
-  /** Cache for stats (refreshed periodically) */
-  private statsCache$: Observable<HolochainContentStats> | null = null;
-
   // Request coalescing for batch loading
   private readonly pendingBatchRequests = new Map<
     string,
@@ -808,9 +802,6 @@ export class HolochainContentService {
   >();
   private batchRequestTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly BATCH_DEBOUNCE_MS = 50; // Collect requests for 50ms before batching
-
-  // Custodian selection service for CDN-like content serving
-  private readonly custodianSelection = inject(CustodianSelectionService);
 
   private readonly holochainClient = inject(HolochainClientService);
 
@@ -918,60 +909,6 @@ export class HolochainContentService {
   }
 
   /**
-   * Get content by ID from Holochain.
-   *
-   * @deprecated Use ContentService.getContent() instead.
-   * Content is now served from doorway projection (SQLite), not DHT.
-   *
-   * Returns null if content not found or service unavailable.
-   * Uses caching to avoid redundant zome calls.
-   */
-  getContent(resourceId: string): Observable<ContentNode | null> {
-    if (!this.isAvailable()) {
-      return of(null);
-    }
-
-    if (!this.contentCache.has(resourceId)) {
-      const request = defer(() => from(this.fetchContentById(resourceId))).pipe(
-        shareReplay(1),
-        catchError(() => of(null))
-      );
-
-      this.contentCache.set(resourceId, request);
-    }
-
-    return this.contentCache.get(resourceId)!;
-  }
-
-  /**
-   * Batch get multiple content items by IDs in a single zome call.
-   *
-   * @deprecated Use ContentService.batchGetContent() instead.
-   * Content is now served from doorway projection (SQLite), not DHT.
-   *
-   * This is more efficient than calling getContent() multiple times
-   * as it reduces network round-trips.
-   *
-   * @param ids Array of content IDs to fetch
-   * @returns Map of id → ContentNode for found items, plus list of not found IDs
-   */
-  async batchGetContent(
-    ids: string[]
-  ): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
-    if (!this.isAvailable() || ids.length === 0) {
-      return { found: new Map(), notFound: ids };
-    }
-
-    const uncachedIds = this.separateUncachedIds(ids);
-
-    if (uncachedIds.length === 0) {
-      return this.resolveCachedItems(ids);
-    }
-
-    return this.fetchUncachedAndMerge(ids, uncachedIds);
-  }
-
-  /**
    * Helper: Separate requested IDs into those not in cache.
    */
   private separateUncachedIds(ids: string[]): string[] {
@@ -1071,28 +1008,9 @@ export class HolochainContentService {
     }
 
     // Fire and forget - don't await, don't block UI
-    // eslint-disable-next-line @typescript-eslint/no-deprecated,sonarjs/deprecation
-    this.batchGetContent(uncachedIds).catch(() => {
+    this.fetchUncachedAndMerge(uncachedIds, uncachedIds).catch(() => {
       // Prefetch errors are non-critical - content will load on demand
     });
-  }
-
-  /**
-   * Get content by type from Holochain.
-   *
-   * @deprecated Use ContentService.queryContent({contentType}) instead.
-   * Content is now served from doorway projection (SQLite), not DHT.
-   *
-   * Returns empty array if service unavailable.
-   */
-  getContentByType(contentType: string, limit = 100): Observable<ContentNode[]> {
-    if (!this.isAvailable()) {
-      return of([]);
-    }
-
-    return defer(() => from(this.fetchContentByType(contentType, limit))).pipe(
-      catchError(() => of([]))
-    );
   }
 
   /**
@@ -1200,31 +1118,10 @@ export class HolochainContentService {
   }
 
   /**
-   * Get content statistics from Holochain.
-   *
-   * @deprecated Content stats should come from doorway projection.
-   *
-   * Cached with shareReplay for efficiency.
-   */
-  getStats(): Observable<HolochainContentStats> {
-    if (!this.isAvailable()) {
-      return of({ totalCount: 0, byType: {} });
-    }
-
-    this.statsCache$ ??= defer(() => from(this.fetchStats())).pipe(
-      shareReplay(1),
-      catchError(() => of({ totalCount: 0, byType: {} }))
-    );
-
-    return this.statsCache$;
-  }
-
-  /**
    * Clear all caches (useful after imports or when data changes)
    */
   clearCache(): void {
     this.contentCache.clear();
-    this.statsCache$ = null;
   }
 
   /**
@@ -1253,76 +1150,6 @@ export class HolochainContentService {
       this.availableSignal.set(false);
       return false;
     }
-  }
-
-  // ===========================================================================
-  // Learning Path Methods (DEPRECATED - use ContentService)
-  // ===========================================================================
-
-  /**
-   * Get all learning paths (path index).
-   *
-   * @deprecated Use ContentService.queryPaths() instead.
-   * Paths are now served from doorway projection (SQLite), not DHT.
-   */
-  async getPathIndex(): Promise<HolochainPathIndex> {
-    const result = await this.holochainClient.callZome<HolochainPathIndex>({
-      zomeName: 'content_store',
-      fnName: 'get_all_paths',
-      payload: null,
-    });
-
-    if (!result.success || !result.data) {
-      return { paths: [], totalCount: 0, lastUpdated: new Date().toISOString() };
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Get a learning path with all its steps.
-   *
-   * @deprecated Use ContentService.getPath() instead.
-   * Paths are now served from doorway projection (SQLite), not DHT.
-   */
-  async getPathWithSteps(pathId: string): Promise<HolochainPathWithSteps | null> {
-    const result = await this.holochainClient.callZome<HolochainPathWithSteps | null>({
-      zomeName: 'content_store',
-      fnName: 'get_path_with_steps',
-      payload: pathId,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Get a lightweight path overview via REST API (cached by Doorway).
-   *
-   * @deprecated Use ContentService.getPath() instead.
-   * Paths are now served from doorway projection (SQLite), not DHT.
-   *
-   * This is MUCH faster than getPathWithSteps because:
-   * - Only counts step links instead of fetching each step record
-   * - Uses Doorway's REST cache (15 minute TTL)
-   *
-   * Use for: path listings, path-overview page, initial navigation
-   */
-  async getPathOverviewRest(pathId: string): Promise<HolochainPathOverview | null> {
-    const result = await this.holochainClient.callZomeRest<HolochainPathOverview | null>({
-      zomeName: 'content_store',
-      fnName: 'get_path_overview',
-      payload: pathId,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
   }
 
   // ===========================================================================
@@ -1493,148 +1320,6 @@ export class HolochainContentService {
 
     if (!result.success || !result.data) {
       return null;
-    }
-
-    return result.data;
-  }
-
-  // ===========================================================================
-  // Relationship/Graph Methods
-  // ===========================================================================
-
-  /**
-   * Get relationships for a content node.
-   *
-   * @deprecated Use ContentService.getRelationships() instead.
-   * This method will be removed in a future release.
-   */
-  async getRelationships(input: GetRelationshipsInput): Promise<HolochainRelationshipOutput[]> {
-    const result = await this.holochainClient.callZome<HolochainRelationshipOutput[]>({
-      zomeName: 'content_store',
-      fnName: 'get_relationships',
-      payload: input,
-    });
-
-    if (!result.success || !result.data) {
-      return [];
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Get content graph starting from a root node.
-   *
-   * @deprecated Use ContentService.getContentGraph() instead.
-   * This method will be removed in a future release.
-   */
-  async getContentGraph(
-    contentId: string,
-    relationshipTypes?: string[]
-  ): Promise<HolochainContentGraph | null> {
-    const input: QueryRelatedContentInput = {
-      content_id: contentId,
-      relationship_types: relationshipTypes,
-    };
-
-    const result = await this.holochainClient.callZome<HolochainContentGraph>({
-      zomeName: 'content_store',
-      fnName: 'get_content_graph',
-      payload: input,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
-  }
-
-  // ===========================================================================
-  // KnowledgeMap Methods
-  // ===========================================================================
-
-  /**
-   * Get a knowledge map by ID.
-   *
-   * @deprecated Use ContentService.getKnowledgeMap() instead.
-   * This method will be removed in a future release.
-   */
-  async getKnowledgeMapById(id: string): Promise<HolochainKnowledgeMapOutput | null> {
-    const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput | null>({
-      zomeName: 'content_store',
-      fnName: 'get_knowledge_map_by_id',
-      payload: id,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Query knowledge maps.
-   *
-   * @deprecated Use ContentService.queryKnowledgeMaps() instead.
-   * This method will be removed in a future release.
-   */
-  async queryKnowledgeMaps(input: QueryKnowledgeMapsInput): Promise<HolochainKnowledgeMapOutput[]> {
-    const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput[]>({
-      zomeName: 'content_store',
-      fnName: 'query_knowledge_maps',
-      payload: input,
-    });
-
-    if (!result.success || !result.data) {
-      return [];
-    }
-
-    return result.data;
-  }
-
-  // ===========================================================================
-  // PathExtension Methods
-  // ===========================================================================
-
-  /**
-   * Get a path extension by ID.
-   *
-   * @deprecated Use ContentService.getPathExtension() instead.
-   * This method will be removed in a future release.
-   */
-  async getPathExtensionById(id: string): Promise<HolochainPathExtensionOutput | null> {
-    const result = await this.holochainClient.callZome<HolochainPathExtensionOutput | null>({
-      zomeName: 'content_store',
-      fnName: 'get_path_extension_by_id',
-      payload: id,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Query path extensions.
-   *
-   * @deprecated Use ContentService.queryPathExtensions() instead.
-   * This method will be removed in a future release.
-   */
-  async queryPathExtensions(
-    input: QueryPathExtensionsInput
-  ): Promise<HolochainPathExtensionOutput[]> {
-    const result = await this.holochainClient.callZome<HolochainPathExtensionOutput[]>({
-      zomeName: 'content_store',
-      fnName: 'query_path_extensions',
-      payload: input,
-    });
-
-    if (!result.success || !result.data) {
-      return [];
     }
 
     return result.data;
@@ -1819,74 +1504,8 @@ export class HolochainContentService {
   }
 
   // ===========================================================================
-  // Private Methods - Zome Calls
+  // Private Methods
   // ===========================================================================
-
-  /**
-   * Fetch single content by ID from Holochain
-   */
-  private async fetchContentById(id: string): Promise<ContentNode | null> {
-    // Try to select a custodian for CDN-like serving (optional optimization)
-    // See issue #TBD for custodian endpoint implementation
-    try {
-      const _custodian = await this.custodianSelection.selectBestCustodian(id);
-      if (_custodian) {
-        // Custodian-based serving not yet implemented
-        // Will use custodian endpoint when doorway service supports it
-        // const content = await this.fetchFromCustodian(_custodian.custodian.endpoint, id);
-        // if (content) return content;
-      }
-    } catch {
-      // Custodian selection failed - will fallback to DHT query
-    }
-
-    // Fall back to DHT query
-    const result = await this.holochainClient.callZome<HolochainContentOutput | null>({
-      zomeName: 'content_store',
-      fnName: 'get_content_by_id',
-      payload: { id } as QueryByIdInput,
-    });
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return this.transformToContentNode(result.data);
-  }
-
-  /**
-   * Fetch content by type from Holochain
-   */
-  private async fetchContentByType(contentType: string, limit: number): Promise<ContentNode[]> {
-    const result = await this.holochainClient.callZome<HolochainContentOutput[]>({
-      zomeName: 'content_store',
-      fnName: 'get_content_by_type',
-      payload: { content_type: contentType, limit } as QueryByTypeInput,
-    });
-
-    if (!result.success || !result.data) {
-      return [];
-    }
-
-    return result.data.map(output => this.transformToContentNode(output));
-  }
-
-  /**
-   * Fetch content statistics from Holochain
-   */
-  private async fetchStats(): Promise<HolochainContentStats> {
-    const result = await this.holochainClient.callZome<HolochainContentStats>({
-      zomeName: 'content_store',
-      fnName: 'get_content_stats',
-      payload: null,
-    });
-
-    if (!result.success || !result.data) {
-      return { totalCount: 0, byType: {} };
-    }
-
-    return result.data;
-  }
 
   // ===========================================================================
   // Transformation - Holochain Entry → ContentNode

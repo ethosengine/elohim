@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { PointsService } from './points.service';
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 import { vi } from 'vitest';
 
 describe('PointsService', () => {
@@ -15,7 +15,7 @@ describe('PointsService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [PointsService, { provide: LearnerBackendService, useValue: backendSpy }],
+      providers: [PointsService, { provide: LEARNER_BACKEND, useValue: backendSpy }],
     });
     service = TestBed.inject(PointsService);
   });

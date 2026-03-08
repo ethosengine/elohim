@@ -24,7 +24,7 @@ import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 
 import {
   getActiveContentIds,
@@ -72,7 +72,7 @@ export class PracticeService {
   /** Challenge history */
   readonly challengeHistory$ = this.challengeHistorySubject.asObservable();
 
-  private readonly backend = inject(LearnerBackendService);
+  private readonly backend = inject(LEARNER_BACKEND);
 
   // ===========================================================================
   // Pool Management

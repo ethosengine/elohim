@@ -113,9 +113,8 @@ pub fn update_human(
     let now = current_timestamp();
 
     // Fetch existing row first so we can fill in fields not supplied by the caller.
-    let existing = get_human_by_id(conn, id)?.ok_or_else(|| {
-        StorageError::NotFound(format!("Human not found: {}", id))
-    })?;
+    let existing = get_human_by_id(conn, id)?
+        .ok_or_else(|| StorageError::NotFound(format!("Human not found: {}", id)))?;
 
     let display_name = input.display_name.unwrap_or(existing.display_name);
     let bio = input.bio.or(existing.bio);

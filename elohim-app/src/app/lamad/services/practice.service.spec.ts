@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 
 import { PracticeService } from './practice.service';
 
@@ -144,7 +144,7 @@ describe('PracticeService', () => {
     mockBackend.refreshPracticePool.mockReturnValue(Promise.resolve(null));
 
     TestBed.configureTestingModule({
-      providers: [PracticeService, { provide: LearnerBackendService, useValue: mockBackend }],
+      providers: [PracticeService, { provide: LEARNER_BACKEND, useValue: mockBackend }],
     });
     service = TestBed.inject(PracticeService);
   });

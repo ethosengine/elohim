@@ -2276,8 +2276,7 @@ pub struct HumanView {
 
 impl From<Human> for HumanView {
     fn from(h: Human) -> Self {
-        let affinities: Vec<String> =
-            serde_json::from_str(&h.affinities).unwrap_or_default();
+        let affinities: Vec<String> = serde_json::from_str(&h.affinities).unwrap_or_default();
         Self {
             id: h.id,
             agent_pub_key: h.agent_pub_key,

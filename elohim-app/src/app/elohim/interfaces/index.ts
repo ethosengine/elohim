@@ -31,3 +31,5 @@ export type {
   CreateMasteryInput,
   CreateEventInput,
 } from './storage-writer.interface';
+export { LEARNER_BACKEND } from './learner-backend.interface';
+export type { ILearnerBackend } from './learner-backend.interface';
