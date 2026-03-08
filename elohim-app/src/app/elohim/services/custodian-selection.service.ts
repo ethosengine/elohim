@@ -2,8 +2,9 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 // @coverage: 97.6% (2026-02-24)
 
+import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
+
 import { CustodianCommitmentService } from './custodian-commitment.service';
-import { ShefaService, CustodianMetrics } from './shefa.service';
 
 /**
  * CustodianSelectionService
@@ -46,7 +47,7 @@ export interface CustodianScore {
   providedIn: 'root',
 })
 export class CustodianSelectionService {
-  private readonly shefa = inject(ShefaService);
+  private readonly shefa = inject(CUSTODIAN_METRICS);
   private readonly commitments = inject(CustodianCommitmentService);
 
   // Cache selection results (2 minute TTL for stability)

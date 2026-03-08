@@ -12,7 +12,6 @@ import { CustodianCommitmentService } from './elohim/services/custodian-commitme
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
-import { ShefaService } from './elohim/services/shefa.service';
 import { ContentIOModuleWithPlugins } from './lamad/content-io/content-io.module';
 
 export const appConfig: ApplicationConfig = {
@@ -43,7 +42,6 @@ export const appConfig: ApplicationConfig = {
     // Shefa metrics and custodian selection services
     CustodianCommitmentService,
     PerformanceMetricsService,
-    ShefaService,
     CustodianSelectionService,
     CustodianMetricsReporterService,
   ],

@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { HolochainContentService } from './holochain-content.service';
 import { HolochainClientService } from './holochain-client.service';
@@ -15,6 +17,8 @@ describe('HolochainContentService', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         HolochainContentService,
         { provide: HolochainClientService, useValue: clientSpy },
       ],

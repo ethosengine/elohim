@@ -3,8 +3,9 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 
 // @coverage: 26.7% (2026-02-24)
 
+import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
+
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
-import { ShefaService, CustodianMetrics } from '../../services/shefa.service';
 
 /** Alert from the Shefa service */
 interface ShefaAlert {
@@ -43,7 +44,7 @@ interface ShefaRecommendation {
   styleUrl: './shefa-dashboard.component.css',
 })
 export class ShefaDashboardComponent implements OnInit, OnDestroy {
-  private readonly shefa = inject(ShefaService);
+  private readonly shefa = inject(CUSTODIAN_METRICS);
   private readonly selection = inject(CustodianSelectionService);
 
   // Expose Math for template use

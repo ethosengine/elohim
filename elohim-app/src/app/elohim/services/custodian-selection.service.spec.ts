@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { CustodianSelectionService } from './custodian-selection.service';
-import { ShefaService } from './shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { CustodianCommitmentService } from './custodian-commitment.service';
 import { vi, Mock } from 'vitest';
 
@@ -22,13 +22,13 @@ describe('CustodianSelectionService', () => {
     TestBed.configureTestingModule({
       providers: [
         CustodianSelectionService,
-        { provide: ShefaService, useValue: shefaSpy },
+        { provide: CUSTODIAN_METRICS, useValue: shefaSpy },
         { provide: CustodianCommitmentService, useValue: commitmentsSpy },
       ],
     });
 
     service = TestBed.inject(CustodianSelectionService);
-    shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
+    shefaMock = TestBed.inject(CUSTODIAN_METRICS) as any;
     commitmentsMock = TestBed.inject(CustodianCommitmentService) as {
       [K in keyof CustodianCommitmentService]?: Mock;
     };

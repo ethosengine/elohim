@@ -11,13 +11,13 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { ShefaService } from '@app/elohim/services/shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { PerformanceMetricsService } from '@app/elohim/services/performance-metrics.service';
 import { CustodianCommitmentService } from '@app/elohim/services/custodian-commitment.service';
-import { EconomicService } from '../../services/economic.service';
+import { ECONOMIC_EVENT_FACTORY } from '../../interfaces';
 import { STEWARDED_RESOURCES } from '../../interfaces/stewarded-resources.interface';
 import { COMPUTE_EVENT } from '../../interfaces';
-import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
+import { DATA_PROTECTION } from '../../interfaces';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
 import { vi } from 'vitest';
@@ -87,13 +87,13 @@ describe('ShefaDashboardComponent', () => {
         provideHttpClientTesting(),
         // Override all services that have root-level providedIn
         { provide: HolochainClientService, useValue: holochainClientMock },
-        { provide: ShefaService, useValue: shefaServiceMock },
+        { provide: CUSTODIAN_METRICS, useValue: shefaServiceMock },
         { provide: PerformanceMetricsService, useValue: performanceMetricsMock },
         { provide: CustodianCommitmentService, useValue: custodianCommitmentMock },
-        { provide: EconomicService, useValue: economicServiceMock },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: economicServiceMock },
         { provide: STEWARDED_RESOURCES, useValue: stewardedResourceMock },
         { provide: ShefaComputeService, useValue: shefaComputeMock },
-        { provide: FamilyCommunityProtectionService, useValue: familyProtectionMock },
+        { provide: DATA_PROTECTION, useValue: familyProtectionMock },
         { provide: COMPUTE_EVENT, useValue: computeEventsMock },
       ],
       schemas: [NO_ERRORS_SCHEMA],

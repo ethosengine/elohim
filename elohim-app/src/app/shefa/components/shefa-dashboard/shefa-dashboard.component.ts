@@ -24,7 +24,7 @@ import { Observable, Subject } from 'rxjs';
 
 import { COMPUTE_EVENT } from '../../interfaces';
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
-import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
+import { DATA_PROTECTION, type IDataProtection } from '../../interfaces';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 /**
@@ -103,7 +103,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   private readonly shefaCompute = inject(ShefaComputeService);
-  private readonly familyProtection = inject(FamilyCommunityProtectionService);
+  private readonly familyProtection = inject(DATA_PROTECTION);
   private readonly computeEvents = inject(COMPUTE_EVENT);
 
   constructor() {

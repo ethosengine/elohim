@@ -3,7 +3,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 // @coverage: 14.7% (2026-02-24)
 
 import { PerformanceMetricsService } from './performance-metrics.service';
-import { type CustodianMetrics, ShefaService } from './shefa.service';
+import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
 
 /**
  * Custodian Metrics Reporter Service
@@ -13,7 +13,7 @@ import { type CustodianMetrics, ShefaService } from './shefa.service';
  *
  * Features:
  * - Collects metrics from PerformanceMetricsService every 5 minutes
- * - Reports metrics to ShefaService for network visibility
+ * - Reports metrics to CUSTODIAN_METRICS for network visibility
  * - Tracks reporting success/failure
  * - Gracefully handles DHT failures with exponential backoff
  *
@@ -53,7 +53,7 @@ export interface MetricsReportingStats {
 })
 export class CustodianMetricsReporterService {
   private readonly metrics = inject(PerformanceMetricsService);
-  private readonly shefa = inject(ShefaService);
+  private readonly shefa = inject(CUSTODIAN_METRICS);
 
   // Reporting configuration
   private readonly REPORT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes

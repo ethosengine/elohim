@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
-import { ShefaService } from '../../services/shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { vi } from 'vitest';
@@ -36,7 +36,7 @@ describe('ShefaDashboardComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ShefaService, useValue: shefaServiceMock },
+        { provide: CUSTODIAN_METRICS, useValue: shefaServiceMock },
         { provide: CustodianSelectionService, useValue: custodianSelectionMock },
         { provide: HolochainClientService, useValue: holochainClientMock },
       ],

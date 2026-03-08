@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { CustodianMetricsReporterService } from './custodian-metrics-reporter.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
-import { ShefaService } from './shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { vi, Mock } from 'vitest';
 
 describe('CustodianMetricsReporterService', () => {
@@ -22,7 +22,7 @@ describe('CustodianMetricsReporterService', () => {
       providers: [
         CustodianMetricsReporterService,
         { provide: PerformanceMetricsService, useValue: metricsSpy },
-        { provide: ShefaService, useValue: shefaSpy },
+        { provide: CUSTODIAN_METRICS, useValue: shefaSpy },
       ],
     });
 
@@ -30,7 +30,7 @@ describe('CustodianMetricsReporterService', () => {
     metricsMock = TestBed.inject(PerformanceMetricsService) as {
       [K in keyof PerformanceMetricsService]?: Mock;
     };
-    shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
+    shefaMock = TestBed.inject(CUSTODIAN_METRICS) as any;
   });
 
   afterEach(() => {

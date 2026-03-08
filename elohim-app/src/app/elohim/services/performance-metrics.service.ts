@@ -13,7 +13,7 @@ import { Injectable, OnDestroy, signal, computed } from '@angular/core';
  * - Zome operation counts
  *
  * These metrics are collected locally and periodically
- * reported to the DHT via ShefaService.
+ * reported to the DHT via CustodianMetricsReporterService.
  */
 
 export interface ResponseTimeMetrics {
