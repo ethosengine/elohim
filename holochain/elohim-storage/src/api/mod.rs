@@ -14,6 +14,8 @@
 //! db/*.rs (models)            — Diesel queries, ORM models
 //! ```
 
+pub mod compute;
+pub mod custodians;
 pub mod economic_events;
 pub mod exchange;
 pub mod flow_planning;
@@ -72,6 +74,12 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("flow-planning") {
         let resource_path = sub_path.strip_prefix("flow-planning").unwrap_or("");
         flow_planning::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("compute") {
+        let resource_path = sub_path.strip_prefix("compute").unwrap_or("");
+        compute::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("custodians") {
+        let resource_path = sub_path.strip_prefix("custodians").unwrap_or("");
+        custodians::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",
