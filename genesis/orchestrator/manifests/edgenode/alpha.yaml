@@ -101,8 +101,23 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
-      nodeSelector:
-        node-type: operations
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+            - weight: 60
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - compute
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
