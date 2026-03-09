@@ -54,5 +54,17 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.7,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

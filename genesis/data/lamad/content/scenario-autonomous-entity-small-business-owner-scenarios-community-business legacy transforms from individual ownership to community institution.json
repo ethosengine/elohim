@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Business legacy transforms from individual ownership to community institution",
   "description": "Business legacy transforms from individual ownership to community institution",
-  "content": "Scenario: Business legacy transforms from individual ownership to community institution\n    Given Rosa built more than business\u2014she created community institution\n    And neighbors trust her shop because they trust her personally\n    When conversion to democratic ownership formalizes community commitment\n    Then Rosa's 15 years of community stewardship is honored and documented\n    And sponsorships (youth soccer, school fundraisers) continue under democratic governance\n    And informal credit for struggling families becomes formalized support program\n    And community institution is preserved beyond Rosa's personal involvement\n    And legacy becomes \"founder who chose community over individual wealth\"\n",
+  "content": "Scenario: Business legacy transforms from individual ownership to community institution\n    Given Rosa built more than business—she created community institution\n    And neighbors trust her shop because they trust her personally\n    When conversion to democratic ownership formalizes community commitment\n    Then Rosa's 15 years of community stewardship is honored and documented\n    And sponsorships (youth soccer, school fundraisers) continue under democratic governance\n    And informal credit for struggling families becomes formalized support program\n    And community institution is preserved beyond Rosa's personal involvement\n    And legacy becomes \"founder who chose community over individual wealth\"\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:autonomous_entity",
@@ -54,5 +54,17 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.7,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

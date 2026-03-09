@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Efficiency and profit maximization", "correct": false, "id": "mf-q1-choice-0" },
-                { "content": "Love as committed action toward flourishing", "correct": true, "id": "mf-q1-choice-1" },
-                { "content": "Centralized control for security", "correct": false, "id": "mf-q1-choice-2" },
-                { "content": "Engagement optimization", "correct": false, "id": "mf-q1-choice-3" }
+                {
+                  "content": "Efficiency and profit maximization",
+                  "correct": false,
+                  "id": "mf-q1-choice-0"
+                },
+                {
+                  "content": "Love as committed action toward flourishing",
+                  "correct": true,
+                  "id": "mf-q1-choice-1"
+                },
+                {
+                  "content": "Centralized control for security",
+                  "correct": false,
+                  "id": "mf-q1-choice-2"
+                },
+                {
+                  "content": "Engagement optimization",
+                  "correct": false,
+                  "id": "mf-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -47,7 +66,11 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
         "questionType": "core",
-        "tags": ["manifesto", "core-principle", "love"]
+        "tags": [
+          "manifesto",
+          "core-principle",
+          "love"
+        ]
       }
     },
     {
@@ -61,16 +84,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "They carry no values", "correct": false, "id": "mf-q2-choice-0" },
-                { "content": "They have no natural limits", "correct": false, "id": "mf-q2-choice-1" },
-                { "content": "They are too difficult to transfer digitally", "correct": true, "id": "mf-q2-choice-2" },
-                { "content": "They fail to reward care work", "correct": false, "id": "mf-q2-choice-3" }
+                {
+                  "content": "They carry no values",
+                  "correct": false,
+                  "id": "mf-q2-choice-0"
+                },
+                {
+                  "content": "They have no natural limits",
+                  "correct": false,
+                  "id": "mf-q2-choice-1"
+                },
+                {
+                  "content": "They are too difficult to transfer digitally",
+                  "correct": true,
+                  "id": "mf-q2-choice-2"
+                },
+                {
+                  "content": "They fail to reward care work",
+                  "correct": false,
+                  "id": "mf-q2-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -93,7 +135,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["manifesto", "economics", "currency"]
+        "tags": [
+          "manifesto",
+          "economics",
+          "currency"
+        ]
       }
     },
     {
@@ -107,16 +153,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Individual Layer", "correct": false, "id": "mf-q3-choice-0" },
-                { "content": "Community Layer", "correct": false, "id": "mf-q3-choice-1" },
-                { "content": "Nation-State Layer", "correct": false, "id": "mf-q3-choice-2" },
-                { "content": "Global Layer", "correct": true, "id": "mf-q3-choice-3" }
+                {
+                  "content": "Individual Layer",
+                  "correct": false,
+                  "id": "mf-q3-choice-0"
+                },
+                {
+                  "content": "Community Layer",
+                  "correct": false,
+                  "id": "mf-q3-choice-1"
+                },
+                {
+                  "content": "Nation-State Layer",
+                  "correct": false,
+                  "id": "mf-q3-choice-2"
+                },
+                {
+                  "content": "Global Layer",
+                  "correct": true,
+                  "id": "mf-q3-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -139,7 +204,11 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
         "questionType": "core",
-        "tags": ["manifesto", "governance", "constitution"]
+        "tags": [
+          "manifesto",
+          "governance",
+          "constitution"
+        ]
       }
     },
     {
@@ -153,16 +222,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "It blocks and excludes attackers more quickly", "correct": false, "id": "mf-q4-choice-0" },
-                { "content": "It uses stronger encryption to prevent attacks", "correct": false, "id": "mf-q4-choice-1" },
-                { "content": "It transforms adversaries into allies by addressing root causes", "correct": true, "id": "mf-q4-choice-2" },
-                { "content": "It relies on centralized monitoring for faster response", "correct": false, "id": "mf-q4-choice-3" }
+                {
+                  "content": "It blocks and excludes attackers more quickly",
+                  "correct": false,
+                  "id": "mf-q4-choice-0"
+                },
+                {
+                  "content": "It uses stronger encryption to prevent attacks",
+                  "correct": false,
+                  "id": "mf-q4-choice-1"
+                },
+                {
+                  "content": "It transforms adversaries into allies by addressing root causes",
+                  "correct": true,
+                  "id": "mf-q4-choice-2"
+                },
+                {
+                  "content": "It relies on centralized monitoring for faster response",
+                  "correct": false,
+                  "id": "mf-q4-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -185,7 +273,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["manifesto", "security", "redemption"]
+        "tags": [
+          "manifesto",
+          "security",
+          "redemption"
+        ]
       }
     },
     {
@@ -199,16 +291,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Love is too abstract to be encoded in technology", "correct": false, "id": "mf-q5-choice-0" },
-                { "content": "Love as committed action toward flourishing can be encoded into technological systems", "correct": true, "id": "mf-q5-choice-1" },
-                { "content": "Technology should avoid matters of love and focus on efficiency", "correct": false, "id": "mf-q5-choice-2" },
-                { "content": "Love and technology are fundamentally incompatible", "correct": false, "id": "mf-q5-choice-3" }
+                {
+                  "content": "Love is too abstract to be encoded in technology",
+                  "correct": false,
+                  "id": "mf-q5-choice-0"
+                },
+                {
+                  "content": "Love as committed action toward flourishing can be encoded into technological systems",
+                  "correct": true,
+                  "id": "mf-q5-choice-1"
+                },
+                {
+                  "content": "Technology should avoid matters of love and focus on efficiency",
+                  "correct": false,
+                  "id": "mf-q5-choice-2"
+                },
+                {
+                  "content": "Love and technology are fundamentally incompatible",
+                  "correct": false,
+                  "id": "mf-q5-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -231,13 +342,23 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
         "questionType": "core",
-        "tags": ["manifesto", "love", "technology"]
+        "tags": [
+          "manifesto",
+          "love",
+          "technology"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "manifesto", "foundations"],
-  "relatedNodeIds": ["manifesto"],
+  "tags": [
+    "assessment",
+    "manifesto",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "manifesto"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "foundations",
@@ -247,5 +368,17 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-12-26T00:00:00Z",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

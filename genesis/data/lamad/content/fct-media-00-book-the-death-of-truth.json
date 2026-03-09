@@ -52,5 +52,17 @@
       "@type": "Person",
       "name": "Michiko Kakutani"
     }
-  }
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
 }

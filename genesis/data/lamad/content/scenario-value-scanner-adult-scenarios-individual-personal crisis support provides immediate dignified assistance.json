@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Personal crisis support provides immediate dignified assistance",
   "description": "Personal crisis support provides immediate dignified assistance",
-  "content": "Scenario: Personal crisis support provides immediate dignified assistance\n    Given Sarah encounters a crisis\u2014job loss, health emergency, family breakdown\n    And she needs immediate support\n    When the personal_agent detects crisis indicators\n    Then it should connect her to appropriate resources immediately\n    And support should be dignified, not stigmatizing\n    And she should access community mutual aid networks\n    And crisis response should be effective under extreme stress\n    And the protocol should function as safety net during vulnerability\n",
+  "content": "Scenario: Personal crisis support provides immediate dignified assistance\n    Given Sarah encounters a crisis—job loss, health emergency, family breakdown\n    And she needs immediate support\n    When the personal_agent detects crisis indicators\n    Then it should connect her to appropriate resources immediately\n    And support should be dignified, not stigmatizing\n    And she should access community mutual aid networks\n    And crisis response should be effective under extreme stress\n    And the protocol should function as safety net during vulnerability\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:value_scanner",
@@ -54,5 +54,22 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.9,
+      "role": "author"
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.5,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-georgina-grocer",
+      "affinity": 0.4,
+      "role": "steward"
+    }
+  ]
 }

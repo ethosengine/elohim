@@ -21,19 +21,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "creativity": 1 },
-          "2": { "creativity": 2 },
-          "3": { "creativity": 3 },
-          "4": { "creativity": 4 },
-          "5": { "creativity": 5 },
-          "6": { "creativity": 6 },
-          "7": { "creativity": 7 }
+          "1": {
+            "creativity": 1
+          },
+          "2": {
+            "creativity": 2
+          },
+          "3": {
+            "creativity": 3
+          },
+          "4": {
+            "creativity": 4
+          },
+          "5": {
+            "creativity": 5
+          },
+          "6": {
+            "creativity": 6
+          },
+          "7": {
+            "creativity": 7
+          }
         }
       },
       "metadata": {
@@ -42,7 +59,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -63,19 +84,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "creativity": 1 },
-          "2": { "creativity": 2 },
-          "3": { "creativity": 3 },
-          "4": { "creativity": 4 },
-          "5": { "creativity": 5 },
-          "6": { "creativity": 6 },
-          "7": { "creativity": 7 }
+          "1": {
+            "creativity": 1
+          },
+          "2": {
+            "creativity": 2
+          },
+          "3": {
+            "creativity": 3
+          },
+          "4": {
+            "creativity": 4
+          },
+          "5": {
+            "creativity": 5
+          },
+          "6": {
+            "creativity": 6
+          },
+          "7": {
+            "creativity": 7
+          }
         }
       },
       "metadata": {
@@ -84,7 +122,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -105,19 +147,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "creativity": 1 },
-          "2": { "creativity": 2 },
-          "3": { "creativity": 3 },
-          "4": { "creativity": 4 },
-          "5": { "creativity": 5 },
-          "6": { "creativity": 6 },
-          "7": { "creativity": 7 }
+          "1": {
+            "creativity": 1
+          },
+          "2": {
+            "creativity": 2
+          },
+          "3": {
+            "creativity": 3
+          },
+          "4": {
+            "creativity": 4
+          },
+          "5": {
+            "creativity": 5
+          },
+          "6": {
+            "creativity": 6
+          },
+          "7": {
+            "creativity": 7
+          }
         }
       },
       "metadata": {
@@ -126,7 +185,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -147,19 +210,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "curiosity": 1 },
-          "2": { "curiosity": 2 },
-          "3": { "curiosity": 3 },
-          "4": { "curiosity": 4 },
-          "5": { "curiosity": 5 },
-          "6": { "curiosity": 6 },
-          "7": { "curiosity": 7 }
+          "1": {
+            "curiosity": 1
+          },
+          "2": {
+            "curiosity": 2
+          },
+          "3": {
+            "curiosity": 3
+          },
+          "4": {
+            "curiosity": 4
+          },
+          "5": {
+            "curiosity": 5
+          },
+          "6": {
+            "curiosity": 6
+          },
+          "7": {
+            "curiosity": 7
+          }
         }
       },
       "metadata": {
@@ -168,7 +248,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -189,19 +273,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "curiosity": 1 },
-          "2": { "curiosity": 2 },
-          "3": { "curiosity": 3 },
-          "4": { "curiosity": 4 },
-          "5": { "curiosity": 5 },
-          "6": { "curiosity": 6 },
-          "7": { "curiosity": 7 }
+          "1": {
+            "curiosity": 1
+          },
+          "2": {
+            "curiosity": 2
+          },
+          "3": {
+            "curiosity": 3
+          },
+          "4": {
+            "curiosity": 4
+          },
+          "5": {
+            "curiosity": 5
+          },
+          "6": {
+            "curiosity": 6
+          },
+          "7": {
+            "curiosity": 7
+          }
         }
       },
       "metadata": {
@@ -210,7 +311,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -231,19 +336,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "curiosity": 1 },
-          "2": { "curiosity": 2 },
-          "3": { "curiosity": 3 },
-          "4": { "curiosity": 4 },
-          "5": { "curiosity": 5 },
-          "6": { "curiosity": 6 },
-          "7": { "curiosity": 7 }
+          "1": {
+            "curiosity": 1
+          },
+          "2": {
+            "curiosity": 2
+          },
+          "3": {
+            "curiosity": 3
+          },
+          "4": {
+            "curiosity": 4
+          },
+          "5": {
+            "curiosity": 5
+          },
+          "6": {
+            "curiosity": 6
+          },
+          "7": {
+            "curiosity": 7
+          }
         }
       },
       "metadata": {
@@ -252,7 +374,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -273,19 +399,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "fairness": 1 },
-          "2": { "fairness": 2 },
-          "3": { "fairness": 3 },
-          "4": { "fairness": 4 },
-          "5": { "fairness": 5 },
-          "6": { "fairness": 6 },
-          "7": { "fairness": 7 }
+          "1": {
+            "fairness": 1
+          },
+          "2": {
+            "fairness": 2
+          },
+          "3": {
+            "fairness": 3
+          },
+          "4": {
+            "fairness": 4
+          },
+          "5": {
+            "fairness": 5
+          },
+          "6": {
+            "fairness": 6
+          },
+          "7": {
+            "fairness": 7
+          }
         }
       },
       "metadata": {
@@ -294,7 +437,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -315,19 +462,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "fairness": 1 },
-          "2": { "fairness": 2 },
-          "3": { "fairness": 3 },
-          "4": { "fairness": 4 },
-          "5": { "fairness": 5 },
-          "6": { "fairness": 6 },
-          "7": { "fairness": 7 }
+          "1": {
+            "fairness": 1
+          },
+          "2": {
+            "fairness": 2
+          },
+          "3": {
+            "fairness": 3
+          },
+          "4": {
+            "fairness": 4
+          },
+          "5": {
+            "fairness": 5
+          },
+          "6": {
+            "fairness": 6
+          },
+          "7": {
+            "fairness": 7
+          }
         }
       },
       "metadata": {
@@ -336,7 +500,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -357,19 +525,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "fairness": 1 },
-          "2": { "fairness": 2 },
-          "3": { "fairness": 3 },
-          "4": { "fairness": 4 },
-          "5": { "fairness": 5 },
-          "6": { "fairness": 6 },
-          "7": { "fairness": 7 }
+          "1": {
+            "fairness": 1
+          },
+          "2": {
+            "fairness": 2
+          },
+          "3": {
+            "fairness": 3
+          },
+          "4": {
+            "fairness": 4
+          },
+          "5": {
+            "fairness": 5
+          },
+          "6": {
+            "fairness": 6
+          },
+          "7": {
+            "fairness": 7
+          }
         }
       },
       "metadata": {
@@ -378,7 +563,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -399,19 +588,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "kindness": 1 },
-          "2": { "kindness": 2 },
-          "3": { "kindness": 3 },
-          "4": { "kindness": 4 },
-          "5": { "kindness": 5 },
-          "6": { "kindness": 6 },
-          "7": { "kindness": 7 }
+          "1": {
+            "kindness": 1
+          },
+          "2": {
+            "kindness": 2
+          },
+          "3": {
+            "kindness": 3
+          },
+          "4": {
+            "kindness": 4
+          },
+          "5": {
+            "kindness": 5
+          },
+          "6": {
+            "kindness": 6
+          },
+          "7": {
+            "kindness": 7
+          }
         }
       },
       "metadata": {
@@ -420,7 +626,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -441,19 +651,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "kindness": 1 },
-          "2": { "kindness": 2 },
-          "3": { "kindness": 3 },
-          "4": { "kindness": 4 },
-          "5": { "kindness": 5 },
-          "6": { "kindness": 6 },
-          "7": { "kindness": 7 }
+          "1": {
+            "kindness": 1
+          },
+          "2": {
+            "kindness": 2
+          },
+          "3": {
+            "kindness": 3
+          },
+          "4": {
+            "kindness": 4
+          },
+          "5": {
+            "kindness": 5
+          },
+          "6": {
+            "kindness": 6
+          },
+          "7": {
+            "kindness": 7
+          }
         }
       },
       "metadata": {
@@ -462,7 +689,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -483,19 +714,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "kindness": 1 },
-          "2": { "kindness": 2 },
-          "3": { "kindness": 3 },
-          "4": { "kindness": 4 },
-          "5": { "kindness": 5 },
-          "6": { "kindness": 6 },
-          "7": { "kindness": 7 }
+          "1": {
+            "kindness": 1
+          },
+          "2": {
+            "kindness": 2
+          },
+          "3": {
+            "kindness": 3
+          },
+          "4": {
+            "kindness": 4
+          },
+          "5": {
+            "kindness": 5
+          },
+          "6": {
+            "kindness": 6
+          },
+          "7": {
+            "kindness": 7
+          }
         }
       },
       "metadata": {
@@ -504,7 +752,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -525,19 +777,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "perseverance": 1 },
-          "2": { "perseverance": 2 },
-          "3": { "perseverance": 3 },
-          "4": { "perseverance": 4 },
-          "5": { "perseverance": 5 },
-          "6": { "perseverance": 6 },
-          "7": { "perseverance": 7 }
+          "1": {
+            "perseverance": 1
+          },
+          "2": {
+            "perseverance": 2
+          },
+          "3": {
+            "perseverance": 3
+          },
+          "4": {
+            "perseverance": 4
+          },
+          "5": {
+            "perseverance": 5
+          },
+          "6": {
+            "perseverance": 6
+          },
+          "7": {
+            "perseverance": 7
+          }
         }
       },
       "metadata": {
@@ -546,7 +815,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -567,19 +840,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "perseverance": 1 },
-          "2": { "perseverance": 2 },
-          "3": { "perseverance": 3 },
-          "4": { "perseverance": 4 },
-          "5": { "perseverance": 5 },
-          "6": { "perseverance": 6 },
-          "7": { "perseverance": 7 }
+          "1": {
+            "perseverance": 1
+          },
+          "2": {
+            "perseverance": 2
+          },
+          "3": {
+            "perseverance": 3
+          },
+          "4": {
+            "perseverance": 4
+          },
+          "5": {
+            "perseverance": 5
+          },
+          "6": {
+            "perseverance": 6
+          },
+          "7": {
+            "perseverance": 7
+          }
         }
       },
       "metadata": {
@@ -588,7 +878,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -609,19 +903,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "perseverance": 1 },
-          "2": { "perseverance": 2 },
-          "3": { "perseverance": 3 },
-          "4": { "perseverance": 4 },
-          "5": { "perseverance": 5 },
-          "6": { "perseverance": 6 },
-          "7": { "perseverance": 7 }
+          "1": {
+            "perseverance": 1
+          },
+          "2": {
+            "perseverance": 2
+          },
+          "3": {
+            "perseverance": 3
+          },
+          "4": {
+            "perseverance": 4
+          },
+          "5": {
+            "perseverance": 5
+          },
+          "6": {
+            "perseverance": 6
+          },
+          "7": {
+            "perseverance": 7
+          }
         }
       },
       "metadata": {
@@ -630,7 +941,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -651,19 +966,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "hope": 1 },
-          "2": { "hope": 2 },
-          "3": { "hope": 3 },
-          "4": { "hope": 4 },
-          "5": { "hope": 5 },
-          "6": { "hope": 6 },
-          "7": { "hope": 7 }
+          "1": {
+            "hope": 1
+          },
+          "2": {
+            "hope": 2
+          },
+          "3": {
+            "hope": 3
+          },
+          "4": {
+            "hope": 4
+          },
+          "5": {
+            "hope": 5
+          },
+          "6": {
+            "hope": 6
+          },
+          "7": {
+            "hope": 7
+          }
         }
       },
       "metadata": {
@@ -672,7 +1004,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -693,19 +1029,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "hope": 1 },
-          "2": { "hope": 2 },
-          "3": { "hope": 3 },
-          "4": { "hope": 4 },
-          "5": { "hope": 5 },
-          "6": { "hope": 6 },
-          "7": { "hope": 7 }
+          "1": {
+            "hope": 1
+          },
+          "2": {
+            "hope": 2
+          },
+          "3": {
+            "hope": 3
+          },
+          "4": {
+            "hope": 4
+          },
+          "5": {
+            "hope": 5
+          },
+          "6": {
+            "hope": 6
+          },
+          "7": {
+            "hope": 7
+          }
         }
       },
       "metadata": {
@@ -714,7 +1067,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     },
@@ -735,19 +1092,36 @@
               "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "hope": 1 },
-          "2": { "hope": 2 },
-          "3": { "hope": 3 },
-          "4": { "hope": 4 },
-          "5": { "hope": 5 },
-          "6": { "hope": 6 },
-          "7": { "hope": 7 }
+          "1": {
+            "hope": 1
+          },
+          "2": {
+            "hope": 2
+          },
+          "3": {
+            "hope": 3
+          },
+          "4": {
+            "hope": 4
+          },
+          "5": {
+            "hope": 5
+          },
+          "6": {
+            "hope": 6
+          },
+          "7": {
+            "hope": 7
+          }
         }
       },
       "metadata": {
@@ -756,7 +1130,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "strengths", "character"],
+        "tags": [
+          "assessment",
+          "strengths",
+          "character"
+        ],
         "instrumentId": "strengths-finder-discovery"
       }
     }
@@ -797,5 +1175,17 @@
     "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479947",
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

@@ -37,5 +37,12 @@
     "description": "Introduction to the Lamad learning system - how the Elohim Protocol approaches education and skill development"
   },
   "createdAt": "2025-12-26T16:00:00Z",
-  "updatedAt": "2025-12-26T16:00:00Z"
+  "updatedAt": "2025-12-26T16:00:00Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.7,
+      "role": "author"
+    }
+  ]
 }

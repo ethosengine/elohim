@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Franchise brand transition occurs with community communication",
   "description": "Franchise brand transition occurs with community communication",
-  "content": "Scenario: Franchise brand transition occurs with community communication\n    Given locations were known as ChickenMax #247, #248, #249\n    And brand change could confuse or alienate customers\n    When democratic governance decides on rebranding strategy\n    Then some locations may de-brand (ChickenMax \u2192 Maria's Kitchen)\n    And others may maintain brand temporarily during transition\n    And customers are informed: same workers, democratic ownership, community commitment\n    And brand transition communicates values shift from corporate to community\n    And workplace_elohim manages customer communication during rebranding\n",
+  "content": "Scenario: Franchise brand transition occurs with community communication\n    Given locations were known as ChickenMax #247, #248, #249\n    And brand change could confuse or alienate customers\n    When democratic governance decides on rebranding strategy\n    Then some locations may de-brand (ChickenMax → Maria's Kitchen)\n    And others may maintain brand temporarily during transition\n    And customers are informed: same workers, democratic ownership, community commitment\n    And brand transition communicates values shift from corporate to community\n    And workplace_elohim manages customer communication during rebranding\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:autonomous_entity",
@@ -54,5 +54,17 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.7,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

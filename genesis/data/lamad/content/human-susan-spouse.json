@@ -57,5 +57,12 @@
     }
   },
   "createdAt": "2025-12-01T20:08:11.328348",
-  "updatedAt": "2025-12-24T03:05:26.353Z"
+  "updatedAt": "2025-12-24T03:05:26.353Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.7,
+      "role": "author"
+    }
+  ]
 }

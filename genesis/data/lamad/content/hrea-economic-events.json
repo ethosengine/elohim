@@ -22,5 +22,12 @@
     }
   ],
   "createdAt": "2025-12-16T03:28:56.642Z",
-  "updatedAt": "2025-12-16T03:29:40.865Z"
+  "updatedAt": "2025-12-16T03:29:40.865Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
 }

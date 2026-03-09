@@ -21,19 +21,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "intrinsic-motivation": 1 },
-          "2": { "intrinsic-motivation": 2 },
-          "3": { "intrinsic-motivation": 3 },
-          "4": { "intrinsic-motivation": 4 },
-          "5": { "intrinsic-motivation": 5 },
-          "6": { "intrinsic-motivation": 6 },
-          "7": { "intrinsic-motivation": 7 }
+          "1": {
+            "intrinsic-motivation": 1
+          },
+          "2": {
+            "intrinsic-motivation": 2
+          },
+          "3": {
+            "intrinsic-motivation": 3
+          },
+          "4": {
+            "intrinsic-motivation": 4
+          },
+          "5": {
+            "intrinsic-motivation": 5
+          },
+          "6": {
+            "intrinsic-motivation": 6
+          },
+          "7": {
+            "intrinsic-motivation": 7
+          }
         }
       },
       "metadata": {
@@ -42,7 +59,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -63,19 +84,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "intrinsic-motivation": 1 },
-          "2": { "intrinsic-motivation": 2 },
-          "3": { "intrinsic-motivation": 3 },
-          "4": { "intrinsic-motivation": 4 },
-          "5": { "intrinsic-motivation": 5 },
-          "6": { "intrinsic-motivation": 6 },
-          "7": { "intrinsic-motivation": 7 }
+          "1": {
+            "intrinsic-motivation": 1
+          },
+          "2": {
+            "intrinsic-motivation": 2
+          },
+          "3": {
+            "intrinsic-motivation": 3
+          },
+          "4": {
+            "intrinsic-motivation": 4
+          },
+          "5": {
+            "intrinsic-motivation": 5
+          },
+          "6": {
+            "intrinsic-motivation": 6
+          },
+          "7": {
+            "intrinsic-motivation": 7
+          }
         }
       },
       "metadata": {
@@ -84,7 +122,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -105,19 +147,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "intrinsic-motivation": 1 },
-          "2": { "intrinsic-motivation": 2 },
-          "3": { "intrinsic-motivation": 3 },
-          "4": { "intrinsic-motivation": 4 },
-          "5": { "intrinsic-motivation": 5 },
-          "6": { "intrinsic-motivation": 6 },
-          "7": { "intrinsic-motivation": 7 }
+          "1": {
+            "intrinsic-motivation": 1
+          },
+          "2": {
+            "intrinsic-motivation": 2
+          },
+          "3": {
+            "intrinsic-motivation": 3
+          },
+          "4": {
+            "intrinsic-motivation": 4
+          },
+          "5": {
+            "intrinsic-motivation": 5
+          },
+          "6": {
+            "intrinsic-motivation": 6
+          },
+          "7": {
+            "intrinsic-motivation": 7
+          }
         }
       },
       "metadata": {
@@ -126,7 +185,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -147,19 +210,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "intrinsic-motivation": 7 },
-          "2": { "intrinsic-motivation": 6 },
-          "3": { "intrinsic-motivation": 5 },
-          "4": { "intrinsic-motivation": 4 },
-          "5": { "intrinsic-motivation": 3 },
-          "6": { "intrinsic-motivation": 2 },
-          "7": { "intrinsic-motivation": 1 }
+          "1": {
+            "intrinsic-motivation": 7
+          },
+          "2": {
+            "intrinsic-motivation": 6
+          },
+          "3": {
+            "intrinsic-motivation": 5
+          },
+          "4": {
+            "intrinsic-motivation": 4
+          },
+          "5": {
+            "intrinsic-motivation": 3
+          },
+          "6": {
+            "intrinsic-motivation": 2
+          },
+          "7": {
+            "intrinsic-motivation": 1
+          }
         }
       },
       "metadata": {
@@ -168,7 +248,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -189,19 +273,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "relationships": 1 },
-          "2": { "relationships": 2 },
-          "3": { "relationships": 3 },
-          "4": { "relationships": 4 },
-          "5": { "relationships": 5 },
-          "6": { "relationships": 6 },
-          "7": { "relationships": 7 }
+          "1": {
+            "relationships": 1
+          },
+          "2": {
+            "relationships": 2
+          },
+          "3": {
+            "relationships": 3
+          },
+          "4": {
+            "relationships": 4
+          },
+          "5": {
+            "relationships": 5
+          },
+          "6": {
+            "relationships": 6
+          },
+          "7": {
+            "relationships": 7
+          }
         }
       },
       "metadata": {
@@ -210,7 +311,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -231,19 +336,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "relationships": 1 },
-          "2": { "relationships": 2 },
-          "3": { "relationships": 3 },
-          "4": { "relationships": 4 },
-          "5": { "relationships": 5 },
-          "6": { "relationships": 6 },
-          "7": { "relationships": 7 }
+          "1": {
+            "relationships": 1
+          },
+          "2": {
+            "relationships": 2
+          },
+          "3": {
+            "relationships": 3
+          },
+          "4": {
+            "relationships": 4
+          },
+          "5": {
+            "relationships": 5
+          },
+          "6": {
+            "relationships": 6
+          },
+          "7": {
+            "relationships": 7
+          }
         }
       },
       "metadata": {
@@ -252,7 +374,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -273,19 +399,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "relationships": 1 },
-          "2": { "relationships": 2 },
-          "3": { "relationships": 3 },
-          "4": { "relationships": 4 },
-          "5": { "relationships": 5 },
-          "6": { "relationships": 6 },
-          "7": { "relationships": 7 }
+          "1": {
+            "relationships": 1
+          },
+          "2": {
+            "relationships": 2
+          },
+          "3": {
+            "relationships": 3
+          },
+          "4": {
+            "relationships": 4
+          },
+          "5": {
+            "relationships": 5
+          },
+          "6": {
+            "relationships": 6
+          },
+          "7": {
+            "relationships": 7
+          }
         }
       },
       "metadata": {
@@ -294,7 +437,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -315,19 +462,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "relationships": 7 },
-          "2": { "relationships": 6 },
-          "3": { "relationships": 5 },
-          "4": { "relationships": 4 },
-          "5": { "relationships": 3 },
-          "6": { "relationships": 2 },
-          "7": { "relationships": 1 }
+          "1": {
+            "relationships": 7
+          },
+          "2": {
+            "relationships": 6
+          },
+          "3": {
+            "relationships": 5
+          },
+          "4": {
+            "relationships": 4
+          },
+          "5": {
+            "relationships": 3
+          },
+          "6": {
+            "relationships": 2
+          },
+          "7": {
+            "relationships": 1
+          }
         }
       },
       "metadata": {
@@ -336,7 +500,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -357,19 +525,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "purpose": 1 },
-          "2": { "purpose": 2 },
-          "3": { "purpose": 3 },
-          "4": { "purpose": 4 },
-          "5": { "purpose": 5 },
-          "6": { "purpose": 6 },
-          "7": { "purpose": 7 }
+          "1": {
+            "purpose": 1
+          },
+          "2": {
+            "purpose": 2
+          },
+          "3": {
+            "purpose": 3
+          },
+          "4": {
+            "purpose": 4
+          },
+          "5": {
+            "purpose": 5
+          },
+          "6": {
+            "purpose": 6
+          },
+          "7": {
+            "purpose": 7
+          }
         }
       },
       "metadata": {
@@ -378,7 +563,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -399,19 +588,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "purpose": 1 },
-          "2": { "purpose": 2 },
-          "3": { "purpose": 3 },
-          "4": { "purpose": 4 },
-          "5": { "purpose": 5 },
-          "6": { "purpose": 6 },
-          "7": { "purpose": 7 }
+          "1": {
+            "purpose": 1
+          },
+          "2": {
+            "purpose": 2
+          },
+          "3": {
+            "purpose": 3
+          },
+          "4": {
+            "purpose": 4
+          },
+          "5": {
+            "purpose": 5
+          },
+          "6": {
+            "purpose": 6
+          },
+          "7": {
+            "purpose": 7
+          }
         }
       },
       "metadata": {
@@ -420,7 +626,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -441,19 +651,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "purpose": 1 },
-          "2": { "purpose": 2 },
-          "3": { "purpose": 3 },
-          "4": { "purpose": 4 },
-          "5": { "purpose": 5 },
-          "6": { "purpose": 6 },
-          "7": { "purpose": 7 }
+          "1": {
+            "purpose": 1
+          },
+          "2": {
+            "purpose": 2
+          },
+          "3": {
+            "purpose": 3
+          },
+          "4": {
+            "purpose": 4
+          },
+          "5": {
+            "purpose": 5
+          },
+          "6": {
+            "purpose": 6
+          },
+          "7": {
+            "purpose": 7
+          }
         }
       },
       "metadata": {
@@ -462,7 +689,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     },
@@ -483,19 +714,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "purpose": 1 },
-          "2": { "purpose": 2 },
-          "3": { "purpose": 3 },
-          "4": { "purpose": 4 },
-          "5": { "purpose": 5 },
-          "6": { "purpose": 6 },
-          "7": { "purpose": 7 }
+          "1": {
+            "purpose": 1
+          },
+          "2": {
+            "purpose": 2
+          },
+          "3": {
+            "purpose": 3
+          },
+          "4": {
+            "purpose": 4
+          },
+          "5": {
+            "purpose": 5
+          },
+          "6": {
+            "purpose": 6
+          },
+          "7": {
+            "purpose": 7
+          }
         }
       },
       "metadata": {
@@ -504,7 +752,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "reflection"],
+        "tags": [
+          "assessment",
+          "values",
+          "reflection"
+        ],
         "instrumentId": "personal-values-discovery"
       }
     }
@@ -542,5 +794,32 @@
     "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479960",
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.5,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-georgina-grocer",
+      "affinity": 0.4,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
 }

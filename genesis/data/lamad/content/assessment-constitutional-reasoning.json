@@ -15,10 +15,26 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Accept the decision without question", "correct": false, "id": "cr-q1-choice-0" },
-                { "content": "File a challenge at the family level", "correct": true, "id": "cr-q1-choice-1" },
-                { "content": "Escalate directly to global Elohim", "correct": false, "id": "cr-q1-choice-2" },
-                { "content": "Leave the community", "correct": false, "id": "cr-q1-choice-3" }
+                {
+                  "content": "Accept the decision without question",
+                  "correct": false,
+                  "id": "cr-q1-choice-0"
+                },
+                {
+                  "content": "File a challenge at the family level",
+                  "correct": true,
+                  "id": "cr-q1-choice-1"
+                },
+                {
+                  "content": "Escalate directly to global Elohim",
+                  "correct": false,
+                  "id": "cr-q1-choice-2"
+                },
+                {
+                  "content": "Leave the community",
+                  "correct": false,
+                  "id": "cr-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false,
@@ -27,7 +43,10 @@
               "deselectEnabled": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -44,7 +63,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["assessment", "governance", "constitutional"]
+        "tags": [
+          "assessment",
+          "governance",
+          "constitutional"
+        ]
       }
     },
     {
@@ -58,10 +81,26 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Community consensus", "correct": false, "id": "cr-q2-choice-0" },
-                { "content": "Individual preference", "correct": false, "id": "cr-q2-choice-1" },
-                { "content": "Love as committed action", "correct": true, "id": "cr-q2-choice-2" },
-                { "content": "Economic efficiency", "correct": false, "id": "cr-q2-choice-3" }
+                {
+                  "content": "Community consensus",
+                  "correct": false,
+                  "id": "cr-q2-choice-0"
+                },
+                {
+                  "content": "Individual preference",
+                  "correct": false,
+                  "id": "cr-q2-choice-1"
+                },
+                {
+                  "content": "Love as committed action",
+                  "correct": true,
+                  "id": "cr-q2-choice-2"
+                },
+                {
+                  "content": "Economic efficiency",
+                  "correct": false,
+                  "id": "cr-q2-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false,
@@ -70,7 +109,10 @@
               "deselectEnabled": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -87,7 +129,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["assessment", "governance", "constitutional"]
+        "tags": [
+          "assessment",
+          "governance",
+          "constitutional"
+        ]
       }
     },
     {
@@ -106,7 +152,10 @@
               "answerForms": []
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -116,7 +165,11 @@
         "difficulty": "hard",
         "estimatedTimeSeconds": 120,
         "questionType": "open-response",
-        "tags": ["assessment", "governance", "constitutional"]
+        "tags": [
+          "assessment",
+          "governance",
+          "constitutional"
+        ]
       }
     },
     {
@@ -130,10 +183,26 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "The decision stands permanently", "correct": false, "id": "cr-q4-choice-0" },
-                { "content": "The case auto-escalates to higher authority", "correct": true, "id": "cr-q4-choice-1" },
-                { "content": "Nothing happens", "correct": false, "id": "cr-q4-choice-2" },
-                { "content": "The user loses their right to appeal", "correct": false, "id": "cr-q4-choice-3" }
+                {
+                  "content": "The decision stands permanently",
+                  "correct": false,
+                  "id": "cr-q4-choice-0"
+                },
+                {
+                  "content": "The case auto-escalates to higher authority",
+                  "correct": true,
+                  "id": "cr-q4-choice-1"
+                },
+                {
+                  "content": "Nothing happens",
+                  "correct": false,
+                  "id": "cr-q4-choice-2"
+                },
+                {
+                  "content": "The user loses their right to appeal",
+                  "correct": false,
+                  "id": "cr-q4-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false,
@@ -142,7 +211,10 @@
               "deselectEnabled": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -159,7 +231,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["assessment", "governance", "constitutional"]
+        "tags": [
+          "assessment",
+          "governance",
+          "constitutional"
+        ]
       }
     },
     {
@@ -173,10 +249,26 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "It makes governance predictable and fair", "correct": true, "id": "cr-q5-choice-0" },
-                { "content": "It prevents all future changes", "correct": false, "id": "cr-q5-choice-1" },
-                { "content": "It benefits established users", "correct": false, "id": "cr-q5-choice-2" },
-                { "content": "It reduces workload", "correct": false, "id": "cr-q5-choice-3" }
+                {
+                  "content": "It makes governance predictable and fair",
+                  "correct": true,
+                  "id": "cr-q5-choice-0"
+                },
+                {
+                  "content": "It prevents all future changes",
+                  "correct": false,
+                  "id": "cr-q5-choice-1"
+                },
+                {
+                  "content": "It benefits established users",
+                  "correct": false,
+                  "id": "cr-q5-choice-2"
+                },
+                {
+                  "content": "It reduces workload",
+                  "correct": false,
+                  "id": "cr-q5-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false,
@@ -185,7 +277,10 @@
               "deselectEnabled": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -202,7 +297,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
         "questionType": "core",
-        "tags": ["assessment", "governance", "constitutional"]
+        "tags": [
+          "assessment",
+          "governance",
+          "constitutional"
+        ]
       }
     }
   ],
@@ -227,5 +326,27 @@
     "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479952",
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    },
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

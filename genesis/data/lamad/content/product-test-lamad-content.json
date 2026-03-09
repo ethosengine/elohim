@@ -30,5 +30,12 @@
     "@type": "SoftwareSourceCode",
     "programmingLanguage": "Gherkin",
     "codeRepository": "https://github.com/EthosEngine/elohim"
-  }
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
 }

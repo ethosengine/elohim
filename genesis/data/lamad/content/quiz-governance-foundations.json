@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "To make all decisions for humans", "correct": false, "id": "gf-q1-choice-0" },
-                { "content": "To serve as constitutional guardians while respecting human agency", "correct": true, "id": "gf-q1-choice-1" },
-                { "content": "To maximize engagement metrics", "correct": false, "id": "gf-q1-choice-2" },
-                { "content": "To enforce rules without exception", "correct": false, "id": "gf-q1-choice-3" }
+                {
+                  "content": "To make all decisions for humans",
+                  "correct": false,
+                  "id": "gf-q1-choice-0"
+                },
+                {
+                  "content": "To serve as constitutional guardians while respecting human agency",
+                  "correct": true,
+                  "id": "gf-q1-choice-1"
+                },
+                {
+                  "content": "To maximize engagement metrics",
+                  "correct": false,
+                  "id": "gf-q1-choice-2"
+                },
+                {
+                  "content": "To enforce rules without exception",
+                  "correct": false,
+                  "id": "gf-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -42,7 +61,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["governance", "foundations", "assessment"]
+        "tags": [
+          "governance",
+          "foundations",
+          "assessment"
+        ]
       }
     },
     {
@@ -56,16 +79,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Global Elohim", "correct": false, "id": "gf-q2-choice-0" },
-                { "content": "Community Elohim", "correct": false, "id": "gf-q2-choice-1" },
-                { "content": "Family Elohim", "correct": true, "id": "gf-q2-choice-2" },
-                { "content": "Personal Agent", "correct": false, "id": "gf-q2-choice-3" }
+                {
+                  "content": "Global Elohim",
+                  "correct": false,
+                  "id": "gf-q2-choice-0"
+                },
+                {
+                  "content": "Community Elohim",
+                  "correct": false,
+                  "id": "gf-q2-choice-1"
+                },
+                {
+                  "content": "Family Elohim",
+                  "correct": true,
+                  "id": "gf-q2-choice-2"
+                },
+                {
+                  "content": "Personal Agent",
+                  "correct": false,
+                  "id": "gf-q2-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -83,7 +125,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["governance", "foundations", "assessment"]
+        "tags": [
+          "governance",
+          "foundations",
+          "assessment"
+        ]
       }
     },
     {
@@ -97,14 +143,25 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "True", "correct": true, "id": "gf-q3-true" },
-                { "content": "False", "correct": false, "id": "gf-q3-false" }
+                {
+                  "content": "True",
+                  "correct": true,
+                  "id": "gf-q3-true"
+                },
+                {
+                  "content": "False",
+                  "correct": false,
+                  "id": "gf-q3-false"
+                }
               ],
               "randomize": false,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -122,7 +179,10 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["governance", "true-false"]
+        "tags": [
+          "governance",
+          "true-false"
+        ]
       }
     },
     {
@@ -136,16 +196,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Nothing, SLAs are aspirational", "correct": false, "id": "gf-q4-choice-0" },
-                { "content": "The decision defaults in favor of the challenger", "correct": true, "id": "gf-q4-choice-1" },
-                { "content": "The system shuts down", "correct": false, "id": "gf-q4-choice-2" },
-                { "content": "Users lose their accounts", "correct": false, "id": "gf-q4-choice-3" }
+                {
+                  "content": "Nothing, SLAs are aspirational",
+                  "correct": false,
+                  "id": "gf-q4-choice-0"
+                },
+                {
+                  "content": "The decision defaults in favor of the challenger",
+                  "correct": true,
+                  "id": "gf-q4-choice-1"
+                },
+                {
+                  "content": "The system shuts down",
+                  "correct": false,
+                  "id": "gf-q4-choice-2"
+                },
+                {
+                  "content": "Users lose their accounts",
+                  "correct": false,
+                  "id": "gf-q4-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -163,7 +242,10 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["governance", "sla"]
+        "tags": [
+          "governance",
+          "sla"
+        ]
       }
     },
     {
@@ -177,16 +259,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "To make governance predictable and consistent over time", "correct": true, "id": "gf-q5-choice-0" },
-                { "content": "To lock in decisions permanently", "correct": false, "id": "gf-q5-choice-1" },
-                { "content": "To benefit long-time users", "correct": false, "id": "gf-q5-choice-2" },
-                { "content": "To reduce the number of appeals", "correct": false, "id": "gf-q5-choice-3" }
+                {
+                  "content": "To make governance predictable and consistent over time",
+                  "correct": true,
+                  "id": "gf-q5-choice-0"
+                },
+                {
+                  "content": "To lock in decisions permanently",
+                  "correct": false,
+                  "id": "gf-q5-choice-1"
+                },
+                {
+                  "content": "To benefit long-time users",
+                  "correct": false,
+                  "id": "gf-q5-choice-2"
+                },
+                {
+                  "content": "To reduce the number of appeals",
+                  "correct": false,
+                  "id": "gf-q5-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -204,13 +305,22 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["governance", "precedent"]
+        "tags": [
+          "governance",
+          "precedent"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "governance", "foundations"],
-  "relatedNodeIds": ["governance-epic"],
+  "tags": [
+    "assessment",
+    "governance",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "governance-epic"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "governance",
@@ -220,5 +330,27 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479353",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    },
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

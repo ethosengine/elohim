@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "It doesn't happen", "correct": false, "id": "ce-q1-choice-0" },
-                { "content": "It occurs outside market transactions", "correct": true, "id": "ce-q1-choice-1" },
-                { "content": "Caregivers prefer anonymity", "correct": false, "id": "ce-q1-choice-2" },
-                { "content": "Governments hide it", "correct": false, "id": "ce-q1-choice-3" }
+                {
+                  "content": "It doesn't happen",
+                  "correct": false,
+                  "id": "ce-q1-choice-0"
+                },
+                {
+                  "content": "It occurs outside market transactions",
+                  "correct": true,
+                  "id": "ce-q1-choice-1"
+                },
+                {
+                  "content": "Caregivers prefer anonymity",
+                  "correct": false,
+                  "id": "ce-q1-choice-2"
+                },
+                {
+                  "content": "Governments hide it",
+                  "correct": false,
+                  "id": "ce-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -42,7 +61,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["value-scanner", "economics", "care-work"]
+        "tags": [
+          "value-scanner",
+          "economics",
+          "care-work"
+        ]
       }
     },
     {
@@ -56,14 +79,25 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "True", "correct": false, "id": "ce-q2-true" },
-                { "content": "False", "correct": true, "id": "ce-q2-false" }
+                {
+                  "content": "True",
+                  "correct": false,
+                  "id": "ce-q2-true"
+                },
+                {
+                  "content": "False",
+                  "correct": true,
+                  "id": "ce-q2-false"
+                }
               ],
               "randomize": false,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -81,7 +115,10 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["value-scanner", "true-false"]
+        "tags": [
+          "value-scanner",
+          "true-false"
+        ]
       }
     },
     {
@@ -95,16 +132,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Real Estate Assessment", "correct": false, "id": "ce-q3-choice-0" },
-                { "content": "Resource-Event-Agent accounting model", "correct": true, "id": "ce-q3-choice-1" },
-                { "content": "Revenue Enhancement Algorithm", "correct": false, "id": "ce-q3-choice-2" },
-                { "content": "Reciprocal Exchange Agreement", "correct": false, "id": "ce-q3-choice-3" }
+                {
+                  "content": "Real Estate Assessment",
+                  "correct": false,
+                  "id": "ce-q3-choice-0"
+                },
+                {
+                  "content": "Resource-Event-Agent accounting model",
+                  "correct": true,
+                  "id": "ce-q3-choice-1"
+                },
+                {
+                  "content": "Revenue Enhancement Algorithm",
+                  "correct": false,
+                  "id": "ce-q3-choice-2"
+                },
+                {
+                  "content": "Reciprocal Exchange Agreement",
+                  "correct": false,
+                  "id": "ce-q3-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -122,13 +178,24 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["value-scanner", "rea", "accounting"]
+        "tags": [
+          "value-scanner",
+          "rea",
+          "accounting"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "value-scanner", "economics", "care-work"],
-  "relatedNodeIds": ["value-scanner-epic"],
+  "tags": [
+    "assessment",
+    "value-scanner",
+    "economics",
+    "care-work"
+  ],
+  "relatedNodeIds": [
+    "value-scanner-epic"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "value-scanner",
@@ -138,5 +205,32 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479358",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.5,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-georgina-grocer",
+      "affinity": 0.4,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
 }

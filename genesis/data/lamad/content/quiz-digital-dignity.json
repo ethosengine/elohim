@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Only privileged people can go viral", "correct": false, "id": "dd-q1-choice-0" },
-                { "content": "Wide reach must be earned through trust, not just engagement", "correct": true, "id": "dd-q1-choice-1" },
-                { "content": "Viruses are privileged", "correct": false, "id": "dd-q1-choice-2" },
-                { "content": "Viral content gets special treatment", "correct": false, "id": "dd-q1-choice-3" }
+                {
+                  "content": "Only privileged people can go viral",
+                  "correct": false,
+                  "id": "dd-q1-choice-0"
+                },
+                {
+                  "content": "Wide reach must be earned through trust, not just engagement",
+                  "correct": true,
+                  "id": "dd-q1-choice-1"
+                },
+                {
+                  "content": "Viruses are privileged",
+                  "correct": false,
+                  "id": "dd-q1-choice-2"
+                },
+                {
+                  "content": "Viral content gets special treatment",
+                  "correct": false,
+                  "id": "dd-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -42,7 +61,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["social-medium", "virality", "trust"]
+        "tags": [
+          "social-medium",
+          "virality",
+          "trust"
+        ]
       }
     },
     {
@@ -56,14 +79,25 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "True", "correct": false, "id": "dd-q2-true" },
-                { "content": "False", "correct": true, "id": "dd-q2-false" }
+                {
+                  "content": "True",
+                  "correct": false,
+                  "id": "dd-q2-true"
+                },
+                {
+                  "content": "False",
+                  "correct": true,
+                  "id": "dd-q2-false"
+                }
               ],
               "randomize": false,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -81,7 +115,10 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["social-medium", "true-false"]
+        "tags": [
+          "social-medium",
+          "true-false"
+        ]
       }
     },
     {
@@ -95,16 +132,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Reactions by mediators", "correct": false, "id": "dd-q3-choice-0" },
-                { "content": "Elohim intercepting potentially harmful reactions with teaching", "correct": true, "id": "dd-q3-choice-1" },
-                { "content": "Delayed reactions", "correct": false, "id": "dd-q3-choice-2" },
-                { "content": "Reactions on media", "correct": false, "id": "dd-q3-choice-3" }
+                {
+                  "content": "Reactions by mediators",
+                  "correct": false,
+                  "id": "dd-q3-choice-0"
+                },
+                {
+                  "content": "Elohim intercepting potentially harmful reactions with teaching",
+                  "correct": true,
+                  "id": "dd-q3-choice-1"
+                },
+                {
+                  "content": "Delayed reactions",
+                  "correct": false,
+                  "id": "dd-q3-choice-2"
+                },
+                {
+                  "content": "Reactions on media",
+                  "correct": false,
+                  "id": "dd-q3-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -122,13 +178,23 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["social-medium", "mediation"]
+        "tags": [
+          "social-medium",
+          "mediation"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "social-medium", "dignity", "design"],
-  "relatedNodeIds": ["social-medium-epic"],
+  "tags": [
+    "assessment",
+    "social-medium",
+    "dignity",
+    "design"
+  ],
+  "relatedNodeIds": [
+    "social-medium-epic"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "social-medium",
@@ -138,5 +204,17 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479370",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Size of the organization", "correct": false, "id": "do-q1-choice-0" },
-                { "content": "Distributed ownership and governance among stakeholders", "correct": true, "id": "do-q1-choice-1" },
-                { "content": "Industry sector", "correct": false, "id": "do-q1-choice-2" },
-                { "content": "Geographic location", "correct": false, "id": "do-q1-choice-3" }
+                {
+                  "content": "Size of the organization",
+                  "correct": false,
+                  "id": "do-q1-choice-0"
+                },
+                {
+                  "content": "Distributed ownership and governance among stakeholders",
+                  "correct": true,
+                  "id": "do-q1-choice-1"
+                },
+                {
+                  "content": "Industry sector",
+                  "correct": false,
+                  "id": "do-q1-choice-2"
+                },
+                {
+                  "content": "Geographic location",
+                  "correct": false,
+                  "id": "do-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -42,7 +61,10 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["autonomous-entity", "ownership"]
+        "tags": [
+          "autonomous-entity",
+          "ownership"
+        ]
       }
     },
     {
@@ -56,14 +78,25 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "True", "correct": false, "id": "do-q2-true" },
-                { "content": "False", "correct": true, "id": "do-q2-false" }
+                {
+                  "content": "True",
+                  "correct": false,
+                  "id": "do-q2-true"
+                },
+                {
+                  "content": "False",
+                  "correct": true,
+                  "id": "do-q2-false"
+                }
               ],
               "randomize": false,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -81,7 +114,10 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["autonomous-entity", "true-false"]
+        "tags": [
+          "autonomous-entity",
+          "true-false"
+        ]
       }
     },
     {
@@ -95,16 +131,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "A door", "correct": false, "id": "do-q3-choice-0" },
-                { "content": "The ability to leave with fair compensation for contribution", "correct": true, "id": "do-q3-choice-1" },
-                { "content": "Being fired", "correct": false, "id": "do-q3-choice-2" },
-                { "content": "A software term", "correct": false, "id": "do-q3-choice-3" }
+                {
+                  "content": "A door",
+                  "correct": false,
+                  "id": "do-q3-choice-0"
+                },
+                {
+                  "content": "The ability to leave with fair compensation for contribution",
+                  "correct": true,
+                  "id": "do-q3-choice-1"
+                },
+                {
+                  "content": "Being fired",
+                  "correct": false,
+                  "id": "do-q3-choice-2"
+                },
+                {
+                  "content": "A software term",
+                  "correct": false,
+                  "id": "do-q3-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -122,13 +177,23 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["autonomous-entity", "exit-rights"]
+        "tags": [
+          "autonomous-entity",
+          "exit-rights"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "autonomous-entity", "ownership", "worker-rights"],
-  "relatedNodeIds": ["autonomous-entity-epic"],
+  "tags": [
+    "assessment",
+    "autonomous-entity",
+    "ownership",
+    "worker-rights"
+  ],
+  "relatedNodeIds": [
+    "autonomous-entity-epic"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "autonomous-entity",
@@ -138,5 +203,27 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479367",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.7,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

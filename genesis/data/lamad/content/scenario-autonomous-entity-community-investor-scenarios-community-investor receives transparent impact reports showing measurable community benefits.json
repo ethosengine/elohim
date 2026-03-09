@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Investor receives transparent impact reports showing measurable community benefits",
   "description": "Investor receives transparent impact reports showing measurable community benefits",
-  "content": "Scenario: Investor receives transparent impact reports showing measurable community benefits\n    Given stock market investing provides opaque financial returns with invisible social impacts\n    And Patricia couldn't verify her portfolio's real effects\n    When community investment provides radical transparency\n    Then quarterly reports show: 12 workers received ownership and wage increases ($11\u2192$18/hour)\n    And 340 community meals served to isolated seniors\n    And 1,200 lbs regenerative produce sourced from Johnson Farm\n    And $40K circulating locally vs. extracting to distant shareholders\n    And community_elohim provides detailed, verifiable impact documentation\n",
+  "content": "Scenario: Investor receives transparent impact reports showing measurable community benefits\n    Given stock market investing provides opaque financial returns with invisible social impacts\n    And Patricia couldn't verify her portfolio's real effects\n    When community investment provides radical transparency\n    Then quarterly reports show: 12 workers received ownership and wage increases ($11→$18/hour)\n    And 340 community meals served to isolated seniors\n    And 1,200 lbs regenerative produce sourced from Johnson Farm\n    And $40K circulating locally vs. extracting to distant shareholders\n    And community_elohim provides detailed, verifiable impact documentation\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:autonomous_entity",
@@ -54,5 +54,17 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.7,
+      "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

@@ -21,19 +21,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 1 },
-          "2": { "anxiety": 2 },
-          "3": { "anxiety": 3 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 5 },
-          "6": { "anxiety": 6 },
-          "7": { "anxiety": 7 }
+          "1": {
+            "anxiety": 1
+          },
+          "2": {
+            "anxiety": 2
+          },
+          "3": {
+            "anxiety": 3
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 5
+          },
+          "6": {
+            "anxiety": 6
+          },
+          "7": {
+            "anxiety": 7
+          }
         }
       },
       "metadata": {
@@ -42,7 +59,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -63,19 +84,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 1 },
-          "2": { "anxiety": 2 },
-          "3": { "anxiety": 3 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 5 },
-          "6": { "anxiety": 6 },
-          "7": { "anxiety": 7 }
+          "1": {
+            "anxiety": 1
+          },
+          "2": {
+            "anxiety": 2
+          },
+          "3": {
+            "anxiety": 3
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 5
+          },
+          "6": {
+            "anxiety": 6
+          },
+          "7": {
+            "anxiety": 7
+          }
         }
       },
       "metadata": {
@@ -84,7 +122,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -105,19 +147,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 1 },
-          "2": { "anxiety": 2 },
-          "3": { "anxiety": 3 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 5 },
-          "6": { "anxiety": 6 },
-          "7": { "anxiety": 7 }
+          "1": {
+            "anxiety": 1
+          },
+          "2": {
+            "anxiety": 2
+          },
+          "3": {
+            "anxiety": 3
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 5
+          },
+          "6": {
+            "anxiety": 6
+          },
+          "7": {
+            "anxiety": 7
+          }
         }
       },
       "metadata": {
@@ -126,7 +185,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -147,19 +210,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 7 },
-          "2": { "anxiety": 6 },
-          "3": { "anxiety": 5 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 3 },
-          "6": { "anxiety": 2 },
-          "7": { "anxiety": 1 }
+          "1": {
+            "anxiety": 7
+          },
+          "2": {
+            "anxiety": 6
+          },
+          "3": {
+            "anxiety": 5
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 3
+          },
+          "6": {
+            "anxiety": 2
+          },
+          "7": {
+            "anxiety": 1
+          }
         }
       },
       "metadata": {
@@ -168,7 +248,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -189,19 +273,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 1 },
-          "2": { "anxiety": 2 },
-          "3": { "anxiety": 3 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 5 },
-          "6": { "anxiety": 6 },
-          "7": { "anxiety": 7 }
+          "1": {
+            "anxiety": 1
+          },
+          "2": {
+            "anxiety": 2
+          },
+          "3": {
+            "anxiety": 3
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 5
+          },
+          "6": {
+            "anxiety": 6
+          },
+          "7": {
+            "anxiety": 7
+          }
         }
       },
       "metadata": {
@@ -210,7 +311,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -231,19 +336,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 1 },
-          "2": { "anxiety": 2 },
-          "3": { "anxiety": 3 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 5 },
-          "6": { "anxiety": 6 },
-          "7": { "anxiety": 7 }
+          "1": {
+            "anxiety": 1
+          },
+          "2": {
+            "anxiety": 2
+          },
+          "3": {
+            "anxiety": 3
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 5
+          },
+          "6": {
+            "anxiety": 6
+          },
+          "7": {
+            "anxiety": 7
+          }
         }
       },
       "metadata": {
@@ -252,7 +374,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -273,19 +399,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "anxiety": 7 },
-          "2": { "anxiety": 6 },
-          "3": { "anxiety": 5 },
-          "4": { "anxiety": 4 },
-          "5": { "anxiety": 3 },
-          "6": { "anxiety": 2 },
-          "7": { "anxiety": 1 }
+          "1": {
+            "anxiety": 7
+          },
+          "2": {
+            "anxiety": 6
+          },
+          "3": {
+            "anxiety": 5
+          },
+          "4": {
+            "anxiety": 4
+          },
+          "5": {
+            "anxiety": 3
+          },
+          "6": {
+            "anxiety": 2
+          },
+          "7": {
+            "anxiety": 1
+          }
         }
       },
       "metadata": {
@@ -294,7 +437,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -315,19 +462,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 1 },
-          "2": { "avoidance": 2 },
-          "3": { "avoidance": 3 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 5 },
-          "6": { "avoidance": 6 },
-          "7": { "avoidance": 7 }
+          "1": {
+            "avoidance": 1
+          },
+          "2": {
+            "avoidance": 2
+          },
+          "3": {
+            "avoidance": 3
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 5
+          },
+          "6": {
+            "avoidance": 6
+          },
+          "7": {
+            "avoidance": 7
+          }
         }
       },
       "metadata": {
@@ -336,7 +500,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -357,19 +525,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 7 },
-          "2": { "avoidance": 6 },
-          "3": { "avoidance": 5 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 3 },
-          "6": { "avoidance": 2 },
-          "7": { "avoidance": 1 }
+          "1": {
+            "avoidance": 7
+          },
+          "2": {
+            "avoidance": 6
+          },
+          "3": {
+            "avoidance": 5
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 3
+          },
+          "6": {
+            "avoidance": 2
+          },
+          "7": {
+            "avoidance": 1
+          }
         }
       },
       "metadata": {
@@ -378,7 +563,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -399,19 +588,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 1 },
-          "2": { "avoidance": 2 },
-          "3": { "avoidance": 3 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 5 },
-          "6": { "avoidance": 6 },
-          "7": { "avoidance": 7 }
+          "1": {
+            "avoidance": 1
+          },
+          "2": {
+            "avoidance": 2
+          },
+          "3": {
+            "avoidance": 3
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 5
+          },
+          "6": {
+            "avoidance": 6
+          },
+          "7": {
+            "avoidance": 7
+          }
         }
       },
       "metadata": {
@@ -420,7 +626,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -441,19 +651,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 7 },
-          "2": { "avoidance": 6 },
-          "3": { "avoidance": 5 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 3 },
-          "6": { "avoidance": 2 },
-          "7": { "avoidance": 1 }
+          "1": {
+            "avoidance": 7
+          },
+          "2": {
+            "avoidance": 6
+          },
+          "3": {
+            "avoidance": 5
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 3
+          },
+          "6": {
+            "avoidance": 2
+          },
+          "7": {
+            "avoidance": 1
+          }
         }
       },
       "metadata": {
@@ -462,7 +689,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -483,19 +714,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 1 },
-          "2": { "avoidance": 2 },
-          "3": { "avoidance": 3 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 5 },
-          "6": { "avoidance": 6 },
-          "7": { "avoidance": 7 }
+          "1": {
+            "avoidance": 1
+          },
+          "2": {
+            "avoidance": 2
+          },
+          "3": {
+            "avoidance": 3
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 5
+          },
+          "6": {
+            "avoidance": 6
+          },
+          "7": {
+            "avoidance": 7
+          }
         }
       },
       "metadata": {
@@ -504,7 +752,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -525,19 +777,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 1 },
-          "2": { "avoidance": 2 },
-          "3": { "avoidance": 3 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 5 },
-          "6": { "avoidance": 6 },
-          "7": { "avoidance": 7 }
+          "1": {
+            "avoidance": 1
+          },
+          "2": {
+            "avoidance": 2
+          },
+          "3": {
+            "avoidance": 3
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 5
+          },
+          "6": {
+            "avoidance": 6
+          },
+          "7": {
+            "avoidance": 7
+          }
         }
       },
       "metadata": {
@@ -546,7 +815,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     },
@@ -567,19 +840,36 @@
               "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "avoidance": 7 },
-          "2": { "avoidance": 6 },
-          "3": { "avoidance": 5 },
-          "4": { "avoidance": 4 },
-          "5": { "avoidance": 3 },
-          "6": { "avoidance": 2 },
-          "7": { "avoidance": 1 }
+          "1": {
+            "avoidance": 7
+          },
+          "2": {
+            "avoidance": 6
+          },
+          "3": {
+            "avoidance": 5
+          },
+          "4": {
+            "avoidance": 4
+          },
+          "5": {
+            "avoidance": 3
+          },
+          "6": {
+            "avoidance": 2
+          },
+          "7": {
+            "avoidance": 1
+          }
         }
       },
       "metadata": {
@@ -588,7 +878,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "attachment", "relationships"],
+        "tags": [
+          "assessment",
+          "attachment",
+          "relationships"
+        ],
         "instrumentId": "attachment-style-discovery"
       }
     }
@@ -624,14 +918,42 @@
         "avoidance"
       ],
       "outcomes": [
-        { "name": "Secure", "anxiety": "low", "avoidance": "low" },
-        { "name": "Anxious-Preoccupied", "anxiety": "high", "avoidance": "low" },
-        { "name": "Dismissive-Avoidant", "anxiety": "low", "avoidance": "high" },
-        { "name": "Fearful-Avoidant", "anxiety": "high", "avoidance": "high" }
+        {
+          "name": "Secure",
+          "anxiety": "low",
+          "avoidance": "low"
+        },
+        {
+          "name": "Anxious-Preoccupied",
+          "anxiety": "high",
+          "avoidance": "low"
+        },
+        {
+          "name": "Dismissive-Avoidant",
+          "anxiety": "low",
+          "avoidance": "high"
+        },
+        {
+          "name": "Fearful-Avoidant",
+          "anxiety": "high",
+          "avoidance": "high"
+        }
       ]
     },
     "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479938",
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

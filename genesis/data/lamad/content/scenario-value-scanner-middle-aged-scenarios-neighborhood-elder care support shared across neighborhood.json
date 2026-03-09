@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Elder care support shared across neighborhood",
   "description": "Elder care support shared across neighborhood",
-  "content": "Scenario: Elder care support shared across neighborhood\n    Given Robert's parents visit regularly and will eventually need local care\n    And several neighbors are also managing elder care\n    When neighborhood_elohim coordinates elder care support\n    Then it should connect neighbors managing similar challenges\n    And facilitate sharing of resources, knowledge, and respite\n    And surface: \"Three neighbors use the same home health agency\u2014could coordinate for better rates\"\n    And build neighborhood capacity to support aging residents\n    And prevent isolation for those managing elder care\n    And create mutual support network for common challenges\n    And strengthen neighborhood through shared caregiving\n",
+  "content": "Scenario: Elder care support shared across neighborhood\n    Given Robert's parents visit regularly and will eventually need local care\n    And several neighbors are also managing elder care\n    When neighborhood_elohim coordinates elder care support\n    Then it should connect neighbors managing similar challenges\n    And facilitate sharing of resources, knowledge, and respite\n    And surface: \"Three neighbors use the same home health agency—could coordinate for better rates\"\n    And build neighborhood capacity to support aging residents\n    And prevent isolation for those managing elder care\n    And create mutual support network for common challenges\n    And strengthen neighborhood through shared caregiving\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:value_scanner",
@@ -54,5 +54,32 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-nancy-neighbor",
+      "affinity": 0.6,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "affinity": 0.5,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.4,
+      "role": "endorser"
+    },
+    {
+      "humanId": "human-georgina-grocer",
+      "affinity": 0.4,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
 }

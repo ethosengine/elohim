@@ -21,19 +21,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "openness": 1 },
-          "2": { "openness": 2 },
-          "3": { "openness": 3 },
-          "4": { "openness": 4 },
-          "5": { "openness": 5 },
-          "6": { "openness": 6 },
-          "7": { "openness": 7 }
+          "1": {
+            "openness": 1
+          },
+          "2": {
+            "openness": 2
+          },
+          "3": {
+            "openness": 3
+          },
+          "4": {
+            "openness": 4
+          },
+          "5": {
+            "openness": 5
+          },
+          "6": {
+            "openness": 6
+          },
+          "7": {
+            "openness": 7
+          }
         }
       },
       "metadata": {
@@ -42,7 +59,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -63,19 +84,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "openness": 1 },
-          "2": { "openness": 2 },
-          "3": { "openness": 3 },
-          "4": { "openness": 4 },
-          "5": { "openness": 5 },
-          "6": { "openness": 6 },
-          "7": { "openness": 7 }
+          "1": {
+            "openness": 1
+          },
+          "2": {
+            "openness": 2
+          },
+          "3": {
+            "openness": 3
+          },
+          "4": {
+            "openness": 4
+          },
+          "5": {
+            "openness": 5
+          },
+          "6": {
+            "openness": 6
+          },
+          "7": {
+            "openness": 7
+          }
         }
       },
       "metadata": {
@@ -84,7 +122,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -105,19 +147,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "openness": 1 },
-          "2": { "openness": 2 },
-          "3": { "openness": 3 },
-          "4": { "openness": 4 },
-          "5": { "openness": 5 },
-          "6": { "openness": 6 },
-          "7": { "openness": 7 }
+          "1": {
+            "openness": 1
+          },
+          "2": {
+            "openness": 2
+          },
+          "3": {
+            "openness": 3
+          },
+          "4": {
+            "openness": 4
+          },
+          "5": {
+            "openness": 5
+          },
+          "6": {
+            "openness": 6
+          },
+          "7": {
+            "openness": 7
+          }
         }
       },
       "metadata": {
@@ -126,7 +185,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -147,19 +210,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "openness": 1 },
-          "2": { "openness": 2 },
-          "3": { "openness": 3 },
-          "4": { "openness": 4 },
-          "5": { "openness": 5 },
-          "6": { "openness": 6 },
-          "7": { "openness": 7 }
+          "1": {
+            "openness": 1
+          },
+          "2": {
+            "openness": 2
+          },
+          "3": {
+            "openness": 3
+          },
+          "4": {
+            "openness": 4
+          },
+          "5": {
+            "openness": 5
+          },
+          "6": {
+            "openness": 6
+          },
+          "7": {
+            "openness": 7
+          }
         }
       },
       "metadata": {
@@ -168,7 +248,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -189,19 +273,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "openness": 1 },
-          "2": { "openness": 2 },
-          "3": { "openness": 3 },
-          "4": { "openness": 4 },
-          "5": { "openness": 5 },
-          "6": { "openness": 6 },
-          "7": { "openness": 7 }
+          "1": {
+            "openness": 1
+          },
+          "2": {
+            "openness": 2
+          },
+          "3": {
+            "openness": 3
+          },
+          "4": {
+            "openness": 4
+          },
+          "5": {
+            "openness": 5
+          },
+          "6": {
+            "openness": 6
+          },
+          "7": {
+            "openness": 7
+          }
         }
       },
       "metadata": {
@@ -210,7 +311,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -231,19 +336,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "conservation": 1 },
-          "2": { "conservation": 2 },
-          "3": { "conservation": 3 },
-          "4": { "conservation": 4 },
-          "5": { "conservation": 5 },
-          "6": { "conservation": 6 },
-          "7": { "conservation": 7 }
+          "1": {
+            "conservation": 1
+          },
+          "2": {
+            "conservation": 2
+          },
+          "3": {
+            "conservation": 3
+          },
+          "4": {
+            "conservation": 4
+          },
+          "5": {
+            "conservation": 5
+          },
+          "6": {
+            "conservation": 6
+          },
+          "7": {
+            "conservation": 7
+          }
         }
       },
       "metadata": {
@@ -252,7 +374,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -273,19 +399,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "conservation": 1 },
-          "2": { "conservation": 2 },
-          "3": { "conservation": 3 },
-          "4": { "conservation": 4 },
-          "5": { "conservation": 5 },
-          "6": { "conservation": 6 },
-          "7": { "conservation": 7 }
+          "1": {
+            "conservation": 1
+          },
+          "2": {
+            "conservation": 2
+          },
+          "3": {
+            "conservation": 3
+          },
+          "4": {
+            "conservation": 4
+          },
+          "5": {
+            "conservation": 5
+          },
+          "6": {
+            "conservation": 6
+          },
+          "7": {
+            "conservation": 7
+          }
         }
       },
       "metadata": {
@@ -294,7 +437,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -315,19 +462,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "conservation": 1 },
-          "2": { "conservation": 2 },
-          "3": { "conservation": 3 },
-          "4": { "conservation": 4 },
-          "5": { "conservation": 5 },
-          "6": { "conservation": 6 },
-          "7": { "conservation": 7 }
+          "1": {
+            "conservation": 1
+          },
+          "2": {
+            "conservation": 2
+          },
+          "3": {
+            "conservation": 3
+          },
+          "4": {
+            "conservation": 4
+          },
+          "5": {
+            "conservation": 5
+          },
+          "6": {
+            "conservation": 6
+          },
+          "7": {
+            "conservation": 7
+          }
         }
       },
       "metadata": {
@@ -336,7 +500,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -357,19 +525,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "conservation": 1 },
-          "2": { "conservation": 2 },
-          "3": { "conservation": 3 },
-          "4": { "conservation": 4 },
-          "5": { "conservation": 5 },
-          "6": { "conservation": 6 },
-          "7": { "conservation": 7 }
+          "1": {
+            "conservation": 1
+          },
+          "2": {
+            "conservation": 2
+          },
+          "3": {
+            "conservation": 3
+          },
+          "4": {
+            "conservation": 4
+          },
+          "5": {
+            "conservation": 5
+          },
+          "6": {
+            "conservation": 6
+          },
+          "7": {
+            "conservation": 7
+          }
         }
       },
       "metadata": {
@@ -378,7 +563,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -399,19 +588,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "conservation": 1 },
-          "2": { "conservation": 2 },
-          "3": { "conservation": 3 },
-          "4": { "conservation": 4 },
-          "5": { "conservation": 5 },
-          "6": { "conservation": 6 },
-          "7": { "conservation": 7 }
+          "1": {
+            "conservation": 1
+          },
+          "2": {
+            "conservation": 2
+          },
+          "3": {
+            "conservation": 3
+          },
+          "4": {
+            "conservation": 4
+          },
+          "5": {
+            "conservation": 5
+          },
+          "6": {
+            "conservation": 6
+          },
+          "7": {
+            "conservation": 7
+          }
         }
       },
       "metadata": {
@@ -420,7 +626,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -441,19 +651,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-transcendence": 1 },
-          "2": { "self-transcendence": 2 },
-          "3": { "self-transcendence": 3 },
-          "4": { "self-transcendence": 4 },
-          "5": { "self-transcendence": 5 },
-          "6": { "self-transcendence": 6 },
-          "7": { "self-transcendence": 7 }
+          "1": {
+            "self-transcendence": 1
+          },
+          "2": {
+            "self-transcendence": 2
+          },
+          "3": {
+            "self-transcendence": 3
+          },
+          "4": {
+            "self-transcendence": 4
+          },
+          "5": {
+            "self-transcendence": 5
+          },
+          "6": {
+            "self-transcendence": 6
+          },
+          "7": {
+            "self-transcendence": 7
+          }
         }
       },
       "metadata": {
@@ -462,7 +689,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -483,19 +714,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-transcendence": 1 },
-          "2": { "self-transcendence": 2 },
-          "3": { "self-transcendence": 3 },
-          "4": { "self-transcendence": 4 },
-          "5": { "self-transcendence": 5 },
-          "6": { "self-transcendence": 6 },
-          "7": { "self-transcendence": 7 }
+          "1": {
+            "self-transcendence": 1
+          },
+          "2": {
+            "self-transcendence": 2
+          },
+          "3": {
+            "self-transcendence": 3
+          },
+          "4": {
+            "self-transcendence": 4
+          },
+          "5": {
+            "self-transcendence": 5
+          },
+          "6": {
+            "self-transcendence": 6
+          },
+          "7": {
+            "self-transcendence": 7
+          }
         }
       },
       "metadata": {
@@ -504,7 +752,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -525,19 +777,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-transcendence": 1 },
-          "2": { "self-transcendence": 2 },
-          "3": { "self-transcendence": 3 },
-          "4": { "self-transcendence": 4 },
-          "5": { "self-transcendence": 5 },
-          "6": { "self-transcendence": 6 },
-          "7": { "self-transcendence": 7 }
+          "1": {
+            "self-transcendence": 1
+          },
+          "2": {
+            "self-transcendence": 2
+          },
+          "3": {
+            "self-transcendence": 3
+          },
+          "4": {
+            "self-transcendence": 4
+          },
+          "5": {
+            "self-transcendence": 5
+          },
+          "6": {
+            "self-transcendence": 6
+          },
+          "7": {
+            "self-transcendence": 7
+          }
         }
       },
       "metadata": {
@@ -546,7 +815,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -567,19 +840,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-transcendence": 1 },
-          "2": { "self-transcendence": 2 },
-          "3": { "self-transcendence": 3 },
-          "4": { "self-transcendence": 4 },
-          "5": { "self-transcendence": 5 },
-          "6": { "self-transcendence": 6 },
-          "7": { "self-transcendence": 7 }
+          "1": {
+            "self-transcendence": 1
+          },
+          "2": {
+            "self-transcendence": 2
+          },
+          "3": {
+            "self-transcendence": 3
+          },
+          "4": {
+            "self-transcendence": 4
+          },
+          "5": {
+            "self-transcendence": 5
+          },
+          "6": {
+            "self-transcendence": 6
+          },
+          "7": {
+            "self-transcendence": 7
+          }
         }
       },
       "metadata": {
@@ -588,7 +878,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -609,19 +903,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-transcendence": 1 },
-          "2": { "self-transcendence": 2 },
-          "3": { "self-transcendence": 3 },
-          "4": { "self-transcendence": 4 },
-          "5": { "self-transcendence": 5 },
-          "6": { "self-transcendence": 6 },
-          "7": { "self-transcendence": 7 }
+          "1": {
+            "self-transcendence": 1
+          },
+          "2": {
+            "self-transcendence": 2
+          },
+          "3": {
+            "self-transcendence": 3
+          },
+          "4": {
+            "self-transcendence": 4
+          },
+          "5": {
+            "self-transcendence": 5
+          },
+          "6": {
+            "self-transcendence": 6
+          },
+          "7": {
+            "self-transcendence": 7
+          }
         }
       },
       "metadata": {
@@ -630,7 +941,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -651,19 +966,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-enhancement": 1 },
-          "2": { "self-enhancement": 2 },
-          "3": { "self-enhancement": 3 },
-          "4": { "self-enhancement": 4 },
-          "5": { "self-enhancement": 5 },
-          "6": { "self-enhancement": 6 },
-          "7": { "self-enhancement": 7 }
+          "1": {
+            "self-enhancement": 1
+          },
+          "2": {
+            "self-enhancement": 2
+          },
+          "3": {
+            "self-enhancement": 3
+          },
+          "4": {
+            "self-enhancement": 4
+          },
+          "5": {
+            "self-enhancement": 5
+          },
+          "6": {
+            "self-enhancement": 6
+          },
+          "7": {
+            "self-enhancement": 7
+          }
         }
       },
       "metadata": {
@@ -672,7 +1004,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -693,19 +1029,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-enhancement": 1 },
-          "2": { "self-enhancement": 2 },
-          "3": { "self-enhancement": 3 },
-          "4": { "self-enhancement": 4 },
-          "5": { "self-enhancement": 5 },
-          "6": { "self-enhancement": 6 },
-          "7": { "self-enhancement": 7 }
+          "1": {
+            "self-enhancement": 1
+          },
+          "2": {
+            "self-enhancement": 2
+          },
+          "3": {
+            "self-enhancement": 3
+          },
+          "4": {
+            "self-enhancement": 4
+          },
+          "5": {
+            "self-enhancement": 5
+          },
+          "6": {
+            "self-enhancement": 6
+          },
+          "7": {
+            "self-enhancement": 7
+          }
         }
       },
       "metadata": {
@@ -714,7 +1067,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -735,19 +1092,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-enhancement": 1 },
-          "2": { "self-enhancement": 2 },
-          "3": { "self-enhancement": 3 },
-          "4": { "self-enhancement": 4 },
-          "5": { "self-enhancement": 5 },
-          "6": { "self-enhancement": 6 },
-          "7": { "self-enhancement": 7 }
+          "1": {
+            "self-enhancement": 1
+          },
+          "2": {
+            "self-enhancement": 2
+          },
+          "3": {
+            "self-enhancement": 3
+          },
+          "4": {
+            "self-enhancement": 4
+          },
+          "5": {
+            "self-enhancement": 5
+          },
+          "6": {
+            "self-enhancement": 6
+          },
+          "7": {
+            "self-enhancement": 7
+          }
         }
       },
       "metadata": {
@@ -756,7 +1130,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -777,19 +1155,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-enhancement": 1 },
-          "2": { "self-enhancement": 2 },
-          "3": { "self-enhancement": 3 },
-          "4": { "self-enhancement": 4 },
-          "5": { "self-enhancement": 5 },
-          "6": { "self-enhancement": 6 },
-          "7": { "self-enhancement": 7 }
+          "1": {
+            "self-enhancement": 1
+          },
+          "2": {
+            "self-enhancement": 2
+          },
+          "3": {
+            "self-enhancement": 3
+          },
+          "4": {
+            "self-enhancement": 4
+          },
+          "5": {
+            "self-enhancement": 5
+          },
+          "6": {
+            "self-enhancement": 6
+          },
+          "7": {
+            "self-enhancement": 7
+          }
         }
       },
       "metadata": {
@@ -798,7 +1193,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     },
@@ -819,19 +1218,36 @@
               "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
       "subscaleContributions": {
         "likert-scale 1": {
-          "1": { "self-enhancement": 1 },
-          "2": { "self-enhancement": 2 },
-          "3": { "self-enhancement": 3 },
-          "4": { "self-enhancement": 4 },
-          "5": { "self-enhancement": 5 },
-          "6": { "self-enhancement": 6 },
-          "7": { "self-enhancement": 7 }
+          "1": {
+            "self-enhancement": 1
+          },
+          "2": {
+            "self-enhancement": 2
+          },
+          "3": {
+            "self-enhancement": 3
+          },
+          "4": {
+            "self-enhancement": 4
+          },
+          "5": {
+            "self-enhancement": 5
+          },
+          "6": {
+            "self-enhancement": 6
+          },
+          "7": {
+            "self-enhancement": 7
+          }
         }
       },
       "metadata": {
@@ -840,7 +1256,11 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["assessment", "values", "psychometric"],
+        "tags": [
+          "assessment",
+          "values",
+          "psychometric"
+        ],
         "instrumentId": "values-hierarchy-discovery"
       }
     }
@@ -879,5 +1299,17 @@
     "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479929",
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

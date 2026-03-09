@@ -15,16 +15,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "To make governance decisions", "correct": false, "id": "civ-q1-choice-0" },
-                { "content": "To provide oversight and accountability", "correct": true, "id": "civ-q1-choice-1" },
-                { "content": "To build AI systems", "correct": false, "id": "civ-q1-choice-2" },
-                { "content": "To enforce rules", "correct": false, "id": "civ-q1-choice-3" }
+                {
+                  "content": "To make governance decisions",
+                  "correct": false,
+                  "id": "civ-q1-choice-0"
+                },
+                {
+                  "content": "To provide oversight and accountability",
+                  "correct": true,
+                  "id": "civ-q1-choice-1"
+                },
+                {
+                  "content": "To build AI systems",
+                  "correct": false,
+                  "id": "civ-q1-choice-2"
+                },
+                {
+                  "content": "To enforce rules",
+                  "correct": false,
+                  "id": "civ-q1-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -42,7 +61,10 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["public-observer", "oversight"]
+        "tags": [
+          "public-observer",
+          "oversight"
+        ]
       }
     },
     {
@@ -56,14 +78,25 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "True", "correct": false, "id": "civ-q2-true" },
-                { "content": "False", "correct": true, "id": "civ-q2-false" }
+                {
+                  "content": "True",
+                  "correct": false,
+                  "id": "civ-q2-true"
+                },
+                {
+                  "content": "False",
+                  "correct": true,
+                  "id": "civ-q2-false"
+                }
               ],
               "randomize": false,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -81,7 +114,10 @@
         "difficulty": "easy",
         "estimatedTimeSeconds": 15,
         "questionType": "core",
-        "tags": ["public-observer", "true-false"]
+        "tags": [
+          "public-observer",
+          "true-false"
+        ]
       }
     },
     {
@@ -95,16 +131,35 @@
             "type": "radio",
             "options": {
               "choices": [
-                { "content": "Everything is public with no privacy", "correct": false, "id": "civ-q3-choice-0" },
-                { "content": "Nothing is shared publicly", "correct": false, "id": "civ-q3-choice-1" },
-                { "content": "Graduated transparency based on context and consent", "correct": true, "id": "civ-q3-choice-2" },
-                { "content": "Random audits only", "correct": false, "id": "civ-q3-choice-3" }
+                {
+                  "content": "Everything is public with no privacy",
+                  "correct": false,
+                  "id": "civ-q3-choice-0"
+                },
+                {
+                  "content": "Nothing is shared publicly",
+                  "correct": false,
+                  "id": "civ-q3-choice-1"
+                },
+                {
+                  "content": "Graduated transparency based on context and consent",
+                  "correct": true,
+                  "id": "civ-q3-choice-2"
+                },
+                {
+                  "content": "Random audits only",
+                  "correct": false,
+                  "id": "civ-q3-choice-3"
+                }
               ],
               "randomize": true,
               "multipleSelect": false
             },
             "graded": true,
-            "version": { "major": 0, "minor": 0 }
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
         }
       },
@@ -122,13 +177,23 @@
         "difficulty": "medium",
         "estimatedTimeSeconds": 30,
         "questionType": "core",
-        "tags": ["public-observer", "transparency"]
+        "tags": [
+          "public-observer",
+          "transparency"
+        ]
       }
     }
   ],
   "contentFormat": "sophia",
-  "tags": ["assessment", "public-observer", "civic", "participation"],
-  "relatedNodeIds": ["public-observer-epic"],
+  "tags": [
+    "assessment",
+    "public-observer",
+    "civic",
+    "participation"
+  ],
+  "relatedNodeIds": [
+    "public-observer-epic"
+  ],
   "metadata": {
     "assessmentType": "mastery",
     "category": "public-observer",
@@ -138,5 +203,17 @@
     "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479362",
-  "updatedAt": "2026-01-24T00:00:00.000Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-timothy-tutor",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-susan-partner",
+      "affinity": 0.5,
+      "role": "curator"
+    }
+  ]
 }

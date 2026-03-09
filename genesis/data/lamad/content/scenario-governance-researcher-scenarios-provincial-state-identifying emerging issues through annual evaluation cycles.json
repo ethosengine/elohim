@@ -5,7 +5,7 @@
   "activityPubType": "Note",
   "title": "Identifying emerging issues through annual evaluation cycles",
   "description": "Identifying emerging issues through annual evaluation cycles",
-  "content": "Scenario: Identifying emerging issues through annual evaluation cycles\n    Given I analyze regional data annually to track trends\n    And I want to identify problems before they become crises\n    When I examine this year's patterns compared to previous years\n    Then I notice: appeal rates trending up (good\u2014people know recourse exists)\n    And I identify: recurring adolescent autonomy conflicts emerging\n    And I detect: systematic issue with business loan evaluation criteria\n    And I recognize: elderly accessibility remaining challenging\n    And I flag: potential issues for community leaders and policymakers\n    And My timely analysis enables: proactive response to emerging challenges\n    And Research provides: early warning system for governance problems\n",
+  "content": "Scenario: Identifying emerging issues through annual evaluation cycles\n    Given I analyze regional data annually to track trends\n    And I want to identify problems before they become crises\n    When I examine this year's patterns compared to previous years\n    Then I notice: appeal rates trending up (good—people know recourse exists)\n    And I identify: recurring adolescent autonomy conflicts emerging\n    And I detect: systematic issue with business loan evaluation criteria\n    And I recognize: elderly accessibility remaining challenging\n    And I flag: potential issues for community leaders and policymakers\n    And My timely analysis enables: proactive response to emerging challenges\n    And Research provides: early warning system for governance problems\n",
   "contentFormat": "gherkin",
   "tags": [
     "epic:governance",
@@ -54,5 +54,17 @@
     }
   },
   "createdAt": "2025-11-22T01:43:14Z",
-  "updatedAt": "2025-11-22T01:43:14Z"
+  "updatedAt": "2025-11-22T01:43:14Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }

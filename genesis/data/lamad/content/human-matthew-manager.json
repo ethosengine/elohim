@@ -68,5 +68,17 @@
     ]
   },
   "createdAt": "2025-12-01T20:08:11.328330",
-  "updatedAt": "2025-12-24T03:05:26.335Z"
+  "updatedAt": "2025-12-24T03:05:26.335Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.8,
+      "role": "author"
+    },
+    {
+      "humanId": "human-pastor-pete-pastor",
+      "affinity": 0.4,
+      "role": "endorser"
+    }
+  ]
 }
