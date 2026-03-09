@@ -11,3 +11,6 @@ export * from './governance-deliberation.model';
 export * from './place.model';
 export * from './collective-research.model';
 export * from './collective.model';
+
+// Mutual Aid - Compute/resource solidarity governance
+export * from './mutual-aid.model';
