@@ -433,6 +433,7 @@ const IDS = IDS_ARG ? (IDS_ARG.split('=')[1] || args[args.indexOf(IDS_ARG) + 1] 
 const FORCE_SEED = args.includes('--force') || process.env.FORCE_SEED === 'true';
 const PATHS_ONLY = args.includes('--paths-only') || process.env.SEED_PATHS_ONLY === 'true';
 const CONTENT_ONLY = args.includes('--content-only') || process.env.SEED_CONTENT_ONLY === 'true';
+const CONDUCTOR_FOR = args.find(a => a.startsWith('--conductor-for='))?.split('=')[1];
 
 // =============================================================================
 // DOORWAY MODE (Required)
@@ -964,6 +965,33 @@ async function connectForVerification(): Promise<HolochainConnection | null> {
  *
  * @returns SeedResult with counts for post-flight verification
  */
+
+/**
+ * Filter content nodes to those stewarded by a specific human.
+ * Returns content where the given humanId is the highest-affinity steward.
+ * If no stewardedBy field exists, defaults to the operator (backwards compat).
+ */
+function filterBySteward(
+  concepts: { concept: ConceptJson; file: string }[],
+  humanId: string,
+  operatorId: string = 'human-matthew-manager',
+): { concept: ConceptJson; file: string }[] {
+  return concepts.filter(({ concept }) => {
+    const stewards = (concept as unknown as Record<string, unknown>).stewardedBy as
+      | Array<{ humanId: string; affinity: number }>
+      | undefined;
+
+    if (!stewards || stewards.length === 0) {
+      // No stewardship annotation — default to operator
+      return humanId === operatorId;
+    }
+
+    // Find highest-affinity steward
+    const primary = stewards.reduce((max, s) => (s.affinity > max.affinity ? s : max), stewards[0]);
+    return primary.humanId === humanId;
+  });
+}
+
 async function seedViaDoorway(): Promise<SeedResult> {
   // Track results for verification
   const result: SeedResult = {
@@ -1098,6 +1126,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
   if (LIMIT > 0 && filteredConcepts.length > LIMIT) {
     filteredConcepts = filteredConcepts.slice(0, LIMIT);
     console.log(`   Limited to ${LIMIT} concepts`);
+  }
+  if (CONDUCTOR_FOR) {
+    const beforeCount = filteredConcepts.length;
+    filteredConcepts = filterBySteward(filteredConcepts, CONDUCTOR_FOR);
+    console.log(`   [stewardship] Filtered to ${filteredConcepts.length}/${beforeCount} content nodes for ${CONDUCTOR_FOR}`);
   }
 
   timer.endPhase('Content Loading');
