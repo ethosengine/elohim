@@ -14,6 +14,7 @@ import { ContentBlob } from '../models/content-node.model';
 import { of, throwError } from 'rxjs';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
+import { BlobMetadataAnchor } from '@app/elohim/integrity';
 
 describe('BlobManagerService', () => {
   let service: BlobManagerService;
@@ -47,6 +48,10 @@ describe('BlobManagerService', () => {
         BlobManagerService,
         BlobVerificationService,
         BlobFallbackService,
+        {
+          provide: BlobMetadataAnchor,
+          useValue: { zomeName: 'content_store', fnName: 'get_blobs_by_content_id', verify: vi.fn().mockResolvedValue(null) },
+        },
       ],
     });
     service = TestBed.inject(BlobManagerService);
