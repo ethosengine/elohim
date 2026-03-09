@@ -136,6 +136,34 @@ export interface ContentBlobCaption {
   isHardOfHearing?: boolean;
 }
 
+/**
+ * ContentSteward - A human's stewardship relationship with content.
+ *
+ * Stewardship is graduated, not binary. The author typically has highest
+ * affinity, but curators, translators, and endorsers all have stewardship
+ * relationships with different weights.
+ *
+ * Affinity determines:
+ * - Which conductor is "home" for this content (highest affinity steward)
+ * - How REA value flows proportionally back to stewards
+ * - Replication priority (higher affinity = earlier sync)
+ */
+export interface ContentSteward {
+  /** Reference to a genesis human ID */
+  humanId: string;
+
+  /** Strength of stewardship relationship (0-1) */
+  affinity: number;
+
+  /** What kind of stewardship */
+  role: StewardshipRole;
+}
+
+/**
+ * StewardshipRole - How this human relates to the content.
+ */
+export type StewardshipRole = 'author' | 'curator' | 'translator' | 'endorser' | 'steward';
+
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
   id: string;
@@ -175,6 +203,9 @@ export interface ContentNode {
 
   /** Large binary media (videos, podcasts, etc.) - Phase 1 blob pointer system */
   blobs?: ContentBlob[];
+
+  /** Who stewards this content, with graduated affinity */
+  stewardedBy?: ContentSteward[];
 
   // =========================================================================
   // Trust & Reach (Bidirectional Attestation Model)
