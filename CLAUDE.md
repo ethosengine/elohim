@@ -10,20 +10,20 @@ Polyglot monorepo for the Elohim Protocol - a distributed learning platform buil
 
 ### elohim-app (Angular 19 - main frontend)
 ```bash
+pnpm install                       # From repo root (workspace install)
 cd elohim-app
-npm install
-npm start                          # Dev server at localhost:4200 (proxies to doorway at :8888)
-npm run build                      # Production build
-npm run lint                       # ESLint
-npm run lint:fix                   # ESLint with auto-fix
-npm run lint:css                   # Stylelint (SCSS/CSS)
-npm run format:check               # Prettier check
-npm test                           # Unit tests (Karma/Jasmine) with coverage
-ng test --watch=false --browsers=ChromeHeadlessCI  # CI-mode tests
-npx ng test --include='**/path.service.spec.ts'    # Single test file
-npm run cypress:run                # E2E tests (Cucumber BDD)
-npm run hc:start                   # Start Holochain + doorway + storage
-npm run hc:start:seed              # Start with content seeding
+pnpm start                         # Dev server at localhost:4200 (proxies to doorway at :8888)
+pnpm run build                     # Production build
+pnpm run lint                      # ESLint
+pnpm run lint:fix                  # ESLint with auto-fix
+pnpm run lint:css                  # Stylelint (SCSS/CSS)
+pnpm run format:check              # Prettier check
+pnpm test                          # Unit tests (Vitest) with coverage
+pnpm exec vitest run --config vite.config.ts                 # CI-mode tests
+pnpm exec vitest run --config vite.config.ts "path.service"  # Single test file
+pnpm run cypress:run               # E2E tests (Cucumber BDD)
+pnpm run hc:start                  # Start Holochain + doorway + storage
+pnpm run hc:start:seed             # Start with content seeding
 ```
 
 ### doorway (Rust gateway service)
@@ -38,10 +38,10 @@ cargo fmt --check
 ### doorway-app (Angular admin UI)
 ```bash
 cd doorway-app
-npm install
-npm start                          # Dev server
-npm run build
-npx eslint src --ext .ts,.html
+pnpm install                       # Or from repo root
+pnpm start                         # Dev server
+pnpm run build
+pnpm exec eslint src --ext .ts,.html
 ```
 
 ### sophia (assessment engine - git submodule, pnpm)
@@ -58,8 +58,8 @@ pnpm typecheck                     # Full type-check
 ### elohim-library (shared Angular libraries)
 ```bash
 cd elohim-library
-npm install
-npx jest                           # Jest tests for elohim-service
+pnpm install                       # Or from repo root
+cd projects/elohim-service && pnpm test   # Vitest tests for elohim-service
 ```
 
 ### elohim-node (Rust P2P runtime)
@@ -129,6 +129,28 @@ The app runs in four modes with different content loading paths:
 - **Production**: Browser direct to doorway.elohim.host
 - **Tauri desktop**: Direct HTTP to local elohim-storage sidecar at :8090
 
+## Development Workflow
+
+### Story-First Default
+
+Before implementing a feature, find or write the a2o scenario that describes the learner's experience. The scenario is your specification. Implementation is done when the scenario passes.
+
+1. **Feel the vision** — read the epic/manifesto context in `genesis/docs/content/elohim-protocol/`
+2. **Find or write the scenario** — check `genesis/a2o/features/` for existing coverage, or write a new `.feature` file
+3. **Implement** to make the scenario pass
+4. **Commit scenario + implementation together**
+
+| Pillar | A2O Features Directory |
+|--------|----------------------|
+| lamad | `genesis/a2o/features/lamad/` |
+| imagodei | `genesis/a2o/features/auth/` |
+| qahal | `genesis/a2o/features/` (governance scenarios) |
+| elohim | `genesis/a2o/features/content/`, `federation/` |
+
+### Exploration Fallback
+
+When story-first isn't practical (prototyping, spikes), capture implementation intent before committing by appending to `.claude/data/dev-intent.jsonl` — a 3-4 sentence summary of what was built, the learner impact, and which a2o feature file needs updating. Then run `/close-loop` to generate scenario updates from your intent.
+
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required
@@ -150,12 +172,15 @@ The sophia-element UMD bundle must be built before elohim-app builds. The `prebu
 cd sophia && pnpm install && pnpm build && pnpm build:umd
 ```
 
+### pnpm Workspace
+All TypeScript/Node.js projects use pnpm workspaces. Run `pnpm install` from the repo root to install all dependencies. Sophia is excluded (git submodule with its own pnpm workspace). Use `pnpm --filter <package-name> <command>` to target specific packages. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
+
 ### libp2p 0.53 API (elohim-node)
 Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for request-response. Swarm uses `StreamExt::next()` not `select_next_event()`.
 
 ## CI/CD
 
-Central orchestrator pattern: only `orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Pipeline definitions are in `orchestrator/Jenkinsfile`'s `PIPELINES` map.
+Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Pipeline definitions are in `genesis/orchestrator/Jenkinsfile`'s `PIPELINES` map.
 
 | Pipeline | Jenkinsfile | Trigger |
 |----------|-------------|---------|

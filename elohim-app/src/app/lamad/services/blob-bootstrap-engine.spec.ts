@@ -22,6 +22,7 @@ import {
   BlobMetadataFetcher,
   CacheIntegrityVerifier,
 } from './blob-bootstrap-engine';
+import { type Mock, vi } from 'vitest';
 
 // ============================================================================
 // MOCK FACTORIES (Reusable across module specs)
@@ -32,30 +33,30 @@ import {
  * Creates a spy object with all methods stubbed.
  * Use this pattern when mocking dependencies defined by interfaces.
  */
-function createMockHolochainConnectionChecker(): jasmine.SpyObj<HolochainConnectionChecker> {
-  return jasmine.createSpyObj<HolochainConnectionChecker>('HolochainConnectionChecker', [
-    'isConnected',
-  ]);
+function createMockHolochainConnectionChecker(): any {
+  return {
+    isConnected: vi.fn(),
+  };
 }
 
 /**
  * PATTERN: Mock factory for async service dependencies
  * Stubs Promise-returning methods with default successful behavior.
  */
-function createMockBlobMetadataFetcher(): jasmine.SpyObj<BlobMetadataFetcher> {
-  return jasmine.createSpyObj<BlobMetadataFetcher>('BlobMetadataFetcher', [
-    'getBlobsForContent',
-  ]);
+function createMockBlobMetadataFetcher(): any {
+  return {
+    getBlobsForContent: vi.fn(),
+  };
 }
 
 /**
  * PATTERN: Mock factory for side-effect-only dependencies
  * Stubs void methods that trigger background operations.
  */
-function createMockCacheIntegrityVerifier(): jasmine.SpyObj<CacheIntegrityVerifier> {
-  return jasmine.createSpyObj<CacheIntegrityVerifier>('CacheIntegrityVerifier', [
-    'startIntegrityVerification',
-  ]);
+function createMockCacheIntegrityVerifier(): any {
+  return {
+    startIntegrityVerification: vi.fn(),
+  };
 }
 
 /**
@@ -79,9 +80,9 @@ function createTestConfig(overrides?: Partial<BlobBootstrapConfig>): BlobBootstr
 describe('BlobBootstrapEngine', () => {
   // PATTERN: Declare shared test fixtures at suite level
   let engine: BlobBootstrapEngine;
-  let mockHolochainChecker: jasmine.SpyObj<HolochainConnectionChecker>;
-  let mockMetadataFetcher: jasmine.SpyObj<BlobMetadataFetcher>;
-  let mockCacheVerifier: jasmine.SpyObj<CacheIntegrityVerifier>;
+  let mockHolochainChecker: any;
+  let mockMetadataFetcher: any;
+  let mockCacheVerifier: any;
   let config: BlobBootstrapConfig;
 
   // PATTERN: Event capture helper for testing pub/sub patterns
@@ -95,8 +96,8 @@ describe('BlobBootstrapEngine', () => {
     mockCacheVerifier = createMockCacheIntegrityVerifier();
 
     // PATTERN: Default mock behavior (happy path)
-    mockHolochainChecker.isConnected.and.returnValue(true);
-    mockMetadataFetcher.getBlobsForContent.and.returnValue(
+    mockHolochainChecker.isConnected.mockReturnValue(true);
+    mockMetadataFetcher.getBlobsForContent.mockReturnValue(
       Promise.resolve([{ hash: 'mock-blob-1' }])
     );
 
@@ -179,7 +180,7 @@ describe('BlobBootstrapEngine', () => {
     it('should complete full bootstrap when Holochain connects immediately', async () => {
       // PATTERN: Testing async orchestration with proper awaits
       // Arrange: Holochain connected, metadata available
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act: Start bootstrap (non-blocking)
       engine.startBootstrap();
@@ -201,7 +202,7 @@ describe('BlobBootstrapEngine', () => {
     it('should emit events in correct sequence during bootstrap', async () => {
       // PATTERN: Testing event-driven architecture
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();
@@ -218,9 +219,10 @@ describe('BlobBootstrapEngine', () => {
       expect(eventTypes).toContain('ready');
 
       // Verify status progression
-      const statusEvents = capturedEvents.filter(
-        e => e.type === 'status-changed'
-      ) as Extract<BlobBootstrapEvent, { type: 'status-changed' }>[];
+      const statusEvents = capturedEvents.filter(e => e.type === 'status-changed') as Extract<
+        BlobBootstrapEvent,
+        { type: 'status-changed' }
+      >[];
 
       expect(statusEvents.length).toBeGreaterThan(0);
       expect(statusEvents[0].status).toBe('initializing');
@@ -233,7 +235,7 @@ describe('BlobBootstrapEngine', () => {
     it('should fetch metadata for all configured content IDs', async () => {
       // PATTERN: Testing dependency interaction and call verification
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();
@@ -248,7 +250,7 @@ describe('BlobBootstrapEngine', () => {
     it('should start cache integrity verification after bootstrap', async () => {
       // PATTERN: Testing side-effect invocation
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();
@@ -267,7 +269,7 @@ describe('BlobBootstrapEngine', () => {
     it('should enter degraded mode when Holochain connection times out', async () => {
       // PATTERN: Testing timeout behavior with polling
       // Arrange: Holochain never connects
-      mockHolochainChecker.isConnected.and.returnValue(false);
+      mockHolochainChecker.isConnected.mockReturnValue(false);
 
       // Act
       engine.startBootstrap();
@@ -287,7 +289,7 @@ describe('BlobBootstrapEngine', () => {
     it('should emit ready event even in degraded mode', async () => {
       // PATTERN: Testing graceful degradation
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(false);
+      mockHolochainChecker.isConnected.mockReturnValue(false);
 
       // Act
       engine.startBootstrap();
@@ -301,8 +303,8 @@ describe('BlobBootstrapEngine', () => {
     it('should handle metadata fetch failures gracefully', async () => {
       // PATTERN: Testing error handling in async flows
       // Arrange: First content succeeds, second fails
-      mockHolochainChecker.isConnected.and.returnValue(true);
-      mockMetadataFetcher.getBlobsForContent.and.callFake((contentId: string) => {
+      mockHolochainChecker.isConnected.mockReturnValue(true);
+      mockMetadataFetcher.getBlobsForContent.mockImplementation((contentId: string) => {
         if (contentId === 'content-1') {
           return Promise.resolve([{ hash: 'blob-1' }]);
         } else {
@@ -324,8 +326,8 @@ describe('BlobBootstrapEngine', () => {
     it('should continue bootstrap when metadata returns empty array', async () => {
       // PATTERN: Testing edge case - valid but empty data
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
-      mockMetadataFetcher.getBlobsForContent.and.returnValue(Promise.resolve([]));
+      mockHolochainChecker.isConnected.mockReturnValue(true);
+      mockMetadataFetcher.getBlobsForContent.mockReturnValue(Promise.resolve([]));
 
       // Act
       engine.startBootstrap();
@@ -347,7 +349,7 @@ describe('BlobBootstrapEngine', () => {
       // PATTERN: Testing polling logic with delayed connection
       // Arrange: Connect after 3 polls
       let pollCount = 0;
-      mockHolochainChecker.isConnected.and.callFake(() => {
+      mockHolochainChecker.isConnected.mockImplementation(() => {
         pollCount++;
         return pollCount >= 3;
       });
@@ -377,7 +379,7 @@ describe('BlobBootstrapEngine', () => {
         shortTimeoutConfig
       );
 
-      mockHolochainChecker.isConnected.and.returnValue(false);
+      mockHolochainChecker.isConnected.mockReturnValue(false);
 
       // Act
       const startTime = Date.now();
@@ -405,7 +407,7 @@ describe('BlobBootstrapEngine', () => {
       engine.on('ready', event => listener1Events.push(event));
       engine.on('ready', event => listener2Events.push(event));
 
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();
@@ -425,7 +427,7 @@ describe('BlobBootstrapEngine', () => {
       // Act: Unsubscribe before bootstrap
       unsubscribe();
 
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
 
@@ -436,16 +438,17 @@ describe('BlobBootstrapEngine', () => {
     it('should emit metadata-loaded event with correct content IDs', async () => {
       // PATTERN: Testing event payload correctness
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
 
       // Assert: Event payload matches state
-      const metadataEvent = capturedEvents.find(
-        e => e.type === 'metadata-loaded'
-      ) as Extract<BlobBootstrapEvent, { type: 'metadata-loaded' }>;
+      const metadataEvent = capturedEvents.find(e => e.type === 'metadata-loaded') as Extract<
+        BlobBootstrapEvent,
+        { type: 'metadata-loaded' }
+      >;
 
       expect(metadataEvent).toBeDefined();
       expect(metadataEvent.contentIds).toEqual(['content-1', 'content-2']);
@@ -460,12 +463,12 @@ describe('BlobBootstrapEngine', () => {
     it('should preload content on demand when Holochain connected', async () => {
       // PATTERN: Testing imperative API calls
       // Arrange: Bootstrap first
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
 
       // Reset call counts
-      mockMetadataFetcher.getBlobsForContent.calls.reset();
+      mockMetadataFetcher.getBlobsForContent.mockClear();
 
       // Act: Preload additional content at runtime
       engine.preloadContent(['content-3', 'content-4']);
@@ -481,7 +484,7 @@ describe('BlobBootstrapEngine', () => {
     it('should check if content is preloaded', async () => {
       // PATTERN: Testing query methods
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
 
@@ -500,7 +503,7 @@ describe('BlobBootstrapEngine', () => {
     it('should not restart bootstrap if startBootstrap called multiple times', async () => {
       // PATTERN: Testing idempotency of operations
       // Arrange
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act: Call startBootstrap twice
       engine.startBootstrap();
@@ -515,13 +518,13 @@ describe('BlobBootstrapEngine', () => {
     it('should allow restart after reset', async () => {
       // PATTERN: Testing reset functionality for test isolation
       // Arrange: Complete first bootstrap
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
 
       // Act: Reset and restart
       engine.reset();
-      mockMetadataFetcher.getBlobsForContent.calls.reset();
+      mockMetadataFetcher.getBlobsForContent.mockClear();
 
       engine.startBootstrap();
       await waitForBootstrapReady(engine, 2000);
@@ -565,7 +568,7 @@ describe('BlobBootstrapEngine', () => {
         emptyConfig
       );
 
-      mockHolochainChecker.isConnected.and.returnValue(true);
+      mockHolochainChecker.isConnected.mockReturnValue(true);
 
       // Act
       engine.startBootstrap();

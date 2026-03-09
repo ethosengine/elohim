@@ -11,72 +11,73 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { ShefaService } from '@app/elohim/services/shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { PerformanceMetricsService } from '@app/elohim/services/performance-metrics.service';
 import { CustodianCommitmentService } from '@app/elohim/services/custodian-commitment.service';
-import { EconomicService } from '../../services/economic.service';
-import { StewardedResourceService } from '../../services/stewarded-resources.service';
-import { ComputeEventService } from '../../services/compute-event.service';
-import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { ECONOMIC_EVENT_FACTORY } from '../../interfaces';
+import { STEWARDED_RESOURCES } from '../../interfaces/stewarded-resources.interface';
+import { COMPUTE_EVENT } from '../../interfaces';
+import { DATA_PROTECTION } from '../../interfaces';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
+import { vi } from 'vitest';
 
 describe('ShefaDashboardComponent', () => {
   let component: ShefaDashboardComponent;
   let fixture: ComponentFixture<ShefaDashboardComponent>;
-  let shefaComputeMock: jasmine.SpyObj<ShefaComputeService>;
-  let familyProtectionMock: jasmine.SpyObj<FamilyCommunityProtectionService>;
-  let computeEventsMock: jasmine.SpyObj<ComputeEventService>;
-  let holochainClientMock: jasmine.SpyObj<HolochainClientService>;
-  let shefaServiceMock: jasmine.SpyObj<ShefaService>;
-  let performanceMetricsMock: jasmine.SpyObj<PerformanceMetricsService>;
-  let custodianCommitmentMock: jasmine.SpyObj<CustodianCommitmentService>;
-  let economicServiceMock: jasmine.SpyObj<EconomicService>;
-  let stewardedResourceMock: jasmine.SpyObj<StewardedResourceService>;
+  let shefaComputeMock: any;
+  let familyProtectionMock: any;
+  let computeEventsMock: any;
+  let holochainClientMock: any;
+  let shefaServiceMock: any;
+  let performanceMetricsMock: any;
+  let custodianCommitmentMock: any;
+  let economicServiceMock: any;
+  let stewardedResourceMock: any;
 
   beforeEach(async () => {
     // Reset to ensure clean test isolation
     TestBed.resetTestingModule();
 
-    holochainClientMock = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
-    holochainClientMock.isConnected.and.returnValue(true);
+    holochainClientMock = {
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
+    holochainClientMock.isConnected.mockReturnValue(true);
 
-    shefaServiceMock = jasmine.createSpyObj('ShefaService', [
-      'getComputeMetrics',
-      'getTokenBalance',
-    ]);
+    shefaServiceMock = {
+      getComputeMetrics: vi.fn(),
+      getTokenBalance: vi.fn(),
+    };
 
-    performanceMetricsMock = jasmine.createSpyObj('PerformanceMetricsService', [
-      'getMetrics',
-      'recordResponseTime',
-    ]);
+    performanceMetricsMock = {
+      getMetrics: vi.fn(),
+      recordResponseTime: vi.fn(),
+    };
 
-    custodianCommitmentMock = jasmine.createSpyObj('CustodianCommitmentService', [
-      'getCommitments',
-      'createCommitment',
-    ]);
+    custodianCommitmentMock = {
+      getCommitments: vi.fn(),
+      createCommitment: vi.fn(),
+    };
 
-    economicServiceMock = jasmine.createSpyObj('EconomicService', [
-      'isAvailable',
-      'getTokenBalance',
-    ]);
+    economicServiceMock = {
+      isAvailable: vi.fn(),
+      getTokenBalance: vi.fn(),
+    };
 
-    stewardedResourceMock = jasmine.createSpyObj('StewardedResourceService', [
-      'getAllocatedResources',
-    ]);
+    stewardedResourceMock = {
+      getAllocatedResources: vi.fn(),
+    };
 
-    shefaComputeMock = jasmine.createSpyObj('ShefaComputeService', [
-      'initializeDashboard',
-    ]);
-    familyProtectionMock = jasmine.createSpyObj('FamilyCommunityProtectionService', [
-      'initializeProtectionMonitoring',
-    ]);
-    computeEventsMock = jasmine.createSpyObj('ComputeEventService', [
-      'initializeEventEmission',
-    ]);
+    shefaComputeMock = {
+      initializeDashboard: vi.fn(),
+    };
+    familyProtectionMock = {
+      initializeProtectionMonitoring: vi.fn(),
+    };
+    computeEventsMock = {
+      initializeEventEmission: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ShefaDashboardComponent],
@@ -86,14 +87,14 @@ describe('ShefaDashboardComponent', () => {
         provideHttpClientTesting(),
         // Override all services that have root-level providedIn
         { provide: HolochainClientService, useValue: holochainClientMock },
-        { provide: ShefaService, useValue: shefaServiceMock },
+        { provide: CUSTODIAN_METRICS, useValue: shefaServiceMock },
         { provide: PerformanceMetricsService, useValue: performanceMetricsMock },
         { provide: CustodianCommitmentService, useValue: custodianCommitmentMock },
-        { provide: EconomicService, useValue: economicServiceMock },
-        { provide: StewardedResourceService, useValue: stewardedResourceMock },
-        { provide: ShefaComputeService, useValue: shefaComputeMock },
-        { provide: FamilyCommunityProtectionService, useValue: familyProtectionMock },
-        { provide: ComputeEventService, useValue: computeEventsMock },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: economicServiceMock },
+        { provide: STEWARDED_RESOURCES, useValue: stewardedResourceMock },
+        { provide: COMPUTE_DASHBOARD, useValue: shefaComputeMock },
+        { provide: DATA_PROTECTION, useValue: familyProtectionMock },
+        { provide: COMPUTE_EVENT, useValue: computeEventsMock },
       ],
       schemas: [NO_ERRORS_SCHEMA],
       teardown: { destroyAfterEach: true },
@@ -140,7 +141,7 @@ describe('ShefaDashboardComponent', () => {
 
   describe('UI state', () => {
     it('should start with loading state', () => {
-      expect(component.isLoading).toBeTrue();
+      expect(component.isLoading).toBe(true);
     });
 
     it('should have null lastUpdateTime initially', () => {
@@ -152,7 +153,7 @@ describe('ShefaDashboardComponent', () => {
     });
 
     it('should have config panel hidden initially', () => {
-      expect(component.showConfigPanel).toBeFalse();
+      expect(component.showConfigPanel).toBe(false);
     });
   });
 

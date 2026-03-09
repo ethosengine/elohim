@@ -96,7 +96,7 @@ Sprint 2 (Pipeline Parallel) ── COMPLETE
 - DNA (level 0) → Edge + App (level 1) → Genesis (sequential after)
 - `propagateDependencies()` auto-includes dependents
 
-**Files**: `orchestrator/Jenkinsfile`
+**Files**: `genesis/orchestrator/Jenkinsfile`
 
 ---
 
@@ -111,7 +111,7 @@ Sprint 2 (Pipeline Parallel) ── COMPLETE
 - NetworkPolicy for cross-env isolation
 - All `doorway-dev` references eliminated
 
-**Files**: `orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `namespaces.yaml`, `network-policies.yaml`, all 4 Jenkinsfiles
+**Files**: `genesis/orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `namespaces.yaml`, `network-policies.yaml`, all 4 Jenkinsfiles
 
 ---
 
@@ -139,7 +139,7 @@ Sprint 2 (Pipeline Parallel) ── COMPLETE
 - Version metadata injected into hApp manifest comments
 - RNA migration framework already existed (~2000 lines)
 
-**Files**: `orchestrator/Jenkinsfile`, `holochain/dna/Jenkinsfile`, `holochain/Jenkinsfile`
+**Files**: `genesis/orchestrator/Jenkinsfile`, `holochain/dna/Jenkinsfile`, `holochain/Jenkinsfile`
 
 ---
 
@@ -168,7 +168,7 @@ Sprint 2 (Pipeline Parallel) ── COMPLETE
 - Cross-namespace NetworkPolicy for P2P port 9876
 - `deployEdgeWithManifest()` auto-detects StatefulSet vs Deployment
 
-**Files**: `orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `network-policies.yaml`, `holochain/Jenkinsfile`
+**Files**: `genesis/orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `network-policies.yaml`, `holochain/Jenkinsfile`
 
 ---
 
@@ -188,7 +188,7 @@ Sprint 2 (Pipeline Parallel) ── COMPLETE
 Browser → Ingress → Doorway Deployment → ClusterIP → P2P StatefulSet
 ```
 
-**Files**: `orchestrator/manifests/doorway/alpha.yaml`, `staging.yaml`, `orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `holochain/Jenkinsfile`
+**Files**: `genesis/orchestrator/manifests/doorway/alpha.yaml`, `staging.yaml`, `genesis/orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `holochain/Jenkinsfile`
 
 ---
 
@@ -218,7 +218,7 @@ K8s manifests:
 CI/CD:
 - `holochain/Jenkinsfile`: staging-read deploy step
 
-**Files**: `doorway/src/config.rs`, `conductor/mod.rs`, `conductor/registry.rs`, `routes/admin_conductors.rs`, `routes/mod.rs`, `routes/health.rs`, `server/http.rs`, `main.rs`, `lib.rs`, `orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `orchestrator/manifests/doorway/alpha.yaml`, `staging.yaml`, `staging-read.yaml`, `holochain/Jenkinsfile`, `doorway/SCALING.md`
+**Files**: `doorway/src/config.rs`, `conductor/mod.rs`, `conductor/registry.rs`, `routes/admin_conductors.rs`, `routes/mod.rs`, `routes/health.rs`, `server/http.rs`, `main.rs`, `lib.rs`, `genesis/orchestrator/manifests/edgenode/alpha.yaml`, `staging.yaml`, `genesis/orchestrator/manifests/doorway/alpha.yaml`, `staging.yaml`, `staging-read.yaml`, `holochain/Jenkinsfile`, `doorway/SCALING.md`
 
 ---
 

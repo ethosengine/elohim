@@ -89,6 +89,16 @@ export interface ResourceMeasure {
 }
 
 /**
+ * ResourceHealthStatus - Health indicator for resource utilization
+ */
+export type ResourceHealthStatus = 'healthy' | 'warning' | 'critical';
+
+/**
+ * ResourceVisibilityLevel - Governance visibility scope for resources and transitions
+ */
+export type ResourceVisibilityLevel = 'private' | 'household' | 'community' | 'public';
+
+/**
  * AllocationStatus - Where the resource is allocated
  */
 export type AllocationStatus =
@@ -223,7 +233,7 @@ export interface StewardedResource {
   // Metadata
   // ─────────────────────────────────────────────────────────────────
   isShared: boolean; // Is this shared with others?
-  visibility: 'private' | 'household' | 'community' | 'public';
+  visibility: ResourceVisibilityLevel;
   dataQuality: 'measured' | 'estimated' | 'manual' | 'mixed';
   lastVerifiedAt?: string; // When Observer last confirmed actual usage
   createdAt: string;
@@ -244,7 +254,7 @@ export interface CategorySummary {
   totalAllocated: ResourceMeasure;
   totalUsed: ResourceMeasure;
   utilizationPercent: number;
-  healthStatus: 'healthy' | 'warning' | 'critical';
+  healthStatus: ResourceHealthStatus;
 }
 
 /**
@@ -264,7 +274,7 @@ export interface StewardedResourceDashboard {
     categoriesCovered: number;
     overallUtilization: number; // Weighted average
     fullyAllocatedCount: number; // How many at capacity
-    healthStatus: 'healthy' | 'warning' | 'critical';
+    healthStatus: ResourceHealthStatus;
   };
 
   // Alerts and insights
@@ -492,7 +502,7 @@ export interface FinancialObligation {
   daysOverdue: number; // If applicable
   status: 'current' | 'overdue' | 'defaulted' | 'paid-off';
   governanceLevel?: string; // Some obligations may be community-governed
-  transparencyLevel: 'private' | 'household' | 'community' | 'public';
+  transparencyLevel: ResourceVisibilityLevel;
 }
 
 // =============================================================================
@@ -794,7 +804,7 @@ export interface TransitionPath {
 
   // Constitutional Record
   transitionEventIds: string[]; // EconomicEvent IDs for all transfers
-  transparencyLevel: 'private' | 'household' | 'community' | 'public';
+  transparencyLevel: ResourceVisibilityLevel;
 
   // Metadata
   createdAt: string;
@@ -921,7 +931,7 @@ export interface CommonsContribution {
 
   // Transparency
   publicRecognition: boolean; // Is this publicly acknowledged?
-  visibilityLevel: 'private' | 'household' | 'community' | 'public';
+  visibilityLevel: ResourceVisibilityLevel;
 
   // Economic Integration
   economicEventId: string; // EconomicEvent for immutability
@@ -1034,7 +1044,7 @@ export function calculateUtilization(
 /**
  * Determine health status based on utilization
  */
-export function getHealthStatus(utilization: number): 'healthy' | 'warning' | 'critical' {
+export function getHealthStatus(utilization: number): ResourceHealthStatus {
   if (utilization > 90) return 'critical';
   if (utilization > 75) return 'warning';
   return 'healthy';

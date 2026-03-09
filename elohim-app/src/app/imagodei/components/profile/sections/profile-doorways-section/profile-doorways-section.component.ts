@@ -1,8 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+
+// @coverage: 2.9% (2026-02-24)
 
 import { type DoorwayWithHealth } from '../../../../models/doorway.model';
 import { type IdentityMode } from '../../../../models/identity.model';
+import { AuthService } from '../../../../services';
 
 export interface DoorwayRegistrationContext {
   identifier: string | null;
@@ -18,6 +21,8 @@ export interface DoorwayRegistrationContext {
   styleUrls: ['./profile-doorways-section.component.css'],
 })
 export class ProfileDoorwaysSectionComponent {
+  private readonly authService = inject(AuthService);
+
   readonly doorways = input.required<DoorwayWithHealth[]>();
   readonly activeDoorwayId = input<string | null>(null);
   readonly identityMode = input<IdentityMode>('hosted');
@@ -67,6 +72,37 @@ export class ProfileDoorwaysSectionComponent {
       this.addDoorway.emit(result.url);
       this.toggleAddDoorway();
     }
+  }
+
+  /**
+   * Navigate to doorway-app with a session transfer token so Matthew
+   * doesn't have to log in again. Falls back to plain URL if token
+   * fetch fails.
+   */
+  async visitDoorway(doorwayUrl: string): Promise<void> {
+    const token = this.authService.token();
+    if (token) {
+      try {
+        const res = await fetch(`${doorwayUrl}/auth/session-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { sessionToken?: string };
+          if (data.sessionToken) {
+            window.open(
+              `${doorwayUrl}/threshold?session_token=${encodeURIComponent(data.sessionToken)}`,
+              '_blank',
+              'noopener'
+            );
+            return;
+          }
+        }
+      } catch {
+        // Fall through to plain navigation
+      }
+    }
+    // Fallback: open without token (user will need to log in)
+    window.open(`${doorwayUrl}/threshold`, '_blank', 'noopener');
   }
 
   formatDate(iso: string): string {

@@ -20,10 +20,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 77.8% (2026-02-05)
+// @coverage: 72.2% (2026-02-24)
 
 import { catchError, of, timeout, firstValueFrom } from 'rxjs';
 
+import { FederationRegistryAnchor } from '@app/elohim/integrity';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import {
@@ -103,6 +104,7 @@ export class DoorwayRegistryService {
 
   private readonly http = inject(HttpClient);
   private readonly holochainClient = inject(HolochainClientService);
+  private readonly federationAnchor = inject(FederationRegistryAnchor);
 
   // ===========================================================================
   // State
@@ -375,24 +377,9 @@ export class DoorwayRegistryService {
    * as a fallback when projection isn't available.
    */
   private async fetchFromDHT(): Promise<DoorwayInfo[]> {
-    try {
-      // Infrastructure DNA handles doorway federation
-      // TODO: Add get_all_doorways or use projection query instead
-      const result = await this.holochainClient.callZome<DoorwayInfo[]>({
-        zomeName: 'infrastructure',
-        fnName: 'get_doorways_by_region',
-        payload: 'global', // Use 'global' region to get all doorways
-        roleName: 'infrastructure',
-      });
-
-      if (result.success && result.data) {
-        return result.data;
-      }
-      return [];
-    } catch {
-      // Falls back to fetchFromDoorway() REST API
-      return [];
-    }
+    // Delegate to FederationRegistryAnchor — the zome call is already
+    // a fallback behind HTTP; now its integrity role is named.
+    return this.federationAnchor.verify('global');
   }
 
   /**

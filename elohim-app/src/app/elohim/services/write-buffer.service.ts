@@ -37,7 +37,7 @@
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
 
-// @coverage: 85.9% (2026-02-05)
+// @coverage: 85.9% (2026-02-24)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -51,6 +51,7 @@ import {
   TsWriteBuffer,
 } from '@elohim/service/cache/write-buffer';
 
+import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 
 // Import from framework-agnostic write buffer
@@ -153,7 +154,14 @@ export interface FlushAllResult {
 })
 export class WriteBufferService implements OnDestroy {
   private readonly logger = inject(LoggerService).createChild('WriteBuffer');
+  private readonly idbCache = inject(IndexedDBCacheService);
   private buffer: IWriteBuffer | null = null;
+
+  /** IDB metadata key for persisted write operations */
+  private static readonly PERSIST_KEY = 'write-buffer-ops';
+
+  /** Whether IDB is available for persistence */
+  private idbAvailable = false;
 
   private readonly stateSubject = new BehaviorSubject<BufferServiceState>('uninitialized');
   private readonly statsSubject = new BehaviorSubject<WriteBufferStats | null>(null);
@@ -230,6 +238,10 @@ export class WriteBufferService implements OnDestroy {
       this.implementation = result.implementation;
 
       this.stateSubject.next('ready');
+
+      // Restore any persisted operations from a previous session
+      await this.restoreFromIdb();
+
       this.updateStats();
 
       this.logger.info('Initialized', { implementation: this.implementation });
@@ -787,6 +799,61 @@ export class WriteBufferService implements OnDestroy {
   // ==========================================================================
 
   /**
+   * Persist pending operations to IndexedDB for crash recovery.
+   * Drains the buffer, saves to IDB, then restores ops back into the buffer.
+   * Called on ngOnDestroy and beforeunload.
+   */
+  async persistToIdb(): Promise<void> {
+    if (!this.buffer || !this.idbAvailable) return;
+
+    const ops = this.buffer.drainAll();
+    if (ops.length === 0) {
+      // Clear any stale persisted data
+      await this.idbCache.setMetadata(WriteBufferService.PERSIST_KEY, []).catch(() => undefined);
+      return;
+    }
+
+    try {
+      await this.idbCache.setMetadata(WriteBufferService.PERSIST_KEY, ops);
+      this.logger.debug('Persisted write buffer to IDB', { count: ops.length });
+    } catch (err) {
+      this.logger.warn('Failed to persist write buffer', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Restore ops back into the live buffer (persist is non-destructive)
+    this.buffer.restore(ops);
+  }
+
+  /**
+   * Restore persisted operations from IndexedDB after initialization.
+   * Clears persisted state after successful restore.
+   */
+  private async restoreFromIdb(): Promise<void> {
+    try {
+      this.idbAvailable = await this.idbCache.init();
+      if (!this.idbAvailable) return;
+
+      const persisted = await this.idbCache.getMetadata<WriteOperation[]>(
+        WriteBufferService.PERSIST_KEY
+      );
+
+      if (persisted && Array.isArray(persisted) && persisted.length > 0 && this.buffer) {
+        this.buffer.restore(persisted);
+        this.logger.info('Restored write buffer from IDB', { count: persisted.length });
+
+        // Clear persisted state now that ops are in memory
+        await this.idbCache.setMetadata(WriteBufferService.PERSIST_KEY, []);
+      }
+    } catch (err) {
+      this.logger.warn('Failed to restore write buffer from IDB', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
    * Clear all queued operations.
    *
    * Warning: This drops all pending writes!
@@ -852,6 +919,9 @@ export class WriteBufferService implements OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+
+    // Best-effort persist before disposal (fire-and-forget)
+    void this.persistToIdb();
 
     this.buffer?.dispose();
     this.stateSubject.complete();

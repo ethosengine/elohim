@@ -376,6 +376,7 @@ Today, these are hardcoded to a single identity:
 1. **Read replica support** — doorway instances that connect to MongoDB but not to any conductor. Serve projection reads only.
 2. **CDN-friendly blob headers** — `Cache-Control: public, immutable` for content-addressed blobs
 3. **Projection write/read split** — one doorway instance runs the signal subscriber; others read from shared MongoDB
+4. **Dogfood: app static assets as blobs** — fonts, icons, sophia UMD bundle, and HTML5 app ZIPs are content-addressed blobs. Seed them into elohim-storage and serve via `/store/{hash}` instead of bundling as build artifacts. Bootstrap hybrid: bundle a critical icon subset (~20 shell/nav icons) for first paint, load the full set from doorway post-connection. Service worker caches blob responses by content hash — subsequent loads are instant, offline-capable. This is the natural first CDN use case: doorway serving its own app's assets proves the content delivery path before external consumers arrive. Shefa accounting: blob-serving bandwidth becomes measurable steward work.
 
 **Axis 2 (identity hosting):**
 

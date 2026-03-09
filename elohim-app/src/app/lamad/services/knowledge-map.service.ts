@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 83.6% (2026-02-05)
+// @coverage: 84.2% (2026-02-24)
 
 import { map, switchMap, tap } from 'rxjs/operators';
 
@@ -61,10 +61,10 @@ export class KnowledgeMapService {
   // Current agent ID (from auth service in production)
   private currentAgentId = DEMO_LEARNER;
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly elohimService: ElohimAgentService
-  ) {
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly elohimService = inject(ElohimAgentService);
+
+  constructor() {
     this.initializeDemoMaps();
   }
 

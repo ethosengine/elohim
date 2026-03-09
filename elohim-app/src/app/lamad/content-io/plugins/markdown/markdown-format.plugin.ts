@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 91.3% (2026-02-05)
+// @coverage: 91.3% (2026-02-24)
 
 import { MarkdownParser } from '../../../parsers/markdown-parser';
 import { MarkdownRendererComponent } from '../../../renderers/markdown-renderer/markdown-renderer.component';
@@ -295,12 +295,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private async readFile(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
-      reader.readAsText(file);
-    });
+    return file.text();
   }
 
   private extractFrontmatter(content: string): Record<string, unknown> | undefined {
@@ -356,11 +351,13 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
 
   private addCoreFields(fields: string[], node: ContentIOExportInput): void {
     if (node.title) {
-      fields.push(`title: "${node.title.replaceAll('"', String.raw`\"`)}"`);
+      const escapedTitle = node.title.replaceAll('"', String.raw`\"`);
+      fields.push(`title: "${escapedTitle}"`);
     }
     if (node.description) {
       const desc = this.truncateDescription(node.description, 200);
-      fields.push(`description: "${desc.replaceAll('"', String.raw`\"`).replaceAll('\n', ' ')}"`);
+      const escapedDesc = desc.replaceAll('"', String.raw`\"`).replaceAll('\n', ' ');
+      fields.push(`description: "${escapedDesc}"`);
     }
     if (node.contentType) {
       fields.push(`contentType: ${node.contentType}`);

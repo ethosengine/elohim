@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-// @coverage: 4.8% (2026-02-05)
+// @coverage: 4.8% (2026-03-03)
 
 /**
  * Lamad routing strategy (spec-compliant):
@@ -59,13 +59,10 @@ export const LAMAD_ROUTES: Routes = [
       // DIRECT RESOURCE ACCESS (Secondary)
       // ============================================
 
-      // SEO: Dynamic title set by ContentViewerComponent
+      // Redirect to app-level /resource/:resourceId (ContentNodes are cross-pillar primitives)
       {
         path: 'resource/:resourceId',
-        loadComponent: async () =>
-          import('./components/content-viewer/content-viewer.component').then(
-            m => m.ContentViewerComponent
-          ),
+        redirectTo: '/resource/:resourceId',
       },
 
       // Content Editor - edit existing content

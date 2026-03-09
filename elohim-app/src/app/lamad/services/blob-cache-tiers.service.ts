@@ -13,9 +13,9 @@
  * Content at different reach levels (private -> commons) never evict each other.
  */
 
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 
-// @coverage: 67.7% (2026-02-05)
+// @coverage: 67.7% (2026-02-24)
 
 import { firstValueFrom } from 'rxjs';
 
@@ -276,10 +276,10 @@ export class BlobCacheTiersService {
   // NEW: WASM-backed reach-aware cache for high-performance operations
   private wasmCacheInitialized = false;
 
-  constructor(
-    private readonly injector: Injector,
-    private readonly wasmCache: WasmCacheService
-  ) {
+  private readonly injector = inject(Injector);
+  private readonly wasmCache = inject(WasmCacheService);
+
+  constructor() {
     this.startCleanupTimer();
     this.startIntegrityVerification();
     this.scheduleWasmInitialization();

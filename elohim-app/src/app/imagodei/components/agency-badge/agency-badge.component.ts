@@ -9,6 +9,8 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-24)
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AgencyService } from '@app/imagodei/services/agency.service';
 

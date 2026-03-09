@@ -9,7 +9,7 @@ use futures_util::{
 };
 use tokio_tungstenite::{
     connect_async_with_config,
-    tungstenite::{http::Request, protocol::Message, Error as WsError},
+    tungstenite::{http::Request, protocol::Message},
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::debug;
@@ -95,17 +95,6 @@ impl Transport {
     /// Split into separate sink and stream for concurrent send/receive.
     pub fn split(self) -> (WsSink, WsStream) {
         (self.sink, self.stream)
-    }
-
-    /// Check if we can still receive (non-destructive peek attempt).
-    pub async fn is_alive(&mut self) -> bool {
-        // Try to receive with a very short timeout
-        match tokio::time::timeout(std::time::Duration::from_millis(1), self.stream.next()).await {
-            Ok(Some(Ok(Message::Close(_)))) => false,
-            Ok(Some(Err(_))) => false,
-            Ok(None) => false,
-            _ => true, // Timeout or got a message = still alive
-        }
     }
 }
 

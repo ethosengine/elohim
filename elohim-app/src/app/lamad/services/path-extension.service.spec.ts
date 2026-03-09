@@ -1,13 +1,15 @@
 import { TestBed } from '@angular/core/testing';
+import { firstValueFrom } from 'rxjs';
 import { of, throwError } from 'rxjs';
 import { PathExtensionService } from './path-extension.service';
 import { PathService } from './path.service';
 import { LearningPath, PathStep } from '../models/learning-path.model';
 import { PathExtension } from '../models/path-extension.model';
+import { vi, Mock } from 'vitest';
 
 describe('PathExtensionService', () => {
   let service: PathExtensionService;
-  let pathServiceSpy: jasmine.SpyObj<PathService>;
+  let pathServiceSpy: any;
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -31,14 +33,16 @@ describe('PathExtensionService', () => {
   };
 
   beforeEach(() => {
-    const pathServiceSpyObj = jasmine.createSpyObj('PathService', ['getPath']);
+    const pathServiceSpyObj = {
+      getPath: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [PathExtensionService, { provide: PathService, useValue: pathServiceSpyObj }],
     });
 
-    pathServiceSpy = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
-    pathServiceSpy.getPath.and.returnValue(of(mockPath));
+    pathServiceSpy = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
+    pathServiceSpy.getPath.mockReturnValue(of(mockPath));
 
     service = TestBed.inject(PathExtensionService);
     service.setCurrentAgent('demo-learner');
@@ -53,82 +57,67 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('getExtensionIndex', () => {
-    it('should return extension index', done => {
-      service.getExtensionIndex().subscribe(index => {
-        expect(index).toBeDefined();
-        expect(index.totalCount).toBeGreaterThanOrEqual(0);
-        expect(index.extensions).toBeDefined();
-        done();
-      });
+    it('should return extension index', async () => {
+      const index = await firstValueFrom(service.getExtensionIndex());
+      expect(index).toBeDefined();
+      expect(index.totalCount).toBeGreaterThanOrEqual(0);
+      expect(index.extensions).toBeDefined();
     });
 
-    it('should include demo extension', done => {
-      service.getExtensionIndex().subscribe(index => {
-        const demoExt = index.extensions.find(e => e.id === 'ext-demo-elohim-path');
-        expect(demoExt).toBeDefined();
-        done();
-      });
+    it('should include demo extension', async () => {
+      const index = await firstValueFrom(service.getExtensionIndex());
+      const demoExt = index.extensions.find(e => e.id === 'ext-demo-elohim-path');
+      expect(demoExt).toBeDefined();
     });
   });
 
   describe('getMyExtensions', () => {
-    it('should return only extensions by current agent', done => {
-      service.getMyExtensions().subscribe(extensions => {
-        for (const ext of extensions) {
-          expect(ext.extendedBy).toBe('demo-learner');
-        }
-        done();
-      });
+    it('should return only extensions by current agent', async () => {
+      const extensions = await firstValueFrom(service.getMyExtensions());
+      for (const ext of extensions) {
+        expect(ext.extendedBy).toBe('demo-learner');
+      }
     });
   });
 
   describe('getExtensionsForPath', () => {
-    it('should filter extensions by base path', done => {
-      service.getExtensionsForPath('elohim-protocol').subscribe(extensions => {
-        for (const ext of extensions) {
-          expect(ext.basePathId).toBe('elohim-protocol');
-        }
-        done();
-      });
+    it('should filter extensions by base path', async () => {
+      const extensions = await firstValueFrom(service.getExtensionsForPath('elohim-protocol'));
+      for (const ext of extensions) {
+        expect(ext.basePathId).toBe('elohim-protocol');
+      }
     });
   });
 
   describe('getExtension', () => {
-    it('should return null for non-existent extension', done => {
-      service.getExtension('non-existent').subscribe(ext => {
-        expect(ext).toBeNull();
-        done();
-      });
+    it('should return null for non-existent extension', async () => {
+      const ext = await firstValueFrom(service.getExtension('non-existent'));
+      expect(ext).toBeNull();
     });
 
-    it('should return extension when authorized', done => {
-      service.getExtension('ext-demo-elohim-path').subscribe(ext => {
-        expect(ext).not.toBeNull();
-        expect(ext?.id).toBe('ext-demo-elohim-path');
-        done();
-      });
+    it('should return extension when authorized', async () => {
+      const ext = await firstValueFrom(service.getExtension('ext-demo-elohim-path'));
+      expect(ext).not.toBeNull();
+      expect(ext?.id).toBe('ext-demo-elohim-path');
     });
 
-    it('should error for unauthorized access to private extension', done => {
+    it('should error for unauthorized access to private extension', async () => {
       // Create private extension as different user
       service.setCurrentAgent('other-user');
-      service
-        .createExtension({
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Private Extension',
           visibility: 'private',
         })
-        .subscribe(ext => {
-          // Try to access as original user
-          service.setCurrentAgent('demo-learner');
+      );
 
-          service.getExtension(ext.id).subscribe({
-            error: err => {
-              expect(err.code).toBe('UNAUTHORIZED');
-              done();
-            },
-          });
-        });
+      // Try to access as original user
+      service.setCurrentAgent('demo-learner');
+
+      await expect(firstValueFrom(service.getExtension(ext.id))).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
     });
   });
 
@@ -137,92 +126,76 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('createExtension', () => {
-    it('should create new extension', done => {
-      service
-        .createExtension({
+    it('should create new extension', async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'My Extension',
         })
-        .subscribe(ext => {
-          expect(ext.id).toBeDefined();
-          expect(ext.basePathId).toBe('test-path');
-          expect(ext.title).toBe('My Extension');
-          expect(ext.extendedBy).toBe('demo-learner');
-          expect(ext.visibility).toBe('private');
-          done();
-        });
+      );
+      expect(ext.id).toBeDefined();
+      expect(ext.basePathId).toBe('test-path');
+      expect(ext.title).toBe('My Extension');
+      expect(ext.extendedBy).toBe('demo-learner');
+      expect(ext.visibility).toBe('private');
     });
 
-    it('should set version from base path', done => {
-      service
-        .createExtension({
+    it('should set version from base path', async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'My Extension',
         })
-        .subscribe(ext => {
-          expect(ext.basePathVersion).toBe('1.0.0');
-          done();
-        });
+      );
+      expect(ext.basePathVersion).toBe('1.0.0');
     });
 
-    it('should error when base path not found', done => {
-      pathServiceSpy.getPath.and.returnValue(of(null as any));
+    it('should error when base path not found', async () => {
+      pathServiceSpy.getPath.mockReturnValue(of(null as any));
 
-      service
-        .createExtension({
-          basePathId: 'non-existent',
-          title: 'My Extension',
-        })
-        .subscribe({
-          error: err => {
-            expect(err.code).toBe('NOT_FOUND');
-            done();
-          },
-        });
+      await expect(
+        firstValueFrom(
+          service.createExtension({
+            basePathId: 'non-existent',
+            title: 'My Extension',
+          })
+        )
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
-    it('should respect visibility parameter', done => {
-      service
-        .createExtension({
+    it('should respect visibility parameter', async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Public Extension',
           visibility: 'public',
         })
-        .subscribe(ext => {
-          expect(ext.visibility).toBe('public');
-          done();
-        });
+      );
+      expect(ext.visibility).toBe('public');
     });
   });
 
   describe('forkExtension', () => {
-    it('should create fork of existing extension', done => {
-      service
-        .forkExtension('ext-demo-elohim-path', {
+    it('should create fork of existing extension', async () => {
+      const forked = await firstValueFrom(
+        service.forkExtension('ext-demo-elohim-path', {
           title: 'My Forked Extension',
         })
-        .subscribe(forked => {
-          expect(forked.id).not.toBe('ext-demo-elohim-path');
-          expect(forked.title).toBe('My Forked Extension');
-          expect(forked.forkedFrom).toBe('ext-demo-elohim-path');
-          expect(forked.visibility).toBe('private');
-          done();
-        });
+      );
+      expect(forked.id).not.toBe('ext-demo-elohim-path');
+      expect(forked.title).toBe('My Forked Extension');
+      expect(forked.forkedFrom).toBe('ext-demo-elohim-path');
+      expect(forked.visibility).toBe('private');
     });
 
-    it('should copy annotations from original', done => {
-      service.forkExtension('ext-demo-elohim-path').subscribe(forked => {
-        expect(forked.annotations.length).toBeGreaterThan(0);
-        done();
-      });
+    it('should copy annotations from original', async () => {
+      const forked = await firstValueFrom(service.forkExtension('ext-demo-elohim-path'));
+      expect(forked.annotations.length).toBeGreaterThan(0);
     });
 
-    it('should error for non-existent extension', done => {
-      service.forkExtension('non-existent').subscribe({
-        error: err => {
-          expect(err.code).toBe('NOT_FOUND');
-          done();
-        },
+    it('should error for non-existent extension', async () => {
+      await expect(firstValueFrom(service.forkExtension('non-existent'))).rejects.toMatchObject({
+        code: 'NOT_FOUND',
       });
     });
   });
@@ -234,19 +207,17 @@ describe('PathExtensionService', () => {
   describe('addInsertion', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should add insertion to extension', done => {
+    it('should add insertion to extension', async () => {
       const newStep: PathStep = {
         order: 0,
         resourceId: 'new-resource',
@@ -257,129 +228,111 @@ describe('PathExtensionService', () => {
         completionCriteria: ['View content'],
       };
 
-      service
-        .addInsertion(testExtensionId, 0, [newStep], 'Adding extra content')
-        .subscribe(insertion => {
-          expect(insertion.id).toBeDefined();
-          expect(insertion.afterStepIndex).toBe(0);
-          expect(insertion.steps.length).toBe(1);
-          expect(insertion.rationale).toBe('Adding extra content');
-          done();
-        });
+      const insertion = await firstValueFrom(
+        service.addInsertion(testExtensionId, 0, [newStep], 'Adding extra content')
+      );
+      expect(insertion.id).toBeDefined();
+      expect(insertion.afterStepIndex).toBe(0);
+      expect(insertion.steps.length).toBe(1);
+      expect(insertion.rationale).toBe('Adding extra content');
     });
 
-    it('should error for non-existent extension', done => {
-      service.addInsertion('non-existent', 0, [], 'test').subscribe({
-        error: err => {
-          expect(err.code).toBe('NOT_FOUND');
-          done();
-        },
-      });
+    it('should error for non-existent extension', async () => {
+      await expect(
+        firstValueFrom(service.addInsertion('non-existent', 0, [], 'test'))
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
-    it('should error for unauthorized edit', done => {
+    it('should error for unauthorized edit', async () => {
       service.setCurrentAgent('other-user');
 
-      service.addInsertion(testExtensionId, 0, [], 'test').subscribe({
-        error: err => {
-          expect(err.code).toBe('UNAUTHORIZED');
-          done();
-        },
-      });
+      await expect(
+        firstValueFrom(service.addInsertion(testExtensionId, 0, [], 'test'))
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
   });
 
   describe('addAnnotation', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should add annotation to extension', done => {
-      service.addAnnotation(testExtensionId, 0, 'insight', 'My insight').subscribe(annotation => {
-        expect(annotation.id).toBeDefined();
-        expect(annotation.stepIndex).toBe(0);
-        expect(annotation.type).toBe('insight');
-        expect(annotation.content).toBe('My insight');
-        done();
-      });
+    it('should add annotation to extension', async () => {
+      const annotation = await firstValueFrom(
+        service.addAnnotation(testExtensionId, 0, 'insight', 'My insight')
+      );
+      expect(annotation.id).toBeDefined();
+      expect(annotation.stepIndex).toBe(0);
+      expect(annotation.type).toBe('insight');
+      expect(annotation.content).toBe('My insight');
     });
 
-    it('should include additional resources', done => {
-      service
-        .addAnnotation(testExtensionId, 1, 'note', 'Extra reading', {
+    it('should include additional resources', async () => {
+      const annotation = await firstValueFrom(
+        service.addAnnotation(testExtensionId, 1, 'note', 'Extra reading', {
           additionalResources: [
             { title: 'Extra Resource', resourceId: 'extra-1', description: 'More depth' },
           ],
         })
-        .subscribe(annotation => {
-          expect(annotation.additionalResources).toBeDefined();
-          expect(annotation.additionalResources?.length).toBe(1);
-          done();
-        });
+      );
+      expect(annotation.additionalResources).toBeDefined();
+      expect(annotation.additionalResources?.length).toBe(1);
     });
   });
 
   describe('addReorder', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should add reorder to extension', done => {
-      service.addReorder(testExtensionId, 0, 2, 'Better flow').subscribe(reorder => {
-        expect(reorder.id).toBeDefined();
-        expect(reorder.fromIndex).toBe(0);
-        expect(reorder.toIndex).toBe(2);
-        expect(reorder.rationale).toBe('Better flow');
-        done();
-      });
+    it('should add reorder to extension', async () => {
+      const reorder = await firstValueFrom(
+        service.addReorder(testExtensionId, 0, 2, 'Better flow')
+      );
+      expect(reorder.id).toBeDefined();
+      expect(reorder.fromIndex).toBe(0);
+      expect(reorder.toIndex).toBe(2);
+      expect(reorder.rationale).toBe('Better flow');
     });
   });
 
   describe('addExclusion', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should add exclusion to extension', done => {
-      service
-        .addExclusion(testExtensionId, 1, 'already-mastered', 'I know this already')
-        .subscribe(exclusion => {
-          expect(exclusion.id).toBeDefined();
-          expect(exclusion.stepIndex).toBe(1);
-          expect(exclusion.reason).toBe('already-mastered');
-          expect(exclusion.notes).toBe('I know this already');
-          done();
-        });
+    it('should add exclusion to extension', async () => {
+      const exclusion = await firstValueFrom(
+        service.addExclusion(testExtensionId, 1, 'already-mastered', 'I know this already')
+      );
+      expect(exclusion.id).toBeDefined();
+      expect(exclusion.stepIndex).toBe(1);
+      expect(exclusion.reason).toBe('already-mastered');
+      expect(exclusion.notes).toBe('I know this already');
     });
   });
 
@@ -387,41 +340,35 @@ describe('PathExtensionService', () => {
     let testExtensionId: string;
     let insertionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
+      );
+      testExtensionId = ext.id;
 
-          service
-            .addInsertion(testExtensionId, 0, [
-              {
-                order: 0,
-                resourceId: 'test',
-                stepTitle: 'Test',
-                stepNarrative: 'Test',
-                learningObjectives: ['Test'],
-                optional: false,
-                completionCriteria: ['View'],
-              },
-            ])
-            .subscribe(insertion => {
-              insertionId = insertion.id;
-              done();
-            });
-        });
+      const insertion = await firstValueFrom(
+        service.addInsertion(testExtensionId, 0, [
+          {
+            order: 0,
+            resourceId: 'test',
+            stepTitle: 'Test',
+            stepNarrative: 'Test',
+            learningObjectives: ['Test'],
+            optional: false,
+            completionCriteria: ['View'],
+          },
+        ])
+      );
+      insertionId = insertion.id;
     });
 
-    it('should remove modification from extension', done => {
-      service.removeModification(testExtensionId, insertionId).subscribe(() => {
-        service.getExtension(testExtensionId).subscribe(ext => {
-          expect(ext?.insertions.find(i => i.id === insertionId)).toBeUndefined();
-          done();
-        });
-      });
+    it('should remove modification from extension', async () => {
+      await firstValueFrom(service.removeModification(testExtensionId, insertionId));
+      const ext = await firstValueFrom(service.getExtension(testExtensionId));
+      expect(ext?.insertions.find(i => i.id === insertionId)).toBeUndefined();
     });
   });
 
@@ -432,30 +379,26 @@ describe('PathExtensionService', () => {
   describe('applyExtension', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should apply extension to get effective steps', done => {
-      service.applyExtension(testExtensionId).subscribe(result => {
-        expect(result.effectiveSteps).toBeDefined();
-        expect(result.effectiveSteps.length).toBe(mockPath.steps.length);
-        expect(result.warnings).toBeDefined();
-        done();
-      });
+    it('should apply extension to get effective steps', async () => {
+      const result = await firstValueFrom(service.applyExtension(testExtensionId));
+      expect(result.effectiveSteps).toBeDefined();
+      expect(result.effectiveSteps.length).toBe(mockPath.steps.length);
+      expect(result.warnings).toBeDefined();
     });
 
-    it('should include inserted steps', done => {
-      service
-        .addInsertion(testExtensionId, 0, [
+    it('should include inserted steps', async () => {
+      await firstValueFrom(
+        service.addInsertion(testExtensionId, 0, [
           {
             order: 0,
             resourceId: 'inserted',
@@ -466,32 +409,24 @@ describe('PathExtensionService', () => {
             completionCriteria: ['View'],
           },
         ])
-        .subscribe(() => {
-          service.applyExtension(testExtensionId).subscribe(result => {
-            expect(result.effectiveSteps.length).toBe(mockPath.steps.length + 1);
-            done();
-          });
-        });
+      );
+      const result = await firstValueFrom(service.applyExtension(testExtensionId));
+      expect(result.effectiveSteps.length).toBe(mockPath.steps.length + 1);
     });
 
-    it('should exclude excluded steps', done => {
-      service.addExclusion(testExtensionId, 1, 'not-relevant').subscribe(() => {
-        service.applyExtension(testExtensionId).subscribe(result => {
-          expect(result.effectiveSteps.length).toBe(mockPath.steps.length - 1);
-          done();
-        });
-      });
+    it('should exclude excluded steps', async () => {
+      await firstValueFrom(service.addExclusion(testExtensionId, 1, 'not-relevant'));
+      const result = await firstValueFrom(service.applyExtension(testExtensionId));
+      expect(result.effectiveSteps.length).toBe(mockPath.steps.length - 1);
     });
 
-    it('should warn on version mismatch', done => {
+    it('should warn on version mismatch', async () => {
       const modifiedPath = { ...mockPath, version: '2.0.0' };
-      pathServiceSpy.getPath.and.returnValue(of(modifiedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(modifiedPath));
 
-      service.applyExtension(testExtensionId).subscribe(result => {
-        const versionWarning = result.warnings.find(w => w.type === 'version-mismatch');
-        expect(versionWarning).toBeDefined();
-        done();
-      });
+      const result = await firstValueFrom(service.applyExtension(testExtensionId));
+      const versionWarning = result.warnings.find(w => w.type === 'version-mismatch');
+      expect(versionWarning).toBeDefined();
     });
   });
 
@@ -502,33 +437,26 @@ describe('PathExtensionService', () => {
   describe('submitUpstreamProposal', () => {
     let testExtensionId: string;
 
-    beforeEach(done => {
-      service
-        .createExtension({
+    beforeEach(async () => {
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test Extension',
         })
-        .subscribe(ext => {
-          testExtensionId = ext.id;
-          done();
-        });
+      );
+      testExtensionId = ext.id;
     });
 
-    it('should submit upstream proposal', done => {
-      service.submitUpstreamProposal(testExtensionId).subscribe(proposal => {
-        expect(proposal.status).toBe('submitted');
-        expect(proposal.submittedAt).toBeDefined();
-        done();
-      });
+    it('should submit upstream proposal', async () => {
+      const proposal = await firstValueFrom(service.submitUpstreamProposal(testExtensionId));
+      expect(proposal.status).toBe('submitted');
+      expect(proposal.submittedAt).toBeDefined();
     });
 
-    it('should error for non-existent extension', done => {
-      service.submitUpstreamProposal('non-existent').subscribe({
-        error: err => {
-          expect(err.code).toBe('NOT_FOUND');
-          done();
-        },
-      });
+    it('should error for non-existent extension', async () => {
+      await expect(
+        firstValueFrom(service.submitUpstreamProposal('non-existent'))
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
@@ -540,75 +468,62 @@ describe('PathExtensionService', () => {
     beforeEach(() => {
       // Mock path ownership
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
     });
 
-    it('should enable collaboration on owned path', done => {
-      service.enableCollaboration('test-path', 'open').subscribe(collab => {
-        expect(collab.pathId).toBe('test-path');
-        expect(collab.collaborationType).toBe('open');
-        expect(collab.roles.get('demo-learner')).toBe('owner');
-        done();
-      });
+    it('should enable collaboration on owned path', async () => {
+      const collab = await firstValueFrom(service.enableCollaboration('test-path', 'open'));
+      expect(collab.pathId).toBe('test-path');
+      expect(collab.collaborationType).toBe('open');
+      expect(collab.roles.get('demo-learner')).toBe('owner');
     });
 
-    it('should error when not path owner', done => {
+    it('should error when not path owner', async () => {
       const otherPath = { ...mockPath, createdBy: 'other-user' };
-      pathServiceSpy.getPath.and.returnValue(of(otherPath));
+      pathServiceSpy.getPath.mockReturnValue(of(otherPath));
 
-      service.enableCollaboration('test-path', 'open').subscribe({
-        error: err => {
-          expect(err.code).toBe('UNAUTHORIZED');
-          done();
-        },
-      });
+      await expect(
+        firstValueFrom(service.enableCollaboration('test-path', 'open'))
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
   });
 
   describe('addCollaborator', () => {
-    beforeEach(done => {
+    beforeEach(async () => {
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
 
-      service.enableCollaboration('test-path', 'open').subscribe(() => done());
+      await firstValueFrom(service.enableCollaboration('test-path', 'open'));
     });
 
-    it('should add collaborator to path', done => {
-      service.addCollaborator('test-path', 'new-collaborator', 'editor').subscribe(() => {
-        service.getCollaborativePath('test-path').subscribe(collab => {
-          expect(collab?.roles.get('new-collaborator')).toBe('editor');
-          done();
-        });
-      });
+    it('should add collaborator to path', async () => {
+      await firstValueFrom(service.addCollaborator('test-path', 'new-collaborator', 'editor'));
+      const collab = await firstValueFrom(service.getCollaborativePath('test-path'));
+      expect(collab?.roles.get('new-collaborator')).toBe('editor');
     });
 
-    it('should error for non-collaborative path', done => {
-      service.addCollaborator('non-collab-path', 'user', 'viewer').subscribe({
-        error: err => {
-          expect(err.code).toBe('NOT_FOUND');
-          done();
-        },
-      });
+    it('should error for non-collaborative path', async () => {
+      await expect(
+        firstValueFrom(service.addCollaborator('non-collab-path', 'user', 'viewer'))
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
   describe('submitProposal', () => {
-    beforeEach(done => {
+    beforeEach(async () => {
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
 
-      service.enableCollaboration('test-path', 'open').subscribe(() => done());
+      await firstValueFrom(service.enableCollaboration('test-path', 'open'));
     });
 
-    it('should submit proposal to collaborative path', done => {
-      service
-        .submitProposal('test-path', 'add-step', { stepIndex: 0 }, 'Need more content')
-        .subscribe(proposal => {
-          expect(proposal.id).toBeDefined();
-          expect(proposal.status).toBe('pending');
-          expect(proposal.changeType).toBe('add-step');
-          done();
-        });
+    it('should submit proposal to collaborative path', async () => {
+      const proposal = await firstValueFrom(
+        service.submitProposal('test-path', 'add-step', { stepIndex: 0 }, 'Need more content')
+      );
+      expect(proposal.id).toBeDefined();
+      expect(proposal.status).toBe('pending');
+      expect(proposal.changeType).toBe('add-step');
     });
   });
 
@@ -617,18 +532,16 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('setCurrentAgent', () => {
-    it('should change current agent', done => {
+    it('should change current agent', async () => {
       service.setCurrentAgent('new-agent');
 
-      service
-        .createExtension({
+      const ext = await firstValueFrom(
+        service.createExtension({
           basePathId: 'test-path',
           title: 'Test',
         })
-        .subscribe(ext => {
-          expect(ext.extendedBy).toBe('new-agent');
-          done();
-        });
+      );
+      expect(ext.extendedBy).toBe('new-agent');
     });
   });
 });

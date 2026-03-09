@@ -877,7 +877,7 @@ The primitives are *informed by* but not *dependent on* external systems.
 ├── unyt/                     # Unyt mutual credit research
 ├── valueflows-hrea/          # ValueFlows + hREA research
 ├── eae/                      # Elohim Autonomous Entity / uncapturable DAO research
-├── requests-and-offers/      # REA-related (Holochain app)
+├── exchange/      # REA-related (Holochain app)
 ├── servicelogger/            # Value/service tracking (Holochain)
 └── holo-host/                # Infrastructure economics (Holochain)
 ```

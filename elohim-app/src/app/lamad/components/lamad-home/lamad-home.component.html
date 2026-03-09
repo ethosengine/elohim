@@ -7,6 +7,7 @@
         class="view-tab"
         [class.active]="viewMode === 'paths'"
         (click)="setViewMode('paths')"
+        data-testid="home-tab-paths"
       >
         <span class="tab-icon">📚</span>
         Learning Paths
@@ -16,6 +17,7 @@
         class="view-tab"
         [class.active]="viewMode === 'explore'"
         (click)="setViewMode('explore')"
+        data-testid="home-tab-explore"
       >
         <span class="tab-icon">🌎</span>
         Knowledge Graph
@@ -64,10 +66,16 @@
               type="button"
               class="btn btn-primary btn-large"
               (click)="continueActiveJourney()"
+              data-testid="home-resume-journey"
             >
               Resume Journey
             </button>
-            <button type="button" class="btn btn-secondary" (click)="goToPath(activeFocus.pathId)">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="goToPath(activeFocus.pathId)"
+              data-testid="home-active-view-path"
+            >
               View Path
             </button>
           </div>
@@ -96,10 +104,20 @@
           </div>
 
           <div class="featured-actions">
-            <button type="button" class="btn btn-primary btn-large" (click)="startFeaturedPath()">
+            <button
+              type="button"
+              class="btn btn-primary btn-large"
+              (click)="startFeaturedPath()"
+              data-testid="home-featured-begin"
+            >
               Begin Journey
             </button>
-            <button type="button" class="btn btn-secondary" (click)="goToPath(featuredPath.id)">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="goToPath(featuredPath.id)"
+              data-testid="home-featured-details"
+            >
               View Details
             </button>
           </div>
@@ -118,13 +136,18 @@
             }
           </h2>
           @if (hasMorePaths) {
-            <button type="button" class="btn btn-text" (click)="toggleShowAllPaths()">
+            <button
+              type="button"
+              class="btn btn-text"
+              (click)="toggleShowAllPaths()"
+              data-testid="home-toggle-all-paths"
+            >
               {{ showAllPaths ? 'Show Featured' : 'View All Paths' }}
             </button>
           }
         </div>
 
-        <div class="paths-grid">
+        <div class="paths-grid" data-testid="home-path-grid">
           @for (path of paths; track path.id) {
             <button class="path-card" (click)="goToPath(path.id)" type="button">
               @if (path.thumbnailUrl) {

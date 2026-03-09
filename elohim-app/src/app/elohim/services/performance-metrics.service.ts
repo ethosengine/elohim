@@ -1,6 +1,6 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, OnDestroy, signal, computed } from '@angular/core';
 
-// @coverage: 98.9% (2026-02-05)
+// @coverage: 98.9% (2026-02-24)
 
 /**
  * PerformanceMetricsService
@@ -13,7 +13,7 @@ import { Injectable, signal, computed } from '@angular/core';
  * - Zome operation counts
  *
  * These metrics are collected locally and periodically
- * reported to the DHT via ShefaService.
+ * reported to the DHT via CustodianMetricsReporterService.
  */
 
 export interface ResponseTimeMetrics {
@@ -115,10 +115,11 @@ class PercentileCalculator {
 @Injectable({
   providedIn: 'root',
 })
-export class PerformanceMetricsService {
+export class PerformanceMetricsService implements OnDestroy {
   // Percentile calculators for response times
   private readonly queryPercentiles = new PercentileCalculator();
   private readonly mutationPercentiles = new PercentileCalculator();
+  private uptimeInterval: ReturnType<typeof setInterval> | null = null;
 
   // Metrics storage
   private readonly metrics = signal<LocalMetrics>({
@@ -387,11 +388,21 @@ export class PerformanceMetricsService {
   }
 
   /**
+   * Cleanup interval on destroy
+   */
+  ngOnDestroy(): void {
+    if (this.uptimeInterval) {
+      clearInterval(this.uptimeInterval);
+      this.uptimeInterval = null;
+    }
+  }
+
+  /**
    * Private helper: start uptime tracking
    */
   private startUptimeTracking(): void {
     // Check periodically if conductor is still responding
-    setInterval(() => {
+    this.uptimeInterval = setInterval(() => {
       // In production, would ping conductor here
       // For now, just update lastCheckTime
       const m = this.metrics();

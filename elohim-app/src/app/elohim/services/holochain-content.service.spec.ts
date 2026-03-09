@@ -1,24 +1,33 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { HolochainContentService } from './holochain-content.service';
 import { HolochainClientService } from './holochain-client.service';
+import { vi, Mock } from 'vitest';
 
 describe('HolochainContentService', () => {
   let service: HolochainContentService;
-  let clientMock: jasmine.SpyObj<HolochainClientService>;
+  let clientMock: any;
 
   beforeEach(() => {
-    const clientSpy = jasmine.createSpyObj('HolochainClientService', ['callZome']);
+    const clientSpy = {
+      callZome: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         HolochainContentService,
         { provide: HolochainClientService, useValue: clientSpy },
       ],
     });
 
     service = TestBed.inject(HolochainContentService);
-    clientMock = TestBed.inject(HolochainClientService) as jasmine.SpyObj<HolochainClientService>;
+    clientMock = TestBed.inject(HolochainClientService) as {
+      [K in keyof HolochainClientService]?: Mock;
+    };
   });
 
   it('should be created', () => {

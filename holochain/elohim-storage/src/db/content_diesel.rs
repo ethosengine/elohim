@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::context::AppContext;
 use super::diesel_schema::{content, content_tags};
-use super::models::{Content, ContentTag, ContentWithTags, NewContent, NewContentTag};
+use super::models::{Content, ContentWithTags, NewContent, NewContentTag};
 use crate::error::StorageError;
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
@@ -391,10 +391,7 @@ pub fn get_content_by_tag(
 // ============================================================================
 
 /// Get content count for an app
-pub fn content_count(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-) -> Result<i64, StorageError> {
+pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
         .filter(content::app_id.eq(&ctx.app_id))
         .count()
@@ -404,10 +401,7 @@ pub fn content_count(
 
 /// Get unique tag count for an app
 #[allow(deprecated)]
-pub fn tag_count(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-) -> Result<i64, StorageError> {
+pub fn tag_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content_tags::table
         .filter(content_tags::app_id.eq(&ctx.app_id))
         .select(diesel::dsl::count_distinct(content_tags::tag))
@@ -422,8 +416,8 @@ mod tests {
     use diesel::Connection;
 
     fn setup_test_db() -> SqliteConnection {
-        let mut conn = SqliteConnection::establish(":memory:")
-            .expect("Failed to create in-memory database");
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
 
         // Create content table
         diesel::sql_query(
@@ -517,7 +511,10 @@ mod tests {
         assert!(lamad_manifesto.is_some(), "Lamad should find manifesto");
 
         let lamad_resources = get_content(&mut conn, &lamad_ctx, "resources").unwrap();
-        assert!(lamad_resources.is_none(), "Lamad should NOT find elohim's resources");
+        assert!(
+            lamad_resources.is_none(),
+            "Lamad should NOT find elohim's resources"
+        );
 
         // Verify elohim app can see only its content
         let elohim_count = content_count(&mut conn, &elohim_ctx).unwrap();
@@ -527,7 +524,10 @@ mod tests {
         assert!(elohim_resources.is_some(), "Elohim should find resources");
 
         let elohim_manifesto = get_content(&mut conn, &elohim_ctx, "manifesto").unwrap();
-        assert!(elohim_manifesto.is_none(), "Elohim should NOT find lamad's manifesto");
+        assert!(
+            elohim_manifesto.is_none(),
+            "Elohim should NOT find lamad's manifesto"
+        );
     }
 
     #[test]
@@ -571,22 +571,20 @@ mod tests {
         assert_eq!(result.skipped, 0, "Should skip 0 items");
 
         // Try to insert same items again - should skip
-        let items2 = vec![
-            CreateContentInput {
-                id: "content-1".to_string(),
-                title: "Content 1 Duplicate".to_string(),
-                description: None,
-                content_type: "concept".to_string(),
-                content_format: "markdown".to_string(),
-                blob_hash: None,
-                blob_cid: None,
-                content_size_bytes: None,
-                metadata_json: None,
-                reach: "public".to_string(),
-                created_by: None,
-                tags: vec![],
-            },
-        ];
+        let items2 = vec![CreateContentInput {
+            id: "content-1".to_string(),
+            title: "Content 1 Duplicate".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            created_by: None,
+            tags: vec![],
+        }];
 
         let result2 = bulk_create_content(&mut conn, &lamad_ctx, items2).unwrap();
         assert_eq!(result2.inserted, 0, "Should insert 0 items (duplicate)");

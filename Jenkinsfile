@@ -20,7 +20,7 @@
  * Artifact dependency:
  *   - Fetches holochain-cache-core WASM from elohim-holochain pipeline
  *
- * @see orchestrator/Jenkinsfile for central trigger logic
+ * @see genesis/orchestrator/Jenkinsfile for central trigger logic
  */
 
 // ============================================================================
@@ -83,9 +83,9 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     // Validate ConfigMap exists
     sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
-    // Update deployment manifest with image tag (SITE_TAG_PLACEHOLDER)
+    // Update deployment manifest with image tag and deploy version label
     def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
-    sh "sed 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
+    sh "sed -e 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' -e 's/DEPLOY_VERSION_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
 
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
@@ -96,9 +96,12 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     // Preview manifest
     sh """
         echo '==== Deployment manifest preview ===='
-        grep 'image:' ${outputFile}
+        grep 'image:\\|app.kubernetes.io/version:' ${outputFile}
         echo '===================================='
     """
+
+    // Pre-deploy: check for ingress hostname conflicts
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
     // Deploy and rollout
     sh "kubectl apply -f ${outputFile}"
@@ -113,11 +116,14 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
         echo '=================================='
     """
 
+    // Post-deploy: detect stale resources (advisory only)
+    sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
+
     echo "${environment} deployment completed!"
 }
 
 def buildSophiaPlugin() {
-    // First, build the sophia monorepo (submodule) since its packages aren't on npm
+    // First, build the sophia monorepo (submodule) since its packages aren't published
     echo 'Building sophia monorepo packages...'
 
     // Initialize and update submodule if needed
@@ -125,12 +131,7 @@ def buildSophiaPlugin() {
 
     dir('sophia') {
         sh '''
-            # Install pnpm if not available
-            if ! command -v pnpm &> /dev/null; then
-                npm install -g pnpm
-            fi
-
-            # Install dependencies
+            # Install dependencies (pnpm pre-installed in builder image)
             pnpm install --frozen-lockfile
 
             # Build all packages (creates dist/ in each package)
@@ -183,7 +184,7 @@ def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
     // Install Cypress if needed
     sh '''
         if [ ! -d "node_modules/cypress" ]; then
-            npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+            pnpm add cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
         fi
     '''
 
@@ -390,6 +391,10 @@ spec:
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
+
+                        // Enable pnpm via corepack (uses packageManager field in root package.json)
+                        sh 'corepack enable'
+                        sh 'pnpm --version'
                     }
                 }
             }
@@ -535,6 +540,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             App will use TypeScript fallback (slightly slower but functional).
                             To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
                             """
+                            // TODO: Make WASM deployment more reliable for alpha/staging.
+                            // The 404 on /wasm/holochain-cache-core/holochain_cache_core.js
+                            // is harmless (TS fallback works) but creates console noise that
+                            // obscures real errors and mismatches production expectations.
+                            // Options: (1) pre-seed Harbor with a known-good WASM artifact,
+                            // (2) suppress the fetch in the browser when WASM isn't bundled,
+                            // (3) make DNA pipeline a dependency of alpha deploys.
                         }
 
                         if (fileExists("${wasmDir}/holochain_cache_core.js")) {
@@ -555,20 +567,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-library') {
                         script {
                             echo 'Installing elohim-library dependencies (required for elohim-service imports)'
-                            sh 'npm ci'
+                            sh 'pnpm install --frozen-lockfile'
                         }
                     }
                     dir('holochain/sdk/storage-client-ts') {
                         script {
                             echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
-                            sh 'npm ci && npm run build'
+                            sh 'pnpm install --frozen-lockfile && pnpm run build'
                             sh 'ls -la dist/ dist/generated/'
                         }
                     }
                     dir('elohim-app') {
                         script {
-                            echo 'Installing npm dependencies'
-                            sh 'npm ci'
+                            echo 'Installing pnpm dependencies'
+                            sh 'pnpm install --frozen-lockfile'
 
                             // Copy WASM files from fetched location to node_modules
                             // This is needed because Angular expects WASM in node_modules/holochain-cache-core
@@ -633,7 +645,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
-                                sh "npm run build -- --configuration=${buildConfig}"
+                                sh 'bash ../scripts/fetch-fonts.sh'
+                                sh "pnpm exec ng build --configuration=${buildConfig}"
 
                                 // Generate version.json for deployment verification
                                 sh """
@@ -661,8 +674,8 @@ VEOF
                 container('builder'){
                     dir('elohim-app') {
                         script {
-                            echo 'Running Angular tests with coverage'
-                            sh 'npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage'
+                            echo 'Running Angular tests with coverage (Vitest)'
+                            sh 'pnpm exec vitest run --config vite.config.ts --coverage'
                         }
                     }
                 }
@@ -700,8 +713,8 @@ VEOF
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
-                                    -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
+                                    -Dsonar.typescript.lcov.reportPaths=coverage/vitest/lcov.info \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/vitest/lcov.info \
                                     -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
                                     -Dsonar.qualitygate.wait=false
                                 """
@@ -894,7 +907,7 @@ VEOF
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
-                                'orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -924,7 +937,7 @@ VEOF
                             """
 
                             deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
-                                'orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
 
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1097,7 +1110,7 @@ VEOF
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
-                                'orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
                         }
                     }
                 }

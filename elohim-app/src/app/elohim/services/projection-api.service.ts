@@ -11,7 +11,7 @@
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 88.4% (2026-02-05)
+// @coverage: 88.4% (2026-02-24)
 
 import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
@@ -22,6 +22,17 @@ import { ContentNode, ContentType, ContentReach } from '../../lamad/models/conte
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
 import { StorageClientService } from './storage-client.service';
+
+import type { IStorageApi, ContentFilters, PathFilters, RelationshipFilters } from '../interfaces';
+import type {
+  ContentMasteryView,
+  ContentStewardshipView,
+  ContentWithTagsView,
+  PathView,
+  PathWithDetailsView,
+  RelationshipView,
+  RelationshipWithContentView,
+} from '@elohim/storage-client/generated';
 
 /**
  * Content query filters for projection API
@@ -95,7 +106,7 @@ export interface ProjectionStats {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ProjectionAPIService {
+export class ProjectionAPIService implements IStorageApi {
   private readonly http = inject(HttpClient);
   private readonly storageClient = inject(StorageClientService);
 
@@ -131,13 +142,109 @@ export class ProjectionAPIService {
   }
 
   // =========================================================================
-  // Content Queries
+  // IStorageApi — Read-oriented interface methods
+  // =========================================================================
+
+  /** Get a single content item by ID, with tags. */
+  getContent(id: string): Observable<ContentWithTagsView | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    const url = this.buildApiUrl(`/Content/${encodeURIComponent(id)}`);
+
+    return this.http.get<ContentWithTagsView>(url).pipe(
+      timeout(this.defaultTimeout),
+      catchError((err: HttpErrorResponse) => {
+        if (err.status === 404) return of(null);
+        return of(null);
+      })
+    );
+  }
+
+  /** List content items with optional filters. */
+  getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    let params = new HttpParams();
+    if (filters?.limit) params = params.set('limit', filters.limit.toString());
+    if (filters?.offset) params = params.set('skip', filters.offset.toString());
+
+    const url = this.buildApiUrl('/Content');
+
+    return this.http.get<ContentWithTagsView[]>(url, { params }).pipe(
+      timeout(this.defaultTimeout),
+      map(data => data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  /** Get a single learning path by ID, with full details. */
+  getPath(id: string): Observable<PathWithDetailsView | null> {
+    if (!this.enabled) {
+      return of(null);
+    }
+
+    const url = this.buildApiUrl(`/LearningPath/${encodeURIComponent(id)}`);
+
+    return this.http.get<PathWithDetailsView>(url).pipe(
+      timeout(this.defaultTimeout),
+      catchError((err: HttpErrorResponse) => {
+        if (err.status === 404) return of(null);
+        return of(null);
+      })
+    );
+  }
+
+  /** List learning paths with optional filters. */
+  getPaths(_filters?: PathFilters): Observable<PathView[]> {
+    if (!this.enabled) {
+      return of([]);
+    }
+
+    let params = new HttpParams();
+    if (_filters?.limit) params = params.set('limit', _filters.limit.toString());
+    if (_filters?.offset) params = params.set('skip', _filters.offset.toString());
+
+    const url = this.buildApiUrl('/LearningPath');
+
+    return this.http.get<PathView[]>(url, { params }).pipe(
+      timeout(this.defaultTimeout),
+      map(data => data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  /** List content relationships — not supported by projection cache. */
+  getRelationships(_filters?: RelationshipFilters): Observable<RelationshipView[]> {
+    return of([]);
+  }
+
+  /** Get relationships for a content node — not supported by projection cache. */
+  getRelatedContent(_id: string): Observable<RelationshipWithContentView[]> {
+    return of([]);
+  }
+
+  /** Get mastery state — not supported by projection cache. */
+  getMastery(_humanId: string, _contentId: string): Observable<ContentMasteryView | null> {
+    return of(null);
+  }
+
+  /** Get stewardship data — not supported by projection cache. */
+  getStewardship(_contentId: string): Observable<ContentStewardshipView | null> {
+    return of(null);
+  }
+
+  // =========================================================================
+  // Domain-Type Content Queries (used by content-resolver, data-loader)
   // =========================================================================
 
   /**
-   * Get a single content node by ID
+   * Get a single content node by ID (returns domain ContentNode type)
    */
-  getContent(id: string): Observable<ContentNode | null> {
+  getContentNode(id: string): Observable<ContentNode | null> {
     if (!this.enabled) {
       return of(null);
     }
@@ -147,7 +254,7 @@ export class ProjectionAPIService {
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
       map(data => this.transformContent(data)),
-      catchError((err: HttpErrorResponse) => this.handleContentError(err, `getContent(${id})`)),
+      catchError((err: HttpErrorResponse) => this.handleContentError(err, `getContentNode(${id})`)),
       shareReplay(1)
     );
   }
@@ -245,13 +352,13 @@ export class ProjectionAPIService {
   }
 
   // =========================================================================
-  // Path Queries
+  // Domain-Type Path Queries (used by content-resolver, data-loader)
   // =========================================================================
 
   /**
-   * Get a single learning path by ID
+   * Get a single learning path by ID (returns domain LearningPath type)
    */
-  getPath(id: string): Observable<LearningPath | null> {
+  getPathNode(id: string): Observable<LearningPath | null> {
     if (!this.enabled) {
       return of(null);
     }
@@ -261,17 +368,17 @@ export class ProjectionAPIService {
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
       map(data => this.transformPath(data)),
-      catchError((err: HttpErrorResponse) => this.handlePathError(err, `getPath(${id})`)),
+      catchError((err: HttpErrorResponse) => this.handlePathError(err, `getPathNode(${id})`)),
       shareReplay(1)
     );
   }
 
   /**
    * Get path overview (minimal data for listing)
-   * Note: Uses same endpoint as getPath since cache API is generic
+   * Note: Uses same endpoint as getPathNode since cache API is generic
    */
   getPathOverview(id: string): Observable<Partial<LearningPath> | null> {
-    return this.getPath(id);
+    return this.getPathNode(id);
   }
 
   /**

@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 5.7% (2026-02-05)
+// @coverage: 5.7% (2026-02-24)
 
 import { BehaviorSubject, Observable, map } from 'rxjs';
+
+import { ContentService } from '@app/elohim/services/content.service';
 
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
@@ -172,6 +174,12 @@ export interface PathAdaptationConfig {
 
   /** Whether inline quiz completion is required before mastery gate */
   requireInlineBeforeMastery: boolean;
+
+  /** Maximum graph traversal depth for recommendations (1 = direct relationships only) */
+  maxGraphDepth: number;
+
+  /** Relationship types to query for recommendations */
+  graphRelationshipTypes: string[];
 }
 
 const DEFAULT_CONFIG: PathAdaptationConfig = {
@@ -181,6 +189,8 @@ const DEFAULT_CONFIG: PathAdaptationConfig = {
   maxRecommendations: 3,
   recommendationThreshold: 0.6,
   requireInlineBeforeMastery: true,
+  maxGraphDepth: 1,
+  graphRelationshipTypes: ['PREREQUISITE', 'REINFORCES'],
 };
 
 /**
@@ -219,6 +229,7 @@ export class PathAdaptationService {
   private readonly cooldownService = inject(AttemptCooldownService);
   private readonly poolService = inject(QuestionPoolService);
   private readonly streakService = inject(StreakTrackerService);
+  private readonly contentService = inject(ContentService);
 
   /** Cached adaptation states by path:human key */
   private readonly states = new Map<string, PathAdaptationState>();
@@ -674,44 +685,91 @@ export class PathAdaptationService {
 
   private generateRecommendations(pathId: string, humanId: string, result: QuizResult): void {
     const state = this.getOrCreateState(pathId, humanId);
-    const newRecs: ContentRecommendation[] = [];
 
     // Find concepts with low scores
-    for (const contentScore of result.contentScores) {
-      if (contentScore.averageScore < 0.6) {
-        // TODO: Look up related/prerequisite content from graph
-        // For now, just flag the concept itself
-        newRecs.push({
-          contentId: contentScore.contentId,
-          reason: 'struggled_with_concept',
-          confidence: 1 - contentScore.averageScore,
-          triggerContext: {
-            quizType: result.type === 'mastery' ? 'mastery' : 'practice',
-            conceptIds: [contentScore.contentId],
-            score: contentScore.averageScore,
-          },
+    const strugglingConcepts = result.contentScores.filter(
+      cs => cs.averageScore < this.config.recommendationThreshold
+    );
+
+    if (strugglingConcepts.length === 0) return;
+
+    // For each struggling concept, query the Rust graph endpoint.
+    // Fire-and-forget: recordMasteryResult is synchronous; recommendations
+    // populate asynchronously and consumers observe via getRecommendations$().
+    for (const contentScore of strugglingConcepts) {
+      this.contentService
+        .getContentGraph(contentScore.contentId, this.config.graphRelationshipTypes)
+        .subscribe(graph => {
+          const newRecs = this.buildRecommendations(graph, contentScore, result);
+          this.mergeRecommendations(state, newRecs);
+          this.saveState(pathId, humanId, state);
         });
-      }
+    }
+  }
+
+  private buildRecommendations(
+    graph: import('@app/elohim/services/content.service').ContentGraph | null,
+    contentScore: import('../models/quiz-session.model').ContentScore,
+    result: QuizResult
+  ): ContentRecommendation[] {
+    const quizType: 'mastery' | 'practice' = result.type === 'mastery' ? 'mastery' : 'practice';
+    const triggerContext = {
+      quizType,
+      conceptIds: [contentScore.contentId],
+      score: contentScore.averageScore,
+    };
+
+    if (graph && graph.related.length > 0) {
+      // Map graph nodes to recommendations — business logic lives in Rust
+      return graph.related.map(node => ({
+        contentId: node.contentId,
+        reason:
+          node.relationshipType === 'PREREQUISITE'
+            ? ('prerequisite_gap' as const)
+            : ('reinforcement' as const),
+        confidence: node.confidence,
+        triggerContext,
+      }));
     }
 
-    // Filter by threshold and limit
+    // Fallback: flag the concept itself when no graph relationships exist
+    return [
+      {
+        contentId: contentScore.contentId,
+        reason: 'struggled_with_concept' as const,
+        confidence: 1 - contentScore.averageScore,
+        triggerContext,
+      },
+    ];
+  }
+
+  private mergeRecommendations(state: PathAdaptationState, newRecs: ContentRecommendation[]): void {
+    const reasonPriority: Record<RecommendationReason, number> = {
+      prerequisite_gap: 0,
+      struggled_with_concept: 1,
+      reinforcement: 2,
+      exploration_interest: 3,
+      advanced_option: 4,
+    };
+
+    const sortByPriorityThenConfidence = (a: ContentRecommendation, b: ContentRecommendation) => {
+      const priorityDiff = (reasonPriority[a.reason] ?? 99) - (reasonPriority[b.reason] ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.confidence - a.confidence;
+    };
+
     const filtered = newRecs
       .filter(r => r.confidence >= this.config.recommendationThreshold)
-      .sort((a, b) => b.confidence - a.confidence)
+      .sort(sortByPriorityThenConfidence)
       .slice(0, this.config.maxRecommendations);
 
-    // Merge with existing, avoiding duplicates
     const existingIds = new Set(state.recommendations.map(r => r.contentId));
     for (const rec of filtered) {
-      if (!existingIds.has(rec.contentId)) {
-        state.recommendations.push(rec);
-      }
+      if (existingIds.has(rec.contentId)) continue;
+      state.recommendations.push(rec);
     }
 
-    // Trim to max
     state.recommendations = state.recommendations.slice(0, this.config.maxRecommendations);
-
-    this.saveState(pathId, humanId, state);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

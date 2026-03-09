@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
-// @coverage: 26.7% (2026-02-05)
+// @coverage: 26.7% (2026-02-24)
+
+import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
 
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
-import { ShefaService, CustodianMetrics } from '../../services/shefa.service';
 
 /** Alert from the Shefa service */
 interface ShefaAlert {
@@ -43,7 +44,7 @@ interface ShefaRecommendation {
   styleUrl: './shefa-dashboard.component.css',
 })
 export class ShefaDashboardComponent implements OnInit, OnDestroy {
-  private readonly shefa = inject(ShefaService);
+  private readonly shefa = inject(CUSTODIAN_METRICS);
   private readonly selection = inject(CustodianSelectionService);
 
   // Expose Math for template use
@@ -226,6 +227,20 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
   setActiveTab(tab: 'overview' | 'custodians' | 'alerts' | 'performance'): void {
     this.activeTab.set(tab);
+  }
+
+  onTierFilterChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as '1' | '2' | '3' | '4' | 'all';
+    this.filterByTier.set(value === 'all' ? 'all' : (Number(value) as 1 | 2 | 3 | 4));
+  }
+
+  onSortByChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as
+      | 'health'
+      | 'reputation'
+      | 'capacity'
+      | 'earnings';
+    this.sortBy.set(value);
   }
 
   refreshData(): void {

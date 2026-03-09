@@ -12,35 +12,37 @@ import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider'
 import { IdentityService } from '../../services/identity.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
+import { vi } from 'vitest';
 
 describe('LoginComponent', () => {
   let component: LoginComponent;
   let fixture: ComponentFixture<LoginComponent>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockPasswordProvider: jasmine.SpyObj<PasswordAuthProvider>;
-  let mockOAuthProvider: jasmine.SpyObj<OAuthAuthProvider>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
-  let mockTauriAuth: jasmine.SpyObj<TauriAuthService>;
-  let mockRouter: jasmine.SpyObj<Router>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockAuthService: any;
+  let mockPasswordProvider: any;
+  let mockOAuthProvider: any;
+  let mockIdentityService: any;
+  let mockDoorwayRegistry: any;
+  let mockTauriAuth: any;
+  let mockRouter: any;
   let mockActivatedRoute: any;
+  let localStorageGetItemSpy: ReturnType<typeof vi.spyOn>;
+  let localStorageSetItemSpy: ReturnType<typeof vi.spyOn>;
+  let localStorageRemoveItemSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    // Create mocks
-    mockAuthService = jasmine.createSpyObj('AuthService', [
-      'registerProvider',
-      'hasProvider',
-      'login',
-      'isAuthenticated',
-    ]);
-    mockAuthService.hasProvider.and.returnValue(false);
-    mockAuthService.isAuthenticated.and.returnValue(false);
-    mockAuthService.login.and.returnValue(
+    mockAuthService = {
+      registerProvider: vi.fn(),
+      hasProvider: vi.fn(),
+      login: vi.fn(),
+      isAuthenticated: vi.fn(),
+    };
+    mockAuthService.hasProvider.mockReturnValue(false);
+    mockAuthService.isAuthenticated.mockReturnValue(false);
+    mockAuthService.login.mockReturnValue(
       Promise.resolve({
         success: true,
         token: 'mock-token',
@@ -51,66 +53,69 @@ describe('LoginComponent', () => {
       })
     );
 
-    mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['login', 'logout']);
+    mockPasswordProvider = {
+      login: vi.fn(),
+      logout: vi.fn(),
+    };
 
-    mockOAuthProvider = jasmine.createSpyObj('OAuthAuthProvider', ['initiateLogin', 'storeReturnUrl'], {
+    mockOAuthProvider = {
+      initiateLogin: vi.fn(),
+      storeReturnUrl: vi.fn(),
       isFlowInProgress: signal(false),
-    });
+    };
 
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      ['waitForAuthenticatedState'],
-      {
-        mode: signal('session'),
-        isAuthenticated: signal(false),
-      }
-    );
-    mockIdentityService.waitForAuthenticatedState.and.returnValue(Promise.resolve(true));
+    mockIdentityService = {
+      waitForAuthenticatedState: vi.fn(),
+    };
+    mockIdentityService.waitForAuthenticatedState.mockReturnValue(Promise.resolve(true));
 
-    mockDoorwayRegistry = jasmine.createSpyObj(
-      'DoorwayRegistryService',
-      ['selectDoorwayByUrl'],
-      {
-        selected: signal(null),
-        hasSelection: signal(false),
-        selectedUrl: signal(null),
-      }
-    );
+    mockDoorwayRegistry = {
+      selectDoorwayByUrl: vi.fn(),
+      selected: signal(null),
+      hasSelection: signal(false),
+    };
 
     mockTauriAuth = {
       isTauri: signal(false),
-      needsUnlock: jasmine.createSpy('needsUnlock').and.returnValue(false),
-      getDoorwayStatus: jasmine.createSpy('getDoorwayStatus').and.returnValue(Promise.resolve(null)),
-    } as any;
+      needsUnlock: vi.fn().mockReturnValue(false),
+      getDoorwayStatus: vi.fn().mockReturnValue(Promise.resolve(null)),
+    };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
-    mockRouter.navigate.and.returnValue(Promise.resolve(true));
+    mockRouter = { navigate: vi.fn() };
+    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
     mockActivatedRoute = {
       queryParams: of({}),
     };
 
     // Mock localStorage
-    spyOn(localStorage, 'getItem').and.returnValue(null);
-    spyOn(localStorage, 'setItem');
-    spyOn(localStorage, 'removeItem');
+    localStorageGetItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+    localStorageSetItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+    localStorageRemoveItemSpy = vi
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(() => {});
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
+        provideRouter([]),
         { provide: AuthService, useValue: mockAuthService },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: TauriAuthService, useValue: mockTauriAuth },
-        { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
     }).compileComponents();
 
+    // Spy on the real Router's navigate method
+    mockRouter = TestBed.inject(Router);
+    vi.spyOn(mockRouter, 'navigate').mockResolvedValue(true);
+
     fixture = TestBed.createComponent(LoginComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges();
   });
 
   // ==========================================================================
@@ -263,7 +268,7 @@ describe('LoginComponent', () => {
 
   describe('ngOnInit', () => {
     it('should register password provider if not already registered', () => {
-      mockAuthService.hasProvider.and.returnValue(false);
+      mockAuthService.hasProvider.mockReturnValue(false);
 
       component.ngOnInit();
 
@@ -271,37 +276,40 @@ describe('LoginComponent', () => {
     });
 
     it('should not register password provider if already registered', () => {
-      mockAuthService.hasProvider.and.returnValue(true);
+      mockAuthService.hasProvider.mockReturnValue(true);
+      mockAuthService.registerProvider.mockClear();
 
       component.ngOnInit();
 
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('should get return URL from query params', (done) => {
-      mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
+    it('should get return URL from query params', () =>
+      new Promise<void>(done => {
+        mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect(component.returnUrl).toBe('/dashboard');
-        done();
-      }, 100);
-    });
+        setTimeout(() => {
+          expect(component.returnUrl).toBe('/dashboard');
+          done();
+        }, 100);
+      }));
 
-    it('should default return URL to / when not in query params', (done) => {
-      mockActivatedRoute.queryParams = of({});
+    it('should default return URL to / when not in query params', () =>
+      new Promise<void>(done => {
+        mockActivatedRoute.queryParams = of({});
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect(component.returnUrl).toBe('/');
-        done();
-      }, 100);
-    });
+        setTimeout(() => {
+          expect(component.returnUrl).toBe('/');
+          done();
+        }, 100);
+      }));
 
     it('should pre-fill identifier from localStorage if remembered', () => {
-      (localStorage.getItem as jasmine.Spy).and.returnValue('user@example.com');
+      localStorageGetItemSpy.mockReturnValue('user@example.com');
 
       component.ngOnInit();
 
@@ -309,7 +317,7 @@ describe('LoginComponent', () => {
     });
 
     it('should redirect if already authenticated', () => {
-      mockAuthService.isAuthenticated.and.returnValue(true);
+      mockAuthService.isAuthenticated.mockReturnValue(true);
 
       component.ngOnInit();
 
@@ -365,9 +373,7 @@ describe('LoginComponent', () => {
 
       component.onFederatedLogin();
 
-      expect(component.error()).toBe(
-        'Please enter a valid identity (e.g. you@your-doorway.host)'
-      );
+      expect(component.error()).toBe('Please enter a valid identity (e.g. you@your-doorway.host)');
       expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
     });
 
@@ -394,7 +400,7 @@ describe('LoginComponent', () => {
 
       component.onFederatedLogin();
 
-      const args = mockOAuthProvider.initiateLogin.calls.mostRecent().args;
+      const args = mockOAuthProvider.initiateLogin.mock.lastCall;
       expect(args[2]).toBe('matthew');
     });
 
@@ -463,7 +469,7 @@ describe('LoginComponent', () => {
 
     it('should set loading state during login', async () => {
       let resolveLogin: (value: any) => void;
-      mockAuthService.login.and.returnValue(
+      mockAuthService.login.mockReturnValue(
         new Promise(resolve => {
           resolveLogin = resolve;
         })
@@ -523,7 +529,7 @@ describe('LoginComponent', () => {
 
       await component.onLogin();
 
-      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'user@example.com');
+      expect(localStorageSetItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'user@example.com');
     });
 
     it('should remove identifier from localStorage when rememberMe is false', async () => {
@@ -531,7 +537,7 @@ describe('LoginComponent', () => {
 
       await component.onLogin();
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
+      expect(localStorageRemoveItemSpy).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
     });
 
     it('should wait for authenticated state before navigation', async () => {
@@ -549,7 +555,7 @@ describe('LoginComponent', () => {
     });
 
     it('should display error message on login failure', async () => {
-      mockAuthService.login.and.returnValue(
+      mockAuthService.login.mockReturnValue(
         Promise.resolve({
           success: false,
           error: 'Invalid credentials',
@@ -564,7 +570,7 @@ describe('LoginComponent', () => {
     });
 
     it('should handle login exception', async () => {
-      mockAuthService.login.and.returnValue(Promise.reject(new Error('Network error')));
+      mockAuthService.login.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await component.onLogin();
 
@@ -573,7 +579,7 @@ describe('LoginComponent', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockAuthService.login.and.returnValue(Promise.reject('Unknown error'));
+      mockAuthService.login.mockReturnValue(Promise.reject('Unknown error'));
 
       await component.onLogin();
 

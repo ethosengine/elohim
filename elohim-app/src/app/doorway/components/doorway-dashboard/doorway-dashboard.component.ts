@@ -1,7 +1,7 @@
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
-// @coverage: 93.7% (2026-02-05)
+// @coverage: 93.7% (2026-02-24)
 
 import { firstValueFrom } from 'rxjs';
 
@@ -150,6 +150,11 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   setStatusFilter(status: NodeStatus | 'all'): void {
     this.statusFilter.set(status);
+  }
+
+  onStatusFilterChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as NodeStatus | 'all';
+    this.statusFilter.set(value);
   }
 
   async refresh(): Promise<void> {

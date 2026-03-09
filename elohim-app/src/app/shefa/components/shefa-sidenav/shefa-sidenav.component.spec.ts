@@ -3,9 +3,15 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withHashLocation } from '@angular/router';
+import { Component } from '@angular/core';
 
 import { ShefaSidenavComponent } from './shefa-sidenav.component';
+import { vi } from 'vitest';
+
+// Stub component to satisfy router routes for all sidenav links
+@Component({ standalone: true, template: '' })
+class StubRouteComponent {}
 
 describe('ShefaSidenavComponent', () => {
   let component: ShefaSidenavComponent;
@@ -14,7 +20,24 @@ describe('ShefaSidenavComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ShefaSidenavComponent],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([
+          { path: 'shefa', component: StubRouteComponent },
+          { path: 'shefa/accounts', component: StubRouteComponent },
+          { path: 'shefa/transactions', component: StubRouteComponent },
+          { path: 'shefa/devices', component: StubRouteComponent },
+          { path: 'shefa/resources', component: StubRouteComponent },
+          { path: 'shefa/resources/property', component: StubRouteComponent },
+          { path: 'shefa/resources/energy', component: StubRouteComponent },
+          { path: 'shefa/resources/knowledge', component: StubRouteComponent },
+          { path: 'shefa/exchange', component: StubRouteComponent },
+          { path: 'shefa/insurance', component: StubRouteComponent },
+          { path: 'shefa/constitutional', component: StubRouteComponent },
+          { path: 'shefa/dashboard', component: StubRouteComponent },
+          { path: 'shefa/planning', component: StubRouteComponent },
+          { path: 'shefa/settings', component: StubRouteComponent },
+        ]),
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ShefaSidenavComponent);
@@ -59,14 +82,14 @@ describe('ShefaSidenavComponent', () => {
 
     it('should render 13 nav items total', () => {
       const items = fixture.nativeElement.querySelectorAll('.nav-item');
-      expect(items.length).toBe(13);
+      expect(items.length).toBe(14);
     });
   });
 
   describe('nav items', () => {
     it('should render Material icons for each nav item', () => {
       const icons = fixture.nativeElement.querySelectorAll('.nav-icon');
-      expect(icons.length).toBe(13);
+      expect(icons.length).toBe(14);
       expect(icons[0].textContent?.trim()).toBe('home');
     });
 
@@ -88,14 +111,14 @@ describe('ShefaSidenavComponent', () => {
 
     it('should have correct routerLink on Dashboard', () => {
       const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
-      // Dashboard is the 11th item (index 10) in Management group
-      expect(items[10].getAttribute('href')).toBe('/shefa/dashboard');
+      // Dashboard is the 12th item (index 11) in Management group
+      expect(items[11].getAttribute('href')).toBe('/shefa/dashboard');
     });
   });
 
   describe('user interactions', () => {
     it('should emit navItemClicked when a nav item is clicked', () => {
-      const spy = jasmine.createSpy('navItemClicked');
+      const spy = vi.fn();
       component.navItemClicked.subscribe(spy);
 
       const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
@@ -105,11 +128,10 @@ describe('ShefaSidenavComponent', () => {
     });
 
     it('should emit collapseClicked when collapse button is clicked', () => {
-      const spy = jasmine.createSpy('collapseClicked');
+      const spy = vi.fn();
       component.collapseClicked.subscribe(spy);
 
-      const btn: HTMLButtonElement =
-        fixture.nativeElement.querySelector('.sidebar-collapse-btn');
+      const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.sidebar-collapse-btn');
       btn.click();
 
       expect(spy).toHaveBeenCalled();

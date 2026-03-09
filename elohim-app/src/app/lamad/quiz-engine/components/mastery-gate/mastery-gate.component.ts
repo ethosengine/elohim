@@ -10,9 +10,10 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
-// @coverage: 88.6% (2026-02-05)
+// @coverage: 88.6% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -127,7 +128,12 @@ export interface MasteryQuizRequestEvent {
 
           <!-- Quiz button -->
           <div class="gate-actions">
-            <button class="btn-start-quiz" [disabled]="!canAttempt()" (click)="onStartQuiz()">
+            <button
+              class="btn-start-quiz"
+              [disabled]="!canAttempt()"
+              (click)="onStartQuiz()"
+              data-testid="gate-start"
+            >
               @if (inCooldown()) {
                 Cooldown Active
               } @else if (attemptsRemaining() === 0) {
@@ -157,7 +163,9 @@ export interface MasteryQuizRequestEvent {
           </div>
 
           <div class="gate-actions">
-            <button class="btn-continue" (click)="onContinue()">Continue to Next Section</button>
+            <button class="btn-continue" (click)="onContinue()" data-testid="gate-continue">
+              Continue to Next Section
+            </button>
           </div>
         }
       </div>
@@ -464,11 +472,9 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly adaptationService: PathAdaptationService,
-    private readonly cooldownService: AttemptCooldownService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly adaptationService = inject(PathAdaptationService);
+  private readonly cooldownService = inject(AttemptCooldownService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadGateStatus();

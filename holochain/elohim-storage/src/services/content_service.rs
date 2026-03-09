@@ -28,21 +28,35 @@ impl ContentService {
 
     /// Get content by ID
     pub fn get(&self, id: &str) -> Result<Option<content::ContentRow>, StorageError> {
-        self.content_db.with_conn(|conn| content::get_content(conn, id))
+        self.content_db
+            .with_conn(|conn| content::get_content(conn, id))
     }
 
     /// List content with filters
-    pub fn list(&self, query: &content::ContentQuery) -> Result<Vec<content::ContentRow>, StorageError> {
-        self.content_db.with_conn(|conn| content::list_content(conn, query))
+    pub fn list(
+        &self,
+        query: &content::ContentQuery,
+    ) -> Result<Vec<content::ContentRow>, StorageError> {
+        self.content_db
+            .with_conn(|conn| content::list_content(conn, query))
     }
 
     /// Get content by tag
-    pub fn get_by_tag(&self, tag: &str, limit: u32) -> Result<Vec<content::ContentRow>, StorageError> {
-        self.content_db.with_conn(|conn| content::get_content_by_tag(conn, tag, limit))
+    pub fn get_by_tag(
+        &self,
+        tag: &str,
+        limit: u32,
+    ) -> Result<Vec<content::ContentRow>, StorageError> {
+        self.content_db
+            .with_conn(|conn| content::get_content_by_tag(conn, tag, limit))
     }
 
     /// Search content by text
-    pub fn search(&self, query: &str, limit: u32) -> Result<Vec<content::ContentRow>, StorageError> {
+    pub fn search(
+        &self,
+        query: &str,
+        limit: u32,
+    ) -> Result<Vec<content::ContentRow>, StorageError> {
         self.list(&content::ContentQuery {
             search: Some(query.to_string()),
             limit,
@@ -55,14 +69,17 @@ impl ContentService {
     // =========================================================================
 
     /// Create a single content item with validation
-    pub fn create(&self, input: content::CreateContentInput) -> Result<content::ContentRow, StorageError> {
+    pub fn create(
+        &self,
+        input: content::CreateContentInput,
+    ) -> Result<content::ContentRow, StorageError> {
         // Validate required fields
         self.validate_content(&input)?;
 
         // Create content
-        let result = self.content_db.with_conn_mut(|conn| {
-            content::create_content(conn, input.clone())
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| content::create_content(conn, input.clone()))?;
 
         // Emit event
         self.events.emit(StorageEvent::ContentCreated {
@@ -89,9 +106,9 @@ impl ContentService {
         let ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
 
         // Perform bulk create
-        let result = self.content_db.with_conn_mut(|conn| {
-            content::bulk_create_content(conn, items)
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| content::bulk_create_content(conn, items))?;
 
         // Emit event if any items were inserted
         if result.inserted > 0 {
@@ -106,12 +123,13 @@ impl ContentService {
 
     /// Delete content by ID
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let deleted = self.content_db.with_conn_mut(|conn| {
-            content::delete_content(conn, id)
-        })?;
+        let deleted = self
+            .content_db
+            .with_conn_mut(|conn| content::delete_content(conn, id))?;
 
         if deleted {
-            self.events.emit(StorageEvent::ContentDeleted { id: id.to_string() });
+            self.events
+                .emit(StorageEvent::ContentDeleted { id: id.to_string() });
         }
 
         Ok(deleted)
@@ -134,7 +152,8 @@ impl ContentService {
             content::delete_content(conn, id)
         })?;
 
-        self.events.emit(StorageEvent::ContentDeleted { id: id.to_string() });
+        self.events
+            .emit(StorageEvent::ContentDeleted { id: id.to_string() });
 
         Ok(true)
     }
@@ -150,7 +169,9 @@ impl ContentService {
         }
 
         if input.id.len() > 255 {
-            return Err(StorageError::InvalidInput("id must be <= 255 characters".into()));
+            return Err(StorageError::InvalidInput(
+                "id must be <= 255 characters".into(),
+            ));
         }
 
         if input.title.is_empty() {
@@ -158,27 +179,73 @@ impl ContentService {
         }
 
         if input.title.len() > 500 {
-            return Err(StorageError::InvalidInput("title must be <= 500 characters".into()));
+            return Err(StorageError::InvalidInput(
+                "title must be <= 500 characters".into(),
+            ));
         }
 
         // Validate content_type is reasonable
         let valid_types = [
-            "concept", "article", "quiz", "assessment", "video", "audio",
-            "image", "document", "interactive", "simulation", "reference",
-            "path", "module", "chapter", "lesson", "exercise", "project",
-            "discussion", "poll", "survey", "scenario", "role", "resource",
+            "concept",
+            "article",
+            "quiz",
+            "assessment",
+            "video",
+            "audio",
+            "image",
+            "document",
+            "interactive",
+            "simulation",
+            "reference",
+            "path",
+            "module",
+            "chapter",
+            "lesson",
+            "exercise",
+            "project",
+            "discussion",
+            "poll",
+            "survey",
+            "scenario",
+            "role",
+            "resource",
         ];
-        if !valid_types.contains(&input.content_type.as_str()) && !input.content_type.starts_with("custom:") {
+        if !valid_types.contains(&input.content_type.as_str())
+            && !input.content_type.starts_with("custom:")
+        {
             // Allow custom types with prefix
             // Just warn, don't reject - be permissive
         }
 
-        // Validate content_format
+        // Validate content_format — aligned with healing.rs CONTENT_FORMATS
         let valid_formats = [
-            "markdown", "html", "json", "text", "perseus",
-            "perseus-json", "perseus-quiz-json", "sophia-quiz-json", "sophia",
-            "gherkin", "yaml", "toml", "latex", "asciidoc",
-            "html5-app", "iframe", "embed",
+            "markdown",
+            "html",
+            "json",
+            "text",
+            "plaintext",
+            "plain",
+            "perseus",
+            "perseus-json",
+            "perseus-quiz-json",
+            "sophia-quiz-json",
+            "sophia",
+            "gherkin",
+            "yaml",
+            "toml",
+            "latex",
+            "asciidoc",
+            "html5-app",
+            "iframe",
+            "embed",
+            "video",
+            "audio",
+            "interactive",
+            "external",
+            "video-embed",
+            "audio-file",
+            "human-json",
+            "organization-json",
         ];
         if !valid_formats.contains(&input.content_format.as_str()) {
             return Err(StorageError::InvalidInput(format!(
@@ -187,8 +254,23 @@ impl ContentService {
             )));
         }
 
-        // Validate reach level
-        let valid_reach = ["public", "commons", "regional", "local", "private", "invited"];
+        // Validate reach level — protocol spec (8 levels) + legacy for backward compat
+        let valid_reach = [
+            // Protocol spec (social/relational hierarchy)
+            "private",
+            "self",
+            "intimate",
+            "trusted",
+            "familiar",
+            "community",
+            "public",
+            "commons",
+            // Legacy values (backward compat with existing stored data)
+            "regional",
+            "local",
+            "invited",
+            "federated",
+        ];
         if !valid_reach.contains(&input.reach.as_str()) {
             return Err(StorageError::InvalidInput(format!(
                 "reach '{}' is not valid. Valid values: {:?}",
@@ -254,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_validate_empty_id() {
-        let events = Arc::new(EventBus::new());
+        let _events = Arc::new(EventBus::new());
         // Can't test without ContentDb, but validation is straightforward
     }
 }

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Session Human Service Tests
  */
@@ -13,24 +14,30 @@ describe('SessionHumanService', () => {
   beforeEach(() => {
     localStorageMock = {};
 
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+    // Use Storage.prototype to intercept all localStorage calls (works in jsdom/vitest)
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
+      (key: string) => localStorageMock[key] ?? null
+    );
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
-    spyOn(localStorage, 'key').and.callFake((index: number) => {
-      return Object.keys(localStorageMock)[index] || null;
+    vi.spyOn(Storage.prototype, 'key').mockImplementation((index: number) => {
+      return Object.keys(localStorageMock)[index] ?? null;
     });
-    // Note: Can't mock localStorage.length in browser environment
-    // since it's a native accessor property that can't be redefined
 
+    // Provide SessionHumanService explicitly so each test gets a fresh instance
     TestBed.configureTestingModule({
       providers: [SessionHumanService],
     });
 
     service = TestBed.inject(SessionHumanService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('initialization', () => {
@@ -447,19 +454,20 @@ describe('SessionHumanService', () => {
   });
 
   describe('session observable', () => {
-    it('should emit session changes', done => {
-      const emissions: (SessionHuman | null)[] = [];
+    it('should emit session changes', () =>
+      new Promise<void>(done => {
+        const emissions: (SessionHuman | null)[] = [];
 
-      service.session$.subscribe(session => {
-        emissions.push(session);
-        if (emissions.length === 2) {
-          expect(emissions[1]?.displayName).toBe('Updated Name');
-          done();
-        }
-      });
+        service.session$.subscribe(session => {
+          emissions.push(session);
+          if (emissions.length === 2) {
+            expect(emissions[1]?.displayName).toBe('Updated Name');
+            done();
+          }
+        });
 
-      service.setDisplayName('Updated Name');
-    });
+        service.setDisplayName('Updated Name');
+      }));
   });
 
   describe('touch', () => {

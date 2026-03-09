@@ -1,18 +1,19 @@
 import { CommonModule } from '@angular/common';
 import {
-  Component,
-  Input,
-  Output,
-  EventEmitter,
-  OnInit,
-  OnChanges,
-  SimpleChanges,
-  ElementRef,
-  ViewChild,
   AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+  ViewChild,
+  inject,
 } from '@angular/core';
 
-// @coverage: 80.0% (2026-02-05)
+// @coverage: 80.0% (2026-02-24)
 
 import {
   GovernanceSignalService,
@@ -82,7 +83,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   clusterCount = 0;
   consensusScore = 0;
 
-  constructor(private readonly signalService: GovernanceSignalService) {}
+  private readonly signalService = inject(GovernanceSignalService);
 
   ngOnInit(): void {
     this.loadClusterData();

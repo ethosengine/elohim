@@ -14,6 +14,8 @@
  * based on contribution evidence, but stewards can dispute "hostile takeovers".
  */
 
+import type { JsonValue } from '@elohim/storage-client/generated';
+
 // ============================================================================
 // Allocation Methods
 // ============================================================================
@@ -95,7 +97,7 @@ export interface StewardshipAllocation {
   allocationRatio: number; // 0.0-1.0, all for content sum to 1.0
   allocationMethod: AllocationMethod;
   contributionType: ContributionType;
-  contributionEvidenceJson: string | null;
+  contributionEvidence: JsonValue | null;
 
   // Governance
   governanceState: GovernanceState;
@@ -118,7 +120,7 @@ export interface StewardshipAllocation {
 
   // Metadata
   note: string | null;
-  metadataJson: string | null;
+  metadata: JsonValue | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -183,9 +185,9 @@ export interface CreateAllocationInput {
   allocationRatio?: number; // default: 1.0
   allocationMethod?: AllocationMethod; // default: 'manual'
   contributionType?: ContributionType; // default: 'inherited'
-  contributionEvidenceJson?: string;
+  contributionEvidence?: JsonValue;
   note?: string;
-  metadataJson?: string;
+  metadata?: JsonValue;
 }
 
 /**
@@ -195,7 +197,7 @@ export interface UpdateAllocationInput {
   allocationRatio?: number;
   allocationMethod?: AllocationMethod;
   contributionType?: ContributionType;
-  contributionEvidenceJson?: string;
+  contributionEvidence?: JsonValue;
   governanceState?: GovernanceState;
   disputeId?: string;
   disputeReason?: string;
@@ -248,81 +250,4 @@ export interface BulkAllocationResult {
   created: number;
   failed: number;
   errors: string[];
-}
-
-// ============================================================================
-// Wire Format Transformers
-// ============================================================================
-
-/**
- * Transform API response (camelCase View) to TypeScript domain model.
- * API now returns camelCase with parsed JSON objects.
- */
-export function fromWireStewardshipAllocation(
-  view: Record<string, unknown>
-): StewardshipAllocation {
-  // API returns parsed JSON objects; stringify for domain model compatibility
-  const contributionEvidence = view['contributionEvidence'];
-  const metadata = view['metadata'];
-
-  return {
-    id: view['id'] as string,
-    contentId: view['contentId'] as string,
-    stewardPresenceId: view['stewardPresenceId'] as string,
-    allocationRatio: view['allocationRatio'] as number,
-    allocationMethod: view['allocationMethod'] as AllocationMethod,
-    contributionType: view['contributionType'] as ContributionType,
-    contributionEvidenceJson: contributionEvidence ? JSON.stringify(contributionEvidence) : null,
-    governanceState: view['governanceState'] as GovernanceState,
-    disputeId: view['disputeId'] as string | null,
-    disputeReason: view['disputeReason'] as string | null,
-    disputedAt: view['disputedAt'] as string | null,
-    disputedBy: view['disputedBy'] as string | null,
-    negotiationSessionId: view['negotiationSessionId'] as string | null,
-    elohimRatifiedAt: view['elohimRatifiedAt'] as string | null,
-    elohimRatifierId: view['elohimRatifierId'] as string | null,
-    effectiveFrom: view['effectiveFrom'] as string,
-    effectiveUntil: view['effectiveUntil'] as string | null,
-    supersededBy: view['supersededBy'] as string | null,
-    recognitionAccumulated: view['recognitionAccumulated'] as number,
-    lastRecognitionAt: view['lastRecognitionAt'] as string | null,
-    note: view['note'] as string | null,
-    metadataJson: metadata ? JSON.stringify(metadata) : null,
-    createdAt: view['createdAt'] as string,
-    updatedAt: view['updatedAt'] as string,
-  };
-}
-
-/**
- * Transform ContentStewardship from API response (camelCase View).
- */
-export function fromWireContentStewardship(view: Record<string, unknown>): ContentStewardship {
-  const allocations = ((view['allocations'] as Record<string, unknown>[]) ?? []).map(a => ({
-    allocation: fromWireStewardshipAllocation(a['allocation'] as Record<string, unknown>),
-    steward: a['steward']
-      ? fromWireContributorPresenceRef(a['steward'] as Record<string, unknown>)
-      : null,
-  }));
-
-  return {
-    contentId: view['contentId'] as string,
-    allocations,
-    totalAllocation: view['totalAllocation'] as number,
-    hasDisputes: view['hasDisputes'] as boolean,
-    primarySteward: view['primarySteward']
-      ? fromWireStewardshipAllocation(view['primarySteward'] as Record<string, unknown>)
-      : null,
-  };
-}
-
-/**
- * Transform ContributorPresenceRef from API response (camelCase View).
- */
-function fromWireContributorPresenceRef(view: Record<string, unknown>): ContributorPresenceRef {
-  return {
-    id: view['id'] as string,
-    displayName: view['displayName'] as string,
-    image: view['image'] as string | null,
-    presenceState: view['presenceState'] as string,
-  };
 }

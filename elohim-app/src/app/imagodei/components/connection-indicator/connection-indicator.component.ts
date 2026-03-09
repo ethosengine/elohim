@@ -15,7 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { catchError, of, switchMap, timer } from 'rxjs';
 
-// @coverage: 76.0% (2026-02-05)
+// @coverage: 72.2% (2026-02-24)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';

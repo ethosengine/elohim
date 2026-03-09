@@ -1,0 +1,1443 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "humanId": "human-ronald-refugee",
+    "displayName": "Ronald",
+    "category": "newcomer",
+    "profileReach": "community",
+    "bio": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "location": "Metro City (municipality)",
+    "affinities": [
+      "engineering",
+      "refugee-rights",
+      "professional-recertification",
+      "community-building"
+    ],
+    "organizations": []
+  },
+  "content": [
+    {
+      "contentId": "assessment-attachment-style",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-constitutional-reasoning",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-personal-values",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-strengths-finder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-values-hierarchy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "care-economy-visibility",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-apprenticeship-program",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-builders-guild",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-educators-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-engineers-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-esl-program",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-farmers-market",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-garden-club",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-gig-workers-alliance",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-holochain-devs",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-homeschool-coop",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-immigrant-support",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-impact-investors",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-local-business",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-local-church",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-manufacturers-guild",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-mining-town",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-neighborhood-association",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-pastoral-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-refugee-resettlement",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-regen-ag-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-rideshare-drivers",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-rust-meetup",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-utility-workers",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-centralized-control",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-communities-self-govern",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-community-wisdom-at-scale",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-complexity-exceeds-processing",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-connection-genuine",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-cross-layer-verification",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-carries-no-values",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-concentrate-not-circulate",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-fail-to-reward-care",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-no-natural-limits",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-dark-patterns-impossible",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-different-values-coexist",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-economic-alignment",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-engagement-optimization",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-engineering-specifications",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-feedback-loops-broken",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-graduated-intimacy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-growth-encouraged-exploitation-prevented",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-human-creativity-flourishes",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-incorruptible-stewardship",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-indigenous-wisdom",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-intergenerational-thinking",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-love-as-technology",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-one-size-fits-all-moderation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-communities",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-developers",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-policymakers",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-peer-to-peer-architecture",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-poverty-of-currency",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-redemptive-security-model",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-representation-capturable",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-scandinavian-insight",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-surveillance-capitalism",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-technology-serves-love",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-transparency-as-immune-system",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-value-generative-economics",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-votes-binary-infrequent",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-vulnerable-people-protected",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-global-orchestra",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-lamad",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-public-observer-epic",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-affinity-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-global",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-individual",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-affinity-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-educational",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-family",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-community-moderator-scenarios-community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-content-creator-scenarios-affinity-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-content-creator-scenarios-community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-displaced-person-scenarios-community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-affinity-network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-family",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-neighborhood",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-refugee-scenarios-global",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "global-orchestra",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hardware-spec",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-agent-model",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-appreciation-gift",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-economic-events",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-intent-commitment",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-process-recipe",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-nancy-neighbor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pam-polarized",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "lamad-reference-implementation",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "manifesto",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "organizations-decomposition",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "quiz-digital-dignity",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "rea-foundations",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist creates cross-geographic climate justice network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist shares successful tactic that spreads through trust",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist creates community organizing space",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist prevents infiltration attempt",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist shares evidence-based call to action",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist detects surveillance attempt and activates sanctuary",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist establishes protected digital identity",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist manages multiple digital identities safely",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist recovers data after device seizure",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child earns district reach through exceptional science project",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child receives help during distress",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child's gradual reach expansion through good judgment",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator coordinates with other moderators on cross-community issue",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator detects and prevents infiltration attempt",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator protects child while educating peer",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator resolves conflict with restorative approach",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator produces quality educational content that earns reach",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator receives sustainable support from communities",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator covers local civic issue with evidence-based reporting",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator documents community history through elder interviews",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person's abuser attempts to locate her",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-climate-displaced community maintains cohesion across distance",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates managed retreat",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-elder preserves bioregional knowledge across displacement",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder finds peer support during life transition",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder protected from health fraud in wellness network",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder protected from romance scam while maintaining real connections",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder reaches out during health concern",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder shares family wisdom with grandchildren",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder stays connected to grandchild's daily life",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder protected from medicare scam",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee documents journey for family reunification",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee maintains family connection across borders",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-activist-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-articles-new-public-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-child-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-community-moderator-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-content-creator-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-displaced-person-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-elder-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-epic",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-foundations-of-humane-technology-course-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-ground-news-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-home-ihrwgho5-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-homepage-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-humane-by-design-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-open-collective-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-pubhubs-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-solutions-ecochain-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-refugee-readme",
+      "reach": "neighborhood",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-appeals-process",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-civic-participation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-community-moderation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-constitutional-councils",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-core-principles",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-digital-dignity",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-distributed-governance",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-economic-coordination",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-five-epics",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-governance-crisis",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-invisible-economy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-platform-design",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-rea-accounting",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-recognition-systems",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-stakeholder-roles",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-trust-networks",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-value-flows",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-value-recognition",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-why-elohim",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-worker-agency",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-worker-ownership",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "valueflows-elohim-bridge",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-bub-builder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-charlie-challenged",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-dan-developer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-dolittle-doctor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-frank-farmer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-georgina-grocer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-gertrude-grandma",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ginny-gigworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-janice-janitor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-lenny-lineworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-manny-manufacturer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-migrant",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-miner",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-matthew-manager",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-meriadoc-moneybags",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pete-pastor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-renold-regent",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ronald-refugee",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-sam-shipper",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-sammy-son",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-susan-spouse",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-tiffany-teen",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-timothy-tutor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-tommy-teacher",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-traveler",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    }
+  ],
+  "relationships": [],
+  "stewardship": [],
+  "collectives": [
+    {
+      "collectiveId": "household-extended",
+      "roleContext": null,
+      "intimacyLevel": "trusted"
+    },
+    {
+      "collectiveId": "community-refugee-resettlement",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "community-engineers-network",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    }
+  ],
+  "conductorGroup": 3,
+  "manifest": {
+    "version": "1.0.0",
+    "generatedAt": "2026-03-03T19:08:21.466Z",
+    "sourceStory": "genesis",
+    "contentHash": "10deb111"
+  }
+}

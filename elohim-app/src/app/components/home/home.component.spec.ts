@@ -9,23 +9,39 @@ import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 import { HomeComponent } from './home.component';
+import { vi } from 'vitest';
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
   let fixture: ComponentFixture<HomeComponent>;
-  let mockConfigService: jasmine.SpyObj<ConfigService>;
-  let mockAnalyticsService: jasmine.SpyObj<AnalyticsService>;
-  let mockDomInteractionService: jasmine.SpyObj<DomInteractionService>;
+  let mockConfigService: any;
+  let mockAnalyticsService: any;
+  let mockDomInteractionService: any;
 
   beforeEach(async () => {
-    mockConfigService = jasmine.createSpyObj('ConfigService', ['getConfig']);
-    mockAnalyticsService = jasmine.createSpyObj('AnalyticsService', ['trackEvent']);
-    mockDomInteractionService = jasmine.createSpyObj('DomInteractionService', [
-      'setupScrollIndicator',
-      'setupHeroTitleAnimation',
-    ]);
+    // IntersectionObserver is not available in jsdom — stub it out
+    if (!('IntersectionObserver' in window)) {
+      class MockIntersectionObserver {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        constructor(_callback: IntersectionObserverCallback) {}
+      }
+      (window as any).IntersectionObserver = MockIntersectionObserver;
+    }
 
-    mockConfigService.getConfig.and.returnValue(
+    mockConfigService = {
+      getConfig: vi.fn(),
+    };
+    mockAnalyticsService = {
+      trackEvent: vi.fn(),
+    };
+    mockDomInteractionService = {
+      setupScrollIndicator: vi.fn(),
+      setupHeroTitleAnimation: vi.fn(),
+    };
+
+    mockConfigService.getConfig.mockReturnValue(
       of({
         logLevel: 'info' as const,
         environment: 'test',
@@ -56,22 +72,20 @@ describe('HomeComponent', () => {
     expect(mockConfigService.getConfig).toHaveBeenCalled();
   });
 
-  it('should setup scroll listeners on init', done => {
+  it('should setup scroll listeners on init', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
-    const scrollSpy = spyOn<any>(component, 'setupParallaxScrolling');
+    const scrollSpy = vi.spyOn(component as any, 'setupParallaxScrolling');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
-    const observerSpy = spyOn<any>(component, 'setupIntersectionObserver');
+    const observerSpy = vi.spyOn(component as any, 'setupIntersectionObserver');
 
     fixture.detectChanges();
 
     // Wait for async operations
-    setTimeout(() => {
-      expect(scrollSpy).toHaveBeenCalled();
-      expect(observerSpy).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupScrollIndicator).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
-      done();
-    }, 100);
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    expect(scrollSpy).toHaveBeenCalled();
+    expect(observerSpy).toHaveBeenCalled();
+    expect(mockDomInteractionService.setupScrollIndicator).toHaveBeenCalled();
+    expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
   });
 
   it('should cleanup on destroy', () => {
@@ -81,14 +95,14 @@ describe('HomeComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).scrollListener = () => {};
     const mockObserver = {
-      disconnect: jasmine.createSpy('disconnect'),
+      disconnect: vi.fn(),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).intersectionObserver = mockObserver;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).rafId = 123;
 
-    const cancelSpy = spyOn(window, 'cancelAnimationFrame');
+    const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame');
 
     component.ngOnDestroy();
 

@@ -12,7 +12,12 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::diesel_schema::*;
+use super::diesel_schema::{
+    apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
+    contributor_presences, custodian_metrics, device_policies, economic_events, human_relationships,
+    humans, local_sessions, path_attestations, path_tags, paths, relationships, steps,
+    stewardship_allocations,
+};
 
 // ============================================================================
 // Timestamp Helpers (SQLite stores timestamps as TEXT)
@@ -617,7 +622,14 @@ pub mod mastery_levels {
 
     /// All mastery levels in order
     pub const ALL: [&str; 8] = [
-        NOT_STARTED, AWARE, REMEMBER, UNDERSTAND, APPLY, ANALYZE, EVALUATE, CREATE
+        NOT_STARTED,
+        AWARE,
+        REMEMBER,
+        UNDERSTAND,
+        APPLY,
+        ANALYZE,
+        EVALUATE,
+        CREATE,
     ];
 
     /// Convert mastery level to index (0-7)
@@ -687,6 +699,42 @@ pub mod presence_states {
     pub fn is_valid(state: &str) -> bool {
         ALL.contains(&state)
     }
+}
+
+// ============================================================================
+// Human Identity Models (imagodei pillar)
+// ============================================================================
+
+/// Human identity row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = humans)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Human {
+    pub id: String,
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    pub bio: Option<String>,
+    /// JSON array of affinity strings stored as TEXT
+    pub affinities: String,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub app_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New human for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = humans)]
+pub struct NewHuman {
+    pub id: String,
+    pub agent_pub_key: Option<String>,
+    pub display_name: String,
+    pub bio: Option<String>,
+    pub affinities: String,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub app_id: String,
 }
 
 // ============================================================================
@@ -810,14 +858,28 @@ pub mod rea_actions {
     pub const TAKE: &str = "take";
     pub const ACCEPT: &str = "accept";
 
+    // Social actions
+    pub const APPRECIATE: &str = "appreciate";
+
     /// All supported hREA actions
-    pub const ALL: [&str; 16] = [
-        USE, CONSUME, CITE,
-        PRODUCE, RAISE, LOWER,
-        TRANSFER, TRANSFER_CUSTODY, TRANSFER_ALL_RIGHTS, MOVE,
-        MODIFY, COMBINE, SEPARATE,
-        WORK, DELIVER_SERVICE,
+    pub const ALL: [&str; 17] = [
+        USE,
+        CONSUME,
+        CITE,
+        PRODUCE,
+        RAISE,
+        LOWER,
+        TRANSFER,
+        TRANSFER_CUSTODY,
+        TRANSFER_ALL_RIGHTS,
+        MOVE,
+        MODIFY,
+        COMBINE,
+        SEPARATE,
+        WORK,
+        DELIVER_SERVICE,
         ACCEPT,
+        APPRECIATE,
     ];
 
     /// Check if an action is valid
@@ -937,6 +999,77 @@ pub struct ContentStewardship {
 }
 
 // ============================================================================
+// Device Policy Models (Stewardship v5)
+// ============================================================================
+
+/// Device policy row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = device_policies)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct DevicePolicy {
+    pub id: String,
+    pub subject_id: String,
+    pub device_id: Option<String>,
+    pub author_id: String,
+    pub author_tier: String,
+    pub inherits_from: Option<String>,
+    pub blocked_categories_json: String,
+    pub blocked_hashes_json: String,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    pub time_windows_json: String,
+    pub cooldown_minutes: Option<i32>,
+    pub disabled_features_json: String,
+    pub disabled_routes_json: String,
+    pub require_approval_json: String,
+    pub log_sessions: i32,
+    pub log_categories: i32,
+    pub log_policy_events: i32,
+    pub retention_days: i32,
+    pub subject_can_view: i32,
+    pub effective_from: String,
+    pub effective_until: Option<String>,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New device policy for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = device_policies)]
+pub struct NewDevicePolicy {
+    pub id: String,
+    pub subject_id: String,
+    pub device_id: Option<String>,
+    pub author_id: String,
+    pub author_tier: String,
+    pub inherits_from: Option<String>,
+    pub blocked_categories_json: String,
+    pub blocked_hashes_json: String,
+    pub age_rating_max: Option<String>,
+    pub reach_level_max: Option<i32>,
+    pub session_max_minutes: Option<i32>,
+    pub daily_max_minutes: Option<i32>,
+    pub time_windows_json: String,
+    pub cooldown_minutes: Option<i32>,
+    pub disabled_features_json: String,
+    pub disabled_routes_json: String,
+    pub require_approval_json: String,
+    pub log_sessions: i32,
+    pub log_categories: i32,
+    pub log_policy_events: i32,
+    pub retention_days: i32,
+    pub subject_can_view: i32,
+    pub effective_from: String,
+    pub effective_until: Option<String>,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// ============================================================================
 // Stewardship Allocation Constants
 // ============================================================================
 
@@ -963,7 +1096,12 @@ pub mod contribution_types {
     pub const INHERITED: &str = "inherited";
 
     pub const ALL: [&str; 6] = [
-        ORIGINAL_CREATOR, EDITOR, TRANSLATOR, CURATOR, MAINTAINER, INHERITED
+        ORIGINAL_CREATOR,
+        EDITOR,
+        TRANSLATOR,
+        CURATOR,
+        MAINTAINER,
+        INHERITED,
     ];
 
     pub fn is_valid(ctype: &str) -> bool {
@@ -1024,4 +1162,185 @@ pub struct NewLocalSession<'a> {
     pub display_name: Option<&'a str>,
     pub profile_image_hash: Option<&'a str>,
     pub bootstrap_url: Option<&'a str>,
+}
+
+// ============================================================================
+// Collective Models (Qahal - Governance Contexts)
+// ============================================================================
+
+/// Collective row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize, TS)]
+#[diesel(table_name = collectives)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct Collective {
+    pub id: String,
+    pub app_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub governance_layer: String,
+    pub constitutional_parent_id: Option<String>,
+    pub reach: String,
+    pub metadata_json: Option<String>,
+    pub created_by: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub dissolved_at: Option<String>,
+}
+
+/// New collective for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = collectives)]
+pub struct NewCollective<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub governance_layer: &'a str,
+    pub constitutional_parent_id: Option<&'a str>,
+    pub reach: &'a str,
+    pub metadata_json: Option<&'a str>,
+    pub created_by: Option<&'a str>,
+}
+
+// ============================================================================
+// Collective Participation Models
+// ============================================================================
+
+/// Collective participation row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize, TS)]
+#[diesel(table_name = collective_participations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CollectiveParticipation {
+    pub id: String,
+    pub app_id: String,
+    pub collective_id: String,
+    pub human_id: String,
+    pub intimacy_level: String,
+    pub role_context: Option<String>,
+    pub governance_weight: f32,
+    pub consent_state: String,
+    pub metadata_json: Option<String>,
+    pub joined_at: String,
+    pub updated_at: String,
+    pub departed_at: Option<String>,
+}
+
+/// New collective participation for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = collective_participations)]
+pub struct NewCollectiveParticipation<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub collective_id: &'a str,
+    pub human_id: &'a str,
+    pub intimacy_level: &'a str,
+    pub role_context: Option<&'a str>,
+    pub governance_weight: f32,
+    pub consent_state: &'a str,
+    pub metadata_json: Option<&'a str>,
+}
+
+// ============================================================================
+// Governance Layer Constants
+// ============================================================================
+
+/// Governance layer types for collectives
+pub mod governance_layers {
+    pub const FAMILY: &str = "family";
+    pub const NEIGHBORHOOD: &str = "neighborhood";
+    pub const FAITH: &str = "faith";
+    pub const EDUCATION: &str = "education";
+    pub const INTEREST: &str = "interest";
+    pub const GEOGRAPHIC: &str = "geographic";
+    pub const WORKPLACE: &str = "workplace";
+    pub const ECONOMIC: &str = "economic";
+    pub const COMMUNITY: &str = "community";
+
+    /// All governance layers
+    pub const ALL: [&str; 9] = [
+        FAMILY,
+        NEIGHBORHOOD,
+        FAITH,
+        EDUCATION,
+        INTEREST,
+        GEOGRAPHIC,
+        WORKPLACE,
+        ECONOMIC,
+        COMMUNITY,
+    ];
+
+    /// Check if a governance layer is valid
+    pub fn is_valid(layer: &str) -> bool {
+        ALL.contains(&layer)
+    }
+}
+
+/// Consent states for participation
+pub mod consent_states {
+    pub const PENDING: &str = "pending";
+    pub const CONSENTED: &str = "consented";
+    pub const WITHDRAWN: &str = "withdrawn";
+
+    pub const ALL: [&str; 3] = [PENDING, CONSENTED, WITHDRAWN];
+
+    pub fn is_valid(state: &str) -> bool {
+        ALL.contains(&state)
+    }
+}
+
+// ============================================================================
+// Custodian Metrics Models
+// ============================================================================
+
+/// Persisted custodian metrics snapshot — reported by custodian nodes via
+/// the storage API and queried by the shefa dashboard and operator tooling.
+///
+/// The primary key is `custodian_id` (agent pub key); each node upserts its
+/// own row so the table holds the most-recent snapshot per custodian.
+///
+/// Metric groups are stored as JSON TEXT blobs to stay within Diesel's
+/// 32-column limit. The service layer deserialises them before building
+/// `CustodianMetricsView`.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = custodian_metrics)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct CustodianMetrics {
+    pub custodian_id: String,
+    pub app_id: String,
+    pub tier: i32,
+    /// JSON: CustodianHealthView fields
+    pub health_json: String,
+    /// JSON: CustodianStorageMetricsView fields
+    pub storage_json: String,
+    /// JSON: CustodianBandwidthView fields
+    pub bandwidth_json: String,
+    /// JSON: CustodianComputationView fields
+    pub computation_json: String,
+    /// JSON: CustodianReputationView fields
+    pub reputation_json: String,
+    /// JSON: CustodianEconomicView fields
+    pub economic_json: String,
+    /// Unix timestamp (milliseconds) when metrics were collected
+    pub collected_at: i64,
+    /// Unix timestamp (milliseconds) of last update
+    pub last_updated_at: i64,
+}
+
+/// New or updated custodian metrics for INSERT OR REPLACE.
+#[derive(Debug, Clone, Insertable, Deserialize)]
+#[diesel(table_name = custodian_metrics)]
+pub struct UpsertCustodianMetrics {
+    pub custodian_id: String,
+    pub app_id: String,
+    pub tier: i32,
+    pub health_json: String,
+    pub storage_json: String,
+    pub bandwidth_json: String,
+    pub computation_json: String,
+    pub reputation_json: String,
+    pub economic_json: String,
+    pub collected_at: i64,
+    pub last_updated_at: i64,
 }

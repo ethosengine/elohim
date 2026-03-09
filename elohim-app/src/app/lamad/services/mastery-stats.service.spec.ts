@@ -14,24 +14,33 @@ import type { SessionHuman } from '@app/imagodei/models/session-human.model';
 
 import type { ContentMastery } from '../models';
 import type { LevelUpEvent } from '../models/learner-mastery-profile.model';
+import type { PracticePool } from '../models/practice.model';
+import { vi, Mock } from 'vitest';
 
 describe('MasteryStatsService', () => {
   let service: MasteryStatsService;
-  let mockMasteryService: jasmine.SpyObj<ContentMasteryService>;
-  let mockPointsService: jasmine.SpyObj<PointsService>;
-  let mockPracticeService: jasmine.SpyObj<PracticeService>;
-  let mockSessionHuman: jasmine.SpyObj<SessionHumanService>;
-  let mockSourceChain: jasmine.SpyObj<LocalSourceChainService>;
+  let mockMasteryService: any;
+  let mockPointsService: any;
+  let mockPracticeService: any;
+  let mockSessionHuman: any;
+  let mockSourceChain: any;
 
   let masterySubject: BehaviorSubject<Map<string, ContentMastery>>;
   let totalPointsSubject: BehaviorSubject<number>;
   let levelUpSubject: Subject<LevelUpEvent>;
   let sessionSubject: BehaviorSubject<SessionHuman | null>;
-  let poolSubject: BehaviorSubject<unknown>;
 
   const createMockMastery = (
     contentId: string,
-    level: 'not_started' | 'seen' | 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create',
+    level:
+      | 'not_started'
+      | 'seen'
+      | 'remember'
+      | 'understand'
+      | 'apply'
+      | 'analyze'
+      | 'evaluate'
+      | 'create',
     freshness = 1.0
   ): ContentMastery => ({
     contentId,
@@ -73,49 +82,34 @@ describe('MasteryStatsService', () => {
     totalPointsSubject = new BehaviorSubject<number>(0);
     levelUpSubject = new Subject<LevelUpEvent>();
     sessionSubject = new BehaviorSubject<SessionHuman | null>(createMockSession());
-    poolSubject = new BehaviorSubject<unknown>(null);
 
-    mockMasteryService = jasmine.createSpyObj(
-      'ContentMasteryService',
-      [],
-      {
-        mastery$: masterySubject.asObservable(),
-        levelUp$: levelUpSubject.asObservable(),
-      }
-    );
+    mockMasteryService = {
+      mastery$: masterySubject.asObservable(),
+      levelUp$: levelUpSubject.asObservable(),
+      totalPoints$: totalPointsSubject.asObservable(),
+    };
 
-    mockPointsService = jasmine.createSpyObj(
-      'PointsService',
-      ['earnPoints', 'refreshBalance'],
-      {
-        totalPoints$: totalPointsSubject.asObservable(),
-      }
-    );
-    mockPointsService.earnPoints.and.returnValue(of(null));
+    mockPointsService = {
+      earnPoints: vi.fn(),
+      refreshBalance: vi.fn(),
+      totalPoints$: totalPointsSubject.asObservable(),
+    };
+    mockPointsService.earnPoints.mockReturnValue(of(null));
 
-    mockPracticeService = jasmine.createSpyObj(
-      'PracticeService',
-      [],
-      {
-        pool$: poolSubject,
-      }
-    );
+    mockPracticeService = { getPoolSync: vi.fn() };
+    mockPracticeService.getPoolSync.mockReturnValue(null);
 
-    mockSessionHuman = jasmine.createSpyObj(
-      'SessionHumanService',
-      [],
-      {
-        session$: sessionSubject.asObservable(),
-      }
-    );
+    mockSessionHuman = {
+      session$: sessionSubject.asObservable(),
+    };
 
-    mockSourceChain = jasmine.createSpyObj('LocalSourceChainService', [
-      'isInitialized',
-      'createEntry',
-      'getEntriesByType',
-    ]);
-    mockSourceChain.isInitialized.and.returnValue(true);
-    mockSourceChain.getEntriesByType.and.returnValue([]);
+    mockSourceChain = {
+      isInitialized: vi.fn(),
+      createEntry: vi.fn(),
+      getEntriesByType: vi.fn(),
+    };
+    mockSourceChain.isInitialized.mockReturnValue(true);
+    mockSourceChain.getEntriesByType.mockReturnValue([]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -157,117 +151,124 @@ describe('MasteryStatsService', () => {
   });
 
   describe('Empty State', () => {
-    it('should produce learner profile with zero values when initialized', done => {
-      service.learnerProfile$.subscribe(profile => {
-        expect(profile).toBeDefined();
-        expect(profile?.totalMasteredNodes).toBe(0);
-        expect(profile?.earnedPoints).toBe(0);
-        expect(profile?.nodesAboveGate).toBe(0);
-        done();
-      });
-    });
+    it('should produce learner profile with zero values when initialized', () =>
+      new Promise<void>(done => {
+        service.learnerProfile$.subscribe(profile => {
+          expect(profile).toBeDefined();
+          expect(profile?.totalMasteredNodes).toBe(0);
+          expect(profile?.earnedPoints).toBe(0);
+          expect(profile?.nodesAboveGate).toBe(0);
+          done();
+        });
+      }));
 
-    it('should produce empty streak info initially', done => {
-      service.streakInfo$.subscribe(streak => {
-        expect(streak).toBeDefined();
-        expect(streak.currentStreak).toBe(0);
-        expect(streak.bestStreak).toBe(0);
-        expect(streak.todayActive).toBe(false);
-        expect(streak.lastActiveDate).toBe('');
-        done();
-      });
-    });
+    it('should produce empty streak info initially', () =>
+      new Promise<void>(done => {
+        service.streakInfo$.subscribe(streak => {
+          expect(streak).toBeDefined();
+          expect(streak.currentStreak).toBe(0);
+          expect(streak.bestStreak).toBe(0);
+          expect(streak.todayActive).toBe(false);
+          expect(streak.lastActiveDate).toBe('');
+          done();
+        });
+      }));
 
-    it('should produce empty level ups initially', done => {
-      service.recentLevelUps$.subscribe(levelUps => {
-        expect(levelUps).toEqual([]);
-        done();
-      });
-    });
+    it('should produce empty level ups initially', () =>
+      new Promise<void>(done => {
+        service.recentLevelUps$.subscribe(levelUps => {
+          expect(levelUps).toEqual([]);
+          done();
+        });
+      }));
   });
 
   describe('Profile Computation', () => {
-    it('should compute profile when mastery and points update', done => {
-      const masteries = new Map<string, ContentMastery>([
-        ['content-1', createMockMastery('content-1', 'seen')],
-        ['content-2', createMockMastery('content-2', 'remember')],
-        ['content-3', createMockMastery('content-3', 'apply')],
-      ]);
+    it('should compute profile when mastery and points update', () =>
+      new Promise<void>(done => {
+        const masteries = new Map<string, ContentMastery>([
+          ['content-1', createMockMastery('content-1', 'seen')],
+          ['content-2', createMockMastery('content-2', 'remember')],
+          ['content-3', createMockMastery('content-3', 'apply')],
+        ]);
 
-      masterySubject.next(masteries);
-      totalPointsSubject.next(500);
+        masterySubject.next(masteries);
+        totalPointsSubject.next(500);
 
-      setTimeout(() => {
-        service.learnerProfile$.subscribe(profile => {
-          expect(profile).toBeDefined();
-          expect(profile?.totalMasteredNodes).toBe(3);
-          expect(profile?.earnedPoints).toBe(500);
-          expect(profile?.levelDistribution.seen).toBe(1);
-          expect(profile?.levelDistribution.remember).toBe(1);
-          expect(profile?.levelDistribution.apply).toBe(1);
-          done();
-        });
-      }, 50);
-    });
+        setTimeout(() => {
+          service.learnerProfile$.subscribe(profile => {
+            expect(profile).toBeDefined();
+            expect(profile?.totalMasteredNodes).toBe(3);
+            expect(profile?.earnedPoints).toBe(500);
+            expect(profile?.levelDistribution.seen).toBe(1);
+            expect(profile?.levelDistribution.remember).toBe(1);
+            expect(profile?.levelDistribution.apply).toBe(1);
+            done();
+          });
+        }, 50);
+      }));
 
-    it('should exclude not_started from totalMasteredNodes', done => {
-      const masteries = new Map<string, ContentMastery>([
-        ['content-1', createMockMastery('content-1', 'not_started')],
-        ['content-2', createMockMastery('content-2', 'seen')],
-      ]);
+    it('should exclude not_started from totalMasteredNodes', () =>
+      new Promise<void>(done => {
+        const masteries = new Map<string, ContentMastery>([
+          ['content-1', createMockMastery('content-1', 'not_started')],
+          ['content-2', createMockMastery('content-2', 'seen')],
+        ]);
 
-      masterySubject.next(masteries);
+        masterySubject.next(masteries);
 
-      setTimeout(() => {
-        service.learnerProfile$.subscribe(profile => {
-          expect(profile?.totalMasteredNodes).toBe(1);
-          done();
-        });
-      }, 50);
-    });
+        setTimeout(() => {
+          service.learnerProfile$.subscribe(profile => {
+            expect(profile?.totalMasteredNodes).toBe(1);
+            done();
+          });
+        }, 50);
+      }));
 
-    it('should count nodesAboveGate correctly', done => {
-      const masteries = new Map<string, ContentMastery>([
-        ['content-1', createMockMastery('content-1', 'seen')],
-        ['content-2', createMockMastery('content-2', 'understand')],
-        ['content-3', createMockMastery('content-3', 'apply')],
-        ['content-4', createMockMastery('content-4', 'analyze')],
-      ]);
+    it('should count nodesAboveGate correctly', () =>
+      new Promise<void>(done => {
+        const masteries = new Map<string, ContentMastery>([
+          ['content-1', createMockMastery('content-1', 'seen')],
+          ['content-2', createMockMastery('content-2', 'understand')],
+          ['content-3', createMockMastery('content-3', 'apply')],
+          ['content-4', createMockMastery('content-4', 'analyze')],
+        ]);
 
-      masterySubject.next(masteries);
+        masterySubject.next(masteries);
 
-      setTimeout(() => {
-        service.learnerProfile$.subscribe(profile => {
-          expect(profile?.nodesAboveGate).toBe(2);
-          done();
-        });
-      }, 50);
-    });
+        setTimeout(() => {
+          service.learnerProfile$.subscribe(profile => {
+            expect(profile?.nodesAboveGate).toBe(2);
+            done();
+          });
+        }, 50);
+      }));
 
-    it('should compute level distribution correctly', done => {
-      const masteries = new Map<string, ContentMastery>([
-        ['content-1', createMockMastery('content-1', 'seen')],
-        ['content-2', createMockMastery('content-2', 'seen')],
-        ['content-3', createMockMastery('content-3', 'remember')],
-        ['content-4', createMockMastery('content-4', 'understand')],
-        ['content-5', createMockMastery('content-5', 'apply')],
-        ['content-6', createMockMastery('content-6', 'apply')],
-        ['content-7', createMockMastery('content-7', 'apply')],
-      ]);
+    it('should compute level distribution correctly', () =>
+      new Promise<void>(done => {
+        const masteries = new Map<string, ContentMastery>([
+          ['content-1', createMockMastery('content-1', 'seen')],
+          ['content-2', createMockMastery('content-2', 'seen')],
+          ['content-3', createMockMastery('content-3', 'remember')],
+          ['content-4', createMockMastery('content-4', 'understand')],
+          ['content-5', createMockMastery('content-5', 'apply')],
+          ['content-6', createMockMastery('content-6', 'apply')],
+          ['content-7', createMockMastery('content-7', 'apply')],
+        ]);
 
-      masterySubject.next(masteries);
+        masterySubject.next(masteries);
 
-      setTimeout(() => {
-        service.learnerProfile$.subscribe(profile => {
-          expect(profile?.levelDistribution.seen).toBe(2);
-          expect(profile?.levelDistribution.remember).toBe(1);
-          expect(profile?.levelDistribution.understand).toBe(1);
-          expect(profile?.levelDistribution.apply).toBe(3);
-          expect(profile?.levelDistribution.analyze).toBe(0);
-          done();
-        });
-      }, 50);
-    });
+        setTimeout(() => {
+          service.learnerProfile$.subscribe(profile => {
+            expect(profile?.levelDistribution.seen).toBe(2);
+            expect(profile?.levelDistribution.remember).toBe(1);
+            expect(profile?.levelDistribution.understand).toBe(1);
+            expect(profile?.levelDistribution.apply).toBe(3);
+            expect(profile?.levelDistribution.analyze).toBe(0);
+            done();
+          });
+        }, 50);
+      }));
   });
 
   describe('getProfileSync()', () => {
@@ -277,20 +278,21 @@ describe('MasteryStatsService', () => {
       expect(profile?.totalMasteredNodes).toBe(0);
     });
 
-    it('should return cached profile after computation', done => {
-      const masteries = new Map<string, ContentMastery>([
-        ['content-1', createMockMastery('content-1', 'seen')],
-      ]);
+    it('should return cached profile after computation', () =>
+      new Promise<void>(done => {
+        const masteries = new Map<string, ContentMastery>([
+          ['content-1', createMockMastery('content-1', 'seen')],
+        ]);
 
-      masterySubject.next(masteries);
+        masterySubject.next(masteries);
 
-      setTimeout(() => {
-        const profile = service.getProfileSync();
-        expect(profile).toBeDefined();
-        expect(profile?.totalMasteredNodes).toBe(1);
-        done();
-      }, 50);
-    });
+        setTimeout(() => {
+          const profile = service.getProfileSync();
+          expect(profile).toBeDefined();
+          expect(profile?.totalMasteredNodes).toBe(1);
+          done();
+        }, 50);
+      }));
   });
 
   describe('refreshProfile()', () => {
@@ -310,7 +312,7 @@ describe('MasteryStatsService', () => {
       service.recordDailyEngagement('view');
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'streak-record',
-        jasmine.objectContaining({
+        expect.objectContaining({
           engagementTypes: ['view'],
         })
       );
@@ -324,7 +326,7 @@ describe('MasteryStatsService', () => {
       expect(mockSourceChain.createEntry).toHaveBeenCalledTimes(1);
 
       // Mock the source chain to return the entry we just created
-      mockSourceChain.getEntriesByType.and.returnValue([
+      mockSourceChain.getEntriesByType.mockReturnValue([
         {
           entryHash: 'hash-1',
           content: {
@@ -362,7 +364,7 @@ describe('MasteryStatsService', () => {
 
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'mastery-level-up',
-        jasmine.objectContaining({
+        expect.objectContaining({
           contentId: 'content-1',
           fromLevel: 'seen',
           toLevel: 'remember',
@@ -401,33 +403,34 @@ describe('MasteryStatsService', () => {
 
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'streak-record',
-        jasmine.objectContaining({
+        expect.objectContaining({
           engagementTypes: ['level_up'],
         })
       );
     });
 
-    it('should update recent level-ups list', done => {
-      const event: LevelUpEvent = {
-        id: 'levelup-1',
-        contentId: 'content-1',
-        fromLevel: 'seen',
-        toLevel: 'remember',
-        timestamp: new Date().toISOString(),
-        pointsEarned: 10,
-        isGateLevel: false,
-      };
+    it('should update recent level-ups list', () =>
+      new Promise<void>(done => {
+        const event: LevelUpEvent = {
+          id: 'levelup-1',
+          contentId: 'content-1',
+          fromLevel: 'seen',
+          toLevel: 'remember',
+          timestamp: new Date().toISOString(),
+          pointsEarned: 10,
+          isGateLevel: false,
+        };
 
-      levelUpSubject.next(event);
+        levelUpSubject.next(event);
 
-      setTimeout(() => {
-        service.recentLevelUps$.subscribe(levelUps => {
-          expect(levelUps.length).toBe(1);
-          expect(levelUps[0].contentId).toBe('content-1');
-          done();
-        });
-      }, 50);
-    });
+        setTimeout(() => {
+          service.recentLevelUps$.subscribe(levelUps => {
+            expect(levelUps.length).toBe(1);
+            expect(levelUps[0].contentId).toBe('content-1');
+            done();
+          });
+        }, 50);
+      }));
   });
 
   describe('recordLevelUp()', () => {
@@ -450,50 +453,52 @@ describe('MasteryStatsService', () => {
   });
 
   describe('Practice Summary', () => {
-    it('should return empty summary when pool is null', done => {
-      poolSubject.next(null);
+    it('should return empty summary when pool is null', () =>
+      new Promise<void>(done => {
+        mockPracticeService.getPoolSync.mockReturnValue(null);
 
-      setTimeout(() => {
-        service.learnerProfile$.subscribe(profile => {
-          expect(profile?.practice.totalChallenges).toBe(0);
-          expect(profile?.practice.totalLevelUps).toBe(0);
-          expect(profile?.practice.totalLevelDowns).toBe(0);
-          expect(profile?.practice.totalDiscoveries).toBe(0);
+        setTimeout(() => {
+          service.learnerProfile$.subscribe(profile => {
+            expect(profile?.practice.totalChallenges).toBe(0);
+            expect(profile?.practice.totalLevelUps).toBe(0);
+            expect(profile?.practice.totalLevelDowns).toBe(0);
+            expect(profile?.practice.totalDiscoveries).toBe(0);
+            done();
+          });
+        }, 50);
+      }));
+
+    it('should extract practice stats from pool via getPoolSync', () =>
+      new Promise<void>(done => {
+        // Configure getPoolSync to return pool data
+        mockPracticeService.getPoolSync.mockReturnValue({
+          total_challenges_taken: 25,
+          total_level_ups: 10,
+          total_level_downs: 3,
+          discoveries_unlocked: 5,
+          active_content_ids_json: '["c1","c2","c3"]',
+          refresh_queue_ids_json: '["c4","c5"]',
+        } as PracticePool);
+
+        // Trigger profile recomputation by updating mastery
+        masterySubject.next(new Map([['content-1', createMockMastery('content-1', 'seen')]]));
+
+        setTimeout(() => {
+          const profile = service.getProfileSync();
+          expect(profile?.practice.totalChallenges).toBe(25);
+          expect(profile?.practice.totalLevelUps).toBe(10);
+          expect(profile?.practice.totalLevelDowns).toBe(3);
+          expect(profile?.practice.totalDiscoveries).toBe(5);
+          expect(profile?.practice.activePoolSize).toBe(3);
+          expect(profile?.practice.refreshQueueSize).toBe(2);
           done();
-        });
-      }, 50);
-    });
-
-    it('should extract practice stats from pool', done => {
-      // Update pool before mastery/points to ensure it's there when profile computes
-      poolSubject.next({
-        total_challenges_taken: 25,
-        total_level_ups: 10,
-        total_level_downs: 3,
-        discoveries_unlocked: 5,
-        active_content_ids_json: '["c1","c2","c3"]',
-        refresh_queue_ids_json: '["c4","c5"]',
-      });
-
-      // Trigger profile recomputation by updating mastery
-      masterySubject.next(new Map([['content-1', createMockMastery('content-1', 'seen')]]));
-
-      setTimeout(() => {
-        const profile = service.getProfileSync();
-        expect(profile?.practice.totalChallenges).toBe(25);
-        expect(profile?.practice.totalLevelUps).toBe(10);
-        expect(profile?.practice.totalLevelDowns).toBe(3);
-        expect(profile?.practice.totalDiscoveries).toBe(5);
-        expect(profile?.practice.activePoolSize).toBe(3);
-        expect(profile?.practice.refreshQueueSize).toBe(2);
-        done();
-      }, 100);
-    });
+        }, 100);
+      }));
   });
 
   describe('Source Chain Integration', () => {
     it('should not create entries when source chain not initialized', () => {
-      mockSourceChain.isInitialized.and.returnValue(false);
+      mockSourceChain.isInitialized.mockReturnValue(false);
 
       service.recordDailyEngagement('view');
 

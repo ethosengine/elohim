@@ -35,16 +35,14 @@ pub mod sync_protocol;
 
 use futures::StreamExt;
 use libp2p::{
-    autonat, dcutr, identify,
-    kad,
-    mdns, noise,
+    autonat, dcutr, identify, kad, mdns,
     multiaddr::Protocol,
-    relay, request_response,
+    noise, relay, request_response,
     swarm::{Swarm, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use serde::Serialize;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, RwLock};
@@ -53,11 +51,11 @@ use tracing::{debug, error, info, warn};
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
-use crate::sync::{DocStore, SyncManager, StreamTracker};
+use crate::sync::{DocStore, StreamTracker, SyncManager};
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
-pub use sync_protocol::{SyncCodec, SyncProtocol, SyncRequest, SyncResponse, DocumentInfo};
+pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
 /// Configuration for P2P node
 #[derive(Debug, Clone)]
@@ -196,8 +194,10 @@ impl P2PNode {
             .build();
 
         // Initialize sync infrastructure (reuses same sled::Db handle)
-        let doc_store = Arc::new(DocStore::from_db(sled_db)
-            .map_err(|e| StorageError::Database(format!("DocStore init failed: {}", e)))?);
+        let doc_store = Arc::new(
+            DocStore::from_db(sled_db)
+                .map_err(|e| StorageError::Database(format!("DocStore init failed: {}", e)))?,
+        );
         let stream_tracker = Arc::new(StreamTracker::new());
         let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
 
@@ -221,6 +221,7 @@ impl P2PNode {
         Ok(Self {
             identity,
             config,
+            #[allow(clippy::arc_with_non_send_sync)]
             swarm: Arc::new(RwLock::new(swarm)),
             blob_store,
             sync_manager,
@@ -338,7 +339,9 @@ impl P2PNode {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!(address = %address, "Listening on");
             }
-            SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
+            SwarmEvent::ConnectionEstablished {
+                peer_id, endpoint, ..
+            } => {
                 debug!(peer = %peer_id, "Connected to peer");
                 // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
                 // With mDNS enabled, discovery handles this (line 362-368). Without mDNS,
@@ -347,7 +350,10 @@ impl P2PNode {
                 if !self.config.enable_mdns {
                     let addr = endpoint.get_remote_address().clone();
                     let mut swarm = self.swarm.write().await;
-                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
+                    swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(&peer_id, addr.clone());
                     info!(peer = %peer_id, addr = %addr, "Added peer to Kademlia (bootstrap connection)");
                 }
                 self.refresh_status().await;
@@ -371,16 +377,18 @@ impl P2PNode {
             ) => {
                 match message {
                     request_response::Message::Request {
-                        request,
-                        channel,
-                        ..
+                        request, channel, ..
                     } => {
                         debug!(peer = %peer, request = ?request, "Received shard request");
                         let response = self.handle_shard_request(request).await;
 
                         // Send response
                         let mut swarm = self.swarm.write().await;
-                        if let Err(e) = swarm.behaviour_mut().shard_protocol.send_response(channel, response) {
+                        if let Err(e) = swarm
+                            .behaviour_mut()
+                            .shard_protocol
+                            .send_response(channel, response)
+                        {
                             warn!(peer = %peer, error = ?e, "Failed to send shard response");
                         }
                     }
@@ -444,28 +452,28 @@ impl P2PNode {
             // Sync protocol events
             behaviour::ElohimStorageBehaviourEvent::SyncProtocol(
                 request_response::Event::Message { peer, message },
-            ) => {
-                match message {
-                    request_response::Message::Request {
-                        request,
-                        channel,
-                        ..
-                    } => {
-                        debug!(peer = %peer, request = ?request, "Received sync request");
-                        let response = self.handle_sync_request(request).await;
-                        let mut swarm = self.swarm.write().await;
-                        if let Err(e) = swarm.behaviour_mut().sync_protocol.send_response(channel, response) {
-                            warn!(peer = %peer, error = ?e, "Failed to send sync response");
-                        }
-                    }
-                    request_response::Message::Response {
-                        request_id,
-                        response,
-                    } => {
-                        self.handle_sync_response(peer, request_id, response).await;
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(peer = %peer, request = ?request, "Received sync request");
+                    let response = self.handle_sync_request(request).await;
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .sync_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send sync response");
                     }
                 }
-            }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    self.handle_sync_response(peer, request_id, response).await;
+                }
+            },
             behaviour::ElohimStorageBehaviourEvent::SyncProtocol(
                 request_response::Event::OutboundFailure {
                     peer,
@@ -491,7 +499,6 @@ impl P2PNode {
             }
 
             // === NAT traversal events ===
-
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,
                 info,
@@ -509,7 +516,10 @@ impl P2PNode {
                     swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
                 }
             }
-            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent { peer_id, .. }) => {
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent {
+                peer_id,
+                ..
+            }) => {
                 debug!(peer = %peer_id, "Identify: sent our info to peer");
             }
             behaviour::ElohimStorageBehaviourEvent::Identify(event) => {
@@ -538,13 +548,18 @@ impl P2PNode {
             }
 
             behaviour::ElohimStorageBehaviourEvent::RelayClient(
-                relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. },
+                relay::client::Event::ReservationReqAccepted {
+                    relay_peer_id,
+                    renewal,
+                    ..
+                },
             ) => {
                 if renewal {
                     debug!(relay = %relay_peer_id, "Relay: reservation renewed");
                 } else {
                     info!(relay = %relay_peer_id, "Relay: reservation accepted");
-                    self.relay_reservations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.relay_reservations
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::RelayClient(event) => {
@@ -558,12 +573,10 @@ impl P2PNode {
             behaviour::ElohimStorageBehaviourEvent::Dcutr(dcutr::Event {
                 remote_peer_id,
                 result,
-            }) => {
-                match result {
-                    Ok(_) => info!(peer = %remote_peer_id, "DCUtR: direct connection upgraded"),
-                    Err(ref e) => debug!(peer = %remote_peer_id, error = %e, "DCUtR: upgrade failed"),
-                }
-            }
+            }) => match result {
+                Ok(_) => info!(peer = %remote_peer_id, "DCUtR: direct connection upgraded"),
+                Err(ref e) => debug!(peer = %remote_peer_id, error = %e, "DCUtR: upgrade failed"),
+            },
         }
     }
 
@@ -617,7 +630,11 @@ impl P2PNode {
                 match self.sync_manager.get_heads(&app_id, &doc_id).await {
                     Ok(heads) => {
                         // Get change count from doc store
-                        let change_count = match self.sync_manager.list_documents(&app_id, Some(&doc_id), 0, 1).await {
+                        let change_count = match self
+                            .sync_manager
+                            .list_documents(&app_id, Some(&doc_id), 0, 1)
+                            .await
+                        {
                             Ok((docs, _)) => docs.first().map(|d| d.change_count).unwrap_or(0),
                             Err(_) => 0,
                         };
@@ -643,7 +660,11 @@ impl P2PNode {
                 bloom_filter: _, // TODO: Use bloom filter for optimization
             } => {
                 debug!(app_id = %app_id, doc_id = %doc_id, have_heads = ?have_heads, "Handling SyncChanges request");
-                match self.sync_manager.get_changes_since(&app_id, &doc_id, &have_heads).await {
+                match self
+                    .sync_manager
+                    .get_changes_since(&app_id, &doc_id, &have_heads)
+                    .await
+                {
                     Ok((changes, new_heads)) => {
                         info!(app_id = %app_id, doc_id = %doc_id, changes_count = changes.len(), "Sending changes");
                         SyncResponse::Changes {
@@ -670,7 +691,11 @@ impl P2PNode {
                 debug!(app_id = %app_id, doc_id = %doc_id, change_hashes = ?change_hashes, "Handling GetChanges request");
                 // For now, return all changes since empty heads (full sync)
                 // TODO: Implement selective change fetching by hash
-                match self.sync_manager.get_changes_since(&app_id, &doc_id, &[]).await {
+                match self
+                    .sync_manager
+                    .get_changes_since(&app_id, &doc_id, &[])
+                    .await
+                {
                     Ok((changes, _)) => {
                         let changes_with_hashes: Vec<(String, Vec<u8>)> = changes
                             .into_iter()
@@ -705,7 +730,11 @@ impl P2PNode {
             } => {
                 debug!(app_id = %app_id, doc_id = %doc_id, "Handling AnnounceChange request");
                 if let Some(data) = change_data {
-                    match self.sync_manager.apply_changes(&app_id, &doc_id, vec![data]).await {
+                    match self
+                        .sync_manager
+                        .apply_changes(&app_id, &doc_id, vec![data])
+                        .await
+                    {
                         Ok(_) => {
                             info!(app_id = %app_id, doc_id = %doc_id, "Applied announced change");
                             SyncResponse::ChangeAck {
@@ -737,7 +766,11 @@ impl P2PNode {
                 limit,
             } => {
                 debug!(app_id = %app_id, prefix = ?prefix, offset = offset, limit = limit, "Handling ListDocuments request");
-                match self.sync_manager.list_documents(&app_id, prefix.as_deref(), offset, limit).await {
+                match self
+                    .sync_manager
+                    .list_documents(&app_id, prefix.as_deref(), offset, limit)
+                    .await
+                {
                     Ok((docs, total)) => {
                         let documents: Vec<DocumentInfo> = docs
                             .into_iter()
@@ -777,7 +810,12 @@ impl P2PNode {
         response: SyncResponse,
     ) {
         match response {
-            SyncResponse::DocumentList { app_id, documents, total, .. } => {
+            SyncResponse::DocumentList {
+                app_id,
+                documents,
+                total,
+                ..
+            } => {
                 debug!(
                     peer = %peer, app_id = %app_id, doc_count = documents.len(),
                     total = total, "Received document list from peer"
@@ -785,7 +823,11 @@ impl P2PNode {
 
                 // Compare with local documents and request changes for diverged ones
                 for remote_doc in &documents {
-                    match self.sync_manager.get_heads(&app_id, &remote_doc.doc_id).await {
+                    match self
+                        .sync_manager
+                        .get_heads(&app_id, &remote_doc.doc_id)
+                        .await
+                    {
                         Ok(local_heads) => {
                             if local_heads != remote_doc.heads {
                                 // Heads differ — request changes from this peer
@@ -827,7 +869,13 @@ impl P2PNode {
                     }
                 }
             }
-            SyncResponse::Changes { app_id, doc_id, changes, new_heads, .. } => {
+            SyncResponse::Changes {
+                app_id,
+                doc_id,
+                changes,
+                new_heads,
+                ..
+            } => {
                 if changes.is_empty() {
                     debug!(peer = %peer, app_id = %app_id, doc_id = %doc_id, "No new changes from peer");
                     return;
@@ -836,7 +884,11 @@ impl P2PNode {
                     peer = %peer, app_id = %app_id, doc_id = %doc_id,
                     change_count = changes.len(), "Applying changes from peer"
                 );
-                if let Err(e) = self.sync_manager.apply_changes(&app_id, &doc_id, changes).await {
+                if let Err(e) = self
+                    .sync_manager
+                    .apply_changes(&app_id, &doc_id, changes)
+                    .await
+                {
                     warn!(
                         peer = %peer, app_id = %app_id, doc_id = %doc_id,
                         error = %e, "Failed to apply sync changes"
@@ -848,7 +900,12 @@ impl P2PNode {
                     );
                 }
             }
-            SyncResponse::Heads { app_id, doc_id, heads, .. } => {
+            SyncResponse::Heads {
+                app_id,
+                doc_id,
+                heads,
+                ..
+            } => {
                 // Compare with local heads and request changes if different
                 match self.sync_manager.get_heads(&app_id, &doc_id).await {
                     Ok(local_heads) if local_heads != heads => {
@@ -859,7 +916,10 @@ impl P2PNode {
                             bloom_filter: None,
                         };
                         let mut swarm = self.swarm.write().await;
-                        swarm.behaviour_mut().sync_protocol.send_request(&peer, sync_request);
+                        swarm
+                            .behaviour_mut()
+                            .sync_protocol
+                            .send_request(&peer, sync_request);
                         debug!(peer = %peer, doc_id = %doc_id, "Heads differ, requesting changes");
                     }
                     _ => {
@@ -929,13 +989,13 @@ impl P2PNode {
     async fn refresh_status(&self) {
         let swarm = self.swarm.read().await;
         let connected_peers = swarm.connected_peers().count();
-        let listen_addresses: Vec<String> = swarm.listeners()
-            .map(|a| a.to_string())
-            .collect();
+        let listen_addresses: Vec<String> = swarm.listeners().map(|a| a.to_string()).collect();
         let bootstrap_nodes: Vec<String> = self.config.bootstrap_nodes.clone();
         let sync_documents = self.sync_manager.count_documents("_all").await.unwrap_or(0) as usize;
         let nat_status = self.nat_status.read().await.clone();
-        let relay_reservations = self.relay_reservations.load(std::sync::atomic::Ordering::Relaxed);
+        let relay_reservations = self
+            .relay_reservations
+            .load(std::sync::atomic::Ordering::Relaxed);
 
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),

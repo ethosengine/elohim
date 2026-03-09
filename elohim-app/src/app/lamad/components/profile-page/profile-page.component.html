@@ -20,11 +20,20 @@
     </div>
 
     <div class="profile-actions">
-      <a routerLink="/identity/profile" class="btn-link identity-link">
+      <a
+        routerLink="/identity/profile"
+        class="btn-link identity-link"
+        data-testid="profile-identity-link"
+      >
         <span class="btn-icon">account_circle</span>
         ImagoDeI Profile
       </a>
-      <button type="button" class="btn-secondary" (click)="goToIdentityProfile()">
+      <button
+        type="button"
+        class="btn-secondary"
+        (click)="goToIdentityProfile()"
+        data-testid="profile-edit"
+      >
         <span class="btn-icon">settings</span>
         Edit Profile
       </button>
@@ -40,7 +49,14 @@
           <strong>Your progress is stored locally</strong>
           <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
         </div>
-        <button type="button" class="btn-primary" (click)="onJoinNetwork()">Join Network</button>
+        <button
+          type="button"
+          class="btn-primary"
+          (click)="onJoinNetwork()"
+          data-testid="profile-join-network"
+        >
+          Join Network
+        </button>
       </div>
     </div>
   }
@@ -52,6 +68,7 @@
       class="tab-btn"
       [class.active]="activeTab === 'overview'"
       (click)="setActiveTab('overview')"
+      data-testid="profile-tab-overview"
     >
       Overview
     </button>
@@ -60,6 +77,7 @@
       class="tab-btn"
       [class.active]="activeTab === 'paths'"
       (click)="setActiveTab('paths')"
+      data-testid="profile-tab-paths"
     >
       Paths
     </button>
@@ -68,6 +86,7 @@
       class="tab-btn"
       [class.active]="activeTab === 'timeline'"
       (click)="setActiveTab('timeline')"
+      data-testid="profile-tab-timeline"
     >
       Timeline
     </button>
@@ -94,6 +113,7 @@
                 <a
                   [routerLink]="['/lamad/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
                   class="resume-action"
+                  data-testid="profile-resume-continue"
                 >
                   <span>Continue</span>
                   <span class="material-icons">arrow_forward</span>
@@ -109,7 +129,11 @@
                   <h3 class="resume-title">{{ resumePoint.title }}</h3>
                   <p class="resume-reason">{{ resumePoint.reason }}</p>
                 </div>
-                <a routerLink="/lamad" class="resume-action resume-action--explore">
+                <a
+                  routerLink="/lamad"
+                  class="resume-action resume-action--explore"
+                  data-testid="profile-resume-browse"
+                >
                   <span>Browse Paths</span>
                   <span class="material-icons">arrow_forward</span>
                 </a>
@@ -180,7 +204,7 @@
                 <span class="stat-label">Learner Level</span>
               </div>
             </div>
-            <a routerLink="/lamad/me" class="dashboard-link">
+            <a routerLink="/lamad/me" class="dashboard-link" data-testid="profile-dashboard-link">
               View Full Dashboard
               <span class="material-icons">arrow_forward</span>
             </a>
@@ -242,7 +266,12 @@
                 </div>
               }
             </div>
-            <button type="button" class="btn-link" (click)="setActiveTab('timeline')">
+            <button
+              type="button"
+              class="btn-link"
+              (click)="setActiveTab('timeline')"
+              data-testid="profile-view-timeline"
+            >
               View Full Timeline
             </button>
           </section>
@@ -263,7 +292,9 @@
             <span class="empty-icon material-icons">route</span>
             <h3>No paths started yet</h3>
             <p>Start a learning path to track your progress here.</p>
-            <a routerLink="/lamad" class="btn-primary">Browse Paths</a>
+            <a routerLink="/lamad" class="btn-primary" data-testid="profile-browse-paths">
+              Browse Paths
+            </a>
           </div>
         } @else {
           <!-- In Progress Section -->
@@ -417,7 +448,9 @@
             <span class="empty-icon material-icons">timeline</span>
             <h3>Your journey begins here</h3>
             <p>Start exploring content to see your learning timeline.</p>
-            <a routerLink="/lamad" class="btn-primary">Start Exploring</a>
+            <a routerLink="/lamad" class="btn-primary" data-testid="profile-start-exploring">
+              Start Exploring
+            </a>
           </div>
         } @else {
           <div class="timeline-enhanced">
@@ -471,6 +504,7 @@
               class="filter-btn"
               [class.active]="activityFilter === 'all'"
               (click)="setActivityFilter('all')"
+              data-testid="profile-filter-all"
             >
               All
             </button>
@@ -479,6 +513,7 @@
               class="filter-btn"
               [class.active]="activityFilter === 'view'"
               (click)="setActivityFilter('view')"
+              data-testid="profile-filter-view"
             >
               Views
             </button>
@@ -487,6 +522,7 @@
               class="filter-btn"
               [class.active]="activityFilter === 'affinity'"
               (click)="setActivityFilter('affinity')"
+              data-testid="profile-filter-affinity"
             >
               Affinity
             </button>
@@ -495,6 +531,7 @@
               class="filter-btn"
               [class.active]="activityFilter === 'path-start'"
               (click)="setActivityFilter('path-start')"
+              data-testid="profile-filter-path-start"
             >
               Path Starts
             </button>
@@ -503,6 +540,7 @@
               class="filter-btn"
               [class.active]="activityFilter === 'step-complete'"
               (click)="setActivityFilter('step-complete')"
+              data-testid="profile-filter-step-complete"
             >
               Steps
             </button>

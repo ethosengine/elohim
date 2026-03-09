@@ -16,7 +16,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 62.2% (2026-02-24)
 
 import { environment } from '../../../../environments/environment';
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';

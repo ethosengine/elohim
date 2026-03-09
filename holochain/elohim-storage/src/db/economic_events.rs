@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::context::AppContext;
 use super::diesel_schema::economic_events;
-use super::models::{EconomicEvent, NewEconomicEvent, rea_actions, lamad_event_types};
+use super::models::{lamad_event_types, rea_actions, EconomicEvent, NewEconomicEvent};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -92,7 +92,9 @@ pub struct EconomicEventQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Result of bulk operation
 #[derive(Debug, Clone, Serialize)]
@@ -197,8 +199,9 @@ pub fn get_events_for_agent(
     economic_events::table
         .filter(economic_events::app_id.eq(&ctx.app_id))
         .filter(
-            economic_events::provider.eq(agent_id)
-                .or(economic_events::receiver.eq(agent_id))
+            economic_events::provider
+                .eq(agent_id)
+                .or(economic_events::receiver.eq(agent_id)),
         )
         .order(economic_events::has_point_in_time.desc())
         .limit(limit)
@@ -286,14 +289,16 @@ pub fn record_event(
     let classified_json = if input.resource_classified_as.is_empty() {
         None
     } else {
-        Some(serde_json::to_string(&input.resource_classified_as)
-            .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?)
+        Some(
+            serde_json::to_string(&input.resource_classified_as)
+                .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?,
+        )
     };
 
     // Default timestamp to now if not provided
-    let point_in_time = input.has_point_in_time.unwrap_or_else(|| {
-        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-    });
+    let point_in_time = input
+        .has_point_in_time
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
 
     let new_event = NewEconomicEvent {
         id: &id,
@@ -339,30 +344,34 @@ pub fn record_content_view(
     content_id: &str,
     duration_seconds: Option<i64>,
 ) -> Result<EconomicEvent, StorageError> {
-    record_event(conn, ctx, CreateEconomicEventInput {
-        id: None,
-        action: rea_actions::CONSUME.to_string(),
-        provider: content_id.to_string(),  // Content provides value
-        receiver: viewer_id.to_string(),   // Viewer receives value
-        resource_conforms_to: None,
-        resource_inventoried_as: None,
-        resource_classified_as: vec!["learning-content".to_string()],
-        resource_quantity_value: Some(1.0),
-        resource_quantity_unit: Some("view".to_string()),
-        effort_quantity_value: duration_seconds.map(|d| d as f32),
-        effort_quantity_unit: Some("seconds".to_string()),
-        has_point_in_time: None,
-        has_duration: duration_seconds.map(|d| format!("{}s", d)),
-        input_of: None,
-        output_of: None,
-        lamad_event_type: Some(lamad_event_types::CONTENT_VIEW.to_string()),
-        content_id: Some(content_id.to_string()),
-        contributor_presence_id: None,
-        path_id: None,
-        triggered_by: None,
-        note: None,
-        metadata_json: None,
-    })
+    record_event(
+        conn,
+        ctx,
+        CreateEconomicEventInput {
+            id: None,
+            action: rea_actions::CONSUME.to_string(),
+            provider: content_id.to_string(), // Content provides value
+            receiver: viewer_id.to_string(),  // Viewer receives value
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            resource_classified_as: vec!["learning-content".to_string()],
+            resource_quantity_value: Some(1.0),
+            resource_quantity_unit: Some("view".to_string()),
+            effort_quantity_value: duration_seconds.map(|d| d as f32),
+            effort_quantity_unit: Some("seconds".to_string()),
+            has_point_in_time: None,
+            has_duration: duration_seconds.map(|d| format!("{}s", d)),
+            input_of: None,
+            output_of: None,
+            lamad_event_type: Some(lamad_event_types::CONTENT_VIEW.to_string()),
+            content_id: Some(content_id.to_string()),
+            contributor_presence_id: None,
+            path_id: None,
+            triggered_by: None,
+            note: None,
+            metadata_json: None,
+        },
+    )
 }
 
 /// Record a content mastery event
@@ -379,30 +388,34 @@ pub fn record_mastery_advancement(
         "to_level": to_level,
     });
 
-    record_event(conn, ctx, CreateEconomicEventInput {
-        id: None,
-        action: rea_actions::PRODUCE.to_string(),
-        provider: learner_id.to_string(),  // Learner produces mastery
-        receiver: learner_id.to_string(),  // Learner receives credential
-        resource_conforms_to: Some("mastery-credential".to_string()),
-        resource_inventoried_as: None,
-        resource_classified_as: vec!["mastery".to_string(), to_level.to_string()],
-        resource_quantity_value: Some(1.0),
-        resource_quantity_unit: Some("level".to_string()),
-        effort_quantity_value: None,
-        effort_quantity_unit: None,
-        has_point_in_time: None,
-        has_duration: None,
-        input_of: None,
-        output_of: None,
-        lamad_event_type: Some(lamad_event_types::MASTERY_ADVANCE.to_string()),
-        content_id: Some(content_id.to_string()),
-        contributor_presence_id: None,
-        path_id: None,
-        triggered_by: None,
-        note: Some(format!("Advanced from {} to {}", from_level, to_level)),
-        metadata_json: Some(metadata.to_string()),
-    })
+    record_event(
+        conn,
+        ctx,
+        CreateEconomicEventInput {
+            id: None,
+            action: rea_actions::PRODUCE.to_string(),
+            provider: learner_id.to_string(), // Learner produces mastery
+            receiver: learner_id.to_string(), // Learner receives credential
+            resource_conforms_to: Some("mastery-credential".to_string()),
+            resource_inventoried_as: None,
+            resource_classified_as: vec!["mastery".to_string(), to_level.to_string()],
+            resource_quantity_value: Some(1.0),
+            resource_quantity_unit: Some("level".to_string()),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: Some(lamad_event_types::MASTERY_ADVANCE.to_string()),
+            content_id: Some(content_id.to_string()),
+            contributor_presence_id: None,
+            path_id: None,
+            triggered_by: None,
+            note: Some(format!("Advanced from {} to {}", from_level, to_level)),
+            metadata_json: Some(metadata.to_string()),
+        },
+    )
 }
 
 /// Record a citation event
@@ -413,30 +426,34 @@ pub fn record_citation(
     cited_content_id: &str,
     contributor_presence_id: Option<&str>,
 ) -> Result<EconomicEvent, StorageError> {
-    record_event(conn, ctx, CreateEconomicEventInput {
-        id: None,
-        action: rea_actions::CITE.to_string(),
-        provider: citer_id.to_string(),
-        receiver: cited_content_id.to_string(),
-        resource_conforms_to: None,
-        resource_inventoried_as: None,
-        resource_classified_as: vec!["citation".to_string()],
-        resource_quantity_value: Some(1.0),
-        resource_quantity_unit: Some("citation".to_string()),
-        effort_quantity_value: None,
-        effort_quantity_unit: None,
-        has_point_in_time: None,
-        has_duration: None,
-        input_of: None,
-        output_of: None,
-        lamad_event_type: Some(lamad_event_types::CITATION.to_string()),
-        content_id: Some(cited_content_id.to_string()),
-        contributor_presence_id: contributor_presence_id.map(|s| s.to_string()),
-        path_id: None,
-        triggered_by: None,
-        note: None,
-        metadata_json: None,
-    })
+    record_event(
+        conn,
+        ctx,
+        CreateEconomicEventInput {
+            id: None,
+            action: rea_actions::CITE.to_string(),
+            provider: citer_id.to_string(),
+            receiver: cited_content_id.to_string(),
+            resource_conforms_to: None,
+            resource_inventoried_as: None,
+            resource_classified_as: vec!["citation".to_string()],
+            resource_quantity_value: Some(1.0),
+            resource_quantity_unit: Some("citation".to_string()),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: Some(lamad_event_types::CITATION.to_string()),
+            content_id: Some(cited_content_id.to_string()),
+            contributor_presence_id: contributor_presence_id.map(|s| s.to_string()),
+            path_id: None,
+            triggered_by: None,
+            note: None,
+            metadata_json: None,
+        },
+    )
 }
 
 /// Record a path completion event
@@ -447,30 +464,34 @@ pub fn record_path_completion(
     path_id: &str,
     attestation_type: Option<&str>,
 ) -> Result<EconomicEvent, StorageError> {
-    record_event(conn, ctx, CreateEconomicEventInput {
-        id: None,
-        action: rea_actions::PRODUCE.to_string(),
-        provider: learner_id.to_string(),
-        receiver: learner_id.to_string(),
-        resource_conforms_to: attestation_type.map(|s| s.to_string()),
-        resource_inventoried_as: None,
-        resource_classified_as: vec!["path-completion".to_string()],
-        resource_quantity_value: Some(1.0),
-        resource_quantity_unit: Some("completion".to_string()),
-        effort_quantity_value: None,
-        effort_quantity_unit: None,
-        has_point_in_time: None,
-        has_duration: None,
-        input_of: None,
-        output_of: None,
-        lamad_event_type: Some(lamad_event_types::PATH_COMPLETION.to_string()),
-        content_id: None,
-        contributor_presence_id: None,
-        path_id: Some(path_id.to_string()),
-        triggered_by: None,
-        note: None,
-        metadata_json: None,
-    })
+    record_event(
+        conn,
+        ctx,
+        CreateEconomicEventInput {
+            id: None,
+            action: rea_actions::PRODUCE.to_string(),
+            provider: learner_id.to_string(),
+            receiver: learner_id.to_string(),
+            resource_conforms_to: attestation_type.map(|s| s.to_string()),
+            resource_inventoried_as: None,
+            resource_classified_as: vec!["path-completion".to_string()],
+            resource_quantity_value: Some(1.0),
+            resource_quantity_unit: Some("completion".to_string()),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: Some(lamad_event_types::PATH_COMPLETION.to_string()),
+            content_id: None,
+            contributor_presence_id: None,
+            path_id: Some(path_id.to_string()),
+            triggered_by: None,
+            note: None,
+            metadata_json: None,
+        },
+    )
 }
 
 /// Record an affinity transfer (recognition flow)
@@ -482,30 +503,34 @@ pub fn record_affinity_transfer(
     affinity_value: f32,
     content_id: &str,
 ) -> Result<EconomicEvent, StorageError> {
-    record_event(conn, ctx, CreateEconomicEventInput {
-        id: None,
-        action: rea_actions::TRANSFER.to_string(),
-        provider: from_agent.to_string(),
-        receiver: to_presence_id.to_string(),
-        resource_conforms_to: Some("affinity".to_string()),
-        resource_inventoried_as: None,
-        resource_classified_as: vec!["recognition".to_string()],
-        resource_quantity_value: Some(affinity_value),
-        resource_quantity_unit: Some("affinity".to_string()),
-        effort_quantity_value: None,
-        effort_quantity_unit: None,
-        has_point_in_time: None,
-        has_duration: None,
-        input_of: None,
-        output_of: None,
-        lamad_event_type: Some(lamad_event_types::AFFINITY_TRANSFER.to_string()),
-        content_id: Some(content_id.to_string()),
-        contributor_presence_id: Some(to_presence_id.to_string()),
-        path_id: None,
-        triggered_by: None,
-        note: None,
-        metadata_json: None,
-    })
+    record_event(
+        conn,
+        ctx,
+        CreateEconomicEventInput {
+            id: None,
+            action: rea_actions::TRANSFER.to_string(),
+            provider: from_agent.to_string(),
+            receiver: to_presence_id.to_string(),
+            resource_conforms_to: Some("affinity".to_string()),
+            resource_inventoried_as: None,
+            resource_classified_as: vec!["recognition".to_string()],
+            resource_quantity_value: Some(affinity_value),
+            resource_quantity_unit: Some("affinity".to_string()),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: None,
+            has_duration: None,
+            input_of: None,
+            output_of: None,
+            lamad_event_type: Some(lamad_event_types::AFFINITY_TRANSFER.to_string()),
+            content_id: Some(content_id.to_string()),
+            contributor_presence_id: Some(to_presence_id.to_string()),
+            path_id: None,
+            triggered_by: None,
+            note: None,
+            metadata_json: None,
+        },
+    )
 }
 
 /// Bulk record events (for seeding/import) - scoped by app
@@ -541,7 +566,7 @@ pub fn update_event_state(
     diesel::update(
         economic_events::table
             .filter(economic_events::app_id.eq(&ctx.app_id))
-            .filter(economic_events::id.eq(id))
+            .filter(economic_events::id.eq(id)),
     )
     .set(economic_events::state.eq(new_state))
     .execute(conn)
@@ -556,10 +581,7 @@ pub fn update_event_state(
 // ============================================================================
 
 /// Get economic event count for an app
-pub fn event_count(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-) -> Result<i64, StorageError> {
+pub fn event_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     economic_events::table
         .filter(economic_events::app_id.eq(&ctx.app_id))
         .count()
@@ -602,11 +624,13 @@ pub fn aggregate_for_content(
     let events = get_events_for_content(conn, ctx, content_id)?;
 
     let total_events = events.len() as i64;
-    let total_resource_quantity: f64 = events.iter()
+    let total_resource_quantity: f64 = events
+        .iter()
         .filter_map(|e| e.resource_quantity_value)
         .map(|v| v as f64)
         .sum();
-    let total_effort_quantity: f64 = events.iter()
+    let total_effort_quantity: f64 = events
+        .iter()
         .filter_map(|e| e.effort_quantity_value)
         .map(|v| v as f64)
         .sum();

@@ -2,14 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { PolicyConsoleComponent } from './policy-console.component';
-import { StewardshipService } from '../../services/stewardship.service';
-import type { DevicePolicy, ComputedPolicy, StewardshipGrant } from '../../models/stewardship.model';
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
+import type {
+  DevicePolicy,
+  ComputedPolicy,
+  StewardshipGrant,
+} from '../../models/stewardship.model';
+import { vi, Mock } from 'vitest';
 
 describe('PolicyConsoleComponent', () => {
   let component: PolicyConsoleComponent;
   let fixture: ComponentFixture<PolicyConsoleComponent>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockStewardshipService: any;
+  let mockRouter: any;
   let mockActivatedRoute: Partial<ActivatedRoute>;
 
   const mockPolicy: DevicePolicy = {
@@ -49,33 +54,33 @@ describe('PolicyConsoleComponent', () => {
   };
 
   beforeEach(async () => {
-    mockStewardshipService = jasmine.createSpyObj('StewardshipService', [
-      'getMyPolicy',
-      'getSubjectPolicy',
-      'getGrantForSubject',
-      'getPolicyChain',
-      'getMyPolicyChain',
-      'getParentPolicy',
-      'upsertPolicy',
-    ]);
+    mockStewardshipService = {
+      getMyPolicy: vi.fn(),
+      getSubjectPolicy: vi.fn(),
+      getGrantForSubject: vi.fn(),
+      getPolicyChain: vi.fn(),
+      getMyPolicyChain: vi.fn(),
+      getParentPolicy: vi.fn(),
+      upsertPolicy: vi.fn(),
+    };
 
-    mockRouter = jasmine.createSpy('Router') as any;
+    mockRouter = vi.fn() as any;
 
     mockActivatedRoute = {
       snapshot: {
         paramMap: {
-          get: jasmine.createSpy('get').and.returnValue(null),
+          get: vi.fn().mockReturnValue(null),
         } as any,
       } as any,
     };
 
-    mockStewardshipService.getMyPolicy.and.returnValue(Promise.resolve({} as ComputedPolicy));
-    mockStewardshipService.getMyPolicyChain.and.returnValue(Promise.resolve([]));
+    mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve({} as ComputedPolicy));
+    mockStewardshipService.getMyPolicyChain.mockReturnValue(Promise.resolve([]));
 
     await TestBed.configureTestingModule({
       imports: [PolicyConsoleComponent],
       providers: [
-        { provide: StewardshipService, useValue: mockStewardshipService },
+        { provide: STEWARDSHIP_POLICY, useValue: mockStewardshipService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
@@ -215,7 +220,7 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should initialize with subject ID from route', async () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.returnValue('subject-123');
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockReturnValue('subject-123');
 
       component.ngOnInit();
       await fixture.whenStable();
@@ -225,7 +230,7 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should load data on init', async () => {
-      spyOn(component, 'loadData').and.returnValue(Promise.resolve());
+      vi.spyOn(component, 'loadData').mockReturnValue(Promise.resolve());
 
       component.ngOnInit();
 
@@ -257,7 +262,7 @@ describe('PolicyConsoleComponent', () => {
         retentionDays: 30,
         subjectCanView: true,
       };
-      mockStewardshipService.getMyPolicy.and.returnValue(Promise.resolve(mockComputedPolicy));
+      mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve(mockComputedPolicy));
 
       await component.loadData();
 
@@ -278,7 +283,9 @@ describe('PolicyConsoleComponent', () => {
         requireApproval: [],
         sessionMaxMinutes: 90,
         dailyMaxMinutes: 180,
-        timeWindows: [{ startHour: 9, startMinute: 0, endHour: 17, endMinute: 0, daysOfWeek: [1, 2, 3, 4, 5] }],
+        timeWindows: [
+          { startHour: 9, startMinute: 0, endHour: 17, endMinute: 0, daysOfWeek: [1, 2, 3, 4, 5] },
+        ],
         cooldownMinutes: 15,
         ageRatingMax: 'PG-13',
         reachLevelMax: 5,
@@ -288,7 +295,7 @@ describe('PolicyConsoleComponent', () => {
         retentionDays: 30,
         subjectCanView: true,
       };
-      mockStewardshipService.getMyPolicy.and.returnValue(Promise.resolve(mockComputedPolicy));
+      mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve(mockComputedPolicy));
 
       await component.loadData();
 
@@ -303,7 +310,9 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should handle load error gracefully', async () => {
-      mockStewardshipService.getMyPolicy.and.returnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyPolicy.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadData();
 
@@ -340,10 +349,10 @@ describe('PolicyConsoleComponent', () => {
         updatedAt: '2024-01-01T00:00:00Z',
       };
 
-      mockStewardshipService.getGrantForSubject.and.returnValue(Promise.resolve(mockGrant));
-      mockStewardshipService.getSubjectPolicy.and.returnValue(Promise.resolve(mockPolicy));
-      mockStewardshipService.getPolicyChain.and.returnValue(Promise.resolve([]));
-      mockStewardshipService.getParentPolicy.and.returnValue(Promise.resolve(null));
+      mockStewardshipService.getGrantForSubject.mockReturnValue(Promise.resolve(mockGrant));
+      mockStewardshipService.getSubjectPolicy.mockReturnValue(Promise.resolve(mockPolicy));
+      mockStewardshipService.getPolicyChain.mockReturnValue(Promise.resolve([]));
+      mockStewardshipService.getParentPolicy.mockReturnValue(Promise.resolve(null));
 
       await component.loadData();
 
@@ -357,10 +366,12 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should populate editing state from subject policy', async () => {
-      mockStewardshipService.getGrantForSubject.and.returnValue(Promise.resolve({} as StewardshipGrant));
-      mockStewardshipService.getSubjectPolicy.and.returnValue(Promise.resolve(mockPolicy));
-      mockStewardshipService.getPolicyChain.and.returnValue(Promise.resolve([]));
-      mockStewardshipService.getParentPolicy.and.returnValue(Promise.resolve(null));
+      mockStewardshipService.getGrantForSubject.mockReturnValue(
+        Promise.resolve({} as StewardshipGrant)
+      );
+      mockStewardshipService.getSubjectPolicy.mockReturnValue(Promise.resolve(mockPolicy));
+      mockStewardshipService.getPolicyChain.mockReturnValue(Promise.resolve([]));
+      mockStewardshipService.getParentPolicy.mockReturnValue(Promise.resolve(null));
 
       await component.loadData();
 
@@ -511,7 +522,11 @@ describe('PolicyConsoleComponent', () => {
 
     it('should not disable inalienable features', () => {
       const inalienable = component.inalienableFeatures[0];
-      component.editingFeatureRules.set({ disabledFeatures: [], disabledRoutes: [], requireApproval: [] });
+      component.editingFeatureRules.set({
+        disabledFeatures: [],
+        disabledRoutes: [],
+        requireApproval: [],
+      });
 
       component.toggleFeature(inalienable);
 
@@ -527,9 +542,9 @@ describe('PolicyConsoleComponent', () => {
 
   describe('Save Policy', () => {
     beforeEach(() => {
-      mockStewardshipService.upsertPolicy.and.returnValue(Promise.resolve(null));
-      mockStewardshipService.getMyPolicy.and.returnValue(Promise.resolve({} as ComputedPolicy));
-      mockStewardshipService.getMyPolicyChain.and.returnValue(Promise.resolve([]));
+      mockStewardshipService.upsertPolicy.mockReturnValue(Promise.resolve(null));
+      mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve({} as ComputedPolicy));
+      mockStewardshipService.getMyPolicyChain.mockReturnValue(Promise.resolve([]));
     });
 
     it('should not save if already saving', async () => {
@@ -563,12 +578,12 @@ describe('PolicyConsoleComponent', () => {
 
       expect(mockStewardshipService.upsertPolicy).toHaveBeenCalledWith({
         subjectId: 'subject-123',
-        contentRules: jasmine.objectContaining({
+        contentRules: expect.objectContaining({
           blockedCategories: ['violence'],
           ageRatingMax: 'PG',
         }),
-        timeRules: jasmine.any(Object),
-        featureRules: jasmine.any(Object),
+        timeRules: expect.any(Object),
+        featureRules: expect.any(Object),
       });
     });
 
@@ -579,7 +594,7 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should reload data after successful save', async () => {
-      spyOn(component, 'loadData').and.returnValue(Promise.resolve());
+      vi.spyOn(component, 'loadData').mockReturnValue(Promise.resolve());
 
       await component.savePolicy();
 
@@ -587,7 +602,7 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should handle save error gracefully', async () => {
-      mockStewardshipService.upsertPolicy.and.returnValue(Promise.reject(new Error('Save failed')));
+      mockStewardshipService.upsertPolicy.mockReturnValue(Promise.reject(new Error('Save failed')));
 
       await component.savePolicy();
 

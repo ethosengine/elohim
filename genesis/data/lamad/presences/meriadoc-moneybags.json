@@ -1,0 +1,15 @@
+{
+  "id": "meriadoc-moneybags",
+  "displayName": "Meriadoc",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["autonomous-entity-epic"],
+  "claimedAgentId": "agent-meriadoc-moneybags",
+  "note": "Community investor and philanthropist. Stewards economics content - autonomous entities, impact investing, and REA economic coordination.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-economics",
+    "affinityDomains": ["autonomous-entity", "economic-coordination"],
+    "humanId": "human-meriadoc-moneybags"
+  }
+}

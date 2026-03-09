@@ -102,6 +102,20 @@ export const SHEFA_ROUTES: Routes = [
         },
       },
       {
+        path: 'resources',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: {
+          title: 'Shefa - My Resources',
+          seo: {
+            title: 'Resource Explorer',
+            description: 'Browse and manage your stewarded resources across all categories.',
+          },
+        },
+      },
+      {
         path: 'resources/property',
         loadComponent: async () =>
           import('./components/shared/shefa-placeholder.component').then(
@@ -165,17 +179,33 @@ export const SHEFA_ROUTES: Routes = [
         },
       },
       {
+        path: 'resources/:lensType',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: { title: 'Shefa - Resources' },
+      },
+      {
+        path: 'resources/:lensType/:folderId',
+        loadComponent: async () =>
+          import('./components/resource-explorer/resource-explorer.component').then(
+            m => m.ResourceExplorerComponent
+          ),
+        data: { title: 'Shefa - Resources' },
+      },
+      {
         path: 'exchange',
         loadComponent: async () =>
           import('./components/shared/shefa-placeholder.component').then(
             m => m.ShefaPlaceholderComponent
           ),
         data: {
-          title: 'Shefa - Requests & Offers',
+          title: 'Shefa - Exchange',
           placeholder: {
-            title: 'Requests & Offers',
+            title: 'Exchange',
             description:
-              'Create and browse requests and offers within your community using ValueFlows intent patterns.',
+              'Create and browse exchanges within your community using ValueFlows intent patterns.',
             features: [
               'Post requests and offers',
               'Matching algorithm',

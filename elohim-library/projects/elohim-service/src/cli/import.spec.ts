@@ -4,39 +4,45 @@
  * Tests for command parsing, option handling, and integration with import pipeline
  */
 
+import { type MockInstance } from 'vitest';
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
+import { runImportPipeline } from '../services/import-pipeline.service';
+import { loadManifest, getImportStats, validateManifest } from '../services/manifest.service';
 
 // Mock dependencies before importing the CLI
-jest.mock('fs');
-jest.mock('../services/import-pipeline.service');
-jest.mock('../services/manifest.service');
-jest.mock('../services/standards.service');
-jest.mock('../services/trust.service');
-jest.mock('../services/human.service');
-jest.mock('../services/scaffold.service');
-jest.mock('../db/kuzu-client');
+vi.mock('fs');
+vi.mock('../services/import-pipeline.service');
+vi.mock('../services/manifest.service');
+vi.mock('../services/standards.service');
+vi.mock('../services/trust.service');
+vi.mock('../services/human.service');
+vi.mock('../services/scaffold.service');
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockFs = vi.mocked(fs);
+const mockRunImportPipeline = vi.mocked(runImportPipeline);
+const mockLoadManifest = vi.mocked(loadManifest);
+const mockGetImportStats = vi.mocked(getImportStats);
+const mockValidateManifest = vi.mocked(validateManifest);
 
 describe('CLI import commands', () => {
   let program: Command;
-  let mockExit: jest.SpyInstance;
-  let mockConsoleLog: jest.SpyInstance;
-  let mockConsoleError: jest.SpyInstance;
+  let mockExit: MockInstance;
+  let mockConsoleLog: MockInstance;
+  let mockConsoleError: MockInstance;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock process.exit
-    mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
+    mockExit = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`process.exit(${code})`);
     }) as any;
 
     // Mock console methods
-    mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
-    mockConsoleError = jest.spyOn(console, 'error').mockImplementation();
+    mockConsoleLog = vi.spyOn(console, 'log').mockImplementation();
+    mockConsoleError = vi.spyOn(console, 'error').mockImplementation();
 
     // Create fresh program instance
     program = new Command();
@@ -51,28 +57,26 @@ describe('CLI import commands', () => {
   describe('import command', () => {
     it('should parse default options correctly', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 5,
         skipped: 2,
         totalNodes: 10,
         totalRelationships: 15,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('-f, --full', 'Full import', false)
         .option('-v, --verbose', 'Verbose', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: options.full ? 'full' : 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             verbose: options.verbose,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -83,11 +87,11 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           mode: 'incremental',
           sourceDir: expect.stringContaining('docs/content'),
-          dbPath: expect.stringContaining('lamad.kuzu'),
+          outputDir: expect.stringContaining('lamad'),
           verbose: false
         })
       );
@@ -95,27 +99,25 @@ describe('CLI import commands', () => {
 
     it('should handle --full flag', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 10,
         skipped: 0,
         totalNodes: 20,
         totalRelationships: 30,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-f, --full', 'Full import', false)
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           await runImportPipeline({
             mode: options.full ? 'full' : 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -125,7 +127,7 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import', '--full']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           mode: 'full'
         })
@@ -134,26 +136,24 @@ describe('CLI import commands', () => {
 
     it('should handle custom source directory', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 3,
         skipped: 0,
         totalNodes: 5,
         totalRelationships: 8,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -163,7 +163,7 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import', '-s', '/custom/path']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceDir: path.resolve('/custom/path')
         })
@@ -172,27 +172,25 @@ describe('CLI import commands', () => {
 
     it('should handle verbose flag', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 5,
         skipped: 0,
         totalNodes: 10,
         totalRelationships: 15,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('-v, --verbose', 'Verbose', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             verbose: options.verbose,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -203,7 +201,7 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import', '--verbose']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           verbose: true
         })
@@ -212,27 +210,25 @@ describe('CLI import commands', () => {
 
     it('should handle dry-run flag', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 0,
         skipped: 0,
         totalNodes: 10,
         totalRelationships: 0,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('--dry-run', 'Dry run', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             dryRun: options.dryRun,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -243,7 +239,7 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import', '--dry-run']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           dryRun: true
         })
@@ -252,27 +248,25 @@ describe('CLI import commands', () => {
 
     it('should handle skip-relationships flag', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 0,
         created: 5,
         skipped: 0,
         totalNodes: 10,
         totalRelationships: 0,
         fileResults: []
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .option('--skip-relationships', 'Skip relationships', false)
         .action(async (options) => {
           await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             skipRelationships: options.skipRelationships,
             generateSourceNodes: true,
             generateDerivedNodes: true
@@ -283,7 +277,7 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'import', '--skip-relationships']);
 
       // Assert
-      expect(runImportPipeline).toHaveBeenCalledWith(
+      expect(mockRunImportPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
           skipRelationships: true
         })
@@ -292,8 +286,7 @@ describe('CLI import commands', () => {
 
     it('should handle import errors and exit with code 1', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockResolvedValue({
+      mockRunImportPipeline.mockResolvedValue({
         errors: 3,
         created: 2,
         skipped: 0,
@@ -322,18 +315,17 @@ describe('CLI import commands', () => {
             processingTime: 8
           }
         ]
-      });
+      } as any);
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           const result = await runImportPipeline({
             mode: 'incremental',
             sourceDir: path.resolve(options.source),
-            outputDir: path.dirname(path.resolve(options.db)),
-            dbPath: path.resolve(options.db),
+            outputDir: path.resolve(options.output),
             generateSourceNodes: true,
             generateDerivedNodes: true
           });
@@ -351,20 +343,18 @@ describe('CLI import commands', () => {
 
     it('should handle pipeline exception', async () => {
       // Arrange
-      const { runImportPipeline } = require('../services/import-pipeline.service');
-      runImportPipeline.mockRejectedValue(new Error('Database connection failed'));
+      mockRunImportPipeline.mockRejectedValue(new Error('Database connection failed'));
 
       program
         .command('import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('-d, --db <file>', 'Database path', './output/lamad.kuzu')
+        .option('-o, --output <dir>', 'Output directory', './output/lamad')
         .action(async (options) => {
           try {
             await runImportPipeline({
               mode: 'incremental',
               sourceDir: path.resolve(options.source),
-              outputDir: path.dirname(path.resolve(options.db)),
-              dbPath: path.resolve(options.db),
+              outputDir: path.resolve(options.output),
               generateSourceNodes: true,
               generateDerivedNodes: true
             });
@@ -388,8 +378,6 @@ describe('CLI import commands', () => {
   describe('stats command', () => {
     it('should load and display manifest statistics', async () => {
       // Arrange
-      const { loadManifest, getImportStats, validateManifest } = require('../services/manifest.service');
-
       const mockManifest = {
         schemaVersion: '1.0.0',
         createdAt: '2024-01-01T00:00:00Z',
@@ -402,15 +390,15 @@ describe('CLI import commands', () => {
         totalRelationships: 75
       };
 
-      loadManifest.mockReturnValue(mockManifest);
-      getImportStats.mockReturnValue({
+      mockLoadManifest.mockReturnValue(mockManifest as any);
+      mockGetImportStats.mockReturnValue({
         schemaVersion: '1.0.0',
         lastImport: '2024-01-02T00:00:00Z',
         totalSources: 10,
         totalNodes: 50,
         migrationCount: 0
-      });
-      validateManifest.mockReturnValue({
+      } as any);
+      mockValidateManifest.mockReturnValue({
         valid: true,
         errors: []
       });
@@ -432,16 +420,15 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'stats']);
 
       // Assert
-      expect(loadManifest).toHaveBeenCalled();
-      expect(getImportStats).toHaveBeenCalled();
+      expect(mockLoadManifest).toHaveBeenCalled();
+      expect(mockGetImportStats).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Total sources: 10'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Total nodes: 50'));
     });
 
     it('should handle manifest load failure', async () => {
       // Arrange
-      const { loadManifest } = require('../services/manifest.service');
-      loadManifest.mockImplementation(() => {
+      mockLoadManifest.mockImplementation(() => {
         throw new Error('Manifest file not found');
       });
 
@@ -471,9 +458,7 @@ describe('CLI import commands', () => {
   describe('validate command', () => {
     it('should validate manifest successfully', async () => {
       // Arrange
-      const { loadManifest, validateManifest } = require('../services/manifest.service');
-
-      loadManifest.mockReturnValue({
+      mockLoadManifest.mockReturnValue({
         schemaVersion: '1.0.0',
         createdAt: '2024-01-01T00:00:00Z',
         lastUpdated: '2024-01-02T00:00:00Z',
@@ -483,9 +468,9 @@ describe('CLI import commands', () => {
         totalSourceFiles: 5,
         totalNodes: 10,
         totalRelationships: 0
-      });
+      } as any);
 
-      validateManifest.mockReturnValue({
+      mockValidateManifest.mockReturnValue({
         valid: true,
         errors: []
       });
@@ -509,15 +494,13 @@ describe('CLI import commands', () => {
       await program.parseAsync(['node', 'test', 'validate']);
 
       // Assert
-      expect(validateManifest).toHaveBeenCalled();
+      expect(mockValidateManifest).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('valid'));
     });
 
     it('should report validation errors and exit with code 1', async () => {
       // Arrange
-      const { loadManifest, validateManifest } = require('../services/manifest.service');
-
-      loadManifest.mockReturnValue({
+      mockLoadManifest.mockReturnValue({
         schemaVersion: '1.0.0',
         createdAt: '2024-01-01T00:00:00Z',
         lastUpdated: '2024-01-02T00:00:00Z',
@@ -527,9 +510,9 @@ describe('CLI import commands', () => {
         totalSourceFiles: 5,
         totalNodes: 10,
         totalRelationships: 0
-      });
+      } as any);
 
-      validateManifest.mockReturnValue({
+      mockValidateManifest.mockReturnValue({
         valid: false,
         errors: [
           'totalSourceFiles mismatch',
@@ -630,81 +613,4 @@ describe('CLI import commands', () => {
     });
   });
 
-  describe('db:init command', () => {
-    it('should initialize Kuzu database from JSON data', async () => {
-      // Arrange
-      const { KuzuClient } = require('../db/kuzu-client');
-
-      const mockClient = {
-        initialize: jest.fn().mockResolvedValue(undefined),
-        bulkInsertContentNodes: jest.fn().mockResolvedValue(10),
-        bulkInsertRelationships: jest.fn().mockResolvedValue(5),
-        getStats: jest.fn().mockResolvedValue({ ContentNode: 10, RELATES_TO: 5 }),
-        close: jest.fn()
-      };
-
-      KuzuClient.mockImplementation(() => mockClient);
-
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(JSON.stringify([
-        { id: 'node-1', contentType: 'epic', title: 'Test' }
-      ]));
-
-      program
-        .command('db:init')
-        .option('-i, --input <dir>', 'Input directory', './output/lamad')
-        .option('-o, --output <file>', 'Output database', './output/lamad.kuzu')
-        .option('--force', 'Overwrite existing', false)
-        .action(async (options) => {
-          const client = new KuzuClient(path.resolve(options.output));
-          await client.initialize();
-
-          const nodesPath = path.join(path.resolve(options.input), 'nodes.json');
-          if (fs.existsSync(nodesPath)) {
-            const nodes = JSON.parse(fs.readFileSync(nodesPath, 'utf-8'));
-            await client.bulkInsertContentNodes(nodes);
-          }
-
-          const stats = await client.getStats();
-          console.log(`Inserted ${stats.ContentNode} nodes`);
-          client.close();
-        });
-
-      // Act
-      await program.parseAsync(['node', 'test', 'db:init']);
-
-      // Assert
-      expect(mockClient.initialize).toHaveBeenCalled();
-      expect(mockClient.bulkInsertContentNodes).toHaveBeenCalled();
-      expect(mockClient.close).toHaveBeenCalled();
-    });
-
-    it('should prevent overwriting existing database without --force', async () => {
-      // Arrange
-      mockFs.existsSync.mockReturnValue(true);
-
-      program
-        .command('db:init')
-        .option('-i, --input <dir>', 'Input directory', './output/lamad')
-        .option('-o, --output <file>', 'Output database', './output/lamad.kuzu')
-        .option('--force', 'Overwrite existing', false)
-        .action(async (options) => {
-          const dbPath = path.resolve(options.output);
-
-          if (fs.existsSync(dbPath) && !options.force) {
-            console.error(`Database already exists at ${dbPath}. Use --force to overwrite.`);
-            process.exit(1);
-          }
-        });
-
-      // Act & Assert
-      await expect(
-        program.parseAsync(['node', 'test', 'db:init'])
-      ).rejects.toThrow('process.exit(1)');
-
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining('already exists')
-      );
-    });
-  });
 });

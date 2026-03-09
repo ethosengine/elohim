@@ -9,6 +9,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 
+// @coverage: 3.7% (2026-02-24)
+
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';

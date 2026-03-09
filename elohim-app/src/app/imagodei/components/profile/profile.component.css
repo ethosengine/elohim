@@ -157,6 +157,52 @@
   line-height: 1.5;
 }
 
+/* Featured Discovery Hex Badges */
+.featured-discoveries {
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-border, #dee2e6);
+}
+
+.hex-badge-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.hex-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--badge-color, #8b5cf6) 12%, var(--surface-card, #fff));
+  border: 1.5px solid color-mix(in srgb, var(--badge-color, #8b5cf6) 30%, transparent);
+  clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+  color: var(--badge-color, #8b5cf6);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hex-badge:not(:disabled):hover {
+  background: color-mix(in srgb, var(--badge-color, #8b5cf6) 22%, var(--surface-card, #fff));
+  transform: scale(1.05);
+}
+
+.hex-badge:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.hex-badge__icon {
+  font-size: 0.85rem;
+}
+
+.hex-badge__label {
+  letter-spacing: 0.05em;
+}
+
 /* Context Links Section */
 .context-links-section {
   padding-top: 1.5rem;

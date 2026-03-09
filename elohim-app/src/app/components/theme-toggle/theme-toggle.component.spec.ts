@@ -5,15 +5,19 @@ import { of } from 'rxjs';
 import { ThemeService } from '../../services/theme.service';
 
 import { ThemeToggleComponent } from './theme-toggle.component';
+import { vi } from 'vitest';
 
 describe('ThemeToggleComponent', () => {
   let component: ThemeToggleComponent;
   let fixture: ComponentFixture<ThemeToggleComponent>;
-  let mockThemeService: jasmine.SpyObj<ThemeService>;
+  let mockThemeService: any;
 
   beforeEach(async () => {
-    mockThemeService = jasmine.createSpyObj('ThemeService', ['getTheme', 'cycleTheme']);
-    mockThemeService.getTheme.and.returnValue(of('device'));
+    mockThemeService = {
+      getTheme: vi.fn(),
+      cycleTheme: vi.fn(),
+    };
+    mockThemeService.getTheme.mockReturnValue(of('device'));
 
     await TestBed.configureTestingModule({
       imports: [ThemeToggleComponent],

@@ -1,0 +1,69 @@
+<header class="dw-toolbar">
+  <div class="toolbar-content">
+    <!-- LEFT: Brand + Nav -->
+    <div class="toolbar-left">
+      <a routerLink="/" class="toolbar-brand">
+        <img src="/threshold/images/elohim_logo_light.png" alt="" class="brand-logo" />
+        <span class="brand-name">Doorway</span>
+      </a>
+      @if (authState.isAuthenticated()) {
+        <nav class="toolbar-nav">
+          <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Dashboard</a>
+          <a routerLink="/doorways" routerLinkActive="active" class="nav-link">Doorways</a>
+        </nav>
+      }
+    </div>
+
+    <!-- RIGHT: Auth State -->
+    <div class="toolbar-right">
+      @if (authState.isLoading()) {
+        <div class="toolbar-skeleton"></div>
+      } @else if (authState.isAuthenticated()) {
+        <!-- Profile Bubble -->
+        <button class="profile-bubble" (click)="toggleDropdown($event)"
+                [attr.aria-expanded]="dropdownOpen()"
+                aria-haspopup="true"
+                data-testid="toolbar-profile-bubble">
+          <span class="profile-initials">{{ authState.initials() }}</span>
+        </button>
+
+        @if (dropdownOpen()) {
+          <!-- Dropdown -->
+          <div class="profile-dropdown" role="menu">
+            <div class="dropdown-identity">
+              <div class="identity-avatar">{{ authState.initials() }}</div>
+              <div class="identity-info">
+                <span class="identity-name">{{ authState.account()?.identifier }}</span>
+                <span class="identity-mode">{{ authState.modeLabel() }}</span>
+              </div>
+            </div>
+            <div class="dropdown-divider"></div>
+            <a routerLink="/account" class="dropdown-item" role="menuitem" (click)="closeDropdown()">My Account</a>
+            @if (authState.isSteward()) {
+              <a href="/identity/profile" class="dropdown-item" role="menuitem">Imagodei Profile <span class="external-icon">&#8599;</span></a>
+            } @else {
+              <a routerLink="/account" fragment="graduation" class="dropdown-item cta" role="menuitem"
+                 (click)="closeDropdown()">Become a Steward</a>
+            }
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-row">
+              <span>Theme</span>
+              <app-theme-toggle [inline]="true" />
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item logout" role="menuitem" (click)="onLogout()" data-testid="toolbar-logout">Sign Out</button>
+          </div>
+        }
+      } @else {
+        <!-- Anonymous -->
+        <app-theme-toggle [inline]="true" />
+        <a routerLink="/login" class="btn-ghost">Sign In</a>
+        <a routerLink="/register" class="btn-primary-sm">Register</a>
+      }
+    </div>
+  </div>
+</header>
+@if (dropdownOpen()) {
+  <button class="dropdown-backdrop" aria-label="Close menu" data-testid="toolbar-backdrop"
+          (click)="closeDropdown()"></button>
+}

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { StreakTrackerService } from './streak-tracker.service';
 import { StreakState } from '../models/streak-state.model';
+import { vi } from 'vitest';
 
 describe('StreakTrackerService', () => {
   let service: StreakTrackerService;
@@ -175,7 +176,7 @@ describe('StreakTrackerService', () => {
     });
 
     it('should register achievement callback', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       service.onAchieved('content-123', callback);
       expect(callback).toBeDefined();
     });
@@ -188,7 +189,7 @@ describe('StreakTrackerService', () => {
     });
 
     it('should remove achievement callback', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       service.onAchieved('content-123', callback);
       service.offAchieved('content-123');
       expect(service).toBeTruthy(); // Just verify method exists

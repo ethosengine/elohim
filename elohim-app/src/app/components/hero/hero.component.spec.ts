@@ -3,17 +3,18 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 import { HeroComponent } from './hero.component';
+import { vi, Mock } from 'vitest';
 
 describe('HeroComponent', () => {
   let component: HeroComponent;
   let fixture: ComponentFixture<HeroComponent>;
-  let domInteractionService: jasmine.SpyObj<DomInteractionService>;
+  let domInteractionService: any;
 
   beforeEach(async () => {
-    const domInteractionServiceSpy = jasmine.createSpyObj<DomInteractionService>(
-      'DomInteractionService',
-      ['setupScrollIndicator', 'setupHeroTitleAnimation']
-    );
+    const domInteractionServiceSpy = {
+      setupScrollIndicator: vi.fn(),
+      setupHeroTitleAnimation: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [HeroComponent],
@@ -27,9 +28,9 @@ describe('HeroComponent', () => {
 
     fixture = TestBed.createComponent(HeroComponent);
     component = fixture.componentInstance;
-    domInteractionService = TestBed.inject(
-      DomInteractionService
-    ) as jasmine.SpyObj<DomInteractionService>;
+    domInteractionService = TestBed.inject(DomInteractionService) as {
+      [K in keyof DomInteractionService]?: Mock;
+    };
   });
 
   it('should create', () => {

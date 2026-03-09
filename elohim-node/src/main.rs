@@ -10,6 +10,7 @@
 
 mod config;
 mod dashboard;
+mod elohim_service;
 mod network;
 mod pod;
 mod update;
@@ -52,6 +53,10 @@ struct Cli {
     #[arg(long, env = "ELOHIM_CLUSTER_NAME")]
     cluster_name: Option<String>,
 
+    /// Enable Bitswap block exchange protocol
+    #[arg(long, env = "ENABLE_BITSWAP")]
+    enable_bitswap: bool,
+
     /// Pod subcommand for manual operations
     #[command(subcommand)]
     pod_cmd: Option<pod::cli::PodCommands>,
@@ -90,6 +95,9 @@ async fn main() -> anyhow::Result<()> {
     }
     if let Some(data_dir) = cli.data_dir {
         config.node.data_dir = PathBuf::from(data_dir);
+    }
+    if cli.enable_bitswap {
+        config.bitswap.enabled = true;
     }
 
     info!("Node ID: {}", config.node.id);
@@ -149,12 +157,30 @@ async fn main() -> anyhow::Result<()> {
         info!("Pod is disabled");
     }
 
-    // --- P2P Layer ---
-    // Build libp2p swarm
+    // --- Blob Store ---
+    // Initialize shared blob store (used by P2P and storage HTTP server)
     let data_dir = &config.node.data_dir;
-    match p2p::build_swarm(&config.p2p, data_dir) {
+    let blob_dir = config
+        .storage
+        .blob_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("blobs"));
+    let blob_store = Arc::new(
+        elohim_storage::BlobStore::new(&blob_dir)
+            .await
+            .expect("Failed to initialize blob store"),
+    );
+    info!(path = %blob_dir.display(), "Blob store initialized");
+
+    // --- P2P Layer ---
+    // Build unified libp2p swarm with node + storage + bitswap protocols
+    match p2p::build_swarm(&config.p2p, data_dir, blob_store.clone(), &config.bitswap) {
         Ok(swarm) => {
             info!(peer_id = %swarm.local_peer_id(), "P2P swarm built");
+            if config.bitswap.enabled {
+                info!("Bitswap block exchange enabled");
+            }
 
             // Create sync engine
             let engine = Arc::new(Mutex::new(
@@ -173,9 +199,6 @@ async fn main() -> anyhow::Result<()> {
             // Spawn swarm event loop
             let swarm_handle = swarm;
             tokio::spawn(async move {
-                // Forward commands to swarm in parallel with event loop
-                // We split: the swarm.run() consumes self and pushes events
-                // But we also need to process commands. Use a wrapper approach:
                 swarm_handle.run(swarm_event_tx).await;
             });
 
@@ -191,8 +214,80 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // --- Storage HTTP Server ---
+    // Serve the storage HTTP API (doorway/Tauri connect here)
+    let storage_http_port = config.storage.http_port;
+    let blob_store_http = blob_store.clone();
+    tokio::spawn(async move {
+        let addr = SocketAddr::from(([0, 0, 0, 0], storage_http_port));
+        info!(%addr, "Storage HTTP server listening");
+        // TODO: Initialize full HttpServer with ContentDb, services, etc.
+        // For now, start a minimal blob-serving endpoint.
+        let app = axum::Router::new().route(
+            "/blob/{hash}",
+            axum::routing::get({
+                let store = blob_store_http.clone();
+                move |axum::extract::Path(hash): axum::extract::Path<String>| {
+                    let store = store.clone();
+                    async move {
+                        match store.get_by_address(&hash).await {
+                            Ok(data) => axum::response::Response::builder()
+                                .header("content-type", "application/octet-stream")
+                                .body(axum::body::Body::from(data))
+                                .unwrap(),
+                            Err(_) => axum::response::Response::builder()
+                                .status(404)
+                                .body(axum::body::Body::from("not found"))
+                                .unwrap(),
+                        }
+                    }
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        if let Err(e) = axum::serve(listener, app).await {
+            tracing::error!(error = %e, "Storage HTTP server failed");
+        }
+    });
+
+    // --- Elohim Agent Service ---
+    // Initialize AI agent service with admission control and REA accounting.
+    // Training-wheels phase: MockBackend, no live LLM required.
+    let elohim_init_config = elohim_service::AgentInitConfig {
+        node_id: config.node.id.clone(),
+        ..Default::default()
+    };
+
+    let elohim_state = match elohim_service::initialize_agent_service(elohim_init_config).await {
+        Ok(state) => {
+            info!("Elohim agent service initialized");
+            Some(Arc::new(state))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to initialize Elohim agent service, running without it");
+            None
+        }
+    };
+
     // Create dashboard router with pod
-    let app = create_router(dashboard_state);
+    let mut app = create_router(dashboard_state);
+
+    // Merge elohim invoke/health routes if agent service initialized
+    if let Some(elohim_state) = elohim_state {
+        let elohim_router = axum::Router::new()
+            .route(
+                "/elohim/invoke",
+                axum::routing::post(elohim_service::handle_invoke),
+            )
+            .route(
+                "/elohim/health",
+                axum::routing::get(elohim_service::handle_health),
+            )
+            .with_state(elohim_state);
+
+        app = app.merge(elohim_router);
+        info!("Elohim invoke/health routes registered");
+    }
 
     // Bind to HTTP port
     let addr = SocketAddr::from(([0, 0, 0, 0], config.api.http_port));

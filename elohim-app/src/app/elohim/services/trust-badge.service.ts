@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 92.8% (2026-02-05)
+// @coverage: 93.1% (2026-03-03)
 
 import { catchError, map } from 'rxjs/operators';
 
@@ -75,11 +75,9 @@ const ATT_AUTHOR_VERIFIED: ContentAttestationType = 'author-verified';
 
 @Injectable({ providedIn: 'root' })
 export class TrustBadgeService {
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly contentService: ContentService,
-    private readonly agentService: AgentService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly contentService = inject(ContentService);
+  private readonly agentService = inject(AgentService);
 
   /**
    * Get full trust badge for a content node.
@@ -459,7 +457,7 @@ export class TrustBadgeService {
       label: 'View Trust Profile',
       icon: '🔍',
       available: true,
-      route: `/lamad/resource/${content.id}/trust`,
+      route: `/resource/${content.id}/trust`,
     });
 
     // Endorse - available to community members
@@ -486,7 +484,7 @@ export class TrustBadgeService {
         label: 'Request Review',
         icon: '📝',
         available: true,
-        route: `/lamad/resource/${content.id}/attestation/request`,
+        route: `/resource/${content.id}/attestation/request`,
       });
     }
 
@@ -535,7 +533,7 @@ export class TrustBadgeService {
           label: 'View Trust Profile',
           icon: '🔍',
           available: true,
-          route: `/lamad/resource/${contentId}/trust`,
+          route: `/resource/${contentId}/trust`,
         },
       ],
     };

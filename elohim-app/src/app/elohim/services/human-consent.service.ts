@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 89.7% (2026-02-05)
+// @coverage: 89.7% (2026-02-24)
 
 import { tap } from 'rxjs/operators';
 
@@ -46,10 +46,8 @@ export class HumanConsentService {
   private readonly consentsSubject = new BehaviorSubject<HumanConsent[]>([]);
   public consents$ = this.consentsSubject.asObservable();
 
-  constructor(
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService
-  ) {}
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly sessionHuman = inject(SessionHumanService);
 
   // =========================================================================
   // INITIALIZATION

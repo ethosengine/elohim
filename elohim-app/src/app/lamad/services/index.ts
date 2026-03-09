@@ -46,6 +46,12 @@ export { PathNegotiationService } from './path-negotiation.service';
 export { ContentMasteryService } from './content-mastery.service';
 export type { MigrationResult } from './content-mastery.service';
 
+// Learner context (mastery-aware adaptation layer)
+export { LearnerContextService } from './learner-context.service';
+
+// Path recommendations (discovery → path mapping)
+export { PathRecommendationService } from './path-recommendation.service';
+
 // Mastery service (elohim-storage backend)
 export { MasteryService, MasteryLevels, MASTERY_LEVEL_ORDER } from './mastery.service';
 export type { MasteryLevelType } from './mastery.service';
@@ -78,3 +84,6 @@ export { ContributorService } from './contributor.service';
 
 // Steward economy (credentials, gates, access, revenue)
 export { StewardService } from './steward.service';
+
+// Scope & Sequence lens (path hierarchy for resource explorer)
+export { ScopeSequenceLensProvider } from './scope-sequence-lens.provider';

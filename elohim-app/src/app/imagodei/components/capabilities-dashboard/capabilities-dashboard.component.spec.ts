@@ -3,13 +3,18 @@ import { signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { CapabilitiesDashboardComponent } from './capabilities-dashboard.component';
-import { StewardshipService } from '../../services/stewardship.service';
-import type { ComputedPolicy, StewardshipGrant, TimeAccessDecision } from '../../models/stewardship.model';
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
+import type {
+  ComputedPolicy,
+  StewardshipGrant,
+  TimeAccessDecision,
+} from '../../models/stewardship.model';
+import { vi } from 'vitest';
 
 describe('CapabilitiesDashboardComponent', () => {
   let component: CapabilitiesDashboardComponent;
   let fixture: ComponentFixture<CapabilitiesDashboardComponent>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipService>;
+  let mockStewardshipService: any;
 
   const mockPolicy: ComputedPolicy = {
     subjectId: 'subject-456',
@@ -61,21 +66,19 @@ describe('CapabilitiesDashboardComponent', () => {
   };
 
   beforeEach(async () => {
-    mockStewardshipService = jasmine.createSpyObj('StewardshipService', [
-      'getMyPolicy',
-      'getMyStewards',
-      'checkTimeAccess',
-    ]);
+    mockStewardshipService = {
+      getMyPolicy: vi.fn(),
+      getMyStewards: vi.fn(),
+      checkTimeAccess: vi.fn(),
+    };
 
-    mockStewardshipService.getMyPolicy.and.returnValue(Promise.resolve(mockPolicy));
-    mockStewardshipService.getMyStewards.and.returnValue(Promise.resolve([mockGrant]));
-    mockStewardshipService.checkTimeAccess.and.returnValue(Promise.resolve(mockTimeAccess));
+    mockStewardshipService.getMyPolicy.mockReturnValue(Promise.resolve(mockPolicy));
+    mockStewardshipService.getMyStewards.mockReturnValue(Promise.resolve([mockGrant]));
+    mockStewardshipService.checkTimeAccess.mockReturnValue(Promise.resolve(mockTimeAccess));
 
     await TestBed.configureTestingModule({
       imports: [CapabilitiesDashboardComponent],
-      providers: [
-        { provide: StewardshipService, useValue: mockStewardshipService },
-      ],
+      providers: [{ provide: STEWARDSHIP_POLICY, useValue: mockStewardshipService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CapabilitiesDashboardComponent);
@@ -99,7 +102,9 @@ describe('CapabilitiesDashboardComponent', () => {
     });
 
     it('should handle load error gracefully', async () => {
-      mockStewardshipService.getMyPolicy.and.returnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyPolicy.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadData();
 
@@ -112,7 +117,7 @@ describe('CapabilitiesDashboardComponent', () => {
         remainingSession: 30,
         remainingDaily: 60,
       };
-      mockStewardshipService.checkTimeAccess.and.returnValue(Promise.resolve(newTimeAccess));
+      mockStewardshipService.checkTimeAccess.mockReturnValue(Promise.resolve(newTimeAccess));
 
       await component.refreshTimeAccess();
 
@@ -120,7 +125,7 @@ describe('CapabilitiesDashboardComponent', () => {
     });
 
     it('should silently handle time access refresh failure', async () => {
-      mockStewardshipService.checkTimeAccess.and.returnValue(Promise.reject(new Error('Timeout')));
+      mockStewardshipService.checkTimeAccess.mockReturnValue(Promise.reject(new Error('Timeout')));
 
       await component.refreshTimeAccess();
 
@@ -149,7 +154,7 @@ describe('CapabilitiesDashboardComponent', () => {
 
   describe('Lifecycle Hooks', () => {
     it('should load data on init', async () => {
-      spyOn(component, 'loadData');
+      vi.spyOn(component, 'loadData');
 
       component.ngOnInit();
 
@@ -165,7 +170,7 @@ describe('CapabilitiesDashboardComponent', () => {
     it('should cleanup timer on destroy', () => {
       component.ngOnInit();
       const subscription = component['timerSubscription'];
-      spyOn(subscription!, 'unsubscribe');
+      vi.spyOn(subscription!, 'unsubscribe');
 
       component.ngOnDestroy();
 
@@ -389,7 +394,9 @@ describe('CapabilitiesDashboardComponent', () => {
       component.policy.set(mockPolicy);
 
       const restrictions = component.restrictions();
-      const timeRestrictions = restrictions.filter(r => r.type === 'time' && r.label.includes('Session'));
+      const timeRestrictions = restrictions.filter(
+        r => r.type === 'time' && r.label.includes('Session')
+      );
 
       expect(timeRestrictions.length).toBe(1);
       expect(timeRestrictions[0].label).toContain('60 minutes');
@@ -399,7 +406,9 @@ describe('CapabilitiesDashboardComponent', () => {
       component.policy.set(mockPolicy);
 
       const restrictions = component.restrictions();
-      const timeRestrictions = restrictions.filter(r => r.type === 'time' && r.label.includes('Daily'));
+      const timeRestrictions = restrictions.filter(
+        r => r.type === 'time' && r.label.includes('Daily')
+      );
 
       expect(timeRestrictions.length).toBe(1);
       expect(timeRestrictions[0].label).toContain('120 minutes');
@@ -502,7 +511,7 @@ describe('CapabilitiesDashboardComponent', () => {
 
   describe('Refresh Functionality', () => {
     it('should reload data on refresh', () => {
-      spyOn(component, 'loadData');
+      vi.spyOn(component, 'loadData');
 
       component.refresh();
 
@@ -602,7 +611,7 @@ describe('CapabilitiesDashboardComponent', () => {
         remainingSession: 20,
         remainingDaily: 40,
       };
-      mockStewardshipService.checkTimeAccess.and.returnValue(Promise.resolve(newTimeAccess));
+      mockStewardshipService.checkTimeAccess.mockReturnValue(Promise.resolve(newTimeAccess));
 
       await component.refreshTimeAccess();
 

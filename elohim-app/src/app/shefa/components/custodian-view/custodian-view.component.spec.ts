@@ -8,18 +8,19 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 
 import { CustodianViewComponent } from './custodian-view.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
+import { vi } from 'vitest';
 
 describe('CustodianViewComponent', () => {
   let component: CustodianViewComponent;
   let fixture: ComponentFixture<CustodianViewComponent>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
+  let mockShefaCompute: any;
 
   beforeEach(async () => {
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', [
-      'getBidirectionalCustodianView',
-    ]);
-    mockShefaCompute.getBidirectionalCustodianView.and.returnValue(
+    mockShefaCompute = {
+      getBidirectionalCustodianView: vi.fn(),
+    };
+    mockShefaCompute.getBidirectionalCustodianView.mockReturnValue(
       of({
         helping: [],
         helpingCount: 0,
@@ -41,7 +42,7 @@ describe('CustodianViewComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ShefaComputeService, useValue: mockShefaCompute },
+        { provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute },
       ],
     }).compileComponents();
 

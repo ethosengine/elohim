@@ -13,34 +13,31 @@ import { DoorwayRegistryService } from '../../services/doorway-registry.service'
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of, EMPTY } from 'rxjs';
+import { vi } from 'vitest';
 
 describe('RegisterComponent', () => {
   let component: RegisterComponent;
   let fixture: ComponentFixture<RegisterComponent>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
-  let mockMigrationService: jasmine.SpyObj<SessionMigrationService>;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockPasswordProvider: jasmine.SpyObj<PasswordAuthProvider>;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockRouter: jasmine.SpyObj<Router>;
-  let mockActivatedRoute: jasmine.SpyObj<ActivatedRoute>;
+  let mockIdentityService: any;
+  let mockSessionHumanService: any;
+  let mockMigrationService: any;
+  let mockDoorwayRegistry: any;
+  let mockAuthService: any;
+  let mockPasswordProvider: any;
+  let mockHolochainClient: any;
+  let mockRouter: any;
+  let mockActivatedRoute: any;
 
   beforeEach(async () => {
-    // Create mocks
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      ['registerHuman'],
-      {
-        mode: signal('session'),
-        isAuthenticated: signal(false),
-      }
-    );
-    mockIdentityService.registerHuman.and.returnValue(
+    mockIdentityService = {
+      registerHuman: vi.fn(),
+      mode: signal('session'),
+      isAuthenticated: signal(false),
+    };
+    mockIdentityService.registerHuman.mockReturnValue(
       Promise.resolve({
         id: 'test-human-id',
         displayName: 'Test User',
@@ -54,61 +51,51 @@ describe('RegisterComponent', () => {
       })
     );
 
-    mockSessionHumanService = jasmine.createSpyObj(
-      'SessionHumanService',
-      ['getSession'],
-      {
-        hasSession: signal(false),
-      }
-    );
-    mockSessionHumanService.getSession.and.returnValue(null);
+    mockSessionHumanService = {
+      getSession: vi.fn(),
+      hasSession: signal(false),
+    };
+    mockSessionHumanService.getSession.mockReturnValue(null);
 
-    mockMigrationService = jasmine.createSpyObj(
-      'SessionMigrationService',
-      ['migrate'],
-      {
-        canMigrate: signal(false),
-        state: signal(null),
-      }
-    );
-    mockMigrationService.migrate.and.returnValue(
-      Promise.resolve({ success: true })
-    );
+    mockMigrationService = {
+      migrate: vi.fn(),
+      canMigrate: signal(false),
+      state: signal(null),
+    };
+    mockMigrationService.migrate.mockReturnValue(Promise.resolve({ success: true }));
 
-    mockDoorwayRegistry = jasmine.createSpyObj(
-      'DoorwayRegistryService',
-      ['selectDoorway', 'validateDoorway', 'selectDoorwayByUrl'],
-      {
-        selected: signal(null),
-        hasSelection: signal(false),
-      }
-    );
+    mockDoorwayRegistry = {
+      selectDoorway: vi.fn(),
+      validateDoorway: vi.fn(),
+      selectDoorwayByUrl: vi.fn(),
+      selected: signal(null),
+      hasSelection: signal(false),
+    };
 
-    mockAuthService = jasmine.createSpyObj('AuthService', ['registerProvider', 'hasProvider']);
-    mockAuthService.hasProvider.and.returnValue(false);
+    mockAuthService = {
+      registerProvider: vi.fn(),
+      hasProvider: vi.fn(),
+    };
+    mockAuthService.hasProvider.mockReturnValue(false);
 
-    mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['authenticate']);
+    mockPasswordProvider = {
+      authenticate: vi.fn(),
+    };
 
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      [],
-      {
-        isConnected: signal(true),
-      }
-    );
+    mockHolochainClient = {
+      isConnected: signal(true),
+    };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate'], {
-      events: EMPTY,
-    });
-    mockRouter.navigate.and.returnValue(Promise.resolve(true));
+    // mockRouter will be set after TestBed.inject(Router) below
 
     mockActivatedRoute = {
       queryParams: of({}),
-    } as any;
+    };
 
     await TestBed.configureTestingModule({
       imports: [RegisterComponent],
       providers: [
+        provideRouter([]),
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: SessionHumanService, useValue: mockSessionHumanService },
         { provide: SessionMigrationService, useValue: mockMigrationService },
@@ -116,10 +103,13 @@ describe('RegisterComponent', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: HolochainClientService, useValue: mockHolochainClient },
-        { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
     }).compileComponents();
+
+    // Spy on the real Router's navigate method
+    mockRouter = TestBed.inject(Router);
+    vi.spyOn(mockRouter, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(RegisterComponent);
     component = fixture.componentInstance;
@@ -308,7 +298,7 @@ describe('RegisterComponent', () => {
 
   describe('ngOnInit', () => {
     it('should register password provider if not already registered', () => {
-      mockAuthService.hasProvider.and.returnValue(false);
+      mockAuthService.hasProvider.mockReturnValue(false);
 
       component.ngOnInit();
 
@@ -316,34 +306,36 @@ describe('RegisterComponent', () => {
     });
 
     it('should not register password provider if already registered', () => {
-      mockAuthService.hasProvider.and.returnValue(true);
+      mockAuthService.hasProvider.mockReturnValue(true);
 
       component.ngOnInit();
 
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('should get return URL from query params', (done) => {
-      mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
+    it('should get return URL from query params', () =>
+      new Promise<void>(resolve => {
+        mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/dashboard');
-        done();
-      }, 100);
-    });
+        setTimeout(() => {
+          expect((component as any).returnUrl).toBe('/dashboard');
+          resolve();
+        }, 100);
+      }));
 
-    it('should default return URL to / when not in query params', (done) => {
-      mockActivatedRoute.queryParams = of({});
+    it('should default return URL to / when not in query params', () =>
+      new Promise<void>(resolve => {
+        mockActivatedRoute.queryParams = of({});
 
-      component.ngOnInit();
+        component.ngOnInit();
 
-      setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/');
-        done();
-      }, 100);
-    });
+        setTimeout(() => {
+          expect((component as any).returnUrl).toBe('/');
+          resolve();
+        }, 100);
+      }));
 
     it('should auto-select doorway from environment when none selected', () => {
       // Default mock has hasSelection = signal(false), environment has localhost doorwayUrl
@@ -386,7 +378,7 @@ describe('RegisterComponent', () => {
         writable: true,
         configurable: true,
       });
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
 
       const newFixture = TestBed.createComponent(RegisterComponent);
       const newComponent = newFixture.componentInstance;
@@ -417,7 +409,7 @@ describe('RegisterComponent', () => {
         writable: true,
         configurable: true,
       });
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
 
       const newFixture = TestBed.createComponent(RegisterComponent);
       const newComponent = newFixture.componentInstance;
@@ -459,7 +451,7 @@ describe('RegisterComponent', () => {
         configurable: true,
       });
 
-      mockRouter.navigate.calls.reset();
+      mockRouter.navigate.mockClear();
 
       const newFixture = TestBed.createComponent(RegisterComponent);
       const newComponent = newFixture.componentInstance;
@@ -573,8 +565,8 @@ describe('RegisterComponent', () => {
 
     it('should set registering state during registration', async () => {
       let resolveRegister: any;
-      mockIdentityService.registerHuman.and.returnValue(
-        new Promise((resolve) => {
+      mockIdentityService.registerHuman.mockReturnValue(
+        new Promise(resolve => {
           resolveRegister = resolve;
         })
       );
@@ -621,7 +613,7 @@ describe('RegisterComponent', () => {
       await component.onRegister();
 
       expect(mockIdentityService.registerHuman).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           email: 'john@example.com',
         })
       );
@@ -643,7 +635,7 @@ describe('RegisterComponent', () => {
     });
 
     it('should handle registration failure', async () => {
-      mockIdentityService.registerHuman.and.returnValue(
+      mockIdentityService.registerHuman.mockReturnValue(
         Promise.reject(new Error('Email already exists'))
       );
 
@@ -654,7 +646,8 @@ describe('RegisterComponent', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockIdentityService.registerHuman.and.returnValue(Promise.reject(new Error('Unknown error')));
+      // Reject with a non-Error value (string) to test the fallback error message
+      mockIdentityService.registerHuman.mockReturnValue(Promise.reject('Unknown error'));
 
       await component.onRegister();
 
@@ -699,7 +692,7 @@ describe('RegisterComponent', () => {
         configurable: true,
       });
 
-      mockMigrationService.migrate.and.returnValue(
+      mockMigrationService.migrate.mockReturnValue(
         Promise.resolve({ success: false, error: 'Migration failed' })
       );
 
@@ -766,7 +759,7 @@ describe('RegisterComponent', () => {
       newComponent.form.confirmPassword = 'password123';
       newComponent.form.displayName = 'John Doe';
 
-      spyOn(newComponent, 'onRegister').and.returnValue(Promise.resolve());
+      vi.spyOn(newComponent, 'onRegister').mockReturnValue(Promise.resolve());
 
       await newComponent.onMigrate();
 
@@ -822,7 +815,7 @@ describe('RegisterComponent', () => {
         configurable: true,
       });
 
-      mockMigrationService.migrate.and.returnValue(
+      mockMigrationService.migrate.mockReturnValue(
         Promise.resolve({ success: false, error: 'Network error' })
       );
 
@@ -842,7 +835,7 @@ describe('RegisterComponent', () => {
         configurable: true,
       });
 
-      mockMigrationService.migrate.and.returnValue(Promise.reject(new Error('Network error')));
+      mockMigrationService.migrate.mockReturnValue(Promise.reject(new Error('Network error')));
 
       const newFixture = TestBed.createComponent(RegisterComponent);
       const newComponent = newFixture.componentInstance;

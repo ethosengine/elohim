@@ -1,0 +1,76 @@
+{
+  "id": "negotiation-adam-eve-001",
+  "title": "Path Negotiation: Adam and Eve - Garden of Understanding",
+  "initiatorId": "human-adam-firstman",
+  "participantId": "human-eve-firstwoman",
+  "status": "accepted",
+  "consentId": "consent-adam-eve-spouse",
+  "requiredIntimacyLevel": "intimate",
+  "validatingAttestationIds": [
+    "attestation-spouse-adam-to-eve",
+    "attestation-spouse-eve-to-adam"
+  ],
+  "sharedAffinityNodes": [
+    "community-garden-club",
+    "care-economy-visibility"
+  ],
+  "divergentNodes": {
+    "initiator": [
+      "value-scanner-epic",
+      "community-regen-ag-network"
+    ],
+    "participant": [
+      "public-observer-epic",
+      "social-medium-epic"
+    ]
+  },
+  "sharedAffinityScores": {
+    "community-garden-club": 0.85,
+    "care-economy-visibility": 0.72
+  },
+  "bridgingStrategy": "complementary",
+  "generatedPathId": "love-map-adam-eve",
+  "proposedPathStructure": {
+    "title": "Garden of Understanding",
+    "description": "An intimate path where a gardener-steward and a truth-seeker discover what they can teach each other about tending the world",
+    "stepCount": 16,
+    "estimatedDuration": "3-4 hours",
+    "conceptIds": [
+      "care-economy-visibility",
+      "community-garden-club",
+      "value-scanner-epic",
+      "community-regen-ag-network",
+      "public-observer-epic",
+      "social-medium-epic"
+    ],
+    "stats": {
+      "sharedConcepts": 2,
+      "initiatorTeaching": 2,
+      "participantTeaching": 2,
+      "novelConcepts": 0
+    }
+  },
+  "createdAt": "2026-02-25T00:00:00.000Z",
+  "updatedAt": "2026-02-25T00:00:00.000Z",
+  "resolvedAt": "2026-02-25T00:00:00.000Z",
+  "negotiationLog": [
+    {
+      "authorId": "system",
+      "timestamp": "2026-02-25T00:00:00.000Z",
+      "type": "system",
+      "content": "Affinity analysis complete. Compatibility score: 0.72. Shared domains: community, care economy. Recommended strategy: complementary (Mutual Teaching)."
+    },
+    {
+      "authorId": "human-adam-firstman",
+      "timestamp": "2026-02-25T00:01:00.000Z",
+      "type": "proposal",
+      "content": "I want to understand what drives your curiosity. Let me show you how I see stewardship, and you show me how you seek truth."
+    },
+    {
+      "authorId": "human-eve-firstwoman",
+      "timestamp": "2026-02-25T00:02:00.000Z",
+      "type": "accept",
+      "content": "Yes. I want to understand how you tend things with such care. The complementary strategy is perfect - we each have something to teach."
+    }
+  ]
+}

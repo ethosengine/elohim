@@ -29,8 +29,12 @@
 //! - **Health Recovery**: Restart services, failover, quarantine
 
 pub mod actions;
+pub mod admission;
 pub mod analyzer;
+#[allow(dead_code)] // Training-wheels: types used when gossipsub broadcast is wired
+pub mod capacity;
 pub mod cli;
+pub mod compute_rea;
 pub mod consensus;
 pub mod decider;
 pub mod executor;

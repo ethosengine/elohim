@@ -1,7 +1,9 @@
+import { vi } from 'vitest';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { DoorwayCacheService } from './doorway-cache.service';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Comprehensive tests for DoorwayCacheService
@@ -49,8 +51,7 @@ describe('DoorwayCacheService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [DoorwayCacheService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), DoorwayCacheService],
     });
 
     service = TestBed.inject(DoorwayCacheService);
@@ -155,9 +156,7 @@ describe('DoorwayCacheService', () => {
         result = data;
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/api/v1/cache/Content')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/api/v1/cache/Content'));
       expect(req.request.method).toBe('GET');
       req.flush([mockContent]);
       tick();
@@ -170,10 +169,7 @@ describe('DoorwayCacheService', () => {
       service.query('Content', { limit: 50 }).subscribe();
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/cache/Content') &&
-          request.params.get('limit') === '50'
-        );
+        return request.url.includes('/cache/Content') && request.params.get('limit') === '50';
       });
       req.flush([mockContent]);
       tick();
@@ -183,10 +179,7 @@ describe('DoorwayCacheService', () => {
       service.query('Content', { skip: 10 }).subscribe();
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/cache/Content') &&
-          request.params.get('skip') === '10'
-        );
+        return request.url.includes('/cache/Content') && request.params.get('skip') === '10';
       });
       req.flush([mockContent]);
       tick();
@@ -196,10 +189,7 @@ describe('DoorwayCacheService', () => {
       service.query('Content', { limit: 20, skip: 5 }).subscribe();
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.params.get('limit') === '20' &&
-          request.params.get('skip') === '5'
-        );
+        return request.params.get('limit') === '20' && request.params.get('skip') === '5';
       });
       req.flush([mockContent]);
       tick();
@@ -285,10 +275,7 @@ describe('DoorwayCacheService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/cache/Content') &&
-          request.params.get('limit') === '1000'
-        );
+        return request.url.includes('/cache/Content') && request.params.get('limit') === '1000';
       });
       req.flush([mockContent]);
       tick();
@@ -299,9 +286,7 @@ describe('DoorwayCacheService', () => {
     it('should accept custom limit', fakeAsync(() => {
       service.getAllContent(500).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '500'
-      );
+      const req = httpMock.expectOne(request => request.params.get('limit') === '500');
       req.flush([mockContent]);
       tick();
     }));
@@ -336,9 +321,7 @@ describe('DoorwayCacheService', () => {
         result = data;
       });
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('/cache/LearningPath/path-1')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('/cache/LearningPath/path-1'));
       req.flush(mockPath);
       tick();
 
@@ -367,10 +350,7 @@ describe('DoorwayCacheService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/cache/LearningPath') &&
-          request.params.get('limit') === '100'
-        );
+        return request.url.includes('/cache/LearningPath') && request.params.get('limit') === '100';
       });
       req.flush([mockPath]);
       tick();
@@ -381,9 +361,7 @@ describe('DoorwayCacheService', () => {
     it('should accept custom limit', fakeAsync(() => {
       service.getAllPaths(50).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '50'
-      );
+      const req = httpMock.expectOne(request => request.params.get('limit') === '50');
       req.flush([mockPath]);
       tick();
     }));
@@ -402,8 +380,7 @@ describe('DoorwayCacheService', () => {
 
       const req = httpMock.expectOne(request => {
         return (
-          request.url.includes('/cache/Relationship') &&
-          request.params.get('limit') === '1000'
+          request.url.includes('/cache/Relationship') && request.params.get('limit') === '1000'
         );
       });
       req.flush([mockRelationship]);
@@ -415,9 +392,7 @@ describe('DoorwayCacheService', () => {
     it('should accept custom limit', fakeAsync(() => {
       service.getAllRelationships(500).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '500'
-      );
+      const req = httpMock.expectOne(request => request.params.get('limit') === '500');
       req.flush([mockRelationship]);
       tick();
     }));
@@ -600,7 +575,7 @@ describe('DoorwayCacheService', () => {
     }));
 
     it('should not log 404 errors (expected for missing content)', fakeAsync(() => {
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
 
       service.get('Content', 'not-found').subscribe();
 
@@ -718,9 +693,7 @@ describe('DoorwayCacheService', () => {
         page1 = data;
       });
 
-      const req1 = httpMock.expectOne(request =>
-        request.params.get('limit') === '10'
-      );
+      const req1 = httpMock.expectOne(request => request.params.get('limit') === '10');
       req1.flush(allItems.slice(0, 10));
       tick();
 
@@ -728,8 +701,8 @@ describe('DoorwayCacheService', () => {
         page2 = data;
       });
 
-      const req2 = httpMock.expectOne(request =>
-        request.params.get('limit') === '10' && request.params.get('skip') === '10'
+      const req2 = httpMock.expectOne(
+        request => request.params.get('limit') === '10' && request.params.get('skip') === '10'
       );
       req2.flush(allItems.slice(10, 20));
       tick();
@@ -748,8 +721,8 @@ describe('DoorwayCacheService', () => {
         result = data;
       });
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '10' && request.params.get('skip') === '90'
+      const req = httpMock.expectOne(
+        request => request.params.get('limit') === '10' && request.params.get('skip') === '90'
       );
       req.flush(lastPage);
       tick();

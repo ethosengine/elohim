@@ -16,7 +16,9 @@
  * - Idempotent daily streak records (one entry per day)
  */
 
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
+
+// @coverage: 96.1% (2026-02-24)
 
 import { BehaviorSubject, Observable, Subscription, combineLatest } from 'rxjs';
 
@@ -69,13 +71,13 @@ export class MasteryStatsService implements OnDestroy {
   /** Recent level-up events */
   readonly recentLevelUps$: Observable<LevelUpEvent[]> = this.recentLevelUpsSubject.asObservable();
 
-  constructor(
-    private readonly contentMastery: ContentMasteryService,
-    private readonly points: PointsService,
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService,
-    private readonly practice: PracticeService
-  ) {
+  private readonly contentMastery = inject(ContentMasteryService);
+  private readonly points = inject(PointsService);
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly sessionHuman = inject(SessionHumanService);
+  private readonly practice = inject(PracticeService);
+
+  constructor() {
     this.initializeSubscriptions();
   }
 
@@ -396,11 +398,9 @@ export class MasteryStatsService implements OnDestroy {
   // ===========================================================================
 
   private getPracticeSummary(): PracticeSummary {
-    // Access pool via synchronous BehaviorSubject value
-    const poolSubject = this.practice.pool$ as unknown as BehaviorSubject<unknown>;
-    const pool = poolSubject?.value;
+    const pool = this.practice.getPoolSync();
 
-    if (!pool || typeof pool !== 'object') {
+    if (!pool) {
       return {
         totalChallenges: 0,
         totalLevelUps: 0,
@@ -411,22 +411,13 @@ export class MasteryStatsService implements OnDestroy {
       };
     }
 
-    const p = pool as {
-      total_challenges_taken?: number;
-      total_level_ups?: number;
-      total_level_downs?: number;
-      discoveries_unlocked?: number;
-      active_content_ids_json?: string;
-      refresh_queue_ids_json?: string;
-    };
-
     return {
-      totalChallenges: p.total_challenges_taken ?? 0,
-      totalLevelUps: p.total_level_ups ?? 0,
-      totalLevelDowns: p.total_level_downs ?? 0,
-      totalDiscoveries: p.discoveries_unlocked ?? 0,
-      activePoolSize: this.parseJsonArray(p.active_content_ids_json).length,
-      refreshQueueSize: this.parseJsonArray(p.refresh_queue_ids_json).length,
+      totalChallenges: pool.total_challenges_taken,
+      totalLevelUps: pool.total_level_ups,
+      totalLevelDowns: pool.total_level_downs,
+      totalDiscoveries: pool.discoveries_unlocked,
+      activePoolSize: this.parseJsonArray(pool.active_content_ids_json).length,
+      refreshQueueSize: this.parseJsonArray(pool.refresh_queue_ids_json).length,
     };
   }
 

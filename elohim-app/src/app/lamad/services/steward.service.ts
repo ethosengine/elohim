@@ -16,12 +16,12 @@
  *   StewardService → HolochainClientService → Holochain Conductor → DHT
  *
  * @see ContributorService for contributor dashboards and recognition
- * @see EconomicService for underlying hREA primitives
+ * @see IEconomicEventFactory for underlying hREA primitives
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
-// @coverage: 23.4% (2026-02-05)
+// @coverage: 24.0% (2026-02-24)
 
 import { catchError, shareReplay, tap } from 'rxjs/operators';
 
@@ -210,7 +210,7 @@ export class StewardService {
   /** Cache for access checks */
   private readonly accessCheckCache = new Map<string, Observable<AccessGrant | null>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if steward service is available.

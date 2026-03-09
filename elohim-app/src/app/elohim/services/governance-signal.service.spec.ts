@@ -58,63 +58,66 @@ describe('GovernanceSignalService', () => {
       expect(typeof service.recordGraduatedFeedback).toBe('function');
     });
 
-    it('should recordReaction return Observable', (done) => {
-      const reaction = {
-        type: 'positive' as any,
-        context: 'test',
-        private: false,
-        respondedAt: new Date().toISOString(),
-        responderId: 'user-1'
-      };
-      service.recordReaction('content-123', reaction).subscribe({
-        next: (result) => {
-          expect(result).toBeDefined();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should recordReaction return Observable', () =>
+      new Promise<void>(done => {
+        const reaction = {
+          type: 'positive' as any,
+          context: 'test',
+          private: false,
+          respondedAt: new Date().toISOString(),
+          responderId: 'user-1',
+        };
+        service.recordReaction('content-123', reaction).subscribe({
+          next: result => {
+            expect(result).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should recordMediationProceed return Observable', (done) => {
-      const log = {
-        contentId: 'content-123',
-        initialReaction: 'negative' as any,
-        mediationChosen: 'proceed' as any,
-        timestamp: new Date().toISOString(),
-        userId: 'user-123',
-        contentType: 'learning',
-        reactionType: 'negative',
-        reasoningShown: true,
-        mediationMessage: 'test'
-      } as any;
-      service.recordMediationProceed(log).subscribe({
-        next: (result) => {
-          expect(result).toBeDefined();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should recordMediationProceed return Observable', () =>
+      new Promise<void>(done => {
+        const log = {
+          contentId: 'content-123',
+          initialReaction: 'negative' as any,
+          mediationChosen: 'proceed' as any,
+          timestamp: new Date().toISOString(),
+          userId: 'user-123',
+          contentType: 'learning',
+          reactionType: 'negative',
+          reasoningShown: true,
+          mediationMessage: 'test',
+        } as any;
+        service.recordMediationProceed(log).subscribe({
+          next: result => {
+            expect(result).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should recordGraduatedFeedback return Observable', (done) => {
-      const feedback = {
-        contentId: 'content-123',
-        rating: 4,
-        dimension: 'clarity' as any,
-        comment: 'Clear explanation',
-        context: 'learning',
-        position: 'middle',
-        positionIndex: 1,
-        intensity: 'moderate'
-      } as any;
-      service.recordGraduatedFeedback('user-123', feedback).subscribe({
-        next: (result) => {
-          expect(result).toBeDefined();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should recordGraduatedFeedback return Observable', () =>
+      new Promise<void>(done => {
+        const feedback = {
+          contentId: 'content-123',
+          rating: 4,
+          dimension: 'clarity' as any,
+          comment: 'Clear explanation',
+          context: 'learning',
+          position: 'middle',
+          positionIndex: 1,
+          intensity: 'moderate',
+        } as any;
+        service.recordGraduatedFeedback('user-123', feedback).subscribe({
+          next: result => {
+            expect(result).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -138,45 +141,49 @@ describe('GovernanceSignalService', () => {
       expect(typeof service.getFeedbackStats).toBe('function');
     });
 
-    it('should getReactions return Observable', (done) => {
-      service.getReactions('content-123').subscribe({
-        next: (reactions) => {
-          expect(Array.isArray(reactions)).toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should getReactions return Observable', () =>
+      new Promise<void>(done => {
+        service.getReactions('content-123').subscribe({
+          next: reactions => {
+            expect(Array.isArray(reactions)).toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should getReactionCounts return Observable', (done) => {
-      service.getReactionCounts('content-123').subscribe({
-        next: (counts) => {
-          expect(counts).toBeDefined();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should getReactionCounts return Observable', () =>
+      new Promise<void>(done => {
+        service.getReactionCounts('content-123').subscribe({
+          next: counts => {
+            expect(counts).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should getGraduatedFeedback return Observable', (done) => {
-      service.getGraduatedFeedback('content-123').subscribe({
-        next: (feedback) => {
-          expect(Array.isArray(feedback)).toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should getGraduatedFeedback return Observable', () =>
+      new Promise<void>(done => {
+        service.getGraduatedFeedback('content-123').subscribe({
+          next: feedback => {
+            expect(Array.isArray(feedback)).toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should getFeedbackStats return Observable', (done) => {
-      service.getFeedbackStats('content-123').subscribe({
-        next: (stats) => {
-          expect(stats).toBeDefined();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should getFeedbackStats return Observable', () =>
+      new Promise<void>(done => {
+        service.getFeedbackStats('content-123').subscribe({
+          next: stats => {
+            expect(stats).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -189,16 +196,17 @@ describe('GovernanceSignalService', () => {
       expect(service.signalChanges$.subscribe).toBeDefined();
     });
 
-    it('should have signalChanges$ subscription', (done) => {
-      let sub: any;
-      sub = service.signalChanges$.subscribe({
-        next: () => {
-          if (sub) sub.unsubscribe();
-          done();
-        },
-        error: done.fail
-      });
-    });
+    it('should have signalChanges$ subscription', () =>
+      new Promise<void>(done => {
+        let sub: any;
+        sub = service.signalChanges$.subscribe({
+          next: () => {
+            if (sub) sub.unsubscribe();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -225,64 +233,68 @@ describe('GovernanceSignalService', () => {
   // ==========================================================================
 
   describe('return types', () => {
-    it('recordReaction should return Observable<boolean>', (done) => {
-      const reaction = {
-        type: 'positive' as any,
-        context: 'test',
-        private: false,
-        respondedAt: new Date().toISOString(),
-        responderId: 'user-1'
-      };
-      const result = service.recordReaction('content-123', reaction);
+    it('recordReaction should return Observable<boolean>', () =>
+      new Promise<void>(done => {
+        const reaction = {
+          type: 'positive' as any,
+          context: 'test',
+          private: false,
+          respondedAt: new Date().toISOString(),
+          responderId: 'user-1',
+        };
+        const result = service.recordReaction('content-123', reaction);
 
-      expect(result.subscribe).toBeDefined();
-      result.subscribe({
-        next: (val) => {
-          expect(typeof val === 'boolean').toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+        expect(result.subscribe).toBeDefined();
+        result.subscribe({
+          next: val => {
+            expect(typeof val === 'boolean').toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('getReactions should return Observable<Array>', (done) => {
-      const result = service.getReactions('content-123');
+    it('getReactions should return Observable<Array>', () =>
+      new Promise<void>(done => {
+        const result = service.getReactions('content-123');
 
-      expect(result.subscribe).toBeDefined();
-      result.subscribe({
-        next: (val) => {
-          expect(Array.isArray(val)).toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+        expect(result.subscribe).toBeDefined();
+        result.subscribe({
+          next: val => {
+            expect(Array.isArray(val)).toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('getReactionCounts should return Observable<Object>', (done) => {
-      const result = service.getReactionCounts('content-123');
+    it('getReactionCounts should return Observable<Object>', () =>
+      new Promise<void>(done => {
+        const result = service.getReactionCounts('content-123');
 
-      expect(result.subscribe).toBeDefined();
-      result.subscribe({
-        next: (val) => {
-          expect(typeof val === 'object').toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+        expect(result.subscribe).toBeDefined();
+        result.subscribe({
+          next: val => {
+            expect(typeof val === 'object').toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('getFeedbackStats should return Observable<Object>', (done) => {
-      const result = service.getFeedbackStats('content-123');
+    it('getFeedbackStats should return Observable<Object>', () =>
+      new Promise<void>(done => {
+        const result = service.getFeedbackStats('content-123');
 
-      expect(result.subscribe).toBeDefined();
-      result.subscribe({
-        next: (val) => {
-          expect(typeof val === 'object').toBe(true);
-          done();
-        },
-        error: done.fail
-      });
-    });
+        expect(result.subscribe).toBeDefined();
+        result.subscribe({
+          next: val => {
+            expect(typeof val === 'object').toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
     it('signalChanges$ should be Observable', () => {
       expect(service.signalChanges$.subscribe).toBeDefined();
@@ -309,7 +321,7 @@ describe('GovernanceSignalService', () => {
         context: 'test',
         private: false,
         respondedAt: new Date().toISOString(),
-        responderId: 'user-1'
+        responderId: 'user-1',
       };
       expect(() => service.recordReaction('content-123', reaction)).not.toThrow();
     });
@@ -323,7 +335,7 @@ describe('GovernanceSignalService', () => {
         context: 'learning',
         position: 'middle',
         positionIndex: 1,
-        intensity: 'moderate'
+        intensity: 'moderate',
       } as any;
       expect(() => service.recordGraduatedFeedback('user-123', feedback)).not.toThrow();
     });
@@ -340,7 +352,7 @@ describe('GovernanceSignalService', () => {
         context: 'test',
         private: false,
         respondedAt: new Date().toISOString(),
-        responderId: 'user-1'
+        responderId: 'user-1',
       };
 
       expect(() => {
@@ -348,22 +360,23 @@ describe('GovernanceSignalService', () => {
       }).not.toThrow();
     });
 
-    it('should allow concurrent retrieval operations', (done) => {
-      let completed = 0;
-      const checkDone = () => {
-        completed++;
-        if (completed === 2) done();
-      };
+    it('should allow concurrent retrieval operations', () =>
+      new Promise<void>(done => {
+        let completed = 0;
+        const checkDone = () => {
+          completed++;
+          if (completed === 2) done();
+        };
 
-      service.getReactions('content-123').subscribe({
-        next: () => checkDone(),
-        error: done.fail
-      });
+        service.getReactions('content-123').subscribe({
+          next: () => checkDone(),
+          error: done.fail,
+        });
 
-      service.getGraduatedFeedback('content-123').subscribe({
-        next: () => checkDone(),
-        error: done.fail
-      });
-    });
+        service.getGraduatedFeedback('content-123').subscribe({
+          next: () => checkDone(),
+          error: done.fail,
+        });
+      }));
   });
 });

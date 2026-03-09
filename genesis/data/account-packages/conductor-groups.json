@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-03T19:08:21.752Z",
+  "groups": [
+    {
+      "group": 0,
+      "name": "Dowell Household",
+      "description": "Core family + workplace — the founders and builders",
+      "humanIds": [
+        "human-matthew-manager",
+        "human-susan-spouse",
+        "human-sammy-son",
+        "human-gertrude-grandma",
+        "human-dan-developer"
+      ]
+    },
+    {
+      "group": 1,
+      "name": "Eden Household",
+      "description": "The originals + community connectors",
+      "humanIds": [
+        "human-adam-firstman",
+        "human-eve-firstwoman",
+        "human-nancy-neighbor",
+        "human-pam-polarized",
+        "human-janice-janitor"
+      ]
+    },
+    {
+      "group": 2,
+      "name": "Valley Economy",
+      "description": "Local economy workers, builders, and faith community",
+      "humanIds": [
+        "human-frank-farmer",
+        "human-georgina-grocer",
+        "human-manny-manufacturer",
+        "human-bub-builder",
+        "human-pete-pastor",
+        "human-timothy-tutor",
+        "human-tommy-teacher"
+      ]
+    },
+    {
+      "group": 3,
+      "name": "Extended Network",
+      "description": "Investors, gig workers, newcomers, visitors, and adversarial actors",
+      "humanIds": [
+        "human-meriadoc-moneybags",
+        "human-ginny-gigworker",
+        "human-mary-miner",
+        "human-lenny-lineworker",
+        "human-mary-migrant",
+        "human-ronald-refugee",
+        "human-traveler",
+        "human-charlie-challenged",
+        "human-sam-shipper",
+        "human-renold-regent",
+        "human-dolittle-doctor",
+        "human-tiffany-teen"
+      ]
+    }
+  ]
+}

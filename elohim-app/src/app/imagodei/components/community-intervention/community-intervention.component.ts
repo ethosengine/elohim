@@ -20,8 +20,9 @@ import { Component, OnInit, inject, signal, computed, input } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
-// @coverage: 92.0% (2026-02-05)
+// @coverage: 92.0% (2026-02-24)
 
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import {
   type CommunityIntervention,
   type RelationshipLevel,
@@ -32,7 +33,6 @@ import {
   getRelationshipLevelLabel,
   getInterventionStatusLabel,
 } from '../../models/stewardship.model';
-import { StewardshipService } from '../../services/stewardship.service';
 
 @Component({
   selector: 'app-community-intervention',
@@ -42,7 +42,7 @@ import { StewardshipService } from '../../services/stewardship.service';
   styleUrls: ['./community-intervention.component.css'],
 })
 export class CommunityInterventionComponent implements OnInit {
-  private readonly stewardship = inject(StewardshipService);
+  private readonly stewardship = inject(STEWARDSHIP_POLICY);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 

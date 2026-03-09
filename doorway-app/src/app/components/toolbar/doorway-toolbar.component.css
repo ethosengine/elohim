@@ -1,0 +1,300 @@
+/* ============================================================================
+   Doorway Toolbar
+   ============================================================================ */
+
+.dw-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 56px;
+  background: var(--dw-bg-secondary);
+  border-bottom: 1px solid var(--dw-border);
+}
+
+.toolbar-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+}
+
+/* ============================================================================
+   Left: Brand + Nav
+   ============================================================================ */
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--dw-text-primary);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.brand-logo {
+  height: 28px;
+  width: auto;
+}
+
+.brand-name {
+  color: var(--dw-text-primary);
+}
+
+.toolbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.nav-link {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  text-decoration: none;
+  color: var(--dw-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+
+.nav-link:hover {
+  color: var(--dw-text-primary);
+  background: var(--dw-bg-hover);
+}
+
+.nav-link.active {
+  color: var(--dw-accent-text);
+  background: var(--dw-accent-subtle);
+}
+
+/* ============================================================================
+   Right: Auth Controls
+   ============================================================================ */
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+/* Skeleton loader during auth check */
+.toolbar-skeleton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--dw-bg-tertiary);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* Profile bubble */
+.profile-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--dw-accent-primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.15s;
+}
+
+.profile-bubble:hover {
+  box-shadow: 0 0 0 2px var(--dw-accent-border);
+}
+
+.profile-initials {
+  line-height: 1;
+  user-select: none;
+}
+
+/* ============================================================================
+   Profile Dropdown
+   ============================================================================ */
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 240px;
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
+  border-radius: 0.5rem;
+  box-shadow: var(--dw-shadow-lg);
+  z-index: 300;
+  overflow: hidden;
+}
+
+.dropdown-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+}
+
+.identity-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--dw-accent-primary);
+  color: #fff;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.identity-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.identity-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--dw-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-mode {
+  font-size: 0.75rem;
+  color: var(--dw-text-secondary);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--dw-border);
+  margin: 0;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  color: var(--dw-text-primary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: var(--dw-bg-hover);
+}
+
+.dropdown-item.cta {
+  color: var(--dw-accent-text);
+  font-weight: 500;
+}
+
+.dropdown-item.logout {
+  color: var(--dw-error-text);
+}
+
+.external-icon {
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+  opacity: 0.6;
+}
+
+.dropdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 1rem;
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+}
+
+/* ============================================================================
+   Backdrop
+   ============================================================================ */
+
+.dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+}
+
+/* ============================================================================
+   Anonymous Auth Buttons
+   ============================================================================ */
+
+.btn-ghost {
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--dw-text-secondary);
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-ghost:hover {
+  color: var(--dw-text-primary);
+  background: var(--dw-bg-hover);
+}
+
+.btn-primary-sm {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  background: var(--dw-accent-primary);
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.btn-primary-sm:hover {
+  background: var(--dw-accent-hover);
+}
+
+/* ============================================================================
+   Mobile (<=640px)
+   ============================================================================ */
+
+@media (width <= 640px) {
+  .toolbar-content {
+    padding: 0 1rem;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .toolbar-nav {
+    display: none;
+  }
+}

@@ -183,6 +183,21 @@ pub struct RequestContext {
     /// Family context
     #[serde(skip_serializing_if = "Option::is_none")]
     pub family_id: Option<String>,
+    /// Optional BYOK credentials (API key for user-provided compute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credentials: Option<RequestCredentials>,
+}
+
+/// BYOK credentials — API key forwarded from the frontend for
+/// user-provided compute during testing/experimentation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[cfg_attr(feature = "typescript", ts(export))]
+pub struct RequestCredentials {
+    /// API key for the target backend
+    pub api_key: String,
+    /// Which backend this key is for (e.g., "anthropic", "openai")
+    pub backend_id: String,
 }
 
 #[cfg(test)]

@@ -101,6 +101,8 @@ pub struct AppState {
     pub peer_url_list: crate::services::federation::PeerUrlList,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
+    /// CORS configuration (origin allowlist, dev-mode flag)
+    pub cors_config: crate::cors::CorsConfig,
 }
 
 impl AppState {
@@ -136,6 +138,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -167,6 +170,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -206,6 +210,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -237,6 +242,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -291,6 +297,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Self {
             args,
@@ -322,6 +329,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         }
     }
 
@@ -370,6 +378,7 @@ impl AppState {
 
         let peer_url_list =
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+        let cors_config = crate::cors::CorsConfig::from_args(&args);
 
         Ok(Self {
             args,
@@ -401,6 +410,7 @@ impl AppState {
             peer_cache: crate::services::federation::new_peer_cache(),
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
+            cors_config,
         })
     }
 
@@ -508,9 +518,34 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                 tokio::spawn(async move {
                     let io = TokioIo::new(stream);
 
-                    let service = service_fn(move |req| {
+                    let service = service_fn(move |req: Request<Incoming>| {
                         let state = Arc::clone(&state);
-                        async move { handle_request(state, addr, req).await }
+                        async move {
+                            // Extract CORS context at the outermost level so every
+                            // response — including early returns — gets CORS headers.
+                            let request_origin: Option<String> = req
+                                .headers()
+                                .get(hyper::header::ORIGIN)
+                                .and_then(|v| v.to_str().ok())
+                                .map(|s| s.to_string());
+                            let cors_config = state.cors_config.clone();
+
+                            if req.method() == hyper::Method::OPTIONS {
+                                let resp: Result<Response<BoxBody>, hyper::Error> =
+                                    Ok(to_boxed(crate::cors::preflight_response(
+                                        &cors_config,
+                                        request_origin.as_deref(),
+                                    )));
+                                return resp;
+                            }
+
+                            let response = handle_request(state, addr, req).await?;
+                            Ok(crate::cors::apply_cors_headers(
+                                &cors_config,
+                                request_origin.as_deref(),
+                                response,
+                            ))
+                        }
                     });
 
                     if let Err(err) = http1::Builder::new()
@@ -556,7 +591,8 @@ async fn handle_request(
         let after_slash = &path[1..]; // Skip leading /
         if !after_slash.is_empty() && !after_slash.contains('/') {
             if hyper_tungstenite::is_upgrade_request(&req) {
-                return Ok(handle_signal_request(state, req, &path, addr).await);
+                let resp = handle_signal_request(state, req, &path, addr).await;
+                return Ok(resp);
             } else {
                 return Ok(to_boxed(bad_request_response(
                     "Signal endpoint requires WebSocket upgrade",
@@ -570,8 +606,6 @@ async fn handle_request(
         if let Some(response) = routes::handle_auth_request(req, Arc::clone(&state)).await {
             return Ok(response);
         }
-        // If handle_auth_request returns None, it didn't handle the request
-        // This shouldn't happen since we checked the path prefix, but handle gracefully
         return Ok(to_boxed(not_found_response(&path)));
     }
 
@@ -629,9 +663,6 @@ async fn handle_request(
         (Method::GET, "/api/v1/federation/p2p-peers") => {
             to_boxed(routes::handle_federation_p2p_peers(Arc::clone(&state)).await)
         }
-
-        // CORS preflight
-        (Method::OPTIONS, _) => to_boxed(preflight_response()),
 
         // ====================================================================
         // Threshold (operator dashboard) - Angular SPA at /threshold/*
@@ -1096,12 +1127,148 @@ async fn handle_request(
             ));
         }
 
+        // Account API routes (proxied to elohim-storage)
+        // POST /account/import - Import account package
+        // GET /account/export/{human_id} - Export account package
+        (_, p) if p.starts_with("/account/") => {
+            debug!(path = %p, "Forwarding account request to elohim-storage");
+            return Ok(to_boxed(
+                routes::handle_account_request(req, state.args.storage_url.clone(), p).await,
+            ));
+        }
+
         // HTML5 App serving routes (proxied to elohim-storage)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
             debug!(path = %p, "Forwarding app request to elohim-storage");
             return Ok(to_boxed(
                 routes::handle_app_request(req, state.args.storage_url.clone(), p).await,
+            ));
+        }
+
+        // EPR Head proxy routes (proxied to elohim-storage)
+        // GET/PUT /epr-head/{id} - Three-pillar metadata envelope (DAG-CBOR)
+        (method, p)
+            if matches!(method, Method::GET | Method::PUT) && p.starts_with("/epr-head/") =>
+        {
+            let id = p.strip_prefix("/epr-head/").unwrap_or("");
+            debug!(path = %p, id = %id, "Forwarding EPR Head request to elohim-storage");
+            let storage_url = match &state.args.storage_url {
+                Some(url) => url,
+                None => {
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(
+                                r#"{"error":"Storage URL not configured"}"#,
+                            )))
+                            .unwrap(),
+                    ));
+                }
+            };
+            match routes::handle_epr_head_request(req, storage_url, id).await {
+                Ok(resp) => to_boxed(resp),
+                Err(e) => {
+                    error!(error = %e, "EPR Head proxy failed");
+                    to_boxed(
+                        Response::builder()
+                            .status(StatusCode::BAD_GATEWAY)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error":"EPR Head proxy failed: {e}"}}"#
+                            ))))
+                            .unwrap(),
+                    )
+                }
+            }
+        }
+
+        // ====================================================================
+        // Domain API Routes (v1) — business logic layer
+        // ====================================================================
+
+        // Collective governance
+        (_, p) if p.starts_with("/api/v1/collectives") => {
+            return Ok(to_boxed(
+                routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Human-scoped collectives (cross-domain route)
+        (Method::GET, p) if p.starts_with("/api/v1/humans/") && p.ends_with("/collectives") => {
+            return Ok(to_boxed(
+                routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Elohim Agent invocation
+        (_, p) if p.starts_with("/api/v1/elohim") => {
+            return Ok(to_boxed(
+                routes::handle_elohim_agent_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Identity API proxy — must come before /identity/did to avoid shadowing
+        (_, p) if p.starts_with("/api/v1/identity") => {
+            return Ok(to_boxed(
+                routes::handle_identity_api_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Presence lifecycle
+        (_, p) if p.starts_with("/api/v1/presence") => {
+            return Ok(to_boxed(
+                routes::handle_presence_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Stewardship policy
+        (_, p) if p.starts_with("/api/v1/stewardship") => {
+            return Ok(to_boxed(
+                routes::handle_stewardship_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Economic events
+        (_, p) if p.starts_with("/api/v1/economic-events") => {
+            return Ok(to_boxed(
+                routes::handle_economic_events_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Stewarded resources
+        (_, p) if p.starts_with("/api/v1/resources") => {
+            return Ok(to_boxed(
+                routes::handle_stewarded_resources_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Requests and offers
+        (_, p) if p.starts_with("/api/v1/exchange") => {
+            return Ok(to_boxed(
+                routes::handle_exchange_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Custodian metrics and data protection
+        (_, p) if p.starts_with("/api/v1/custodians") => {
+            return Ok(to_boxed(
+                routes::handle_custodians_api_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Compute dashboard
+        (_, p) if p.starts_with("/api/v1/compute") => {
+            return Ok(to_boxed(
+                routes::handle_compute_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Flow planning
+        (_, p) if p.starts_with("/api/v1/flow-planning") => {
+            return Ok(to_boxed(
+                routes::handle_flow_planning_request(req, Arc::clone(&state), p).await,
             ));
         }
 
@@ -1261,7 +1428,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(
                         r#"{"error": "Failed to read request body"}"#,
                     )))
@@ -1279,7 +1445,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(format!(
                         r#"{{"error": "Invalid JSON: {e}"}}"#
                     ))))
@@ -1308,7 +1473,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("Content-Type", "application/json")
-                    .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(
                         r#"{"error": "Internal serialization error"}"#,
                     )))
@@ -1321,7 +1485,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
         Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .header("Access-Control-Allow-Origin", "*")
             .header("Cache-Control", "no-store")
             .body(Full::new(Bytes::from(json_body)))
             .unwrap(),
@@ -1331,17 +1494,6 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
 /// Convert a Full<Bytes> body to BoxBody
 fn to_boxed(response: Response<Full<Bytes>>) -> Response<BoxBody> {
     response.map(|body| body.map_err(|never| match never {}).boxed())
-}
-
-/// CORS preflight response
-fn preflight_response() -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Headers", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .body(Full::new(Bytes::new()))
-        .unwrap()
 }
 
 /// Not found response

@@ -20,8 +20,16 @@ export type {
   SkipSelectionEvent,
 } from './pre-assessment/pre-assessment.component';
 
+export { AssessmentCompletionSummaryComponent } from './assessment-completion-summary/assessment-completion-summary.component';
+export type {
+  CompletionMode,
+  SubscaleBar,
+} from './assessment-completion-summary/assessment-completion-summary.component';
+
 export { DiscoveryQuizComponent } from './discovery-quiz/discovery-quiz.component';
 export type {
   DiscoveryQuizCompletionEvent,
   EPIC_SUBSCALES,
 } from './discovery-quiz/discovery-quiz.component';
+
+export { RecommendationListComponent } from './recommendation-list/recommendation-list.component';

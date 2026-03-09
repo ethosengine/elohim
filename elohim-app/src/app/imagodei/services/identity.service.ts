@@ -16,7 +16,7 @@
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
-// @coverage: 63.5% (2026-02-05)
+// @coverage: 59.4% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
@@ -24,14 +24,20 @@ import {
   type IdentityState,
   type IdentityMode,
   type HumanProfile,
+  type HumanEntry,
+  type HumanSessionResult,
+  type HumanUpdateResult,
   type RegisterHumanRequest,
   type UpdateProfileRequest,
+  type RegisterHumanPayload,
+  type UpdateHumanPayload,
   type ProfileReach,
   type HostingCostSummary,
   INITIAL_IDENTITY_STATE,
   getInitials,
   isNetworkMode,
 } from '../models/identity.model';
+import { IDENTITY_API } from '../interfaces/identity.interface';
 
 import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
@@ -42,69 +48,6 @@ const STAGE_APP_STEWARD = 'app-steward';
 
 // Re-export utility functions for consumers
 export { isNetworkMode, getInitials } from '../models/identity.model';
-
-// =============================================================================
-// Wire Format Types (internal - snake_case matches conductor response)
-// =============================================================================
-
-/** Human entry as returned from conductor */
-interface HumanEntry {
-  id: string;
-  displayName: string;
-  bio: string | null;
-  affinities: string[];
-  profileReach: string;
-  location: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Attestation as returned from conductor */
-interface AttestationEntry {
-  actionHash: Uint8Array;
-  attestation: {
-    id: string;
-    attestationType: string;
-    attesterId: string;
-    recipientId: string;
-    evidenceJson: string;
-    issuedAt: string;
-  };
-}
-
-/** Session result from get_current_human / register_human */
-interface HumanSessionResult {
-  agentPubkey: string;
-  actionHash: Uint8Array;
-  human: HumanEntry;
-  sessionStartedAt: string;
-  attestations: AttestationEntry[];
-}
-
-/** Result from update_human_profile */
-interface HumanUpdateResult {
-  actionHash: Uint8Array;
-  human: HumanEntry;
-}
-
-/** Payload for registering a human */
-interface RegisterHumanPayload {
-  id: string;
-  displayName: string;
-  bio?: string;
-  affinities: string[];
-  profileReach: string;
-  location?: string;
-}
-
-/** Payload for updating human profile */
-interface UpdateHumanPayload {
-  displayName?: string;
-  bio?: string;
-  affinities?: string[];
-  profileReach?: string;
-  location?: string;
-}
 
 // =============================================================================
 // Type Mappers
@@ -256,7 +199,8 @@ function generateDID(
 @Injectable({ providedIn: 'root' })
 export class IdentityService {
   // Dependencies
-  private readonly holochainClient = inject(HolochainClientService);
+  private readonly identityApi = inject(IDENTITY_API);
+  private readonly holochainClient = inject(HolochainClientService); // connection state only
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly agencyService = inject(AgencyService);
   private readonly authService = inject(AuthService);
@@ -544,18 +488,15 @@ export class IdentityService {
   }
 
   /**
-   * Fetch identity from Holochain conductor.
-   * Calls the imagodei zome to get current human profile.
+   * Fetch identity via the identity API boundary.
    */
-  private async fetchHolochainIdentity() {
-    // Call imagodei DNA to get current human profile
-    // Note: get_my_human returns HumanOutput { action_hash, human } not full HumanSessionResult
-    return this.holochainClient.callZome<HumanSessionResult | null>({
-      zomeName: 'imagodei',
-      fnName: 'get_my_human',
-      payload: null,
-      roleName: 'imagodei', // Use imagodei DNA for identity
-    });
+  private async fetchHolochainIdentity(): Promise<{ success: boolean; data: HumanSessionResult | null }> {
+    try {
+      const data = await this.identityApi.getMyHuman();
+      return { success: data !== null, data };
+    } catch {
+      return { success: false, data: null };
+    }
   }
 
   /**
@@ -852,19 +793,7 @@ export class IdentityService {
 
     try {
       const payload = toRegisterPayload(request);
-      // Call imagodei DNA to create human profile
-      const result = await this.holochainClient.callZome<HumanSessionResult>({
-        zomeName: 'imagodei',
-        fnName: 'create_human',
-        payload,
-        roleName: 'imagodei', // Use imagodei DNA for identity
-      });
-
-      if (!result.success || !result.data) {
-        throw new Error(result.error ?? REGISTRATION_FAILED_MESSAGE);
-      }
-
-      const sessionResult = result.data;
+      const sessionResult = await this.identityApi.createHuman(payload);
       const profile = mapToProfile(sessionResult.human);
 
       // Get session for linking
@@ -926,25 +855,16 @@ export class IdentityService {
     }
 
     try {
-      // Call imagodei DNA to get current human profile
-      const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'imagodei',
-        fnName: 'get_my_human',
-        payload: null,
-        roleName: 'imagodei', // Use imagodei DNA for identity
-      });
+      const sessionResult = await this.identityApi.getMyHuman();
 
-      if (result.success && result.data) {
-        const profile = mapToProfile(result.data.human);
+      if (sessionResult) {
+        const profile = mapToProfile(sessionResult.human);
         this.updateState({ profile });
         return profile;
       }
 
       return null;
     } catch (error) {
-      // Profile not available - return null (visitor or not yet registered)
-      // This is expected when the user hasn't created a Holochain identity yet
-      // Log only unexpected errors
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes('not found') && !message.includes("doesn't exist")) {
         console.warn('[IdentityService] Unexpected error fetching profile:', message);
@@ -970,19 +890,8 @@ export class IdentityService {
 
     try {
       const payload = toUpdatePayload(request);
-      // Call imagodei DNA to update human profile
-      const result = await this.holochainClient.callZome<HumanUpdateResult>({
-        zomeName: 'imagodei',
-        fnName: 'update_human',
-        payload,
-        roleName: 'imagodei', // Use imagodei DNA for identity
-      });
-
-      if (!result.success || !result.data) {
-        throw new Error(result.error ?? 'Update failed');
-      }
-
-      const profile = mapToProfile(result.data.human);
+      const updateResult = await this.identityApi.updateHuman(payload);
+      const profile = mapToProfile(updateResult.human);
 
       this.updateState({
         displayName: profile.displayName,

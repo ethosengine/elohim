@@ -14,18 +14,17 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, inject } from '@angular/core';
 
-// @coverage: 37.7% (2026-02-05)
+// @coverage: 37.7% (2026-02-24)
 
 import { takeUntil, tap } from 'rxjs/operators';
 
 import { Observable, Subject } from 'rxjs';
 
+import { COMPUTE_DASHBOARD, COMPUTE_EVENT } from '../../interfaces';
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
-import { ComputeEventService } from '../../services/compute-event.service';
-import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { DATA_PROTECTION, type IDataProtection } from '../../interfaces';
 
 /**
  * Display mode type
@@ -102,11 +101,11 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   // Cleanup
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly shefaCompute: ShefaComputeService,
-    private readonly familyProtection: FamilyCommunityProtectionService,
-    private readonly computeEvents: ComputeEventService
-  ) {
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
+  private readonly familyProtection = inject(DATA_PROTECTION);
+  private readonly computeEvents = inject(COMPUTE_EVENT);
+
+  constructor() {
     this.mergedConfig = { ...DEFAULT_CONFIG, ...this.config };
   }
 

@@ -1,5 +1,7 @@
 import { Component, input } from '@angular/core';
 
+// @coverage: 50.0% (2026-02-24)
+
 @Component({
   selector: 'app-profile-attestations-section',
   standalone: true,

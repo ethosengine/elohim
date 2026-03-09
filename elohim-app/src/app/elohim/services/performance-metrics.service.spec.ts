@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { PerformanceMetricsService, LocalMetrics, ResponseTimeMetrics } from './performance-metrics.service';
+import {
+  PerformanceMetricsService,
+  LocalMetrics,
+  ResponseTimeMetrics,
+} from './performance-metrics.service';
 
 describe('PerformanceMetricsService', () => {
   let service: PerformanceMetricsService;
@@ -9,8 +13,14 @@ describe('PerformanceMetricsService', () => {
     service = TestBed.inject(PerformanceMetricsService);
   });
 
+  afterEach(() => {
+    service.ngOnDestroy();
+  });
+
   describe('Service Creation', () => {
-    it('should be created', () => { expect(service).toBeTruthy(); });
+    it('should be created', () => {
+      expect(service).toBeTruthy();
+    });
     it('should be a singleton (providedIn: root)', () => {
       const service2 = TestBed.inject(PerformanceMetricsService);
       expect(service).toBe(service2);
@@ -60,19 +70,39 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('Method Existence', () => {
-    it('should have recordQuery method', () => { expect(typeof service.recordQuery).toBe('function'); });
-    it('should have recordMutation method', () => { expect(typeof service.recordMutation).toBe('function'); });
-    it('should have recordValidation method', () => { expect(typeof service.recordValidation).toBe('function'); });
-    it('should have updateResourceUsage method', () => { expect(typeof service.updateResourceUsage).toBe('function'); });
-    it('should have recordDowntime method', () => { expect(typeof service.recordDowntime).toBe('function'); });
-    it('should have updateReplicationWorkload method', () => { expect(typeof service.updateReplicationWorkload).toBe('function'); });
-    it('should have getMetrics method', () => { expect(typeof service.getMetrics).toBe('function'); });
-    it('should have getMetricsForReport method', () => { expect(typeof service.getMetricsForReport).toBe('function'); });
-    it('should have reset method', () => { expect(typeof service.reset).toBe('function'); });
+    it('should have recordQuery method', () => {
+      expect(typeof service.recordQuery).toBe('function');
+    });
+    it('should have recordMutation method', () => {
+      expect(typeof service.recordMutation).toBe('function');
+    });
+    it('should have recordValidation method', () => {
+      expect(typeof service.recordValidation).toBe('function');
+    });
+    it('should have updateResourceUsage method', () => {
+      expect(typeof service.updateResourceUsage).toBe('function');
+    });
+    it('should have recordDowntime method', () => {
+      expect(typeof service.recordDowntime).toBe('function');
+    });
+    it('should have updateReplicationWorkload method', () => {
+      expect(typeof service.updateReplicationWorkload).toBe('function');
+    });
+    it('should have getMetrics method', () => {
+      expect(typeof service.getMetrics).toBe('function');
+    });
+    it('should have getMetricsForReport method', () => {
+      expect(typeof service.getMetricsForReport).toBe('function');
+    });
+    it('should have reset method', () => {
+      expect(typeof service.reset).toBe('function');
+    });
   });
 
   describe('recordQuery', () => {
-    it('should accept duration and success parameters', () => { expect(() => service.recordQuery(100, true)).not.toThrow(); });
+    it('should accept duration and success parameters', () => {
+      expect(() => service.recordQuery(100, true)).not.toThrow();
+    });
     it('should increment queriesProcessed on successful query', () => {
       const before = service.currentMetrics().queriesProcessed;
       service.recordQuery(50, true);
@@ -113,7 +143,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('recordMutation', () => {
-    it('should accept duration and success parameters', () => { expect(() => service.recordMutation(100, true)).not.toThrow(); });
+    it('should accept duration and success parameters', () => {
+      expect(() => service.recordMutation(100, true)).not.toThrow();
+    });
     it('should increment mutationsProcessed on successful mutation', () => {
       const before = service.currentMetrics().mutationsProcessed;
       service.recordMutation(50, true);
@@ -141,7 +173,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('recordValidation', () => {
-    it('should accept duration and success parameters', () => { expect(() => service.recordValidation(100, true)).not.toThrow(); });
+    it('should accept duration and success parameters', () => {
+      expect(() => service.recordValidation(100, true)).not.toThrow();
+    });
     it('should increment validationsProcessed on successful validation', () => {
       const before = service.currentMetrics().validationsProcessed;
       service.recordValidation(50, true);
@@ -158,7 +192,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('updateResourceUsage', () => {
-    it('should accept cpuPercent, memoryPercent, diskPercent parameters', () => { expect(() => service.updateResourceUsage(50, 60, 70)).not.toThrow(); });
+    it('should accept cpuPercent, memoryPercent, diskPercent parameters', () => {
+      expect(() => service.updateResourceUsage(50, 60, 70)).not.toThrow();
+    });
     it('should update cpuUsagePercent', () => {
       service.updateResourceUsage(45, 0, 0);
       expect(service.currentMetrics().cpuUsagePercent).toBe(45);
@@ -175,7 +211,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('recordDowntime', () => {
-    it('should accept reason and durationMs parameters', () => { expect(() => service.recordDowntime('Network failure', 5000)).not.toThrow(); });
+    it('should accept reason and durationMs parameters', () => {
+      expect(() => service.recordDowntime('Network failure', 5000)).not.toThrow();
+    });
     it('should add downtime event to downEvents array', () => {
       const before = service.currentMetrics().downEvents.length;
       service.recordDowntime('Connection lost', 1000);
@@ -196,7 +234,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('updateReplicationWorkload', () => {
-    it('should accept tasksRunning, reconstructionTasks, avgReconstructionTimeMs parameters', () => { expect(() => service.updateReplicationWorkload(5, 3, 250)).not.toThrow(); });
+    it('should accept tasksRunning, reconstructionTasks, avgReconstructionTimeMs parameters', () => {
+      expect(() => service.updateReplicationWorkload(5, 3, 250)).not.toThrow();
+    });
     it('should update all replication metrics simultaneously', () => {
       service.updateReplicationWorkload(5, 3, 250);
       const metrics = service.currentMetrics();
@@ -252,7 +292,9 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('errorRatePercent computed signal', () => {
-    it('should return 0 when no operations recorded', () => { expect(service.errorRatePercent()).toBe(0); });
+    it('should return 0 when no operations recorded', () => {
+      expect(service.errorRatePercent()).toBe(0);
+    });
     it('should calculate error rate from failed operations', () => {
       service.recordQuery(100, true);
       service.recordQuery(100, false);
@@ -261,8 +303,12 @@ describe('PerformanceMetricsService', () => {
   });
 
   describe('systemHealthScore computed signal', () => {
-    it('should return a number', () => { expect(typeof service.systemHealthScore()).toBe('number'); });
-    it('should have initial health score of 100 (perfect uptime, no errors)', () => { expect(service.systemHealthScore()).toBe(100); });
+    it('should return a number', () => {
+      expect(typeof service.systemHealthScore()).toBe('number');
+    });
+    it('should have initial health score of 100 (perfect uptime, no errors)', () => {
+      expect(service.systemHealthScore()).toBe(100);
+    });
   });
 
   // TODO: Add async flow tests - constructor calls startUptimeTracking with setInterval

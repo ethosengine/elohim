@@ -7,25 +7,50 @@
 
 import { ContentType, ContentFormat } from '../models/content-node.model';
 
-// @coverage: 69.4% (2026-02-05)
+// @coverage: 69.4% (2026-02-24)
 
 /**
  * Icon mappings for content types.
  * These represent the semantic category of content.
  */
-const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
+export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
+  // Wire types (from healing.rs)
   epic: '📖',
-  feature: '⚡',
-  scenario: '✓',
   concept: '💡',
-  simulation: '🎮',
-  video: '🎬',
+  lesson: '📝',
+  scenario: '✓',
   assessment: '📝',
-  'discovery-assessment': '🔮',
+
+  reflection: '🪞',
+  discussion: '💬',
+  exercise: '🏋️',
+  example: '📌',
+  reference: '📑',
+  article: '📰',
+  feature: '⚡',
+  practice: '🔄',
+  human: '🧑',
   organization: '🏢',
+  contributor: '🤝',
+  video: '🎬',
+  audio: '🎧',
+  book: '📕',
   'book-chapter': '📚',
-  tool: '🛠️',
+  documentary: '🎞️',
+  'bible-verse': '✝️',
+  activity: '🏃',
+  narrative: '📜',
+  'course-module': '🎓',
+  module: '📦',
+  quiz: '❓',
+  podcast: '🎙️',
   role: '👤',
+  simulation: '🎮',
+  // App-layer extensions
+  community: '👥',
+  'discovery-assessment': '🔮',
+  instrument: '🧪',
+  tool: '🛠️',
   path: '🛤️',
   placeholder: '⚠️',
 };
@@ -34,19 +59,34 @@ const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
  * Icon mappings for content formats.
  * These represent how content is rendered/consumed.
  */
-const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
+export const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
+  // Wire formats (from healing.rs)
   markdown: '📄',
-  'html5-app': '🎮',
-  'video-embed': '🎬',
-  'video-file': '🎬',
-  'audio-file': '🎧',
-  'perseus-quiz-json': '📝',
-  'sophia-quiz-json': '📝',
-  'external-link': '🔗',
-  epub: '📚',
-  gherkin: '✓',
   html: '📄',
   plaintext: '📄',
+  text: '📄',
+  plain: '📄',
+  video: '🎬',
+  audio: '🎧',
+  interactive: '🎮',
+  external: '🔗',
+  gherkin: '✓',
+  perseus: '📝',
+  'perseus-json': '📝',
+  'perseus-quiz-json': '📝',
+  'video-embed': '🎬',
+  'audio-file': '🎧',
+  'html5-app': '🎮',
+  'human-json': '🧑',
+  'organization-json': '🏢',
+  json: '📋',
+  sophia: '📝',
+  'sophia-quiz-json': '📝',
+  // App-layer extensions
+  'video-file': '🎬',
+  'instrument-json': '🧪',
+  'external-link': '🔗',
+  epub: '📚',
 };
 
 /**

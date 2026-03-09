@@ -15,6 +15,7 @@ import type { StewardedDevice } from '../../models/device-stewardship.model';
 import type { LearnerPointBalance } from '@app/lamad/models/learning-points.model';
 
 import { DeviceStewardshipComponent } from './device-stewardship.component';
+import { vi, Mock } from 'vitest';
 
 // =============================================================================
 // Test Data
@@ -95,7 +96,7 @@ const MOCK_BALANCE: LearnerPointBalance = {
 
 function createMockDeviceStewardshipService() {
   return {
-    loadDevices: jasmine.createSpy('loadDevices').and.returnValue(Promise.resolve()),
+    loadDevices: vi.fn().mockReturnValue(Promise.resolve()),
     state: signal({
       devices: [],
       currentDevice: null,
@@ -139,22 +140,20 @@ function createMockIdentityService(stage: IdentityState['agencyStage'] = 'visito
 function createMockPointsService(balance: LearnerPointBalance | null = null) {
   const balanceSubject = new BehaviorSubject<LearnerPointBalance | null>(balance);
   return {
-    getBalance$: jasmine.createSpy('getBalance$').and.returnValue(balanceSubject.asObservable()),
-    loadHistory: jasmine.createSpy('loadHistory').and.returnValue(of([])),
-    getPointsByTriggerSync: jasmine.createSpy('getPointsByTriggerSync').and.returnValue(
-      balance
-        ? JSON.parse(balance.points_by_trigger_json)
-        : {}
-    ),
-    getRecentPointsEarned: jasmine.createSpy('getRecentPointsEarned').and.returnValue(25),
-    refreshBalance: jasmine.createSpy('refreshBalance'),
+    getBalance$: vi.fn().mockReturnValue(balanceSubject.asObservable()),
+    loadHistory: vi.fn().mockReturnValue(of([])),
+    getPointsByTriggerSync: vi
+      .fn()
+      .mockReturnValue(balance ? JSON.parse(balance.points_by_trigger_json) : {}),
+    getRecentPointsEarned: vi.fn().mockReturnValue(25),
+    refreshBalance: vi.fn(),
     _balanceSubject: balanceSubject,
   };
 }
 
 function createMockMasteryService() {
   return {
-    getMasteryForHuman: jasmine.createSpy('getMasteryForHuman').and.returnValue(
+    getMasteryForHuman: vi.fn().mockReturnValue(
       of([
         {
           id: 'm1',
@@ -213,7 +212,7 @@ describe('DeviceStewardshipComponent', () => {
 
   function setupTestBed(
     agencyStage: IdentityState['agencyStage'] = 'visitor',
-    balance: LearnerPointBalance | null = null,
+    balance: LearnerPointBalance | null = null
   ) {
     mockService = createMockDeviceStewardshipService();
     mockIdentityService = createMockIdentityService(agencyStage);
@@ -445,7 +444,7 @@ describe('DeviceStewardshipComponent', () => {
     it('should show disabled download CTA', () => {
       const cta = fixture.nativeElement.querySelector('.upgrade-cta');
       expect(cta).toBeTruthy();
-      expect(cta.disabled).toBeTrue();
+      expect(cta.disabled).toBe(true);
       expect(cta.textContent).toContain('Download the Desktop App');
     });
 
@@ -562,8 +561,8 @@ describe('DeviceStewardshipComponent', () => {
     it('should render node steward section', () => {
       fixture.detectChanges();
       const headers = fixture.nativeElement.querySelectorAll('.section-header h2');
-      const infraHeader = Array.from(headers as NodeListOf<HTMLElement>).find(
-        h => h.textContent?.includes('Infrastructure Nodes'),
+      const infraHeader = Array.from(headers as NodeListOf<HTMLElement>).find(h =>
+        h.textContent?.includes('Infrastructure Nodes')
       );
       expect(infraHeader).toBeTruthy();
     });
@@ -603,7 +602,7 @@ describe('DeviceStewardshipComponent', () => {
     it('should display location when available', () => {
       fixture.detectChanges();
       const locationValue = fixture.nativeElement.querySelector(
-        '.device-grid .device-card .detail-value',
+        '.device-grid .device-card .detail-value'
       );
       expect(locationValue.textContent).toContain('Home Office');
     });
@@ -692,7 +691,7 @@ describe('DeviceStewardshipComponent', () => {
 
   describe('Refresh', () => {
     it('should call loadDevices on refresh', () => {
-      mockService.loadDevices.calls.reset();
+      mockService.loadDevices.mockClear();
       component.refresh();
       expect(mockService.loadDevices).toHaveBeenCalled();
     });
@@ -701,7 +700,7 @@ describe('DeviceStewardshipComponent', () => {
       mockService.isLoading.set(true);
       fixture.detectChanges();
       const btn = fixture.nativeElement.querySelector('.refresh-btn');
-      expect(btn.disabled).toBeTrue();
+      expect(btn.disabled).toBe(true);
     });
   });
 
@@ -733,7 +732,7 @@ describe('DeviceStewardshipComponent', () => {
       mockService.error.set('Some error');
       fixture.detectChanges();
 
-      mockService.loadDevices.calls.reset();
+      mockService.loadDevices.mockClear();
       const retryBtn = fixture.nativeElement.querySelector('.dismiss-btn');
       retryBtn.click();
 
@@ -815,7 +814,7 @@ describe('DeviceStewardshipComponent', () => {
         ...INITIAL_IDENTITY_STATE,
         agencyStage: 'app-steward',
       });
-      expect(component.isSteward()).toBeTrue();
+      expect(component.isSteward()).toBe(true);
     });
 
     it('should compute isSteward for node-steward', () => {
@@ -823,7 +822,7 @@ describe('DeviceStewardshipComponent', () => {
         ...INITIAL_IDENTITY_STATE,
         agencyStage: 'node-steward',
       });
-      expect(component.isSteward()).toBeTrue();
+      expect(component.isSteward()).toBe(true);
     });
 
     it('should compute isSteward false for hosted', () => {
@@ -831,7 +830,7 @@ describe('DeviceStewardshipComponent', () => {
         ...INITIAL_IDENTITY_STATE,
         agencyStage: 'hosted',
       });
-      expect(component.isSteward()).toBeFalse();
+      expect(component.isSteward()).toBe(false);
     });
   });
 });

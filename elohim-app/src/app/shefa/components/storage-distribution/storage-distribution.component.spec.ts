@@ -6,16 +6,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { StorageDistributionComponent } from './storage-distribution.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
+import { vi } from 'vitest';
 
 describe('StorageDistributionComponent', () => {
   let component: StorageDistributionComponent;
   let fixture: ComponentFixture<StorageDistributionComponent>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
+  let mockShefaCompute: any;
 
   beforeEach(async () => {
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', ['getStorageContentDistribution']);
-    mockShefaCompute.getStorageContentDistribution.and.returnValue(
+    mockShefaCompute = {
+      getStorageContentDistribution: vi.fn(),
+    };
+    mockShefaCompute.getStorageContentDistribution.mockReturnValue(
       of({
         byContentType: [],
         byReachLevel: [],
@@ -35,7 +38,7 @@ describe('StorageDistributionComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [StorageDistributionComponent],
-      providers: [{ provide: ShefaComputeService, useValue: mockShefaCompute }],
+      providers: [{ provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(StorageDistributionComponent);

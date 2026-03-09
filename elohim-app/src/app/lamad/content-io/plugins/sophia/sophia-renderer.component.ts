@@ -29,11 +29,12 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 92.6% (2026-02-05)
+// @coverage: 92.7% (2026-02-24)
 
 import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
+import { AssessmentCompletionSummaryComponent } from '../../../quiz-engine/components/assessment-completion-summary/assessment-completion-summary.component';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import {
   ContentRenderer,
@@ -90,102 +91,32 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
 @Component({
   selector: 'app-sophia-renderer',
   standalone: true,
-  imports: [CommonModule, RouterModule, SophiaWrapperComponent],
+  imports: [
+    CommonModule,
+    RouterModule,
+    SophiaWrapperComponent,
+    AssessmentCompletionSummaryComponent,
+  ],
   template: `
     <div class="sophia-renderer">
       <!-- Results View -->
       @if (showResults) {
-        <div class="results-section">
-          <!-- Mastery Mode Results -->
-          @if (assessmentMode === 'mastery') {
-            <div class="result-card" [class.passed]="masteryPassed" [class.failed]="!masteryPassed">
-              <div class="result-icon">{{ masteryPassed ? '🎯' : '📚' }}</div>
-              <h4 class="result-title">{{ masteryPassed ? 'Well Done!' : 'Keep Learning' }}</h4>
-              <p class="result-description">
-                You got {{ demonstratedCount }} of {{ totalMoments }} correct.
-              </p>
-              <div class="score-display">
-                <span class="score-value">{{ masteryScorePercent }}%</span>
-                <span class="score-label">Score</span>
-              </div>
-            </div>
-
-            <!-- Mastery rewards summary -->
-            @if (learnerProfile$ | async; as profile) {
-              <div class="mastery-preview">
-                <div class="preview-item">
-                  <span
-                    class="preview-icon material-icons"
-                    [style.color]="profile.learnerLevel.color"
-                  >
-                    {{ profile.learnerLevel.icon }}
-                  </span>
-                  <div class="preview-content">
-                    <strong>{{ profile.learnerLevel.label }}</strong>
-                    <span class="preview-detail">{{ profile.totalXP | number }} XP</span>
-                  </div>
-                </div>
-                <div class="preview-item">
-                  <span
-                    class="preview-icon material-icons streak-fire"
-                    [class.streak-active]="profile.streak.todayActive"
-                  >
-                    local_fire_department
-                  </span>
-                  <div class="preview-content">
-                    <strong>{{ profile.streak.currentStreak }} Day Streak</strong>
-                    <span class="preview-detail">Best: {{ profile.streak.bestStreak }} days</span>
-                  </div>
-                </div>
-                <div class="preview-item">
-                  <span class="preview-icon material-icons">emoji_events</span>
-                  <div class="preview-content">
-                    <strong>{{ profile.totalMasteredNodes }} Mastered</strong>
-                    <span class="preview-detail">{{ profile.nodesAboveGate }} above gate</span>
-                  </div>
-                </div>
-              </div>
-              <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
-            }
-          } @else {
-            <!-- Discovery/Reflection Mode Results -->
-            <div class="result-card">
-              <div class="result-icon">✨</div>
-              <h4 class="result-title">Assessment Complete</h4>
-              <p class="result-description">Thank you for completing this reflection.</p>
-            </div>
-
-            <!-- Profile summary + dashboard link -->
-            @if (learnerProfile$ | async; as profile) {
-              <div class="imagodei-preview">
-                <p class="preview-text">Your responses contribute to your learning profile.</p>
-                <div class="preview-item">
-                  <span
-                    class="preview-icon material-icons"
-                    [style.color]="profile.learnerLevel.color"
-                  >
-                    {{ profile.learnerLevel.icon }}
-                  </span>
-                  <div class="preview-content">
-                    <strong>{{ profile.learnerLevel.label }}</strong>
-                    <span class="preview-detail">{{ profile.totalXP | number }} XP</span>
-                  </div>
-                </div>
-                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
-              </div>
-            } @else {
-              <div class="imagodei-preview">
-                <p class="preview-text">Your responses will be saved to your learning profile.</p>
-                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
-              </div>
-            }
-          }
-
-          <!-- Continue navigation -->
-          <div class="results-actions">
-            <button class="btn btn-primary" (click)="completeAndContinue()">Continue</button>
-          </div>
-        </div>
+        <app-assessment-completion-summary
+          [mode]="assessmentMode"
+          [title]="title"
+          [contentNodeId]="node?.id ?? ''"
+          [instrumentId]="resolvedInstrumentId"
+          [subscaleScores]="aggregatedReflection?.subscaleTotals ?? null"
+          [normalizedScores]="aggregatedReflection?.normalizedScores ?? null"
+          [primaryType]="resolvedPrimaryType"
+          [score]="assessmentMode === 'mastery' ? masteryScorePercent : null"
+          [passed]="assessmentMode === 'mastery' ? masteryPassed : null"
+          [correctCount]="assessmentMode === 'mastery' ? demonstratedCount : null"
+          [totalCount]="totalMoments"
+          (continue)="completeAndContinue()"
+          (viewProfile)="(null)"
+          data-testid="sophia-completion-summary"
+        />
       } @else {
         <!-- Header (hidden during results) -->
         <header class="quiz-header" *ngIf="showHeader">
@@ -743,6 +674,32 @@ export class SophiaRendererComponent
   /** Whether mastery assessment was passed (70% threshold) */
   get masteryPassed(): boolean {
     return this.masteryScorePercent >= 70;
+  }
+
+  /** Instrument ID from the first moment's metadata (discovery/reflection mode) */
+  get resolvedInstrumentId(): string | null {
+    return this.moments[0]?.metadata?.instrumentId ?? null;
+  }
+
+  /** Primary type result derived from Psyche API interpretation (discovery mode) */
+  get resolvedPrimaryType(): { typeId: string; name: string; score: number } | null {
+    if (!this.psycheAPI || !this.aggregatedReflection) return null;
+    const instId = this.resolvedInstrumentId;
+    if (!instId) return null;
+
+    try {
+      const interp = this.psycheAPI.interpretReflection(instId, this.aggregatedReflection);
+      if (interp?.primaryType) {
+        return {
+          typeId: interp.primaryType.typeId,
+          name: interp.primaryType.typeName,
+          score: interp.primaryType.confidence,
+        };
+      }
+    } catch {
+      // Interpretation failed — return null for generic summary
+    }
+    return null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────

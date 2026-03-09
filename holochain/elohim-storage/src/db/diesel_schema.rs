@@ -11,6 +11,40 @@ diesel::table! {
 }
 
 diesel::table! {
+    collectives (id) {
+        id -> Text,
+        app_id -> Text,
+        name -> Text,
+        description -> Nullable<Text>,
+        governance_layer -> Text,
+        constitutional_parent_id -> Nullable<Text>,
+        reach -> Text,
+        metadata_json -> Nullable<Text>,
+        created_by -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+        dissolved_at -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    collective_participations (id) {
+        id -> Text,
+        app_id -> Text,
+        collective_id -> Text,
+        human_id -> Text,
+        intimacy_level -> Text,
+        role_context -> Nullable<Text>,
+        governance_weight -> Float,
+        consent_state -> Text,
+        metadata_json -> Nullable<Text>,
+        joined_at -> Text,
+        updated_at -> Text,
+        departed_at -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     chapters (id) {
         id -> Text,
         app_id -> Text,
@@ -274,6 +308,53 @@ diesel::table! {
 }
 
 diesel::table! {
+    device_policies (id) {
+        id -> Text,
+        subject_id -> Text,
+        device_id -> Nullable<Text>,
+        author_id -> Text,
+        author_tier -> Text,
+        inherits_from -> Nullable<Text>,
+        blocked_categories_json -> Text,
+        blocked_hashes_json -> Text,
+        age_rating_max -> Nullable<Text>,
+        reach_level_max -> Nullable<Integer>,
+        session_max_minutes -> Nullable<Integer>,
+        daily_max_minutes -> Nullable<Integer>,
+        time_windows_json -> Text,
+        cooldown_minutes -> Nullable<Integer>,
+        disabled_features_json -> Text,
+        disabled_routes_json -> Text,
+        require_approval_json -> Text,
+        log_sessions -> Integer,
+        log_categories -> Integer,
+        log_policy_events -> Integer,
+        retention_days -> Integer,
+        subject_can_view -> Integer,
+        effective_from -> Text,
+        effective_until -> Nullable<Text>,
+        version -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    humans (id) {
+        id -> Text,
+        agent_pub_key -> Nullable<Text>,
+        display_name -> Text,
+        bio -> Nullable<Text>,
+        affinities -> Text,
+        profile_reach -> Text,
+        location -> Nullable<Text>,
+        app_id -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     steps (id) {
         id -> Text,
         app_id -> Text,
@@ -290,7 +371,29 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    /// Custodian metrics snapshots — one row per custodian (upsert on report).
+    ///
+    /// Metric groups are stored as JSON TEXT blobs to stay within Diesel's
+    /// 32-column limit. The service layer deserialises them into typed structs
+    /// before building the CustodianMetricsView.
+    custodian_metrics (custodian_id) {
+        custodian_id -> Text,
+        app_id -> Text,
+        tier -> Integer,
+        health_json -> Text,
+        storage_json -> Text,
+        bandwidth_json -> Text,
+        computation_json -> Text,
+        reputation_json -> Text,
+        economic_json -> Text,
+        collected_at -> BigInt,
+        last_updated_at -> BigInt,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
+diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(path_attestations -> paths (path_id));
 diesel::joinable!(path_tags -> paths (path_id));
@@ -300,12 +403,17 @@ diesel::joinable!(steps -> paths (path_id));
 diesel::allow_tables_to_appear_in_same_query!(
     apps,
     chapters,
+    collective_participations,
+    collectives,
     content,
     content_mastery,
     content_tags,
     contributor_presences,
+    custodian_metrics,
+    device_policies,
     economic_events,
     human_relationships,
+    humans,
     local_sessions,
     path_attestations,
     path_tags,

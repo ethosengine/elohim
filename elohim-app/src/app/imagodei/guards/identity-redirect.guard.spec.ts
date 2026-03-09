@@ -9,19 +9,23 @@ import { Router, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@a
 
 import { identityDefaultRedirectGuard } from './identity-redirect.guard';
 import { IdentityService } from '../services/identity.service';
+import { vi, Mock } from 'vitest';
 
 describe('identityDefaultRedirectGuard', () => {
-  let mockRouter: jasmine.SpyObj<Router>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
+  let mockRouter: any;
+  let mockIdentityService: any;
   let mockRoute: ActivatedRouteSnapshot;
   let mockState: RouterStateSnapshot;
 
   beforeEach(() => {
-    mockRouter = jasmine.createSpyObj('Router', ['createUrlTree']);
+    mockRouter = {
+      createUrlTree: vi.fn(),
+    };
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', ['isAuthenticated'], {
-      mode: jasmine.createSpy('mode'),
-    });
+    mockIdentityService = {
+      isAuthenticated: vi.fn(),
+      mode: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -35,11 +39,11 @@ describe('identityDefaultRedirectGuard', () => {
   });
 
   it('should redirect authenticated hosted users to /identity/profile', () => {
-    (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-    mockIdentityService.isAuthenticated.and.returnValue(true);
+    (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+    mockIdentityService.isAuthenticated.mockReturnValue(true);
 
     const profileTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(profileTree);
+    mockRouter.createUrlTree.mockReturnValue(profileTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
@@ -50,11 +54,11 @@ describe('identityDefaultRedirectGuard', () => {
   });
 
   it('should redirect authenticated steward users to /identity/profile', () => {
-    (mockIdentityService.mode as jasmine.Spy).and.returnValue('steward');
-    mockIdentityService.isAuthenticated.and.returnValue(true);
+    (mockIdentityService.mode as Mock).mockReturnValue('steward');
+    mockIdentityService.isAuthenticated.mockReturnValue(true);
 
     const profileTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(profileTree);
+    mockRouter.createUrlTree.mockReturnValue(profileTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
@@ -65,11 +69,11 @@ describe('identityDefaultRedirectGuard', () => {
   });
 
   it('should redirect unauthenticated users to /identity/login', () => {
-    (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-    mockIdentityService.isAuthenticated.and.returnValue(false);
+    (mockIdentityService.mode as Mock).mockReturnValue('session');
+    mockIdentityService.isAuthenticated.mockReturnValue(false);
 
     const loginTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(loginTree);
+    mockRouter.createUrlTree.mockReturnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
@@ -80,11 +84,11 @@ describe('identityDefaultRedirectGuard', () => {
   });
 
   it('should redirect session-mode users to /identity/login', () => {
-    (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-    mockIdentityService.isAuthenticated.and.returnValue(true);
+    (mockIdentityService.mode as Mock).mockReturnValue('session');
+    mockIdentityService.isAuthenticated.mockReturnValue(true);
 
     const loginTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(loginTree);
+    mockRouter.createUrlTree.mockReturnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
@@ -95,11 +99,11 @@ describe('identityDefaultRedirectGuard', () => {
   });
 
   it('should redirect anonymous users to /identity/login', () => {
-    (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
-    mockIdentityService.isAuthenticated.and.returnValue(false);
+    (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
+    mockIdentityService.isAuthenticated.mockReturnValue(false);
 
     const loginTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(loginTree);
+    mockRouter.createUrlTree.mockReturnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)

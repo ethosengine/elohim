@@ -10,7 +10,7 @@ You are the CI/CD Pipeline Specialist for the Elohim Protocol. You understand th
 
 ## Orchestrator Architecture
 
-The central orchestrator (`orchestrator/Jenkinsfile`) is the **ONLY pipeline that receives GitHub webhooks**. It analyzes changesets and triggers downstream pipelines.
+The central orchestrator (`genesis/orchestrator/Jenkinsfile`) is the **ONLY pipeline that receives GitHub webhooks**. It analyzes changesets and triggers downstream pipelines.
 
 **Pipeline Dependency Graph**:
 ```
@@ -40,7 +40,7 @@ elohim-holochain (DNA/hApp, WASM artifacts)
 
 | Job | Purpose | Key Files |
 |-----|---------|-----------|
-| `elohim-orchestrator` | Webhook receiver, changeset analyzer | orchestrator/Jenkinsfile |
+| `elohim-orchestrator` | Webhook receiver, changeset analyzer | genesis/orchestrator/Jenkinsfile |
 | `elohim` | Angular app build/deploy | Jenkinsfile |
 | `elohim-holochain` | DNA compilation, WASM artifacts | holochain/Jenkinsfile |
 | `elohim-edge` | Doorway + storage deployment | holochain/Jenkinsfile |

@@ -278,6 +278,20 @@ pub enum ResponsePayload {
         to_layer: constitution::ConstitutionalLayer,
         reason: String,
     },
+
+    /// Reach negotiation result
+    ReachNegotiation {
+        /// Recommended reach level
+        recommended_reach: String,
+        /// Whether safety review passed
+        safety_cleared: bool,
+        /// Safety issues found (if any)
+        safety_issues: Vec<SafetyIssue>,
+        /// Conditions attached to the reach level
+        conditions: Vec<String>,
+        /// Decision factors for transparency
+        decision_factors: Vec<DecisionFactor>,
+    },
 }
 
 /// A safety issue found during review.
@@ -289,6 +303,21 @@ pub struct SafetyIssue {
     pub severity: String,
     pub description: String,
     pub location: Option<String>,
+}
+
+/// A factor in a reach negotiation decision (for transparency).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[cfg_attr(feature = "typescript", ts(export))]
+pub struct DecisionFactor {
+    /// Name of the factor
+    pub factor: String,
+    /// How it influenced the decision
+    pub influence: String,
+    /// Weight given (0.0 - 1.0)
+    pub weight: f32,
+    /// Supporting evidence
+    pub evidence: String,
 }
 
 /// An accuracy issue found during verification.

@@ -1,5 +1,7 @@
 import { Component, Input } from '@angular/core';
 
+// @coverage: 86.7% (2026-02-24)
+
 /**
  * Row of stat cards showing mastery and freshness metrics.
  */

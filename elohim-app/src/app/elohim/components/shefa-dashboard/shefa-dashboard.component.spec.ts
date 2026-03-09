@@ -4,38 +4,39 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
-import { ShefaService } from '../../services/shefa.service';
+import { CUSTODIAN_METRICS } from '@app/shefa';
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
 import { HolochainClientService } from '../../services/holochain-client.service';
+import { vi } from 'vitest';
 
 describe('ShefaDashboardComponent', () => {
   let component: ShefaDashboardComponent;
   let fixture: ComponentFixture<ShefaDashboardComponent>;
-  let shefaServiceMock: jasmine.SpyObj<ShefaService>;
-  let custodianSelectionMock: jasmine.SpyObj<CustodianSelectionService>;
-  let holochainClientMock: jasmine.SpyObj<HolochainClientService>;
+  let shefaServiceMock: any;
+  let custodianSelectionMock: any;
+  let holochainClientMock: any;
 
   beforeEach(async () => {
-    shefaServiceMock = jasmine.createSpyObj('ShefaService', [
-      'getMetricsForCustodian',
-      'getAllMetrics',
-    ]);
+    shefaServiceMock = {
+      getMetricsForCustodian: vi.fn(),
+      getAllMetrics: vi.fn(),
+    };
 
-    custodianSelectionMock = jasmine.createSpyObj('CustodianSelectionService', [
-      'selectCustodians',
-    ]);
+    custodianSelectionMock = {
+      selectCustodians: vi.fn(),
+    };
 
-    holochainClientMock = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
+    holochainClientMock = {
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ShefaDashboardComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ShefaService, useValue: shefaServiceMock },
+        { provide: CUSTODIAN_METRICS, useValue: shefaServiceMock },
         { provide: CustodianSelectionService, useValue: custodianSelectionMock },
         { provide: HolochainClientService, useValue: holochainClientMock },
       ],

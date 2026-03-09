@@ -30,11 +30,23 @@
     "diagnose:content": "npx tsx src/diagnose.ts --content",
     "debug:stream": "npx tsx src/debug-stream.ts",
     "debug:stream:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' npx tsx src/debug-stream.ts",
+    "account-packages": "npx tsx src/account-package.ts",
+    "account-packages:dry": "npx tsx src/account-package.ts --dry-run",
+    "account-packages:stats": "npx tsx src/account-package.ts --stats",
+    "seed:humans": "npx tsx src/seed-humans.ts",
+    "seed:humans:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-humans.ts",
+    "seed:collectives": "npx tsx src/seed-collectives.ts",
+    "seed:collectives:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-collectives.ts",
+    "seed:collectives:dry": "npx tsx src/seed-collectives.ts --dry-run",
+    "seed:accounts": "npx tsx src/seed-accounts.ts",
+    "seed:accounts:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-accounts.ts",
     "seed:test-admin": "npx tsx src/seed-test-admin.ts",
-    "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts"
+    "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@elohim/storage-client": "file:../../holochain/sdk/storage-client-ts",
+    "@elohim/storage-client": "workspace:*",
     "@holochain/client": "^0.20.1",
     "multiformats": "^13.4.1",
     "ws": "^8.16.0"

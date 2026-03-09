@@ -9,20 +9,29 @@ import {
   AfterViewInit,
   ElementRef,
   ViewChild,
+  ViewContainerRef,
+  ComponentRef,
   OnDestroy,
   inject,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Router } from '@angular/router';
 
-// @coverage: 72.8% (2026-02-05)
+// @coverage: 72.8% (2026-02-24)
 
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
+import { firstValueFrom, Subscription } from 'rxjs';
 
+import { EprPopoverComponent } from '@app/elohim/components/epr-popover/epr-popover.component';
+import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { parseEpr } from '@app/elohim/utils/epr-ref';
 
 import { ContentNode } from '../../models/content-node.model';
+import { PathContextService } from '../../services/path-context.service';
+import { PathService } from '../../services/path.service';
 
 /**
  * Table of Contents entry extracted from markdown headings.
@@ -32,6 +41,8 @@ export interface TocEntry {
   text: string;
   level: number;
 }
+
+const EPR_ANCHOR_SELECTOR = 'a[data-epr]';
 
 @Component({
   selector: 'app-markdown-renderer',
@@ -46,6 +57,7 @@ export interface TocEntry {
         (click)="toggleToc()"
         [class.toc-open]="tocVisible"
         title="Toggle Table of Contents"
+        data-testid="markdown-toc-toggle"
       >
         <span class="toc-icon">&#9776;</span>
       </button>
@@ -57,7 +69,9 @@ export interface TocEntry {
       <nav *ngIf="tocEntries.length > 0" class="toc-sidebar" [class.toc-visible]="tocVisible">
         <div class="toc-header">
           <span>Contents</span>
-          <button class="toc-close" (click)="toggleToc()">&times;</button>
+          <button class="toc-close" (click)="toggleToc()" data-testid="markdown-toc-close">
+            &times;
+          </button>
         </div>
         <ul class="toc-list">
           <li
@@ -82,7 +96,13 @@ export interface TocEntry {
       </article>
 
       <!-- Back to Top Button -->
-      <button *ngIf="showBackToTop" class="back-to-top" (click)="scrollToTop()" title="Back to top">
+      <button
+        *ngIf="showBackToTop"
+        class="back-to-top"
+        (click)="scrollToTop()"
+        title="Back to top"
+        data-testid="markdown-back-to-top"
+      >
         &uarr;
       </button>
     </div>
@@ -93,6 +113,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   @Input() node!: ContentNode;
   /** When true, renderer adapts to fit within parent container without TOC/back-to-top */
   @Input() embedded = false;
+  /** Path steps for context-aware EPR link resolution (provided by path step view) */
+  @Input() pathSteps: StepRef[] = [];
   @Output() tocGenerated = new EventEmitter<TocEntry[]>();
 
   @ViewChild('contentEl') contentEl!: ElementRef<HTMLElement>;
@@ -105,10 +127,31 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
   private readonly marked: Marked;
   private scrollListener?: () => void;
+  private eprClickListener?: (e: Event) => void;
   private headingElements: HTMLElement[] = [];
   private readonly storageClient = inject(StorageClientService);
+  private readonly eprResolver = inject(EprResolverService);
+  private readonly pathContext = inject(PathContextService);
+  private readonly pathService = inject(PathService);
+  private readonly router = inject(Router);
+  private readonly vcr = inject(ViewContainerRef);
+  private activePopover: ComponentRef<EprPopoverComponent> | null = null;
+  private popoverSub: Subscription | null = null;
+  private eprHoverListener?: (e: Event) => void;
+  private eprLeaveListener?: (e: Event) => void;
+  private hoveredEprAnchor: HTMLAnchorElement | null = null;
+  private popoverShowTimer: ReturnType<typeof setTimeout> | null = null;
+  private popoverDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly sanitizer: DomSanitizer) {
+  /** Prefetched cross-path matches, keyed by content ID. */
+  private readonly crossPathCache = new Map<
+    string,
+    import('@app/elohim/services/epr-resolver.service').CrossPathMatch[]
+  >();
+
+  private readonly sanitizer = inject(DomSanitizer);
+
+  constructor() {
     // Configure marked with syntax highlighting
     this.marked = new Marked(
       markedHighlight({
@@ -126,7 +169,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       breaks: false,
     });
 
-    // Configure custom renderer to transform blob URLs in images
+    // Configure custom renderer to transform blob URLs and intercept epr: links
     this.marked.use({
       renderer: {
         image: token => {
@@ -134,6 +177,19 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
           const resolvedHref = this.resolveBlobUrl(token.href);
           const title = token.title ? ` title="${token.title}"` : '';
           return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
+        },
+        link: token => {
+          if (token.href?.startsWith('epr:')) {
+            // EPR link — render as data attribute for click handler interception
+            const escapedHref = token.href.replaceAll('"', '&quot;');
+            const escapedText = token.text ?? token.href;
+            return `<a href="#" data-epr="${escapedHref}" class="epr-link-inline">${escapedText}</a>`;
+          }
+          // Non-EPR links render normally as standard anchors
+          const href = token.href ?? '';
+          const title = token.title ? ` title="${token.title}"` : '';
+          const text = token.text ?? href;
+          return `<a href="${href}"${title}>${text}</a>`;
         },
       },
     });
@@ -175,11 +231,23 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
   ngAfterViewInit(): void {
     this.setupScrollListener();
+    this.setupEprClickHandler();
+    this.setupEprHoverHandler();
   }
 
   ngOnDestroy(): void {
+    this.destroyPopover();
     if (this.scrollListener) {
       window.removeEventListener('scroll', this.scrollListener);
+    }
+    if (this.eprClickListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('click', this.eprClickListener);
+    }
+    if (this.eprHoverListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('mouseover', this.eprHoverListener);
+    }
+    if (this.eprLeaveListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('mouseout', this.eprLeaveListener);
     }
   }
 
@@ -210,6 +278,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       return;
     }
 
+    this.destroyPopover();
+
     // Parse markdown to HTML
     let html = await this.marked.parse(this.node.content);
 
@@ -227,6 +297,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Update heading elements after view updates
     setTimeout(() => this.cacheHeadingElements(), 0);
+
+    // Prefetch cross-path data for EPR links found in the markdown
+    this.prefetchCrossPathData(this.node.content);
   }
 
   /**
@@ -301,6 +374,209 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       .replaceAll(/\s+/g, '-')
       .replaceAll(/-+/g, '-')
       .substring(0, 50);
+  }
+
+  /**
+   * Set up event delegation for epr: link clicks.
+   * Uses event delegation on the content element to catch clicks on
+   * dynamically rendered [data-epr] anchors.
+   */
+  private setupEprClickHandler(): void {
+    if (!this.contentEl) return;
+
+    this.eprClickListener = (e: Event) => {
+      const target = (e.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
+      if (!target) return;
+
+      e.preventDefault();
+
+      const eprUri = target.dataset['epr'];
+      if (!eprUri) return;
+
+      void this.resolveAndNavigate(eprUri);
+    };
+
+    this.contentEl.nativeElement.addEventListener('click', this.eprClickListener);
+  }
+
+  /**
+   * Resolve an EPR URI with cross-path context and navigate.
+   * Uses prefetched cross-path data when available, falls back to fetch.
+   */
+  private async resolveAndNavigate(eprUri: string): Promise<void> {
+    const ctx = this.pathContext.currentContext;
+    const currentPathId = ctx?.pathId ?? null;
+
+    const ref = parseEpr(eprUri);
+    let crossPathMatches = this.crossPathCache.get(ref.id);
+
+    // Fall back to live fetch if not prefetched
+    if (crossPathMatches === undefined && currentPathId) {
+      crossPathMatches = await firstValueFrom(
+        this.pathService.findContentInPaths(ref.id, currentPathId)
+      );
+    }
+
+    const resolved = this.eprResolver.resolveInContext(
+      eprUri,
+      currentPathId,
+      this.pathSteps,
+      crossPathMatches
+    );
+
+    this.destroyPopover();
+    void this.router.navigate(resolved.route);
+  }
+
+  /**
+   * Scan markdown for epr: URIs and prefetch cross-path data for each.
+   * This makes click resolution instant instead of waiting for an API call.
+   */
+  private prefetchCrossPathData(markdown: string): void {
+    const ctx = this.pathContext.currentContext;
+    const currentPathId = ctx?.pathId ?? null;
+    if (!currentPathId) return;
+
+    this.crossPathCache.clear();
+
+    // Find all epr: URIs in the markdown source
+    const eprPattern = /epr:([a-z0-9][\w-]*)/gi;
+    const contentIds = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = eprPattern.exec(markdown)) !== null) {
+      contentIds.add(match[1]);
+    }
+
+    // Prefetch cross-path matches for each unique content ID
+    for (const contentId of contentIds) {
+      this.pathService.findContentInPaths(contentId, currentPathId).subscribe(matches => {
+        this.crossPathCache.set(contentId, matches);
+      });
+    }
+  }
+
+  /**
+   * Set up hover-based popover for epr: links.
+   * Uses mouseover/mouseout event delegation on the content element.
+   * Shows EPR Head metadata popover after a short debounce delay.
+   */
+  private setupEprHoverHandler(): void {
+    if (!this.contentEl) return;
+    const el = this.contentEl.nativeElement;
+
+    this.eprHoverListener = (e: Event) => {
+      const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
+      if (!anchor || anchor === this.hoveredEprAnchor) return;
+
+      this.hoveredEprAnchor = anchor;
+
+      // Cancel any pending dismiss
+      if (this.popoverDismissTimer) {
+        clearTimeout(this.popoverDismissTimer);
+        this.popoverDismissTimer = null;
+      }
+
+      // Debounce show to avoid flashing on quick mouse movements
+      if (this.popoverShowTimer) clearTimeout(this.popoverShowTimer);
+      this.popoverShowTimer = setTimeout(() => {
+        this.showPopover(anchor);
+      }, 300);
+    };
+
+    this.eprLeaveListener = (e: Event) => {
+      const me = e as MouseEvent;
+      const anchor = (me.target as HTMLElement).closest<HTMLAnchorElement>(EPR_ANCHOR_SELECTOR);
+      if (!anchor) return;
+
+      // Ignore if moving to a child within the same anchor
+      const related = me.relatedTarget as HTMLElement | null;
+      if (related && anchor.contains(related)) return;
+
+      this.hoveredEprAnchor = null;
+
+      // Cancel pending show
+      if (this.popoverShowTimer) {
+        clearTimeout(this.popoverShowTimer);
+        this.popoverShowTimer = null;
+      }
+
+      // Delay dismiss to allow mouse to reach the popover
+      this.scheduleDismiss();
+    };
+
+    el.addEventListener('mouseover', this.eprHoverListener);
+    el.addEventListener('mouseout', this.eprLeaveListener);
+  }
+
+  private showPopover(anchor: HTMLAnchorElement): void {
+    const eprUri = anchor.dataset['epr'];
+    if (!eprUri) return;
+
+    // Clean up any existing popover
+    this.destroyPopover();
+    this.hoveredEprAnchor = anchor; // Restore — destroyPopover clears it
+
+    // Get route synchronously for the "Open resource" link
+    const { route } = this.eprResolver.resolveUrl(eprUri);
+
+    // Fetch EPR Head metadata
+    this.popoverSub = this.eprResolver.resolveEprHead(eprUri).subscribe(head => {
+      if (!head) return;
+
+      // Position below the anchor
+      const rect = anchor.getBoundingClientRect();
+      const position = { top: rect.bottom + 8, left: rect.left };
+
+      // Create popover component programmatically
+      const ref = this.vcr.createComponent(EprPopoverComponent);
+
+      // Ensure host is at viewport origin for correct fixed positioning
+      const hostEl = ref.location.nativeElement as HTMLElement;
+      hostEl.style.top = '0';
+      hostEl.style.left = '0';
+
+      ref.instance.head = head;
+      ref.instance.position = position;
+      ref.instance.route = route;
+      ref.instance.dismissed.subscribe(() => this.destroyPopover());
+
+      // Cancel dismiss when mouse enters the popover
+      hostEl.addEventListener('mouseenter', () => {
+        if (this.popoverDismissTimer) {
+          clearTimeout(this.popoverDismissTimer);
+          this.popoverDismissTimer = null;
+        }
+      });
+
+      this.activePopover = ref;
+    });
+  }
+
+  private scheduleDismiss(): void {
+    if (this.popoverDismissTimer) clearTimeout(this.popoverDismissTimer);
+    this.popoverDismissTimer = setTimeout(() => {
+      this.destroyPopover();
+    }, 200);
+  }
+
+  private destroyPopover(): void {
+    if (this.popoverShowTimer) {
+      clearTimeout(this.popoverShowTimer);
+      this.popoverShowTimer = null;
+    }
+    if (this.popoverDismissTimer) {
+      clearTimeout(this.popoverDismissTimer);
+      this.popoverDismissTimer = null;
+    }
+    if (this.popoverSub) {
+      this.popoverSub.unsubscribe();
+      this.popoverSub = null;
+    }
+    if (this.activePopover) {
+      this.activePopover.destroy();
+      this.activePopover = null;
+    }
+    this.hoveredEprAnchor = null;
   }
 
   private setupScrollListener(): void {

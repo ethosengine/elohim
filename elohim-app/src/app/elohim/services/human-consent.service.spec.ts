@@ -6,6 +6,7 @@ import { LocalSourceChainService } from './local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { HumanConsent } from '@app/elohim/models/human-consent.model';
 import { LearningPath } from '@app/lamad/models/learning-path.model';
+import { vi, Mock } from 'vitest';
 
 /**
  * Comprehensive tests for HumanConsentService
@@ -20,23 +21,25 @@ import { LearningPath } from '@app/lamad/models/learning-path.model';
  */
 describe('HumanConsentService', () => {
   let service: HumanConsentService;
-  let sourceChainMock: jasmine.SpyObj<LocalSourceChainService>;
-  let sessionHumanMock: jasmine.SpyObj<SessionHumanService>;
+  let sourceChainMock: any;
+  let sessionHumanMock: any;
 
   const mockAgentId = 'agent-123';
 
   beforeEach(() => {
-    const sourceChainSpy = jasmine.createSpyObj('LocalSourceChainService', [
-      'isInitialized',
-      'getAgentId',
-      'getEntriesByType',
-      'createEntry',
-    ]);
-    const sessionHumanSpy = jasmine.createSpyObj('SessionHumanService', ['getCurrentHuman']);
+    const sourceChainSpy = {
+      isInitialized: vi.fn(),
+      getAgentId: vi.fn(),
+      getEntriesByType: vi.fn(),
+      createEntry: vi.fn(),
+    };
+    const sessionHumanSpy = {
+      getCurrentHuman: vi.fn(),
+    };
 
-    sourceChainSpy.isInitialized.and.returnValue(true);
-    sourceChainSpy.getAgentId.and.returnValue(mockAgentId);
-    sourceChainSpy.getEntriesByType.and.returnValue([]);
+    sourceChainSpy.isInitialized.mockReturnValue(true);
+    sourceChainSpy.getAgentId.mockReturnValue(mockAgentId);
+    sourceChainSpy.getEntriesByType.mockReturnValue([]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -47,8 +50,12 @@ describe('HumanConsentService', () => {
     });
 
     service = TestBed.inject(HumanConsentService);
-    sourceChainMock = TestBed.inject(LocalSourceChainService) as jasmine.SpyObj<LocalSourceChainService>;
-    sessionHumanMock = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
+    sourceChainMock = TestBed.inject(LocalSourceChainService) as {
+      [K in keyof LocalSourceChainService]?: Mock;
+    };
+    sessionHumanMock = TestBed.inject(SessionHumanService) as {
+      [K in keyof SessionHumanService]?: Mock;
+    };
   });
 
   // ===========================================================================
@@ -65,7 +72,7 @@ describe('HumanConsentService', () => {
     });
 
     it('should not load consents if source chain not initialized', () => {
-      sourceChainMock.isInitialized.and.returnValue(false);
+      sourceChainMock.isInitialized.mockReturnValue(false);
       service.initialize();
       expect(sourceChainMock.getEntriesByType).not.toHaveBeenCalled();
     });
@@ -203,7 +210,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let result: HumanConsent | null = null;
@@ -245,7 +252,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let error: Error | null = null;
@@ -276,7 +283,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let error: Error | null = null;
@@ -313,7 +320,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let completed = false;
@@ -348,7 +355,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let completed = false;
@@ -376,7 +383,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let completed = false;
@@ -406,7 +413,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let error: Error | null = null;
@@ -445,7 +452,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let result: HumanConsent | null = null;
@@ -453,7 +460,7 @@ describe('HumanConsentService', () => {
         .proposeElevation({
           consentId: 'consent-1',
           newLevel: 'trusted',
-          message: 'Let\'s deepen our relationship',
+          message: "Let's deepen our relationship",
         })
         .subscribe(consent => {
           result = consent;
@@ -481,7 +488,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let error: Error | null = null;
@@ -517,7 +524,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let error: Error | null = null;
@@ -559,7 +566,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       let result: HumanConsent | null = null;
@@ -617,7 +624,7 @@ describe('HumanConsentService', () => {
           },
         },
       ];
-      sourceChainMock.getEntriesByType.and.returnValue(mockEntries);
+      sourceChainMock.getEntriesByType.mockReturnValue(mockEntries);
       service.initialize();
 
       let result: HumanConsent[] = [];
@@ -662,7 +669,7 @@ describe('HumanConsentService', () => {
           },
         },
       ];
-      sourceChainMock.getEntriesByType.and.returnValue(mockEntries);
+      sourceChainMock.getEntriesByType.mockReturnValue(mockEntries);
       service.initialize();
 
       let result: HumanConsent[] = [];
@@ -710,7 +717,7 @@ describe('HumanConsentService', () => {
           },
         },
       ];
-      sourceChainMock.getEntriesByType.and.returnValue(mockEntries);
+      sourceChainMock.getEntriesByType.mockReturnValue(mockEntries);
       service.initialize();
 
       let result: HumanConsent[] = [];
@@ -758,7 +765,7 @@ describe('HumanConsentService', () => {
           },
         },
       ];
-      sourceChainMock.getEntriesByType.and.returnValue(mockEntries);
+      sourceChainMock.getEntriesByType.mockReturnValue(mockEntries);
       service.initialize();
 
       let result: string[] = [];
@@ -850,7 +857,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       const trustedPath = { ...mockPath, visibility: 'trusted' as const, createdBy: 'creator-1' };
@@ -880,7 +887,7 @@ describe('HumanConsentService', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       };
-      sourceChainMock.getEntriesByType.and.returnValue([mockEntry]);
+      sourceChainMock.getEntriesByType.mockReturnValue([mockEntry]);
       service.initialize();
 
       const intimatePath = { ...mockPath, visibility: 'intimate' as const, createdBy: 'creator-1' };

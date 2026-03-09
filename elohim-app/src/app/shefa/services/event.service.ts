@@ -7,7 +7,7 @@
  * - Querying events for analytics
  *
  * NOTE: This service uses the elohim-storage SQLite backend via StorageApiService.
- * For Holochain-backed events, see EconomicService.
+ * For Holochain-backed events, see IEconomicEventFactory.
  *
  * ValueFlows/hREA Action Types:
  * - 'use': Consuming a resource (e.g., viewing content)
@@ -19,9 +19,9 @@
  * Uses StorageApiService for HTTP communication with elohim-storage.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 68.0% (2026-02-05)
+// @coverage: 68.0% (2026-02-24)
 
 import { map } from 'rxjs/operators';
 
@@ -68,7 +68,7 @@ export type REAAction = (typeof REAActions)[keyof typeof REAActions];
   providedIn: 'root',
 })
 export class EventService {
-  constructor(private readonly storageApi: StorageApiService) {}
+  private readonly storageApi = inject(StorageApiService);
 
   // ===========================================================================
   // Content Interaction Events

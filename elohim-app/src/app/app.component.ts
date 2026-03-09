@@ -13,7 +13,7 @@ import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
-// @coverage: 90.9% (2026-02-05)
+// @coverage: 88.4% (2026-02-24)
 
 /** Connection retry configuration */
 interface RetryConfig {
@@ -54,7 +54,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private isDestroyed = false;
   private holochainInitialized = false;
 
-  constructor(private readonly router: Router) {
+  private readonly router = inject(Router);
+
+  constructor() {
     // Post-unlock trigger (Tauri): when status transitions to 'authenticated' after needs_unlock,
     // initialize Holochain connection (which was deferred during lock gate)
     effect(() => {
@@ -89,8 +91,30 @@ export class AppComponent implements OnInit, OnDestroy {
     // Check initial route
     this.showFloatingToggle = this.isRootLandingPage(this.router.url);
 
+    // Register web+epr protocol handler (browser primitive for EPR links)
+    this.registerEprProtocolHandler();
+
     // Initialize auth and connections
     void this.initializeApp();
+  }
+
+  /**
+   * Register web+epr:// as a custom protocol handler.
+   * When a user clicks a web+epr: link outside the app (email, other apps),
+   * the browser opens this app's /resolve route.
+   */
+  private registerEprProtocolHandler(): void {
+    try {
+      if ('registerProtocolHandler' in navigator) {
+        navigator.registerProtocolHandler(
+          'web+epr',
+          `${globalThis.location.origin}/resolve?uri=%s`
+        );
+      }
+    } catch {
+      // Protocol handler registration fails silently in some contexts
+      // (e.g., non-HTTPS, cross-origin iframes). Not critical.
+    }
   }
 
   /**

@@ -225,8 +225,6 @@ mod tests {
     fn test_event_bus_no_subscribers() {
         let bus = EventBus::new();
         // Should not panic even with no subscribers
-        bus.emit(StorageEvent::ContentDeleted {
-            id: "test".into(),
-        });
+        bus.emit(StorageEvent::ContentDeleted { id: "test".into() });
     }
 }

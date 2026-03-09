@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 
 import { OpinionClusterComponent, Statement, StatementVote } from './opinion-cluster.component';
+import { type Mock, vi } from 'vitest';
 
 // OpinionCluster matches the service interface
 interface MockOpinionCluster {
@@ -20,7 +21,7 @@ interface MockOpinionCluster {
 describe('OpinionClusterComponent', () => {
   let component: OpinionClusterComponent;
   let fixture: ComponentFixture<OpinionClusterComponent>;
-  let mockSignalService: jasmine.SpyObj<GovernanceSignalService>;
+  let mockSignalService: any;
 
   // Mock clusters matching the service interface
   const mockClusters: MockOpinionCluster[] = [
@@ -43,8 +44,10 @@ describe('OpinionClusterComponent', () => {
   ];
 
   beforeEach(async () => {
-    mockSignalService = jasmine.createSpyObj('GovernanceSignalService', ['computeOpinionClusters']);
-    mockSignalService.computeOpinionClusters.and.returnValue(of(mockClusters));
+    mockSignalService = {
+      computeOpinionClusters: vi.fn(),
+    };
+    mockSignalService.computeOpinionClusters.mockReturnValue(of(mockClusters));
 
     await TestBed.configureTestingModule({
       imports: [OpinionClusterComponent],
@@ -62,9 +65,9 @@ describe('OpinionClusterComponent', () => {
 
   describe('initialization', () => {
     it('should have default values', () => {
-      expect(component.showLabels).toBeTrue();
-      expect(component.highlightConsensus).toBeTrue();
-      expect(component.interactive).toBeTrue();
+      expect(component.showLabels).toBe(true);
+      expect(component.highlightConsensus).toBe(true);
+      expect(component.interactive).toBe(true);
       expect(component.statements).toEqual([]);
       expect(component.votes).toEqual([]);
     });
@@ -85,7 +88,7 @@ describe('OpinionClusterComponent', () => {
 
   describe('ngOnChanges', () => {
     it('should recalculate clusters when votes change', () => {
-      spyOn<any>(component, 'recalculateClusters');
+      vi.spyOn<any, any>(component, 'recalculateClusters').mockImplementation(() => {});
 
       const changes: SimpleChanges = {
         votes: new SimpleChange([], [{ participantId: 'p1', statementId: 's1', value: 1 }], false),
@@ -96,7 +99,7 @@ describe('OpinionClusterComponent', () => {
     });
 
     it('should recalculate clusters when statements change', () => {
-      spyOn<any>(component, 'recalculateClusters');
+      vi.spyOn<any, any>(component, 'recalculateClusters').mockImplementation(() => {});
 
       const changes: SimpleChanges = {
         statements: new SimpleChange([], [{ id: 's1', text: 'Statement 1' }], false),
@@ -226,7 +229,7 @@ describe('OpinionClusterComponent', () => {
 
       (component as any).computeClusters();
 
-      expect(component.participants.every(p => p.cluster !== null)).toBeTrue();
+      expect(component.participants.every(p => p.cluster !== null)).toBe(true);
     });
 
     it('should filter out empty clusters', () => {
@@ -245,7 +248,7 @@ describe('OpinionClusterComponent', () => {
 
       const clusters = (component as any).computeClusters();
 
-      expect(clusters.every((c: MockOpinionCluster) => c.memberCount > 0)).toBeTrue();
+      expect(clusters.every((c: MockOpinionCluster) => c.memberCount > 0)).toBe(true);
     });
   });
 
@@ -356,7 +359,7 @@ describe('OpinionClusterComponent', () => {
 
   describe('event emitters', () => {
     it('should emit statement when selectStatement called', () => {
-      spyOn(component.statementSelected, 'emit');
+      vi.spyOn(component.statementSelected, 'emit');
       const statement: Statement = { id: 's1', text: 'Test' };
 
       component.selectStatement(statement);
@@ -593,11 +596,11 @@ describe('OpinionClusterComponent', () => {
 
   describe('recalculateClusters()', () => {
     it('should call computeParticipantPositions, computeClusters, identifyConsensusAndDivisive, and updateStats', () => {
-      spyOn<any>(component, 'computeParticipantPositions').and.returnValue([]);
-      spyOn<any>(component, 'computeClusters').and.returnValue([]);
-      spyOn<any>(component, 'identifyConsensusAndDivisive');
-      spyOn<any>(component, 'updateStats');
-      spyOn<any>(component, 'render');
+      vi.spyOn<any, any>(component, 'computeParticipantPositions').mockReturnValue([]);
+      vi.spyOn<any, any>(component, 'computeClusters').mockReturnValue([]);
+      vi.spyOn<any, any>(component, 'identifyConsensusAndDivisive').mockImplementation(() => {});
+      vi.spyOn<any, any>(component, 'updateStats').mockImplementation(() => {});
+      vi.spyOn<any, any>(component, 'render').mockImplementation(() => {});
 
       (component as any).recalculateClusters();
 
@@ -622,7 +625,7 @@ describe('OpinionClusterComponent', () => {
 
       const positions = (component as any).computeParticipantPositions();
 
-      expect(positions[0].isCurrentUser).toBeTrue();
+      expect(positions[0].isCurrentUser).toBe(true);
     });
 
     it('should handle participants with missing votes for some statements', () => {

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FocusedViewToggleComponent } from './focused-view-toggle.component';
 
@@ -41,34 +42,37 @@ describe('FocusedViewToggleComponent', () => {
       expect(typeof component.toggle).toBe('function');
     });
 
-    it('should emit toggled output when toggle is called', (done) => {
-      component.toggled.subscribe((value: boolean) => {
-        expect(value).toBe(true);
-        done();
-      });
+    it('should emit toggled output when toggle is called', () =>
+      new Promise<void>(done => {
+        component.toggled.subscribe((value: boolean) => {
+          expect(value).toBe(true);
+          done();
+        });
 
-      component.toggle();
-    });
+        component.toggle();
+      }));
 
-    it('should emit negated isActive value when toggled', (done) => {
-      component.isActive = true;
-      component.toggled.subscribe((value: boolean) => {
-        expect(value).toBe(false);
-        done();
-      });
+    it('should emit negated isActive value when toggled', () =>
+      new Promise<void>(done => {
+        component.isActive = true;
+        component.toggled.subscribe((value: boolean) => {
+          expect(value).toBe(false);
+          done();
+        });
 
-      component.toggle();
-    });
+        component.toggle();
+      }));
 
-    it('should emit true when isActive is false', (done) => {
-      component.isActive = false;
-      component.toggled.subscribe((value: boolean) => {
-        expect(value).toBe(true);
-        done();
-      });
+    it('should emit true when isActive is false', () =>
+      new Promise<void>(done => {
+        component.isActive = false;
+        component.toggled.subscribe((value: boolean) => {
+          expect(value).toBe(true);
+          done();
+        });
 
-      component.toggle();
-    });
+        component.toggle();
+      }));
   });
 
   describe('Template', () => {
@@ -87,14 +91,15 @@ describe('FocusedViewToggleComponent', () => {
       expect(button.getAttribute('aria-pressed')).toBeDefined();
     });
 
-    it('should call toggle on button click', (done) => {
-      spyOn(component, 'toggle');
-      const button = fixture.nativeElement.querySelector('button.focused-view-btn');
+    it('should call toggle on button click', () =>
+      new Promise<void>(done => {
+        vi.spyOn(component, 'toggle');
+        const button = fixture.nativeElement.querySelector('button.focused-view-btn');
 
-      button.click();
+        button.click();
 
-      expect(component.toggle).toHaveBeenCalled();
-      done();
-    });
+        expect(component.toggle).toHaveBeenCalled();
+        done();
+      }));
   });
 });

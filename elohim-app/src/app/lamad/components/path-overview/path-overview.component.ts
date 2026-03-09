@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 44.0% (2026-02-05)
+// @coverage: 45.1% (2026-03-03)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -13,8 +13,13 @@ import { AgentService } from '@app/elohim/services/agent.service';
 
 import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
+import { RecommendationListComponent } from '../../quiz-engine/components/recommendation-list/recommendation-list.component';
+import {
+  PathAdaptationService,
+  type ContentRecommendation,
+} from '../../quiz-engine/services/path-adaptation.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { PathService } from '../../services/path.service';
+import { PathService, type AccessType } from '../../services/path.service';
 import {
   getStepTypeIcon,
   getIconForContent,
@@ -34,6 +39,8 @@ interface StepDisplay {
   isLocked: boolean;
   masteryLevel: MasteryLevel;
   masteryTier: MasteryTier;
+  /** How this step was unlocked (for visual differentiation) */
+  accessType?: AccessType;
 }
 
 /**
@@ -121,7 +128,7 @@ interface ChapterDisplay {
 @Component({
   selector: 'app-path-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, RecommendationListComponent],
   templateUrl: './path-overview.component.html',
   styleUrls: ['./path-overview.component.css'],
 })
@@ -154,10 +161,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
+  /** Active recommendations from PathAdaptationService. */
+  recommendations = signal<ContentRecommendation[]>([]);
+
   private readonly destroy$ = new Subject<void>();
 
   private readonly seoService = inject(SeoService);
   private readonly contentMasteryService = inject(ContentMasteryService);
+  private readonly adaptationService = inject(PathAdaptationService);
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
@@ -193,6 +204,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       path: this.pathService.getPath(this.pathId),
       progress: this.agentService.getProgressForPath(this.pathId),
       accessible: this.pathService.getAccessibleSteps(this.pathId),
+      accessChecks: this.pathService.getAccessCheckResults(this.pathId),
       completion: this.pathService.getPathCompletionByContent(this.pathId),
       chapterSummaries: this.pathService.getChapterSummariesWithContent(this.pathId),
       stepsMetadata: this.pathService.getAllStepsMetadata(this.pathId), // Lightweight!
@@ -204,6 +216,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           path,
           progress,
           accessible,
+          accessChecks,
           completion,
           chapterSummaries,
           stepsMetadata,
@@ -235,6 +248,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
             isLocked: !accessible.includes(s.stepIndex),
             masteryLevel: s.masteryLevel,
             masteryTier: s.masteryTier,
+            accessType: accessChecks.get(s.stepIndex)?.accessType,
           }));
 
           if (chapterSummaries.length > 0) {
@@ -273,6 +287,15 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           }
 
           this.isLoading = false;
+
+          // Load active recommendations for this path/agent
+          const humanId = this.agentService.getCurrentAgentId();
+          this.adaptationService
+            .getRecommendations$(this.pathId, humanId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(recs => {
+              this.recommendations.set(recs);
+            });
         },
         error: (err: unknown) => {
           const errorMsg = err instanceof Error ? err.message : 'Failed to load path';
@@ -280,6 +303,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         },
       });
+  }
+
+  /**
+   * Dismiss a recommendation and remove it from the active list.
+   */
+  onDismissRecommendation(contentId: string): void {
+    const humanId = this.agentService.getCurrentAgentId();
+    this.adaptationService.dismissRecommendation(this.pathId, humanId, contentId);
   }
 
   /**
@@ -424,6 +455,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       'global-complete': s.isGlobalCompletion,
       locked: s.isLocked,
       accessible: !s.isLocked,
+      'mastery-unlocked': s.accessType === 'mastery-unlocked',
+      'skip-ahead': s.accessType === 'skip-ahead',
       [this.getMasteryTierClass(s.masteryTier)]: true,
     };
   }
@@ -699,7 +732,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
       // Fallback to direct resource view if no matching step found
-      void this.router.navigate(['/lamad/resource', conceptId]);
+      void this.router.navigate(['/resource', conceptId]);
     }
   }
 

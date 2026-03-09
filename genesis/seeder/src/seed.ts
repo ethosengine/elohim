@@ -460,8 +460,9 @@ const APP_ID = 'elohim';
 const ZOME_NAME = 'content_store';
 const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
 
-// Storage URL for blob sync (defaults to doorway + /storage path)
-const STORAGE_URL = process.env.STORAGE_URL || (DOORWAY_URL ? `${DOORWAY_URL}/storage` : null);
+// Storage URL for direct blob sync (must point to elohim-storage, e.g., http://host:8090)
+// Do NOT derive from DOORWAY_URL — doorway proxies /db/* requests itself.
+const STORAGE_URL = process.env.STORAGE_URL || null;
 
 /**
  * Clean up error messages by truncating long byte arrays

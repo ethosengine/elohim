@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-// @coverage: 10.0% (2026-02-05)
+// @coverage: 8.3% (2026-03-03)
 
 export const routes: Routes = [
   {
@@ -36,6 +36,22 @@ export const routes: Routes = [
         m => m.AuthCallbackComponent
       ),
     title: 'Signing In...',
+  },
+  // Cross-pillar resource viewer (ContentNodes are protocol primitives, not pillar-scoped)
+  {
+    path: 'resource/:resourceId',
+    loadComponent: async () =>
+      import('./lamad/components/content-viewer/content-viewer.component').then(
+        m => m.ContentViewerComponent
+      ),
+  },
+  // EPR protocol handler redirect (web+epr:// links from outside the app)
+  {
+    path: 'resolve',
+    loadComponent: async () =>
+      import('./elohim/components/epr-resolve-redirect/epr-resolve-redirect.component').then(
+        m => m.EprResolveRedirectComponent
+      ),
   },
   // 404 catch-all - must be last
   {

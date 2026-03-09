@@ -16,14 +16,15 @@ import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 import { ProfileComponent } from './profile.component';
+import { vi } from 'vitest';
 
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockAgencyService: jasmine.SpyObj<AgencyService>;
-  let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockIdentityService: any;
+  let mockAgencyService: any;
+  let mockDiscoveryService: any;
+  let mockRouter: any;
 
   const mockProfile: HumanProfile = {
     id: 'human-123',
@@ -37,43 +38,43 @@ describe('ProfileComponent', () => {
   };
 
   beforeEach(async () => {
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      ['getCurrentHuman', 'updateProfile'],
-      {
-        profile: signal(mockProfile),
-        displayName: signal('Test User'),
-        mode: signal('hosted'),
-        isAuthenticated: signal(true),
-        attestations: signal([]),
-        isLoading: signal(false),
-        did: signal('did:web:hosted.elohim.host:humans:human-123'),
-        identity: signal({
-          mode: 'hosted',
-          isAuthenticated: true,
-          humanId: 'human-123',
-          displayName: 'Test User',
-          agentPubKey: null,
-          did: 'did:web:hosted.elohim.host:humans:human-123',
-          profile: mockProfile,
-          attestations: [],
-          agencyStage: 'hosted',
-          keyLocation: 'custodial',
-          canExportKeys: false,
-          keyBackup: null,
-          isLocalConductor: false,
-          conductorUrl: null,
-          linkedSessionId: null,
-          hasPendingMigration: false,
-          hostingCost: null,
-          nodeOperatorIncome: null,
-          isLoading: false,
-          error: null,
-        }),
-      }
-    );
+    mockIdentityService = {
+      getCurrentHuman: vi.fn(),
+      updateProfile: vi.fn(),
+      profile: signal(mockProfile),
+      displayName: signal('Test User'),
+      mode: signal('hosted'),
+      isAuthenticated: signal(true),
+      attestations: signal([]),
+      isLoading: signal(false),
+      did: signal('did:web:hosted.elohim.host:humans:human-123'),
+      identity: signal({
+        mode: 'hosted',
+        isAuthenticated: true,
+        humanId: 'human-123',
+        displayName: 'Test User',
+        agentPubKey: null,
+        did: 'did:web:hosted.elohim.host:humans:human-123',
+        profile: mockProfile,
+        attestations: [],
+        agencyStage: 'hosted',
+        keyLocation: 'custodial',
+        canExportKeys: false,
+        keyBackup: null,
+        isLocalConductor: false,
+        conductorUrl: null,
+        linkedSessionId: null,
+        hasPendingMigration: false,
+        hostingCost: null,
+        nodeOperatorIncome: null,
+        isLoading: false,
+        error: null,
+      }),
+    };
+    mockIdentityService.getCurrentHuman.mockReturnValue(Promise.resolve(mockProfile));
+    mockIdentityService.updateProfile.mockReturnValue(Promise.resolve(mockProfile));
 
-    mockAgencyService = jasmine.createSpyObj('AgencyService', [], {
+    mockAgencyService = {
       currentStage: signal('hosted'),
       stageInfo: signal({
         stage: 'hosted',
@@ -110,17 +111,21 @@ describe('ProfileComponent', () => {
         label: 'Offline',
         description: 'Not connected',
       }),
-    });
+    };
 
-    mockDiscoveryService = jasmine.createSpyObj('DiscoveryAttestationService', ['toggleFeatured'], {
+    mockDiscoveryService = {
+      toggleFeatured: vi.fn(),
+      getBadgeDisplay: vi.fn(),
       featuredResults: signal([]),
-      results: signal([]),
+    };
+    mockDiscoveryService.getBadgeDisplay.mockReturnValue({
+      label: 'ISTP',
+      icon: '🔧',
+      color: '#8B5CF6',
     });
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
-
-    mockIdentityService.getCurrentHuman.and.returnValue(Promise.resolve(mockProfile));
-    mockIdentityService.updateProfile.and.returnValue(Promise.resolve(mockProfile));
+    mockRouter = { navigate: vi.fn() };
+    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
@@ -128,78 +133,34 @@ describe('ProfileComponent', () => {
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: AgencyService, useValue: mockAgencyService },
         { provide: DiscoveryAttestationService, useValue: mockDiscoveryService },
-        {
-          provide: DoorwayRegistryService,
-          useValue: {
-            doorwaysWithHealth: signal([]),
-            selected: signal(null),
-            selectedUrl: signal(null),
-            hasSelection: signal(false),
-            selectDoorwayByUrl: jasmine.createSpy('selectDoorwayByUrl'),
-            validateDoorway: jasmine
-              .createSpy('validateDoorway')
-              .and.returnValue(Promise.resolve({ isValid: false })),
-          },
-        },
-        {
-          provide: TauriAuthService,
-          useValue: {
-            isTauri: signal(false),
-            graduationStatus: signal('idle'),
-            graduationError: signal(''),
-            isGraduationEligible: signal(false),
-            confirmStewardship: jasmine
-              .createSpy('confirmStewardship')
-              .and.returnValue(Promise.resolve(false)),
-          },
-        },
-        {
-          provide: HolochainClientService,
-          useValue: {
-            getDisplayInfo: () => ({
-              state: 'connected',
-              mode: 'doorway',
-              adminUrl: 'ws://localhost:4444',
-              appUrl: 'ws://localhost:4445',
-              agentPubKey: 'test-key',
-              dnaHash: 'test-dna',
-              connectedAt: new Date(),
-              hasStoredCredentials: true,
-              error: null,
-            }),
-            disconnect: jasmine.createSpy('disconnect').and.returnValue(Promise.resolve()),
-            connect: jasmine.createSpy('connect').and.returnValue(Promise.resolve()),
-          },
-        },
-        {
-          provide: SessionHumanService,
-          useValue: {
-            prepareMigration: () => null,
-          },
-        },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            fragment: of(null),
-          },
-        },
         { provide: Router, useValue: mockRouter },
         {
           provide: AuthService,
-          useValue: {
-            identifier: signal<string | null>(null),
-            token: signal<string | null>(null),
-          },
+          useValue: { isAuthenticated: vi.fn().mockReturnValue(true) },
+        },
+        {
+          provide: SessionHumanService,
+          useValue: { hasSession: signal(false), getSession: vi.fn().mockReturnValue(null) },
+        },
+        {
+          provide: DoorwayRegistryService,
+          useValue: { selected: signal(null), selectedUrl: vi.fn().mockReturnValue(null) },
+        },
+        {
+          provide: HolochainClientService,
+          useValue: { isConnected: signal(true), getDisplayInfo: vi.fn() },
+        },
+        {
+          provide: TauriAuthService,
+          useValue: { isTauri: signal(false), needsUnlock: vi.fn().mockReturnValue(false) },
         },
         {
           provide: HostingAccountService,
-          useValue: {
-            account: signal(null),
-            isLoading: signal(false),
-            error: signal<string | null>(null),
-            loadAccount: jasmine.createSpy('loadAccount').and.returnValue(Promise.resolve(null)),
-            clearAccount: jasmine.createSpy('clearAccount'),
-          },
+          useValue: { getHostingInfo: vi.fn().mockReturnValue(Promise.resolve(null)) },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: { queryParams: of({}), snapshot: { fragment: null } },
         },
       ],
     }).compileComponents();
@@ -220,7 +181,7 @@ describe('ProfileComponent', () => {
     });
 
     it('should handle profile load failure silently', async () => {
-      mockIdentityService.getCurrentHuman.and.returnValue(
+      mockIdentityService.getCurrentHuman.mockReturnValue(
         Promise.reject(new Error('Network error'))
       );
 
@@ -280,7 +241,7 @@ describe('ProfileComponent', () => {
       await component.saveProfile();
 
       expect(mockIdentityService.updateProfile).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           displayName: 'Updated Name',
           bio: 'Updated bio',
         })
@@ -290,7 +251,7 @@ describe('ProfileComponent', () => {
     });
 
     it('should handle save error', async () => {
-      mockIdentityService.updateProfile.and.returnValue(Promise.reject(new Error('Save failed')));
+      mockIdentityService.updateProfile.mockReturnValue(Promise.reject(new Error('Save failed')));
       component.form.displayName = 'Test';
 
       await component.saveProfile();
@@ -332,6 +293,46 @@ describe('ProfileComponent', () => {
       component.navigateToDiscovery();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/discovery']);
+    });
+
+    it('should navigate to resource by contentNodeId', () => {
+      component.navigateToResource('content-enneagram-001');
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/resource', 'content-enneagram-001']);
+    });
+  });
+
+  describe('Discovery Badge Helpers', () => {
+    const mockResult = {
+      id: 'discovery-1',
+      assessmentId: 'assessment-mbti',
+      assessmentTitle: 'MBTI Assessment',
+      contentNodeId: 'content-mbti-001',
+      framework: 'mbti',
+      category: 'personality',
+      humanId: 'human-123',
+      completedAt: '2026-01-15T10:00:00.000Z',
+      primaryType: { typeId: 'istp', name: 'ISTP', score: 0.9 },
+      subscaleScores: {},
+      displayString: 'ISTP',
+      shortDisplay: 'ISTP',
+    } as any;
+
+    it('should return badge color from discovery service', () => {
+      const color = component.getBadgeColor(mockResult);
+
+      expect(mockDiscoveryService.getBadgeDisplay).toHaveBeenCalledWith(mockResult);
+      expect(color).toBe('#8B5CF6');
+    });
+
+    it('should return category icon for discovery result', () => {
+      const icon = component.getDiscoveryCategoryIcon(mockResult);
+
+      expect(icon).toBeTruthy();
+    });
+
+    it('should expose featuredDiscoveryResults from service', () => {
+      expect(component.featuredDiscoveryResults()).toEqual([]);
     });
   });
 

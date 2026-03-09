@@ -31,9 +31,9 @@
  */
 
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 67.9% (2026-02-05)
+// @coverage: 67.9% (2026-02-24)
 
 import { catchError, map, timeout } from 'rxjs/operators';
 
@@ -52,28 +52,40 @@ import {
   HumanRelationshipQuery,
   CreateHumanRelationshipInput,
 } from '@app/imagodei/models/human-relationship.model';
-import { RelationshipQuery, CreateRelationshipInput } from '@app/lamad/models/content-node.model';
+import { CreateRelationshipInput } from '@app/lamad/models/content-node.model';
 import {
-  StewardshipAllocation,
-  ContentStewardship,
   AllocationQuery,
   CreateAllocationInput,
   UpdateAllocationInput,
   FileDisputeInput,
   ResolveDisputeInput,
   BulkAllocationResult,
-  fromWireStewardshipAllocation,
-  fromWireContentStewardship,
 } from '@app/lamad/models/stewardship-allocation.model';
 
 import { environment } from '../../../environments/environment';
+import {
+  type IStorageApi,
+  type IStorageWriter,
+  type ContentFilters,
+  type PathFilters,
+  type RelationshipFilters,
+  type CreatePresenceInput,
+  type CreateMasteryInput,
+  type CreateEventInput,
+} from '../interfaces';
 
 import type {
   RelationshipView,
+  RelationshipWithContentView,
   HumanRelationshipView as HumanRelationshipViewBase,
   ContributorPresenceView as ContributorPresenceViewBase,
   EconomicEventView,
   ContentMasteryView,
+  ContentWithTagsView,
+  PathView,
+  PathWithDetailsView,
+  StewardshipAllocationView,
+  ContentStewardshipView,
 } from '@elohim/storage-client/generated';
 
 /**
@@ -89,15 +101,6 @@ export interface PresenceQuery {
 }
 
 /**
- * Input for creating a presence
- */
-export interface CreatePresenceInput {
-  displayName: string;
-  establishingContentIds: string[];
-  externalIdentifiers?: { platform: string; identifier: string }[];
-}
-
-/**
  * Query parameters for mastery
  */
 export interface MasteryQuery {
@@ -109,37 +112,10 @@ export interface MasteryQuery {
   offset?: number;
 }
 
-/**
- * Input for creating/updating mastery
- */
-export interface CreateMasteryInput {
-  humanId: string;
-  contentId: string;
-  masteryLevel?: string;
-  engagementType?: string;
-}
-
-/**
- * Input for creating an economic event
- */
-export interface CreateEventInput {
-  action: string;
-  provider: string;
-  receiver: string;
-  resourceConformsTo?: string;
-  resourceQuantity?: { value: number; unit: string };
-  lamadEventType?: string;
-  contentId?: string;
-  pathId?: string;
-  contributorPresenceId?: string;
-  note?: string;
-  metadata?: Record<string, unknown>;
-}
-
 @Injectable({
   providedIn: 'root',
 })
-export class StorageApiService {
+export class StorageApiService implements IStorageApi, IStorageWriter {
   /** Base URL for elohim-storage API */
   private readonly baseUrl: string;
 
@@ -149,12 +125,126 @@ export class StorageApiService {
   /** Default request timeout in milliseconds */
   private readonly defaultTimeoutMs = 30000;
 
-  constructor(private readonly http: HttpClient) {
+  private readonly http = inject(HttpClient);
+
+  constructor() {
     // Use storageUrl from environment or fall back to doorway URL
     this.baseUrl =
       environment.holochain?.storageUrl ??
       (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??
       '';
+  }
+
+  // ==========================================================================
+  // IStorageApi — Read-oriented interface methods
+  // ==========================================================================
+
+  /** Get a single content item by ID, with tags. */
+  getContent(id: string): Observable<ContentWithTagsView | null> {
+    return this.http
+      .get<ContentWithTagsView>(`${this.baseUrl}/db/content/${encodeURIComponent(id)}`)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => {
+          if ((error as Record<string, unknown>)['status'] === 404) {
+            return of(null);
+          }
+          return this.handleError('getContent', error);
+        })
+      );
+  }
+
+  /** List content items with optional filters. */
+  getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]> {
+    let params = new HttpParams().set('appId', this.appId);
+
+    if (filters?.contentType) params = params.set('contentType', filters.contentType);
+    if (filters?.tags?.length) params = params.set('tags', filters.tags.join(','));
+    if (filters?.reach) params = params.set('reach', filters.reach);
+    if (filters?.search) params = params.set('search', filters.search);
+    if (filters?.limit) params = params.set('limit', filters.limit.toString());
+    if (filters?.offset) params = params.set('offset', filters.offset.toString());
+
+    return this.http.get<ContentWithTagsView[]>(`${this.baseUrl}/db/content`, { params }).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError(error => this.handleError('getContents', error))
+    );
+  }
+
+  /** Get a single learning path by ID, with full details. */
+  getPath(id: string): Observable<PathWithDetailsView | null> {
+    return this.http
+      .get<PathWithDetailsView>(`${this.baseUrl}/db/paths/${encodeURIComponent(id)}`)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => {
+          if ((error as Record<string, unknown>)['status'] === 404) {
+            return of(null);
+          }
+          return this.handleError('getPath', error);
+        })
+      );
+  }
+
+  /** List learning paths with optional filters. */
+  getPaths(filters?: PathFilters): Observable<PathView[]> {
+    let params = new HttpParams().set('appId', this.appId);
+
+    if (filters?.pathType) params = params.set('pathType', filters.pathType);
+    if (filters?.difficulty) params = params.set('difficulty', filters.difficulty);
+    if (filters?.visibility) params = params.set('visibility', filters.visibility);
+    if (filters?.tags?.length) params = params.set('tags', filters.tags.join(','));
+    if (filters?.limit) params = params.set('limit', filters.limit.toString());
+    if (filters?.offset) params = params.set('offset', filters.offset.toString());
+
+    return this.http.get<PathView[]>(`${this.baseUrl}/db/paths`, { params }).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError(error => this.handleError('getPaths', error))
+    );
+  }
+
+  /** Get relationships for a content node, with joined content. */
+  getRelatedContent(id: string): Observable<RelationshipWithContentView[]> {
+    const params = new HttpParams()
+      .set('appId', this.appId)
+      .set('sourceId', id)
+      .set('includeContent', 'true');
+
+    return this.http
+      .get<RelationshipWithContentView[]>(`${this.baseUrl}/db/relationships`, { params })
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => this.handleError('getRelatedContent', error))
+      );
+  }
+
+  /** Get mastery state for a human on specific content. */
+  getMastery(humanId: string, contentId: string): Observable<ContentMasteryView | null> {
+    const params = new HttpParams()
+      .set('appId', this.appId)
+      .set('humanId', humanId)
+      .set('contentId', contentId);
+
+    return this.http.get<ContentMasteryView[]>(`${this.baseUrl}/db/mastery`, { params }).pipe(
+      timeout(this.defaultTimeoutMs),
+      map(results => results[0] ?? null),
+      catchError(error => this.handleError('getMastery', error))
+    );
+  }
+
+  /** Get stewardship data for a content piece. */
+  getStewardship(contentId: string): Observable<ContentStewardshipView | null> {
+    return this.http
+      .get<ContentStewardshipView>(`${this.baseUrl}/db/allocations/content/${contentId}`)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => {
+          if ((error as Record<string, unknown>)['status'] === 404) {
+            return of(null);
+          }
+          return this.handleError('getStewardship', error);
+        })
+      );
   }
 
   // ==========================================================================
@@ -165,7 +255,7 @@ export class StorageApiService {
    * List content relationships with optional filters.
    * Query params use camelCase.
    */
-  getRelationships(query?: RelationshipQuery): Observable<RelationshipView[]> {
+  getRelationships(query?: RelationshipFilters): Observable<RelationshipView[]> {
     let params = new HttpParams().set('appId', this.appId);
 
     if (query?.sourceId) params = params.set('sourceId', query.sourceId);
@@ -592,7 +682,7 @@ export class StorageApiService {
   /**
    * List stewardship allocations with optional filters.
    */
-  getStewardshipAllocations(query?: AllocationQuery): Observable<StewardshipAllocation[]> {
+  getStewardshipAllocations(query?: AllocationQuery): Observable<StewardshipAllocationView[]> {
     let params = new HttpParams().set('appId', this.appId);
 
     if (query?.contentId) params = params.set('contentId', query.contentId);
@@ -603,10 +693,9 @@ export class StorageApiService {
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
     return this.http
-      .get<Record<string, unknown>[]>(`${this.baseUrl}/db/allocations`, { params })
+      .get<StewardshipAllocationView[]>(`${this.baseUrl}/db/allocations`, { params })
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(wires => wires.map(w => fromWireStewardshipAllocation(w))),
         catchError(error => this.handleError('getStewardshipAllocations', error))
       );
   }
@@ -614,12 +703,11 @@ export class StorageApiService {
   /**
    * Get a specific stewardship allocation by ID.
    */
-  getStewardshipAllocation(allocationId: string): Observable<StewardshipAllocation | null> {
+  getStewardshipAllocation(allocationId: string): Observable<StewardshipAllocationView | null> {
     return this.http
-      .get<Record<string, unknown> | null>(`${this.baseUrl}/db/allocations/${allocationId}`)
+      .get<StewardshipAllocationView | null>(`${this.baseUrl}/db/allocations/${allocationId}`)
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(w => (w ? fromWireStewardshipAllocation(w) : null)),
         catchError(error => {
           if ((error as Record<string, unknown>)['status'] === 404) {
             return of(null);
@@ -632,12 +720,11 @@ export class StorageApiService {
   /**
    * Get all stewardship data for a content piece (aggregate view).
    */
-  getContentStewardship(contentId: string): Observable<ContentStewardship> {
+  getContentStewardship(contentId: string): Observable<ContentStewardshipView> {
     return this.http
-      .get<Record<string, unknown>>(`${this.baseUrl}/db/allocations/content/${contentId}`)
+      .get<ContentStewardshipView>(`${this.baseUrl}/db/allocations/content/${contentId}`)
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(w => fromWireContentStewardship(w)),
         catchError(error => this.handleError('getContentStewardship', error))
       );
   }
@@ -645,12 +732,13 @@ export class StorageApiService {
   /**
    * Get all allocations for a steward.
    */
-  getAllocationsForSteward(stewardPresenceId: string): Observable<StewardshipAllocation[]> {
+  getAllocationsForSteward(stewardPresenceId: string): Observable<StewardshipAllocationView[]> {
     return this.http
-      .get<Record<string, unknown>[]>(`${this.baseUrl}/db/allocations/steward/${stewardPresenceId}`)
+      .get<
+        StewardshipAllocationView[]
+      >(`${this.baseUrl}/db/allocations/steward/${stewardPresenceId}`)
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(wires => wires.map(w => fromWireStewardshipAllocation(w))),
         catchError(error => this.handleError('getAllocationsForSteward', error))
       );
   }
@@ -659,25 +747,20 @@ export class StorageApiService {
    * Create a new stewardship allocation.
    * API accepts camelCase InputView with parsed JSON objects.
    */
-  createStewardshipAllocation(input: CreateAllocationInput): Observable<StewardshipAllocation> {
+  createStewardshipAllocation(input: CreateAllocationInput): Observable<StewardshipAllocationView> {
     const body = {
       contentId: input.contentId,
       stewardPresenceId: input.stewardPresenceId,
       allocationRatio: input.allocationRatio ?? 1,
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
-      contributionEvidence: input.contributionEvidenceJson
-        ? (JSON.parse(input.contributionEvidenceJson) as Record<string, unknown>)
-        : null,
+      contributionEvidence: input.contributionEvidence ?? null,
       note: input.note,
-      metadata: input.metadataJson
-        ? (JSON.parse(input.metadataJson) as Record<string, unknown>)
-        : null,
+      metadata: input.metadata ?? null,
     };
 
-    return this.http.post<Record<string, unknown>>(`${this.baseUrl}/db/allocations`, body).pipe(
+    return this.http.post<StewardshipAllocationView>(`${this.baseUrl}/db/allocations`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => fromWireStewardshipAllocation(w)),
       catchError(error => this.handleError('createStewardshipAllocation', error))
     );
   }
@@ -689,13 +772,13 @@ export class StorageApiService {
   updateStewardshipAllocation(
     allocationId: string,
     input: UpdateAllocationInput
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     const body: Record<string, unknown> = {};
     if (input.allocationRatio !== undefined) body['allocationRatio'] = input.allocationRatio;
     if (input.allocationMethod) body['allocationMethod'] = input.allocationMethod;
     if (input.contributionType) body['contributionType'] = input.contributionType;
-    if (input.contributionEvidenceJson)
-      body['contributionEvidence'] = JSON.parse(input.contributionEvidenceJson);
+    if (input.contributionEvidence !== undefined)
+      body['contributionEvidence'] = input.contributionEvidence;
     if (input.governanceState) body['governanceState'] = input.governanceState;
     if (input.disputeId) body['disputeId'] = input.disputeId;
     if (input.disputeReason) body['disputeReason'] = input.disputeReason;
@@ -704,10 +787,9 @@ export class StorageApiService {
     if (input.note) body['note'] = input.note;
 
     return this.http
-      .put<Record<string, unknown>>(`${this.baseUrl}/db/allocations/${allocationId}`, body)
+      .put<StewardshipAllocationView>(`${this.baseUrl}/db/allocations/${allocationId}`, body)
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(w => fromWireStewardshipAllocation(w)),
         catchError(error => this.handleError('updateStewardshipAllocation', error))
       );
   }
@@ -729,7 +811,7 @@ export class StorageApiService {
   fileAllocationDispute(
     allocationId: string,
     input: FileDisputeInput
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     const body = {
       disputeId: input.disputeId,
       disputedBy: input.disputedBy,
@@ -737,10 +819,12 @@ export class StorageApiService {
     };
 
     return this.http
-      .post<Record<string, unknown>>(`${this.baseUrl}/db/allocations/${allocationId}/dispute`, body)
+      .post<StewardshipAllocationView>(
+        `${this.baseUrl}/db/allocations/${allocationId}/dispute`,
+        body
+      )
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(w => fromWireStewardshipAllocation(w)),
         catchError(error => this.handleError('fileAllocationDispute', error))
       );
   }
@@ -752,17 +836,19 @@ export class StorageApiService {
   resolveAllocationDispute(
     allocationId: string,
     input: ResolveDisputeInput
-  ): Observable<StewardshipAllocation> {
+  ): Observable<StewardshipAllocationView> {
     const body = {
       ratifierId: input.ratifierId,
       newState: input.newState,
     };
 
     return this.http
-      .post<Record<string, unknown>>(`${this.baseUrl}/db/allocations/${allocationId}/resolve`, body)
+      .post<StewardshipAllocationView>(
+        `${this.baseUrl}/db/allocations/${allocationId}/resolve`,
+        body
+      )
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map(w => fromWireStewardshipAllocation(w)),
         catchError(error => this.handleError('resolveAllocationDispute', error))
       );
   }
@@ -778,13 +864,9 @@ export class StorageApiService {
       allocationRatio: input.allocationRatio ?? 1,
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
-      contributionEvidence: input.contributionEvidenceJson
-        ? (JSON.parse(input.contributionEvidenceJson) as Record<string, unknown>)
-        : null,
+      contributionEvidence: input.contributionEvidence ?? null,
       note: input.note,
-      metadata: input.metadataJson
-        ? (JSON.parse(input.metadataJson) as Record<string, unknown>)
-        : null,
+      metadata: input.metadata ?? null,
     }));
 
     return this.http.post<BulkAllocationResult>(`${this.baseUrl}/db/allocations/bulk`, body).pipe(

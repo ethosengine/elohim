@@ -83,7 +83,7 @@ The Tauri app does NOT use Rust FFI or direct SQLite bindings. It makes standard
 | `src-tauri/Cargo.toml` | Dependencies (tauri 2.9, tauri-plugin-holochain main-0.6) |
 | `src-tauri/tauri.conf.json` | Tauri config (deep-link schemes, dev URL, bundle targets) |
 | `flake.nix` | Nix devShell (holonix + tauri-plugin-holochain + just) |
-| `package.json` | npm scripts: `tauri:dev`, `tauri:build` |
+| `package.json` | pnpm scripts: `tauri:dev`, `tauri:build` |
 
 ---
 
@@ -181,7 +181,7 @@ just steward-dev
 just steward-build
 
 # Or via npm directly
-cd steward && npm run tauri:dev
+cd steward && pnpm run tauri:dev
 ```
 
 ### Prerequisites

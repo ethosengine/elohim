@@ -8,17 +8,21 @@ set dotenv-load := false
 default:
     @just --list
 
+# Install dependencies (skip if node_modules is current)
+install:
+    pnpm install --frozen-lockfile --ignore-scripts
+
 # Validate seed data schemas
 validate:
-    npm run validate
+    pnpm run validate
 
 # Run tests
 test:
-    npx vitest run
+    pnpm exec vitest run
 
 # Type-check without building
 check:
-    npx tsc --noEmit
+    pnpm exec tsc --noEmit
 
-# Quality gate: validate + test
-gate: validate test
+# Quality gate: install + validate + test
+gate: install validate test

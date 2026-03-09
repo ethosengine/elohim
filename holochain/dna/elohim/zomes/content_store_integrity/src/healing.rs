@@ -19,7 +19,7 @@ pub const CONTENT_TYPES: &[&str] = &[
     "lesson",         // Digestible learning session (AI-derived from concepts)
     "scenario",       // Gherkin feature/scenario
     "assessment",     // Quiz or test
-    "resource",       // Supporting material
+
     "reflection",     // Journaling/reflection prompt
     "discussion",     // Discussion topic
     "exercise",       // Practice activity
@@ -43,6 +43,9 @@ pub const CONTENT_TYPES: &[&str] = &[
     "course-module",  // Course module structure
     "module",         // Generic module
     "quiz",           // Quiz content (distinct from assessment)
+    "podcast",        // Podcast content reference
+    "role",           // Role/persona in simulation or governance
+    "simulation",     // Simulation exercise
 ];
 
 /// Reach levels - must match REACH_LEVELS in lib.rs
@@ -77,11 +80,14 @@ pub const CONTENT_FORMATS: &[&str] = &[
     "html5-app",       // HTML5 interactive application
     "human-json",      // Human persona JSON format
     "organization-json", // Organization JSON format
-    "json",            // Generic JSON format
+    "json",              // Generic JSON format
+    "sophia",            // Sophia assessment format (psychometric/discovery)
+    "sophia-quiz-json",  // Sophia quiz format (self-documenting assessment content)
 ];
 
 pub const PATH_VISIBILITIES: &[&str] = &[
     "private",   // Only creator
+    "intimate",  // Mutual-attestation paths (e.g. love-map)
     "unlisted",  // Accessible by link
     "community", // Community members
     "public",    // Anyone

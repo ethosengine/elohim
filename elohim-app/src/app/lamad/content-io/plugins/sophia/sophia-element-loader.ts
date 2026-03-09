@@ -5,7 +5,9 @@
  * an external UMD bundle, ensuring React and Sophia are only loaded when needed.
  */
 
-// @coverage: 45.0% (2026-02-05)
+// @coverage: 44.7% (2026-02-24)
+
+import { getInstrument as getRegistryInstrument } from '../../../quiz-engine/instruments/instrument-registry';
 
 // Import types for local use and re-export for consumers
 import type { Moment, Recognition } from './sophia-moment.model';
@@ -318,15 +320,7 @@ export interface PsycheAPI {
 export interface PsychometricInstrument {
   id: string;
   name: string;
-  category:
-    | 'personality'
-    | 'values'
-    | 'interests'
-    | 'skills'
-    | 'vocational'
-    | 'wellbeing'
-    | 'learning'
-    | 'custom';
+  category: string;
   subscales: SubscaleDefinition[];
   scoringConfig: ScoringConfig;
   interpret: (aggregated: AggregatedReflection) => unknown;
@@ -448,6 +442,48 @@ export interface DimensionalProfile {
  *
  * Returns null if the sophia element hasn't been loaded yet.
  */
+/**
+ * Build a PsychometricInterpretation from registry instrument + aggregated data.
+ * Used by the PsycheAPI interpretReflection/interpretWithInstrument methods.
+ */
+/**
+ * Build a PsychometricInterpretation from registry instrument + aggregated data.
+ * Used by the PsycheAPI interpretReflection/interpretWithInstrument methods.
+ *
+ * Uses getInstrument from instrument-registry (safe: registry only has
+ * type-imports from this file, so no runtime circular dependency).
+ */
+function buildInterpretation(
+  instrumentId: string,
+  aggregated: AggregatedReflection
+): PsychometricInterpretation {
+  const entry = getRegistryInstrument(instrumentId);
+  const raw = entry?.config.interpret?.(aggregated) as
+    | { primaryType?: { typeId: string; typeName: string; description?: string } }
+    | null
+    | undefined;
+
+  const primaryType: TypeResult | undefined = raw?.primaryType
+    ? {
+        typeId: raw.primaryType.typeId,
+        typeName: raw.primaryType.typeName,
+        confidence: 1,
+        description: raw.primaryType.description,
+      }
+    : undefined;
+
+  return {
+    id: `interp-${instrumentId}-${Date.now()}`,
+    instrumentId,
+    category: (entry?.config.category as string) ?? 'unknown',
+    primaryType,
+    summary: primaryType ? primaryType.typeName : 'No interpretation available',
+    aggregatedReflection: aggregated,
+    interpretedAt: Date.now(),
+    confidence: primaryType ? 1 : 0,
+  };
+}
+
 export function getPsycheAPI(): PsycheAPI | null {
   const sophiaElement = _globals.SophiaElement;
 
@@ -558,11 +594,17 @@ export function getPsycheAPI(): PsycheAPI | null {
       momentIds: [],
       aggregatedAt: Date.now(),
     }),
-    interpretReflection: () => {
-      throw new Error('Not implemented');
+    interpretReflection: (
+      instrumentId: string,
+      aggregated: AggregatedReflection
+    ): PsychometricInterpretation => {
+      return buildInterpretation(instrumentId, aggregated);
     },
-    interpretWithInstrument: () => {
-      throw new Error('Not implemented');
+    interpretWithInstrument: (
+      instrument: PsychometricInstrument,
+      aggregated: AggregatedReflection
+    ): PsychometricInterpretation => {
+      return buildInterpretation(instrument.id, aggregated);
     },
   } as PsycheAPI;
 }

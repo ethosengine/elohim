@@ -1,6 +1,8 @@
 import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+// @coverage: 60.0% (2026-02-24)
+
 import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
 
 import { ShefaSidenavComponent } from '../shefa-sidenav/shefa-sidenav.component';

@@ -1,0 +1,15 @@
+{
+  "id": "adam-firstman",
+  "displayName": "Adam",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["value-scanner-epic", "care-economy-visibility"],
+  "claimedAgentId": "agent-adam-firstman",
+  "note": "The original gardener. Stewards care economy content through the lens of tending and nurturing. Natural affinity for value-scanner content where stewardship meets ecology.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-care-economy",
+    "affinityDomains": ["value-scanner", "community"],
+    "humanId": "human-adam-firstman"
+  }
+}

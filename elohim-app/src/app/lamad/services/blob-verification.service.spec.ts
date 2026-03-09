@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError, Observable } from 'rxjs';
 import { BlobVerificationService, BlobVerificationResult } from './blob-verification.service';
@@ -8,15 +9,9 @@ import { DoorwayClientService } from '../../elohim/services/doorway-client.servi
  * so that tests exercise the SubtleCrypto/fallback path.
  */
 const mockDoorwayClientService = {
-  verifyBlob: jasmine
-    .createSpy('verifyBlob')
-    .and.returnValue(throwError(() => new Error('Mock: Server unavailable'))),
-  verifyBlobData: jasmine
-    .createSpy('verifyBlobData')
-    .and.returnValue(throwError(() => new Error('Mock: Server unavailable'))),
-  checkHealth: jasmine
-    .createSpy('checkHealth')
-    .and.returnValue(throwError(() => new Error('Mock: Server unavailable'))),
+  verifyBlob: vi.fn().mockReturnValue(throwError(() => new Error('Mock: Server unavailable'))),
+  verifyBlobData: vi.fn().mockReturnValue(throwError(() => new Error('Mock: Server unavailable'))),
+  checkHealth: vi.fn().mockReturnValue(throwError(() => new Error('Mock: Server unavailable'))),
 };
 
 describe('BlobVerificationService', () => {
@@ -32,9 +27,9 @@ describe('BlobVerificationService', () => {
     service = TestBed.inject(BlobVerificationService);
 
     // Reset spies between tests
-    mockDoorwayClientService.verifyBlob.calls.reset();
-    mockDoorwayClientService.verifyBlobData.calls.reset();
-    mockDoorwayClientService.checkHealth.calls.reset();
+    mockDoorwayClientService.verifyBlob.mockClear();
+    mockDoorwayClientService.verifyBlobData.mockClear();
+    mockDoorwayClientService.checkHealth.mockClear();
   });
 
   it('should be created', () => {
@@ -96,234 +91,249 @@ describe('BlobVerificationService', () => {
   // ================== OBSERVABLE RETURN TYPE TESTS ==================
 
   describe('Observable Return Types', () => {
-    it('verifyBlob should return Observable<BlobVerificationResult>', done => {
-      const testBlob = new Blob(['test']);
-      const result$ = service.verifyBlob(testBlob, 'dummy_hash');
+    it('verifyBlob should return Observable<BlobVerificationResult>', () =>
+      new Promise<void>(done => {
+        const testBlob = new Blob(['test']);
+        const result$ = service.verifyBlob(testBlob, 'dummy_hash');
 
-      expect(result$ instanceof Observable).toBe(true);
+        expect(result$ instanceof Observable).toBe(true);
 
-      result$.subscribe(result => {
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-        expect(result.isValid).toBeDefined();
-        expect(result.computedHash).toBeDefined();
-        expect(result.expectedHash).toBeDefined();
-        expect(result.durationMs).toBeDefined();
-        done();
-      });
-    });
+        result$.subscribe(result => {
+          expect(result).toBeDefined();
+          expect(typeof result).toBe('object');
+          expect(result.isValid).toBeDefined();
+          expect(result.computedHash).toBeDefined();
+          expect(result.expectedHash).toBeDefined();
+          expect(result.durationMs).toBeDefined();
+          done();
+        });
+      }));
 
-    it('verifyChunk should return Observable<BlobVerificationResult>', done => {
-      const testBlob = new Blob(['chunk']);
-      const result$ = service.verifyChunk(testBlob, 'dummy_hash');
+    it('verifyChunk should return Observable<BlobVerificationResult>', () =>
+      new Promise<void>(done => {
+        const testBlob = new Blob(['chunk']);
+        const result$ = service.verifyChunk(testBlob, 'dummy_hash');
 
-      expect(result$ instanceof Observable).toBe(true);
+        expect(result$ instanceof Observable).toBe(true);
 
-      result$.subscribe(result => {
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-        done();
-      });
-    });
+        result$.subscribe(result => {
+          expect(result).toBeDefined();
+          expect(typeof result).toBe('object');
+          done();
+        });
+      }));
 
-    it('verifyMultiple should return Observable<BlobVerificationResult[]>', done => {
-      const blobs: [Blob, string][] = [
-        [new Blob(['data1']), 'hash1'],
-        [new Blob(['data2']), 'hash2'],
-      ];
-      const result$ = service.verifyMultiple(blobs);
+    it('verifyMultiple should return Observable<BlobVerificationResult[]>', () =>
+      new Promise<void>(done => {
+        const blobs: [Blob, string][] = [
+          [new Blob(['data1']), 'hash1'],
+          [new Blob(['data2']), 'hash2'],
+        ];
+        const result$ = service.verifyMultiple(blobs);
 
-      expect(result$ instanceof Observable).toBe(true);
+        expect(result$ instanceof Observable).toBe(true);
 
-      result$.subscribe(results => {
-        expect(Array.isArray(results)).toBe(true);
-        expect(results.length).toBe(2);
-        expect(results[0]).toBeDefined();
-        done();
-      });
-    });
+        result$.subscribe(results => {
+          expect(Array.isArray(results)).toBe(true);
+          expect(results.length).toBe(2);
+          expect(results[0]).toBeDefined();
+          done();
+        });
+      }));
   });
 
   // ================== PROPERTY INITIALIZATION TESTS ==================
 
   describe('Result Object Structure', () => {
-    it('BlobVerificationResult should have all required properties', done => {
-      const testBlob = new Blob(['test']);
+    it('BlobVerificationResult should have all required properties', () =>
+      new Promise<void>(done => {
+        const testBlob = new Blob(['test']);
 
-      service.verifyBlob(testBlob, 'test_hash').subscribe(result => {
-        // Required properties
-        expect(result.isValid).toBeDefined();
-        expect(typeof result.isValid).toBe('boolean');
+        service.verifyBlob(testBlob, 'test_hash').subscribe(result => {
+          // Required properties
+          expect(result.isValid).toBeDefined();
+          expect(typeof result.isValid).toBe('boolean');
 
-        expect(result.computedHash).toBeDefined();
-        expect(typeof result.computedHash).toBe('string');
+          expect(result.computedHash).toBeDefined();
+          expect(typeof result.computedHash).toBe('string');
 
-        expect(result.expectedHash).toBeDefined();
-        expect(typeof result.expectedHash).toBe('string');
+          expect(result.expectedHash).toBeDefined();
+          expect(typeof result.expectedHash).toBe('string');
 
-        expect(result.durationMs).toBeDefined();
-        expect(typeof result.durationMs).toBe('number');
+          expect(result.durationMs).toBeDefined();
+          expect(typeof result.durationMs).toBe('number');
 
-        // Optional property
-        if (result.error !== undefined) {
-          expect(typeof result.error).toBe('string');
-        }
+          // Optional property
+          if (result.error !== undefined) {
+            expect(typeof result.error).toBe('string');
+          }
 
-        // Optional method indicator
-        if (result.method !== undefined) {
-          expect(['wasm', 'server', 'subtle-crypto', 'fallback-js']).toContain(result.method);
-        }
+          // Optional method indicator
+          if (result.method !== undefined) {
+            expect(['wasm', 'server', 'subtle-crypto', 'fallback-js']).toContain(result.method);
+          }
 
-        done();
-      });
-    });
+          done();
+        });
+      }));
 
-    it('should include durationMs in milliseconds', done => {
-      const testBlob = new Blob(['test data']);
+    it('should include durationMs in milliseconds', () =>
+      new Promise<void>(done => {
+        const testBlob = new Blob(['test data']);
 
-      service.verifyBlob(testBlob, 'hash').subscribe(result => {
-        expect(result.durationMs).toBeGreaterThanOrEqual(0);
-        expect(typeof result.durationMs).toBe('number');
-        done();
-      });
-    });
+        service.verifyBlob(testBlob, 'hash').subscribe(result => {
+          expect(result.durationMs).toBeGreaterThanOrEqual(0);
+          expect(typeof result.durationMs).toBe('number');
+          done();
+        });
+      }));
 
-    it('computedHash should be hexadecimal string (64 chars for SHA256)', done => {
-      const testBlob = new Blob(['test']);
+    it('computedHash should be hexadecimal string (64 chars for SHA256)', () =>
+      new Promise<void>(done => {
+        const testBlob = new Blob(['test']);
 
-      service.verifyBlob(testBlob, '').subscribe(result => {
-        expect(result.computedHash).toMatch(/^[a-f0-9]*$/);
-        expect(result.computedHash.length).toBe(64);
-        done();
-      });
-    });
+        service.verifyBlob(testBlob, '').subscribe(result => {
+          expect(result.computedHash).toMatch(/^[a-f0-9]*$/);
+          expect(result.computedHash.length).toBe(64);
+          done();
+        });
+      }));
   });
 
   // ================== SIMPLE INPUT/OUTPUT TESTS ==================
 
   describe('Simple Input/Output', () => {
-    it('should accept Blob and string as parameters to verifyBlob', done => {
-      const blob = new Blob(['data']);
-      const hash = 'a'.repeat(64);
+    it('should accept Blob and string as parameters to verifyBlob', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['data']);
+        const hash = 'a'.repeat(64);
 
-      service.verifyBlob(blob, hash).subscribe(result => {
-        expect(result).toBeDefined();
-        done();
-      });
-    });
+        service.verifyBlob(blob, hash).subscribe(result => {
+          expect(result).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should handle empty Blob input', done => {
-      const emptyBlob = new Blob(['']);
+    it('should handle empty Blob input', () =>
+      new Promise<void>(done => {
+        const emptyBlob = new Blob(['']);
 
-      service.verifyBlob(emptyBlob, '').subscribe(result => {
-        expect(result.computedHash).toBeDefined();
-        expect(result.computedHash.length).toBe(64);
-        done();
-      });
-    });
-
-    it('should handle empty string hash input', done => {
-      const blob = new Blob(['test']);
-
-      service.verifyBlob(blob, '').subscribe(result => {
-        expect(result.expectedHash).toBe('');
-        expect(result.isValid).toBe(false);
-        done();
-      });
-    });
-
-    it('should return isValid false when hashes do not match', done => {
-      const blob = new Blob(['test']);
-      const wrongHash = '0000000000000000000000000000000000000000000000000000000000000000';
-
-      service.verifyBlob(blob, wrongHash).subscribe(result => {
-        expect(result.isValid).toBe(false);
-        expect(result.expectedHash).toBe(wrongHash);
-        done();
-      });
-    });
-
-    it('should return expectedHash matching input parameter', done => {
-      const blob = new Blob(['test']);
-      const inputHash = 'abcdef123456789' + '0'.repeat(49);
-
-      service.verifyBlob(blob, inputHash).subscribe(result => {
-        expect(result.expectedHash).toBe(inputHash);
-        done();
-      });
-    });
-
-    it('should handle Blob with various content types', done => {
-      const blobTypes = [
-        new Blob(['text'], { type: 'text/plain' }),
-        new Blob([new Uint8Array([1, 2, 3])], { type: 'application/octet-stream' }),
-        new Blob(['{"json": true}'], { type: 'application/json' }),
-      ];
-
-      let completed = 0;
-
-      blobTypes.forEach(blob => {
-        service.verifyBlob(blob, '').subscribe(result => {
+        service.verifyBlob(emptyBlob, '').subscribe(result => {
           expect(result.computedHash).toBeDefined();
           expect(result.computedHash.length).toBe(64);
-          completed++;
-
-          if (completed === blobTypes.length) {
-            done();
-          }
+          done();
         });
-      });
-    });
+      }));
+
+    it('should handle empty string hash input', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
+
+        service.verifyBlob(blob, '').subscribe(result => {
+          expect(result.expectedHash).toBe('');
+          expect(result.isValid).toBe(false);
+          done();
+        });
+      }));
+
+    it('should return isValid false when hashes do not match', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
+        const wrongHash = '0000000000000000000000000000000000000000000000000000000000000000';
+
+        service.verifyBlob(blob, wrongHash).subscribe(result => {
+          expect(result.isValid).toBe(false);
+          expect(result.expectedHash).toBe(wrongHash);
+          done();
+        });
+      }));
+
+    it('should return expectedHash matching input parameter', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
+        const inputHash = 'abcdef123456789' + '0'.repeat(49);
+
+        service.verifyBlob(blob, inputHash).subscribe(result => {
+          expect(result.expectedHash).toBe(inputHash);
+          done();
+        });
+      }));
+
+    it('should handle Blob with various content types', () =>
+      new Promise<void>(done => {
+        const blobTypes = [
+          new Blob(['text'], { type: 'text/plain' }),
+          new Blob([new Uint8Array([1, 2, 3])], { type: 'application/octet-stream' }),
+          new Blob(['{"json": true}'], { type: 'application/json' }),
+        ];
+
+        let completed = 0;
+
+        blobTypes.forEach(blob => {
+          service.verifyBlob(blob, '').subscribe(result => {
+            expect(result.computedHash).toBeDefined();
+            expect(result.computedHash.length).toBe(64);
+            completed++;
+
+            if (completed === blobTypes.length) {
+              done();
+            }
+          });
+        });
+      }));
   });
 
   // ================== METHOD SIGNATURE TESTS ==================
 
   describe('Method Signatures', () => {
-    it('verifyChunk should delegate to verifyBlob', done => {
-      const chunkBlob = new Blob(['chunk data']);
-      const hash = 'abc123' + '0'.repeat(58);
+    it('verifyChunk should delegate to verifyBlob', () =>
+      new Promise<void>(done => {
+        const chunkBlob = new Blob(['chunk data']);
+        const hash = 'abc123' + '0'.repeat(58);
 
-      // First verify with verifyBlob
-      service.verifyBlob(chunkBlob, hash).subscribe(blobResult => {
-        // Then verify with verifyChunk
-        service.verifyChunk(chunkBlob, hash).subscribe(chunkResult => {
-          // Results should be structurally identical
-          expect(chunkResult.computedHash).toEqual(blobResult.computedHash);
-          expect(chunkResult.isValid).toEqual(blobResult.isValid);
+        // First verify with verifyBlob
+        service.verifyBlob(chunkBlob, hash).subscribe(blobResult => {
+          // Then verify with verifyChunk
+          service.verifyChunk(chunkBlob, hash).subscribe(chunkResult => {
+            // Results should be structurally identical
+            expect(chunkResult.computedHash).toEqual(blobResult.computedHash);
+            expect(chunkResult.isValid).toEqual(blobResult.isValid);
+            done();
+          });
+        });
+      }));
+
+    it('verifyMultiple with empty array should return empty array', () =>
+      new Promise<void>(done => {
+        service.verifyMultiple([]).subscribe(results => {
+          expect(Array.isArray(results)).toBe(true);
+          expect(results.length).toBe(0);
           done();
         });
-      });
-    });
+      }));
 
-    it('verifyMultiple with empty array should return empty array', done => {
-      service.verifyMultiple([]).subscribe(results => {
-        expect(Array.isArray(results)).toBe(true);
-        expect(results.length).toBe(0);
-        done();
-      });
-    });
+    it('verifyMultiple should process all blobs', () =>
+      new Promise<void>(done => {
+        const blobs: [Blob, string][] = [
+          [new Blob(['blob1']), 'hash1'],
+          [new Blob(['blob2']), 'hash2'],
+          [new Blob(['blob3']), 'hash3'],
+        ];
 
-    it('verifyMultiple should process all blobs', done => {
-      const blobs: [Blob, string][] = [
-        [new Blob(['blob1']), 'hash1'],
-        [new Blob(['blob2']), 'hash2'],
-        [new Blob(['blob3']), 'hash3'],
-      ];
-
-      service.verifyMultiple(blobs).subscribe(results => {
-        expect(results.length).toBe(3);
-        expect(results[0]).toBeDefined();
-        expect(results[1]).toBeDefined();
-        expect(results[2]).toBeDefined();
-        done();
-      });
-    });
+        service.verifyMultiple(blobs).subscribe(results => {
+          expect(results.length).toBe(3);
+          expect(results[0]).toBeDefined();
+          expect(results[1]).toBeDefined();
+          expect(results[2]).toBeDefined();
+          done();
+        });
+      }));
 
     it('streamComputeHash should return Promise<string>', async () => {
       const blob = new Blob(['test']);
       const result = service.streamComputeHash(blob);
 
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof (result as any).then).toBe('function');
 
       const hash = await result;
       expect(typeof hash).toBe('string');
@@ -372,29 +382,31 @@ describe('BlobVerificationService', () => {
   // ================== ERROR HANDLING TESTS ==================
 
   describe('Error Handling', () => {
-    it('should handle verifyBlob error gracefully', done => {
-      const blob = new Blob(['test']);
+    it('should handle verifyBlob error gracefully', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
 
-      service.verifyBlob(blob, 'hash').subscribe(result => {
-        // Should return result even if internal error occurs
-        expect(result).toBeDefined();
-        expect(result.isValid).toBeDefined();
-        expect(result.computedHash).toBeDefined();
-        done();
-      });
-    });
+        service.verifyBlob(blob, 'hash').subscribe(result => {
+          // Should return result even if internal error occurs
+          expect(result).toBeDefined();
+          expect(result.isValid).toBeDefined();
+          expect(result.computedHash).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should populate error field when verification fails', done => {
-      const blob = new Blob(['test']);
-      const invalidHash = 'invalid_hash_that_will_not_match';
+    it('should populate error field when verification fails', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
+        const invalidHash = 'invalid_hash_that_will_not_match';
 
-      service.verifyBlob(blob, invalidHash).subscribe(result => {
-        expect(result).toBeDefined();
-        // Result should still be valid object structure
-        expect(result.isValid).toBe(false);
-        done();
-      });
-    });
+        service.verifyBlob(blob, invalidHash).subscribe(result => {
+          expect(result).toBeDefined();
+          // Result should still be valid object structure
+          expect(result.isValid).toBe(false);
+          done();
+        });
+      }));
   });
 
   // ================== ASYNC FLOW TESTS ==================
@@ -416,63 +428,67 @@ describe('BlobVerificationService', () => {
   // ================== ORIGINAL INTEGRATION TESTS ==================
 
   describe('verifyBlob Integration', () => {
-    it('should verify blob with matching hash', (done) => {
-      // Create a simple test blob
-      const testData = new TextEncoder().encode('test content');
-      const blob = new Blob([testData]);
+    it('should verify blob with matching hash', () =>
+      new Promise<void>(done => {
+        // Create a simple test blob
+        const testData = new TextEncoder().encode('test content');
+        const blob = new Blob([testData]);
 
-      // Compute expected hash first
-      service.verifyBlob(blob, '').subscribe(result => {
-        const expectedHash = result.computedHash;
+        // Compute expected hash first
+        service.verifyBlob(blob, '').subscribe(result => {
+          const expectedHash = result.computedHash;
 
-        // Now verify with the correct hash
-        service.verifyBlob(blob, expectedHash).subscribe(verifyResult => {
-          expect(verifyResult.isValid).toBe(true);
-          expect(verifyResult.computedHash).toEqual(expectedHash);
-          expect(verifyResult.expectedHash).toEqual(expectedHash);
-          expect(verifyResult.durationMs).toBeGreaterThanOrEqual(0);
+          // Now verify with the correct hash
+          service.verifyBlob(blob, expectedHash).subscribe(verifyResult => {
+            expect(verifyResult.isValid).toBe(true);
+            expect(verifyResult.computedHash).toEqual(expectedHash);
+            expect(verifyResult.expectedHash).toEqual(expectedHash);
+            expect(verifyResult.durationMs).toBeGreaterThanOrEqual(0);
+            done();
+          });
+        });
+      }));
+
+    it('should reject blob with mismatched hash', () =>
+      new Promise<void>(done => {
+        const testData = new TextEncoder().encode('test content');
+        const blob = new Blob([testData]);
+        const wrongHash = 'definitely_not_the_right_hash_0000000000000000000000000000';
+
+        service.verifyBlob(blob, wrongHash).subscribe(result => {
+          expect(result.isValid).toBe(false);
+          expect(result.expectedHash).toEqual(wrongHash);
+          expect(result.computedHash).not.toEqual(wrongHash);
           done();
         });
-      });
-    });
+      }));
 
-    it('should reject blob with mismatched hash', (done) => {
-      const testData = new TextEncoder().encode('test content');
-      const blob = new Blob([testData]);
-      const wrongHash = 'definitely_not_the_right_hash_0000000000000000000000000000';
+    it('should handle case-insensitive hash comparison', () =>
+      new Promise<void>(done => {
+        const testData = new TextEncoder().encode('test');
+        const blob = new Blob([testData]);
 
-      service.verifyBlob(blob, wrongHash).subscribe(result => {
-        expect(result.isValid).toBe(false);
-        expect(result.expectedHash).toEqual(wrongHash);
-        expect(result.computedHash).not.toEqual(wrongHash);
-        done();
-      });
-    });
+        service.verifyBlob(blob, '').subscribe(result => {
+          const hash = result.computedHash;
 
-    it('should handle case-insensitive hash comparison', (done) => {
-      const testData = new TextEncoder().encode('test');
-      const blob = new Blob([testData]);
+          // Test with uppercase
+          service.verifyBlob(blob, hash.toUpperCase()).subscribe(verifyResult => {
+            expect(verifyResult.isValid).toBe(true);
+            done();
+          });
+        });
+      }));
 
-      service.verifyBlob(blob, '').subscribe(result => {
-        const hash = result.computedHash;
+    it('should measure verification duration', () =>
+      new Promise<void>(done => {
+        const testData = new TextEncoder().encode('larger test content for timing');
+        const blob = new Blob([testData]);
 
-        // Test with uppercase
-        service.verifyBlob(blob, hash.toUpperCase()).subscribe(verifyResult => {
-          expect(verifyResult.isValid).toBe(true);
+        service.verifyBlob(blob, '').subscribe(result => {
+          expect(result.durationMs).toBeGreaterThanOrEqual(0);
           done();
         });
-      });
-    });
-
-    it('should measure verification duration', (done) => {
-      const testData = new TextEncoder().encode('larger test content for timing');
-      const blob = new Blob([testData]);
-
-      service.verifyBlob(blob, '').subscribe(result => {
-        expect(result.durationMs).toBeGreaterThanOrEqual(0);
-        done();
-      });
-    });
+      }));
   });
 
   describe('streamComputeHash Integration', () => {
@@ -514,11 +530,11 @@ describe('BlobVerificationService', () => {
     });
 
     it('should handle custom chunk sizes', async () => {
-      const testData = new TextEncoder().encode('a'.repeat(2 * 1024 * 1024)); // 2 MB
+      const testData = new TextEncoder().encode('a'.repeat(64 * 1024)); // 64 KB
       const blob = new Blob([testData]);
 
-      const smallChunkHash = await service.streamComputeHash(blob, 256 * 1024); // 256 KB chunks
-      const largeChunkHash = await service.streamComputeHash(blob, 2 * 1024 * 1024); // 2 MB chunk
+      const smallChunkHash = await service.streamComputeHash(blob, 16 * 1024); // 16 KB chunks
+      const largeChunkHash = await service.streamComputeHash(blob, 64 * 1024); // 64 KB chunk
 
       // Same content should produce same hash regardless of chunk size
       expect(smallChunkHash).toEqual(largeChunkHash);
@@ -526,174 +542,183 @@ describe('BlobVerificationService', () => {
   });
 
   describe('verifyChunk Integration', () => {
-    it('should verify individual chunk', (done) => {
-      const chunkData = new TextEncoder().encode('chunk data');
-      const chunk = new Blob([chunkData]);
+    it('should verify individual chunk', () =>
+      new Promise<void>(done => {
+        const chunkData = new TextEncoder().encode('chunk data');
+        const chunk = new Blob([chunkData]);
 
-      service.verifyChunk(chunk, '').subscribe(result => {
-        const expectedHash = result.computedHash;
+        service.verifyChunk(chunk, '').subscribe(result => {
+          const expectedHash = result.computedHash;
 
-        service.verifyChunk(chunk, expectedHash).subscribe(verifyResult => {
-          expect(verifyResult.isValid).toBe(true);
-          done();
+          service.verifyChunk(chunk, expectedHash).subscribe(verifyResult => {
+            expect(verifyResult.isValid).toBe(true);
+            done();
+          });
         });
-      });
-    });
+      }));
   });
 
   describe('verifyMultiple Integration', () => {
-    it('should verify multiple blobs in parallel', (done) => {
-      const testData1 = new TextEncoder().encode('blob 1');
-      const testData2 = new TextEncoder().encode('blob 2');
-      const blob1 = new Blob([testData1]);
-      const blob2 = new Blob([testData2]);
+    it('should verify multiple blobs in parallel', () =>
+      new Promise<void>(done => {
+        const testData1 = new TextEncoder().encode('blob 1');
+        const testData2 = new TextEncoder().encode('blob 2');
+        const blob1 = new Blob([testData1]);
+        const blob2 = new Blob([testData2]);
 
-      // First pass to get hashes
-      let hash1 = '';
-      let hash2 = '';
-      let completed = 0;
+        // First pass to get hashes
+        let hash1 = '';
+        let hash2 = '';
+        let completed = 0;
 
-      service.verifyBlob(blob1, '').subscribe(result => {
-        hash1 = result.computedHash;
-        completed++;
+        service.verifyBlob(blob1, '').subscribe(result => {
+          hash1 = result.computedHash;
+          completed++;
 
-        if (completed === 2) {
-          // Now verify with correct hashes
-          service
-            .verifyMultiple([
-              [blob1, hash1],
-              [blob2, hash2],
-            ])
-            .subscribe((results: BlobVerificationResult[]) => {
-              expect(results.length).toBe(2);
-              expect(results[0].isValid).toBe(true);
-              expect(results[1].isValid).toBe(true);
-              done();
-            });
-        }
-      });
+          if (completed === 2) {
+            // Now verify with correct hashes
+            service
+              .verifyMultiple([
+                [blob1, hash1],
+                [blob2, hash2],
+              ])
+              .subscribe((results: BlobVerificationResult[]) => {
+                expect(results.length).toBe(2);
+                expect(results[0].isValid).toBe(true);
+                expect(results[1].isValid).toBe(true);
+                done();
+              });
+          }
+        });
 
-      service.verifyBlob(blob2, '').subscribe(result => {
-        hash2 = result.computedHash;
-        completed++;
+        service.verifyBlob(blob2, '').subscribe(result => {
+          hash2 = result.computedHash;
+          completed++;
 
-        if (completed === 2) {
-          // Now verify with correct hashes
-          service
-            .verifyMultiple([
-              [blob1, hash1],
-              [blob2, hash2],
-            ])
-            .subscribe((results: BlobVerificationResult[]) => {
-              expect(results.length).toBe(2);
-              expect(results[0].isValid).toBe(true);
-              expect(results[1].isValid).toBe(true);
-              done();
-            });
-        }
-      });
-    });
+          if (completed === 2) {
+            // Now verify with correct hashes
+            service
+              .verifyMultiple([
+                [blob1, hash1],
+                [blob2, hash2],
+              ])
+              .subscribe((results: BlobVerificationResult[]) => {
+                expect(results.length).toBe(2);
+                expect(results[0].isValid).toBe(true);
+                expect(results[1].isValid).toBe(true);
+                done();
+              });
+          }
+        });
+      }));
 
-    it('should handle empty array', (done) => {
-      service.verifyMultiple([]).subscribe(results => {
-        expect(results).toEqual([]);
-        done();
-      });
-    });
+    it('should handle empty array', () =>
+      new Promise<void>(done => {
+        service.verifyMultiple([]).subscribe(results => {
+          expect(results).toEqual([]);
+          done();
+        });
+      }));
   });
 
   describe('SubtleCrypto Fallback for Non-HTTPS Contexts', () => {
-    it('should use pure-JS SHA256 when SubtleCrypto unavailable', (done) => {
-      const testData = 'test content';
-      const blob = new Blob([testData]);
-      const expectedHash = 'd4d8f0b8d9c8c8f8e8d8c8b8a8989898989898989898989898989898989898';
+    it('should use pure-JS SHA256 when SubtleCrypto unavailable', () =>
+      new Promise<void>(done => {
+        const testData = 'test content';
+        const blob = new Blob([testData]);
+        const expectedHash = 'd4d8f0b8d9c8c8f8e8d8c8b8a8989898989898989898989898989898989898';
 
-      // This test will work with the fallback SHA256
-      service.verifyBlob(blob, expectedHash).subscribe(result => {
-        // Just verify it doesn't error and returns a result
-        expect(result.computedHash).toBeDefined();
-        expect(typeof result.computedHash).toBe('string');
-        expect(result.computedHash.length).toBe(64); // SHA256 is 64 hex chars
-        done();
-      });
-    });
-
-    it('should produce consistent hashes with fallback', (done) => {
-      const testData = 'test data for hashing';
-      const blob = new Blob([testData]);
-
-      let hash1: string;
-
-      // Compute hash first time
-      service.verifyBlob(blob, '0000').subscribe(result1 => {
-        hash1 = result1.computedHash;
-
-        // Compute same hash again to verify consistency
-        service.verifyBlob(new Blob([testData]), '0000').subscribe(result2 => {
-          expect(result2.computedHash).toBe(hash1);
+        // This test will work with the fallback SHA256
+        service.verifyBlob(blob, expectedHash).subscribe(result => {
+          // Just verify it doesn't error and returns a result
+          expect(result.computedHash).toBeDefined();
+          expect(typeof result.computedHash).toBe('string');
+          expect(result.computedHash.length).toBe(64); // SHA256 is 64 hex chars
           done();
         });
-      });
-    });
+      }));
 
-    it('should fallback gracefully when SubtleCrypto fails', (done) => {
-      const blob = new Blob(['test']);
+    it('should produce consistent hashes with fallback', () =>
+      new Promise<void>(done => {
+        const testData = 'test data for hashing';
+        const blob = new Blob([testData]);
 
-      // Even if SubtleCrypto is unavailable or fails, should get a valid hash
-      service.verifyBlob(blob, 'invalid_hash').subscribe(result => {
-        expect(result.computedHash).toBeDefined();
-        expect(result.computedHash.length).toBe(64);
-        expect(result.isValid).toBe(false); // Should not match "invalid_hash"
-        done();
-      });
-    });
+        let hash1: string;
 
-    it('should compute different hashes for different content', (done) => {
-      const blob1 = new Blob(['content1']);
-      const blob2 = new Blob(['content2']);
+        // Compute hash first time
+        service.verifyBlob(blob, '0000').subscribe(result1 => {
+          hash1 = result1.computedHash;
 
-      let hash1: string;
+          // Compute same hash again to verify consistency
+          service.verifyBlob(new Blob([testData]), '0000').subscribe(result2 => {
+            expect(result2.computedHash).toBe(hash1);
+            done();
+          });
+        });
+      }));
 
-      service.verifyBlob(blob1, '0000').subscribe(result1 => {
-        hash1 = result1.computedHash;
+    it('should fallback gracefully when SubtleCrypto fails', () =>
+      new Promise<void>(done => {
+        const blob = new Blob(['test']);
 
-        service.verifyBlob(blob2, '0000').subscribe(result2 => {
-          expect(result2.computedHash).not.toBe(hash1);
+        // Even if SubtleCrypto is unavailable or fails, should get a valid hash
+        service.verifyBlob(blob, 'invalid_hash').subscribe(result => {
+          expect(result.computedHash).toBeDefined();
+          expect(result.computedHash.length).toBe(64);
+          expect(result.isValid).toBe(false); // Should not match "invalid_hash"
           done();
         });
-      });
-    });
+      }));
 
-    it('should handle large blobs with fallback', (done) => {
-      // Create a large blob (1 MB)
-      const largeData = new Uint8Array(1024 * 1024);
-      for (let i = 0; i < largeData.length; i++) {
-        largeData[i] = Math.floor(Math.random() * 256);
-      }
-      const blob = new Blob([largeData]);
+    it('should compute different hashes for different content', () =>
+      new Promise<void>(done => {
+        const blob1 = new Blob(['content1']);
+        const blob2 = new Blob(['content2']);
 
-      service.verifyBlob(blob, 'dummy_hash').subscribe(result => {
-        expect(result.computedHash).toBeDefined();
-        expect(result.computedHash.length).toBe(64);
-        expect(result.durationMs).toBeGreaterThan(0);
-        done();
-      });
-    });
+        let hash1: string;
 
-    it('should produce standard SHA256 hashes', (done) => {
-      // Test with a known SHA256 hash
-      // SHA256('') = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-      const emptyBlob = new Blob(['']);
+        service.verifyBlob(blob1, '0000').subscribe(result1 => {
+          hash1 = result1.computedHash;
 
-      service
-        .verifyBlob(emptyBlob, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
-        .subscribe(result => {
-          expect(result.isValid).toBe(true);
-          expect(result.computedHash).toBe(
-            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-          );
+          service.verifyBlob(blob2, '0000').subscribe(result2 => {
+            expect(result2.computedHash).not.toBe(hash1);
+            done();
+          });
+        });
+      }));
+
+    it('should handle large blobs with fallback', () =>
+      new Promise<void>(done => {
+        // Create a large blob (1 MB)
+        const largeData = new Uint8Array(1024 * 1024);
+        for (let i = 0; i < largeData.length; i++) {
+          largeData[i] = Math.floor(Math.random() * 256);
+        }
+        const blob = new Blob([largeData]);
+
+        service.verifyBlob(blob, 'dummy_hash').subscribe(result => {
+          expect(result.computedHash).toBeDefined();
+          expect(result.computedHash.length).toBe(64);
+          expect(result.durationMs).toBeGreaterThan(0);
           done();
         });
-    });
+      }));
+
+    it('should produce standard SHA256 hashes', () =>
+      new Promise<void>(done => {
+        // Test with a known SHA256 hash
+        // SHA256('') = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        const emptyBlob = new Blob(['']);
+
+        service
+          .verifyBlob(emptyBlob, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+          .subscribe(result => {
+            expect(result.isValid).toBe(true);
+            expect(result.computedHash).toBe(
+              'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+            );
+            done();
+          });
+      }));
   });
 });

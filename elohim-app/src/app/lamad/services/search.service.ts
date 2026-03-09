@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 94.0% (2026-02-05)
+// @coverage: 94.2% (2026-02-24)
 
 import { map, catchError } from 'rxjs/operators';
 
@@ -66,10 +66,8 @@ import type { ContentAttestationType } from '../models/content-attestation.model
  */
 @Injectable({ providedIn: 'root' })
 export class SearchService {
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly trustBadgeService: TrustBadgeService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly trustBadgeService = inject(TrustBadgeService);
 
   /**
    * Search content AND paths with relevance scoring, filtering, and facets.

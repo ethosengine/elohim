@@ -17,8 +17,9 @@ import { Component, OnInit, inject, signal, computed, input } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
-// @coverage: 97.2% (2026-02-05)
+// @coverage: 97.2% (2026-02-24)
 
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import {
   type ComputedPolicy,
   type DevicePolicy,
@@ -38,7 +39,6 @@ import {
   AGE_RATINGS,
   INALIENABLE_FEATURES,
 } from '../../models/stewardship.model';
-import { StewardshipService } from '../../services/stewardship.service';
 
 /** Active tab in the policy editor */
 type PolicyTab = 'content' | 'time' | 'features' | 'monitoring';
@@ -51,7 +51,7 @@ type PolicyTab = 'content' | 'time' | 'features' | 'monitoring';
   styleUrls: ['./policy-console.component.css'],
 })
 export class PolicyConsoleComponent implements OnInit {
-  private readonly stewardship = inject(StewardshipService);
+  private readonly stewardship = inject(STEWARDSHIP_POLICY);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 

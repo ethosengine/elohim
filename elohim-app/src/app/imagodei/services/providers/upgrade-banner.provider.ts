@@ -6,7 +6,9 @@
  * Self-registers with BannerService on construction.
  */
 
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
+
+// @coverage: 100.0% (2026-02-24)
 
 import { map, takeUntil } from 'rxjs/operators';
 
@@ -37,10 +39,10 @@ export class UpgradeBannerProvider implements BannerNoticeProvider, OnDestroy {
   private readonly upgradeModalRequestedSubject = new Subject<void>();
   readonly upgradeModalRequested$ = this.upgradeModalRequestedSubject.asObservable();
 
-  constructor(
-    private readonly sessionHumanService: SessionHumanService,
-    private readonly bannerService: BannerService
-  ) {
+  private readonly sessionHumanService = inject(SessionHumanService);
+  private readonly bannerService = inject(BannerService);
+
+  constructor() {
     // Subscribe to upgrade prompts and map to BannerNotices
     this.sessionHumanService.upgradePrompts$
       .pipe(

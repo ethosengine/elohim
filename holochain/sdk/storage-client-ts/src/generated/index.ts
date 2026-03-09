@@ -7,8 +7,19 @@
  * Source: holochain/elohim-storage/src/db/models.rs
  */
 
+export * from './AccountIdentityView';
+export * from './AccountImportResultView';
+export * from './AccountPackageInputView';
+export * from './AccountPackageView';
 export * from './App';
+export * from './Collective';
+export * from './CollectiveParticipation';
+export * from './CollectiveParticipationView';
+export * from './CollectiveSeedView';
+export * from './CollectiveView';
+export * from './CreateCollectiveInputView';
 export * from './AppView';
+export * from './ContentAssignmentView';
 export * from './Chapter';
 export * from './ChapterView';
 export * from './ChapterWithSteps';
@@ -42,6 +53,7 @@ export * from './InitiateClaimInputView';
 export * from './JsonValue';
 export * from './LocalSession';
 export * from './LocalSessionView';
+export * from './OrganizationContextView';
 export * from './Path';
 export * from './PathAttestation';
 export * from './PathAttestationView';
@@ -61,4 +73,7 @@ export * from './StewardshipAllocation';
 export * from './StewardshipAllocationView';
 export * from './StewardshipAllocationWithPresence';
 export * from './StewardshipAllocationWithPresenceView';
+export * from './PackageManifestView';
+export * from './RelationshipSeedView';
+export * from './StewardshipSeedView';
 export * from './UpdateAllocationInputView';

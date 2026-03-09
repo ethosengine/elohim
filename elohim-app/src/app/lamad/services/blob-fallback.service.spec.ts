@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('BlobFallbackService', () => {
   let service: BlobFallbackService;
@@ -8,8 +9,7 @@ describe('BlobFallbackService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [BlobFallbackService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), BlobFallbackService],
     });
     service = TestBed.inject(BlobFallbackService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -72,187 +72,201 @@ describe('BlobFallbackService', () => {
   });
 
   describe('fetchWithFallback', () => {
-    it('should fetch from primary URL if available', done => {
-      const primaryUrl = 'https://primary.example.com/blob.mp4';
-      const secondaryUrl = 'https://secondary.example.com/blob.mp4';
-      const testBlob = new Blob(['test data']);
+    it('should fetch from primary URL if available', () =>
+      new Promise<void>(done => {
+        const primaryUrl = 'https://primary.example.com/blob.mp4';
+        const secondaryUrl = 'https://secondary.example.com/blob.mp4';
+        const testBlob = new Blob(['test data']);
 
-      service.fetchWithFallback([primaryUrl, secondaryUrl]).subscribe(result => {
-        expect(result.blob.size).toBe(testBlob.size);
-        expect(result.urlIndex).toBe(0);
-        expect(result.successUrl).toBe(primaryUrl);
-        expect(result.retryCount).toBe(0);
-        done();
-      });
-
-      const req = httpMock.expectOne(primaryUrl);
-      expect(req.request.method).toBe('GET');
-      req.flush(testBlob);
-    });
-
-    it('should fallback to secondary URL on primary failure', done => {
-      const primaryUrl = 'https://primary.example.com/blob.mp4';
-      const secondaryUrl = 'https://secondary.example.com/blob.mp4';
-      const testBlob = new Blob(['fallback data']);
-
-      service.fetchWithFallback([primaryUrl, secondaryUrl], 30000, 0).subscribe(result => {
-        expect(result.urlIndex).toBe(1);
-        expect(result.successUrl).toBe(secondaryUrl);
-        done();
-      });
-
-      // Primary fails
-      const primaryReq = httpMock.expectOne(primaryUrl);
-      primaryReq.error(new ErrorEvent('Network error'));
-
-      // Secondary succeeds
-      const secondaryReq = httpMock.expectOne(secondaryUrl);
-      secondaryReq.flush(testBlob);
-    });
-
-    it('should cascade through multiple fallback URLs', done => {
-      const urls = [
-        'https://cdn1.example.com/blob.mp4',
-        'https://cdn2.example.com/blob.mp4',
-        'https://cdn3.example.com/blob.mp4',
-      ];
-      const testBlob = new Blob(['final data']);
-
-      service.fetchWithFallback(urls, 30000, 0).subscribe(result => {
-        expect(result.urlIndex).toBe(2);
-        expect(result.successUrl).toBe(urls[2]);
-        done();
-      });
-
-      // First URL fails
-      const req1 = httpMock.expectOne(urls[0]);
-      req1.error(new ErrorEvent('Timeout'));
-
-      // Second URL fails
-      const req2 = httpMock.expectOne(urls[1]);
-      req2.error(new ErrorEvent('404 Not Found'));
-
-      // Third URL succeeds
-      const req3 = httpMock.expectOne(urls[2]);
-      req3.flush(testBlob);
-    });
-
-    it('should error if all URLs fail', done => {
-      const urls = ['https://cdn1.example.com/blob.mp4', 'https://cdn2.example.com/blob.mp4'];
-
-      service.fetchWithFallback(urls, 30000, 0).subscribe(
-        () => fail('should have errored'),
-        error => {
-          expect(error.message).toContain('All fallback URLs exhausted');
+        service.fetchWithFallback([primaryUrl, secondaryUrl]).subscribe(result => {
+          expect(result.blob.size).toBe(testBlob.size);
+          expect(result.urlIndex).toBe(0);
+          expect(result.successUrl).toBe(primaryUrl);
+          expect(result.retryCount).toBe(0);
           done();
-        }
-      );
+        });
 
-      const req1 = httpMock.expectOne(urls[0]);
-      req1.error(new ErrorEvent('Error 1'));
+        const req = httpMock.expectOne(primaryUrl);
+        expect(req.request.method).toBe('GET');
+        req.flush(testBlob);
+      }));
 
-      const req2 = httpMock.expectOne(urls[1]);
-      req2.error(new ErrorEvent('Error 2'));
-    });
+    it('should fallback to secondary URL on primary failure', () =>
+      new Promise<void>(done => {
+        const primaryUrl = 'https://primary.example.com/blob.mp4';
+        const secondaryUrl = 'https://secondary.example.com/blob.mp4';
+        const testBlob = new Blob(['fallback data']);
 
-    it('should error if no URLs provided', done => {
-      service.fetchWithFallback([]).subscribe(
-        () => fail('should have errored'),
-        error => {
-          expect(error.message).toContain('No fallback URLs provided');
+        service.fetchWithFallback([primaryUrl, secondaryUrl], 30000, 0).subscribe(result => {
+          expect(result.urlIndex).toBe(1);
+          expect(result.successUrl).toBe(secondaryUrl);
           done();
-        }
-      );
-    });
+        });
 
-    it('should retry individual URLs on failure', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+        // Primary fails
+        const primaryReq = httpMock.expectOne(primaryUrl);
+        primaryReq.error(new ErrorEvent('Network error'));
 
-      service.fetchWithFallback([url], 30000, 2).subscribe(result => {
-        expect(result.retryCount).toBeGreaterThan(0);
-        done();
-      });
+        // Secondary succeeds
+        const secondaryReq = httpMock.expectOne(secondaryUrl);
+        secondaryReq.flush(testBlob);
+      }));
 
-      // First attempt fails
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Temporary error'));
+    it('should cascade through multiple fallback URLs', () =>
+      new Promise<void>(done => {
+        const urls = [
+          'https://cdn1.example.com/blob.mp4',
+          'https://cdn2.example.com/blob.mp4',
+          'https://cdn3.example.com/blob.mp4',
+        ];
+        const testBlob = new Blob(['final data']);
 
-      // Retry succeeds (after exponential backoff)
-      setTimeout(() => {
-        const req2 = httpMock.expectOne(url);
-        req2.flush(testBlob);
-      }, 150); // 100ms initial backoff + buffer
-    });
+        service.fetchWithFallback(urls, 30000, 0).subscribe(result => {
+          expect(result.urlIndex).toBe(2);
+          expect(result.successUrl).toBe(urls[2]);
+          done();
+        });
 
-    it('should track request duration', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+        // First URL fails
+        const req1 = httpMock.expectOne(urls[0]);
+        req1.error(new ErrorEvent('Timeout'));
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result.durationMs).toBeGreaterThanOrEqual(0);
-        done();
-      });
+        // Second URL fails
+        const req2 = httpMock.expectOne(urls[1]);
+        req2.error(new ErrorEvent('404 Not Found'));
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        // Third URL succeeds
+        const req3 = httpMock.expectOne(urls[2]);
+        req3.flush(testBlob);
+      }));
+
+    it('should error if all URLs fail', () =>
+      new Promise<void>(done => {
+        const urls = ['https://cdn1.example.com/blob.mp4', 'https://cdn2.example.com/blob.mp4'];
+
+        service.fetchWithFallback(urls, 30000, 0).subscribe(
+          () => {
+            throw new Error('should have errored');
+          },
+          error => {
+            expect(error.message).toContain('All fallback URLs exhausted');
+            done();
+          }
+        );
+
+        const req1 = httpMock.expectOne(urls[0]);
+        req1.error(new ErrorEvent('Error 1'));
+
+        const req2 = httpMock.expectOne(urls[1]);
+        req2.error(new ErrorEvent('Error 2'));
+      }));
+
+    it('should error if no URLs provided', () =>
+      new Promise<void>(done => {
+        service.fetchWithFallback([]).subscribe(
+          () => {
+            throw new Error('should have errored');
+          },
+          error => {
+            expect(error.message).toContain('No fallback URLs provided');
+            done();
+          }
+        );
+      }));
+
+    it('should retry individual URLs on failure', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
+
+        service.fetchWithFallback([url], 30000, 2).subscribe(result => {
+          expect(result.retryCount).toBeGreaterThan(0);
+          done();
+        });
+
+        // First attempt fails
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Temporary error'));
+
+        // Retry succeeds (after exponential backoff)
+        setTimeout(() => {
+          const req2 = httpMock.expectOne(url);
+          req2.flush(testBlob);
+        }, 150); // 100ms initial backoff + buffer
+      }));
+
+    it('should track request duration', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
+
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result.durationMs).toBeGreaterThanOrEqual(0);
+          done();
+        });
+
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
   });
 
   describe('URL Health Tracking', () => {
-    it('should record successful fetch', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should record successful fetch', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url]).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.successCount).toBe(1);
-        expect(health.failureCount).toBe(0);
-        expect(health.isHealthy).toBe(true);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.successCount).toBe(1);
+          expect(health.failureCount).toBe(0);
+          expect(health.isHealthy).toBe(true);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-    it('should record failed fetch', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should record failed fetch', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const failedHealth = service.getUrlHealth(url);
-        expect(failedHealth.successCount).toBe(0);
-        expect(failedHealth.failureCount).toBeGreaterThan(0);
-        expect(failedHealth.isHealthy).toBe(false);
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const failedHealth = service.getUrlHealth(url);
+          expect(failedHealth.successCount).toBe(0);
+          expect(failedHealth.failureCount).toBeGreaterThan(0);
+          expect(failedHealth.isHealthy).toBe(false);
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Network error'));
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Network error'));
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
 
-    it('should track error messages', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should track error messages', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toContain(url);
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastErrorMessage).toContain(url);
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Network error'));
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Network error'));
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
 
     it('should sort URLs by health', () => {
       const url1 = 'https://healthy.example.com/blob.mp4';
@@ -335,89 +349,99 @@ describe('BlobFallbackService', () => {
       httpMock.match(url).forEach(req => req.flush(new Blob(['test'])));
     });
 
-    it('should return BlobFetchResult with all required properties', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['test data']);
+    it('should return BlobFetchResult with all required properties', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['test data']);
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result).toBeDefined();
-        expect(typeof result.blob).toBe('object');
-        expect(typeof result.urlIndex).toBe('number');
-        expect(typeof result.successUrl).toBe('string');
-        expect(typeof result.durationMs).toBe('number');
-        expect(typeof result.retryCount).toBe('number');
-        expect(result.successUrl).toBe(url);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result).toBeDefined();
+          expect(typeof result.blob).toBe('object');
+          expect(typeof result.urlIndex).toBe('number');
+          expect(typeof result.successUrl).toBe('string');
+          expect(typeof result.durationMs).toBe('number');
+          expect(typeof result.retryCount).toBe('number');
+          expect(result.successUrl).toBe(url);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
   });
 
   describe('Input Validation Tests', () => {
-    it('should handle null fallback URLs array', done => {
-      service.fetchWithFallback(null as any).subscribe(
-        () => fail('should have errored'),
-        error => {
-          expect(error).toBeDefined();
-          expect(error.message).toContain('No fallback URLs provided');
+    it('should handle null fallback URLs array', () =>
+      new Promise<void>(done => {
+        service.fetchWithFallback(null as any).subscribe(
+          () => {
+            throw new Error('should have errored');
+          },
+          error => {
+            expect(error).toBeDefined();
+            expect(error.message).toContain('No fallback URLs provided');
+            done();
+          }
+        );
+      }));
+
+    it('should handle undefined fallback URLs', () =>
+      new Promise<void>(done => {
+        service.fetchWithFallback(undefined as any).subscribe(
+          () => {
+            throw new Error('should have errored');
+          },
+          error => {
+            expect(error).toBeDefined();
+            done();
+          }
+        );
+      }));
+
+    it('should handle single URL array', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
+
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result.urlIndex).toBe(0);
+          expect(result.successUrl).toBe(url);
           done();
-        }
-      );
-    });
+        });
 
-    it('should handle undefined fallback URLs', done => {
-      service.fetchWithFallback(undefined as any).subscribe(
-        () => fail('should have errored'),
-        error => {
-          expect(error).toBeDefined();
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
+
+    it('should accept custom timeout value', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
+        const customTimeout = 5000;
+
+        service.fetchWithFallback([url], customTimeout).subscribe(result => {
+          expect(result).toBeDefined();
           done();
-        }
-      );
-    });
+        });
 
-    it('should handle single URL array', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result.urlIndex).toBe(0);
-        expect(result.successUrl).toBe(url);
-        done();
-      });
+    it('should accept custom maxRetries value', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
+        const customRetries = 3;
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        service.fetchWithFallback([url], 30000, customRetries).subscribe(result => {
+          expect(result).toBeDefined();
+          done();
+        });
 
-    it('should accept custom timeout value', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
-      const customTimeout = 5000;
-
-      service.fetchWithFallback([url], customTimeout).subscribe(result => {
-        expect(result).toBeDefined();
-        done();
-      });
-
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
-
-    it('should accept custom maxRetries value', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
-      const customRetries = 3;
-
-      service.fetchWithFallback([url], 30000, customRetries).subscribe(result => {
-        expect(result).toBeDefined();
-        done();
-      });
-
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
   });
 
   describe('URL Health Interface Tests', () => {
@@ -451,93 +475,98 @@ describe('BlobFallbackService', () => {
       expect(healthArray[1].url).toBe(urls[1]);
     });
 
-    it('should update lastAccessTime on success', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should update lastAccessTime on success', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url]).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastAccessTime).toBeDefined();
-        expect(health.lastAccessTime instanceof Date).toBe(true);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastAccessTime).toBeDefined();
+          expect(health.lastAccessTime instanceof Date).toBe(true);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-    it('should store lastErrorMessage on failure', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should store lastErrorMessage on failure', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toBeDefined();
-        expect(typeof health.lastErrorMessage).toBe('string');
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastErrorMessage).toBeDefined();
+          expect(typeof health.lastErrorMessage).toBe('string');
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Network error'));
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Network error'));
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
   });
 
   describe('URL Validation', () => {
-    it('should validate single URL successfully', done => {
-      const url = 'https://example.com/blob.mp4';
+    it('should validate single URL successfully', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
 
-      service.validateUrl(url).then(result => {
-        expect(result.url).toBe(url);
-        expect(typeof result.isValid).toBe('boolean');
-        expect(result.statusCode).toBeDefined();
-        expect(result.responseTimeMs).toBeGreaterThanOrEqual(0);
-        done();
-      });
+        service.validateUrl(url).then(result => {
+          expect(result.url).toBe(url);
+          expect(typeof result.isValid).toBe('boolean');
+          expect(result.statusCode).toBeDefined();
+          expect(result.responseTimeMs).toBeGreaterThanOrEqual(0);
+          done();
+        });
 
-      // Mock HTTP HEAD response
-      const req = httpMock.expectOne(url);
-      req.flush(null, { status: 200, statusText: 'OK' });
-    });
+        // Mock HTTP HEAD response
+        const req = httpMock.expectOne(url);
+        req.flush(null, { status: 200, statusText: 'OK' });
+      }));
 
-    it('should detect URL validation failures', done => {
-      const url = 'https://invalid.example.com/blob.mp4';
+    it('should detect URL validation failures', () =>
+      new Promise<void>(done => {
+        const url = 'https://invalid.example.com/blob.mp4';
 
-      service.validateUrl(url).then(result => {
-        expect(result.url).toBe(url);
-        expect(result.isValid).toBe(false);
-        expect(result.statusCode).toBe(-1);
-        expect(result.errorMessage).toBeDefined();
-        done();
-      });
+        service.validateUrl(url).then(result => {
+          expect(result.url).toBe(url);
+          expect(result.isValid).toBe(false);
+          expect(result.statusCode).toBe(-1);
+          expect(result.errorMessage).toBeDefined();
+          done();
+        });
 
-      // Mock HTTP HEAD failure
-      const req = httpMock.expectOne(url);
-      req.error(new ErrorEvent('error'));
-    });
+        // Mock HTTP HEAD failure
+        const req = httpMock.expectOne(url);
+        req.error(new ErrorEvent('error'));
+      }));
 
-    it('should extract capabilities from validation headers', done => {
-      const url = 'https://example.com/blob.mp4';
+    it('should extract capabilities from validation headers', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
 
-      service.validateUrl(url).then(result => {
-        expect(result.supportsRangeRequests).toBe(true);
-        expect(result.contentLength).toBe(1024);
-        done();
-      });
+        service.validateUrl(url).then(result => {
+          expect(result.supportsRangeRequests).toBe(true);
+          expect(result.contentLength).toBe(1024);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(null, {
-        status: 200,
-        statusText: 'OK',
-        headers: {
-          'Content-Length': '1024',
-          'Accept-Ranges': 'bytes',
-        },
-      });
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(null, {
+          status: 200,
+          statusText: 'OK',
+          headers: {
+            'Content-Length': '1024',
+            'Accept-Ranges': 'bytes',
+          },
+        });
+      }));
 
     it('should detect URL types (custodian vs CDN vs standard)', () => {
       const custodianUrl = 'https://custodian-123.example.com/blob.mp4';
@@ -549,36 +578,38 @@ describe('BlobFallbackService', () => {
       expect(service['detectUrlType'](standardUrl)).toBe('standard');
     });
 
-    it('should return UrlValidationResult with all required properties', done => {
-      const url = 'https://example.com/blob.mp4';
+    it('should return UrlValidationResult with all required properties', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
 
-      service.validateUrl(url).then(result => {
-        expect(result).toBeDefined();
-        expect(result.url).toBe(url);
-        expect(typeof result.isValid).toBe('boolean');
-        expect(typeof result.statusCode).toBe('number');
-        expect(typeof result.type).toBe('string');
-        expect(typeof result.responseTimeMs).toBe('number');
-        expect(['standard', 'custodian', 'cloudfront', 'cdn', 'unknown']).toContain(result.type);
-        done();
-      });
+        service.validateUrl(url).then(result => {
+          expect(result).toBeDefined();
+          expect(result.url).toBe(url);
+          expect(typeof result.isValid).toBe('boolean');
+          expect(typeof result.statusCode).toBe('number');
+          expect(typeof result.type).toBe('string');
+          expect(typeof result.responseTimeMs).toBe('number');
+          expect(['standard', 'custodian', 'cloudfront', 'cdn', 'unknown']).toContain(result.type);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(null, { status: 200, statusText: 'OK' });
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(null, { status: 200, statusText: 'OK' });
+      }));
 
-    it('should handle invalid URL format gracefully', done => {
-      const invalidUrl = 'not-a-valid-url';
+    it('should handle invalid URL format gracefully', () =>
+      new Promise<void>(done => {
+        const invalidUrl = 'not-a-valid-url';
 
-      service.validateUrl(invalidUrl).then(result => {
-        expect(result.url).toBe(invalidUrl);
-        expect(result.type).toBe('unknown');
-        done();
-      });
+        service.validateUrl(invalidUrl).then(result => {
+          expect(result.url).toBe(invalidUrl);
+          expect(result.type).toBe('unknown');
+          done();
+        });
 
-      const req = httpMock.expectOne(invalidUrl);
-      req.error(new ErrorEvent('Invalid URL'));
-    });
+        const req = httpMock.expectOne(invalidUrl);
+        req.error(new ErrorEvent('Invalid URL'));
+      }));
 
     it('should detect cloudfront URLs', () => {
       const cloudfrontUrl = 'https://d123.cloudfront.net/blob.mp4';
@@ -598,175 +629,189 @@ describe('BlobFallbackService', () => {
       expect(detectedType).toBe('cdn');
     });
 
-    it('should validate multiple URLs in parallel', done => {
-      const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
+    it('should validate multiple URLs in parallel', () =>
+      new Promise<void>(done => {
+        const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
 
-      service.validateUrls(urls).then(results => {
-        expect(results.length).toBe(2);
-        expect(results[0].url).toBe(urls[0]);
-        expect(results[1].url).toBe(urls[1]);
-        done();
-      });
+        service.validateUrls(urls).then(results => {
+          expect(results.length).toBe(2);
+          expect(results[0].url).toBe(urls[0]);
+          expect(results[1].url).toBe(urls[1]);
+          done();
+        });
 
-      const reqs = httpMock.match(req => urls.includes(req.url));
-      expect(reqs.length).toBe(2);
-      reqs.forEach(req => {
-        req.flush(null, { status: 200, statusText: 'OK' });
-      });
-    });
+        const reqs = httpMock.match(req => urls.includes(req.url));
+        expect(reqs.length).toBe(2);
+        reqs.forEach(req => {
+          req.flush(null, { status: 200, statusText: 'OK' });
+        });
+      }));
 
-    it('should filter to valid and healthy URLs only', done => {
-      const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
+    it('should filter to valid and healthy URLs only', () =>
+      new Promise<void>(done => {
+        const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
 
-      // Mark second URL as healthy in history
-      service['recordUrlSuccess'](urls[1]);
+        // Mark second URL as healthy in history
+        service['recordUrlSuccess'](urls[1]);
 
-      service.getValidAndHealthyUrls(urls).then(validUrls => {
-        // Results should include URLs that passed validation and are healthy
-        expect(Array.isArray(validUrls)).toBe(true);
-        done();
-      });
+        service.getValidAndHealthyUrls(urls).then(validUrls => {
+          // Results should include URLs that passed validation and are healthy
+          expect(Array.isArray(validUrls)).toBe(true);
+          done();
+        });
 
-      const reqs = httpMock.match(req => urls.includes(req.url));
-      reqs.forEach(req => {
-        req.flush(null, { status: 200, statusText: 'OK' });
-      });
-    });
+        const reqs = httpMock.match(req => urls.includes(req.url));
+        reqs.forEach(req => {
+          req.flush(null, { status: 200, statusText: 'OK' });
+        });
+      }));
   });
 
   describe('Error Message Extraction Tests', () => {
-    it('should extract error message from HttpErrorResponse', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should extract error message from HttpErrorResponse', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toBeDefined();
-        expect(health.lastErrorMessage).toContain('Http failure');
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastErrorMessage).toBeDefined();
+          expect(health.lastErrorMessage).toContain('Http failure');
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.flush(null, { status: 404, statusText: 'Not Found' });
+        const req1 = httpMock.expectOne(url);
+        req1.flush(null, { status: 404, statusText: 'Not Found' });
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
 
-    it('should extract error message from generic Error object', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should extract error message from generic Error object', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toBeDefined();
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastErrorMessage).toBeDefined();
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Network timeout'));
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Network timeout'));
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
 
-    it('should extract error message from string type error', done => {
-      const url = 'https://example.com/blob.mp4';
-      const fallbackUrl = 'https://fallback.example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should extract error message from string type error', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const fallbackUrl = 'https://fallback.example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
-        const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toBeDefined();
-        done();
-      });
+        service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
+          const health = service.getUrlHealth(url);
+          expect(health.lastErrorMessage).toBeDefined();
+          done();
+        });
 
-      const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent('Connection refused'));
+        const req1 = httpMock.expectOne(url);
+        req1.error(new ErrorEvent('Connection refused'));
 
-      const req2 = httpMock.expectOne(fallbackUrl);
-      req2.flush(testBlob);
-    });
+        const req2 = httpMock.expectOne(fallbackUrl);
+        req2.flush(testBlob);
+      }));
   });
 
   describe('Blob Property Tests', () => {
-    it('should return Blob with correct type from successful fetch', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['test data'], { type: 'video/mp4' });
+    it('should return Blob with correct type from successful fetch', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['test data'], { type: 'video/mp4' });
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result.blob).toBeDefined();
-        expect(result.blob instanceof Blob).toBe(true);
-        expect(result.blob.size).toBeGreaterThan(0);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result.blob).toBeDefined();
+          expect(result.blob instanceof Blob).toBe(true);
+          expect(result.blob.size).toBeGreaterThan(0);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-    it('should return empty Blob when server returns empty response', done => {
-      const url = 'https://example.com/blob.mp4';
-      const emptyBlob = new Blob([]);
+    it('should return empty Blob when server returns empty response', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const emptyBlob = new Blob([]);
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result.blob).toBeDefined();
-        expect(result.blob instanceof Blob).toBe(true);
-        expect(result.blob.size).toBe(0);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result.blob).toBeDefined();
+          expect(result.blob instanceof Blob).toBe(true);
+          expect(result.blob.size).toBe(0);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(emptyBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(emptyBlob);
+      }));
   });
 
   describe('Duration and Retry Count Tests', () => {
-    it('should track zero retry count on first success', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should track zero retry count on first success', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url], 30000, 0).subscribe(result => {
-        expect(result.retryCount).toBe(0);
-        done();
-      });
+        service.fetchWithFallback([url], 30000, 0).subscribe(result => {
+          expect(result.retryCount).toBe(0);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-    it('should track non-negative duration time', done => {
-      const url = 'https://example.com/blob.mp4';
-      const testBlob = new Blob(['data']);
+    it('should track non-negative duration time', () =>
+      new Promise<void>(done => {
+        const url = 'https://example.com/blob.mp4';
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url]).subscribe(result => {
-        expect(result.durationMs).toBeGreaterThanOrEqual(0);
-        done();
-      });
+        service.fetchWithFallback([url]).subscribe(result => {
+          expect(result.durationMs).toBeGreaterThanOrEqual(0);
+          done();
+        });
 
-      const req = httpMock.expectOne(url);
-      req.flush(testBlob);
-    });
+        const req = httpMock.expectOne(url);
+        req.flush(testBlob);
+      }));
 
-    it('should increment urlIndex for each cascaded URL', done => {
-      const urls = ['https://url1.example.com', 'https://url2.example.com', 'https://url3.example.com'];
-      const testBlob = new Blob(['data']);
+    it('should increment urlIndex for each cascaded URL', () =>
+      new Promise<void>(done => {
+        const urls = [
+          'https://url1.example.com',
+          'https://url2.example.com',
+          'https://url3.example.com',
+        ];
+        const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback(urls, 30000, 0).subscribe(result => {
-        expect(result.urlIndex).toBe(2);
-        done();
-      });
+        service.fetchWithFallback(urls, 30000, 0).subscribe(result => {
+          expect(result.urlIndex).toBe(2);
+          done();
+        });
 
-      const req1 = httpMock.expectOne(urls[0]);
-      req1.error(new ErrorEvent('Error 1'));
+        const req1 = httpMock.expectOne(urls[0]);
+        req1.error(new ErrorEvent('Error 1'));
 
-      const req2 = httpMock.expectOne(urls[1]);
-      req2.error(new ErrorEvent('Error 2'));
+        const req2 = httpMock.expectOne(urls[1]);
+        req2.error(new ErrorEvent('Error 2'));
 
-      const req3 = httpMock.expectOne(urls[2]);
-      req3.flush(testBlob);
-    });
+        const req3 = httpMock.expectOne(urls[2]);
+        req3.flush(testBlob);
+      }));
   });
 });

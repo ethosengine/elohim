@@ -7,6 +7,7 @@ import { ContentService } from '@app/lamad/services/content.service';
 import { AgentService } from './agent.service';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import { ContentAttestation } from '@app/lamad/models/content-attestation.model';
+import { vi, Mock } from 'vitest';
 
 /**
  * Comprehensive tests for TrustBadgeService
@@ -22,9 +23,9 @@ import { ContentAttestation } from '@app/lamad/models/content-attestation.model'
  */
 describe('TrustBadgeService', () => {
   let service: TrustBadgeService;
-  let dataLoaderMock: jasmine.SpyObj<DataLoaderService>;
-  let contentServiceMock: jasmine.SpyObj<ContentService>;
-  let agentServiceMock: jasmine.SpyObj<AgentService>;
+  let dataLoaderMock: any;
+  let contentServiceMock: any;
+  let agentServiceMock: any;
 
   const mockContent: ContentNode = {
     id: 'content-1',
@@ -58,14 +59,16 @@ describe('TrustBadgeService', () => {
   };
 
   beforeEach(() => {
-    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', [
-      'getAttestationsForContent',
-    ]);
-    const contentServiceSpy = jasmine.createSpyObj('ContentService', ['getContent']);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', [
-      'getCurrentAgentId',
-      'getAttestations',
-    ]);
+    const dataLoaderSpy = {
+      getAttestationsForContent: vi.fn(),
+    };
+    const contentServiceSpy = {
+      getContent: vi.fn(),
+    };
+    const agentServiceSpy = {
+      getCurrentAgentId: vi.fn(),
+      getAttestations: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -77,9 +80,9 @@ describe('TrustBadgeService', () => {
     });
 
     service = TestBed.inject(TrustBadgeService);
-    dataLoaderMock = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    contentServiceMock = TestBed.inject(ContentService) as jasmine.SpyObj<ContentService>;
-    agentServiceMock = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    dataLoaderMock = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    contentServiceMock = TestBed.inject(ContentService) as { [K in keyof ContentService]?: Mock };
+    agentServiceMock = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
   });
 
   // ===========================================================================
@@ -98,10 +101,10 @@ describe('TrustBadgeService', () => {
 
   describe('getBadge', () => {
     it('should generate badge for content without attestations', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -117,10 +120,10 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should generate badge with peer-reviewed attestation', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -140,10 +143,10 @@ describe('TrustBadgeService', () => {
         { ...mockAttestation, id: 'att-3', attestationType: 'author-verified' },
       ];
 
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of(attestations));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of(attestations));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -161,10 +164,10 @@ describe('TrustBadgeService', () => {
         attestationType: 'governance-ratified',
       };
 
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([govAttestation]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([govAttestation]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -189,10 +192,10 @@ describe('TrustBadgeService', () => {
         ],
       };
 
-      contentServiceMock.getContent.and.returnValue(of(flaggedContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(flaggedContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -206,10 +209,10 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should include available actions for author', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('author-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('author-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -223,8 +226,8 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should handle error gracefully', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(throwError(() => new Error('Network error')));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
+      contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network error')));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
 
       let badge: any = null;
       service.getBadge('content-1').subscribe(b => {
@@ -243,10 +246,10 @@ describe('TrustBadgeService', () => {
 
   describe('getCompactBadge', () => {
     it('should generate compact badge', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let compactBadge: any = null;
       service.getCompactBadge('content-1').subscribe(b => {
@@ -277,10 +280,10 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should fetch badges for multiple content IDs', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badges: any = null;
       service.getBadgesForContent(['content-1', 'content-2']).subscribe(b => {
@@ -296,10 +299,10 @@ describe('TrustBadgeService', () => {
 
   describe('getCompactBadgesForContent', () => {
     it('should fetch compact badges for multiple content IDs', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
-      agentServiceMock.getCurrentAgentId.and.returnValue('agent-1');
-      agentServiceMock.getAttestations.and.returnValue([]);
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
+      agentServiceMock.getCurrentAgentId.mockReturnValue('agent-1');
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       let badges: any = null;
       service.getCompactBadgesForContent(['content-1', 'content-2']).subscribe(b => {
@@ -318,8 +321,8 @@ describe('TrustBadgeService', () => {
 
   describe('getIndicators', () => {
     it('should generate indicators for content', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
 
       let indicators: any = null;
       service.getIndicators('content-1').subscribe(i => {
@@ -346,8 +349,8 @@ describe('TrustBadgeService', () => {
         ],
       };
 
-      contentServiceMock.getContent.and.returnValue(of(flaggedContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
+      contentServiceMock.getContent.mockReturnValue(of(flaggedContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
 
       let indicators: any = null;
       service.getIndicators('content-1').subscribe(i => {
@@ -356,7 +359,9 @@ describe('TrustBadgeService', () => {
       tick();
 
       expect(indicators.flags.length).toBe(1);
-      const negativeIndicators = indicators.indicators.filter((ind: any) => ind.polarity === 'negative');
+      const negativeIndicators = indicators.indicators.filter(
+        (ind: any) => ind.polarity === 'negative'
+      );
       expect(negativeIndicators.length).toBeGreaterThan(0);
     }));
 
@@ -373,8 +378,8 @@ describe('TrustBadgeService', () => {
         ],
       };
 
-      contentServiceMock.getContent.and.returnValue(of(flaggedContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([mockAttestation]));
+      contentServiceMock.getContent.mockReturnValue(of(flaggedContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([mockAttestation]));
 
       let indicators: any = null;
       service.getIndicators('content-1').subscribe(i => {
@@ -387,8 +392,8 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should handle error and return empty indicator set', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(throwError(() => new Error('Error')));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
+      contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Error')));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
 
       let indicators: any = null;
       service.getIndicators('content-1').subscribe(i => {
@@ -413,8 +418,8 @@ describe('TrustBadgeService', () => {
     }));
 
     it('should fetch indicators for multiple content IDs', fakeAsync(() => {
-      contentServiceMock.getContent.and.returnValue(of(mockContent));
-      dataLoaderMock.getAttestationsForContent.and.returnValue(of([]));
+      contentServiceMock.getContent.mockReturnValue(of(mockContent));
+      dataLoaderMock.getAttestationsForContent.mockReturnValue(of([]));
 
       let indicators: any = null;
       service.getIndicatorsForContent(['content-1', 'content-2']).subscribe(i => {
@@ -475,7 +480,8 @@ describe('TrustBadgeService', () => {
     });
 
     it('should return empty array when all attestations obtained', () => {
-      const allAttestations: import('@app/lamad/models/content-attestation.model').ContentAttestationType[] = ['author-verified'];
+      const allAttestations: import('@app/lamad/models/content-attestation.model').ContentAttestationType[] =
+        ['author-verified'];
       const needed = service.getAttestationsNeededForNextLevel('private', allAttestations);
       expect(needed.length).toBe(0);
     });

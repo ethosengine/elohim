@@ -120,7 +120,7 @@ unclaimed -> stewarded -> claimed
 
 ## Shefa Service Landscape
 
-Services in `elohim-app/src/app/shefa/services/`. Most are stubs defining the API surface. Only `RequestsAndOffersService` is fully implemented. Core services (`EconomicService`, `EconomicEventFactoryService`, `EventService`) are partial. `ElohimStubService` is an intentional mock.
+Services in `elohim-app/src/app/shefa/services/`. Most are stubs defining the API surface. Only `ExchangeService` is fully implemented. Core services (`EconomicService`, `EconomicEventFactoryService`, `EventService`) are partial. `ElohimStubService` is an intentional mock.
 
 Six service groups: Core, Contributor/Stewardship, Marketplace, Banking Bridge, Insurance, Compute. See `references/generated-types.md` for the full service listing with status and purpose.
 
@@ -208,7 +208,7 @@ await http.post(`/db/contributor-presences/${presenceId}/claim`, input);
 | `elohim-app/src/app/shefa/models/contributor-presence.model.ts` | Presence model |
 | `elohim-app/src/app/shefa/models/economic-event.model.ts` | Event model |
 | `elohim-app/src/app/shefa/services/economic.service.ts` | Core economic service |
-| `elohim-app/src/app/shefa/services/requests-and-offers.service.ts` | Marketplace |
+| `elohim-app/src/app/shefa/services/exchange.service.ts` | Marketplace |
 | `elohim-app/src/app/shefa/README-REQUESTS-AND-OFFERS.md` | Marketplace design |
 | `elohim-app/src/app/shefa/README-INSURANCE-MUTUAL.md` | Insurance mutual design |
 | `genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md` | Economic whitepaper |

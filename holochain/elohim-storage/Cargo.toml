@@ -48,13 +48,18 @@ url = "2"  # Query string parsing for HTTP sync API
 cid = "0.11"
 multihash-codetable = { version = "0.1", features = ["sha2"] }
 
+# IPLD codecs for EPR Head serialization (versions match rust-ipfs workspace)
+serde_ipld_dagcbor = "0.6.3"
+serde_ipld_dagjson = "0.2.1"
+ipld-core = { version = "0.4.1", features = ["serde"] }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7"
 
 # TypeScript generation from Rust types
-ts-rs = { version = "10.1", features = ["serde-compat", "serde-json-impl"] }
+ts-rs = { version = "10.1", features = ["serde-compat"] }
 
 # Local database for metadata
 sled = "0.34"

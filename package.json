@@ -1,0 +1,43 @@
+{
+  "name": "elohim",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=20.20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "less",
+      "lmdb",
+      "msgpackr-extract",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "libsodium-wrappers": "^0.8.2",
+      "libsodium": "^0.8.2"
+    },
+    "patchedDependencies": {
+      "@angular/build@19.2.22": "patches/@angular__build@19.2.22.patch"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "app:dev": "pnpm --filter elohim-app start",
+    "app:build": "pnpm --filter elohim-app build",
+    "app:test": "pnpm --filter elohim-app test",
+    "app:lint": "pnpm --filter elohim-app lint",
+    "doorway-app:dev": "pnpm --filter doorway-app start",
+    "doorway-app:build": "pnpm --filter doorway-app build",
+    "lib:test": "pnpm --filter elohim-library test",
+    "storage-client:build": "pnpm --filter @elohim/storage-client build",
+    "seed": "pnpm --filter holochain-seeder seed",
+    "a2o:test": "pnpm --filter @elohim/a2o test",
+    "a2o:lint": "pnpm --filter @elohim/a2o lint"
+  }
+}

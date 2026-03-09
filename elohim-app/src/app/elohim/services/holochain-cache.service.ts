@@ -1,16 +1,16 @@
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 70.1% (2026-02-05)
+// @coverage: 70.1% (2026-02-24)
 
 /**
  * Cache entry metadata
  */
 export interface CacheEntry {
   key: string;
-  value: any;
+  value: unknown;
   timestamp: number;
   ttlMs?: number; // Optional TTL in milliseconds
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -144,7 +144,7 @@ export class HolochainCacheService {
   /**
    * Get value from cache (L1 then L2)
    */
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     // Ensure database is initialized
     await this.ensureInitialized();
 
@@ -183,11 +183,11 @@ export class HolochainCacheService {
   /**
    * Set value in cache (L1 + L2)
    */
-  async set<T = any>(
+  async set<T = unknown>(
     key: string,
     value: T,
     ttlMs?: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.initPromise;
 
@@ -291,7 +291,7 @@ export class HolochainCacheService {
    *
    * Useful for warming cache on app startup or before user accesses content.
    */
-  async preload<T = any>(items: { key: string; value: T; ttlMs?: number }[]): Promise<void> {
+  async preload<T = unknown>(items: { key: string; value: T; ttlMs?: number }[]): Promise<void> {
     for (const item of items) {
       try {
         await this.set(item.key, item.value, item.ttlMs);
@@ -349,7 +349,7 @@ export class HolochainCacheService {
   /**
    * Estimate object size in bytes (rough estimate)
    */
-  private estimateSize(obj: any): number {
+  private estimateSize(obj: unknown): number {
     const str = JSON.stringify(obj);
     return new Blob([str]).size;
   }
@@ -384,7 +384,7 @@ export class HolochainCacheService {
       const request = store.get(key);
 
       request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
-      request.onsuccess = () => resolve(request.result ?? null);
+      request.onsuccess = () => resolve((request.result as CacheEntry | undefined) ?? null);
     });
   }
 

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/storybook",
+    "types": []
+  },
+  "include": [
+    ".storybook/preview.ts",
+    "projects/lamad-ui/src/**/*.ts"
+  ],
+  "exclude": [
+    "projects/lamad-ui/src/**/*.spec.ts"
+  ]
+}

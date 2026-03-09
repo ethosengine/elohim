@@ -3,17 +3,19 @@ import { provideRouter, ActivatedRoute, Router } from '@angular/router';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
+import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { LearningPath } from '../../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
+import { vi, Mock } from 'vitest';
 
 describe('PathOverviewComponent', () => {
   let component: PathOverviewComponent;
   let fixture: ComponentFixture<PathOverviewComponent>;
-  let pathService: jasmine.SpyObj<PathService>;
-  let agentService: jasmine.SpyObj<AgentService>;
+  let pathService: any;
+  let agentService: any;
   let router: Router;
   let paramsSubject: BehaviorSubject<any>;
 
@@ -146,25 +148,33 @@ describe('PathOverviewComponent', () => {
   beforeEach(async () => {
     localStorage.clear();
 
-    const pathServiceSpy = jasmine.createSpyObj('PathService', [
-      'getPath',
-      'getAccessibleSteps',
-      'getPathCompletionByContent',
-      'getChapterSummariesWithContent',
-      'getAllStepsMetadata',
-      'getConceptProgressForPath',
-      'getChapterFirstStep',
-    ]);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getProgressForPath']);
-    const seoServiceSpy = jasmine.createSpyObj('SeoService', [
-      'updateForPath',
-      'updateSeo',
-      'setTitle',
-    ]);
-    const contentMasteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
-      'getMasteryLevelSync',
-    ]);
-    contentMasteryServiceSpy.getMasteryLevelSync.and.returnValue('not_started');
+    const pathServiceSpy = {
+      getPath: vi.fn(),
+      getAccessibleSteps: vi.fn(),
+      getAccessCheckResults: vi.fn(),
+      getPathCompletionByContent: vi.fn(),
+      getChapterSummariesWithContent: vi.fn(),
+      getAllStepsMetadata: vi.fn(),
+      getConceptProgressForPath: vi.fn(),
+      getChapterFirstStep: vi.fn(),
+    };
+    const agentServiceSpy = {
+      getProgressForPath: vi.fn(),
+      getCurrentAgentId: vi.fn().mockReturnValue('test-agent'),
+    };
+    const adaptationServiceSpy = {
+      getRecommendations$: vi.fn().mockReturnValue(of([])),
+      dismissRecommendation: vi.fn(),
+    };
+    const seoServiceSpy = {
+      updateForPath: vi.fn(),
+      updateSeo: vi.fn(),
+      setTitle: vi.fn(),
+    };
+    const contentMasteryServiceSpy = {
+      getMasteryLevelSync: vi.fn(),
+    };
+    contentMasteryServiceSpy.getMasteryLevelSync.mockReturnValue('not_started');
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path' });
 
@@ -174,6 +184,7 @@ describe('PathOverviewComponent', () => {
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
+        { provide: PathAdaptationService, useValue: adaptationServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
         {
@@ -183,18 +194,28 @@ describe('PathOverviewComponent', () => {
       ],
     }).compileComponents();
 
-    pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
-    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
+    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
-    pathService.getPath.and.returnValue(of(mockPath));
-    agentService.getProgressForPath.and.returnValue(of(mockProgress));
-    pathService.getAccessibleSteps.and.returnValue(of(mockAccessibleSteps));
-    pathService.getPathCompletionByContent.and.returnValue(of(mockCompletion));
-    pathService.getChapterSummariesWithContent.and.returnValue(of([]));
-    pathService.getAllStepsMetadata.and.returnValue(of(mockStepsMetadata));
-    pathService.getConceptProgressForPath.and.returnValue(of([]));
+    pathService.getPath.mockReturnValue(of(mockPath));
+    agentService.getProgressForPath.mockReturnValue(of(mockProgress));
+    pathService.getAccessibleSteps.mockReturnValue(of(mockAccessibleSteps));
+    pathService.getAccessCheckResults.mockReturnValue(
+      of(
+        new Map<number, any>([
+          [0, { accessible: true, accessType: 'sequential' }],
+          [1, { accessible: true, accessType: 'sequential' }],
+          [2, { accessible: true, accessType: 'sequential' }],
+          [3, { accessible: false }],
+        ])
+      )
+    );
+    pathService.getPathCompletionByContent.mockReturnValue(of(mockCompletion));
+    pathService.getChapterSummariesWithContent.mockReturnValue(of([]));
+    pathService.getAllStepsMetadata.mockReturnValue(of(mockStepsMetadata));
+    pathService.getConceptProgressForPath.mockReturnValue(of([]));
 
     fixture = TestBed.createComponent(PathOverviewComponent);
     component = fixture.componentInstance;
@@ -217,7 +238,7 @@ describe('PathOverviewComponent', () => {
   });
 
   it('should handle load error', () => {
-    pathService.getPath.and.returnValue(throwError(() => new Error('Network error')));
+    pathService.getPath.mockReturnValue(throwError(() => new Error('Network error')));
 
     fixture.detectChanges();
 
@@ -232,7 +253,7 @@ describe('PathOverviewComponent', () => {
   });
 
   it('should return 0 as current step if no progress', () => {
-    agentService.getProgressForPath.and.returnValue(of(null as any));
+    agentService.getProgressForPath.mockReturnValue(of(null as any));
     fixture.detectChanges();
 
     expect(component.getCurrentStepIndex()).toBe(0);
@@ -251,7 +272,7 @@ describe('PathOverviewComponent', () => {
       reflectionResponses: {},
       attestationsEarned: [],
     };
-    agentService.getProgressForPath.and.returnValue(of(progressAllComplete));
+    agentService.getProgressForPath.mockReturnValue(of(progressAllComplete));
     fixture.detectChanges();
 
     expect(component.getCurrentStepIndex()).toBe(3); // min(4, 3) = 3
@@ -296,7 +317,7 @@ describe('PathOverviewComponent', () => {
       reflectionResponses: {},
       attestationsEarned: [],
     };
-    agentService.getProgressForPath.and.returnValue(of(progressAllRequired));
+    agentService.getProgressForPath.mockReturnValue(of(progressAllRequired));
     fixture.detectChanges();
 
     expect(component.isCompleted()).toBe(true);
@@ -363,7 +384,7 @@ describe('PathOverviewComponent', () => {
       ...mockPath,
       difficulty: 'advanced',
     };
-    pathService.getPath.and.returnValue(of(advancedPath));
+    pathService.getPath.mockReturnValue(of(advancedPath));
     fixture.detectChanges();
 
     expect(component.getDifficultyDisplay()).toBe('Advanced');
@@ -372,8 +393,8 @@ describe('PathOverviewComponent', () => {
   it('should cleanup on destroy', () => {
     fixture.detectChanges();
 
-    spyOn(component['destroy$'], 'next');
-    spyOn(component['destroy$'], 'complete');
+    vi.spyOn(component['destroy$'], 'next');
+    vi.spyOn(component['destroy$'], 'complete');
 
     component.ngOnDestroy();
 
@@ -383,7 +404,7 @@ describe('PathOverviewComponent', () => {
 
   it('should reload when route params change', () => {
     fixture.detectChanges();
-    pathService.getPath.calls.reset();
+    pathService.getPath.mockClear();
 
     paramsSubject.next({ pathId: 'another-path' });
 

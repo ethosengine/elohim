@@ -10,6 +10,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NotificationService } from '../../../core/notifications/notification.service';
 import { DoorwayAdminService } from '../../../services/doorway-admin.service';
 import {
   FederatedDoorway,
@@ -34,7 +35,7 @@ import {
         <section class="peers-config-section">
           <div class="section-header">
             <h3>Configured Peers ({{ peerConfig().length }})</h3>
-            <button class="btn btn-sm btn-secondary" (click)="refreshPeers()" [disabled]="refreshing()">
+            <button class="btn btn-sm btn-secondary" (click)="refreshPeers()" [disabled]="refreshing()" data-testid="federation-refresh">
               {{ refreshing() ? 'Refreshing...' : 'Refresh' }}
             </button>
           </div>
@@ -48,8 +49,9 @@ import {
               [(ngModel)]="newPeerUrl"
               (keyup.enter)="addPeer()"
               [disabled]="addingPeer()"
+              data-testid="federation-peer-url"
             />
-            <button class="btn btn-sm btn-primary" (click)="addPeer()" [disabled]="addingPeer() || !newPeerUrl">
+            <button class="btn btn-sm btn-primary" (click)="addPeer()" [disabled]="addingPeer() || !newPeerUrl" data-testid="federation-add-peer">
               {{ addingPeer() ? 'Adding...' : 'Add Peer' }}
             </button>
           </div>
@@ -198,378 +200,11 @@ import {
       }
     </div>
   `,
-  styles: [`
-    .federation-tab {
-      padding: 1rem 0;
-    }
-
-    .loading-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 3rem;
-      color: var(--text-secondary, #6b7280);
-    }
-
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #e5e7eb;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 1rem;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary, #111827);
-      margin: 0 0 1rem;
-    }
-
-    /* Configured Peers Section */
-    .peers-config-section {
-      margin-bottom: 2rem;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.75rem;
-
-      h3 { margin: 0; }
-    }
-
-    .add-peer-row {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .peer-url-input {
-      flex: 1;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border-color, #d1d5db);
-      border-radius: 0.375rem;
-      font-size: 0.875rem;
-      background: white;
-      color: var(--text-primary, #111827);
-
-      &:focus {
-        outline: none;
-        border-color: #6366f1;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-      }
-    }
-
-    .config-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-      margin-bottom: 1rem;
-
-      th, td {
-        padding: 0.625rem 0.75rem;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color, #e5e7eb);
-      }
-
-      th {
-        background: #f9fafb;
-        font-weight: 500;
-        color: var(--text-secondary, #6b7280);
-        font-size: 0.8125rem;
-      }
-
-      tbody tr:hover {
-        background: #f9fafb;
-      }
-
-      .url-cell {
-        font-family: monospace;
-        font-size: 0.8125rem;
-        word-break: break-all;
-        max-width: 300px;
-      }
-    }
-
-    .status-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.375rem;
-
-      &.reachable { background: #10b981; }
-      &.unreachable { background: #ef4444; }
-    }
-
-    .text-muted {
-      color: var(--text-secondary, #9ca3af);
-    }
-
-    /* Buttons */
-    .btn {
-      cursor: pointer;
-      border: none;
-      border-radius: 0.375rem;
-      font-weight: 500;
-      white-space: nowrap;
-
-      &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-    }
-
-    .btn-sm {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.8125rem;
-    }
-
-    .btn-primary {
-      background: #6366f1;
-      color: white;
-
-      &:hover:not(:disabled) { background: #4f46e5; }
-    }
-
-    .btn-secondary {
-      background: #f3f4f6;
-      color: #374151;
-      border: 1px solid #d1d5db;
-
-      &:hover:not(:disabled) { background: #e5e7eb; }
-    }
-
-    .btn-danger {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-
-      &:hover:not(:disabled) { background: #fee2e2; }
-    }
-
-    /* Doorway Grid */
-    .doorway-section {
-      margin-bottom: 2rem;
-    }
-
-    .doorway-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-
-    .doorway-card {
-      background: white;
-      border: 1px solid var(--border-color, #e5e7eb);
-      border-radius: 0.5rem;
-      padding: 1rem;
-
-      &.self {
-        border-color: #6366f1;
-        background: #fafafe;
-      }
-    }
-
-    .dw-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .dw-status {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #9ca3af;
-      flex-shrink: 0;
-
-      &.active, &.online { background: #10b981; }
-      &.degraded { background: #f59e0b; }
-      &.offline { background: #ef4444; }
-    }
-
-    .dw-name {
-      font-weight: 600;
-      font-size: 0.875rem;
-      color: var(--text-primary, #111827);
-    }
-
-    .self-tag {
-      margin-left: auto;
-      padding: 0.125rem 0.375rem;
-      border-radius: 0.25rem;
-      background: #e0e7ff;
-      color: #4338ca;
-      font-size: 0.6875rem;
-      font-weight: 600;
-    }
-
-    .dw-details {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.375rem 1rem;
-    }
-
-    .dw-detail {
-      display: flex;
-      flex-direction: column;
-
-      .label {
-        font-size: 0.6875rem;
-        color: var(--text-secondary, #6b7280);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      .value {
-        font-size: 0.8125rem;
-        color: var(--text-primary, #111827);
-
-        &.url {
-          font-size: 0.75rem;
-          word-break: break-all;
-          color: var(--text-secondary, #6b7280);
-        }
-
-        &.status-text {
-          &.active, &.online { color: #059669; }
-          &.degraded { color: #d97706; }
-          &.offline { color: #dc2626; }
-        }
-      }
-    }
-
-    .dw-caps {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.375rem;
-      margin-top: 0.75rem;
-    }
-
-    .cap-badge {
-      padding: 0.125rem 0.375rem;
-      border-radius: 0.25rem;
-      background: #f3f4f6;
-      color: #6b7280;
-      font-size: 0.6875rem;
-    }
-
-    /* P2P Peers */
-    .peers-section {
-      margin-top: 2rem;
-    }
-
-    .peers-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-
-      th, td {
-        padding: 0.75rem 1rem;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color, #e5e7eb);
-      }
-
-      th {
-        background: #f9fafb;
-        font-weight: 500;
-        color: var(--text-secondary, #6b7280);
-      }
-
-      tbody tr:hover {
-        background: #f9fafb;
-      }
-
-      .peer-id {
-        font-family: monospace;
-        font-size: 0.8125rem;
-      }
-    }
-
-    .conn-badge {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 500;
-
-      &.connected { background: #d1fae5; color: #065f46; }
-      &.connecting { background: #fef3c7; color: #92400e; }
-      &.disconnected { background: #f3f4f6; color: #4b5563; }
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-secondary, #6b7280);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .doorway-card {
-        background: #1f2937;
-        border-color: #374151;
-
-        &.self {
-          border-color: #6366f1;
-          background: #1e1b3a;
-        }
-      }
-
-      .cap-badge {
-        background: #374151;
-        color: #9ca3af;
-      }
-
-      .self-tag {
-        background: #312e81;
-        color: #a5b4fc;
-      }
-
-      .config-table th,
-      .peers-table th {
-        background: #1f2937;
-      }
-
-      .config-table tbody tr:hover,
-      .peers-table tbody tr:hover {
-        background: #374151;
-      }
-
-      .peer-url-input {
-        background: #1f2937;
-        border-color: #374151;
-        color: #e5e7eb;
-      }
-
-      .btn-secondary {
-        background: #374151;
-        color: #e5e7eb;
-        border-color: #4b5563;
-
-        &:hover:not(:disabled) { background: #4b5563; }
-      }
-
-      .btn-danger {
-        background: #451a1a;
-        border-color: #7f1d1d;
-
-        &:hover:not(:disabled) { background: #7f1d1d; }
-      }
-    }
-  `],
+  styleUrl: './federation-tab.component.css',
 })
 export class FederationTabComponent implements OnInit {
   private readonly adminService = inject(DoorwayAdminService);
+  private readonly notify = inject(NotificationService);
 
   readonly loading = signal(true);
   readonly doorways = signal<FederatedDoorway[]>([]);
@@ -625,10 +260,10 @@ export class FederationTabComponent implements OnInit {
         this.newPeerUrl = '';
         await this.reloadPeerConfig();
       } else {
-        alert(result?.message ?? 'Failed to add peer');
+        this.notify.error(result?.message ?? 'Failed to add peer');
       }
     } catch {
-      alert('Failed to add peer');
+      this.notify.error('Failed to add peer');
     } finally {
       this.addingPeer.set(false);
     }
@@ -641,10 +276,10 @@ export class FederationTabComponent implements OnInit {
       if (result?.success) {
         await this.reloadPeerConfig();
       } else {
-        alert(result?.message ?? 'Failed to remove peer');
+        this.notify.error(result?.message ?? 'Failed to remove peer');
       }
     } catch {
-      alert('Failed to remove peer');
+      this.notify.error('Failed to remove peer');
     } finally {
       this.removingPeer.set(null);
     }
@@ -656,7 +291,7 @@ export class FederationTabComponent implements OnInit {
       await this.adminService.refreshFederationPeers().toPromise();
       await this.reloadPeerConfig();
     } catch {
-      alert('Failed to refresh peers');
+      this.notify.error('Failed to refresh peers');
     } finally {
       this.refreshing.set(false);
     }

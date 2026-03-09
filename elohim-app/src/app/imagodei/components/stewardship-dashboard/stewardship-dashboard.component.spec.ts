@@ -7,41 +7,30 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { StewardshipDashboardComponent } from './stewardship-dashboard.component';
 import { IdentityService } from '../../services/identity.service';
-import { PresenceService } from '../../services/presence.service';
 import { StewardshipAllocationService } from '@app/lamad/services/stewardship-allocation.service';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('StewardshipDashboardComponent', () => {
   let component: StewardshipDashboardComponent;
   let fixture: ComponentFixture<StewardshipDashboardComponent>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockPresenceService: jasmine.SpyObj<PresenceService>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipAllocationService>;
+  let mockIdentityService: any;
+  let mockStewardshipService: any;
 
   beforeEach(async () => {
-    // Create mocks
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      [],
-      {
-        profile: signal(null),
-        humanId: signal(null),
-      }
-    );
+    mockIdentityService = {
+      profile: signal(null),
+      humanId: signal(null),
+    };
 
-    mockPresenceService = jasmine.createSpyObj('PresenceService', ['loadPresences']);
-
-    mockStewardshipService = jasmine.createSpyObj(
-      'StewardshipAllocationService',
-      ['getStewardPortfolio'],
-      {}
-    );
+    mockStewardshipService = {
+      getStewardPortfolio: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [StewardshipDashboardComponent],
       providers: [
         { provide: IdentityService, useValue: mockIdentityService },
-        { provide: PresenceService, useValue: mockPresenceService },
         { provide: StewardshipAllocationService, useValue: mockStewardshipService },
       ],
     }).compileComponents();
@@ -187,7 +176,7 @@ describe('StewardshipDashboardComponent', () => {
     it('should set error when no presence ID', () => {
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(null),
-        configurable: true
+        configurable: true,
       });
 
       component.loadPortfolio();
@@ -200,10 +189,10 @@ describe('StewardshipDashboardComponent', () => {
       const presenceId = 'human-123';
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: jasmine.createSpy('subscribe')
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
+        subscribe: vi.fn(),
       } as any);
 
       component.loadPortfolio();
@@ -211,55 +200,57 @@ describe('StewardshipDashboardComponent', () => {
       expect(mockStewardshipService.getStewardPortfolio).toHaveBeenCalledWith(presenceId);
     });
 
-    it('should handle successful portfolio load', (done) => {
-      const presenceId = 'human-123';
-      const mockPortfolio = {
-        stewardPresenceId: presenceId,
-        totalRecognition: 1000,
-        contentCount: 5,
-        activeDisputeCount: 2,
-        allocations: []
-      };
+    it('should handle successful portfolio load', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockPortfolio = {
+          stewardPresenceId: presenceId,
+          totalRecognition: 1000,
+          contentCount: 5,
+          activeDisputeCount: 2,
+          allocations: [],
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next(mockPortfolio);
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next(mockPortfolio);
 
-          expect(component.portfolio()).toEqual(mockPortfolio);
-          expect(component.isLoading()).toBe(false);
-          done();
+            expect(component.portfolio()).toEqual(mockPortfolio);
+            expect(component.isLoading()).toBe(false);
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
-    it('should handle portfolio load error', (done) => {
-      const presenceId = 'human-123';
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.error(new Error('Network error'));
+    it('should handle portfolio load error', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.error(new Error('Network error'));
 
-          expect(component.error()).toContain('Failed to load stewardship portfolio');
-          expect(component.isLoading()).toBe(false);
-          done();
+            expect(component.error()).toContain('Failed to load stewardship portfolio');
+            expect(component.isLoading()).toBe(false);
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
   });
 
   // ==========================================================================
@@ -268,7 +259,7 @@ describe('StewardshipDashboardComponent', () => {
 
   describe('Refresh', () => {
     it('should call loadPortfolio', () => {
-      spyOn(component, 'loadPortfolio');
+      vi.spyOn(component, 'loadPortfolio');
 
       component.refresh();
 
@@ -336,379 +327,388 @@ describe('StewardshipDashboardComponent', () => {
   // ==========================================================================
 
   describe('Portfolio Display', () => {
-    it('should transform allocations for display', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        id: 'alloc-1',
-        contentId: 'test-content-id',
-        stewardPresenceId: presenceId,
-        allocationRatio: 0.5,
-        allocationMethod: 'computed' as const,
-        contributionType: 'author' as const,
-        contributionEvidenceJson: null,
-        governanceState: 'active' as const,
-        disputeId: null,
-        disputeReason: null,
-        disputedAt: null,
-        disputedBy: null,
-        negotiationSessionId: null,
-        elohimRatifiedAt: null,
-        elohimRatifierId: null,
-        effectiveFrom: '2024-01-01T00:00:00Z',
-        effectiveUntil: null,
-        supersededBy: null,
-        recognitionAccumulated: 100,
-        lastRecognitionAt: null,
-        note: null,
-        metadataJson: null,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
-      const mockPortfolio = {
-        stewardPresenceId: presenceId,
-        totalRecognition: 1000,
-        contentCount: 1,
-        activeDisputeCount: 0,
-        allocations: [mockAllocation]
-      };
-
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next(mockPortfolio);
-
-          const allocations = component.allocations();
-          expect(allocations.length).toBe(1);
-          expect(allocations[0].allocation).toEqual(mockAllocation);
-          expect(allocations[0].contentTitle).toBeDefined();
-          expect(allocations[0].stateLabel).toBe('Active');
-          expect(allocations[0].stateColor).toBe('green');
-          done();
-
-          return { unsubscribe: () => {} };
-        }
-      } as any);
-
-      component.loadPortfolio();
-    });
-
-    it('should handle multiple allocations', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocations = [
-        {
-          contentId: 'content-1',
-          stewardId: presenceId,
-          ratio: 0.5,
+    it('should transform allocations for display', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          id: 'alloc-1',
+          contentId: 'test-content-id',
+          stewardPresenceId: presenceId,
+          allocationRatio: 0.5,
+          allocationMethod: 'computed' as const,
+          contributionType: 'author' as const,
+          contributionEvidence: null,
           governanceState: 'active' as const,
-          totalRecognition: 100,
+          disputeId: null,
+          disputeReason: null,
+          disputedAt: null,
+          disputedBy: null,
+          negotiationSessionId: null,
+          elohimRatifiedAt: null,
+          elohimRatifierId: null,
+          effectiveFrom: '2024-01-01T00:00:00Z',
+          effectiveUntil: null,
+          supersededBy: null,
+          recognitionAccumulated: 100,
+          lastRecognitionAt: null,
+          note: null,
+          metadata: null,
           createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          contentId: 'content-2',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
+        const mockPortfolio = {
+          stewardPresenceId: presenceId,
+          totalRecognition: 1000,
+          contentCount: 1,
+          activeDisputeCount: 0,
+          allocations: [mockAllocation],
+        };
+
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next(mockPortfolio);
+
+            const allocations = component.allocations();
+            expect(allocations.length).toBe(1);
+            expect(allocations[0].allocation).toEqual(mockAllocation);
+            expect(allocations[0].contentTitle).toBeDefined();
+            expect(allocations[0].stateLabel).toBe('Active');
+            expect(allocations[0].stateColor).toBe('green');
+            done();
+
+            return { unsubscribe: () => {} };
+          },
+        } as any);
+
+        component.loadPortfolio();
+      }));
+
+    it('should handle multiple allocations', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocations = [
+          {
+            contentId: 'content-1',
+            stewardId: presenceId,
+            ratio: 0.5,
+            governanceState: 'active' as const,
+            totalRecognition: 100,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+          {
+            contentId: 'content-2',
+            stewardId: presenceId,
+            ratio: 0.3,
+            governanceState: 'disputed' as const,
+            totalRecognition: 50,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ];
+        const mockPortfolio = {
           stewardId: presenceId,
-          ratio: 0.3,
-          governanceState: 'disputed' as const,
-          totalRecognition: 50,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        }
-      ];
-      const mockPortfolio = {
-        stewardId: presenceId,
-        totalRecognition: 150,
-        contentCount: 2,
-        activeDisputeCount: 1,
-        allocations: mockAllocations
-      };
+          totalRecognition: 150,
+          contentCount: 2,
+          activeDisputeCount: 1,
+          allocations: mockAllocations,
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next(mockPortfolio);
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next(mockPortfolio);
 
-          const allocations = component.allocations();
-          expect(allocations.length).toBe(2);
-          expect(allocations[0].stateLabel).toBe('Active');
-          expect(allocations[1].stateLabel).toBe('Disputed');
-          expect(allocations[1].stateColor).toBe('orange');
-          done();
+            const allocations = component.allocations();
+            expect(allocations.length).toBe(2);
+            expect(allocations[0].stateLabel).toBe('Active');
+            expect(allocations[1].stateLabel).toBe('Disputed');
+            expect(allocations[1].stateColor).toBe('orange');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
   });
 
   describe('Governance State Formatting', () => {
-    it('should format active state', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'test-content',
-        stewardId: presenceId,
-        ratio: 1,
-        governanceState: 'active' as const,
-        totalRecognition: 100,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should format active state', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'test-content',
+          stewardId: presenceId,
+          ratio: 1,
+          governanceState: 'active' as const,
+          totalRecognition: 100,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 100,
-            contentCount: 1,
-            activeDisputeCount: 0,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 100,
+              contentCount: 1,
+              activeDisputeCount: 0,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.stateLabel).toBe('Active');
-          expect(allocation.stateColor).toBe('green');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.stateLabel).toBe('Active');
+            expect(allocation.stateColor).toBe('green');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
-    it('should format disputed state', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'test-content',
-        stewardId: presenceId,
-        ratio: 0.5,
-        governanceState: 'disputed' as const,
-        totalRecognition: 50,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should format disputed state', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'test-content',
+          stewardId: presenceId,
+          ratio: 0.5,
+          governanceState: 'disputed' as const,
+          totalRecognition: 50,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 50,
-            contentCount: 1,
-            activeDisputeCount: 1,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 50,
+              contentCount: 1,
+              activeDisputeCount: 1,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.stateLabel).toBe('Disputed');
-          expect(allocation.stateColor).toBe('orange');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.stateLabel).toBe('Disputed');
+            expect(allocation.stateColor).toBe('orange');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
-    it('should format pending_review state', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'test-content',
-        stewardId: presenceId,
-        ratio: 0.7,
-        governanceState: 'pending_review' as const,
-        totalRecognition: 70,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should format pending_review state', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'test-content',
+          stewardId: presenceId,
+          ratio: 0.7,
+          governanceState: 'pending_review' as const,
+          totalRecognition: 70,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 70,
-            contentCount: 1,
-            activeDisputeCount: 0,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 70,
+              contentCount: 1,
+              activeDisputeCount: 0,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.stateLabel).toBe('Pending Review');
-          expect(allocation.stateColor).toBe('blue');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.stateLabel).toBe('Pending Review');
+            expect(allocation.stateColor).toBe('blue');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
-    it('should format superseded state', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'test-content',
-        stewardId: presenceId,
-        ratio: 0,
-        governanceState: 'superseded' as const,
-        totalRecognition: 0,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should format superseded state', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'test-content',
+          stewardId: presenceId,
+          ratio: 0,
+          governanceState: 'superseded' as const,
+          totalRecognition: 0,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 0,
-            contentCount: 1,
-            activeDisputeCount: 0,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 0,
+              contentCount: 1,
+              activeDisputeCount: 0,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.stateLabel).toBe('Superseded');
-          expect(allocation.stateColor).toBe('gray');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.stateLabel).toBe('Superseded');
+            expect(allocation.stateColor).toBe('gray');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
   });
 
   describe('Content ID Formatting', () => {
-    it('should format kebab-case to Title Case', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'quiz-manifesto-foundations',
-        stewardId: presenceId,
-        ratio: 1,
-        governanceState: 'active' as const,
-        totalRecognition: 100,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should format kebab-case to Title Case', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'quiz-manifesto-foundations',
+          stewardId: presenceId,
+          ratio: 1,
+          governanceState: 'active' as const,
+          totalRecognition: 100,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 100,
-            contentCount: 1,
-            activeDisputeCount: 0,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 100,
+              contentCount: 1,
+              activeDisputeCount: 0,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.contentTitle).toBe('Quiz Manifesto Foundations');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.contentTitle).toBe('Quiz Manifesto Foundations');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
-    it('should handle single word content IDs', (done) => {
-      const presenceId = 'human-123';
-      const mockAllocation = {
-        contentId: 'introduction',
-        stewardId: presenceId,
-        ratio: 1,
-        governanceState: 'active' as const,
-        totalRecognition: 50,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      };
+    it('should handle single word content IDs', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockAllocation = {
+          contentId: 'introduction',
+          stewardId: presenceId,
+          ratio: 1,
+          governanceState: 'active' as const,
+          totalRecognition: 50,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next({
-            stewardId: presenceId,
-            totalRecognition: 50,
-            contentCount: 1,
-            activeDisputeCount: 0,
-            allocations: [mockAllocation]
-          });
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next({
+              stewardId: presenceId,
+              totalRecognition: 50,
+              contentCount: 1,
+              activeDisputeCount: 0,
+              allocations: [mockAllocation],
+            });
 
-          const allocation = component.allocations()[0];
-          expect(allocation.contentTitle).toBe('Introduction');
-          done();
+            const allocation = component.allocations()[0];
+            expect(allocation.contentTitle).toBe('Introduction');
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty portfolio', (done) => {
-      const presenceId = 'human-123';
-      const mockPortfolio = {
-        stewardId: presenceId,
-        totalRecognition: 0,
-        contentCount: 0,
-        activeDisputeCount: 0,
-        allocations: []
-      };
+    it('should handle empty portfolio', () =>
+      new Promise<void>(done => {
+        const presenceId = 'human-123';
+        const mockPortfolio = {
+          stewardId: presenceId,
+          totalRecognition: 0,
+          contentCount: 0,
+          activeDisputeCount: 0,
+          allocations: [],
+        };
 
-      Object.defineProperty(mockIdentityService, 'humanId', {
-        get: () => signal(presenceId),
-        configurable: true
-      });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: (callbacks: any) => {
-          callbacks.next(mockPortfolio);
+        Object.defineProperty(mockIdentityService, 'humanId', {
+          get: () => signal(presenceId),
+          configurable: true,
+        });
+        mockStewardshipService.getStewardPortfolio.mockReturnValue({
+          subscribe: (callbacks: any) => {
+            callbacks.next(mockPortfolio);
 
-          expect(component.totalRecognition()).toBe(0);
-          expect(component.contentCount()).toBe(0);
-          expect(component.disputeCount()).toBe(0);
-          expect(component.hasAllocations()).toBe(false);
-          done();
+            expect(component.totalRecognition()).toBe(0);
+            expect(component.contentCount()).toBe(0);
+            expect(component.disputeCount()).toBe(0);
+            expect(component.hasAllocations()).toBe(false);
+            done();
 
-          return { unsubscribe: () => {} };
-        }
-      } as any);
+            return { unsubscribe: () => {} };
+          },
+        } as any);
 
-      component.loadPortfolio();
-    });
+        component.loadPortfolio();
+      }));
 
     it('should handle very large recognition values', () => {
       expect(component.formatRecognition(1234567890)).toBe('1234.6M');

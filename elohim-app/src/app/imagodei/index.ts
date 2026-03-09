@@ -10,6 +10,9 @@
  * - Attestations earned by humans
  */
 
+// Interfaces (abstract contracts for IoC)
+export * from './interfaces';
+
 // Models
 export * from './models';
 

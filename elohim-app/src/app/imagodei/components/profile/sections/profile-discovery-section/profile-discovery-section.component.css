@@ -31,11 +31,15 @@
   margin-bottom: 1rem;
 }
 
+/* Card as button — reset browser defaults */
 .discovery-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
   background: linear-gradient(
     135deg,
     var(--primary-50, #eff6ff) 0%,
@@ -43,12 +47,17 @@
   );
   border: 1px solid var(--primary-100, #dbeafe);
   border-radius: 10px;
+  cursor: default;
   transition:
     transform 0.15s,
     box-shadow 0.15s;
 }
 
-.discovery-card:hover {
+.discovery-card--linked {
+  cursor: pointer;
+}
+
+.discovery-card--linked:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
 }
@@ -63,6 +72,7 @@
   background: var(--surface-card, #fff);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
+  flex-shrink: 0;
 }
 
 .discovery-content {
@@ -90,15 +100,31 @@
   text-overflow: ellipsis;
 }
 
-.discovery-short {
-  padding: 0.25rem 0.5rem;
-  background: var(--purple-100, #f3e8ff);
-  color: var(--purple-700, #7c3aed);
-  border-radius: 4px;
+/* Hexagonal badge with category color */
+.discovery-hex-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.5rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--badge-color, #8b5cf6) 15%, transparent);
+  color: var(--badge-color, #8b5cf6);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.025em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.discovery-link-icon {
+  font-size: 1rem;
+  color: var(--text-color-secondary, #6c757d);
+  flex-shrink: 0;
+}
+
+.discovery-card--linked:hover .discovery-link-icon {
+  color: var(--primary-500, #3b82f6);
 }
 
 .discovery-add-btn {

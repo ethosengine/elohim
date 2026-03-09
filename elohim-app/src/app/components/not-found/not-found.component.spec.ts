@@ -4,15 +4,18 @@ import { Router, provideRouter } from '@angular/router';
 import { SeoService } from '../../services/seo.service';
 
 import { NotFoundComponent } from './not-found.component';
+import { vi, Mock } from 'vitest';
 
 describe('NotFoundComponent', () => {
   let component: NotFoundComponent;
   let fixture: ComponentFixture<NotFoundComponent>;
-  let seoServiceSpy: jasmine.SpyObj<SeoService>;
+  let seoServiceSpy: any;
   let router: Router;
 
   beforeEach(async () => {
-    seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateSeo']);
+    seoServiceSpy = {
+      updateSeo: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [NotFoundComponent],
@@ -20,7 +23,7 @@ describe('NotFoundComponent', () => {
     }).compileComponents();
 
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     // Mock the url property
     Object.defineProperty(router, 'url', { value: '/some/invalid/path', writable: true });
 
@@ -41,7 +44,7 @@ describe('NotFoundComponent', () => {
     fixture.detectChanges();
 
     expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(
-      jasmine.objectContaining({
+      expect.objectContaining({
         title: 'Page Not Found',
         noIndex: true,
       })
@@ -59,7 +62,7 @@ describe('NotFoundComponent', () => {
   });
 
   it('should go back', () => {
-    spyOn(window.history, 'back');
+    vi.spyOn(window.history, 'back');
     component.goBack();
     expect(window.history.back).toHaveBeenCalled();
   });

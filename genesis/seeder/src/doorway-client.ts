@@ -240,6 +240,17 @@ export class DoorwayClient {
   private config: DoorwayClientConfig & { baseUrl: string; timeout: number; retries: number; dryRun: boolean };
 
   constructor(config: DoorwayClientConfig) {
+    // Warn if storageUrl has a non-root path (common misconfiguration)
+    if (config.storageUrl) {
+      try {
+        const parsed = new URL(config.storageUrl);
+        if (parsed.pathname !== '/') {
+          console.warn(`⚠️ storageUrl has non-root path: ${config.storageUrl}`);
+          console.warn(`  Should point directly to elohim-storage (e.g., http://host:8090)`);
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
     this.config = {
       baseUrl: config.baseUrl.replace(/\/$/, ''), // Remove trailing slash
       storageUrl: config.storageUrl?.replace(/\/$/, ''), // Direct storage URL for /db/* routes

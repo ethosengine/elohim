@@ -69,7 +69,7 @@ pub trait LlmBackend: Send + Sync {
 }
 
 /// Request for LLM completion.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(feature = "typescript", ts(export))]
 pub struct CompletionRequest {
@@ -87,18 +87,7 @@ pub struct CompletionRequest {
     pub response_format: Option<ResponseFormat>,
 }
 
-impl Default for CompletionRequest {
-    fn default() -> Self {
-        Self {
-            system_prompt: None,
-            messages: Vec::new(),
-            max_tokens: None,
-            temperature: None,
-            stop_sequences: Vec::new(),
-            response_format: None,
-        }
-    }
-}
+// Default derived — all fields are Option/Vec which default to None/empty
 
 impl CompletionRequest {
     /// Create a new request with a user message.

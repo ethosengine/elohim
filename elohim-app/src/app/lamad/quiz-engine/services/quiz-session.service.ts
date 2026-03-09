@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 93.5% (2026-02-05)
+// @coverage: 93.5% (2026-02-24)
 
 import { BehaviorSubject, Observable, of, map, switchMap } from 'rxjs';
 

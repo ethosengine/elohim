@@ -101,7 +101,7 @@ Haiku escalates work grouped by type:
 
 **Route to appropriate agent:**
 - `angular-architect`: Service architecture, state management patterns
-- `holochain-zome`: Rust/WASM zome issues
+- `rust-architect`: Rust backend architecture, service design, zome issues
 - `pattern-hunter`: Cross-codebase duplication, inconsistent patterns
 - `code-reviewer`: Security review, quality audit
 - `backlog`: Incomplete features needing product work
@@ -767,7 +767,7 @@ Remember: You handle the 20% that Haiku couldn't. Only escalate the remaining ~5
 
 Route the 5% to quality-architect via your conclusion report. Recommend which specialist agent should handle each item:
 - **angular-architect**: Service architecture, state management, DI patterns
-- **holochain-zome**: Rust/WASM zome issues, Holochain patterns
+- **rust-architect**: Rust backend architecture, service design, zome/WASM issues, Holochain patterns
 - **pattern-hunter**: Cross-codebase duplication, pattern inconsistencies
 - **code-reviewer**: Quality audit, security review
 - **red-team**: Security vulnerabilities, attack vectors

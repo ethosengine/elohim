@@ -11,7 +11,14 @@
   <!-- Error state -->
   <div *ngIf="error && !isLoading" class="error-state">
     <h2>⚠️ {{ error }}</h2>
-    <button type="button" class="btn-primary" (click)="backToHome()">Back to Lamad</button>
+    <button
+      type="button"
+      class="btn-primary"
+      (click)="backToHome()"
+      data-testid="viewer-error-back"
+    >
+      Back to Lamad
+    </button>
   </div>
 
   <!-- Content -->
@@ -19,7 +26,14 @@
     <!-- Header -->
     <div class="content-header">
       <div class="header-nav">
-        <button type="button" class="back-button" (click)="backToHome()">← Back to Lamad</button>
+        <button
+          type="button"
+          class="back-button"
+          (click)="backToHome()"
+          data-testid="viewer-back-home"
+        >
+          ← Back to Lamad
+        </button>
 
         <!-- Return to Path button (shown when viewing from a detour) -->
         <button
@@ -27,6 +41,7 @@
           *ngIf="hasReturnPath"
           class="return-to-path-btn"
           (click)="returnToPath()"
+          data-testid="viewer-return-to-path"
         >
           ← Return to {{ pathContext?.pathTitle }}
         </button>
@@ -58,8 +73,9 @@
           <app-content-download [node]="node"></app-content-download>
           <a
             *ngIf="canEditContent"
-            [routerLink]="['/lamad/resource', node.id, 'edit']"
+            [routerLink]="['/resource', node.id, 'edit']"
             class="btn-edit"
+            data-testid="viewer-edit-link"
           >
             ✏️ Edit
           </a>
@@ -79,6 +95,7 @@
             class="btn-affinity"
             (click)="adjustAffinity(-0.1)"
             [disabled]="affinity <= 0"
+            data-testid="viewer-affinity-decrease"
           >
             - Decrease
           </button>
@@ -87,6 +104,7 @@
             class="btn-affinity"
             (click)="adjustAffinity(0.1)"
             [disabled]="affinity >= 1"
+            data-testid="viewer-affinity-increase"
           >
             + Increase
           </button>
@@ -98,6 +116,7 @@
             class="btn-quick"
             (click)="setAffinity(0.5)"
             [ngClass]="{ active: affinity >= 0.4 && affinity <= 0.6 }"
+            data-testid="viewer-affinity-practicing"
           >
             📚 Practicing
           </button>
@@ -106,6 +125,7 @@
             class="btn-quick"
             (click)="setAffinity(1.0)"
             [ngClass]="{ active: affinity > 0.9 }"
+            data-testid="viewer-affinity-mastered"
           >
             ✅ Mastered
           </button>
@@ -128,6 +148,7 @@
         class="tab-btn"
         (click)="setActiveTab('content')"
         [class.active]="activeTab === 'content'"
+        data-testid="viewer-tab-content"
       >
         Content
       </button>
@@ -136,6 +157,7 @@
         class="tab-btn"
         (click)="setActiveTab('trust')"
         [class.active]="activeTab === 'trust'"
+        data-testid="viewer-tab-trust"
       >
         Attestations
       </button>
@@ -144,6 +166,7 @@
         class="tab-btn"
         (click)="setActiveTab('governance')"
         [class.active]="activeTab === 'governance'"
+        data-testid="viewer-tab-governance"
       >
         Governance
       </button>
@@ -152,6 +175,7 @@
         class="tab-btn"
         (click)="setActiveTab('network')"
         [class.active]="activeTab === 'network'"
+        data-testid="viewer-tab-network"
       >
         Network
       </button>
@@ -453,7 +477,9 @@
 
             <div *ngIf="challenges.length === 0" class="empty-state">
               <p>No challenges filed against this content.</p>
-              <button type="button" class="btn-secondary">File a Challenge</button>
+              <button type="button" class="btn-secondary" data-testid="viewer-file-challenge">
+                File a Challenge
+              </button>
             </div>
 
             <div *ngIf="challenges.length > 0" class="challenges-list">
@@ -483,7 +509,9 @@
 
             <div *ngIf="discussions.length === 0" class="empty-state">
               <p>No discussions about this content yet.</p>
-              <button type="button" class="btn-secondary">Start Discussion</button>
+              <button type="button" class="btn-secondary" data-testid="viewer-start-discussion">
+                Start Discussion
+              </button>
             </div>
 
             <div *ngIf="discussions.length > 0" class="discussions-list">
@@ -524,7 +552,12 @@
 
         <!-- Explore in Full Graph Button -->
         <div class="network-actions">
-          <button type="button" class="btn-explore-graph" (click)="exploreInGraph()">
+          <button
+            type="button"
+            class="btn-explore-graph"
+            (click)="exploreInGraph()"
+            data-testid="viewer-explore-graph"
+          >
             <span class="icon">🔭</span>
             Explore in Full Graph
           </button>

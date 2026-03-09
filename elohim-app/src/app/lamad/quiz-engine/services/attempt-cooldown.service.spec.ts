@@ -369,18 +369,12 @@ describe('AttemptCooldownService', () => {
     });
 
     it('should return Map', () => {
-      const result = service.getBulkCooldownStatus(
-        ['content-1', 'content-2'],
-        'human-456'
-      );
+      const result = service.getBulkCooldownStatus(['content-1', 'content-2'], 'human-456');
       expect(result instanceof Map).toBe(true);
     });
 
     it('should return map with entries for all content', () => {
-      const result = service.getBulkCooldownStatus(
-        ['content-1', 'content-2'],
-        'human-456'
-      );
+      const result = service.getBulkCooldownStatus(['content-1', 'content-2'], 'human-456');
       expect(result.size).toBe(2);
     });
   });
@@ -392,18 +386,12 @@ describe('AttemptCooldownService', () => {
     });
 
     it('should return Map', () => {
-      const result = service.getBulkMasteryStatus(
-        ['content-1', 'content-2'],
-        'human-456'
-      );
+      const result = service.getBulkMasteryStatus(['content-1', 'content-2'], 'human-456');
       expect(result instanceof Map).toBe(true);
     });
 
     it('should return map with entries for all content', () => {
-      const result = service.getBulkMasteryStatus(
-        ['content-1', 'content-2'],
-        'human-456'
-      );
+      const result = service.getBulkMasteryStatus(['content-1', 'content-2'], 'human-456');
       expect(result.size).toBe(2);
     });
   });

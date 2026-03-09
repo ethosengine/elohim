@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-24)
+
 import { environment } from '../../../environments/environment';
 
 export interface BuildInfo {

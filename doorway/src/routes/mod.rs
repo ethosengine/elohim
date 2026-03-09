@@ -1,5 +1,6 @@
 //! HTTP routes for Doorway
 
+pub mod account;
 pub mod admin;
 pub mod admin_conductors;
 pub mod admin_users;
@@ -7,16 +8,27 @@ pub mod api;
 pub mod apps;
 pub mod auth_routes;
 pub mod blob;
+pub mod collectives;
+pub mod compute;
+pub mod custodians;
 pub mod dashboard_ws;
 pub mod db;
 pub mod debug_stream;
+pub mod economic_events;
+pub mod elohim_agent;
+pub mod epr;
+pub mod exchange;
 pub mod federation;
+pub mod flow_planning;
 pub mod health;
 pub mod identity;
 pub mod import;
 pub mod import_ws;
+pub mod presence;
 pub mod seed;
 pub mod status;
+pub mod stewarded_resources;
+pub mod stewardship;
 pub mod stream;
 pub mod threshold;
 pub mod zome_helpers;
@@ -59,10 +71,23 @@ pub use federation::{
     handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers,
 };
 pub use health::{health_check, readiness_check, version_info};
-pub use identity::{handle_did_document, handle_did_endpoint};
+pub use identity::{handle_did_document, handle_did_endpoint, handle_identity_api_request};
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_check_blob, handle_seed_blob, BlobUploadResponse};
 pub use status::status_check;
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
+
+pub use account::handle_account_request;
+pub use collectives::handle_collectives_request;
+pub use compute::handle_compute_request;
+pub use custodians::handle_custodians_api_request;
+pub use economic_events::handle_economic_events_request;
+pub use elohim_agent::handle_elohim_agent_request;
+pub use epr::handle_epr_head_request;
+pub use exchange::handle_exchange_request;
+pub use flow_planning::handle_flow_planning_request;
+pub use presence::handle_presence_request;
+pub use stewarded_resources::handle_stewarded_resources_request;
+pub use stewardship::handle_stewardship_request;

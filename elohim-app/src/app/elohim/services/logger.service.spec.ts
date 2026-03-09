@@ -1,3 +1,4 @@
+import { vi, Mock } from 'vitest';
 /* eslint-disable no-console, sonarjs/no-duplicate-string */
 import { TestBed } from '@angular/core/testing';
 
@@ -22,17 +23,17 @@ describe('LoggerService', () => {
     });
     service = TestBed.inject(LoggerService);
 
-    // Spy on console methods
+    // Spy on console methods and clear call history between tests
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.clearAllMocks();
+  });
 
-    spyOn(console, 'debug');
-
-    spyOn(console, 'info');
-
-    spyOn(console, 'warn');
-
-    spyOn(console, 'error');
-
-    spyOn(console, 'log');
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -143,7 +144,7 @@ describe('LoggerService', () => {
     it('debug should accept message with context', () => {
       const context = { key: 'value' };
       service.debug('debug with context', context);
-      expect(console.debug).toHaveBeenCalledWith(jasmine.any(String), context);
+      expect(console.debug).toHaveBeenCalledWith(expect.any(String), context);
     });
 
     it('info should accept message and call console.info', () => {
@@ -154,7 +155,7 @@ describe('LoggerService', () => {
     it('info should accept message with context', () => {
       const context = { userId: '123' };
       service.info('info with context', context);
-      expect(console.info).toHaveBeenCalledWith(jasmine.any(String), context);
+      expect(console.info).toHaveBeenCalledWith(expect.any(String), context);
     });
 
     it('warn should accept message and call console.warn', () => {
@@ -165,7 +166,7 @@ describe('LoggerService', () => {
     it('warn should accept message with context', () => {
       const context = { warning: true };
       service.warn('warn with context', context);
-      expect(console.warn).toHaveBeenCalledWith(jasmine.any(String), context);
+      expect(console.warn).toHaveBeenCalledWith(expect.any(String), context);
     });
 
     it('error should accept message and call console.error', () => {
@@ -177,7 +178,7 @@ describe('LoggerService', () => {
       const error = new Error('test error');
       const context = { errorCode: 500 };
       service.error('error occurred', error, context);
-      expect(console.error).toHaveBeenCalledWith(jasmine.any(String), context, error);
+      expect(console.error).toHaveBeenCalledWith(expect.any(String), context, error);
     });
   });
 
@@ -185,26 +186,26 @@ describe('LoggerService', () => {
     it('should output with timestamp when configured', () => {
       service.configure({ includeTimestamp: true });
       service.info(TEST_MESSAGE);
-      expect(console.info).toHaveBeenCalledWith(jasmine.stringMatching(/\[\d{2}:\d{2}:\d{2}\]/));
+      expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/\[\d{2}:\d{2}:\d{2}\]/));
     });
 
     it('should output without timestamp when disabled', () => {
       service.configure({ includeTimestamp: false });
       service.info(TEST_MESSAGE);
-      const callArgs = (console.info as jasmine.Spy).calls.mostRecent().args[0];
+      const callArgs = (console.info as Mock).mock.lastCall[0];
       expect(callArgs).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/);
     });
 
     it('should include source in output', () => {
       service.setSource('TestSource');
       service.info(TEST_MESSAGE);
-      expect(console.info).toHaveBeenCalledWith(jasmine.stringMatching(/\[TestSource\]/));
+      expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/\[TestSource\]/));
     });
 
     it('should include correlation ID prefix in output', () => {
       service.setCorrelationId('req-1234');
       service.info(TEST_MESSAGE);
-      const callArgs = (console.info as jasmine.Spy).calls.mostRecent().args[0];
+      const callArgs = (console.info as Mock).mock.lastCall[0];
       expect(callArgs).toContain('req-1234');
     });
   });
@@ -225,10 +226,10 @@ describe('LoggerService', () => {
       const logs = service.getRecentLogs();
       expect(logs.length).toBeGreaterThan(0);
       expect(logs[0]).toEqual(
-        jasmine.objectContaining({
-          timestamp: jasmine.any(String),
-          level: jasmine.any(String),
-          message: jasmine.any(String),
+        expect.objectContaining({
+          timestamp: expect.any(String),
+          level: expect.any(String),
+          message: expect.any(String),
         })
       );
     });
@@ -236,9 +237,9 @@ describe('LoggerService', () => {
     it('startTimer should return LogTimer interface', () => {
       const timer = service.startTimer('test');
       expect(timer).toEqual(
-        jasmine.objectContaining({
-          end: jasmine.any(Function),
-          elapsed: jasmine.any(Function),
+        expect.objectContaining({
+          end: expect.any(Function),
+          elapsed: expect.any(Function),
         })
       );
     });
@@ -290,7 +291,7 @@ describe('LoggerService', () => {
     it('should initialize with includeTimestamp true by default', () => {
       service.configure({ includeTimestamp: true });
       service.info(TEST);
-      const callArgs = (console.info as jasmine.Spy).calls.mostRecent().args[0];
+      const callArgs = (console.info as Mock).mock.lastCall[0];
       expect(callArgs).toMatch(/\[\d{2}:\d{2}:\d{2}\]/);
     });
 
@@ -637,12 +638,12 @@ describe('LoggerService', () => {
     it('should include context in log output', () => {
       const context = { userId: 'abc', action: 'login' };
       service.info('User action', context);
-      expect(console.info).toHaveBeenCalledWith(jasmine.any(String), context);
+      expect(console.info).toHaveBeenCalledWith(expect.any(String), context);
     });
 
     it('should work without context', () => {
       service.info('Simple message');
-      expect(console.info).toHaveBeenCalledWith(jasmine.any(String));
+      expect(console.info).toHaveBeenCalledWith(expect.any(String));
     });
   });
 
@@ -803,7 +804,7 @@ describe('LoggerService', () => {
       service.info('JSON message', { key: 'value' });
 
       expect(console.log).toHaveBeenCalled();
-      const logCall = (console.log as jasmine.Spy).calls.first().args[0];
+      const logCall = (console.log as Mock).mock.calls[0][0];
       const parsed = JSON.parse(logCall);
       expect(parsed.message).toBe('JSON message');
       expect(parsed.context.key).toBe('value');

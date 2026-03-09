@@ -2,15 +2,18 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { LamadNotFoundComponent } from './lamad-not-found.component';
 import { SeoService } from '../../../services/seo.service';
+import { vi, Mock } from 'vitest';
 
 describe('LamadNotFoundComponent', () => {
   let component: LamadNotFoundComponent;
   let fixture: ComponentFixture<LamadNotFoundComponent>;
-  let seoServiceSpy: jasmine.SpyObj<SeoService>;
+  let seoServiceSpy: any;
   let router: Router;
 
   beforeEach(async () => {
-    seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateSeo']);
+    seoServiceSpy = {
+      updateSeo: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [LamadNotFoundComponent],
@@ -18,7 +21,7 @@ describe('LamadNotFoundComponent', () => {
     }).compileComponents();
 
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     // Mock the url property
     Object.defineProperty(router, 'url', { value: '/lamad/some/invalid/path', writable: true });
 
@@ -39,7 +42,7 @@ describe('LamadNotFoundComponent', () => {
     fixture.detectChanges();
 
     expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(
-      jasmine.objectContaining({
+      expect.objectContaining({
         title: 'Content Not Found - Lamad',
         noIndex: true,
       })
@@ -91,7 +94,7 @@ describe('LamadNotFoundComponent', () => {
   });
 
   it('should go back', () => {
-    spyOn(window.history, 'back');
+    vi.spyOn(window.history, 'back');
     component.goBack();
     expect(window.history.back).toHaveBeenCalled();
   });

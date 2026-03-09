@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 
-// @coverage: 92.4% (2026-02-05)
+// @coverage: 92.4% (2026-03-03)
 
 import { filter, map, mergeMap } from 'rxjs/operators';
 
@@ -400,7 +400,7 @@ export class SeoService {
     createdAt?: string;
     updatedAt?: string;
   }): void {
-    const canonicalUrl = `${DEFAULTS.siteUrl}/lamad/resource/${content.id}`;
+    const canonicalUrl = `${DEFAULTS.siteUrl}/resource/${content.id}`;
     const description = content.summary ?? `${content.title} - ${content.contentType} content`;
 
     this.updateSeo({

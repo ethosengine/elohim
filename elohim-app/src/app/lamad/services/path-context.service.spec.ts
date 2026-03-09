@@ -44,18 +44,19 @@ describe('PathContextService', () => {
   });
 
   describe('enterPath', () => {
-    it('should set active path context', done => {
-      service.context$.subscribe(context => {
-        if (context) {
-          expect(context.pathId).toBe('test-path');
-          expect(context.pathTitle).toBe('Test Learning Path');
-          expect(context.stepIndex).toBe(2);
-          done();
-        }
-      });
+    it('should set active path context', () =>
+      new Promise<void>(done => {
+        service.context$.subscribe(context => {
+          if (context) {
+            expect(context.pathId).toBe('test-path');
+            expect(context.pathTitle).toBe('Test Learning Path');
+            expect(context.stepIndex).toBe(2);
+            done();
+          }
+        });
 
-      service.enterPath(getMockPathContext());
-    });
+        service.enterPath(getMockPathContext());
+      }));
 
     it('should initialize detour stack', () => {
       const contextWithoutStack = { ...getMockPathContext() };
@@ -103,7 +104,7 @@ describe('PathContextService', () => {
 
     it('should return active context', () => {
       service.enterPath(getMockPathContext());
-      expect(service.currentContext).toEqual(jasmine.objectContaining(getMockPathContext()));
+      expect(service.currentContext).toEqual(expect.objectContaining(getMockPathContext()));
     });
   });
 
@@ -243,7 +244,7 @@ describe('PathContextService', () => {
       });
 
       const route = service.returnFromDetour();
-      expect(route).toEqual(['/lamad/resource', 'related-concept']);
+      expect(route).toEqual(['/resource', 'related-concept']);
       expect(service.detourDepth).toBe(1);
     });
 
@@ -394,48 +395,51 @@ describe('PathContextService', () => {
   });
 
   describe('context$ observable', () => {
-    it('should emit when context changes', done => {
-      let emitCount = 0;
-      service.context$.subscribe(() => {
-        emitCount++;
-        if (emitCount === 2) {
-          // Initial null + enterPath
-          done();
-        }
-      });
+    it('should emit when context changes', () =>
+      new Promise<void>(done => {
+        let emitCount = 0;
+        service.context$.subscribe(() => {
+          emitCount++;
+          if (emitCount === 2) {
+            // Initial null + enterPath
+            done();
+          }
+        });
 
-      service.enterPath(getMockPathContext());
-    });
+        service.enterPath(getMockPathContext());
+      }));
 
-    it('should emit when detour starts', done => {
-      let emitCount = 0;
-      service.context$.subscribe(context => {
-        emitCount++;
-        if (emitCount === 3) {
-          // Initial null + enterPath + startDetour
-          expect(context?.detourStack?.length).toBe(1);
-          done();
-        }
-      });
+    it('should emit when detour starts', () =>
+      new Promise<void>(done => {
+        let emitCount = 0;
+        service.context$.subscribe(context => {
+          emitCount++;
+          if (emitCount === 3) {
+            // Initial null + enterPath + startDetour
+            expect(context?.detourStack?.length).toBe(1);
+            done();
+          }
+        });
 
-      service.enterPath(getMockPathContext());
-      service.startDetour(getMockDetour());
-    });
+        service.enterPath(getMockPathContext());
+        service.startDetour(getMockDetour());
+      }));
 
-    it('should emit when position updates', done => {
-      let emitCount = 0;
-      service.context$.subscribe(context => {
-        emitCount++;
-        if (emitCount === 3) {
-          // Initial null + enterPath + updatePosition
-          expect(context?.stepIndex).toBe(7);
-          done();
-        }
-      });
+    it('should emit when position updates', () =>
+      new Promise<void>(done => {
+        let emitCount = 0;
+        service.context$.subscribe(context => {
+          emitCount++;
+          if (emitCount === 3) {
+            // Initial null + enterPath + updatePosition
+            expect(context?.stepIndex).toBe(7);
+            done();
+          }
+        });
 
-      service.enterPath(getMockPathContext());
-      service.updatePosition(7);
-    });
+        service.enterPath(getMockPathContext());
+        service.updatePosition(7);
+      }));
   });
 
   describe('edge cases', () => {

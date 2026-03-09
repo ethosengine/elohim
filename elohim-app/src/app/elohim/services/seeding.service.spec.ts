@@ -22,11 +22,7 @@ describe('SeedingService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        SeedingService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [SeedingService, provideHttpClient(), provideHttpClientTesting()],
     });
 
     service = TestBed.inject(SeedingService);
@@ -61,7 +57,7 @@ describe('SeedingService', () => {
 
     it('initialize should return Promise', () => {
       const promise = service.initialize('import');
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should initialize with import mode', async () => {
@@ -97,13 +93,13 @@ describe('SeedingService', () => {
     it('bulkCreateContent should return Promise<BatchResult>', () => {
       const mockContent: ContentNode[] = [];
       const promise = service.bulkCreateContent(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should accept empty content array', async () => {
       const mockContent: ContentNode[] = [];
       const promise = service.bulkCreateContent(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should accept multiple content nodes', async () => {
@@ -133,7 +129,7 @@ describe('SeedingService', () => {
       ];
 
       const promise = service.bulkCreateContent(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('bulkCreateContent should auto-initialize if not ready', async () => {
@@ -155,13 +151,13 @@ describe('SeedingService', () => {
     it('bulkCreatePaths should return Promise<BatchResult>', () => {
       const mockPaths: LearningPath[] = [];
       const promise = service.bulkCreatePaths(mockPaths);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should accept empty paths array', async () => {
       const mockPaths: LearningPath[] = [];
       const promise = service.bulkCreatePaths(mockPaths);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should accept multiple paths', async () => {
@@ -185,7 +181,7 @@ describe('SeedingService', () => {
       ];
 
       const promise = service.bulkCreatePaths(mockPaths);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('bulkCreatePaths should auto-initialize if not ready', async () => {
@@ -212,13 +208,13 @@ describe('SeedingService', () => {
       const mockContent: ContentNode[] = [];
       const mockPaths: LearningPath[] = [];
       const promise = service.recoverySync(mockContent, mockPaths);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('incrementalSync should return Promise<BatchResult>', () => {
       const mockContent: ContentNode[] = [];
       const promise = service.incrementalSync(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('incrementalSync should accept content array', async () => {
@@ -237,7 +233,7 @@ describe('SeedingService', () => {
       ];
 
       const promise = service.incrementalSync(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -405,27 +401,27 @@ describe('SeedingService', () => {
   describe('return types', () => {
     it('initialize should return Promise<void>', () => {
       const result = service.initialize();
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('bulkCreateContent should return Promise<BatchResult>', () => {
       const result = service.bulkCreateContent([]);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('bulkCreatePaths should return Promise<BatchResult>', () => {
       const result = service.bulkCreatePaths([]);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('recoverySync should return Promise', () => {
       const result = service.recoverySync([], []);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('incrementalSync should return Promise<BatchResult>', () => {
       const result = service.incrementalSync([]);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('cancel should return void', async () => {
@@ -451,18 +447,18 @@ describe('SeedingService', () => {
     it('should handle empty content array', async () => {
       const mockContent: ContentNode[] = [];
       const promise = service.bulkCreateContent(mockContent);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should handle empty paths array', async () => {
       const mockPaths: LearningPath[] = [];
       const promise = service.bulkCreatePaths(mockPaths);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should handle recovery sync with empty content', async () => {
       const promise = service.recoverySync([], []);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should handle multiple initialize calls', async () => {

@@ -4,7 +4,6 @@ import {
   Component,
   ComponentRef,
   HostListener,
-  Inject,
   OnDestroy,
   OnInit,
   ViewChild,
@@ -13,7 +12,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 90.5% (2026-02-05)
+// @coverage: 90.5% (2026-03-03)
 
 import { catchError, takeUntil } from 'rxjs/operators';
 
@@ -133,28 +132,25 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
   private readonly seoService = inject(SeoService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly affinityService = inject(AffinityTrackingService);
+  private readonly agentService = inject(AgentService);
+  private readonly rendererRegistry = inject(RendererRegistryService);
+  private readonly contentService = inject(ContentService);
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly trustBadgeService = inject(TrustBadgeService);
+  private readonly editorService = inject(ContentEditorService);
+  private readonly pathContextService = inject(PathContextService);
+  private readonly governanceService = inject(GovernanceService);
+  private readonly signalService = inject(GovernanceSignalService);
+  private readonly document = inject(DOCUMENT);
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
 
   /** CSS class for focused view mode */
   private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
-
-  constructor(
-    private readonly route: ActivatedRoute,
-    private readonly router: Router,
-    private readonly affinityService: AffinityTrackingService,
-    private readonly agentService: AgentService,
-    private readonly rendererRegistry: RendererRegistryService,
-    private readonly contentService: ContentService,
-    private readonly dataLoader: DataLoaderService,
-    private readonly trustBadgeService: TrustBadgeService,
-    private readonly editorService: ContentEditorService,
-    private readonly pathContextService: PathContextService,
-    private readonly governanceService: GovernanceService,
-    private readonly signalService: GovernanceSignalService,
-    @Inject(DOCUMENT) private readonly document: Document
-  ) {}
 
   ngOnInit(): void {
     // Handle direct content access: /lamad/resource/:resourceId
@@ -168,7 +164,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
     // Listen for affinity changes
     this.affinityService.changes$.pipe(takeUntil(this.destroy$)).subscribe(change => {
-      if (change && change.nodeId === this.nodeId) {
+      if (change?.nodeId === this.nodeId) {
         this.affinity = change.newValue;
       }
     });
@@ -836,7 +832,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     // Navigate to the selected content
-    void this.router.navigate(['/lamad/resource', nodeId]);
+    void this.router.navigate(['/resource', nodeId]);
   }
 
   /**

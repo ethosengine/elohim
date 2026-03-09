@@ -1,8 +1,16 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { vi } from 'vitest';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SimpleChange } from '@angular/core';
+
+import { of } from 'rxjs';
+
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
+import { PathService } from '../../services/path.service';
+import { PathContextService } from '../../services/path-context.service';
 
 describe('MarkdownRendererComponent', () => {
   let component: MarkdownRendererComponent;
@@ -11,6 +19,16 @@ describe('MarkdownRendererComponent', () => {
   // Mock StorageClientService
   const mockStorageClientService = {
     getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`,
+  };
+
+  const mockPathService = {
+    findContentInPaths: vi.fn().mockReturnValue(of([])),
+    listPaths: vi.fn().mockReturnValue(of({ paths: [] })),
+    getPath: vi.fn(),
+  };
+
+  const mockPathContextService = {
+    currentContext: null as { pathId: string } | null,
   };
 
   const createContentNode = (content: string): ContentNode => ({
@@ -28,7 +46,13 @@ describe('MarkdownRendererComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MarkdownRendererComponent],
-      providers: [{ provide: StorageClientService, useValue: mockStorageClientService }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StorageClientService, useValue: mockStorageClientService },
+        { provide: PathService, useValue: mockPathService },
+        { provide: PathContextService, useValue: mockPathContextService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MarkdownRendererComponent);
@@ -47,17 +71,18 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('markdown rendering', () => {
-    it('should render basic markdown', fakeAsync(() => {
+    it('should render basic markdown', async () => {
       component.node = createContentNode('# Hello World\n\nThis is a test.');
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should render markdown with multiple headings', fakeAsync(() => {
+    it('should render markdown with multiple headings', async () => {
       const markdown = `# Heading 1
 ## Heading 2
 ### Heading 3`;
@@ -66,39 +91,42 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries.length).toBe(3);
-    }));
+    });
 
-    it('should handle code blocks', fakeAsync(() => {
+    it('should handle code blocks', async () => {
       const markdown = '```javascript\nconst x = 1;\n```';
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should warn for non-string content', fakeAsync(() => {
-      spyOn(console, 'warn');
+    it('should warn for non-string content', async () => {
+      vi.spyOn(console, 'warn');
       const node = createContentNode('');
       (node as any).content = { invalid: 'object' };
       component.node = node;
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(console.warn).toHaveBeenCalledWith('Markdown renderer expects string content');
-    }));
+    });
   });
 
   describe('table of contents', () => {
-    it('should generate TOC from headings', fakeAsync(() => {
+    it('should generate TOC from headings', async () => {
       const markdown = `# First
 ## Second
 ### Third`;
@@ -107,15 +135,16 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries.length).toBe(3);
       expect(component.tocEntries[0].level).toBe(1);
       expect(component.tocEntries[1].level).toBe(2);
       expect(component.tocEntries[2].level).toBe(3);
-    }));
+    });
 
-    it('should emit tocGenerated event', fakeAsync(() => {
+    it('should emit tocGenerated event', async () => {
       let emittedToc: TocEntry[] = [];
       component.tocGenerated.subscribe((toc: TocEntry[]) => {
         emittedToc = toc;
@@ -125,12 +154,13 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(emittedToc.length).toBe(1);
-    }));
+    });
 
-    it('should generate unique IDs for duplicate headings', fakeAsync(() => {
+    it('should generate unique IDs for duplicate headings', async () => {
       const markdown = `# Test
 # Test
 # Test`;
@@ -139,41 +169,44 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       const ids = component.tocEntries.map(e => e.id);
       const uniqueIds = new Set(ids);
       expect(uniqueIds.size).toBe(3);
-    }));
+    });
 
     it('should toggle TOC visibility', () => {
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
 
       component.toggleToc();
-      expect(component.tocVisible).toBeTrue();
+      expect(component.tocVisible).toBe(true);
 
       component.toggleToc();
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
     });
   });
 
   describe('scroll behavior', () => {
-    it('should scroll to heading when link clicked', fakeAsync(() => {
+    it('should scroll to heading when link clicked', async () => {
       const markdown = '# Test Heading';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
-      // Create a mock element
+      // Create a mock element (jsdom doesn't implement scrollIntoView, so assign it first)
       const mockElement = document.createElement('div');
       mockElement.id = component.tocEntries[0].id;
+      mockElement.scrollIntoView = vi.fn();
       document.body.appendChild(mockElement);
-      spyOn(mockElement, 'scrollIntoView');
+      vi.spyOn(mockElement, 'scrollIntoView');
 
       const event = new Event('click');
-      spyOn(event, 'preventDefault');
+      vi.spyOn(event, 'preventDefault');
 
       component.scrollToHeading(event, component.tocEntries[0].id);
 
@@ -185,67 +218,70 @@ describe('MarkdownRendererComponent', () => {
       expect(component.activeHeadingId).toBe(component.tocEntries[0].id);
 
       document.body.removeChild(mockElement);
-    }));
+    });
 
-    it('should close TOC on mobile after clicking link', fakeAsync(() => {
+    it('should close TOC on mobile after clicking link', async () => {
       const markdown = '# Test';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       // Mock mobile viewport
-      spyOnProperty(window, 'innerWidth').and.returnValue(500);
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(500);
 
-      // Create mock element
+      // Create mock element (jsdom doesn't implement scrollIntoView)
       const mockElement = document.createElement('div');
       mockElement.id = component.tocEntries[0].id;
+      mockElement.scrollIntoView = vi.fn();
       document.body.appendChild(mockElement);
 
       component.tocVisible = true;
       const event = new Event('click');
       component.scrollToHeading(event, component.tocEntries[0].id);
 
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
 
       document.body.removeChild(mockElement);
-    }));
+    });
 
     it('should scroll to top when scrollToTop called', () => {
-      spyOn(window, 'scrollTo');
+      vi.spyOn(window, 'scrollTo');
       component.scrollToTop();
       expect(window.scrollTo).toHaveBeenCalled();
     });
   });
 
   describe('embedded mode', () => {
-    it('should apply embedded class when embedded is true', fakeAsync(() => {
+    it('should apply embedded class when embedded is true', async () => {
       component.embedded = true;
       component.node = createContentNode('# Test');
       fixture.detectChanges();
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.markdown-wrapper');
-      expect(wrapper.classList.contains('embedded')).toBeTrue();
-    }));
+      expect(wrapper.classList.contains('embedded')).toBe(true);
+    });
   });
 
   describe('lifecycle', () => {
     it('should set up scroll listener after view init', () => {
-      spyOn(window, 'addEventListener');
+      vi.spyOn(window, 'addEventListener');
       component.ngAfterViewInit();
-      expect(window.addEventListener).toHaveBeenCalledWith('scroll', jasmine.any(Function), {
+      expect(window.addEventListener).toHaveBeenCalledWith('scroll', expect.any(Function), {
         passive: true,
       });
     });
 
     it('should remove scroll listener on destroy', () => {
-      spyOn(window, 'removeEventListener');
+      vi.spyOn(window, 'removeEventListener');
       component.ngAfterViewInit();
       component.ngOnDestroy();
       expect(window.removeEventListener).toHaveBeenCalled();
@@ -253,56 +289,60 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('ID generation', () => {
-    it('should generate lowercase IDs', fakeAsync(() => {
+    it('should generate lowercase IDs', async () => {
       const markdown = '# UPPERCASE HEADING';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).toBe(component.tocEntries[0].id.toLowerCase());
-    }));
+    });
 
-    it('should replace spaces with hyphens', fakeAsync(() => {
+    it('should replace spaces with hyphens', async () => {
       const markdown = '# Test Heading Here';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).toContain('-');
       expect(component.tocEntries[0].id).not.toContain(' ');
-    }));
+    });
 
-    it('should remove special characters', fakeAsync(() => {
+    it('should remove special characters', async () => {
       const markdown = '# Test! @Heading#';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id).not.toContain('!');
       expect(component.tocEntries[0].id).not.toContain('@');
       expect(component.tocEntries[0].id).not.toContain('#');
-    }));
+    });
 
-    it('should truncate long IDs', fakeAsync(() => {
+    it('should truncate long IDs', async () => {
       const longHeading = '# ' + 'A'.repeat(100);
       component.node = createContentNode(longHeading);
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.tocEntries[0].id.length).toBeLessThanOrEqual(50);
-    }));
+    });
   });
 
   describe('GFM support', () => {
-    it('should render task lists', fakeAsync(() => {
+    it('should render task lists', async () => {
       const markdown = `- [ ] Task 1
 - [x] Task 2`;
 
@@ -310,12 +350,13 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
 
-    it('should render tables', fakeAsync(() => {
+    it('should render tables', async () => {
       const markdown = `| Header 1 | Header 2 |
 | --- | --- |
 | Cell 1 | Cell 2 |`;
@@ -324,27 +365,129 @@ describe('MarkdownRendererComponent', () => {
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true),
       });
-      tick();
+      fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(component.renderedContent).toBeTruthy();
-    }));
+    });
   });
 
   describe('back to top button', () => {
     it('should initially hide back to top button', () => {
-      expect(component.showBackToTop).toBeFalse();
+      expect(component.showBackToTop).toBe(false);
     });
 
-    it('should show back to top button after scrolling', fakeAsync(() => {
+    it('should show back to top button after scrolling', async () => {
       component.ngAfterViewInit();
-      tick();
 
       // Simulate scroll event
       Object.defineProperty(window, 'scrollY', { value: 400, writable: true });
       window.dispatchEvent(new Event('scroll'));
-      tick();
+      await fixture.whenStable();
 
-      expect(component.showBackToTop).toBeTrue();
-    }));
+      expect(component.showBackToTop).toBe(true);
+    });
+  });
+});
+
+describe('MarkdownRendererComponent — cross-path prefetch', () => {
+  let component: MarkdownRendererComponent;
+  let fixture: ComponentFixture<MarkdownRendererComponent>;
+  let pathServiceSpy: { findContentInPaths: ReturnType<typeof vi.fn> };
+  let pathContextSpy: { currentContext: { pathId: string } | null };
+
+  const createContentNode = (content: string): ContentNode => ({
+    id: 'test-markdown',
+    title: 'Test',
+    description: '',
+    contentType: 'concept',
+    contentFormat: 'markdown',
+    content,
+    tags: [],
+    relatedNodeIds: [],
+    metadata: {},
+  });
+
+  beforeEach(async () => {
+    pathServiceSpy = {
+      findContentInPaths: vi.fn().mockReturnValue(of([])),
+    };
+    pathContextSpy = {
+      currentContext: { pathId: 'elohim-protocol' },
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [MarkdownRendererComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: StorageClientService,
+          useValue: { getBlobUrl: (h: string) => `https://test/blob/${h}` },
+        },
+        { provide: PathService, useValue: pathServiceSpy },
+        { provide: PathContextService, useValue: pathContextSpy },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(MarkdownRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    component?.ngOnDestroy();
+  });
+
+  it('should prefetch cross-path data for EPR links in markdown', async () => {
+    const markdown = 'Read about [REA](epr:rea-foundations) and [trust](epr:web-of-trust).';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Should call findContentInPaths for each unique EPR content ID
+    expect(pathServiceSpy.findContentInPaths).toHaveBeenCalledWith(
+      'rea-foundations',
+      'elohim-protocol'
+    );
+    expect(pathServiceSpy.findContentInPaths).toHaveBeenCalledWith(
+      'web-of-trust',
+      'elohim-protocol'
+    );
+  });
+
+  it('should not prefetch when no path context', async () => {
+    pathContextSpy.currentContext = null;
+    const markdown = 'Link to [REA](epr:rea-foundations).';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(pathServiceSpy.findContentInPaths).not.toHaveBeenCalled();
+  });
+
+  it('should deduplicate EPR content IDs before prefetching', async () => {
+    const markdown =
+      'First [link](epr:manifesto) and second [link](epr:manifesto) to same content.';
+
+    component.node = createContentNode(markdown);
+    component.ngOnChanges({
+      node: new SimpleChange(null, component.node, true),
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Should only call once for the deduplicated ID
+    const calls = pathServiceSpy.findContentInPaths.mock.calls.filter(
+      (c: string[]) => c[0] === 'manifesto'
+    );
+    expect(calls.length).toBe(1);
   });
 });

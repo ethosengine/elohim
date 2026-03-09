@@ -84,6 +84,10 @@ pub enum ElohimCapability {
     GeographicReachAssignment,
     /// Enforce bioregional boundaries
     BioregionalEnforcement,
+
+    // ========== Reach Negotiation Operations ==========
+    /// Negotiate content reach before distribution
+    ReachNegotiation,
 }
 
 impl ElohimCapability {
@@ -105,6 +109,7 @@ impl ElohimCapability {
             Self::FamilyValueAlignment => 1800,
             Self::PersonalAgentSupport => 1500,
             Self::AffinityAnalysis => 2000,
+            Self::ReachNegotiation => 2000,
 
             // Slow operations
             Self::KnowledgeMapSynthesis => 3000,
@@ -145,6 +150,9 @@ impl ElohimCapability {
             // Individual capabilities (or no layer restriction)
             Self::PersonalAgentSupport => Some(ConstitutionalLayer::Individual),
 
+            // Context-dependent (no single layer)
+            Self::ReachNegotiation => None,
+
             // No specific layer required
             _ => None,
         }
@@ -180,6 +188,7 @@ impl ElohimCapability {
             Self::PlaceNamingGovernance => "Govern place naming and identity",
             Self::GeographicReachAssignment => "Assign geographic reach for content or agents",
             Self::BioregionalEnforcement => "Enforce bioregional boundaries and limits",
+            Self::ReachNegotiation => "Negotiate content reach before distribution using constitutional wisdom",
         }
     }
 
@@ -213,6 +222,7 @@ impl ElohimCapability {
             Self::PlaceNamingGovernance,
             Self::GeographicReachAssignment,
             Self::BioregionalEnforcement,
+            Self::ReachNegotiation,
         ]
     }
 }

@@ -17,6 +17,7 @@
       (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
       [disabled]="!expandable || activeAlerts.length <= 1"
       [attr.aria-expanded]="isExpanded"
+      data-testid="alert-banner-toggle"
     >
       <!-- Icon -->
       <ng-container *ngIf="iconTemplate; else defaultIcon">
@@ -84,6 +85,7 @@
           class="btn-dismiss"
           (click)="dismissAlert(primaryAlert!, $event)"
           aria-label="Dismiss"
+          data-testid="alert-banner-dismiss"
         >
           ✕
         </button>
@@ -95,6 +97,7 @@
           class="btn-expand"
           [attr.aria-expanded]="isExpanded"
           aria-label="Expand alerts"
+          data-testid="alert-banner-expand"
         >
           {{ isExpanded ? '▲' : '▼' }}
         </button>
@@ -138,7 +141,12 @@
       </div>
 
       <div class="show-more" *ngIf="hasHiddenAlerts">
-        <button type="button" class="btn-show-more" (click)="toggleExpanded()">
+        <button
+          type="button"
+          class="btn-show-more"
+          (click)="toggleExpanded()"
+          data-testid="alert-show-more"
+        >
           Show {{ hiddenCount }} more alerts
         </button>
       </div>
@@ -192,7 +200,12 @@
     </div>
 
     <div class="show-more-cards" *ngIf="hasHiddenAlerts">
-      <button type="button" class="btn-show-more" (click)="toggleExpanded()">
+      <button
+        type="button"
+        class="btn-show-more"
+        (click)="toggleExpanded()"
+        data-testid="alert-show-more-cards"
+      >
         Show {{ hiddenCount }} more alerts
       </button>
     </div>
@@ -241,6 +254,7 @@
       class="btn-dismiss"
       (click)="dismissAlert(primaryAlert!, $event)"
       aria-label="Dismiss"
+      data-testid="alert-inline-dismiss"
     >
       ✕
     </button>

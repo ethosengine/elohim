@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 30.8% (2026-02-05)
+// @coverage: 30.8% (2026-02-24)
 
 /**
  * Sound types for quiz feedback.

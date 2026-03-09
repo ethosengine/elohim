@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-03-03)
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -172,7 +172,7 @@ export class PathContextService {
     // If there are more detours, return to the previous detour's content
     if (current.detourStack.length > 0) {
       const previousDetour = current.detourStack.at(-1)!;
-      return ['/lamad/resource', previousDetour.toContentId];
+      return ['/resource', previousDetour.toContentId];
     }
 
     // No more detours - return to the path
@@ -253,7 +253,7 @@ export class PathContextService {
         const detour = current.detourStack[i];
         breadcrumbs.push({
           label: `Exploring: ${detour.toContentId}`,
-          route: ['/lamad/resource', detour.toContentId],
+          route: ['/resource', detour.toContentId],
           isDetour: true,
           isCurrent: i === current.detourStack.length - 1,
         });

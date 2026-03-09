@@ -25,8 +25,11 @@ use libp2p::request_response;
 use serde::{Deserialize, Serialize};
 use std::io;
 
-/// Protocol identifier for sync
-pub const SYNC_PROTOCOL_ID: &str = "/elohim/sync/1.0.0";
+/// Protocol identifier for storage CRDT sync.
+///
+/// Renamed from `/elohim/sync/1.0.0` to avoid collision with elohim-node's
+/// `/elohim/doc-sync/1.0.0` when both run in the unified swarm.
+pub const SYNC_PROTOCOL_ID: &str = "/elohim/storage-sync/1.0.0";
 
 /// Sync protocol definition
 #[derive(Debug, Clone)]
@@ -158,9 +161,7 @@ pub enum SyncResponse {
     },
 
     /// Error response
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 /// Information about a syncable document
@@ -214,8 +215,7 @@ impl request_response::Codec for SyncCodec {
         io.read_exact(&mut buf).await?;
 
         // Deserialize
-        rmp_serde::from_slice(&buf)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     async fn read_response<T>(
@@ -244,8 +244,7 @@ impl request_response::Codec for SyncCodec {
         io.read_exact(&mut buf).await?;
 
         // Deserialize
-        rmp_serde::from_slice(&buf)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     async fn write_request<T>(
@@ -329,7 +328,12 @@ mod tests {
         let bytes = rmp_serde::to_vec(&response).unwrap();
         let decoded: SyncResponse = rmp_serde::from_slice(&bytes).unwrap();
         match decoded {
-            SyncResponse::Heads { app_id, doc_id, heads, change_count } => {
+            SyncResponse::Heads {
+                app_id,
+                doc_id,
+                heads,
+                change_count,
+            } => {
                 assert_eq!(app_id, "lamad");
                 assert_eq!(doc_id, "test-doc");
                 assert_eq!(heads.len(), 1);

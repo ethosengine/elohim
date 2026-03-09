@@ -30,10 +30,7 @@ use tracing::{debug, info, warn};
 #[serde(tag = "type", content = "payload")]
 pub enum BlobSignal {
     /// Request a blob by hash
-    Request {
-        hash: String,
-        requester: String,
-    },
+    Request { hash: String, requester: String },
 
     /// Announce having a blob
     Announce {
@@ -65,6 +62,7 @@ pub enum BlobSignal {
 const MAX_SIGNAL_CHUNK_SIZE: usize = 256 * 1024;
 
 /// Pending blob requests
+#[allow(dead_code)]
 struct PendingRequest {
     hash: String,
     requester: String,
@@ -90,25 +88,48 @@ impl SignalHandler {
     }
 
     /// Handle incoming signal from Holochain
-    pub async fn handle_signal(&self, signal: BlobSignal) -> Result<Option<BlobSignal>, StorageError> {
+    pub async fn handle_signal(
+        &self,
+        signal: BlobSignal,
+    ) -> Result<Option<BlobSignal>, StorageError> {
         match signal {
-            BlobSignal::Request { hash, requester } => {
-                self.handle_request(&hash, &requester).await
+            BlobSignal::Request { hash, requester } => self.handle_request(&hash, &requester).await,
+            BlobSignal::Announce {
+                hash,
+                size_bytes,
+                chunk_count,
+                provider,
+            } => {
+                self.handle_announce(&hash, size_bytes, chunk_count, &provider)
+                    .await
             }
-            BlobSignal::Announce { hash, size_bytes, chunk_count, provider } => {
-                self.handle_announce(&hash, size_bytes, chunk_count, &provider).await
+            BlobSignal::ChunkDelivery {
+                hash,
+                chunk_index,
+                total_chunks,
+                data,
+            } => {
+                self.handle_chunk_delivery(&hash, chunk_index, total_chunks, data)
+                    .await
             }
-            BlobSignal::ChunkDelivery { hash, chunk_index, total_chunks, data } => {
-                self.handle_chunk_delivery(&hash, chunk_index, total_chunks, data).await
-            }
-            BlobSignal::TransferInit { hash, size_bytes, transfer_id, connection_info } => {
-                self.handle_transfer_init(&hash, size_bytes, &transfer_id, &connection_info).await
+            BlobSignal::TransferInit {
+                hash,
+                size_bytes,
+                transfer_id,
+                connection_info,
+            } => {
+                self.handle_transfer_init(&hash, size_bytes, &transfer_id, &connection_info)
+                    .await
             }
         }
     }
 
     /// Handle blob request - check if we have it and can provide
-    async fn handle_request(&self, hash: &str, requester: &str) -> Result<Option<BlobSignal>, StorageError> {
+    async fn handle_request(
+        &self,
+        hash: &str,
+        requester: &str,
+    ) -> Result<Option<BlobSignal>, StorageError> {
         if !self.store.exists(hash).await {
             debug!(hash = %hash, "Blob request received but we don't have it");
             return Ok(None);
@@ -123,7 +144,7 @@ impl SignalHandler {
         Ok(Some(BlobSignal::Announce {
             hash: hash.to_string(),
             size_bytes,
-            chunk_count: ((size_bytes + MAX_SIGNAL_CHUNK_SIZE as u64 - 1) / MAX_SIGNAL_CHUNK_SIZE as u64) as u32,
+            chunk_count: size_bytes.div_ceil(MAX_SIGNAL_CHUNK_SIZE as u64) as u32,
             provider: self.my_agent_id.clone(),
         }))
     }
@@ -223,7 +244,7 @@ impl SignalHandler {
         hash: &str,
         size_bytes: u64,
         transfer_id: &str,
-        connection_info: &str,
+        _connection_info: &str,
     ) -> Result<Option<BlobSignal>, StorageError> {
         // TODO: Implement WebRTC or direct TCP transfer for large blobs
         warn!(
@@ -247,13 +268,16 @@ impl SignalHandler {
         // Add to pending requests
         {
             let mut pending = self.pending_requests.write().await;
-            pending.insert(hash.to_string(), PendingRequest {
-                hash: hash.to_string(),
-                requester: self.my_agent_id.clone(),
-                received_chunks: HashMap::new(),
-                total_chunks: None,
-                created_at: std::time::Instant::now(),
-            });
+            pending.insert(
+                hash.to_string(),
+                PendingRequest {
+                    hash: hash.to_string(),
+                    requester: self.my_agent_id.clone(),
+                    received_chunks: HashMap::new(),
+                    total_chunks: None,
+                    created_at: std::time::Instant::now(),
+                },
+            );
         }
 
         info!(hash = %hash, "Requesting blob from network");
@@ -265,7 +289,11 @@ impl SignalHandler {
     }
 
     /// Provide a blob to a requester
-    pub async fn provide_blob(&self, hash: &str, requester: &str) -> Result<Vec<BlobSignal>, StorageError> {
+    pub async fn provide_blob(
+        &self,
+        hash: &str,
+        _requester: &str,
+    ) -> Result<Vec<BlobSignal>, StorageError> {
         let data = self.store.get(hash).await?;
         let size = data.len();
 
@@ -279,7 +307,7 @@ impl SignalHandler {
             }])
         } else if size <= MAX_SIGNAL_CHUNK_SIZE * 10 {
             // Send as multiple chunks via signals
-            let chunk_count = (size + MAX_SIGNAL_CHUNK_SIZE - 1) / MAX_SIGNAL_CHUNK_SIZE;
+            let chunk_count = size.div_ceil(MAX_SIGNAL_CHUNK_SIZE);
             let mut signals = Vec::with_capacity(chunk_count);
 
             for (i, chunk) in data.chunks(MAX_SIGNAL_CHUNK_SIZE).enumerate() {

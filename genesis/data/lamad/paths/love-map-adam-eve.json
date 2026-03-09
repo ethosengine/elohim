@@ -1,0 +1,336 @@
+{
+  "id": "love-map-adam-eve",
+  "version": "1.0.0",
+  "title": "Garden of Understanding: Adam and Eve's Love Map",
+  "description": "An intimate path where a gardener-steward and a truth-seeker discover what they can teach each other about tending the world",
+  "purpose": "Build mutual understanding between partners through complementary teaching - each sharing their domain of passion with the other",
+  "createdBy": "system-negotiation",
+  "contributors": [],
+  "createdAt": "2026-02-25T00:00:00.000Z",
+  "updatedAt": "2026-02-25T00:00:00.000Z",
+  "visibility": "intimate",
+  "participantIds": ["human-adam-firstman", "human-eve-firstwoman"],
+  "isEmergent": true,
+  "negotiationId": "negotiation-adam-eve-001",
+  "requiredAttestations": ["attestation-spouse-adam-eve"],
+  "requiresMutualAttestation": true,
+  "chapters": [
+    {
+      "id": "chapter-1-in-the-garden-together",
+      "title": "In the Garden Together",
+      "description": "Shared ground - the values, communities, and care practices that drew you together",
+      "order": 1,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "care-economy-visibility",
+          "stepTitle": "Making Care Visible",
+          "stepNarrative": "You both believe that care work deserves recognition. Start here - in the shared conviction that tending to others has real value.",
+          "learningObjectives": [
+            "Explore how care economy principles resonate with both partners",
+            "Identify shared values around visible, valued care work"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and discuss together"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 2,
+          "stepType": "content",
+          "resourceId": "community-garden-club",
+          "stepTitle": "The Garden We Share",
+          "stepNarrative": "The garden club is where your worlds overlap most naturally. Explore what community gardening reveals about how you each approach shared spaces.",
+          "learningObjectives": [
+            "Understand what community gardening means to each partner",
+            "Discover shared approaches to tending shared spaces"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and discuss together"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 3,
+          "stepType": "content",
+          "resourceId": "concept-technology-serves-love",
+          "stepTitle": "When Technology Serves Love",
+          "stepNarrative": "What does it mean to build technology that serves love? Discuss how digital tools can strengthen rather than replace the care you give each other.",
+          "learningObjectives": [
+            "Explore the intersection of technology and intimate care",
+            "Discuss how digital tools serve your relationship"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and discuss together"
+          ],
+          "estimatedTime": "10 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 4,
+          "stepType": "content",
+          "resourceId": "concept-love-as-technology",
+          "stepTitle": "Love as Technology",
+          "stepNarrative": "Love itself is a technology - a way of knowing and shaping the world. Reflect together on how love organizes your shared life.",
+          "learningObjectives": [
+            "Understand love as an organizing principle",
+            "Reflect on how love shapes your shared decisions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and reflect together"
+          ],
+          "estimatedTime": "10 minutes",
+          "teachingPartner": "shared"
+        }
+      ],
+      "estimatedDuration": "50 minutes"
+    },
+    {
+      "id": "chapter-2-tending-and-naming",
+      "title": "Tending and Naming",
+      "description": "Adam teaches Eve - stewardship, ecology, naming, and the regenerative patterns he sees in the world",
+      "order": 2,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "value-scanner-epic",
+          "stepTitle": "The Value Scanner's Eye",
+          "stepNarrative": "Adam, show Eve how you see value in the world. The value scanner perspective names what matters and measures what's real.",
+          "learningObjectives": [
+            "Understand the value scanner domain through Adam's eyes",
+            "Learn how value recognition shapes stewardship"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Adam explains, Eve asks questions"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-adam-firstman"
+        },
+        {
+          "order": 2,
+          "stepType": "content",
+          "resourceId": "concept-incorruptible-stewardship",
+          "stepTitle": "Incorruptible Stewardship",
+          "stepNarrative": "Adam, teach Eve about stewardship that cannot be corrupted - tending resources with integrity, the way you tend the garden.",
+          "learningObjectives": [
+            "Understand principles of incorruptible stewardship",
+            "Connect stewardship to personal relationship values"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Adam explains, Eve reflects"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-adam-firstman"
+        },
+        {
+          "order": 3,
+          "stepType": "content",
+          "resourceId": "community-regen-ag-network",
+          "stepTitle": "Regenerative Agriculture",
+          "stepNarrative": "Adam, walk Eve through the regenerative agriculture network - how soil health mirrors relational health, how patience yields abundance.",
+          "learningObjectives": [
+            "Understand regenerative agriculture principles",
+            "Draw parallels between ecological and relational regeneration"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Adam explains, Eve asks questions"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-adam-firstman"
+        },
+        {
+          "order": 4,
+          "stepType": "content",
+          "resourceId": "concept-intergenerational-thinking",
+          "stepTitle": "Thinking in Generations",
+          "stepNarrative": "Adam, share your long view - how you think about planting trees whose shade you may never sit in, and what that means for your family.",
+          "learningObjectives": [
+            "Understand intergenerational thinking as a stewardship practice",
+            "Discuss how long-term vision shapes family decisions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Adam explains, both reflect"
+          ],
+          "estimatedTime": "10 minutes",
+          "teachingPartner": "human-adam-firstman"
+        }
+      ],
+      "estimatedDuration": "55 minutes"
+    },
+    {
+      "id": "chapter-3-seeking-and-questioning",
+      "title": "Seeking and Questioning",
+      "description": "Eve teaches Adam - truth-seeking, public observation, digital relationships, and the courage to question",
+      "order": 3,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "public-observer-epic",
+          "stepTitle": "The Public Observer's Lens",
+          "stepNarrative": "Eve, show Adam how you see the world. The public observer watches, questions, and holds power accountable.",
+          "learningObjectives": [
+            "Understand the public observer domain through Eve's eyes",
+            "Learn how critical observation strengthens communities"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Eve explains, Adam asks questions"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-eve-firstwoman"
+        },
+        {
+          "order": 2,
+          "stepType": "content",
+          "resourceId": "social-medium-epic",
+          "stepTitle": "Social Medium: Relationships in Digital Space",
+          "stepNarrative": "Eve, teach Adam about social medium - how digital communication can nurture genuine connection instead of shallow engagement.",
+          "learningObjectives": [
+            "Understand the social medium domain through Eve's perspective",
+            "Explore how digital spaces can serve real relationships"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Eve explains, Adam reflects"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-eve-firstwoman"
+        },
+        {
+          "order": 3,
+          "stepType": "content",
+          "resourceId": "concept-connection-genuine",
+          "stepTitle": "Genuine Connection",
+          "stepNarrative": "Eve, share what genuine connection means to you - how you distinguish real presence from performative interaction, online and off.",
+          "learningObjectives": [
+            "Understand the qualities of genuine connection",
+            "Discuss how authenticity shows up in your relationship"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Eve explains, both discuss"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "human-eve-firstwoman"
+        },
+        {
+          "order": 4,
+          "stepType": "content",
+          "resourceId": "concept-transparency-as-immune-system",
+          "stepTitle": "Transparency as Immune System",
+          "stepNarrative": "Eve, teach Adam how transparency protects communities - and relationships. How honest questioning is an act of love, not suspicion.",
+          "learningObjectives": [
+            "Understand transparency as a protective mechanism",
+            "Discuss how honest questioning strengthens trust between partners"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Eve explains, Adam reflects"
+          ],
+          "estimatedTime": "10 minutes",
+          "teachingPartner": "human-eve-firstwoman"
+        }
+      ],
+      "estimatedDuration": "55 minutes"
+    },
+    {
+      "id": "chapter-4-new-beginnings-together",
+      "title": "New Beginnings Together",
+      "description": "Synthesis - bridging both perspectives into a shared vision for tending the world together",
+      "order": 4,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "concept-value-generative-economics",
+          "stepTitle": "Value-Generative Economics",
+          "stepNarrative": "Together, explore an economy that generates value instead of extracting it. What would your household look like if it ran on these principles?",
+          "learningObjectives": [
+            "Understand value-generative economics as a shared framework",
+            "Imagine household and family economics through this lens"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and discuss together"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 2,
+          "stepType": "content",
+          "resourceId": "concept-communities-self-govern",
+          "stepTitle": "Communities That Self-Govern",
+          "stepNarrative": "A family is the smallest self-governing community. Discuss how the principles of community self-governance apply to your life together.",
+          "learningObjectives": [
+            "Apply self-governance principles to family life",
+            "Design shared decision-making practices"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and discuss together"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 3,
+          "stepType": "content",
+          "resourceId": "concept-different-values-coexist",
+          "stepTitle": "Different Values Can Coexist",
+          "stepNarrative": "You don't have to see the world the same way to tend it together. Celebrate your complementary perspectives - the gardener and the questioner need each other.",
+          "learningObjectives": [
+            "Appreciate complementary perspectives in partnership",
+            "Identify how different values strengthen your shared life"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read and reflect together"
+          ],
+          "estimatedTime": "10 minutes",
+          "teachingPartner": "shared"
+        },
+        {
+          "order": 4,
+          "stepType": "content",
+          "resourceId": "concept-path-forward-communities",
+          "stepTitle": "Our Path Forward",
+          "stepNarrative": "Reflect on what you've learned about each other. Name one thing your partner taught you that changed how you see the world. This is your garden now - tend it together.",
+          "learningObjectives": [
+            "Synthesize mutual learning into shared understanding",
+            "Commit to ongoing complementary growth"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Share reflections with each other"
+          ],
+          "estimatedTime": "15 minutes",
+          "teachingPartner": "shared"
+        }
+      ],
+      "estimatedDuration": "55 minutes"
+    }
+  ],
+  "tags": ["love-map", "intimate", "complementary", "family"],
+  "difficulty": "intermediate",
+  "estimatedDuration": "3-4 hours",
+  "pathType": "journey",
+  "reach": "invited",
+  "prerequisitePaths": [],
+  "attestationsGranted": [
+    "love-map-adam-eve-completed"
+  ]
+}

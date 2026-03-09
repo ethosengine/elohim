@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { SophiaRendererComponent } from '../content-io/plugins/sophia/sophia-renderer.component';
 
@@ -18,7 +18,9 @@ import { RendererRegistryService } from './renderer-registry.service';
  */
 @Injectable({ providedIn: 'root' })
 export class RendererInitializerService {
-  constructor(private readonly registry: RendererRegistryService) {
+  private readonly registry = inject(RendererRegistryService);
+
+  constructor() {
     this.registerBuiltInRenderers();
   }
 

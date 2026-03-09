@@ -157,6 +157,10 @@ spec:
                             ]]
                         ])
 
+                        // Enable pnpm via corepack (uses packageManager field in root package.json)
+                        sh 'corepack enable'
+                        sh 'pnpm --version'
+
                         echo """
 ═══════════════════════════════════════════════════════════
 🌱 GENESIS PIPELINE
@@ -214,7 +218,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                     dir('genesis/seeder') {
                         sh '''
                             echo "Installing seeder dependencies..."
-                            npm ci --prefer-offline
+                            pnpm install --frozen-lockfile
                             echo "✅ Seeder ready"
                         '''
                     }
@@ -243,6 +247,23 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Validate Constants') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    dir('genesis/seeder') {
+                        sh '''#!/bin/bash
+                            set -euo pipefail
+
+                            echo "Running constants sync tests..."
+                            npx vitest run --reporter=verbose
+
+                            echo "✅ Constants validation passed"
+                        '''
+                    }
+                }
+            }
+        }
 
         stage('Verify Target Health') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
@@ -485,11 +506,181 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 echo "⚠️ Sample content '\$SAMPLE_ID' not found (may be expected)"
                             fi
 
+                            # Verify sophia assessment content survived seeding
+                            echo ""
+                            echo "🔬 Verifying assessment content format & widgets..."
+                            for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
+                                ASSESSMENT=\$(curl -sf "http://${internalStorage}/db/content/\$ASSESSMENT_ID" || echo '{}')
+                                FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
+
+                                if [ -z "\$FMT" ]; then
+                                    echo "   ⚠️ Assessment '\$ASSESSMENT_ID' not found"
+                                    continue
+                                fi
+
+                                if [ "\$FMT" = "markdown" ]; then
+                                    echo "   ❌ Assessment '\$ASSESSMENT_ID' has format 'markdown' (likely defaulted from unknown format)"
+                                    exit 1
+                                fi
+
+                                HAS_WIDGETS=\$(echo "\$ASSESSMENT" | jq -r '.contentBody' | jq -e '.[0].content.widgets | length > 0' 2>/dev/null && echo "yes" || echo "no")
+                                if [ "\$HAS_WIDGETS" = "yes" ]; then
+                                    echo "   ✅ Assessment '\$ASSESSMENT_ID': format=\$FMT, widgets present"
+                                else
+                                    echo "   ⚠️ Assessment '\$ASSESSMENT_ID': format=\$FMT, no widgets in content body"
+                                fi
+                            done
+
                             echo ""
                             echo "═══════════════════════════════════════════════════════════"
                             echo "✅ SEEDING VERIFIED"
                             echo "═══════════════════════════════════════════════════════════"
                         """
+                    }
+                }
+            }
+        }
+
+        stage('Seed Humans') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        def adminKey = ''
+                        try {
+                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                adminKey = env.ADMIN_KEY
+                            }
+                        } catch (e) {
+                            echo "doorway-admin-bootstrap-key credential not found — seeding without admin promotion"
+                        }
+                        dir('genesis/seeder') {
+                            withEnv(["API_KEY_ADMIN=${adminKey}"]) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED HUMANS"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Collectives') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "SEED COLLECTIVES"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Doorway: ${doorwayHost}"
+                                echo ""
+                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-collectives.ts
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Accounts') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "SEED ACCOUNTS"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Doorway: ${doorwayHost}"
+                                echo ""
+                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-accounts.ts
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('E2E Verification') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+
+                        // Install E2E driver dependencies
+                        dir('genesis/a2o') {
+                            sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
+                        }
+
+                        // Always run API-level tests (@e2e tag, fast, no browser)
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/a2o') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "🧪 E2E VERIFICATION (API)"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+
+                                    E2E_DOORWAY_ALPHA="${doorwayHost}" \
+                                    E2E_DOORWAY_STAGING="${doorwayHost}" \
+                                        npx cucumber-js --tags '@e2e and not @browser-only' \
+                                        --format progress-bar \
+                                        --format json:reports/cucumber-report.json \
+                                        --format html:reports/cucumber-report.html
+
+                                    echo "✅ API E2E tests passed"
+                                """
+                            }
+                        }
+
+                        // Run BDD coverage gap scan (advisory)
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            dir('genesis/a2o') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    echo ""
+                                    echo "📊 BDD Coverage Gap Scan"
+                                    npx tsx scripts/scan-coverage.ts --ci --suggest 5
+                                """
+                            }
+                        }
+
+                        // Archive reports
+                        archiveArtifacts(
+                            artifacts: 'genesis/a2o/reports/**',
+                            allowEmptyArchive: true
+                        )
                     }
                 }
             }

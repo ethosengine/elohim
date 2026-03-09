@@ -9,11 +9,12 @@ import {
 } from '@app/elohim/services/governance-signal.service';
 
 import { GraduatedFeedbackComponent, FeedbackContext } from './graduated-feedback.component';
+import { vi } from 'vitest';
 
 describe('GraduatedFeedbackComponent', () => {
   let component: GraduatedFeedbackComponent;
   let fixture: ComponentFixture<GraduatedFeedbackComponent>;
-  let mockSignalService: jasmine.SpyObj<GovernanceSignalService>;
+  let mockSignalService: any;
   let signalChanges$: Subject<any>;
 
   const mockStats: FeedbackStats = {
@@ -32,15 +33,13 @@ describe('GraduatedFeedbackComponent', () => {
 
   beforeEach(async () => {
     signalChanges$ = new Subject();
-    mockSignalService = jasmine.createSpyObj(
-      'GovernanceSignalService',
-      ['recordGraduatedFeedback', 'getFeedbackStats'],
-      {
-        signalChanges$: signalChanges$.asObservable(),
-      }
-    );
-    mockSignalService.getFeedbackStats.and.returnValue(of(mockStats));
-    mockSignalService.recordGraduatedFeedback.and.returnValue(of(true));
+    mockSignalService = {
+      recordGraduatedFeedback: vi.fn(),
+      getFeedbackStats: vi.fn(),
+      signalChanges$: signalChanges$.asObservable(),
+    };
+    mockSignalService.getFeedbackStats.mockReturnValue(of(mockStats));
+    mockSignalService.recordGraduatedFeedback.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
       imports: [GraduatedFeedbackComponent, FormsModule],
@@ -153,47 +152,47 @@ describe('GraduatedFeedbackComponent', () => {
     it('should return true when requiresReasoning input is true', () => {
       component.requiresReasoning = true;
       component.selectedPosition = 0.5;
-      expect(component.reasoningRequired).toBeTrue();
+      expect(component.reasoningRequired).toBe(true);
     });
 
     it('should return true for positions that require reasoning', () => {
       component.context = 'proposal';
       component.selectedPosition = 0; // Block position requires reasoning
-      expect(component.reasoningRequired).toBeTrue();
+      expect(component.reasoningRequired).toBe(true);
     });
 
     it('should return false for normal positions', () => {
       component.requiresReasoning = false;
       component.context = 'usefulness';
       component.selectedPosition = 0.5;
-      expect(component.reasoningRequired).toBeFalse();
+      expect(component.reasoningRequired).toBe(false);
     });
   });
 
   describe('canSubmit getter', () => {
     it('should return false when no position selected', () => {
       component.selectedPosition = null;
-      expect(component.canSubmit).toBeFalse();
+      expect(component.canSubmit).toBe(false);
     });
 
     it('should return true when position selected and no reasoning required', () => {
       component.context = 'usefulness';
       component.selectedPosition = 0.5;
-      expect(component.canSubmit).toBeTrue();
+      expect(component.canSubmit).toBe(true);
     });
 
     it('should return false when reasoning required but empty', () => {
       component.context = 'proposal';
       component.selectedPosition = 0; // Block
       component.reasoning = '';
-      expect(component.canSubmit).toBeFalse();
+      expect(component.canSubmit).toBe(false);
     });
 
     it('should return true when reasoning required and provided', () => {
       component.context = 'proposal';
       component.selectedPosition = 0; // Block
       component.reasoning = 'My reasoning for blocking';
-      expect(component.canSubmit).toBeTrue();
+      expect(component.canSubmit).toBe(true);
     });
   });
 
@@ -210,7 +209,7 @@ describe('GraduatedFeedbackComponent', () => {
       const blockPosition = component.currentScale.positions[0]; // Block
       component.selectPosition(blockPosition);
 
-      expect(component.showReasoningField).toBeTrue();
+      expect(component.showReasoningField).toBe(true);
     });
 
     it('should show reasoning field when component requires it', () => {
@@ -218,7 +217,7 @@ describe('GraduatedFeedbackComponent', () => {
       const position = component.currentScale.positions[2];
       component.selectPosition(position);
 
-      expect(component.showReasoningField).toBeTrue();
+      expect(component.showReasoningField).toBe(true);
     });
   });
 
@@ -226,10 +225,10 @@ describe('GraduatedFeedbackComponent', () => {
     it('should toggle reasoning field visibility', () => {
       component.showReasoningField = false;
       component.toggleReasoning();
-      expect(component.showReasoningField).toBeTrue();
+      expect(component.showReasoningField).toBe(true);
 
       component.toggleReasoning();
-      expect(component.showReasoningField).toBeFalse();
+      expect(component.showReasoningField).toBe(false);
     });
   });
 
@@ -260,7 +259,7 @@ describe('GraduatedFeedbackComponent', () => {
 
       expect(mockSignalService.recordGraduatedFeedback).toHaveBeenCalledWith(
         'content-1',
-        jasmine.objectContaining({
+        expect.objectContaining({
           context: 'usefulness',
           position: 'Useful',
           positionIndex: 0.5,
@@ -280,7 +279,7 @@ describe('GraduatedFeedbackComponent', () => {
 
       expect(mockSignalService.recordGraduatedFeedback).toHaveBeenCalledWith(
         'content-1',
-        jasmine.objectContaining({
+        expect.objectContaining({
           reasoning: undefined,
         })
       );
@@ -291,11 +290,11 @@ describe('GraduatedFeedbackComponent', () => {
       component.submit();
       tick();
 
-      expect(component.hasSubmitted).toBeTrue();
+      expect(component.hasSubmitted).toBe(true);
     }));
 
     it('should emit feedbackSubmitted on success', fakeAsync(() => {
-      spyOn(component.feedbackSubmitted, 'emit');
+      vi.spyOn(component.feedbackSubmitted, 'emit');
       component.selectedPosition = 0.5;
       component.submit();
       tick();
@@ -308,7 +307,7 @@ describe('GraduatedFeedbackComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getFeedbackStats.calls.reset();
+      mockSignalService.getFeedbackStats.mockClear();
       component.selectedPosition = 0.5;
       component.submit();
       tick();
@@ -317,15 +316,15 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should handle submission error', fakeAsync(() => {
-      mockSignalService.recordGraduatedFeedback.and.returnValue(
+      mockSignalService.recordGraduatedFeedback.mockReturnValue(
         throwError(() => new Error('Failed'))
       );
       component.selectedPosition = 0.5;
       component.submit();
       tick();
 
-      expect(component.isSubmitting).toBeFalse();
-      expect(component.hasSubmitted).toBeFalse();
+      expect(component.isSubmitting).toBe(false);
+      expect(component.hasSubmitted).toBe(false);
     }));
   });
 
@@ -342,8 +341,8 @@ describe('GraduatedFeedbackComponent', () => {
       expect(component.selectedPosition).toBeNull();
       expect(component.intensity).toBe(5);
       expect(component.reasoning).toBe('');
-      expect(component.showReasoningField).toBeFalse();
-      expect(component.hasSubmitted).toBeFalse();
+      expect(component.showReasoningField).toBe(false);
+      expect(component.hasSubmitted).toBe(false);
     });
   });
 
@@ -440,7 +439,7 @@ describe('GraduatedFeedbackComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getFeedbackStats.calls.reset();
+      mockSignalService.getFeedbackStats.mockClear();
 
       signalChanges$.next({
         type: 'graduated-feedback',
@@ -456,7 +455,7 @@ describe('GraduatedFeedbackComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getFeedbackStats.calls.reset();
+      mockSignalService.getFeedbackStats.mockClear();
 
       signalChanges$.next({
         type: 'graduated-feedback',
@@ -472,7 +471,7 @@ describe('GraduatedFeedbackComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getFeedbackStats.calls.reset();
+      mockSignalService.getFeedbackStats.mockClear();
 
       signalChanges$.next({
         type: 'reaction',

@@ -1,0 +1,92 @@
+{
+  "id": "epic-domain-discovery",
+  "title": "Epic Domain Discovery",
+  "contentType": "instrument",
+  "contentFormat": "instrument-json",
+  "name": "Epic Domain Discovery",
+  "version": "1.0.0",
+  "category": "vocational",
+  "framework": "epic-domain",
+  "description": "Discover which Elohim Protocol epic domain resonates most with your interests and values",
+  "subscales": [
+    {
+      "id": "governance",
+      "name": "AI Constitutional",
+      "description": "Interest in AI governance, constitutional frameworks, and ensuring AI serves humanity",
+      "dimension": "epic-domain",
+      "color": "#8B5CF6",
+      "icon": "\ud83c\udfdb\ufe0f"
+    },
+    {
+      "id": "care",
+      "name": "Value Scanner",
+      "description": "Passion for recognizing care work, supporting caregivers, and making invisible contributions visible",
+      "dimension": "epic-domain",
+      "color": "#EC4899",
+      "icon": "\ud83d\udc9d"
+    },
+    {
+      "id": "economic",
+      "name": "Economic Coordination",
+      "description": "Interest in transforming workplace dynamics, worker ownership, and equitable economic systems",
+      "dimension": "epic-domain",
+      "color": "#10B981",
+      "icon": "\ud83d\udcca"
+    },
+    {
+      "id": "public",
+      "name": "Public Observer",
+      "description": "Commitment to democratic participation, transparency, and civic engagement",
+      "dimension": "epic-domain",
+      "color": "#3B82F6",
+      "icon": "\ud83d\udd0d"
+    },
+    {
+      "id": "social",
+      "name": "Social Medium",
+      "description": "Focus on building healthier digital spaces, fostering connection, and improving online communication",
+      "dimension": "epic-domain",
+      "color": "#F59E0B",
+      "icon": "\ud83d\udcac"
+    }
+  ],
+  "resultTypes": [
+    {
+      "id": "governance",
+      "name": "AI Constitutional",
+      "description": "You're drawn to shaping how AI systems are governed and ensuring they serve humanity through proper constitutional frameworks."
+    },
+    {
+      "id": "care",
+      "name": "Value Scanner",
+      "description": "You're passionate about recognizing and valuing care work, supporting caregivers, and making invisible contributions visible."
+    },
+    {
+      "id": "economic",
+      "name": "Economic Coordination",
+      "description": "You're interested in transforming workplace dynamics, promoting worker ownership, and creating more equitable economic systems."
+    },
+    {
+      "id": "public",
+      "name": "Public Observer",
+      "description": "You're committed to strengthening democratic participation, increasing transparency, and empowering civic engagement."
+    },
+    {
+      "id": "social",
+      "name": "Social Medium",
+      "description": "You're focused on building healthier digital spaces, fostering genuine connection, and improving online communication."
+    }
+  ],
+  "scoringConfig": {
+    "method": "highest-subscale",
+    "normalize": true
+  },
+  "display": {
+    "framework": "epic-domain",
+    "frameworkDisplayName": "Epic Domain",
+    "autoFeature": false,
+    "displayTemplate": "{{primaryType.name}}",
+    "shortTemplate": "{{primaryType.shortCode}}"
+  },
+  "estimatedMinutes": 10
+}

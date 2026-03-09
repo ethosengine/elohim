@@ -15,15 +15,15 @@
  * - Delegates to LearnerBackendService for zome calls
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 76.7% (2026-02-05)
+// @coverage: 76.7% (2026-02-24)
 
 import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 
 import {
   parsePointsByTrigger,
@@ -64,7 +64,7 @@ export class PointsService {
   /** Total points as observable */
   readonly totalPoints$ = this.balance$.pipe(map(balance => balance?.total_points ?? 0));
 
-  constructor(private readonly backend: LearnerBackendService) {}
+  private readonly backend = inject(LEARNER_BACKEND);
 
   // ===========================================================================
   // Balance Management

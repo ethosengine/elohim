@@ -5,11 +5,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { of, throwError, Subject, delay } from 'rxjs';
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search.model';
+import { vi, Mock } from 'vitest';
 
 describe('SearchComponent', () => {
   let component: SearchComponent;
   let fixture: ComponentFixture<SearchComponent>;
-  let searchServiceSpy: jasmine.SpyObj<SearchService>;
+  let searchServiceSpy: any;
   let queryParamsSubject: Subject<any>;
 
   const mockSearchResults = [
@@ -32,7 +33,9 @@ describe('SearchComponent', () => {
   beforeEach(async () => {
     queryParamsSubject = new Subject();
 
-    const searchSpyObj = jasmine.createSpyObj('SearchService', ['search']);
+    const searchSpyObj = {
+      search: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SearchComponent],
@@ -48,10 +51,10 @@ describe('SearchComponent', () => {
       ],
     }).compileComponents();
 
-    searchServiceSpy = TestBed.inject(SearchService) as jasmine.SpyObj<SearchService>;
+    searchServiceSpy = TestBed.inject(SearchService) as { [K in keyof SearchService]?: Mock };
 
     // Default spy return - use 'as any' to avoid full interface implementation in test
-    searchServiceSpy.search.and.returnValue(of({ results: mockSearchResults } as any));
+    searchServiceSpy.search.mockReturnValue(of({ results: mockSearchResults } as any));
 
     fixture = TestBed.createComponent(SearchComponent);
     component = fixture.componentInstance;
@@ -69,7 +72,7 @@ describe('SearchComponent', () => {
 
       expect(component.query).toBe('test query');
       expect(searchServiceSpy.search).toHaveBeenCalledWith({ text: 'test query' });
-      expect(component.hasSearched).toBeTrue();
+      expect(component.hasSearched).toBe(true);
     }));
 
     it('should not search if query param is empty', fakeAsync(() => {
@@ -101,8 +104,8 @@ describe('SearchComponent', () => {
 
       expect(searchServiceSpy.search).toHaveBeenCalledWith({ text: 'test search' });
       expect(component.results).toEqual(mockSearchResults);
-      expect(component.hasSearched).toBeTrue();
-      expect(component.isLoading).toBeFalse();
+      expect(component.hasSearched).toBe(true);
+      expect(component.isLoading).toBe(false);
     }));
 
     it('should not search if query is empty', () => {
@@ -120,27 +123,27 @@ describe('SearchComponent', () => {
     });
 
     it('should handle search error', fakeAsync(() => {
-      searchServiceSpy.search.and.returnValue(throwError(() => new Error('Search failed')));
+      searchServiceSpy.search.mockReturnValue(throwError(() => new Error('Search failed')));
       component.query = 'test';
       component.performSearch();
       tick();
 
       expect(component.results).toEqual([]);
-      expect(component.isLoading).toBeFalse();
+      expect(component.isLoading).toBe(false);
     }));
 
     it('should set isLoading during search', fakeAsync(() => {
       // Use delayed observable to test isLoading state
-      searchServiceSpy.search.and.returnValue(
+      searchServiceSpy.search.mockReturnValue(
         of({ results: mockSearchResults } as any).pipe(delay(100))
       );
 
       component.query = 'test';
       component.performSearch();
 
-      expect(component.isLoading).toBeTrue();
+      expect(component.isLoading).toBe(true);
       tick(100);
-      expect(component.isLoading).toBeFalse();
+      expect(component.isLoading).toBe(false);
     }));
   });
 
@@ -205,7 +208,7 @@ describe('SearchComponent', () => {
     }));
 
     it('should show no results message when empty', fakeAsync(() => {
-      searchServiceSpy.search.and.returnValue(of({ results: [] } as any));
+      searchServiceSpy.search.mockReturnValue(of({ results: [] } as any));
       component.query = 'nonexistent';
       component.performSearch();
       tick();

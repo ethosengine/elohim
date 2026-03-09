@@ -3,16 +3,17 @@ import { MeaningMapComponent } from './meaning-map.component';
 import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { ContentIndex, DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('MeaningMapComponent', () => {
   let component: MeaningMapComponent;
   let fixture: ComponentFixture<MeaningMapComponent>;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let affinityServiceSpy: jasmine.SpyObj<AffinityTrackingService>;
-  let routerSpy: jasmine.SpyObj<Router>;
+  let dataLoaderSpy: any;
+  let affinityServiceSpy: any;
+  let routerSpy: any;
   let affinitySubject: BehaviorSubject<Map<string, number>>;
 
   const mockNodes: ContentNode[] = [
@@ -54,15 +55,35 @@ describe('MeaningMapComponent', () => {
   beforeEach(async () => {
     affinitySubject = new BehaviorSubject(new Map<string, number>());
 
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContentIndex']);
-    const affinitySpyObj = jasmine.createSpyObj(
-      'AffinityTrackingService',
-      ['getAffinity', 'getStats'],
-      {
-        affinity$: affinitySubject.asObservable(),
-      }
-    );
-    const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
+    const dataLoaderSpyObj = {
+      getContentIndex: vi.fn().mockReturnValue(of({ nodes: mockNodes, totalCount: 3, byType: {} })),
+    };
+    const affinitySpyObj = {
+      getAffinity: vi.fn().mockImplementation((id: string) => {
+        if (id === 'node-1') return 0.6;
+        if (id === 'node-2') return 0.6;
+        if (id === 'node-3') return 0.4;
+        return 0;
+      }),
+      getStats: vi.fn().mockReturnValue({
+        totalNodes: 3,
+        averageAffinity: 0.5,
+        engagedNodes: 2,
+        engagedCount: 2,
+        distribution: { unseen: 1, low: 0, medium: 1, high: 1 },
+        byCategory: new Map([
+          ['core', { category: 'core', nodeCount: 2, engagedCount: 2, averageAffinity: 0.6 }],
+          [
+            'deployment',
+            { category: 'deployment', nodeCount: 1, engagedCount: 0, averageAffinity: 0.4 },
+          ],
+        ]),
+        byType: new Map(),
+      }),
+      affinity$: affinitySubject.asObservable(),
+      changes$: of(null),
+    };
+    const routerSpyObj = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [MeaningMapComponent],
@@ -74,29 +95,9 @@ describe('MeaningMapComponent', () => {
       ],
     }).compileComponents();
 
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    affinityServiceSpy = TestBed.inject(
-      AffinityTrackingService
-    ) as jasmine.SpyObj<AffinityTrackingService>;
-    routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
-
-    // Default spy returns
-    dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: mockNodes }));
-    affinityServiceSpy.getAffinity.and.returnValue(0.5);
-    affinityServiceSpy.getStats.and.returnValue({
-      totalNodes: 3,
-      averageAffinity: 0.5,
-      engagedNodes: 2,
-      distribution: { unseen: 0, low: 1, medium: 1, high: 1 },
-      byCategory: new Map([
-        ['core', { category: 'core', nodeCount: 2, engagedCount: 1, averageAffinity: 0.6 }],
-        [
-          'deployment',
-          { category: 'deployment', nodeCount: 1, engagedCount: 1, averageAffinity: 0.4 },
-        ],
-      ]),
-      byType: new Map(),
-    });
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as any;
+    affinityServiceSpy = TestBed.inject(AffinityTrackingService) as any;
+    routerSpy = TestBed.inject(Router) as any;
 
     fixture = TestBed.createComponent(MeaningMapComponent);
     component = fixture.componentInstance;
@@ -113,7 +114,7 @@ describe('MeaningMapComponent', () => {
 
       expect(dataLoaderSpy.getContentIndex).toHaveBeenCalled();
       expect(component.categories.length).toBeGreaterThan(0);
-      expect(component.isLoading).toBeFalse();
+      expect(component.isLoading).toBe(false);
     }));
 
     it('should calculate overall stats', fakeAsync(() => {
@@ -174,13 +175,13 @@ describe('MeaningMapComponent', () => {
       tick();
 
       const category = component.categories[0];
-      expect(category.expanded).toBeTrue();
+      expect(category.expanded).toBe(true);
 
       component.toggleCategory(category);
-      expect(category.expanded).toBeFalse();
+      expect(category.expanded).toBe(false);
 
       component.toggleCategory(category);
-      expect(category.expanded).toBeTrue();
+      expect(category.expanded).toBe(true);
     }));
   });
 
@@ -245,7 +246,7 @@ describe('MeaningMapComponent', () => {
       component.ngOnDestroy();
 
       // Should not throw errors
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     }));
   });
 
@@ -265,8 +266,10 @@ describe('MeaningMapComponent', () => {
         },
       ];
 
-      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: nodesWithoutCategory }));
-      affinityServiceSpy.getStats.and.returnValue({
+      dataLoaderSpy.getContentIndex.mockReturnValue(
+        of({ nodes: nodesWithoutCategory } as ContentIndex)
+      );
+      affinityServiceSpy.getStats.mockReturnValue({
         totalNodes: 1,
         averageAffinity: 0,
         engagedNodes: 0,

@@ -10,11 +10,12 @@ import {
   MiniGraphNode,
   MiniGraphEdge,
 } from '../../models/exploration-context.model';
+import { vi, Mock } from 'vitest';
 
 describe('MiniGraphComponent', () => {
   let component: MiniGraphComponent;
   let fixture: ComponentFixture<MiniGraphComponent>;
-  let relatedConceptsService: jasmine.SpyObj<RelatedConceptsService>;
+  let relatedConceptsService: any;
 
   // Mock data
   const mockMiniGraphNode: MiniGraphNode = {
@@ -46,21 +47,18 @@ describe('MiniGraphComponent', () => {
   };
 
   beforeEach(async () => {
-    const relatedConceptsServiceSpy = jasmine.createSpyObj(
-      'RelatedConceptsService',
-      ['getNeighborhood']
-    );
+    const relatedConceptsServiceSpy = {
+      getNeighborhood: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [MiniGraphComponent],
-      providers: [
-        { provide: RelatedConceptsService, useValue: relatedConceptsServiceSpy },
-      ],
+      providers: [{ provide: RelatedConceptsService, useValue: relatedConceptsServiceSpy }],
     }).compileComponents();
 
-    relatedConceptsService = TestBed.inject(
-      RelatedConceptsService
-    ) as jasmine.SpyObj<RelatedConceptsService>;
+    relatedConceptsService = TestBed.inject(RelatedConceptsService) as {
+      [K in keyof RelatedConceptsService]?: Mock;
+    };
     fixture = TestBed.createComponent(MiniGraphComponent);
     component = fixture.componentInstance;
   });
@@ -142,27 +140,21 @@ describe('MiniGraphComponent', () => {
 
     it('should render mini-graph-container div', () => {
       fixture.detectChanges();
-      const container: DebugElement = fixture.debugElement.query(
-        By.css('.mini-graph-container')
-      );
+      const container: DebugElement = fixture.debugElement.query(By.css('.mini-graph-container'));
       expect(container).toBeTruthy();
     });
 
     it('should render loading overlay when isLoading is true', () => {
       component.isLoading = true;
       fixture.detectChanges();
-      const loadingOverlay: DebugElement = fixture.debugElement.query(
-        By.css('.loading-overlay')
-      );
+      const loadingOverlay: DebugElement = fixture.debugElement.query(By.css('.loading-overlay'));
       expect(loadingOverlay).toBeTruthy();
     });
 
     it('should not render loading overlay when isLoading is false', () => {
       component.isLoading = false;
       fixture.detectChanges();
-      const loadingOverlay: DebugElement = fixture.debugElement.query(
-        By.css('.loading-overlay')
-      );
+      const loadingOverlay: DebugElement = fixture.debugElement.query(By.css('.loading-overlay'));
       expect(loadingOverlay).toBeFalsy();
     });
 
@@ -170,34 +162,26 @@ describe('MiniGraphComponent', () => {
       component.isEmpty = true;
       component.isLoading = false;
       fixture.detectChanges();
-      const emptyState: DebugElement = fixture.debugElement.query(
-        By.css('.empty-state')
-      );
+      const emptyState: DebugElement = fixture.debugElement.query(By.css('.empty-state'));
       expect(emptyState).toBeTruthy();
     });
 
     it('should not render empty state when isEmpty is false', () => {
       component.isEmpty = false;
       fixture.detectChanges();
-      const emptyState: DebugElement = fixture.debugElement.query(
-        By.css('.empty-state')
-      );
+      const emptyState: DebugElement = fixture.debugElement.query(By.css('.empty-state'));
       expect(emptyState).toBeFalsy();
     });
 
     it('should render graph-viewport container', () => {
       fixture.detectChanges();
-      const graphViewport: DebugElement = fixture.debugElement.query(
-        By.css('.graph-viewport')
-      );
+      const graphViewport: DebugElement = fixture.debugElement.query(By.css('.graph-viewport'));
       expect(graphViewport).toBeTruthy();
     });
 
     it('should render expand button', () => {
       fixture.detectChanges();
-      const expandButton: DebugElement = fixture.debugElement.query(
-        By.css('.expand-button')
-      );
+      const expandButton: DebugElement = fixture.debugElement.query(By.css('.expand-button'));
       expect(expandButton).toBeTruthy();
     });
 
@@ -211,34 +195,28 @@ describe('MiniGraphComponent', () => {
     it('should render tooltip when hoveredNode exists and is not focus', () => {
       component.hoveredNode = mockNeighborNode;
       fixture.detectChanges();
-      const tooltip: DebugElement = fixture.debugElement.query(
-        By.css('.node-tooltip')
-      );
+      const tooltip: DebugElement = fixture.debugElement.query(By.css('.node-tooltip'));
       expect(tooltip).toBeTruthy();
     });
 
     it('should not render tooltip when hoveredNode is null', () => {
       component.hoveredNode = null;
       fixture.detectChanges();
-      const tooltip: DebugElement = fixture.debugElement.query(
-        By.css('.node-tooltip')
-      );
+      const tooltip: DebugElement = fixture.debugElement.query(By.css('.node-tooltip'));
       expect(tooltip).toBeFalsy();
     });
 
     it('should not render tooltip when hoveredNode is focus node', () => {
       component.hoveredNode = mockMiniGraphNode;
       fixture.detectChanges();
-      const tooltip: DebugElement = fixture.debugElement.query(
-        By.css('.node-tooltip')
-      );
+      const tooltip: DebugElement = fixture.debugElement.query(By.css('.node-tooltip'));
       expect(tooltip).toBeFalsy();
     });
   });
 
   describe('Simple Method Tests', () => {
     it('should emit exploreRequested when onExpandClick is called', () => {
-      spyOn(component.exploreRequested, 'emit');
+      vi.spyOn(component.exploreRequested, 'emit');
       component.onExpandClick();
       expect(component.exploreRequested.emit).toHaveBeenCalledWith();
     });
@@ -252,7 +230,7 @@ describe('MiniGraphComponent', () => {
           isFirstChange: () => true,
         },
       };
-      relatedConceptsService.getNeighborhood.and.returnValue(of(mockGraphData));
+      relatedConceptsService.getNeighborhood.mockReturnValue(of(mockGraphData));
       component.focusNodeId = 'new-id';
       component.ngOnChanges(changes);
       expect(component.focusNodeId).toBe('new-id');
@@ -302,9 +280,9 @@ describe('MiniGraphComponent', () => {
     it('should reference the graph-viewport element', () => {
       fixture.detectChanges();
       expect(component.graphContainer.nativeElement).toBeTruthy();
-      expect(
-        component.graphContainer.nativeElement.classList.contains('graph-viewport')
-      ).toBe(true);
+      expect(component.graphContainer.nativeElement.classList.contains('graph-viewport')).toBe(
+        true
+      );
     });
   });
 

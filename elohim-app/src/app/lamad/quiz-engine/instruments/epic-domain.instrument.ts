@@ -16,6 +16,8 @@
  * - Social (Social Medium): Building healthier digital spaces, online communication
  */
 
+import { registerInstrument } from './instrument-registry';
+
 import type {
   SubscaleDefinition,
   ResultTypeDefinition,
@@ -23,7 +25,7 @@ import type {
   AggregatedReflection,
 } from '../../content-io/plugins/sophia/sophia-element-loader';
 
-// @coverage: 92.9% (2026-02-05)
+// @coverage: 93.1% (2026-02-24)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Instrument ID
@@ -252,3 +254,20 @@ export function sortEpicDomainsByScore(subscaleTotals: Record<string, number>): 
 
   return mapped.sort((a, b) => b.score - a.score);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Self-Registration
+// ─────────────────────────────────────────────────────────────────────────────
+
+registerInstrument({
+  config: EPIC_DOMAIN_INSTRUMENT_CONFIG,
+  subscales: EPIC_DOMAIN_SUBSCALES,
+  resultTypes: EPIC_DOMAIN_RESULT_TYPES,
+  displayConfig: {
+    framework: 'epic-domain',
+    frameworkDisplayName: 'Epic Domain',
+    autoFeature: false,
+    displayTemplate: '{{primaryType.name}}',
+    shortTemplate: '{{primaryType.shortCode}}',
+  },
+});

@@ -6,158 +6,541 @@
   "content": [
     {
       "id": "pv-q1",
-      "question": {
-        "content": "How important is recognition for your contributions?\n\n**Not Important** ← [[☃ widget 1]] → **Very Important**",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am driven by my own internal interests and passions, not by external rewards.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 1": {
-            "type": "numeric-input",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "value": 50,
-              "simplify": "required",
-              "size": "small",
-              "answerForms": [],
-              "coefficient": false,
-              "labelText": "(0-100)"
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
-      "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "recognition"
-        ],
-        "scaleAnchors": {
-          "low": "Not Important",
-          "high": "Very Important"
-        },
-        "range": {
-          "min": 0,
-          "max": 100
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "intrinsic-motivation": 1 },
+          "2": { "intrinsic-motivation": 2 },
+          "3": { "intrinsic-motivation": 3 },
+          "4": { "intrinsic-motivation": 4 },
+          "5": { "intrinsic-motivation": 5 },
+          "6": { "intrinsic-motivation": 6 },
+          "7": { "intrinsic-motivation": 7 }
         }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
       }
     },
     {
       "id": "pv-q2",
-      "question": {
-        "content": "How much do you value helping others even when no one notices?\n\n**Rarely** ← [[☃ widget 2]] → **Always**",
+      "purpose": "discovery",
+      "content": {
+        "content": "I find deep satisfaction in activities that are meaningful to me, regardless of recognition.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 2": {
-            "type": "numeric-input",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "value": 50,
-              "simplify": "required",
-              "size": "small",
-              "answerForms": [],
-              "coefficient": false,
-              "labelText": "(0-100)"
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
-      "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "altruism"
-        ],
-        "scaleAnchors": {
-          "low": "Rarely",
-          "high": "Always"
-        },
-        "range": {
-          "min": 0,
-          "max": 100
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "intrinsic-motivation": 1 },
+          "2": { "intrinsic-motivation": 2 },
+          "3": { "intrinsic-motivation": 3 },
+          "4": { "intrinsic-motivation": 4 },
+          "5": { "intrinsic-motivation": 5 },
+          "6": { "intrinsic-motivation": 6 },
+          "7": { "intrinsic-motivation": 7 }
         }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
       }
     },
     {
       "id": "pv-q3",
-      "question": {
-        "content": "Which forms of contribution feel most meaningful to you?\n\n[[☃ widget 3]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I pursue goals because they align with my values, not because others expect it of me.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 3": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "Caring for family members",
-                  "correct": true
-                },
-                {
-                  "content": "Mentoring or teaching others",
-                  "correct": true
-                },
-                {
-                  "content": "Creating things that help people",
-                  "correct": true
-                },
-                {
-                  "content": "Organizing community efforts",
-                  "correct": true
-                },
-                {
-                  "content": "Being present and listening to others",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": true,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": true
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "intrinsic-motivation": 1 },
+          "2": { "intrinsic-motivation": 2 },
+          "3": { "intrinsic-motivation": 3 },
+          "4": { "intrinsic-motivation": 4 },
+          "5": { "intrinsic-motivation": 5 },
+          "6": { "intrinsic-motivation": 6 },
+          "7": { "intrinsic-motivation": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "contribution-types"
-        ]
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q4",
+      "purpose": "discovery",
+      "content": {
+        "content": "Receiving praise or recognition motivates me more than the work itself.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "intrinsic-motivation": 7 },
+          "2": { "intrinsic-motivation": 6 },
+          "3": { "intrinsic-motivation": 5 },
+          "4": { "intrinsic-motivation": 4 },
+          "5": { "intrinsic-motivation": 3 },
+          "6": { "intrinsic-motivation": 2 },
+          "7": { "intrinsic-motivation": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q5",
+      "purpose": "discovery",
+      "content": {
+        "content": "Having strong, close relationships is one of the most important things in my life.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "relationships": 1 },
+          "2": { "relationships": 2 },
+          "3": { "relationships": 3 },
+          "4": { "relationships": 4 },
+          "5": { "relationships": 5 },
+          "6": { "relationships": 6 },
+          "7": { "relationships": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q6",
+      "purpose": "discovery",
+      "content": {
+        "content": "I invest significant time and energy in maintaining my connections with others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "relationships": 1 },
+          "2": { "relationships": 2 },
+          "3": { "relationships": 3 },
+          "4": { "relationships": 4 },
+          "5": { "relationships": 5 },
+          "6": { "relationships": 6 },
+          "7": { "relationships": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q7",
+      "purpose": "discovery",
+      "content": {
+        "content": "I feel most fulfilled when I am deeply connected to the people around me.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "relationships": 1 },
+          "2": { "relationships": 2 },
+          "3": { "relationships": 3 },
+          "4": { "relationships": 4 },
+          "5": { "relationships": 5 },
+          "6": { "relationships": 6 },
+          "7": { "relationships": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q8",
+      "purpose": "discovery",
+      "content": {
+        "content": "I prefer to work independently rather than relying on others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "relationships": 7 },
+          "2": { "relationships": 6 },
+          "3": { "relationships": 5 },
+          "4": { "relationships": 4 },
+          "5": { "relationships": 3 },
+          "6": { "relationships": 2 },
+          "7": { "relationships": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q9",
+      "purpose": "discovery",
+      "content": {
+        "content": "I want my life to make a positive difference in the world.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "purpose": 1 },
+          "2": { "purpose": 2 },
+          "3": { "purpose": 3 },
+          "4": { "purpose": 4 },
+          "5": { "purpose": 5 },
+          "6": { "purpose": 6 },
+          "7": { "purpose": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q10",
+      "purpose": "discovery",
+      "content": {
+        "content": "I have a clear sense of what I am here to contribute or accomplish.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "purpose": 1 },
+          "2": { "purpose": 2 },
+          "3": { "purpose": 3 },
+          "4": { "purpose": 4 },
+          "5": { "purpose": 5 },
+          "6": { "purpose": 6 },
+          "7": { "purpose": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q11",
+      "purpose": "discovery",
+      "content": {
+        "content": "I regularly reflect on whether how I spend my time aligns with what matters most to me.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "purpose": 1 },
+          "2": { "purpose": 2 },
+          "3": { "purpose": 3 },
+          "4": { "purpose": 4 },
+          "5": { "purpose": 5 },
+          "6": { "purpose": 6 },
+          "7": { "purpose": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
+      }
+    },
+    {
+      "id": "pv-q12",
+      "purpose": "discovery",
+      "content": {
+        "content": "I feel a sense of meaning in my daily activities.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "purpose": 1 },
+          "2": { "purpose": 2 },
+          "3": { "purpose": 3 },
+          "4": { "purpose": 4 },
+          "5": { "purpose": 5 },
+          "6": { "purpose": 6 },
+          "7": { "purpose": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
+  "contentFormat": "sophia",
   "tags": [
     "assessment",
+    "discovery",
     "values",
     "reflection",
     "value-scanner"
   ],
-  "sourcePath": "generated/assessment-personal-values.json",
   "relatedNodeIds": [
     "value-scanner-journey"
   ],
   "metadata": {
-    "instrumentType": "discovery",
+    "assessmentType": "discovery",
     "domain": "values",
-    "estimatedTime": "10-15 minutes",
+    "estimatedTime": "8-12 minutes",
     "attestationId": "values-explorer",
-    "sourceFormat": "assessment-json",
-    "migratedAt": "2025-12-26T05:42:25.374Z",
-    "questionCount": 3
+    "instrumentId": "personal-values-discovery",
+    "questionCount": 12,
+    "validation": {
+      "inspired_by": "Self-Determination Theory (Deci & Ryan)",
+      "reliability": "Adapted for educational purposes"
+    },
+    "interpretation": {
+      "method": "profile",
+      "dimensions": [
+        "intrinsic-motivation",
+        "relationships",
+        "purpose"
+      ]
+    },
+    "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479960",
-  "updatedAt": "2025-11-28T00:09:03.479961"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }

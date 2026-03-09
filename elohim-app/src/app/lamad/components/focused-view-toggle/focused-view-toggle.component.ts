@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 /**
  * Toggle button for focused/fullscreen content view.
@@ -20,6 +20,7 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
       [attr.aria-label]="isActive ? 'Exit focused view' : 'Enter focused view'"
       [attr.aria-pressed]="isActive"
       type="button"
+      data-testid="focused-view-toggle"
     >
       <span class="icon">{{ isActive ? '⤢' : '⤡' }}</span>
       <span class="label">{{ isActive ? 'Exit' : 'Focus' }}</span>

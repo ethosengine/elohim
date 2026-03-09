@@ -1,11 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, computed, signal } from '@angular/core';
 
-// @coverage: 30.2% (2026-02-05)
+// @coverage: 30.2% (2026-02-24)
 
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { HolochainContentService } from '../../services/holochain-content.service';
-import { OfflineOperationQueueService } from '../../services/offline-operation-queue.service';
 
 /**
  * Holochain Availability UI Component
@@ -14,7 +13,6 @@ import { OfflineOperationQueueService } from '../../services/offline-operation-q
  *
  * Features:
  * - Shows connection status (connected, connecting, error, offline)
- * - Displays queue size for offline operations
  * - Provides retry button for manual reconnection
  * - Dismissible warnings
  * - Clear messaging on feature availability in degraded mode
@@ -23,7 +21,7 @@ import { OfflineOperationQueueService } from '../../services/offline-operation-q
  * - Connected: Green banner, all features available
  * - Connecting: Yellow banner, features degraded, show progress
  * - Error: Red banner, error message, retry button
- * - Offline: Gray banner, cached content only, queue visible
+ * - Offline: Gray banner, cached content only
  */
 @Component({
   selector: 'app-holochain-availability-ui',
@@ -35,7 +33,6 @@ import { OfflineOperationQueueService } from '../../services/offline-operation-q
 export class HolochainAvailabilityUiComponent {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly holochainContent = inject(HolochainContentService);
-  private readonly operationQueue = inject(OfflineOperationQueueService);
 
   // Exposed state from services
   readonly connectionState = this.holochainClient.state;
@@ -45,8 +42,6 @@ export class HolochainAvailabilityUiComponent {
 
   // Local component state
   readonly isDismissed = signal(false);
-  readonly queuedOperations = computed(() => this.operationQueue.getQueueSize());
-  readonly hasQueuedOperations = computed(() => this.queuedOperations() > 0);
 
   // Computed display states
   readonly isConnecting = computed(() => this.connectionState() === 'connecting');
@@ -60,17 +55,13 @@ export class HolochainAvailabilityUiComponent {
     const state = this.connectionState();
     return (
       !this.isDismissed() &&
-      (state === 'connecting' ||
-        state === 'error' ||
-        state === 'disconnected' ||
-        this.hasQueuedOperations())
+      (state === 'connecting' || state === 'error' || state === 'disconnected')
     );
   });
 
   // Status messaging
   readonly statusMessage = computed(() => {
     const state = this.connectionState();
-    const queueSize = this.queuedOperations();
 
     if (state === 'connected') {
       return 'Connected to Holochain';
@@ -86,9 +77,6 @@ export class HolochainAvailabilityUiComponent {
     }
 
     if (state === 'disconnected') {
-      if (queueSize > 0) {
-        return `Offline - ${queueSize} operations queued`;
-      }
       return 'Offline - Using cached content';
     }
 
@@ -105,10 +93,7 @@ export class HolochainAvailabilityUiComponent {
       return 'Some features may be temporarily unavailable while connecting.';
     }
 
-    return (
-      'Working in offline mode. Some features are unavailable. ' +
-      'Write operations will be queued and synced when connection is restored.'
-    );
+    return 'Working in offline mode. Some features are unavailable.';
   });
 
   // CSS class bindings
@@ -154,18 +139,6 @@ export class HolochainAvailabilityUiComponent {
   }
 
   /**
-   * Sync queued operations
-   */
-  async syncQueuedOperations(): Promise<void> {
-    try {
-      await this.operationQueue.syncAll();
-      this.isDismissed.set(false); // Show success message
-    } catch {
-      // Operation sync failed silently - queued operations will retry
-    }
-  }
-
-  /**
    * Get degradation features list
    */
   getDegradedFeatures(): string[] {
@@ -173,18 +146,12 @@ export class HolochainAvailabilityUiComponent {
       return [];
     }
 
-    const features = [
+    return [
       'Creating new content',
       'Submitting mastery progress',
       'Recording appreciation',
       'Accessing real-time data',
     ];
-
-    if (this.hasQueuedOperations()) {
-      features.push('Syncing queued operations');
-    }
-
-    return features;
   }
 
   /**

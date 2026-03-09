@@ -3,13 +3,15 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 
+import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import { SophiaRendererComponent } from './sophia-renderer.component';
 import { SophiaWrapperComponent } from './sophia-wrapper.component';
 import { ContentNode } from '../../../models/content-node.model';
 import type { Recognition, Moment } from './sophia-moment.model';
+import { vi, Mock } from 'vitest';
 
 // Mock SophiaWrapperComponent
 @Component({
@@ -81,13 +83,51 @@ describe('SophiaRendererComponent', () => {
   });
 
   beforeEach(async () => {
-    const mockMasteryStats = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
-      learnerProfile$: new BehaviorSubject(null),
-    });
+    const mockMasteryStats = {
+      recordDailyEngagement: vi.fn(),
+      learnerProfile$: new BehaviorSubject(null).asObservable(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SophiaRendererComponent, RouterModule.forRoot([]), NoopAnimationsModule],
-      providers: [{ provide: MasteryStatsService, useValue: mockMasteryStats }],
+      providers: [
+        { provide: MasteryStatsService, useValue: mockMasteryStats },
+        {
+          provide: ElohimPresenceService,
+          useValue: (() => {
+            const spy = {
+              onDiscoveryCompleted: vi.fn(),
+              onContentCompleted: vi.fn(),
+              dismissNotice: vi.fn(),
+              handleAction: vi.fn(),
+              presence$: of([]),
+              cost$: of({
+                tokensProcessed: 0,
+                timeMs: 0,
+                constitutionalChecks: 0,
+                precedentLookups: 0,
+              }),
+              notices$: of([]),
+              providerId: 'elohim-presence',
+            };
+            const mockResponse = of({
+              requestId: 'req-1',
+              elohimId: 'elohim-1',
+              status: 'fulfilled' as const,
+              constitutionalReasoning: {
+                primaryPrinciple: 'Test',
+                interpretation: 'Test',
+                valuesWeighed: [],
+                confidence: 0.5,
+              },
+              respondedAt: new Date().toISOString(),
+            });
+            spy.onDiscoveryCompleted.mockReturnValue(mockResponse);
+            spy.onContentCompleted.mockReturnValue(mockResponse);
+            return spy;
+          })(),
+        },
+      ],
     })
       .overrideComponent(SophiaRendererComponent, {
         remove: { imports: [SophiaWrapperComponent] },
@@ -107,10 +147,10 @@ describe('SophiaRendererComponent', () => {
     it('should initialize with default values', () => {
       expect(component.moments).toEqual([]);
       expect(component.currentMomentIndex).toBe(0);
-      expect(component.hasAnswer).toBeFalse();
-      expect(component.isSubmitting).toBeFalse();
-      expect(component.showFeedback).toBeFalse();
-      expect(component.showResults).toBeFalse();
+      expect(component.hasAnswer).toBe(false);
+      expect(component.isSubmitting).toBe(false);
+      expect(component.showFeedback).toBe(false);
+      expect(component.showResults).toBe(false);
       expect(component.assessmentMode).toBe('mastery');
     });
 
@@ -126,8 +166,8 @@ describe('SophiaRendererComponent', () => {
       component.ngOnChanges({ node: { currentValue: component.node } as any });
 
       expect(component.assessmentMode).toBe('mastery');
-      expect(component.modeConfig.showFeedback).toBeTrue();
-      expect(component.modeConfig.showCorrectness).toBeTrue();
+      expect(component.modeConfig.showFeedback).toBe(true);
+      expect(component.modeConfig.showCorrectness).toBe(true);
     });
 
     it('should detect discovery mode from moment purpose', () => {
@@ -137,8 +177,8 @@ describe('SophiaRendererComponent', () => {
       component.ngOnChanges({ node: { currentValue: component.node } as any });
 
       expect(component.assessmentMode).toBe('discovery');
-      expect(component.modeConfig.showFeedback).toBeFalse();
-      expect(component.modeConfig.trackSubscales).toBeTrue();
+      expect(component.modeConfig.showFeedback).toBe(false);
+      expect(component.modeConfig.trackSubscales).toBe(true);
     });
 
     it('should detect reflection mode from moment purpose', () => {
@@ -212,9 +252,9 @@ describe('SophiaRendererComponent', () => {
     });
 
     it('should detect last moment', () => {
-      expect(component.isLastMoment).toBeFalse();
+      expect(component.isLastMoment).toBe(false);
       component.currentMomentIndex = 1;
-      expect(component.isLastMoment).toBeTrue();
+      expect(component.isLastMoment).toBe(true);
     });
 
     it('should calculate mastery score', () => {
@@ -226,9 +266,9 @@ describe('SophiaRendererComponent', () => {
 
     it('should determine if mastery passed (70% threshold)', () => {
       component.demonstratedCount = 1;
-      expect(component.masteryPassed).toBeFalse(); // 50%
+      expect(component.masteryPassed).toBe(false); // 50%
       component.demonstratedCount = 2;
-      expect(component.masteryPassed).toBeTrue(); // 100%
+      expect(component.masteryPassed).toBe(true); // 100%
     });
   });
 
@@ -241,10 +281,10 @@ describe('SophiaRendererComponent', () => {
 
     it('should handle answer change events', () => {
       component.handleAnswerChange(true);
-      expect(component.hasAnswer).toBeTrue();
+      expect(component.hasAnswer).toBe(true);
 
       component.handleAnswerChange(false);
-      expect(component.hasAnswer).toBeFalse();
+      expect(component.hasAnswer).toBe(false);
     });
 
     it('should handle recognition events', () => {
@@ -269,7 +309,7 @@ describe('SophiaRendererComponent', () => {
 
     it('should not submit without moment component', () => {
       component.submitAnswer();
-      expect(component.isSubmitting).toBeFalse();
+      expect(component.isSubmitting).toBe(false);
     });
 
     it('should show feedback after submitting correct answer', () => {
@@ -285,8 +325,8 @@ describe('SophiaRendererComponent', () => {
 
       component.submitAnswer();
 
-      expect(component.showFeedback).toBeTrue();
-      expect(component.showNextButton).toBeTrue();
+      expect(component.showFeedback).toBe(true);
+      expect(component.showNextButton).toBe(true);
       expect(component.demonstratedCount).toBe(1);
     });
 
@@ -302,14 +342,14 @@ describe('SophiaRendererComponent', () => {
 
       component.submitAnswer();
 
-      expect(component.showFeedback).toBeTrue();
+      expect(component.showFeedback).toBe(true);
       expect(component.demonstratedCount).toBe(0);
     });
 
     it('should not double-submit when already submitting', () => {
       component.isSubmitting = true;
       component.submitAnswer();
-      expect(component.isSubmitting).toBeTrue();
+      expect(component.isSubmitting).toBe(true);
     });
 
     it('should not submit when feedback is already showing', () => {
@@ -334,15 +374,15 @@ describe('SophiaRendererComponent', () => {
       component.nextMoment();
 
       expect(component.currentMomentIndex).toBe(1);
-      expect(component.hasAnswer).toBeFalse();
-      expect(component.showFeedback).toBeFalse();
+      expect(component.hasAnswer).toBe(false);
+      expect(component.showFeedback).toBe(false);
     });
 
     it('should show results on last moment', () => {
       component.currentMomentIndex = 1; // last moment
       component.nextMoment();
 
-      expect(component.showResults).toBeTrue();
+      expect(component.showResults).toBe(true);
     });
 
     it('should go to previous moment', () => {
@@ -350,7 +390,7 @@ describe('SophiaRendererComponent', () => {
       component.previousMoment();
 
       expect(component.currentMomentIndex).toBe(0);
-      expect(component.hasAnswer).toBeTrue();
+      expect(component.hasAnswer).toBe(true);
     });
 
     it('should not go before first moment', () => {
@@ -375,7 +415,7 @@ describe('SophiaRendererComponent', () => {
       component.previousMoment();
 
       expect(component.currentMomentIndex).toBe(0);
-      expect(component.hasAnswer).toBeTrue();
+      expect(component.hasAnswer).toBe(true);
     });
   });
 
@@ -415,7 +455,7 @@ describe('SophiaRendererComponent', () => {
       component.submitAnswer();
 
       expect(component.currentMomentIndex).toBe(1);
-      expect(component.showFeedback).toBeFalse();
+      expect(component.showFeedback).toBe(false);
     });
 
     it('should show results after last discovery moment', () => {
@@ -427,7 +467,7 @@ describe('SophiaRendererComponent', () => {
       mockWrapper.setMockRecognition(createMockRecognition({ momentId: 'm2' }));
       component.submitAnswer();
 
-      expect(component.showResults).toBeTrue();
+      expect(component.showResults).toBe(true);
     });
   });
 
@@ -452,7 +492,7 @@ describe('SophiaRendererComponent', () => {
 
       expect(emittedEvent).toBeDefined();
       expect(emittedEvent.type).toBe('quiz');
-      expect(emittedEvent.passed).toBeTrue();
+      expect(emittedEvent.passed).toBe(true);
       expect(emittedEvent.score).toBe(100);
     });
 
@@ -462,7 +502,7 @@ describe('SophiaRendererComponent', () => {
 
       component.completeAndContinue();
 
-      expect(emittedEvent.passed).toBeFalse();
+      expect(emittedEvent.passed).toBe(false);
       expect(emittedEvent.score).toBe(50);
     });
 
@@ -481,7 +521,7 @@ describe('SophiaRendererComponent', () => {
 
       component.completeAndContinue();
 
-      expect(emittedEvent.passed).toBeTrue();
+      expect(emittedEvent.passed).toBe(true);
       expect(emittedEvent.score).toBe(100);
       expect(emittedEvent.details.subscaleTotals).toBeDefined();
       expect(emittedEvent.details.primarySubscale).toBe('openness');
@@ -494,7 +534,7 @@ describe('SophiaRendererComponent', () => {
 
       component.completeAndContinue();
 
-      expect(emittedEvent.passed).toBeTrue();
+      expect(emittedEvent.passed).toBe(true);
       expect(emittedEvent.score).toBe(100);
     });
   });
@@ -509,19 +549,19 @@ describe('SophiaRendererComponent', () => {
 
     it('should implement InteractiveRenderer with complete output', () => {
       expect(component.complete).toBeDefined();
-      expect(component.complete instanceof EventEmitter).toBeTrue();
+      expect(component.complete instanceof EventEmitter).toBe(true);
     });
   });
 
   describe('Input Properties', () => {
     it('should accept showHeader input', () => {
       component.showHeader = false;
-      expect(component.showHeader).toBeFalse();
+      expect(component.showHeader).toBe(false);
     });
 
     it('should accept reviewMode input', () => {
       component.reviewMode = true;
-      expect(component.reviewMode).toBeTrue();
+      expect(component.reviewMode).toBe(true);
     });
   });
 
@@ -557,11 +597,55 @@ describe('SophiaRendererComponent', () => {
 
   describe('Cleanup', () => {
     it('should complete destroy$ subject on destroy', () => {
-      const destroySpy = spyOn((component as any).destroy$, 'complete');
+      const destroySpy = vi.spyOn((component as any).destroy$, 'complete');
 
       component.ngOnDestroy();
 
       expect(destroySpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('Completion Summary Integration', () => {
+    it('should render app-assessment-completion-summary when showResults is true', () => {
+      component.showResults = true;
+      fixture.detectChanges();
+
+      const summary = fixture.nativeElement.querySelector('app-assessment-completion-summary');
+      expect(summary).toBeTruthy();
+    });
+
+    it('should not render completion summary when showResults is false', () => {
+      component.showResults = false;
+      fixture.detectChanges();
+
+      const summary = fixture.nativeElement.querySelector('app-assessment-completion-summary');
+      expect(summary).toBeNull();
+    });
+
+    it('should resolve instrumentId from first moment metadata', () => {
+      component.moments = [
+        {
+          id: 'moment-1',
+          content: {},
+          metadata: { instrumentId: 'attachment-style-discovery' },
+        } as unknown as Moment,
+      ];
+
+      expect(component.resolvedInstrumentId).toBe('attachment-style-discovery');
+    });
+
+    it('should return null instrumentId when no moments', () => {
+      component.moments = [];
+      expect(component.resolvedInstrumentId).toBeNull();
+    });
+
+    it('should return null instrumentId when moment has no metadata', () => {
+      component.moments = [{ id: 'moment-1', content: {} } as unknown as Moment];
+      expect(component.resolvedInstrumentId).toBeNull();
+    });
+
+    it('should return null primaryType when no psyche API', () => {
+      expect(component.resolvedPrimaryType).toBeNull();
     });
   });
 });

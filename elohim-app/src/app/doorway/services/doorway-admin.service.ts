@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 86.2% (2026-02-05)
+// @coverage: 86.2% (2026-02-24)
 
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 

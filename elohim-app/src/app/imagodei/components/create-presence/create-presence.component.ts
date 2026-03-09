@@ -17,10 +17,11 @@ import { Component, inject, signal, computed, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { ContentService } from '@app/lamad/services/content.service';
 
+import { PRESENCE_LIFECYCLE } from '../../interfaces';
 import {
   type CreatePresenceRequest,
   type ExternalIdentifier,
@@ -29,7 +30,6 @@ import {
   getProviderLabel,
   getProviderIcon,
 } from '../../models/presence.model';
-import { PresenceService } from '../../services/presence.service';
 
 /** External identifier being edited */
 interface IdentifierEntry {
@@ -46,7 +46,7 @@ interface IdentifierEntry {
   styleUrls: ['./create-presence.component.css'],
 })
 export class CreatePresenceComponent {
-  private readonly presenceService = inject(PresenceService);
+  private readonly presenceService = inject(PRESENCE_LIFECYCLE);
   private readonly contentService = inject(ContentService);
   private readonly router = inject(Router);
 

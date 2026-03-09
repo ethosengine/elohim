@@ -17,6 +17,8 @@
  * - Constitutional proofs stored as verifiable credentials
  */
 
+import type { ReachNegotiationParams, ReachNegotiationResult } from './create-context.model';
+
 // ============================================================================
 // Constitutional Layers
 // ============================================================================
@@ -122,7 +124,10 @@ export type ElohimCapability =
   | 'cultural-context-mediation' // Mediate cultural place disputes
   | 'place-relationship-mapping' // Map place relationships
   | 'ecological-limit-assessment' // Assess ecological limits
-  | 'place-stewardship'; // General place stewardship
+  | 'place-stewardship' // General place stewardship
+
+  // Reach Negotiation Operations (Content-Reach epic)
+  | 'reach-negotiation'; // Negotiate content reach before distribution
 
 // ============================================================================
 // Elohim Agent Entity
@@ -280,7 +285,8 @@ export type ElohimRequestParams =
   | AttestationRecommendationParams
   | KnowledgeMapSynthesisParams
   | SpiralDetectionParams
-  | PathAnalysisParams;
+  | PathAnalysisParams
+  | ReachNegotiationParams;
 
 export interface ContentReviewParams {
   type: 'content-review';
@@ -340,6 +346,15 @@ export interface ElohimResponse {
   /** If declined: why */
   declineReason?: string;
 
+  /** If deferred: why (e.g. 'BudgetExhausted', 'QueueFull') */
+  deferReason?: string;
+
+  /** If deferred: suggested alternative nodes to try */
+  meshHints?: MeshHint[];
+
+  /** If deferred: how long to wait before retrying (milliseconds) */
+  retryAfterMs?: number;
+
   /** If escalated: to which Elohim/layer */
   escalatedTo?: string;
 
@@ -388,7 +403,8 @@ export type ElohimResponsePayload =
   | AttestationRecommendation
   | ElohimKnowledgeMapUpdate
   | SpiralDetectionResult
-  | PathAnalysisResult;
+  | PathAnalysisResult
+  | ReachNegotiationResult;
 
 export interface ContentReviewResult {
   type: 'content-review';
@@ -446,6 +462,23 @@ export interface PathAnalysisResult {
 }
 
 /**
+ * MeshHint - A neighbor node that may have capacity to serve a deferred request.
+ *
+ * Mirrors the Rust `MeshHint` struct from elohim-node admission control.
+ * Training-wheels: initially empty, populated when gossip neighbor table is built.
+ */
+export interface MeshHint {
+  /** Neighbor node identifier */
+  nodeId: string;
+  /** Remaining compute budget on the neighbor */
+  budgetRemaining: number;
+  /** Estimated wait time in milliseconds */
+  estimatedWaitMs: number;
+  /** Capabilities the neighbor can serve */
+  capabilities: string[];
+}
+
+/**
  * ElohimComputationCost - Resource usage for transparency.
  */
 export interface ElohimComputationCost {
@@ -480,3 +513,6 @@ export interface ElohimSelectionCriteria {
   contextFamilyId?: string;
   contextCommunityId?: string;
 }
+
+// Re-export reach negotiation types from create-context.model
+export type { ReachNegotiationParams, ReachNegotiationResult } from './create-context.model';

@@ -6,358 +6,783 @@
   "content": [
     {
       "id": "str-q1",
-      "question": {
-        "content": "I always find new ways to look at things.\n\n[[☃ widget 1]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I regularly come up with new ways to do things.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "creativity": 1 },
+          "2": { "creativity": 2 },
+          "3": { "creativity": 3 },
+          "4": { "creativity": 4 },
+          "5": { "creativity": 5 },
+          "6": { "creativity": 6 },
+          "7": { "creativity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "creativity"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     },
     {
       "id": "str-q2",
-      "question": {
-        "content": "I am always curious about the world.\n\n[[☃ widget 2]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I like to think of creative solutions to problems.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 2": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "creativity": 1 },
+          "2": { "creativity": 2 },
+          "3": { "creativity": 3 },
+          "4": { "creativity": 4 },
+          "5": { "creativity": 5 },
+          "6": { "creativity": 6 },
+          "7": { "creativity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "curiosity"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     },
     {
       "id": "str-q3",
-      "question": {
-        "content": "I always let others share first.\n\n[[☃ widget 3]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I enjoy finding novel approaches to problems.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 3": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "creativity": 1 },
+          "2": { "creativity": 2 },
+          "3": { "creativity": 3 },
+          "4": { "creativity": 4 },
+          "5": { "creativity": 5 },
+          "6": { "creativity": 6 },
+          "7": { "creativity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "fairness"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     },
     {
       "id": "str-q4",
-      "question": {
-        "content": "I try to help everyone I meet.\n\n[[☃ widget 4]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am always asking questions about the world.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 4": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "curiosity": 1 },
+          "2": { "curiosity": 2 },
+          "3": { "curiosity": 3 },
+          "4": { "curiosity": 4 },
+          "5": { "curiosity": 5 },
+          "6": { "curiosity": 6 },
+          "7": { "curiosity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "kindness"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     },
     {
       "id": "str-q5",
-      "question": {
-        "content": "I finish what I start.\n\n[[☃ widget 5]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I find almost everything interesting.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 5": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "curiosity": 1 },
+          "2": { "curiosity": 2 },
+          "3": { "curiosity": 3 },
+          "4": { "curiosity": 4 },
+          "5": { "curiosity": 5 },
+          "6": { "curiosity": 6 },
+          "7": { "curiosity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "perseverance"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     },
     {
       "id": "str-q6",
-      "question": {
-        "content": "I can always find the positive in what seems negative.\n\n[[☃ widget 6]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "I seek out new experiences regularly.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 6": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Like Me",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5 - Very Much Like Me",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "curiosity": 1 },
+          "2": { "curiosity": 2 },
+          "3": { "curiosity": 3 },
+          "4": { "curiosity": 4 },
+          "5": { "curiosity": 5 },
+          "6": { "curiosity": 6 },
+          "7": { "curiosity": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "hope"
-        ],
-        "scaleType": "likert-5",
-        "reverseScored": false
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q7",
+      "purpose": "discovery",
+      "content": {
+        "content": "I treat all people fairly regardless of who they are.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "fairness": 1 },
+          "2": { "fairness": 2 },
+          "3": { "fairness": 3 },
+          "4": { "fairness": 4 },
+          "5": { "fairness": 5 },
+          "6": { "fairness": 6 },
+          "7": { "fairness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q8",
+      "purpose": "discovery",
+      "content": {
+        "content": "I believe everyone deserves equal opportunity.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "fairness": 1 },
+          "2": { "fairness": 2 },
+          "3": { "fairness": 3 },
+          "4": { "fairness": 4 },
+          "5": { "fairness": 5 },
+          "6": { "fairness": 6 },
+          "7": { "fairness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q9",
+      "purpose": "discovery",
+      "content": {
+        "content": "Justice and equal treatment are very important to me.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "fairness": 1 },
+          "2": { "fairness": 2 },
+          "3": { "fairness": 3 },
+          "4": { "fairness": 4 },
+          "5": { "fairness": 5 },
+          "6": { "fairness": 6 },
+          "7": { "fairness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q10",
+      "purpose": "discovery",
+      "content": {
+        "content": "I go out of my way to help others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "kindness": 1 },
+          "2": { "kindness": 2 },
+          "3": { "kindness": 3 },
+          "4": { "kindness": 4 },
+          "5": { "kindness": 5 },
+          "6": { "kindness": 6 },
+          "7": { "kindness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q11",
+      "purpose": "discovery",
+      "content": {
+        "content": "I enjoy doing favors for people.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "kindness": 1 },
+          "2": { "kindness": 2 },
+          "3": { "kindness": 3 },
+          "4": { "kindness": 4 },
+          "5": { "kindness": 5 },
+          "6": { "kindness": 6 },
+          "7": { "kindness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q12",
+      "purpose": "discovery",
+      "content": {
+        "content": "I find it easy to show compassion to others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "kindness": 1 },
+          "2": { "kindness": 2 },
+          "3": { "kindness": 3 },
+          "4": { "kindness": 4 },
+          "5": { "kindness": 5 },
+          "6": { "kindness": 6 },
+          "7": { "kindness": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q13",
+      "purpose": "discovery",
+      "content": {
+        "content": "I finish what I start, even when it gets difficult.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "perseverance": 1 },
+          "2": { "perseverance": 2 },
+          "3": { "perseverance": 3 },
+          "4": { "perseverance": 4 },
+          "5": { "perseverance": 5 },
+          "6": { "perseverance": 6 },
+          "7": { "perseverance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q14",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am a hard worker who never gives up.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "perseverance": 1 },
+          "2": { "perseverance": 2 },
+          "3": { "perseverance": 3 },
+          "4": { "perseverance": 4 },
+          "5": { "perseverance": 5 },
+          "6": { "perseverance": 6 },
+          "7": { "perseverance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q15",
+      "purpose": "discovery",
+      "content": {
+        "content": "I persist through setbacks and challenges.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "perseverance": 1 },
+          "2": { "perseverance": 2 },
+          "3": { "perseverance": 3 },
+          "4": { "perseverance": 4 },
+          "5": { "perseverance": 5 },
+          "6": { "perseverance": 6 },
+          "7": { "perseverance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q16",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am optimistic about the future.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "hope": 1 },
+          "2": { "hope": 2 },
+          "3": { "hope": 3 },
+          "4": { "hope": 4 },
+          "5": { "hope": 5 },
+          "6": { "hope": 6 },
+          "7": { "hope": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q17",
+      "purpose": "discovery",
+      "content": {
+        "content": "I believe good things will happen.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "hope": 1 },
+          "2": { "hope": 2 },
+          "3": { "hope": 3 },
+          "4": { "hope": 4 },
+          "5": { "hope": 5 },
+          "6": { "hope": 6 },
+          "7": { "hope": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
+      }
+    },
+    {
+      "id": "str-q18",
+      "purpose": "discovery",
+      "content": {
+        "content": "Even in difficult times, I expect things to improve.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Like Me At All",
+              "maxLabel": "Very Much Like Me"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "hope": 1 },
+          "2": { "hope": 2 },
+          "3": { "hope": 3 },
+          "4": { "hope": 4 },
+          "5": { "hope": 5 },
+          "6": { "hope": 6 },
+          "7": { "hope": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-strengths-finder",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "strengths", "character"],
+        "instrumentId": "strengths-finder-discovery"
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
+  "contentFormat": "sophia",
   "tags": [
     "assessment",
+    "discovery",
     "strengths",
     "character",
     "self-knowledge"
   ],
-  "sourcePath": "generated/assessment-strengths-finder.json",
   "relatedNodeIds": [
     "know-thyself-path"
   ],
   "metadata": {
-    "instrumentType": "discovery",
+    "assessmentType": "discovery",
     "domain": "strengths",
-    "estimatedTime": "20-30 minutes",
+    "estimatedTime": "12-15 minutes",
     "attestationId": "strengths-aware",
+    "instrumentId": "strengths-finder-discovery",
+    "questionCount": 18,
     "validation": {
       "inspired_by": "VIA Character Strengths Survey",
       "reliability": "Adapted for educational purposes"
     },
-    "sourceFormat": "assessment-json",
-    "migratedAt": "2025-12-26T05:45:22.690Z",
-    "questionCount": 6,
     "interpretation": {
       "method": "ranking",
       "dimensions": [
@@ -368,8 +793,9 @@
         "perseverance",
         "hope"
       ]
-    }
+    },
+    "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479947",
-  "updatedAt": "2025-11-28T00:09:03.479948"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }

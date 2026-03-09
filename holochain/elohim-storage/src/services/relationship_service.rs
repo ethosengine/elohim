@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::db::{relationships, content, ContentDb};
+use crate::db::{content, relationships, ContentDb};
 use crate::error::StorageError;
 
 use super::events::{EventBus, StorageEvent};
@@ -28,12 +28,17 @@ impl RelationshipService {
 
     /// Get relationship by ID
     pub fn get(&self, id: &str) -> Result<Option<relationships::RelationshipRow>, StorageError> {
-        self.content_db.with_conn(|conn| relationships::get_relationship(conn, id))
+        self.content_db
+            .with_conn(|conn| relationships::get_relationship(conn, id))
     }
 
     /// List relationships with filtering
-    pub fn list(&self, query: &relationships::RelationshipQuery) -> Result<Vec<relationships::RelationshipRow>, StorageError> {
-        self.content_db.with_conn(|conn| relationships::list_relationships(conn, query))
+    pub fn list(
+        &self,
+        query: &relationships::RelationshipQuery,
+    ) -> Result<Vec<relationships::RelationshipRow>, StorageError> {
+        self.content_db
+            .with_conn(|conn| relationships::list_relationships(conn, query))
     }
 
     /// Get relationships for a content item
@@ -99,23 +104,23 @@ impl RelationshipService {
         // Check for self-referential relationship
         if input.source_id == input.target_id {
             return Err(StorageError::InvalidInput(
-                "Cannot create relationship from content to itself".into()
+                "Cannot create relationship from content to itself".into(),
             ));
         }
 
         // Check for cycles if this is a hierarchical relationship
-        if self.is_hierarchical(&input.relationship_type) {
-            if self.would_create_cycle(&input.source_id, &input.target_id)? {
-                return Err(StorageError::InvalidInput(
-                    "This relationship would create a cycle in the content graph".into()
-                ));
-            }
+        if self.is_hierarchical(&input.relationship_type)
+            && self.would_create_cycle(&input.source_id, &input.target_id)?
+        {
+            return Err(StorageError::InvalidInput(
+                "This relationship would create a cycle in the content graph".into(),
+            ));
         }
 
         // Create relationship
-        let result = self.content_db.with_conn_mut(|conn| {
-            relationships::create_relationship(conn, input.clone())
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| relationships::create_relationship(conn, input.clone()))?;
 
         // Emit event
         self.events.emit(StorageEvent::RelationshipCreated {
@@ -141,9 +146,9 @@ impl RelationshipService {
         }
 
         // Perform bulk create
-        let result = self.content_db.with_conn_mut(|conn| {
-            relationships::bulk_create_relationships(conn, inputs)
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| relationships::bulk_create_relationships(conn, inputs))?;
 
         // Emit event
         if result.created > 0 {
@@ -157,12 +162,13 @@ impl RelationshipService {
 
     /// Delete a relationship by ID
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let deleted = self.content_db.with_conn_mut(|conn| {
-            relationships::delete_relationship(conn, id)
-        })?;
+        let deleted = self
+            .content_db
+            .with_conn_mut(|conn| relationships::delete_relationship(conn, id))?;
 
         if deleted {
-            self.events.emit(StorageEvent::RelationshipDeleted { id: id.to_string() });
+            self.events
+                .emit(StorageEvent::RelationshipDeleted { id: id.to_string() });
         }
 
         Ok(deleted)
@@ -170,9 +176,8 @@ impl RelationshipService {
 
     /// Delete all relationships for a content item
     pub fn delete_for_content(&self, content_id: &str) -> Result<usize, StorageError> {
-        self.content_db.with_conn_mut(|conn| {
-            relationships::delete_relationships_for_content(conn, content_id)
-        })
+        self.content_db
+            .with_conn_mut(|conn| relationships::delete_relationships_for_content(conn, content_id))
     }
 
     // =========================================================================
@@ -180,7 +185,10 @@ impl RelationshipService {
     // =========================================================================
 
     /// Validate relationship input
-    fn validate_relationship(&self, input: &relationships::CreateRelationshipInput) -> Result<(), StorageError> {
+    fn validate_relationship(
+        &self,
+        input: &relationships::CreateRelationshipInput,
+    ) -> Result<(), StorageError> {
         if input.source_id.is_empty() {
             return Err(StorageError::InvalidInput("source_id is required".into()));
         }
@@ -190,15 +198,29 @@ impl RelationshipService {
         }
 
         if input.relationship_type.is_empty() {
-            return Err(StorageError::InvalidInput("relationship_type is required".into()));
+            return Err(StorageError::InvalidInput(
+                "relationship_type is required".into(),
+            ));
         }
 
         // Validate relationship_type
         let valid_types = [
-            "RELATES_TO", "CONTAINS", "DEPENDS_ON", "IMPLEMENTS", "REFERENCES",
-            "PREREQUISITE", "FOLLOWUP", "SIBLING", "PARENT", "CHILD",
-            "SIMILAR_TO", "CONTRASTS_WITH", "ELABORATES", "SUMMARIZES",
-            "EXAMPLE_OF", "DEFINITION_OF",
+            "RELATES_TO",
+            "CONTAINS",
+            "DEPENDS_ON",
+            "IMPLEMENTS",
+            "REFERENCES",
+            "PREREQUISITE",
+            "FOLLOWUP",
+            "SIBLING",
+            "PARENT",
+            "CHILD",
+            "SIMILAR_TO",
+            "CONTRASTS_WITH",
+            "ELABORATES",
+            "SUMMARIZES",
+            "EXAMPLE_OF",
+            "DEFINITION_OF",
         ];
         if !valid_types.contains(&input.relationship_type.as_str()) {
             return Err(StorageError::InvalidInput(format!(
@@ -210,7 +232,7 @@ impl RelationshipService {
         // Validate confidence range
         if input.confidence < 0.0 || input.confidence > 1.0 {
             return Err(StorageError::InvalidInput(
-                "confidence must be between 0.0 and 1.0".into()
+                "confidence must be between 0.0 and 1.0".into(),
             ));
         }
 
@@ -237,9 +259,10 @@ impl RelationshipService {
 
     /// Validate that content exists
     fn validate_content_exists(&self, id: &str, field_name: &str) -> Result<(), StorageError> {
-        let exists = self.content_db.with_conn(|conn| {
-            content::get_content(conn, id)
-        })?.is_some();
+        let exists = self
+            .content_db
+            .with_conn(|conn| content::get_content(conn, id))?
+            .is_some();
 
         if !exists {
             return Err(StorageError::InvalidInput(format!(
@@ -253,7 +276,10 @@ impl RelationshipService {
 
     /// Check if a relationship type is hierarchical (could form cycles)
     fn is_hierarchical(&self, rel_type: &str) -> bool {
-        matches!(rel_type, "CONTAINS" | "PARENT" | "CHILD" | "DEPENDS_ON" | "PREREQUISITE")
+        matches!(
+            rel_type,
+            "CONTAINS" | "PARENT" | "CHILD" | "DEPENDS_ON" | "PREREQUISITE"
+        )
     }
 
     /// Check if creating this relationship would create a cycle

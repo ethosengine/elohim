@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ContributorService } from './contributor.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
@@ -5,22 +6,13 @@ import { signal } from '@angular/core';
 
 describe('ContributorService', () => {
   let service: ContributorService;
-  let holochainSpy: jasmine.SpyObj<HolochainClientService>;
+  let holochainSpy: any;
 
   beforeEach(() => {
-    holochainSpy = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['callZome'],
-      {
-        isConnected: signal(true),
-      }
-    );
+    holochainSpy = { callZome: vi.fn(), isConnected: signal(true) };
 
     TestBed.configureTestingModule({
-      providers: [
-        ContributorService,
-        { provide: HolochainClientService, useValue: holochainSpy },
-      ],
+      providers: [ContributorService, { provide: HolochainClientService, useValue: holochainSpy }],
     });
     service = TestBed.inject(ContributorService);
   });
@@ -77,7 +69,7 @@ describe('ContributorService', () => {
     });
 
     it('should cache requests', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       service.getDashboard('contributor-123');
       service.getDashboard('contributor-123');
       // Should only call once due to caching
@@ -92,7 +84,7 @@ describe('ContributorService', () => {
     });
 
     it('should return observable', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.getMyDashboard();
       expect(result).toBeDefined();
       expect(result.subscribe).toBeDefined();
@@ -106,14 +98,14 @@ describe('ContributorService', () => {
     });
 
     it('should return observable', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.getImpact('contributor-123');
       expect(result).toBeDefined();
       expect(result.subscribe).toBeDefined();
     });
 
     it('should accept contributorId parameter', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       expect(() => {
         service.getImpact('contributor-123');
       }).not.toThrow();
@@ -127,7 +119,7 @@ describe('ContributorService', () => {
     });
 
     it('should return observable', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.getContentImpact('contributor-123');
       expect(result).toBeDefined();
       expect(result.subscribe).toBeDefined();
@@ -153,9 +145,7 @@ describe('ContributorService', () => {
     });
 
     it('should cache requests', () => {
-      holochainSpy.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       service.getRecognitionHistory('contributor-123');
       service.getRecognitionHistory('contributor-123');
       // Cache should prevent multiple calls
@@ -183,7 +173,7 @@ describe('ContributorService', () => {
     });
 
     it('should return observable', () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.refreshMyDashboard();
       expect(result).toBeDefined();
       expect(result.subscribe).toBeDefined();
@@ -197,15 +187,15 @@ describe('ContributorService', () => {
     });
 
     it('should return Promise<boolean>', async () => {
-      holochainSpy.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainSpy.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
       const result = service.testAvailability();
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof (result as any).then).toBe('function');
       const isAvailable = await result;
       expect(typeof isAvailable).toBe('boolean');
     });
 
     it('should handle errors gracefully', async () => {
-      holochainSpy.callZome.and.returnValue(Promise.reject(new Error('Connection failed')));
+      holochainSpy.callZome.mockReturnValue(Promise.reject(new Error('Connection failed')));
       const result = await service.testAvailability();
       expect(typeof result).toBe('boolean');
     });

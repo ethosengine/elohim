@@ -12,14 +12,15 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 83.1% (2026-02-05)
+// @coverage: 83.2% (2026-02-24)
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { LearningPath, PathStep } from '../../lamad/models/learning-path.model';
+import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
 import { StorageClientService } from './storage-client.service';
@@ -66,7 +67,7 @@ export interface Relationship {
   relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence: number;
   inferenceSource: string; // explicit, path, tag, semantic
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt?: string;
 }
 
@@ -285,6 +286,7 @@ interface RawPathExtensionData {
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
   private readonly storageClient = inject(StorageClientService);
+  private readonly blobFetcher: IBlobFetcher = inject(BLOB_FETCHER);
   private readonly http = inject(HttpClient);
 
   // In-memory cache for hot paths
@@ -314,7 +316,9 @@ export class ContentService {
         const contentBody = data.contentBody ?? '';
 
         const isBlobReference =
-          contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+          contentBody.startsWith('sha256:') ||
+          contentBody.startsWith('sha256-') ||
+          contentBody.startsWith('bafk');
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
@@ -344,20 +348,28 @@ export class ContentService {
   }
 
   /**
-   * Fetch blob content by CID from storage
+   * Fetch blob content by CID from storage.
+   *
+   * Resolution order:
+   * 1. Helia verified-fetch (CID blobs only, 5s timeout)
+   * 2. Doorway HTTP (`/store/{cid}`)
    */
   private fetchBlobContent(blobCid: string): Observable<string> {
-    // Normalize hash format: storage expects sha256- (hyphen) not sha256: (colon)
-    const normalizedCid = blobCid.replace('sha256:', 'sha256-');
+    // Normalize content address: CIDv1 (bafkrei...) passes through,
+    // legacy formats normalized to sha256-{hex}. Backend handles all formats.
+    const normalizedCid = blobCid.startsWith('bafk')
+      ? blobCid
+      : blobCid.replace('sha256:', 'sha256-');
 
     // Check cache first
     const cached = this.blobCache.get(normalizedCid);
     if (cached) return cached;
 
-    // Use StorageClientService to get the correct blob URL (handles doorway vs direct mode)
-    const blobUrl = this.storageClient.getBlobUrl(normalizedCid);
-
-    const obs = this.http.get(blobUrl, { responseType: 'text' }).pipe(shareReplay(1));
+    // Use blob fetcher (Helia verified-fetch with HTTP fallback, handles CID gating internally)
+    const obs = from(this.blobFetcher.fetchVerified(normalizedCid)).pipe(
+      map(bytes => new TextDecoder().decode(bytes)),
+      shareReplay(1)
+    );
 
     this.blobCache.set(normalizedCid, obs);
     return obs;
@@ -768,25 +780,23 @@ export class ContentService {
   /**
    * Transform a step from snake_case to camelCase
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Bridge type: raw storage steps have extra fields beyond PathStep
-  private transformStep(step: RawStepData): any {
+  private transformStep(step: RawStepData): PathStep {
     return {
-      id: step.id,
-      pathId: step.pathId ?? step.pathId,
+      pathId: step.pathId,
       chapterId: step.chapterId,
-      // Map to both 'title' and 'stepTitle' for compatibility
-      title: step.title ?? '',
       stepTitle: step.title ?? '',
       stepNarrative: step.description ?? '',
-      description: step.description ?? '',
       stepType: step.stepType ?? 'content',
-      resourceId: step.resourceId ?? step.resourceId ?? '',
-      resourceType: step.resourceType ?? step.resourceType ?? 'content',
+      resourceId: step.resourceId ?? '',
       order: step.orderIndex ?? 0,
       orderIndex: step.orderIndex ?? 0,
-      estimatedDuration: step.estimatedDuration ?? step.estimatedDuration,
+      estimatedDuration: step.estimatedDuration,
       metadata: step.metadata,
-    };
+      // Required PathStep fields with safe defaults
+      learningObjectives: [],
+      optional: false,
+      completionCriteria: [],
+    } as PathStep;
   }
 
   /**
@@ -865,9 +875,13 @@ export class ContentService {
       blobHash = value.slice(5);
     }
 
-    // Only convert to blob URL if it looks like a hash (sha256-... or sha256:...)
-    // Other relative paths should pass through unchanged
-    if (!blobHash.startsWith('sha256-') && !blobHash.startsWith('sha256:')) {
+    // Only convert to blob URL if it looks like a content address
+    // (CIDv1 bafk..., sha256-..., or sha256:...). Other relative paths pass through.
+    if (
+      !blobHash.startsWith('sha256-') &&
+      !blobHash.startsWith('sha256:') &&
+      !blobHash.startsWith('bafk')
+    ) {
       return value;
     }
 

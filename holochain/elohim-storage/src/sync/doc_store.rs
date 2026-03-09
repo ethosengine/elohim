@@ -5,8 +5,7 @@
 use automerge::Automerge;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::error::StorageError;
 
@@ -118,7 +117,12 @@ impl DocStore {
     /// Save an Automerge document
     ///
     /// Documents are stored with composite keys: `{app_id}:{doc_id}`
-    pub async fn save(&self, app_id: &str, doc_id: &str, doc: &Automerge) -> Result<(), StorageError> {
+    pub async fn save(
+        &self,
+        app_id: &str,
+        doc_id: &str,
+        doc: &Automerge,
+    ) -> Result<(), StorageError> {
         let data = doc.save();
         let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
         let change_count = doc.get_changes(&[]).len() as u64;
@@ -136,8 +140,8 @@ impl DocStore {
             heads,
         };
 
-        let bytes = rmp_serde::to_vec(&stored)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let bytes =
+            rmp_serde::to_vec(&stored).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         // Composite key: app_id:doc_id
         let storage_key = format!("{}:{}", app_id, doc_id);
@@ -156,7 +160,11 @@ impl DocStore {
     }
 
     /// Get a stored document
-    pub async fn get(&self, app_id: &str, doc_id: &str) -> Result<Option<StoredDocument>, StorageError> {
+    pub async fn get(
+        &self,
+        app_id: &str,
+        doc_id: &str,
+    ) -> Result<Option<StoredDocument>, StorageError> {
         let storage_key = format!("{}:{}", app_id, doc_id);
         match self.docs.get(storage_key.as_bytes()) {
             Ok(Some(bytes)) => {

@@ -12,7 +12,8 @@
 #   elohim-node/             → cargo fmt + clippy + tests
 #   elohim-library/          → tsc type-check + jest tests
 #   genesis/                 → schema validation + tests
-#   orchestrator/            → Jenkinsfile linting (any *Jenkinsfile* change)
+#   genesis/a2o/             → E2E lint + typecheck
+#   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
 # Falls back to inline commands if `just` is not installed.
 # This prevents pushing broken code that wastes CI time.
@@ -21,8 +22,13 @@
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use default --silent
 
+# pnpm (standalone install to PNPM_HOME)
+PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
+[ -d "$PNPM_HOME" ] && export PATH="$PNPM_HOME:$PATH"
+
 # Rustup (cargo fmt, clippy, tests for doorway)
 [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH"
+
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 
@@ -87,6 +93,10 @@ fi
 if echo "$CHANGED" | grep -q "Jenkinsfile"; then
   PROJECTS="$PROJECTS orchestrator"
 fi
+# E2E framework changes trigger TypeScript linting
+if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
+  PROJECTS="$PROJECTS genesis-a2o"
+fi
 
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
@@ -116,8 +126,8 @@ run_gate() {
     echo "[$PROJECT_NAME] just not found, using fallback..."
     case "$PROJECT_NAME" in
       elohim-app)
-        npx ng build --configuration=development 2>&1 && \
-        npx ng test --watch=false --browsers=ChromeHeadlessCI 2>&1
+        pnpm exec ng build --configuration=development 2>&1 && \
+        pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
         ;;
       doorway|elohim-node)
@@ -127,8 +137,9 @@ run_gate() {
         rc=$?
         ;;
       doorway-app)
-        npx eslint src --ext .ts,.html 2>&1 && \
-        npx ng build --configuration=development 2>&1
+        pnpm exec eslint src --ext .ts,.html 2>&1 && \
+        pnpm exec ng build --configuration=development 2>&1 && \
+        pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
         ;;
       sophia)
@@ -142,17 +153,21 @@ run_gate() {
         rc=$?
         ;;
       elohim-library)
-        npx eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
-        (cd projects/elohim-service && npx tsc --noEmit) 2>&1 && \
-        npx jest --config projects/elohim-service/jest.config.js --ci 2>&1
+        pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
+        (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
+        (cd projects/elohim-service && pnpm exec jest --ci) 2>&1
         rc=$?
         ;;
       genesis)
-        npm run validate 2>&1 && npx vitest run 2>&1
+        pnpm install --frozen-lockfile --ignore-scripts 2>&1 && pnpm run validate 2>&1 && pnpm exec vitest run 2>&1
         rc=$?
         ;;
       orchestrator)
-        npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
+        pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
+        rc=$?
+        ;;
+      genesis-a2o)
+        pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
         ;;
       *)
@@ -165,6 +180,34 @@ run_gate() {
   cd "$OLDPWD" || true
   return $rc
 }
+
+# ── Resource Guard ────────────────────────────────────────────────
+#
+# Pause rust-analyzer during gate runs to free ~8.8GB of active RAM.
+# SIGSTOP freezes the process (no new allocations, OS can reclaim pages).
+# SIGCONT resumes on any exit — normal, error, or signal.
+
+RA_PIDS=""
+if command -v pgrep >/dev/null 2>&1; then
+  RA_PIDS=$(pgrep -f rust-analyzer 2>/dev/null || true)
+fi
+
+resume_rust_analyzer() {
+  if [ -n "$RA_PIDS" ]; then
+    for pid in $RA_PIDS; do
+      kill -CONT "$pid" 2>/dev/null || true
+    done
+  fi
+}
+
+if [ -n "$RA_PIDS" ]; then
+  RA_COUNT=$(echo "$RA_PIDS" | wc -l | tr -d ' ')
+  echo "  Pausing $RA_COUNT rust-analyzer process(es) to free RAM..."
+  for pid in $RA_PIDS; do
+    kill -STOP "$pid" 2>/dev/null || true
+  done
+  trap resume_rust_analyzer EXIT INT TERM HUP
+fi
 
 # ── Run Gates ─────────────────────────────────────────────────────
 
@@ -189,9 +232,11 @@ for PROJECT in $PROJECTS; do
 
   # Map project name to directory
   case "$PROJECT" in
-    elohim-storage)  PROJECT_DIR="holochain/elohim-storage" ;;
-    genesis)         PROJECT_DIR="genesis/seeder" ;;
-    *)               PROJECT_DIR="$PROJECT" ;;
+    elohim-storage)   PROJECT_DIR="holochain/elohim-storage" ;;
+    genesis)          PROJECT_DIR="genesis/seeder" ;;
+    genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
+    orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
+    *)                PROJECT_DIR="$PROJECT" ;;
   esac
 
   run_gate "$PROJECT" "$PROJECT_DIR"

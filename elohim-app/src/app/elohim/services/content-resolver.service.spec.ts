@@ -21,12 +21,13 @@ import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { HolochainContentService } from './holochain-content.service';
 import { createConnectionStrategy } from '@elohim/service/connection';
+import { vi, Mock } from 'vitest';
 
 describe('ContentResolverService', () => {
   let service: ContentResolverService;
-  let idbCacheMock: jasmine.SpyObj<IndexedDBCacheService>;
-  let projectionMock: jasmine.SpyObj<ProjectionAPIService>;
-  let holochainMock: jasmine.SpyObj<HolochainContentService>;
+  let idbCacheMock: any;
+  let projectionMock: any;
+  let holochainMock: any;
 
   const mockContent = {
     id: 'test-content',
@@ -60,52 +61,52 @@ describe('ContentResolverService', () => {
   };
 
   beforeEach(() => {
-    const idbSpy = jasmine.createSpyObj('IndexedDBCacheService', [
-      'init',
-      'isAvailable',
-      'getStats',
-      'getContent',
-      'setContent',
-      'getPath',
-      'setPath',
-      'getContentBatch',
-      'setContentBatch',
-      'removeContent',
-    ]);
-    const projectionSpy = jasmine.createSpyObj(
-      'ProjectionAPIService',
-      ['getContent', 'batchGetContent', 'getPath', 'isHealthy'],
-      {
-        enabled: true, // Property mock - projection API is enabled by default
-      }
-    );
-    const holochainSpy = jasmine.createSpyObj('HolochainContentService', [
-      'isAvailable',
-      'getContent',
-      'getPathWithSteps',
-    ]);
+    const idbSpy = {
+      init: vi.fn(),
+      isAvailable: vi.fn(),
+      getStats: vi.fn(),
+      getContent: vi.fn(),
+      setContent: vi.fn(),
+      getPath: vi.fn(),
+      setPath: vi.fn(),
+      getContentBatch: vi.fn(),
+      setContentBatch: vi.fn(),
+      removeContent: vi.fn(),
+    };
+    const projectionSpy = {
+      getContentNode: vi.fn(),
+      batchGetContent: vi.fn(),
+      getPathNode: vi.fn(),
+      isHealthy: vi.fn(),
+      enabled: true,
+    };
+    const holochainSpy = {
+      isAvailable: vi.fn(),
+      getContent: vi.fn(),
+      getPathWithSteps: vi.fn(),
+    };
 
-    idbSpy.init.and.returnValue(Promise.resolve(true));
-    idbSpy.isAvailable.and.returnValue(false);
-    idbSpy.getContent.and.returnValue(Promise.resolve(null));
-    idbSpy.setContent.and.returnValue(Promise.resolve());
-    idbSpy.getPath.and.returnValue(Promise.resolve(null));
-    idbSpy.setPath.and.returnValue(Promise.resolve());
-    idbSpy.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-    idbSpy.setContentBatch.and.returnValue(Promise.resolve());
-    idbSpy.removeContent.and.returnValue(Promise.resolve());
-    idbSpy.getStats.and.returnValue(
+    idbSpy.init.mockReturnValue(Promise.resolve(true));
+    idbSpy.isAvailable.mockReturnValue(false);
+    idbSpy.getContent.mockReturnValue(Promise.resolve(null));
+    idbSpy.setContent.mockReturnValue(Promise.resolve());
+    idbSpy.getPath.mockReturnValue(Promise.resolve(null));
+    idbSpy.setPath.mockReturnValue(Promise.resolve());
+    idbSpy.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+    idbSpy.setContentBatch.mockReturnValue(Promise.resolve());
+    idbSpy.removeContent.mockReturnValue(Promise.resolve());
+    idbSpy.getStats.mockReturnValue(
       Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: true })
     );
 
-    projectionSpy.getContent.and.returnValue(of(null));
-    projectionSpy.batchGetContent.and.returnValue(of(new Map()));
-    projectionSpy.getPath.and.returnValue(of(null));
-    projectionSpy.isHealthy.and.returnValue(Promise.resolve(true));
+    projectionSpy.getContentNode.mockReturnValue(of(null));
+    projectionSpy.batchGetContent.mockReturnValue(of(new Map()));
+    projectionSpy.getPathNode.mockReturnValue(of(null));
+    projectionSpy.isHealthy.mockReturnValue(Promise.resolve(true));
 
-    holochainSpy.isAvailable.and.returnValue(true);
-    holochainSpy.getContent.and.returnValue(of(null));
-    holochainSpy.getPathWithSteps.and.returnValue(Promise.resolve(null));
+    holochainSpy.isAvailable.mockReturnValue(true);
+    holochainSpy.getContent.mockReturnValue(of(null));
+    holochainSpy.getPathWithSteps.mockReturnValue(Promise.resolve(null));
 
     TestBed.configureTestingModule({
       providers: [
@@ -117,11 +118,9 @@ describe('ContentResolverService', () => {
     });
 
     service = TestBed.inject(ContentResolverService);
-    idbCacheMock = TestBed.inject(IndexedDBCacheService) as jasmine.SpyObj<IndexedDBCacheService>;
-    projectionMock = TestBed.inject(ProjectionAPIService) as jasmine.SpyObj<ProjectionAPIService>;
-    holochainMock = TestBed.inject(
-      HolochainContentService
-    ) as jasmine.SpyObj<HolochainContentService>;
+    idbCacheMock = idbSpy;
+    projectionMock = projectionSpy;
+    holochainMock = holochainSpy;
   });
 
   it('should be created', () => {
@@ -153,7 +152,7 @@ describe('ContentResolverService', () => {
     });
 
     it('should handle initialization errors gracefully', async () => {
-      idbCacheMock.init.and.returnValue(Promise.reject(new Error('IndexedDB unavailable')));
+      idbCacheMock.init.mockReturnValue(Promise.reject(new Error('IndexedDB unavailable')));
 
       const result = await service.initialize();
 
@@ -162,12 +161,13 @@ describe('ContentResolverService', () => {
       expect(service.isReady).toBe(true);
     });
 
-    it('should expose state observable', done => {
-      service.state$.subscribe(state => {
-        expect(typeof state).toBe('string');
-        done();
-      });
-    });
+    it('should expose state observable', () =>
+      new Promise<void>(done => {
+        service.state$.subscribe(state => {
+          expect(typeof state).toBe('string');
+          done();
+        });
+      }));
 
     it('should expose current state synchronously', () => {
       expect(typeof service.state).toBe('string');
@@ -250,51 +250,51 @@ describe('ContentResolverService', () => {
     });
 
     it('should resolve from IndexedDB (Tier 1) first', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
       const result = await service.resolveContent('test-content');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
       expect(idbCacheMock.getContent).toHaveBeenCalledWith('test-content');
-      expect(projectionMock.getContent).not.toHaveBeenCalled();
+      expect(projectionMock.getContentNode).not.toHaveBeenCalled();
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should fall back to Projection API (Tier 2) when IndexedDB misses', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
       expect(idbCacheMock.getContent).toHaveBeenCalled();
-      expect(projectionMock.getContent).toHaveBeenCalledWith('test-content');
+      expect(projectionMock.getContentNode).toHaveBeenCalledWith('test-content');
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should fall back to Holochain (Tier 3) when Projection API misses', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(null));
-      holochainMock.getContent.and.returnValue(of(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
+      holochainMock.getContent.mockReturnValue(of(mockContent));
       // Mark Holochain as available so it's consulted
-      holochainMock.isAvailable.and.returnValue(true);
+      holochainMock.isAvailable.mockReturnValue(true);
 
       const result = await service.resolveContent('test-content');
 
       // Service skips conductor for content (line 641-643), returns null
       expect(result).toBeNull();
       expect(idbCacheMock.getContent).toHaveBeenCalled();
-      expect(projectionMock.getContent).toHaveBeenCalled();
+      expect(projectionMock.getContentNode).toHaveBeenCalled();
       // Conductor is skipped for content, Holochain not called
       expect(holochainMock.getContent).not.toHaveBeenCalled();
     });
 
     it('should return null when all tiers miss', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(null));
-      holochainMock.getContent.and.returnValue(of(null));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
+      holochainMock.getContent.mockReturnValue(of(null));
 
       const result = await service.resolveContent('missing-content');
 
@@ -302,8 +302,8 @@ describe('ContentResolverService', () => {
     });
 
     it('should cache result from Projection API to IndexedDB', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
@@ -314,10 +314,10 @@ describe('ContentResolverService', () => {
     });
 
     it('should cache result from Holochain to IndexedDB', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(null));
-      holochainMock.getContent.and.returnValue(of(mockContent));
-      holochainMock.isAvailable.and.returnValue(true);
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
+      holochainMock.getContent.mockReturnValue(of(mockContent));
+      holochainMock.isAvailable.mockReturnValue(true);
 
       const result = await service.resolveContent('test-content');
 
@@ -338,7 +338,7 @@ describe('ContentResolverService', () => {
     });
 
     it('should resolve path from IndexedDB first', async () => {
-      idbCacheMock.getPath.and.returnValue(Promise.resolve(mockPath));
+      idbCacheMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
       const result = await service.resolvePath('test-path');
 
@@ -348,22 +348,22 @@ describe('ContentResolverService', () => {
     });
 
     it('should fall back to Projection API for paths', async () => {
-      idbCacheMock.getPath.and.returnValue(Promise.resolve(null));
-      projectionMock.getPath.and.returnValue(of(mockPath));
+      idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
+      projectionMock.getPathNode.mockReturnValue(of(mockPath));
 
       const result = await service.resolvePath('test-path');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockPath);
-      expect(projectionMock.getPath).toHaveBeenCalledWith('test-path');
+      expect(projectionMock.getPathNode).toHaveBeenCalledWith('test-path');
     });
 
     it('should fall back to Holochain for paths', async () => {
-      idbCacheMock.getPath.and.returnValue(Promise.resolve(null));
-      projectionMock.getPath.and.returnValue(of(null));
+      idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
+      projectionMock.getPathNode.mockReturnValue(of(null));
       const pathWithSteps: any = mockPath;
-      holochainMock.getPathWithSteps.and.returnValue(Promise.resolve(pathWithSteps));
-      holochainMock.isAvailable.and.returnValue(true);
+      holochainMock.getPathWithSteps.mockReturnValue(Promise.resolve(pathWithSteps));
+      holochainMock.isAvailable.mockReturnValue(true);
 
       const result = await service.resolvePath('test-path');
 
@@ -373,8 +373,8 @@ describe('ContentResolverService', () => {
     });
 
     it('should cache path results', async () => {
-      idbCacheMock.getPath.and.returnValue(Promise.resolve(null));
-      projectionMock.getPath.and.returnValue(of(mockPath));
+      idbCacheMock.getPath.mockReturnValue(Promise.resolve(null));
+      projectionMock.getPathNode.mockReturnValue(of(mockPath));
 
       const result = await service.resolvePath('test-path');
 
@@ -405,8 +405,8 @@ describe('ContentResolverService', () => {
         ['content-3', content3],
       ]);
 
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(of(contentMap));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+      projectionMock.batchGetContent.mockReturnValue(of(contentMap));
 
       const result = await service.batchResolveContent(['content-1', 'content-2', 'content-3']);
 
@@ -420,7 +420,7 @@ describe('ContentResolverService', () => {
       const cachedContent = { ...mockContent, id: 'content-1', title: 'Cached' };
       const cachedMap = new Map([['content-1', cachedContent]]);
 
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(cachedMap));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(cachedMap));
 
       const result = await service.batchResolveContent(['content-1']);
 
@@ -438,8 +438,8 @@ describe('ContentResolverService', () => {
         ['content-3', { ...mockContent, id: 'content-3' }],
       ]);
 
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(cachedMap));
-      projectionMock.batchGetContent.and.returnValue(of(fetchedMap));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(cachedMap));
+      projectionMock.batchGetContent.mockReturnValue(of(fetchedMap));
 
       const result = await service.batchResolveContent(['content-1', 'content-2', 'content-3']);
 
@@ -460,8 +460,8 @@ describe('ContentResolverService', () => {
         ['content-2', { ...mockContent, id: 'content-2' }],
       ]);
 
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(of(fetchedMap));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+      projectionMock.batchGetContent.mockReturnValue(of(fetchedMap));
 
       const result = await service.batchResolveContent(['content-1', 'content-2']);
 
@@ -494,7 +494,7 @@ describe('ContentResolverService', () => {
 
     it('should handle cache failures gracefully', async () => {
       await service.initialize();
-      idbCacheMock.setContent.and.returnValue(Promise.reject(new Error('Cache full')));
+      idbCacheMock.setContent.mockReturnValue(Promise.reject(new Error('Cache full')));
 
       // Should not throw
       await service.cacheContent(mockContent);
@@ -514,21 +514,21 @@ describe('ContentResolverService', () => {
     });
 
     it('should handle IndexedDB errors and fall back', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.reject(new Error('IndexedDB unavailable')));
-      projectionMock.getContent.and.returnValue(of(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.reject(new Error('IndexedDB unavailable')));
+      projectionMock.getContentNode.mockReturnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
 
       expect(result).not.toBeNull();
       expect(result!.data).toEqual(mockContent);
-      expect(projectionMock.getContent).toHaveBeenCalled();
+      expect(projectionMock.getContentNode).toHaveBeenCalled();
     });
 
     it('should handle Projection API errors and fall back', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(throwError(() => new Error('API error')));
-      holochainMock.getContent.and.returnValue(of(mockContent));
-      holochainMock.isAvailable.and.returnValue(true);
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(throwError(() => new Error('API error')));
+      holochainMock.getContent.mockReturnValue(of(mockContent));
+      holochainMock.isAvailable.mockReturnValue(true);
 
       const result = await service.resolveContent('test-content');
 
@@ -538,9 +538,9 @@ describe('ContentResolverService', () => {
     });
 
     it('should handle Holochain errors gracefully', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(null));
-      projectionMock.getContent.and.returnValue(of(null));
-      holochainMock.getContent.and.returnValue(throwError(() => new Error('Holochain error')));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(null));
+      projectionMock.getContentNode.mockReturnValue(of(null));
+      holochainMock.getContent.mockReturnValue(throwError(() => new Error('Holochain error')));
 
       const result = await service.resolveContent('test-content');
 
@@ -548,8 +548,8 @@ describe('ContentResolverService', () => {
     });
 
     it('should handle partial batch failures', async () => {
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(throwError(() => new Error('Batch error')));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+      projectionMock.batchGetContent.mockReturnValue(throwError(() => new Error('Batch error')));
 
       // Wrap in try-catch since error may propagate
       try {
@@ -600,7 +600,7 @@ describe('ContentResolverService', () => {
     });
 
     it('should resolve content via generic method', async () => {
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
       const result = service.resolve('content', 'test-content');
 
@@ -608,7 +608,7 @@ describe('ContentResolverService', () => {
     });
 
     it('should resolve path via generic method', async () => {
-      idbCacheMock.getPath.and.returnValue(Promise.resolve(mockPath));
+      idbCacheMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
       const result = service.resolve('path', 'test-path');
 
@@ -639,12 +639,13 @@ describe('ContentResolverService', () => {
       expect(service.isReady).toBe(true);
     });
 
-    it('should expose state observable', done => {
-      service.state$.subscribe(state => {
-        expect(state).toBeDefined();
-        done();
-      });
-    });
+    it('should expose state observable', () =>
+      new Promise<void>(done => {
+        service.state$.subscribe(state => {
+          expect(state).toBeDefined();
+          done();
+        });
+      }));
 
     it('should expose current state', () => {
       const state = service.state;
@@ -678,7 +679,7 @@ describe('ContentResolverService', () => {
       service.registerAllStandardSources();
       const longId = 'a'.repeat(1000);
 
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
       const result = await service.resolveContent(longId);
 
@@ -690,7 +691,7 @@ describe('ContentResolverService', () => {
       await service.initialize();
       const specialId = 'test@#$%^&*()_+-=[]{}|;:,.<>?/~`';
 
-      idbCacheMock.getContent.and.returnValue(Promise.resolve(mockContent));
+      idbCacheMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
       const result = await service.resolveContent(specialId);
 
@@ -701,8 +702,8 @@ describe('ContentResolverService', () => {
       await service.initialize();
 
       const ids = Array.from({ length: 1000 }, (_, i) => `content-${i}`);
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(of(new Map()));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+      projectionMock.batchGetContent.mockReturnValue(of(new Map()));
 
       const result = await service.batchResolveContent(ids);
 
@@ -713,8 +714,8 @@ describe('ContentResolverService', () => {
       await service.initialize();
 
       const ids = ['content-1', 'content-1', 'content-2', 'content-2'];
-      idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(of(new Map([['content-1', mockContent]])));
+      idbCacheMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+      projectionMock.batchGetContent.mockReturnValue(of(new Map([['content-1', mockContent]])));
 
       const result = await service.batchResolveContent(ids);
 

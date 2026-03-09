@@ -32,23 +32,23 @@ describe('SophiaFormatPlugin', () => {
 
   describe('Capabilities', () => {
     it('should support import', () => {
-      expect(plugin.canImport).toBeTrue();
+      expect(plugin.canImport).toBe(true);
     });
 
     it('should support export', () => {
-      expect(plugin.canExport).toBeTrue();
+      expect(plugin.canExport).toBe(true);
     });
 
     it('should support validation', () => {
-      expect(plugin.canValidate).toBeTrue();
+      expect(plugin.canValidate).toBe(true);
     });
 
     it('should support rendering', () => {
-      expect(plugin.canRender).toBeTrue();
+      expect(plugin.canRender).toBe(true);
     });
 
     it('should not support editing', () => {
-      expect(plugin.canEdit).toBeFalse();
+      expect(plugin.canEdit).toBe(false);
     });
   });
 
@@ -76,7 +76,7 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(validMoment);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
 
@@ -90,7 +90,7 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(validPerseus);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
 
@@ -108,7 +108,7 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(momentArray);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
     });
 
     it('should reject invalid structure', async () => {
@@ -118,14 +118,14 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(invalid);
 
-      expect(result.valid).toBeFalse();
+      expect(result.valid).toBe(false);
       expect(result.errors[0].code).toBe('INVALID_STRUCTURE');
     });
 
     it('should reject malformed JSON', async () => {
       const result = await plugin.validate('not valid json');
 
-      expect(result.valid).toBeFalse();
+      expect(result.valid).toBe(false);
       expect(result.errors[0].code).toBe('PARSE_ERROR');
     });
 
@@ -140,13 +140,13 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(file);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
     });
 
     it('should reject empty content', async () => {
       const result = await plugin.validate(JSON.stringify(null));
 
-      expect(result.valid).toBeFalse();
+      expect(result.valid).toBe(false);
     });
 
     it('should reject content with missing widgets', async () => {
@@ -157,7 +157,7 @@ describe('SophiaFormatPlugin', () => {
 
       const result = await plugin.validate(invalid);
 
-      expect(result.valid).toBeFalse();
+      expect(result.valid).toBe(false);
     });
   });
 
@@ -224,11 +224,11 @@ describe('SophiaFormatPlugin', () => {
     });
 
     it('should throw on invalid content', async () => {
-      await expectAsync(plugin.import('not json')).toBeRejectedWithError();
+      await await expect(plugin.import('not json')).rejects.toThrow();
     });
 
     it('should throw on invalid structure', async () => {
-      await expectAsync(plugin.import(JSON.stringify({ invalid: true }))).toBeRejectedWithError(
+      await await expect(plugin.import(JSON.stringify({ invalid: true }))).rejects.toThrow(
         'Invalid Sophia assessment format'
       );
     });
@@ -275,7 +275,7 @@ describe('SophiaFormatPlugin', () => {
       expect(metadata.displayName).toBe('Sophia Assessment');
       expect(metadata.icon).toBe('quiz');
       expect(metadata.category).toBe('data');
-      expect(metadata.supportsRoundTrip).toBeTrue();
+      expect(metadata.supportsRoundTrip).toBe(true);
       expect(metadata.priority).toBe(10);
     });
   });
@@ -285,7 +285,7 @@ describe('SophiaFormatPlugin', () => {
       const config = plugin.getEditorConfig();
 
       expect(config.editorMode).toBe('code');
-      expect(config.supportsLivePreview).toBeTrue();
+      expect(config.supportsLivePreview).toBe(true);
     });
   });
 

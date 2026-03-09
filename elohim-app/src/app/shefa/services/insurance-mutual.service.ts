@@ -11,17 +11,16 @@
  * All operations create immutable EconomicEvent entries
  * for full audit trail and transparency.
  *
- * Integration: Works with EconomicService for event creation,
+ * Integration: Works with ECONOMIC_EVENT_FACTORY for event creation,
  * relies on Observer protocol for risk assessment data.
  */
 
 /* eslint-disable @typescript-eslint/require-await -- Phase 1: most methods are TODO stubs returning Promise<T> without async work */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 33.6% (2026-02-05)
+// @coverage: 33.6% (2026-02-24)
 
-import { firstValueFrom } from 'rxjs';
 
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import {
@@ -39,7 +38,7 @@ import {
   AdjustmentReasoning,
 } from '@app/shefa/models/insurance-mutual.model';
 
-import { EconomicService } from './economic.service';
+import { ECONOMIC_EVENT_FACTORY, type IEconomicEventFactory } from '../interfaces';
 
 /**
  * Reasons for flagging a claim for governance review.
@@ -51,11 +50,28 @@ type GovernanceReviewReason =
   | 'pattern-concern'
   | 'other';
 
+/** Risk tier values used in member risk profiles and search filters. */
+type RiskTier = 'low' | 'standard' | 'high' | 'uninsurable';
+
+/** Risk trend direction values used in member risk profiles and search filters. */
+type RiskTrendDirection = 'improving' | 'stable' | 'declining';
+
+// ============================================================================
+// STRING CONSTANTS
+// ============================================================================
+
+const ELOHIM_MUTUAL = 'elohim-mutual';
+const UNIT_TOKEN = 'unit-token';
+const NOT_YET_IMPLEMENTED = 'Not yet implemented';
+const EVENT_TYPE_PREVENTIVE_CARE = 'preventive-care-completed';
+const EVENT_TYPE_COMMUNITY_SUPPORT = 'community-support-provided';
+const EVENT_TYPE_CLAIM_FILED = 'claim-filed';
+
 @Injectable({
   providedIn: 'root',
 })
 export class InsuranceMutualService {
-  constructor(private readonly economicService: EconomicService) {}
+  private readonly economicService = inject(ECONOMIC_EVENT_FACTORY);
 
   // ============================================================================
   // MEMBER ENROLLMENT & RISK ASSESSMENT
@@ -161,18 +177,16 @@ export class InsuranceMutualService {
     };
 
     // Step 5: Create immutable enrollment event
-    const enrollmentEvent = await firstValueFrom(
-      this.economicService.createEvent({
+    const enrollmentEvent = await this.economicService.createEconomicEvent({
         action: 'deliver-service',
         providerId: memberId,
-        receiverId: 'elohim-mutual',
+        receiverId: ELOHIM_MUTUAL,
         resourceClassifiedAs: ['stewardship', 'membership'],
         note: `Member ${memberId} enrolled in ${qahalId} mutual. Risk tier: ${
           riskProfile.riskTier
         }. Coverage level: community.`,
         lamadEventType: 'coverage-decision',
-      })
-    );
+      });
 
     // Step 6: Link policy and risk profile to event
     riskProfile.assessmentEventIds.push(enrollmentEvent.id);
@@ -210,9 +224,9 @@ export class InsuranceMutualService {
     // For now, return defaults
     return {
       defaultRisks: getDefaultCoveredRisks(),
-      deductible: { hasNumericalValue: 500, hasUnit: 'unit-token' },
+      deductible: { hasNumericalValue: 500, hasUnit: UNIT_TOKEN },
       coinsurance: 20,
-      outOfPocketMaximum: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
+      outOfPocketMaximum: { hasNumericalValue: 5000, hasUnit: UNIT_TOKEN },
       constitutionalBasis: 'community-health-coverage-2024.md',
     };
   }
@@ -268,13 +282,11 @@ export class InsuranceMutualService {
 
     // Step 2: Query Observer attestations for this member
     // Get all events where member is the provider, then filter by lamadEventType
-    const allMemberEvents = await firstValueFrom(
-      this.economicService.getEventsForAgent(memberId, 'provider')
-    );
+    const allMemberEvents = await this.economicService.getEventsByProvider(memberId);
     const relevantEventTypes = new Set([
-      'preventive-care-completed',
-      'community-support-provided',
-      'claim-filed',
+      EVENT_TYPE_PREVENTIVE_CARE,
+      EVENT_TYPE_COMMUNITY_SUPPORT,
+      EVENT_TYPE_CLAIM_FILED,
       'risk-reduction-verified',
     ]);
     const memberEvents = allMemberEvents.filter(e => {
@@ -285,7 +297,7 @@ export class InsuranceMutualService {
     // Step 3: Extract care maintenance score from preventive events
     const careEvents = memberEvents.filter(e => {
       const eventType = e.metadata?.['lamadEventType'];
-      return eventType === 'preventive-care-completed' || eventType === 'risk-reduction-verified';
+      return eventType === EVENT_TYPE_PREVENTIVE_CARE || eventType === 'risk-reduction-verified';
     });
     const careMaintenanceScore = calculateCareMaintenanceScore(careEvents);
     const careEventCount = careEvents.length;
@@ -293,7 +305,7 @@ export class InsuranceMutualService {
     // Step 4: Extract community connectedness score from support network events
     const supportEvents = memberEvents.filter(e => {
       const eventType = e.metadata?.['lamadEventType'];
-      return eventType === 'community-support-provided';
+      return eventType === EVENT_TYPE_COMMUNITY_SUPPORT;
     });
     const communityConnectednessScore = calculateCommunityConnectednessScore(supportEvents);
     const communityEventCount = supportEvents.length;
@@ -301,7 +313,7 @@ export class InsuranceMutualService {
     // Step 5: Extract claims history
     const claimEvents = memberEvents.filter(e => {
       const eventType = e.metadata?.['lamadEventType'];
-      return eventType === 'claim-filed';
+      return eventType === EVENT_TYPE_CLAIM_FILED;
     });
     const historicalClaimsRate = calculateHistoricalClaimsRate(
       claimEvents,
@@ -351,16 +363,14 @@ export class InsuranceMutualService {
     };
 
     // Step 10: Create assessment event
-    const assessmentEvent = await firstValueFrom(
-      this.economicService.createEvent({
+    const assessmentEvent = await this.economicService.createEconomicEvent({
         action: 'raise',
-        providerId: 'elohim-mutual',
+        providerId: ELOHIM_MUTUAL,
         receiverId: memberId,
         resourceClassifiedAs: ['risk-assessment', 'behavioral-observation'],
         note: `Risk assessment for ${_riskType}. New score: ${newRiskScore} (tier: ${newRiskTier}). Trend: ${riskTrend}. Evidence: ${careEventCount} care events, ${communityEventCount} community events, ${claimsEventCount} claims.`,
-        lamadEventType: 'preventive-care-completed',
-      })
-    );
+        lamadEventType: EVENT_TYPE_PREVENTIVE_CARE,
+      });
 
     // Step 11: Link event to profile
     updatedProfile.assessmentEventIds.push(assessmentEvent.id);
@@ -379,7 +389,7 @@ export class InsuranceMutualService {
     // TODO: Implementation
     // Get all members of Qahal, reassess each
     // Identify improving/declining members for governance review
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -407,7 +417,7 @@ export class InsuranceMutualService {
     // 3. Check against constitutional constraints (dignity floor, etc)
     // 4. Record policy creation/modification as EconomicEvent
     // 5. Return updated policy with event reference
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -416,7 +426,7 @@ export class InsuranceMutualService {
    */
   async addCoveredRisk(_policyId: string, _risk: CoveredRisk): Promise<CoveragePolicy> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -424,7 +434,7 @@ export class InsuranceMutualService {
    */
   async getCoveragePolicy(_memberId: string): Promise<CoveragePolicy | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -505,12 +515,11 @@ export class InsuranceMutualService {
       },
     };
 
-    // Step 5: Create 'claim-filed' EconomicEvent
-    const claimFiledEvent = await firstValueFrom(
-      this.economicService.createEvent({
+    // Step 5: Create EVENT_TYPE_CLAIM_FILED EconomicEvent
+    const claimFiledEvent = await this.economicService.createEconomicEvent({
         action: 'work',
         providerId: memberId,
-        receiverId: 'elohim-mutual',
+        receiverId: ELOHIM_MUTUAL,
         resourceConformsTo: lossDetails.lossType,
         resourceQuantityValue: lossDetails.estimatedLossAmount.hasNumericalValue,
         resourceQuantityUnit: lossDetails.estimatedLossAmount.hasUnit,
@@ -519,9 +528,8 @@ export class InsuranceMutualService {
         }. Description: ${lossDetails.description}. Observer attestations: ${
           lossDetails.observerAttestationIds.length
         }`,
-        lamadEventType: 'claim-filed',
-      })
-    );
+        lamadEventType: EVENT_TYPE_CLAIM_FILED,
+      });
 
     // Step 6: Link event to claim
     claim.eventIds.filedEventId = claimFiledEvent.id;
@@ -554,7 +562,7 @@ export class InsuranceMutualService {
     // 1. Add docs to claim
     // 2. Create event recording submission
     // 3. Notify assigned adjuster
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -594,8 +602,8 @@ export class InsuranceMutualService {
    */
   async searchMembers(_filters: {
     qahalId?: string;
-    riskTier?: 'low' | 'standard' | 'high' | 'uninsurable';
-    riskTrendDirection?: 'improving' | 'stable' | 'declining';
+    riskTier?: RiskTier;
+    riskTrendDirection?: RiskTrendDirection;
     careMaintenanceScoreMin?: number;
     communityConnectednessScoreMin?: number;
     limit?: number;
@@ -772,7 +780,7 @@ export class InsuranceMutualService {
     // 2. Update claim with adjuster ID
     // 3. Create 'claim-assigned' event (or use 'stewardship-begin'?)
     // 4. Notify adjuster of assignment
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -873,15 +881,13 @@ export class InsuranceMutualService {
     claim.lastUpdatedAt = new Date().toISOString();
 
     // Step 7: Create 'claim-adjusted' EconomicEvent
-    const adjustedEvent = await firstValueFrom(
-      this.economicService.createEvent({
+    const adjustedEvent = await this.economicService.createEconomicEvent({
         action: 'modify',
         providerId: _adjusterId,
         receiverId: claim.memberId,
         note: `Claim adjusted. ${reasoning.plainLanguageExplanation}`,
         lamadEventType: 'claim-adjusted',
-      })
-    );
+      });
 
     // Update event reference in claim
     claim.eventIds.adjustedEventId = adjustedEvent.id;
@@ -918,7 +924,7 @@ export class InsuranceMutualService {
     _note?: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -937,7 +943,7 @@ export class InsuranceMutualService {
     // 2. Update claim status to 'denied'
     // 3. Create 'claim-denied' EconomicEvent
     // 4. Create appeal window (e.g., 30 days) for member
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -978,18 +984,16 @@ export class InsuranceMutualService {
     const netPaymentToMember = amountAfterDeductible - coinsuranceAmount;
 
     // Step 3: Create 'claim-settled' EconomicEvent (transfer)
-    const settlementEvent = await firstValueFrom(
-      this.economicService.createEvent({
+    const settlementEvent = await this.economicService.createEconomicEvent({
         action: 'transfer',
-        providerId: 'elohim-mutual',
+        providerId: ELOHIM_MUTUAL,
         receiverId: claim.memberId,
         resourceConformsTo: 'settlement-payment',
         resourceQuantityValue: netPaymentToMember,
-        resourceQuantityUnit: settledAmount.hasUnit ?? 'unit-token',
+        resourceQuantityUnit: settledAmount.hasUnit ?? UNIT_TOKEN,
         note: `Claim settlement. Gross: ${settledAmount.hasNumericalValue}. Deductible: -${deductibleAmount}. Coinsurance: -${coinsuranceAmount}. Net to member: ${netPaymentToMember}`,
         lamadEventType: 'claim-settled',
-      })
-    );
+      });
 
     // Step 4: Create AttributionClaim for member against CommonsPool
     // This records the member's claim on the pool's reserves
@@ -1001,7 +1005,7 @@ export class InsuranceMutualService {
       claimantId: claim.memberId,
       amount: {
         hasNumericalValue: netPaymentToMember,
-        hasUnit: settledAmount.hasUnit ?? 'unit-token',
+        hasUnit: settledAmount.hasUnit ?? UNIT_TOKEN,
       },
       requiredAttestationLevel: 'basic',
       identityVerified: true, // Member already verified through policy enrollment
@@ -1017,7 +1021,7 @@ export class InsuranceMutualService {
     // claim.statusHistory.push({
     //   status: 'settled',
     //   changedAt: new Date().toISOString(),
-    //   changedBy: 'elohim-mutual',
+    //   changedBy: ELOHIM_MUTUAL,
     //   note: `Claim settled. Paid: ${netPaymentToMember} via ${_paymentMethod}`,
     // });
     // claim.settlementEventIds.push(settlementEvent.id);
@@ -1057,7 +1061,7 @@ export class InsuranceMutualService {
     // 2. Assign to different adjuster or governance committee
     // 3. Create 'claim-appealed' EconomicEvent
     // 4. Set review deadline
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1071,7 +1075,7 @@ export class InsuranceMutualService {
     _reasoning: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -1104,7 +1108,7 @@ export class InsuranceMutualService {
     // 4. Create 'prevention-incentive-awarded' EconomicEvent
     // 5. Calculate premium adjustment for next period
     // 6. Return updated profile and event
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1121,7 +1125,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -1141,7 +1145,7 @@ export class InsuranceMutualService {
     _note?: string
   ): Promise<void> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1156,7 +1160,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1178,7 +1182,7 @@ export class InsuranceMutualService {
     qualityTrend: 'improving' | 'stable' | 'declining';
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -1200,7 +1204,7 @@ export class InsuranceMutualService {
     isAdequate: boolean;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1221,7 +1225,7 @@ export class InsuranceMutualService {
     trend: 'stable' | 'increasing' | 'decreasing';
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -1266,7 +1270,7 @@ export class InsuranceMutualService {
 
     const basePremium: Measure = {
       hasNumericalValue: basePremiumAmount,
-      hasUnit: 'unit-token',
+      hasUnit: UNIT_TOKEN,
     };
 
     // Step 4: Risk adjustment based on risk tier
@@ -1280,7 +1284,6 @@ export class InsuranceMutualService {
         riskAdjustmentPercent = -20;
         break;
       case 'standard':
-        riskAdjustmentPercent = 0;
         break;
       case 'high':
         riskAdjustmentPercent = 30;
@@ -1294,7 +1297,7 @@ export class InsuranceMutualService {
     const riskAdjustmentAmount = Math.round(basePremiumAmount * (riskAdjustmentPercent / 100));
     const riskAdjustment: Measure = {
       hasNumericalValue: riskAdjustmentAmount,
-      hasUnit: 'unit-token',
+      hasUnit: UNIT_TOKEN,
     };
 
     // Step 5: Prevention discount
@@ -1319,14 +1322,14 @@ export class InsuranceMutualService {
     );
     const preventionDiscount: Measure = {
       hasNumericalValue: -preventionDiscountAmount,
-      hasUnit: 'unit-token',
+      hasUnit: UNIT_TOKEN,
     };
 
     // Step 6: Calculate final premium
     const finalPremiumAmount = premiumBeforeDiscount - preventionDiscountAmount;
     const finalPremium: Measure = {
       hasNumericalValue: Math.max(100, finalPremiumAmount), // Minimum 100
-      hasUnit: 'unit-token',
+      hasUnit: UNIT_TOKEN,
     };
 
     // Step 7: Create human-readable breakdown
@@ -1386,7 +1389,7 @@ HOW TO LOWER YOUR PREMIUM:
     // 3. Update CommonsPool (add to reserves)
     // 4. Update policy (coverage effective dates, last premium event)
     // 5. Record in deductible tracker (reset if new period)
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   // ============================================================================
@@ -1409,7 +1412,7 @@ HOW TO LOWER YOUR PREMIUM:
     preventionOpportunities: string[];
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 
   /**
@@ -1432,7 +1435,7 @@ HOW TO LOWER YOUR PREMIUM:
     topClaimReasons: { reason: string; count: number }[];
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    throw new Error(NOT_YET_IMPLEMENTED);
   }
 }
 
@@ -1507,13 +1510,13 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
       riskType: 'emergency-health',
       isCovered: true,
       coverage: {
-        limitPerIncident: { hasNumericalValue: 100000, hasUnit: 'unit-token' },
+        limitPerIncident: { hasNumericalValue: 100000, hasUnit: UNIT_TOKEN },
         coveragePercent: 80, // 20% coinsurance
       },
       exclusions: ['Cosmetic procedures', 'Experimental treatments'],
       preventionIncentive: {
         discountPercent: 15,
-        requiredAttestations: ['preventive-care-completed'],
+        requiredAttestations: [EVENT_TYPE_PREVENTIVE_CARE],
       },
       waitingPeriod: '0 days',
       addedAt: new Date().toISOString(),
@@ -1524,13 +1527,13 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
       riskType: 'preventive-health',
       isCovered: true,
       coverage: {
-        annualLimit: { hasNumericalValue: 10000, hasUnit: 'unit-token' },
+        annualLimit: { hasNumericalValue: 10000, hasUnit: UNIT_TOKEN },
         coveragePercent: 90, // 10% coinsurance
       },
       exclusions: [],
       preventionIncentive: {
         discountPercent: 20,
-        requiredAttestations: ['preventive-care-completed'],
+        requiredAttestations: [EVENT_TYPE_PREVENTIVE_CARE],
       },
       waitingPeriod: '0 days',
       addedAt: new Date().toISOString(),
@@ -1544,13 +1547,13 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
       riskType: 'mental-health',
       isCovered: true,
       coverage: {
-        annualLimit: { hasNumericalValue: 20000, hasUnit: 'unit-token' },
+        annualLimit: { hasNumericalValue: 20000, hasUnit: UNIT_TOKEN },
         coveragePercent: 80, // 20% coinsurance
       },
       exclusions: [],
       preventionIncentive: {
         discountPercent: 10,
-        requiredAttestations: ['community-support-provided'],
+        requiredAttestations: [EVENT_TYPE_COMMUNITY_SUPPORT],
       },
       waitingPeriod: '30 days',
       addedAt: new Date().toISOString(),
@@ -1561,7 +1564,7 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
       riskType: 'dental',
       isCovered: true,
       coverage: {
-        annualLimit: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
+        annualLimit: { hasNumericalValue: 5000, hasUnit: UNIT_TOKEN },
         coveragePercent: 70, // 30% coinsurance
       },
       exclusions: ['Cosmetic dental work', 'Orthodontics for adults'],
@@ -1574,7 +1577,7 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
       riskType: 'other',
       isCovered: true,
       coverage: {
-        limitPerIncident: { hasNumericalValue: 500000, hasUnit: 'unit-token' },
+        limitPerIncident: { hasNumericalValue: 500000, hasUnit: UNIT_TOKEN },
         coveragePercent: 80, // 20% coinsurance
       },
       exclusions: ['Pre-existing conditions in first 12 months'],

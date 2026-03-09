@@ -1,0 +1,80 @@
+{
+  "id": "values-hierarchy-discovery",
+  "title": "Personal Values Hierarchy",
+  "contentType": "instrument",
+  "contentFormat": "instrument-json",
+  "name": "Personal Values Hierarchy",
+  "version": "1.0.0",
+  "category": "values",
+  "framework": "values-hierarchy",
+  "description": "Discover your core values and how they guide your decisions",
+  "subscales": [
+    {
+      "id": "openness",
+      "name": "Openness to Change",
+      "description": "Valuing creativity, curiosity, independence, and stimulation",
+      "dimension": "values",
+      "color": "#F59E0B",
+      "icon": "\ud83c\udf0a"
+    },
+    {
+      "id": "conservation",
+      "name": "Conservation",
+      "description": "Valuing security, stability, tradition, and social harmony",
+      "dimension": "values",
+      "color": "#10B981",
+      "icon": "\ud83c\udfe0"
+    },
+    {
+      "id": "self-transcendence",
+      "name": "Self-Transcendence",
+      "description": "Valuing benevolence, universalism, and welfare of others",
+      "dimension": "values",
+      "color": "#8B5CF6",
+      "icon": "\ud83c\udf0d"
+    },
+    {
+      "id": "self-enhancement",
+      "name": "Self-Enhancement",
+      "description": "Valuing personal achievement, success, and demonstrating competence",
+      "dimension": "values",
+      "color": "#EF4444",
+      "icon": "\ud83c\udfc6"
+    }
+  ],
+  "resultTypes": [
+    {
+      "id": "openness",
+      "name": "Openness to Change",
+      "description": "You prioritize creativity, independence, and new experiences. You value the freedom to explore ideas and chart your own course."
+    },
+    {
+      "id": "conservation",
+      "name": "Conservation",
+      "description": "You prioritize security, stability, and tradition. You value the harmony and predictability that established systems provide."
+    },
+    {
+      "id": "self-transcendence",
+      "name": "Self-Transcendence",
+      "description": "You prioritize the welfare of others, benevolence, and universal understanding. You value making a positive difference for people beyond yourself."
+    },
+    {
+      "id": "self-enhancement",
+      "name": "Self-Enhancement",
+      "description": "You prioritize personal achievement and demonstrating competence. You value setting and reaching ambitious goals."
+    }
+  ],
+  "scoringConfig": {
+    "method": "dimensional",
+    "normalize": true
+  },
+  "display": {
+    "framework": "values-hierarchy",
+    "frameworkDisplayName": "Values Hierarchy",
+    "autoFeature": false,
+    "displayTemplate": "{{primaryType.name}}",
+    "shortTemplate": "{{primaryType.shortCode}}"
+  },
+  "estimatedMinutes": 15,
+  "recommendedInterval": "P6M"
+}

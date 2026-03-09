@@ -41,10 +41,12 @@ describe('DuplicateDetectionService', () => {
       } as any;
 
       const result = service.detect(transaction);
-      expect(result).toEqual(jasmine.objectContaining({
-        isDuplicate: jasmine.any(Boolean),
-        confidence: jasmine.any(Number),
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          isDuplicate: expect.any(Boolean),
+          confidence: expect.any(Number),
+        })
+      );
     });
 
     it('should detect exact match', () => {
@@ -69,7 +71,7 @@ describe('DuplicateDetectionService', () => {
 
       service.registerTransaction(staged);
       const result = service.detect(transaction);
-      expect(result.isDuplicate).toBeTrue();
+      expect(result.isDuplicate).toBe(true);
       expect(result.confidence).toBeGreaterThan(90);
     });
 
@@ -83,7 +85,7 @@ describe('DuplicateDetectionService', () => {
       } as any;
 
       const result = service.detect(transaction);
-      expect(result.isDuplicate).toBeFalse();
+      expect(result.isDuplicate).toBe(false);
     });
   });
 
@@ -105,7 +107,7 @@ describe('DuplicateDetectionService', () => {
       ];
 
       const result = service.filterDuplicates(transactions);
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should filter out exact duplicates', () => {
@@ -179,7 +181,7 @@ describe('DuplicateDetectionService', () => {
 
       service.registerTransaction(staged);
       const result = service.detect(transaction);
-      expect(result.isDuplicate).toBeTrue();
+      expect(result.isDuplicate).toBe(true);
     });
   });
 
@@ -254,7 +256,7 @@ describe('DuplicateDetectionService', () => {
       service.registerTransaction(staged);
       service.clearIndexes();
       const result = service.detect(transaction);
-      expect(result.isDuplicate).toBeFalse();
+      expect(result.isDuplicate).toBe(false);
     });
   });
 });

@@ -1,13 +1,10 @@
 //! ElohimStorageBehaviour - Combined network behaviour for P2P shard and sync transfer
 
 use libp2p::{
-    autonat,
-    dcutr,
-    identify,
+    autonat, dcutr, identify,
     identity::Keypair,
     kad::{self, Behaviour as Kademlia},
-    mdns,
-    relay,
+    mdns, relay,
     request_response::{self, Behaviour as RequestResponse, ProtocolSupport},
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour},
     PeerId,
@@ -22,20 +19,15 @@ use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::P2PConfig;
 
 /// Relay operating mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RelayMode {
     /// Desktop stewards behind NAT — connect through relay servers
+    #[default]
     Client,
     /// K8s edgenode pods with stable IPs — serve as relays for others
     Server,
     /// Doorway hosts — both relay client and server
     Both,
-}
-
-impl Default for RelayMode {
-    fn default() -> Self {
-        Self::Client
-    }
 }
 
 impl std::str::FromStr for RelayMode {
@@ -45,7 +37,10 @@ impl std::str::FromStr for RelayMode {
             "client" => Ok(Self::Client),
             "server" => Ok(Self::Server),
             "both" => Ok(Self::Both),
-            _ => Err(format!("Invalid relay mode '{}': expected client, server, or both", s)),
+            _ => Err(format!(
+                "Invalid relay mode '{}': expected client, server, or both",
+                s
+            )),
         }
     }
 }
@@ -179,30 +174,24 @@ impl ElohimStorageBehaviour {
         let peer_id = PeerId::from(keypair.public());
 
         // Kademlia DHT with sled persistence (shared DB handle with DocStore)
-        let store = SledRecordStore::from_db(sled_db)
-            .expect("Failed to open sled Kademlia store");
+        let store = SledRecordStore::from_db(sled_db).expect("Failed to open sled Kademlia store");
         let kademlia = Kademlia::new(peer_id, store);
 
         // Shard request-response protocol
         let shard_protocol = RequestResponse::new(
             [(ShardProtocol, ProtocolSupport::Full)],
-            request_response::Config::default()
-                .with_request_timeout(config.request_timeout),
+            request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
         // Sync request-response protocol
         let sync_protocol = RequestResponse::new(
             [(SyncProtocol, ProtocolSupport::Full)],
-            request_response::Config::default()
-                .with_request_timeout(config.request_timeout),
+            request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
         // mDNS for local discovery
-        let mdns = mdns::tokio::Behaviour::new(
-            mdns::Config::default(),
-            peer_id,
-        )
-        .expect("mDNS behaviour should be created");
+        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
+            .expect("mDNS behaviour should be created");
 
         // Relay server (enabled for Server/Both modes)
         let relay_server = match config.relay_mode {
@@ -218,14 +207,8 @@ impl ElohimStorageBehaviour {
 
         // Identify protocol — advertise who we are and what we support
         let identify = identify::Behaviour::new(
-            identify::Config::new(
-                "/elohim/id/1.0.0".to_string(),
-                keypair.public(),
-            )
-            .with_agent_version(format!(
-                "elohim-storage/{}",
-                env!("CARGO_PKG_VERSION")
-            )),
+            identify::Config::new("/elohim/id/1.0.0".to_string(), keypair.public())
+                .with_agent_version(format!("elohim-storage/{}", env!("CARGO_PKG_VERSION"))),
         );
 
         // AutoNAT — probe peers to detect NAT status

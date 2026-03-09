@@ -11,7 +11,12 @@
  */
 
 import { TestBed } from '@angular/core/testing';
-import { SlaMonitorService, SlaRegistration, SlaResolution, SlaEntityType } from './sla-monitor.service';
+import {
+  SlaMonitorService,
+  SlaRegistration,
+  SlaResolution,
+  SlaEntityType,
+} from './sla-monitor.service';
 
 describe('SlaMonitorService', () => {
   let service: SlaMonitorService;

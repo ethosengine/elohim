@@ -34,9 +34,10 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
-// @coverage: 25.4% (2026-02-05)
+// @coverage: 25.2% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -48,12 +49,7 @@ import {
   type ReflectionRecognition,
 } from '../../../content-io/plugins/sophia/sophia-element-loader';
 import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
-import {
-  EPIC_DOMAIN_SUBSCALES,
-  EPIC_DOMAIN_INSTRUMENT_ID,
-  EPIC_DOMAIN_INSTRUMENT_CONFIG,
-  getEpicResultType,
-} from '../../instruments/epic-domain.instrument';
+import { EPIC_DOMAIN_INSTRUMENT_ID, EPIC_DOMAIN_SUBSCALES, getInstrument } from '../../instruments';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
 
@@ -169,7 +165,7 @@ export interface DiscoveryQuizCompletionEvent {
               }
             </div>
 
-            <button class="btn-explore" (click)="onExploreEpic()">
+            <button class="btn-explore" (click)="onExploreEpic()" data-testid="quiz-explore">
               Explore {{ getResultName() }} →
             </button>
           </div>
@@ -187,7 +183,12 @@ export interface DiscoveryQuizCompletionEvent {
               ></app-sophia-question>
 
               <div class="answer-controls">
-                <button class="btn-continue" [disabled]="!hasAnswer()" (click)="continueToNext()">
+                <button
+                  class="btn-continue"
+                  [disabled]="!hasAnswer()"
+                  (click)="continueToNext()"
+                  data-testid="quiz-continue"
+                >
                   {{ isLastQuestion() ? 'See Results' : 'Continue' }}
                 </button>
               </div>
@@ -467,6 +468,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   /** Human ID taking the quiz */
   @Input({ required: true }) humanId!: string;
 
+  /** Instrument ID for psychometric scoring (defaults to epic-domain for backward compatibility) */
+  @Input() instrumentId = EPIC_DOMAIN_INSTRUMENT_ID;
+
   /** Emitted when quiz completes */
   @Output() completed = new EventEmitter<DiscoveryQuizCompletionEvent>();
 
@@ -519,29 +523,27 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     if (agg) {
       return agg.subscaleTotals;
     }
-    // Default empty scores
-    return {
-      governance: 0,
-      care: 0,
-      economic: 0,
-      public: 0,
-      social: 0,
-    };
+    // Default empty scores from active instrument subscales
+    const subscales = this.activeSubscales();
+    return Object.fromEntries(subscales.map(s => [s.id, 0]));
   });
 
   protected sortedSubscales = computed(() => {
     const agg = this.aggregated();
     const scores = agg?.normalizedScores ?? this.subscaleScores();
     const total = Object.values(scores).reduce((sum, v) => sum + v, 0) || 1;
+    const subscales = this.activeSubscales();
 
-    return EPIC_DOMAIN_SUBSCALES.map(subscale => ({
-      key: subscale.id,
-      name: subscale.name,
-      icon: subscale.icon ?? '📌',
-      color: subscale.color ?? '#888',
-      score: scores[subscale.id] ?? 0,
-      percent: ((scores[subscale.id] ?? 0) / total) * 100,
-    })).sort((a, b) => b.score - a.score);
+    return subscales
+      .map(subscale => ({
+        key: subscale.id,
+        name: subscale.name,
+        icon: subscale.icon ?? '📌',
+        color: subscale.color ?? '#888',
+        score: scores[subscale.id] ?? 0,
+        percent: ((scores[subscale.id] ?? 0) / total) * 100,
+      }))
+      .sort((a, b) => b.score - a.score);
   });
 
   protected primarySubscale = computed(() => {
@@ -553,15 +555,32 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     return sorted[0]?.key ?? 'governance';
   });
 
+  /**
+   * Resolve subscales for the active instrument from the registry.
+   * Falls back to EPIC_DOMAIN_SUBSCALES for backward compatibility.
+   */
+  private readonly activeSubscales = computed(() => {
+    const entry = getInstrument(this.instrumentId);
+    return entry?.subscales ?? EPIC_DOMAIN_SUBSCALES;
+  });
+
+  /**
+   * Build a lookup map of subscale metadata for the active instrument.
+   */
+  private readonly subscaleLookup = computed(() => {
+    const subscales = this.activeSubscales();
+    return Object.fromEntries(
+      subscales.map(s => [s.id, { name: s.name, color: s.color ?? '#888', icon: s.icon ?? '📌' }])
+    );
+  });
+
   private readonly destroy$ = new Subject<void>();
   private lastRecognition: Recognition | null = null;
   private psycheAPI: PsycheAPI | null = null;
 
-  constructor(
-    private readonly poolService: QuestionPoolService,
-    private readonly discoveryService: DiscoveryAttestationService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly poolService = inject(QuestionPoolService);
+  private readonly discoveryService = inject(DiscoveryAttestationService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.initializePsycheAPI();
@@ -587,11 +606,11 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Register the Epic Domain instrument if not already registered
-    if (!this.psycheAPI.hasInstrument(EPIC_DOMAIN_INSTRUMENT_ID)) {
-      const instrument = this.psycheAPI.createInstrument(EPIC_DOMAIN_INSTRUMENT_CONFIG);
+    // Register the active instrument if not already registered
+    const entry = getInstrument(this.instrumentId);
+    if (entry && !this.psycheAPI.hasInstrument(this.instrumentId)) {
+      const instrument = this.psycheAPI.createInstrument(entry.config);
       this.psycheAPI.registerInstrument(instrument);
-      // Debug: console.log('[DiscoveryQuiz] Registered Epic Domain instrument');
     }
   }
 
@@ -656,7 +675,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
    */
   getResultIcon(): string {
     const key = this.primarySubscale();
-    return EPIC_SUBSCALES[key]?.icon ?? '🎯';
+    return this.subscaleLookup()[key]?.icon ?? '🎯';
   }
 
   /**
@@ -664,7 +683,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
    */
   getResultName(): string {
     const key = this.primarySubscale();
-    return EPIC_SUBSCALES[key]?.name ?? key;
+    return this.subscaleLookup()[key]?.name ?? key;
   }
 
   /**
@@ -678,9 +697,10 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       return interp.primaryType.description;
     }
 
-    // Fallback to result type definition
+    // Fallback to result type definition from registry
     const key = this.primarySubscale();
-    const resultType = getEpicResultType(key);
+    const entry = getInstrument(this.instrumentId);
+    const resultType = entry?.resultTypes.find(r => r.id === key);
     if (resultType?.description) {
       return resultType.description;
     }
@@ -755,10 +775,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     if (allRecognitions.length > 0) {
       const aggregated = this.psycheAPI.aggregateReflections(allRecognitions, {
         normalization: 'sum',
-        subscales: EPIC_DOMAIN_SUBSCALES,
+        subscales: this.activeSubscales(),
       });
       this.aggregated.set(aggregated);
-      // Debug: console.log('[DiscoveryQuiz] Aggregated via psyche-core:', aggregated);
     }
   }
 
@@ -775,7 +794,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     // Use psyche-core interpretation if available
     if (this.psycheAPI && agg) {
       try {
-        interp = this.psycheAPI.interpretReflection(EPIC_DOMAIN_INSTRUMENT_ID, agg);
+        interp = this.psycheAPI.interpretReflection(this.instrumentId, agg);
         this.interpretation.set(interp);
         // Debug: console.log('[DiscoveryQuiz] Interpretation via psyche-core:', interp);
       } catch {

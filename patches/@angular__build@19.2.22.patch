@@ -1,0 +1,25 @@
+diff --git a/src/tools/angular/transformers/jit-resource-transformer.js b/src/tools/angular/transformers/jit-resource-transformer.js
+index b57a38a6c0b491ed09ce65e8bc7224d7fb5a2b59..f3fe0a419e14ad972497b87b8ce7e80749aecdd9 100755
+--- a/src/tools/angular/transformers/jit-resource-transformer.js
++++ b/src/tools/angular/transformers/jit-resource-transformer.js
+@@ -40,7 +40,19 @@ function createJitResourceTransformer(getTypeChecker) {
+             return typescript_1.default.visitEachChild(node, visitNode, context);
+         };
+         return (sourceFile) => {
+-            const updatedSourceFile = typescript_1.default.visitEachChild(sourceFile, visitNode, context);
++            // Workaround: In Vitest JIT mode, the emitted source file nodes fail
++            // ts.isSourceFile() checks (they are synthetic nodes from the builder).
++            // visitEachChild uses isSourceFile internally and skips traversal when
++            // it returns false, so the visitor never reaches class declarations.
++            // Fall back to manual statement iteration when visitEachChild is a no-op.
++            let updatedSourceFile = typescript_1.default.visitEachChild(sourceFile, visitNode, context);
++            if (resourceImportDeclarations.length === 0 && sourceFile.statements.length > 0) {
++                // visitEachChild may have been a no-op — try manual iteration
++                const updatedStatements = sourceFile.statements.map(stmt => visitNode(stmt));
++                if (resourceImportDeclarations.length > 0) {
++                    updatedSourceFile = nodeFactory.updateSourceFile(sourceFile, updatedStatements);
++                }
++            }
+             if (resourceImportDeclarations.length > 0) {
+                 return nodeFactory.updateSourceFile(updatedSourceFile, typescript_1.default.setTextRange(nodeFactory.createNodeArray([...resourceImportDeclarations, ...updatedSourceFile.statements], updatedSourceFile.statements.hasTrailingComma), updatedSourceFile.statements), updatedSourceFile.isDeclarationFile, updatedSourceFile.referencedFiles, updatedSourceFile.typeReferenceDirectives, updatedSourceFile.hasNoDefaultLib, updatedSourceFile.libReferenceDirectives);
+             }

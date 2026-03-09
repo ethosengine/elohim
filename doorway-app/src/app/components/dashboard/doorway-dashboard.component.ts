@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { NotificationService } from '../../core/notifications/notification.service';
+import { ConfirmDialogService } from '../../core/notifications/confirm-dialog.service';
 import { DoorwayAdminService } from '../../services/doorway-admin.service';
 import { PipelineTabComponent } from './tabs/pipeline-tab.component';
 import { FederationTabComponent } from './tabs/federation-tab.component';
@@ -43,6 +45,8 @@ type UserSortField = 'identifier' | 'permissionLevel' | 'isActive' | 'storagePer
 })
 export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   private readonly adminService = inject(DoorwayAdminService);
+  private readonly notify = inject(NotificationService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   // Data state
   readonly nodes = signal<NodeDetails[]>([]);
@@ -295,52 +299,54 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   async toggleUserStatus(userId: string, currentActive: boolean): Promise<void> {
     const result = await this.adminService.updateUserStatus(userId, !currentActive).toPromise();
     if (result?.success) {
+      this.notify.success(`User ${currentActive ? 'deactivated' : 'activated'}`);
       this.loadUsers();
-      // Update selected user if open
       if (this.selectedUser()?.id === userId) {
         this.viewUser(userId);
       }
     } else {
-      // Failed to toggle user status
+      this.notify.error(result?.message ?? 'Failed to toggle user status');
     }
   }
 
   async forceUserLogout(userId: string): Promise<void> {
-    if (confirm('This will invalidate all active sessions for this user. Continue?')) {
+    if (await this.confirmDialog.confirm('This will invalidate all active sessions for this user. Continue?')) {
       const result = await this.adminService.forceLogout(userId).toPromise();
       if (result?.success) {
-        alert('User has been logged out from all sessions.');
+        this.notify.success('User has been logged out from all sessions.');
         if (this.selectedUser()?.id === userId) {
           this.viewUser(userId);
         }
       } else {
-        alert('Failed to force logout: ' + result?.message);
+        this.notify.error('Failed to force logout: ' + (result?.message ?? ''));
       }
     }
   }
 
   async deleteUser(userId: string): Promise<void> {
-    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (await this.confirmDialog.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       const result = await this.adminService.deleteUser(userId).toPromise();
       if (result?.success) {
+        this.notify.success('User deleted');
         this.closeUserDetail();
         this.loadUsers();
       } else {
-        alert('Failed to delete user: ' + result?.message);
+        this.notify.error('Failed to delete user: ' + (result?.message ?? ''));
       }
     }
   }
 
   async resetUserUsage(userId: string): Promise<void> {
-    if (confirm('Reset all usage counters for this user?')) {
+    if (await this.confirmDialog.confirm('Reset all usage counters for this user?')) {
       const result = await this.adminService.resetUsage(userId).toPromise();
       if (result?.success) {
+        this.notify.success('Usage counters reset');
         if (this.selectedUser()?.id === userId) {
           this.viewUser(userId);
         }
         this.loadUsers();
       } else {
-        alert('Failed to reset usage: ' + result?.message);
+        this.notify.error('Failed to reset usage: ' + (result?.message ?? ''));
       }
     }
   }
@@ -348,12 +354,13 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   async updateUserPermission(userId: string, level: UserPermissionLevel): Promise<void> {
     const result = await this.adminService.updatePermission(userId, level).toPromise();
     if (result?.success) {
+      this.notify.success('Permission updated');
       if (this.selectedUser()?.id === userId) {
         this.viewUser(userId);
       }
       this.loadUsers();
     } else {
-      alert('Failed to update permission: ' + result?.message);
+      this.notify.error('Failed to update permission: ' + (result?.message ?? ''));
     }
   }
 

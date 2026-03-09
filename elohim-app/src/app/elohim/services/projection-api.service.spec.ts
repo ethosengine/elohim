@@ -1,13 +1,12 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Comprehensive tests for ProjectionAPIService
@@ -24,7 +23,7 @@ import { LearningPath } from '../../lamad/models/learning-path.model';
 describe('ProjectionAPIService', () => {
   let service: ProjectionAPIService;
   let httpMock: HttpTestingController;
-  let mockStorageClient: jasmine.SpyObj<StorageClientService>;
+  let mockStorageClient: any;
 
   const mockContentData = {
     id: 'content-1',
@@ -70,12 +69,17 @@ describe('ProjectionAPIService', () => {
 
   beforeEach(() => {
     // Mock StorageClientService
-    mockStorageClient = jasmine.createSpyObj('StorageClientService', ['getBlobUrl']);
-    mockStorageClient.getBlobUrl.and.callFake((hash: string) => `https://blob.example.com/${hash}`);
+    mockStorageClient = {
+      getBlobUrl: vi.fn(),
+    };
+    mockStorageClient.getBlobUrl.mockImplementation(
+      (hash: string) => `https://blob.example.com/${hash}`
+    );
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         ProjectionAPIService,
         { provide: StorageClientService, useValue: mockStorageClient },
       ],
@@ -116,7 +120,7 @@ describe('ProjectionAPIService', () => {
   describe('getContent', () => {
     it('should fetch content by ID', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -134,7 +138,7 @@ describe('ProjectionAPIService', () => {
 
     it('should transform content data correctly', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -150,7 +154,7 @@ describe('ProjectionAPIService', () => {
 
     it('should resolve blob URLs via StorageClientService', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -169,7 +173,7 @@ describe('ProjectionAPIService', () => {
       };
 
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -182,7 +186,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle 404 errors gracefully', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('not-found').subscribe(data => {
+      service.getContentNode('not-found').subscribe(data => {
         result = data;
       });
 
@@ -195,7 +199,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle timeout errors', fakeAsync(() => {
       let result: ContentNode | null = null;
-      service.getContent('content-1').subscribe(data => {
+      service.getContentNode('content-1').subscribe(data => {
         result = data;
       });
 
@@ -210,7 +214,7 @@ describe('ProjectionAPIService', () => {
     it('should return null when API is disabled', fakeAsync(() => {
       // This would require mocking environment, so we test the observable completes
       let result: ContentNode | null | undefined = undefined;
-      const obs = service.getContent('content-1');
+      const obs = service.getContentNode('content-1');
       obs.subscribe(data => {
         result = data;
       });
@@ -226,7 +230,7 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should use shareReplay for caching', fakeAsync(() => {
-      const obs = service.getContent('content-1');
+      const obs = service.getContentNode('content-1');
 
       // Subscribe twice
       let result1: ContentNode | null = null;
@@ -485,10 +489,7 @@ describe('ProjectionAPIService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/Content') &&
-          request.params.get('limit') === '25'
-        );
+        return request.url.includes('/Content') && request.params.get('limit') === '25';
       });
       req.flush([mockContentData]);
       tick();
@@ -504,7 +505,7 @@ describe('ProjectionAPIService', () => {
   describe('getPath', () => {
     it('should fetch path by ID', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('path-1').subscribe(data => {
+      service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
 
@@ -522,7 +523,7 @@ describe('ProjectionAPIService', () => {
 
     it('should transform path data correctly', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('path-1').subscribe(data => {
+      service.getPathNode('path-1').subscribe(data => {
         result = data;
       });
 
@@ -538,7 +539,7 @@ describe('ProjectionAPIService', () => {
 
     it('should handle path 404 errors gracefully', fakeAsync(() => {
       let result: LearningPath | null = null;
-      service.getPath('not-found').subscribe(data => {
+      service.getPathNode('not-found').subscribe(data => {
         result = data;
       });
 
@@ -659,10 +660,7 @@ describe('ProjectionAPIService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return (
-          request.url.includes('/LearningPath') &&
-          request.params.get('limit') === '100'
-        );
+        return request.url.includes('/LearningPath') && request.params.get('limit') === '100';
       });
       req.flush([mockPathData]);
       tick();
@@ -673,9 +671,7 @@ describe('ProjectionAPIService', () => {
     it('should accept custom limit', fakeAsync(() => {
       service.getAllPaths(50).subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.params.get('limit') === '50'
-      );
+      const req = httpMock.expectOne(request => request.params.get('limit') === '50');
       req.flush([]);
       tick();
     }));
@@ -788,7 +784,7 @@ describe('ProjectionAPIService', () => {
       delete (dataWithDocId as any).id;
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -804,7 +800,7 @@ describe('ProjectionAPIService', () => {
       delete (dataWithAuthor as any).authorId;
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -821,7 +817,7 @@ describe('ProjectionAPIService', () => {
       };
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -840,7 +836,7 @@ describe('ProjectionAPIService', () => {
       const dataWithNullThumb = { ...mockContentData, thumbnailUrl: null };
 
       let result: ContentNode | null = null;
-      service.getContent('test').subscribe((data: ContentNode | null) => {
+      service.getContentNode('test').subscribe((data: ContentNode | null) => {
         result = data;
       });
 
@@ -859,12 +855,12 @@ describe('ProjectionAPIService', () => {
       ];
 
       testCases.forEach(testCase => {
-        mockStorageClient.getBlobUrl.calls.reset();
+        mockStorageClient.getBlobUrl.mockClear();
 
         const data = { ...mockContentData, thumbnailUrl: testCase.input };
         let result: ContentNode | null = null;
 
-        service.getContent('test').subscribe(d => {
+        service.getContentNode('test').subscribe(d => {
           result = d;
         });
 
@@ -883,17 +879,15 @@ describe('ProjectionAPIService', () => {
 
   describe('URL building', () => {
     it('should encode special characters in IDs', fakeAsync(() => {
-      service.getContent('content/with/slashes').subscribe();
+      service.getContentNode('content/with/slashes').subscribe();
 
-      const req = httpMock.expectOne(request =>
-        request.url.includes('content%2Fwith%2Fslashes')
-      );
+      const req = httpMock.expectOne(request => request.url.includes('content%2Fwith%2Fslashes'));
       req.flush(mockContentData);
       tick();
     }));
 
     it('should build proper cache endpoint URLs', fakeAsync(() => {
-      service.getContent('test-id').subscribe();
+      service.getContentNode('test-id').subscribe();
 
       const req = httpMock.expectOne(request => {
         return request.url.includes('/api/v1/cache/Content/test-id');

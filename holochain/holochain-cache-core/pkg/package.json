@@ -1,0 +1,7 @@
+{
+  "name": "holochain-cache-core",
+  "version": "0.1.0",
+  "description": "Stub - built by wasm-pack from holochain-cache-core crate",
+  "main": "holochain_cache_core.js",
+  "types": "holochain_cache_core.d.ts"
+}

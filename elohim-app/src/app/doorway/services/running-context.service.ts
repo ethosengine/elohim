@@ -1,10 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 94.6% (2026-02-05)
+// @coverage: 94.6% (2026-02-24)
 
 import { Observable } from 'rxjs';
 
+import { NodeRegistryAnchor } from '@app/elohim/integrity';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 
@@ -67,6 +68,7 @@ export class RunningContextService {
   private readonly http = inject(HttpClient);
   private readonly identityService = inject(IdentityService);
   private readonly holochainClient = inject(HolochainClientService);
+  private readonly nodeAnchor = inject(NodeRegistryAnchor);
 
   // Compute context state
   private readonly _context = signal<ComputeContext>({
@@ -210,41 +212,27 @@ export class RunningContextService {
    * Get nodes registered to the current user's Imago Dei identity
    */
   private async getRegisteredNodes(): Promise<RegisteredNode[]> {
-    // Try to get nodes from node_registry_coordinator
-    try {
-      const result = await this.holochainClient.callZome<any[]>({
-        zomeName: 'node_registry_coordinator',
-        fnName: 'get_my_nodes',
-        payload: null,
-      });
+    const rawNodes = await this.nodeAnchor.verify(null);
 
-      if (!result.success || !result.data) {
-        return [];
-      }
+    return rawNodes.map(n => {
+      const nodeType = (n.node_type ?? 'self-hosted') as RegisteredNode['nodeType'];
+      const doorwayUrl = n.doorway_url ?? null;
 
-      return (result.data || []).map(n => {
-        const nodeType = n.node_type ?? 'self-hosted';
-        const doorwayUrl = n.doorway_url ?? null;
+      // Holoports always have doorway capability
+      // Self-hosted/cloud nodes have doorway if doorwayUrl is configured
+      const hasDoorway =
+        nodeType === 'holoport' || nodeType === 'holoport-plus' || doorwayUrl !== null;
 
-        // Holoports always have doorway capability
-        // Self-hosted/cloud nodes have doorway if doorwayUrl is configured
-        const hasDoorway =
-          nodeType === 'holoport' || nodeType === 'holoport-plus' || doorwayUrl !== null;
-
-        return {
-          nodeId: n.node_id,
-          displayName: n.display_name ?? n.node_id.substring(0, 8),
-          nodeType,
-          status: this.mapStatus(n.status),
-          lastSeen: n.last_heartbeat ?? null,
-          doorwayUrl,
-          hasDoorway,
-        };
-      });
-    } catch {
-      // Zome call failed - node registry service unavailable, return empty list
-      return [];
-    }
+      return {
+        nodeId: n.node_id,
+        displayName: n.display_name ?? n.node_id.substring(0, 8),
+        nodeType,
+        status: this.mapStatus(n.status),
+        lastSeen: n.last_heartbeat ?? null,
+        doorwayUrl,
+        hasDoorway,
+      };
+    });
   }
 
   /**

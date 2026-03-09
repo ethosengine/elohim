@@ -7,6 +7,7 @@ import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+import { vi, Mock } from 'vitest';
 
 // Mock components
 @Component({ selector: 'app-mini-graph', standalone: true, template: '' })
@@ -28,7 +29,11 @@ class MockRelatedConceptsPanelComponent {
 }
 
 // Mock renderer component
-@Component({ selector: 'app-mock-renderer', standalone: true, template: '<div>Mock Renderer</div>' })
+@Component({
+  selector: 'app-mock-renderer',
+  standalone: true,
+  template: '<div>Mock Renderer</div>',
+})
 class MockRendererComponent {
   @Input() node!: ContentNode;
   @Input() embedded = false;
@@ -38,7 +43,7 @@ class MockRendererComponent {
 describe('LessonViewComponent', () => {
   let component: LessonViewComponent;
   let fixture: ComponentFixture<LessonViewComponent>;
-  let rendererRegistrySpy: jasmine.SpyObj<RendererRegistryService>;
+  let rendererRegistrySpy: any;
 
   const mockContent: ContentNode = {
     id: 'test-concept',
@@ -63,8 +68,10 @@ describe('LessonViewComponent', () => {
   };
 
   beforeEach(async () => {
-    rendererRegistrySpy = jasmine.createSpyObj('RendererRegistryService', ['getRenderer']);
-    rendererRegistrySpy.getRenderer.and.returnValue(null);
+    rendererRegistrySpy = {
+      getRenderer: vi.fn(),
+    };
+    rendererRegistrySpy.getRenderer.mockReturnValue(null);
 
     await TestBed.configureTestingModule({
       imports: [LessonViewComponent],
@@ -174,7 +181,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should load registered renderer when available', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       // Manually trigger ngOnChanges
       component.ngOnChanges({
@@ -338,56 +345,61 @@ describe('LessonViewComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should emit exploreContent when related concept clicked', done => {
-      component.exploreContent.subscribe(conceptId => {
-        expect(conceptId).toBe('related-1');
-        done();
-      });
+    it('should emit exploreContent when related concept clicked', () =>
+      new Promise<void>(done => {
+        component.exploreContent.subscribe(conceptId => {
+          expect(conceptId).toBe('related-1');
+          done();
+        });
 
-      component.onRelatedConceptClick('related-1');
-    });
+        component.onRelatedConceptClick('related-1');
+      }));
 
-    it('should emit exploreContent when graph node clicked', done => {
-      component.exploreContent.subscribe(nodeId => {
-        expect(nodeId).toBe('node-123');
-        done();
-      });
+    it('should emit exploreContent when graph node clicked', () =>
+      new Promise<void>(done => {
+        component.exploreContent.subscribe(nodeId => {
+          expect(nodeId).toBe('node-123');
+          done();
+        });
 
-      component.onGraphNodeClick('node-123');
-    });
+        component.onGraphNodeClick('node-123');
+      }));
 
-    it('should emit exploreInGraph when explore button clicked', done => {
-      component.exploreInGraph.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
+    it('should emit exploreInGraph when explore button clicked', () =>
+      new Promise<void>(done => {
+        component.exploreInGraph.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
 
-      component.onExploreInGraphClick();
-    });
+        component.onExploreInGraphClick();
+      }));
 
-    it('should emit quizCompleted when inline quiz completes', done => {
-      const quizEvent = { streak: 3, totalCorrect: 5 };
-      component.quizCompleted.subscribe(event => {
-        expect(event).toEqual(quizEvent);
-        done();
-      });
+    it('should emit quizCompleted when inline quiz completes', () =>
+      new Promise<void>(done => {
+        const quizEvent = { streak: 3, totalCorrect: 5 };
+        component.quizCompleted.subscribe(event => {
+          expect(event).toEqual(quizEvent);
+          done();
+        });
 
-      component.onInlineQuizCompleted(quizEvent);
-    });
+        component.onInlineQuizCompleted(quizEvent);
+      }));
 
-    it('should emit practicedEarned when attestation earned', done => {
-      component.practicedEarned.subscribe(() => {
-        expect(true).toBe(true);
-        done();
-      });
+    it('should emit practicedEarned when attestation earned', () =>
+      new Promise<void>(done => {
+        component.practicedEarned.subscribe(() => {
+          expect(true).toBe(true);
+          done();
+        });
 
-      component.onPracticedAttestation();
-    });
+        component.onPracticedAttestation();
+      }));
   });
 
   describe('renderer lifecycle', () => {
     it('should create renderer on content change', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       // Set content and initialize component
       component.content = mockContent;
@@ -408,7 +420,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should destroy previous renderer on content change', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({
@@ -443,7 +455,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should clean up renderer on destroy', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({
@@ -467,7 +479,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should subscribe to renderer completion events', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       let emittedEvent: any;
       component.complete.subscribe(event => {
@@ -495,7 +507,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should set embedded mode on renderer', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({
@@ -518,7 +530,7 @@ describe('LessonViewComponent', () => {
 
   describe('refreshKey input', () => {
     it('should reload renderer when refreshKey changes', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       component.content = mockContent;
       component.refreshKey = 1;
@@ -565,7 +577,7 @@ describe('LessonViewComponent', () => {
       tick();
 
       // Should only call getRenderer once (from content change, not refreshKey)
-      expect(rendererRegistrySpy.getRenderer.calls.count()).toBeLessThanOrEqual(1);
+      expect(rendererRegistrySpy.getRenderer.mock.calls.length).toBeLessThanOrEqual(1);
     }));
   });
 
@@ -635,7 +647,7 @@ describe('LessonViewComponent', () => {
         // No embedded input
       }
 
-      rendererRegistrySpy.getRenderer.and.returnValue(SimpleRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(SimpleRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({
@@ -662,7 +674,7 @@ describe('LessonViewComponent', () => {
         // No complete output
       }
 
-      rendererRegistrySpy.getRenderer.and.returnValue(StaticRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(StaticRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({
@@ -682,7 +694,7 @@ describe('LessonViewComponent', () => {
     }));
 
     it('should handle rapid content changes', fakeAsync(() => {
-      rendererRegistrySpy.getRenderer.and.returnValue(MockRendererComponent);
+      rendererRegistrySpy.getRenderer.mockReturnValue(MockRendererComponent);
 
       component.content = mockContent;
       component.ngOnChanges({

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AffinityCircleComponent } from './affinity-circle.component';
 
@@ -49,14 +50,14 @@ describe('AffinityCircleComponent', () => {
   describe('circumference', () => {
     it('should calculate circumference for default size', () => {
       component.size = 80;
-      const radius = (80 / 2) - 4;
+      const radius = 80 / 2 - 4;
       const expected = 2 * Math.PI * radius;
       expect(component.circumference).toBeCloseTo(expected, 2);
     });
 
     it('should calculate circumference for custom size', () => {
       component.size = 100;
-      const radius = (100 / 2) - 4;
+      const radius = 100 / 2 - 4;
       const expected = 2 * Math.PI * radius;
       expect(component.circumference).toBeCloseTo(expected, 2);
     });
@@ -223,7 +224,7 @@ describe('AffinityCircleComponent', () => {
     });
 
     it('should return default color for undefined level', () => {
-      spyOn(component, 'getAffinityLevel').and.returnValue('unknown' as any);
+      vi.spyOn(component, 'getAffinityLevel').mockReturnValue('unknown' as any);
       expect(component.getStrokeColor()).toBe('#e0e0e0');
     });
   });

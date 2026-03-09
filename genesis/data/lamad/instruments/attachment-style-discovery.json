@@ -1,0 +1,71 @@
+{
+  "id": "attachment-style-discovery",
+  "title": "Attachment Style Exploration",
+  "contentType": "instrument",
+  "contentFormat": "instrument-json",
+  "name": "Attachment Style Exploration",
+  "version": "1.0.0",
+  "category": "personality",
+  "framework": "attachment-style",
+  "description": "Understand your patterns in close relationships",
+  "subscales": [
+    {
+      "id": "anxiety",
+      "name": "Anxiety",
+      "description": "Worry about abandonment and need for reassurance in relationships",
+      "dimension": "attachment",
+      "color": "#EF4444",
+      "icon": "\ud83d\udcad"
+    },
+    {
+      "id": "avoidance",
+      "name": "Avoidance",
+      "description": "Discomfort with closeness and reluctance to depend on others",
+      "dimension": "attachment",
+      "color": "#6366F1",
+      "icon": "\ud83d\udee1\ufe0f"
+    }
+  ],
+  "resultTypes": [
+    {
+      "id": "secure",
+      "name": "Secure",
+      "description": "You tend to feel comfortable with closeness and are confident in your relationships. You find it relatively easy to depend on others and have others depend on you.",
+      "subscaleProfile": { "anxiety": 0, "avoidance": 0 }
+    },
+    {
+      "id": "anxious-preoccupied",
+      "name": "Anxious-Preoccupied",
+      "description": "You tend to seek high levels of closeness and approval from others. You may worry about whether your relationships are as strong as you want them to be.",
+      "subscaleProfile": { "anxiety": 1, "avoidance": 0 }
+    },
+    {
+      "id": "dismissive-avoidant",
+      "name": "Dismissive-Avoidant",
+      "description": "You tend to value independence and self-sufficiency. You may prefer not to depend on others or have others depend on you.",
+      "subscaleProfile": { "anxiety": 0, "avoidance": 1 }
+    },
+    {
+      "id": "fearful-avoidant",
+      "name": "Fearful-Avoidant",
+      "description": "You may have mixed feelings about closeness. You desire close relationships but may find it difficult to trust or depend on others fully.",
+      "subscaleProfile": { "anxiety": 1, "avoidance": 1 }
+    }
+  ],
+  "scoringConfig": {
+    "method": "threshold-based",
+    "normalize": false,
+    "thresholds": {
+      "anxiety": 12,
+      "avoidance": 8
+    }
+  },
+  "display": {
+    "framework": "attachment-style",
+    "frameworkDisplayName": "Attachment Style",
+    "autoFeature": false,
+    "displayTemplate": "{{primaryType.name}}",
+    "shortTemplate": "{{primaryType.shortCode}}"
+  },
+  "estimatedMinutes": 10
+}

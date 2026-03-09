@@ -32,7 +32,7 @@
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
 
-// @coverage: 58.3% (2026-02-05)
+// @coverage: 58.9% (2026-02-24)
 
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 
@@ -662,7 +662,7 @@ export class ContentResolverService implements OnDestroy {
 
       case 'projection':
         if (!this.projectionApi.enabled) return null;
-        return await firstValueFrom(this.projectionApi.getContent(contentId));
+        return await firstValueFrom(this.projectionApi.getContentNode(contentId));
 
       case 'conductor':
         // Conductor no longer handles content - use projection instead
@@ -753,7 +753,7 @@ export class ContentResolverService implements OnDestroy {
 
       case 'projection':
         if (!this.projectionApi.enabled) return null;
-        return await firstValueFrom(this.projectionApi.getPath(pathId));
+        return await firstValueFrom(this.projectionApi.getPathNode(pathId));
 
       case 'conductor':
         // Conductor no longer handles paths - use projection instead

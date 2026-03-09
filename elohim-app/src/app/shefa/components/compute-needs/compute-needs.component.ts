@@ -11,14 +11,14 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 
-// @coverage: 23.5% (2026-02-05)
+// @coverage: 23.5% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
 import { ComputeNeedsAssessment, NodeRecommendation } from '../../models/shefa-dashboard.model';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 
 @Component({
   selector: 'app-compute-needs',
@@ -48,7 +48,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly shefaCompute: ShefaComputeService) {}
+  private readonly shefaCompute = inject(COMPUTE_DASHBOARD);
 
   ngOnInit(): void {
     if (!this.operatorId) {

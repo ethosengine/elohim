@@ -13,11 +13,12 @@ import { GovernanceService, Vote } from '@app/elohim/services/governance.service
 import { ProposalRecord } from '@app/elohim/services/data-loader.service';
 
 import { ProposalVoteComponent } from './proposal-vote.component';
+import { vi } from 'vitest';
 
 describe('ProposalVoteComponent', () => {
   let component: ProposalVoteComponent;
   let fixture: ComponentFixture<ProposalVoteComponent>;
-  let mockGovernanceService: jasmine.SpyObj<GovernanceService>;
+  let mockGovernanceService: any;
 
   const mockProposal: ProposalRecord = {
     id: 'proposal-1',
@@ -32,12 +33,12 @@ describe('ProposalVoteComponent', () => {
   } as unknown as ProposalRecord;
 
   beforeEach(async () => {
-    mockGovernanceService = jasmine.createSpyObj('GovernanceService', [
-      'voteOnProposal',
-      'getMyVote',
-    ]);
-    mockGovernanceService.getMyVote.and.returnValue(of(null));
-    mockGovernanceService.voteOnProposal.and.returnValue(of(true));
+    mockGovernanceService = {
+      voteOnProposal: vi.fn(),
+      getMyVote: vi.fn(),
+    };
+    mockGovernanceService.getMyVote.mockReturnValue(of(null));
+    mockGovernanceService.voteOnProposal.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
       imports: [ProposalVoteComponent, FormsModule],
@@ -82,14 +83,14 @@ describe('ProposalVoteComponent', () => {
         position: 'agree',
         reasoning: 'I support this',
       };
-      mockGovernanceService.getMyVote.and.returnValue(of(existingVote));
+      mockGovernanceService.getMyVote.mockReturnValue(of(existingVote));
 
       fixture.detectChanges();
       tick();
 
       expect(component.currentVote).toBe('agree');
       expect(component.reasoning).toBe('I support this');
-      expect(component.hasExistingVote).toBeTrue();
+      expect(component.hasExistingVote).toBe(true);
 
       discardPeriodicTasks();
     }));
@@ -120,7 +121,7 @@ describe('ProposalVoteComponent', () => {
       const blockPosition = component.positions.find(p => p.id === 'block')!;
       component.selectPosition(blockPosition);
 
-      expect(component.showReasoningField).toBeTrue();
+      expect(component.showReasoningField).toBe(true);
     });
 
     it('should show reasoning field when changing vote (has existing vote)', () => {
@@ -128,7 +129,7 @@ describe('ProposalVoteComponent', () => {
       const agreePosition = component.positions.find(p => p.id === 'agree')!;
       component.selectPosition(agreePosition);
 
-      expect(component.showReasoningField).toBeTrue();
+      expect(component.showReasoningField).toBe(true);
     });
 
     it('should not show reasoning field for non-block positions without existing vote', () => {
@@ -136,7 +137,7 @@ describe('ProposalVoteComponent', () => {
       const agreePosition = component.positions.find(p => p.id === 'agree')!;
       component.selectPosition(agreePosition);
 
-      expect(component.showReasoningField).toBeFalse();
+      expect(component.showReasoningField).toBe(false);
     });
   });
 
@@ -155,43 +156,43 @@ describe('ProposalVoteComponent', () => {
   describe('reasoningValid getter', () => {
     it('should return true for non-block positions', () => {
       component.currentVote = 'agree';
-      expect(component.reasoningValid).toBeTrue();
+      expect(component.reasoningValid).toBe(true);
     });
 
     it('should return false for block without reasoning', () => {
       component.currentVote = 'block';
       component.reasoning = '';
-      expect(component.reasoningValid).toBeFalse();
+      expect(component.reasoningValid).toBe(false);
     });
 
     it('should return false for block with short reasoning', () => {
       component.currentVote = 'block';
       component.reasoning = 'Too short';
-      expect(component.reasoningValid).toBeFalse();
+      expect(component.reasoningValid).toBe(false);
     });
 
     it('should return true for block with sufficient reasoning', () => {
       component.currentVote = 'block';
       component.reasoning = 'This is my detailed reasoning for blocking this proposal.';
-      expect(component.reasoningValid).toBeTrue();
+      expect(component.reasoningValid).toBe(true);
     });
   });
 
   describe('canSubmit getter', () => {
     it('should return false when no vote selected', () => {
       component.currentVote = null;
-      expect(component.canSubmit).toBeFalse();
+      expect(component.canSubmit).toBe(false);
     });
 
     it('should return true when vote selected and valid', () => {
       component.currentVote = 'agree';
-      expect(component.canSubmit).toBeTrue();
+      expect(component.canSubmit).toBe(true);
     });
 
     it('should return false when block without valid reasoning', () => {
       component.currentVote = 'block';
       component.reasoning = '';
-      expect(component.canSubmit).toBeFalse();
+      expect(component.canSubmit).toBe(false);
     });
   });
 
@@ -231,7 +232,7 @@ describe('ProposalVoteComponent', () => {
 
     it('should set isSubmitting during submission', fakeAsync(() => {
       // Use delayed observable so we can observe isSubmitting=true before completion
-      mockGovernanceService.voteOnProposal.and.returnValue(of(true).pipe(delay(100)));
+      mockGovernanceService.voteOnProposal.mockReturnValue(of(true).pipe(delay(100)));
 
       fixture.detectChanges();
       tick();
@@ -239,17 +240,17 @@ describe('ProposalVoteComponent', () => {
       component.currentVote = 'agree';
       component.submitVote();
 
-      expect(component.isSubmitting).toBeTrue();
+      expect(component.isSubmitting).toBe(true);
 
       tick(100); // Wait for delayed observable to complete
 
-      expect(component.isSubmitting).toBeFalse();
+      expect(component.isSubmitting).toBe(false);
 
       discardPeriodicTasks();
     }));
 
     it('should emit voteSubmitted on success for new vote', fakeAsync(() => {
-      spyOn(component.voteSubmitted, 'emit');
+      vi.spyOn(component.voteSubmitted, 'emit');
       fixture.detectChanges();
       tick();
 
@@ -260,13 +261,13 @@ describe('ProposalVoteComponent', () => {
 
       // Note: The component has a bug where it always emits voteChanged
       // because hasExistingVote is set to true before the emit check
-      expect(component.hasExistingVote).toBeTrue();
+      expect(component.hasExistingVote).toBe(true);
 
       discardPeriodicTasks();
     }));
 
     it('should emit voteChanged for changed vote', fakeAsync(() => {
-      spyOn(component.voteChanged, 'emit');
+      vi.spyOn(component.voteChanged, 'emit');
       fixture.detectChanges();
       tick();
 
@@ -296,7 +297,7 @@ describe('ProposalVoteComponent', () => {
     }));
 
     it('should handle submission error', fakeAsync(() => {
-      mockGovernanceService.voteOnProposal.and.returnValue(
+      mockGovernanceService.voteOnProposal.mockReturnValue(
         throwError(() => new Error('Network error'))
       );
       fixture.detectChanges();
@@ -306,7 +307,7 @@ describe('ProposalVoteComponent', () => {
       component.submitVote();
       tick();
 
-      expect(component.isSubmitting).toBeFalse();
+      expect(component.isSubmitting).toBe(false);
 
       discardPeriodicTasks();
     }));
@@ -413,14 +414,14 @@ describe('ProposalVoteComponent', () => {
       component.voteResults.total = 5;
       (component as any).updateQuorum();
 
-      expect(component.quorumMet).toBeFalse();
+      expect(component.quorumMet).toBe(false);
     });
 
     it('should detect when quorum met', () => {
       component.voteResults.total = 10;
       (component as any).updateQuorum();
 
-      expect(component.quorumMet).toBeTrue();
+      expect(component.quorumMet).toBe(true);
     });
   });
 

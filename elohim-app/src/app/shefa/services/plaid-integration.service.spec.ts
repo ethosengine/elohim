@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Plaid Integration Service Tests
  *
@@ -21,13 +22,14 @@ describe('PlaidIntegrationService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        PlaidIntegrationService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [PlaidIntegrationService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(PlaidIntegrationService);
+
+    // Stub private crypto methods — tests pass fake tokens that aren't valid base64,
+    // so atob() throws. Spying prevents real Web Crypto API calls.
+    vi.spyOn(service as any, 'decryptAccessToken').mockResolvedValue('fake-decrypted-token');
+    vi.spyOn(service as any, 'encryptAccessToken').mockResolvedValue('fake-encrypted-token');
   });
 
   // ==========================================================================
@@ -60,12 +62,12 @@ describe('PlaidIntegrationService', () => {
     it('should initiatePlaidLink return Promise', () => {
       const stewardId = 'steward-123';
       const promise = service.initiatePlaidLink(stewardId);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should handlePlaidCallback return Promise<PlaidConnection>', () => {
       const promise = service.handlePlaidCallback('public-token-123');
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -104,7 +106,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.fetchTransactions(mockConnection, dateRange);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should syncRecentTransactions return Promise', () => {
@@ -124,7 +126,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.syncRecentTransactions(mockConnection);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -143,7 +145,7 @@ describe('PlaidIntegrationService', () => {
 
     it('should getAccounts return Promise', () => {
       const promise = service.getAccounts('encrypted-token');
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
 
     it('should refreshConnection return Promise', () => {
@@ -163,7 +165,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const promise = service.refreshConnection(mockConnection);
-      expect(promise instanceof Promise).toBe(true);
+      expect(typeof promise.then).toBe('function');
     });
   });
 
@@ -185,7 +187,7 @@ describe('PlaidIntegrationService', () => {
         webhook_type: 'TRANSACTIONS',
         webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
         item_id: 'item-123',
-        new_transactions: 5
+        new_transactions: 5,
       };
 
       expect(() => service.handleWebhook(payload)).not.toThrow();
@@ -197,21 +199,22 @@ describe('PlaidIntegrationService', () => {
       expect(observable.subscribe).toBeDefined();
     });
 
-    it('should emit webhook events on handleWebhook', (done) => {
-      const payload: PlaidWebhookPayload = {
-        webhook_type: 'ITEM',
-        webhook_code: 'LOGIN_REQUIRED',
-        item_id: 'item-123',
-        new_transactions: 0
-      };
+    it('should emit webhook events on handleWebhook', () =>
+      new Promise<void>(done => {
+        const payload: PlaidWebhookPayload = {
+          webhook_type: 'ITEM',
+          webhook_code: 'LOGIN_REQUIRED',
+          item_id: 'item-123',
+          new_transactions: 0,
+        };
 
-      service.onWebhookReceived().subscribe(received => {
-        expect(received).toEqual(payload);
-        done();
-      });
+        service.onWebhookReceived().subscribe(received => {
+          expect(received).toEqual(payload);
+          done();
+        });
 
-      service.handleWebhook(payload);
-    });
+        service.handleWebhook(payload);
+      }));
   });
 
   // ==========================================================================
@@ -339,7 +342,7 @@ describe('PlaidIntegrationService', () => {
         webhook_type: 'TRANSACTIONS',
         webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
         item_id: 'item-123',
-        new_transactions: 5
+        new_transactions: 5,
       };
 
       expect(() => service.handleWebhook(payload)).not.toThrow();
@@ -359,12 +362,12 @@ describe('PlaidIntegrationService', () => {
 
     it('initiatePlaidLink should return Promise', () => {
       const result = service.initiatePlaidLink('steward-123');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('handlePlaidCallback should return Promise', () => {
       const result = service.handlePlaidCallback('public-token');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('fetchTransactions should return Promise', () => {
@@ -388,7 +391,7 @@ describe('PlaidIntegrationService', () => {
         end: '2024-01-31',
       });
 
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('syncRecentTransactions should return Promise', () => {
@@ -408,12 +411,12 @@ describe('PlaidIntegrationService', () => {
       };
 
       const result = service.syncRecentTransactions(mockConnection);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('getAccounts should return Promise', () => {
       const result = service.getAccounts('encrypted-token');
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
 
     it('refreshConnection should return Promise', () => {
@@ -433,7 +436,7 @@ describe('PlaidIntegrationService', () => {
       };
 
       const result = service.refreshConnection(mockConnection);
-      expect(result instanceof Promise).toBe(true);
+      expect(typeof result.then).toBe('function');
     });
   });
 
@@ -442,29 +445,30 @@ describe('PlaidIntegrationService', () => {
   // ==========================================================================
 
   describe('edge cases', () => {
-    it('should handle multiple webhook subscriptions', (done) => {
-      let count = 0;
-      const payload: PlaidWebhookPayload = {
-        webhook_type: 'TRANSACTIONS',
-        webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
-        item_id: 'item-123',
-        new_transactions: 5
-      };
+    it('should handle multiple webhook subscriptions', () =>
+      new Promise<void>(done => {
+        let count = 0;
+        const payload: PlaidWebhookPayload = {
+          webhook_type: 'TRANSACTIONS',
+          webhook_code: 'TRANSACTIONS_UPDATES_AVAILABLE',
+          item_id: 'item-123',
+          new_transactions: 5,
+        };
 
-      const sub1 = service.onWebhookReceived().subscribe(() => {
-        count++;
-      });
+        const sub1 = service.onWebhookReceived().subscribe(() => {
+          count++;
+        });
 
-      const sub2 = service.onWebhookReceived().subscribe(() => {
-        count++;
-        sub1.unsubscribe();
-        sub2.unsubscribe();
-        expect(count).toBe(2);
-        done();
-      });
+        const sub2 = service.onWebhookReceived().subscribe(() => {
+          count++;
+          sub1.unsubscribe();
+          sub2.unsubscribe();
+          expect(count).toBe(2);
+          done();
+        });
 
-      service.handleWebhook(payload);
-    });
+        service.handleWebhook(payload);
+      }));
 
     it('should accept empty linked accounts array', () => {
       const mockConnection: PlaidConnection = {

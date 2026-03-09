@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import {
   IframeRendererComponent,
@@ -363,7 +363,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       text
         .toLowerCase()
         .replaceAll(/[^a-z0-9]+/g, '-')
-        // eslint-disable-next-line sonarjs/slow-regex, sonarjs/anchor-precedence -- Safe: slug transformation on user input
+        // eslint-disable-next-line sonarjs/slow-regex -- Safe: slug transformation on user input
         .replaceAll(/^-+|-+$/g, '')
     );
   }

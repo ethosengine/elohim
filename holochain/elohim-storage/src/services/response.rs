@@ -4,8 +4,8 @@
 //! Reduces boilerplate and ensures consistent error formatting.
 
 use bytes::Bytes;
-use hyper::{header, Response, StatusCode};
 use http_body_util::Full;
+use hyper::{header, Response, StatusCode};
 use serde::Serialize;
 
 use crate::error::StorageError;
@@ -34,8 +34,11 @@ pub fn created<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
 /// Build a JSON response with 200 OK status and X-Supported-Schema-Versions header.
 /// Used by bulk endpoints to advertise supported schema versions to clients.
 pub fn ok_with_schema_info<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
-    let versions = SUPPORTED_SCHEMA_VERSIONS.iter()
-        .map(|v| v.to_string()).collect::<Vec<_>>().join(",");
+    let versions = SUPPORTED_SCHEMA_VERSIONS
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
     let json = serde_json::to_string(body).unwrap_or_else(|_| "{}".to_string());
     Response::builder()
         .status(StatusCode::OK)
@@ -105,7 +108,9 @@ pub fn service_unavailable(message: &str) -> Response<Full<Bytes>> {
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     let (status, message) = match &error {
         StorageError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-        StorageError::BlobNotFound(msg) => (StatusCode::NOT_FOUND, format!("Blob not found: {}", msg)),
+        StorageError::BlobNotFound(msg) => {
+            (StatusCode::NOT_FOUND, format!("Blob not found: {}", msg))
+        }
         StorageError::HashMismatch { expected, actual } => (
             StatusCode::CONFLICT,
             format!("Hash mismatch: expected {}, got {}", expected, actual),

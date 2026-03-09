@@ -19,13 +19,13 @@
  * - Analyze content impact
  * - Get current agent's contributor stats
  *
- * @see AppreciationService for the underlying recognition primitives
+ * @see IEconomicEventFactory for the underlying recognition primitives
  * @see StewardService for steward economy operations
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
-// @coverage: 37.7% (2026-02-05)
+// @coverage: 37.7% (2026-02-24)
 
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 
@@ -141,7 +141,7 @@ export class ContributorService {
   /** Cache for recognition history */
   private readonly recognitionCache = new Map<string, Observable<LamadContributorRecognition[]>>();
 
-  constructor(private readonly holochainClient: HolochainClientService) {}
+  private readonly holochainClient = inject(HolochainClientService);
 
   /**
    * Check if contributor service is available.

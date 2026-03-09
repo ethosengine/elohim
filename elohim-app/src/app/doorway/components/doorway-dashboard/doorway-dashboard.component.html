@@ -254,7 +254,7 @@
         <div class="nodes-panel">
           <!-- Filters -->
           <div class="filters">
-            <select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)">
+            <select [value]="statusFilter()" (change)="onStatusFilterChange($event)">
               <option value="all">All Status</option>
               <option value="online">Online</option>
               <option value="degraded">Degraded</option>

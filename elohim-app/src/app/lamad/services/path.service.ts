@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 20.0% (2026-02-05)
+// @coverage: 20.0% (2026-02-24)
 
 import { map, switchMap } from 'rxjs/operators';
 
@@ -14,6 +14,7 @@ import {
 } from '@app/elohim/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { type CrossPathMatch } from '@app/elohim/services/epr-resolver.service';
 
 import {
   LearningPath,
@@ -25,6 +26,15 @@ import {
 } from '../models';
 
 import { ContentMasteryService } from './content-mastery.service';
+import { LearnerContextService } from './learner-context.service';
+
+/**
+ * How a step was unlocked — for UI visual differentiation.
+ * - sequential: normal fog-of-war progression (completed + 1)
+ * - mastery-unlocked: prior mastery on the step's content (Bloom >= understand)
+ * - skip-ahead: section skipped via pre-assessment
+ */
+export type AccessType = 'sequential' | 'mastery-unlocked' | 'skip-ahead';
 
 /**
  * Access check result for fog-of-war system.
@@ -32,6 +42,8 @@ import { ContentMasteryService } from './content-mastery.service';
 export interface AccessCheckResult {
   accessible: boolean;
   reason?: string;
+  /** How the step was unlocked (present only when accessible is true). */
+  accessType?: AccessType;
 }
 
 /** Metrics for a single chapter, used by getPathOverview. */
@@ -59,11 +71,10 @@ interface ChapterMetricsResult {
 @Injectable({ providedIn: 'root' })
 export class PathService {
   private readonly contentMastery = inject(ContentMasteryService);
+  private readonly learnerContext = inject(LearnerContextService);
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly agentService: AgentService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly agentService = inject(AgentService);
 
   /**
    * Get path metadata (does NOT load step content).
@@ -116,11 +127,14 @@ export class PathService {
   }
 
   /**
-   * Check if a step is accessible (fog-of-war rules).
+   * Check if a step is accessible (adaptive fog-of-war rules).
    *
-   * Rules:
-   * 1. Check attestation requirements
-   * 2. Check sequential progression (can access completed, current, or +1 step)
+   * Rules (in priority order):
+   * 1. Validate step index
+   * 2. Check attestation requirements (HARD WALL — never bypassed)
+   * 3. Check mastery unlock (Bloom >= 'understand' on step content)
+   * 4. Check skip-ahead (section skipped via pre-assessment)
+   * 5. Check sequential progression (completed + current + 1 ahead)
    */
   isStepAccessible(
     path: LearningPath,
@@ -128,7 +142,7 @@ export class PathService {
     progress: AgentProgress | null,
     attestations: string[]
   ): AccessCheckResult {
-    // Validate step index
+    // 1. Validate step index
     if (stepIndex < 0 || stepIndex >= path.steps.length) {
       return {
         accessible: false,
@@ -138,7 +152,7 @@ export class PathService {
 
     const step = path.steps[stepIndex];
 
-    // Check attestation requirement
+    // 2. Check attestation requirement (HARD WALL — mastery cannot bypass this)
     if (step.attestationRequired && !attestations.includes(step.attestationRequired)) {
       return {
         accessible: false,
@@ -146,7 +160,29 @@ export class PathService {
       };
     }
 
-    // Check sequential progression
+    // 3. Check mastery unlock — prior mastery on the step's content opens the door
+    if (this.learnerContext.isMasteryUnlocked(step.resourceId)) {
+      return {
+        accessible: true,
+        reason: 'Prior mastery',
+        accessType: 'mastery-unlocked',
+      };
+    }
+
+    // 4. Check skip-ahead — section skipped via pre-assessment
+    if (
+      step.sectionId &&
+      progress?.agentId &&
+      this.learnerContext.isInSkippedSection(path.id, step.sectionId, progress.agentId)
+    ) {
+      return {
+        accessible: true,
+        reason: 'Skipped via pre-assessment',
+        accessType: 'skip-ahead',
+      };
+    }
+
+    // 5. Sequential progression (unchanged fallback)
     // Can access: any completed step, current step, or ONE step ahead
     if (progress) {
       const maxCompleted =
@@ -167,7 +203,7 @@ export class PathService {
       };
     }
 
-    return { accessible: true };
+    return { accessible: true, accessType: 'sequential' };
   }
 
   /**
@@ -206,6 +242,28 @@ export class PathService {
         }
 
         return accessible;
+      })
+    );
+  }
+
+  /**
+   * Get access check results for every step in a path.
+   * Returns a Map<stepIndex, AccessCheckResult> for UI consumption.
+   */
+  getAccessCheckResults(pathId: string): Observable<Map<number, AccessCheckResult>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId),
+    }).pipe(
+      map(({ path, progress }) => {
+        const attestations = this.agentService.getAttestations();
+        const results = new Map<number, AccessCheckResult>();
+
+        for (let i = 0; i < path.steps.length; i++) {
+          results.set(i, this.isStepAccessible(path, i, progress, attestations));
+        }
+
+        return results;
       })
     );
   }
@@ -1051,5 +1109,45 @@ export class PathService {
       }
     }
     return false;
+  }
+
+  // =========================================================================
+  // CROSS-PATH CONTENT LOOKUP (for context-aware EPR resolution)
+  // =========================================================================
+
+  /**
+   * Find which paths contain a given content ID.
+   *
+   * Used by the EPR context-aware resolver to provide cross-path links:
+   * when the user clicks an epr: link and the target content isn't in
+   * the current path, this finds OTHER paths that contain it.
+   *
+   * @param contentId - The content node ID to search for
+   * @param excludePathId - Path to exclude (typically the current path)
+   * @returns Array of CrossPathMatch sorted by step index (earliest first)
+   */
+  findContentInPaths(contentId: string, excludePathId?: string): Observable<CrossPathMatch[]> {
+    return this.listPaths().pipe(
+      switchMap(index => {
+        const pathIds = index.paths.map(p => p.id).filter(id => id !== excludePathId);
+
+        if (pathIds.length === 0) return of([]);
+
+        // Load each path and search its steps
+        const pathLoads = pathIds.map(id => this.getPath(id));
+        return forkJoin(pathLoads).pipe(
+          map(paths => {
+            const matches: CrossPathMatch[] = [];
+            for (const path of paths) {
+              const stepIndex = path.steps.findIndex(s => s.resourceId === contentId);
+              if (stepIndex >= 0) {
+                matches.push({ pathId: path.id, stepIndex });
+              }
+            }
+            return matches;
+          })
+        );
+      })
+    );
   }
 }

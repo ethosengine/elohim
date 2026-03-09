@@ -5,7 +5,7 @@
 export { SessionHumanService } from './session-human.service';
 export { ProfileService } from '@app/elohim/services/profile.service';
 export { IdentityService } from './identity.service';
-export { PresenceService } from './presence.service';
+
 export { SessionMigrationService } from './session-migration.service';
 export { AgencyService } from './agency.service';
 export { HumanRelationshipService } from './human-relationship.service';
@@ -21,6 +21,9 @@ export { OAuthAuthProvider } from './providers/oauth-auth.provider';
 
 // Hosting
 export { HostingAccountService } from './hosting-account.service';
+
+// Account packages
+export { AccountPackageService } from './account-package.service';
 
 // Banner providers
 export { UpgradeBannerProvider } from './providers/upgrade-banner.provider';

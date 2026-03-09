@@ -687,7 +687,7 @@ export function connectionStateColor(state: string): string {
  * Get quota gauge color based on usage percentage
  */
 export function quotaGaugeColor(percent: number): string {
-  if (percent >= 90) return '#ef4444';
-  if (percent >= 70) return '#f59e0b';
-  return '#10b981';
+  if (percent >= 90) return 'var(--dw-error)';
+  if (percent >= 70) return 'var(--dw-warning)';
+  return 'var(--dw-success)';
 }

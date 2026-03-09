@@ -16,8 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -59,12 +57,10 @@ impl StreamTracker {
     pub fn with_persistence(db: sled::Tree) -> Self {
         // Load existing positions from disk
         let mut positions = HashMap::new();
-        for item in db.iter() {
-            if let Ok((key, value)) = item {
-                if let Ok(pos) = rmp_serde::from_slice::<StreamPosition>(&value) {
-                    let key_str = String::from_utf8_lossy(&key).to_string();
-                    positions.insert(key_str, pos);
-                }
+        for (key, value) in db.iter().flatten() {
+            if let Ok(pos) = rmp_serde::from_slice::<StreamPosition>(&value) {
+                let key_str = String::from_utf8_lossy(&key).to_string();
+                positions.insert(key_str, pos);
             }
         }
 
@@ -103,12 +99,15 @@ impl StreamTracker {
         };
 
         // Update in memory
-        self.positions.write().await.insert(key.clone(), pos.clone());
+        self.positions
+            .write()
+            .await
+            .insert(key.clone(), pos.clone());
 
         // Persist if we have a database
         if let Some(ref db) = self.db {
-            let bytes = rmp_serde::to_vec(&pos)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let bytes =
+                rmp_serde::to_vec(&pos).map_err(|e| StorageError::Serialization(e.to_string()))?;
             db.insert(key.as_bytes(), bytes)
                 .map_err(|e| StorageError::Database(e.to_string()))?;
         }
@@ -148,11 +147,7 @@ impl StreamTracker {
     }
 
     /// Remove position for a peer and document
-    pub async fn remove_position(
-        &self,
-        peer_id: &str,
-        doc_id: &str,
-    ) -> Result<bool, StorageError> {
+    pub async fn remove_position(&self, peer_id: &str, doc_id: &str) -> Result<bool, StorageError> {
         let key = Self::make_key(peer_id, doc_id);
         let existed = self.positions.write().await.remove(&key).is_some();
 

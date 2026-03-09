@@ -7,9 +7,10 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = "0.4"
+hdk = "=0.6.0"
 serde = "1"
 serde_json = "1"
+holochain_serialized_bytes = "=0.0.56"
 node_registry_integrity = { path = "../node_registry_integrity" }
 
 [profile.release]

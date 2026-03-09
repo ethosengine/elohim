@@ -11,10 +11,10 @@
 //! - `policy_daily_usage` - Daily usage tracking
 //! - `policy_events` - Policy violation/block logs
 
-use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::db::{DbPool, PooledConn};
 use crate::error::StorageError;
@@ -135,9 +135,9 @@ impl Default for CachedPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeWindow {
-    pub day_of_week: Vec<u8>,  // 0=Sun, 1=Mon, etc.
-    pub start_hour: u8,        // 0-23
-    pub start_minute: u8,      // 0-59
+    pub day_of_week: Vec<u8>, // 0=Sun, 1=Mon, etc.
+    pub start_hour: u8,       // 0-23
+    pub start_minute: u8,     // 0-59
     pub end_hour: u8,
     pub end_minute: u8,
 }
@@ -371,7 +371,9 @@ impl PolicyCache {
             "#,
         )
         .execute(&mut conn)
-        .map_err(|e| StorageError::Internal(format!("Failed to create policy_daily_usage: {}", e)))?;
+        .map_err(|e| {
+            StorageError::Internal(format!("Failed to create policy_daily_usage: {}", e))
+        })?;
 
         // Create policy_events table
         diesel::sql_query(
@@ -393,17 +395,23 @@ impl PolicyCache {
         .map_err(|e| StorageError::Internal(format!("Failed to create policy_events: {}", e)))?;
 
         // Create indexes
-        diesel::sql_query("CREATE INDEX IF NOT EXISTS idx_policy_sessions_agent ON policy_sessions(agent_id)")
-            .execute(&mut conn)
-            .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
+        diesel::sql_query(
+            "CREATE INDEX IF NOT EXISTS idx_policy_sessions_agent ON policy_sessions(agent_id)",
+        )
+        .execute(&mut conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
 
-        diesel::sql_query("CREATE INDEX IF NOT EXISTS idx_policy_events_agent ON policy_events(agent_id)")
-            .execute(&mut conn)
-            .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
+        diesel::sql_query(
+            "CREATE INDEX IF NOT EXISTS idx_policy_events_agent ON policy_events(agent_id)",
+        )
+        .execute(&mut conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
 
-        diesel::sql_query("CREATE INDEX IF NOT EXISTS idx_policy_events_timestamp ON policy_events(timestamp)")
-            .execute(&mut conn)
-            .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
+        diesel::sql_query(
+            "CREATE INDEX IF NOT EXISTS idx_policy_events_timestamp ON policy_events(timestamp)",
+        )
+        .execute(&mut conn)
+        .map_err(|e| StorageError::Internal(format!("Failed to create index: {}", e)))?;
 
         info!("Policy cache tables initialized");
         Ok(())
@@ -451,8 +459,9 @@ impl PolicyCache {
 
             if expires > Utc::now() {
                 // Parse and cache
-                let policy: CachedPolicy = serde_json::from_str(&row.policy_json)
-                    .map_err(|e| StorageError::Internal(format!("Failed to parse policy: {}", e)))?;
+                let policy: CachedPolicy = serde_json::from_str(&row.policy_json).map_err(|e| {
+                    StorageError::Internal(format!("Failed to parse policy: {}", e))
+                })?;
 
                 self.hot_cache.insert(agent_id.to_string(), policy.clone());
                 debug!("Policy loaded from SQLite for agent {}", agent_id);
@@ -593,7 +602,10 @@ impl PolicyCache {
                 .execute(&mut conn)
                 .map_err(|e| StorageError::Internal(format!("Failed to end session: {}", e)))?;
 
-            info!("Ended session {} ({}min)", session_id, session.duration_minutes);
+            info!(
+                "Ended session {} ({}min)",
+                session_id, session.duration_minutes
+            );
         }
 
         Ok(())
@@ -769,7 +781,11 @@ impl PolicyEnforcement {
     }
 
     /// Check if content can be served to an agent
-    pub fn can_serve(&self, agent_id: &str, content: &ContentMetadata) -> Result<PolicyDecision, StorageError> {
+    pub fn can_serve(
+        &self,
+        agent_id: &str,
+        content: &ContentMetadata,
+    ) -> Result<PolicyDecision, StorageError> {
         let policy = self.cache.get_policy(agent_id)?;
 
         // Check blocked hashes
@@ -789,19 +805,29 @@ impl PolicyEnforcement {
         }
 
         // Check age rating
-        if let (Some(max_rating), Some(content_rating)) = (&policy.age_rating_max, &content.age_rating) {
+        if let (Some(max_rating), Some(content_rating)) =
+            (&policy.age_rating_max, &content.age_rating)
+        {
             if !is_rating_allowed(content_rating, max_rating) {
                 return Ok(PolicyDecision::Block {
-                    reason: format!("Age rating '{}' exceeds maximum '{}'", content_rating, max_rating),
+                    reason: format!(
+                        "Age rating '{}' exceeds maximum '{}'",
+                        content_rating, max_rating
+                    ),
                 });
             }
         }
 
         // Check reach level
-        if let (Some(max_reach), Some(content_reach)) = (policy.reach_level_max, content.reach_level) {
+        if let (Some(max_reach), Some(content_reach)) =
+            (policy.reach_level_max, content.reach_level)
+        {
             if content_reach > max_reach {
                 return Ok(PolicyDecision::Block {
-                    reason: format!("Reach level {} exceeds maximum {}", content_reach, max_reach),
+                    reason: format!(
+                        "Reach level {} exceeds maximum {}",
+                        content_reach, max_reach
+                    ),
                 });
             }
         }
@@ -810,7 +836,11 @@ impl PolicyEnforcement {
     }
 
     /// Check if a feature is allowed for an agent
-    pub fn can_use_feature(&self, agent_id: &str, feature: &str) -> Result<PolicyDecision, StorageError> {
+    pub fn can_use_feature(
+        &self,
+        agent_id: &str,
+        feature: &str,
+    ) -> Result<PolicyDecision, StorageError> {
         let policy = self.cache.get_policy(agent_id)?;
 
         if policy.disabled_features.contains(&feature.to_string()) {
@@ -823,7 +853,11 @@ impl PolicyEnforcement {
     }
 
     /// Check if a route is allowed for an agent
-    pub fn can_access_route(&self, agent_id: &str, route: &str) -> Result<PolicyDecision, StorageError> {
+    pub fn can_access_route(
+        &self,
+        agent_id: &str,
+        route: &str,
+    ) -> Result<PolicyDecision, StorageError> {
         let policy = self.cache.get_policy(agent_id)?;
 
         for disabled_route in &policy.disabled_routes {
@@ -844,8 +878,8 @@ impl PolicyEnforcement {
 
         // Check time windows
         if !policy.time_windows_json.is_empty() && policy.time_windows_json != "[]" {
-            let windows: Vec<TimeWindow> = serde_json::from_str(&policy.time_windows_json)
-                .unwrap_or_default();
+            let windows: Vec<TimeWindow> =
+                serde_json::from_str(&policy.time_windows_json).unwrap_or_default();
 
             if !windows.is_empty() && !is_in_allowed_window(&windows) {
                 return Ok(TimeAccessDecision::OutsideWindow);
@@ -872,12 +906,12 @@ impl PolicyEnforcement {
         }
 
         // Calculate remaining time
-        let remaining_session = policy.session_max_minutes.map(|max| {
-            (max as i32 - session_minutes).max(0) as u32
-        });
-        let remaining_daily = policy.daily_max_minutes.map(|max| {
-            (max as i32 - daily_minutes).max(0) as u32
-        });
+        let remaining_session = policy
+            .session_max_minutes
+            .map(|max| (max as i32 - session_minutes).max(0) as u32);
+        let remaining_daily = policy
+            .daily_max_minutes
+            .map(|max| (max as i32 - daily_minutes).max(0) as u32);
 
         Ok(TimeAccessDecision::Allowed {
             remaining_session,
@@ -899,19 +933,23 @@ impl PolicyEnforcement {
 fn is_rating_allowed(content_rating: &str, max_rating: &str) -> bool {
     let ratings = ["G", "PG", "PG-13", "R", "NC-17"];
 
-    let content_idx = ratings.iter().position(|r| *r == content_rating).unwrap_or(0);
-    let max_idx = ratings.iter().position(|r| *r == max_rating).unwrap_or(ratings.len() - 1);
+    let content_idx = ratings
+        .iter()
+        .position(|r| *r == content_rating)
+        .unwrap_or(0);
+    let max_idx = ratings
+        .iter()
+        .position(|r| *r == max_rating)
+        .unwrap_or(ratings.len() - 1);
 
     content_idx <= max_idx
 }
 
 /// Check if a route matches a pattern (supports wildcards)
 fn route_matches(route: &str, pattern: &str) -> bool {
-    if pattern.ends_with("/*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    if let Some(prefix) = pattern.strip_suffix("/*") {
         route.starts_with(prefix)
-    } else if pattern.ends_with("*") {
-        let prefix = &pattern[..pattern.len() - 1];
+    } else if let Some(prefix) = pattern.strip_suffix('*') {
         route.starts_with(prefix)
     } else {
         route == pattern

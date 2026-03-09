@@ -33,8 +33,20 @@ export * from './human-consent.model';
 // Banner notification system
 export * from './banner-notice.model';
 
+// Elohim presence
+export * from './elohim-presence.model';
+
+// Create context (reach negotiation, birth context)
+export * from './create-context.model';
+
+// EPR Head (IPLD-compatible content metadata)
+export * from './epr-head.model';
+
 // Infrastructure
 export * from './source-chain.model';
 export * from './json-ld.model';
 export * from './open-graph.model';
 export * from './verifiable-credential.model';
+
+// Zome Wire Types - Centralized Holochain zome response types
+export * from './zome-wire-types';

@@ -18,10 +18,11 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 96.6% (2026-02-05)
+// @coverage: 96.6% (2026-02-24)
 
 import { interval, Subscription } from 'rxjs';
 
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import {
   type ComputedPolicy,
   type StewardshipGrant,
@@ -31,7 +32,6 @@ import {
   getStewardTierLabel,
   getAuthorityBasisLabel,
 } from '../../models/stewardship.model';
-import { StewardshipService } from '../../services/stewardship.service';
 
 /** Restriction display item */
 interface RestrictionItem {
@@ -49,7 +49,7 @@ interface RestrictionItem {
   styleUrls: ['./capabilities-dashboard.component.css'],
 })
 export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
-  private readonly stewardship = inject(StewardshipService);
+  private readonly stewardship = inject(STEWARDSHIP_POLICY);
   private timerSubscription?: Subscription;
 
   // ===========================================================================

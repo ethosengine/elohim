@@ -6,37 +6,42 @@ import { ContentEditorPageComponent } from './content-editor-page.component';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { ContentFormatRegistryService } from '../../content-io/services/content-format-registry.service';
+import { vi } from 'vitest';
 
 describe('ContentEditorPageComponent', () => {
   let component: ContentEditorPageComponent;
   let fixture: ComponentFixture<ContentEditorPageComponent>;
-  let mockDataLoader: jasmine.SpyObj<DataLoaderService>;
-  let mockEditorService: jasmine.SpyObj<ContentEditorService>;
-  let mockRegistry: jasmine.SpyObj<ContentFormatRegistryService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockDataLoader: any;
+  let mockEditorService: any;
+  let mockRegistry: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
-    mockDataLoader = jasmine.createSpyObj('DataLoaderService', ['getContent']);
-    mockDataLoader.getContent.and.returnValue(of(null as any));
+    mockDataLoader = {
+      getContent: vi.fn(),
+    };
+    mockDataLoader.getContent.mockReturnValue(of(null as any));
 
-    mockEditorService = jasmine.createSpyObj('ContentEditorService', [
-      'canEdit',
-      'createNewDraft',
-      'saveContent',
-    ]);
-    mockEditorService.canEdit.and.returnValue(false);
+    mockEditorService = {
+      canEdit: vi.fn(),
+      createNewDraft: vi.fn(),
+      saveContent: vi.fn(),
+    };
+    mockEditorService.canEdit.mockReturnValue(false);
 
-    mockRegistry = jasmine.createSpyObj('ContentFormatRegistryService', [
-      'getEditorComponent',
-      'getEditorConfig',
-    ]);
-    mockRegistry.getEditorComponent.and.returnValue(null);
-    mockRegistry.getEditorConfig.and.returnValue({
+    mockRegistry = {
+      getEditorComponent: vi.fn(),
+      getEditorConfig: vi.fn(),
+    };
+    mockRegistry.getEditorComponent.mockReturnValue(null);
+    mockRegistry.getEditorConfig.mockReturnValue({
       editorMode: 'visual',
       supportsLivePreview: false,
     });
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = {
+      navigate: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [ContentEditorPageComponent],

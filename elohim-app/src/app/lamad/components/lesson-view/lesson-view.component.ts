@@ -12,10 +12,11 @@ import {
   ComponentRef,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  inject,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { Subject, Subscription } from 'rxjs';
 
@@ -138,6 +139,7 @@ interface InlineQuizCompletionEvent {
         (click)="toggleExplorationPanel()"
         [attr.aria-expanded]="explorationPanelOpen"
         aria-controls="exploration-panel"
+        data-testid="lesson-toggle-panel"
       >
         <span class="toggle-icon">{{ explorationPanelOpen ? '→' : '←' }}</span>
         <span class="toggle-label">{{ explorationPanelOpen ? 'Hide' : 'Explore' }}</span>
@@ -155,6 +157,7 @@ interface InlineQuizCompletionEvent {
             class="panel-close"
             (click)="toggleExplorationPanel()"
             aria-label="Close exploration panel"
+            data-testid="lesson-panel-close"
           >
             ×
           </button>
@@ -187,7 +190,11 @@ interface InlineQuizCompletionEvent {
 
           <!-- Explore in Full Graph button -->
           <div class="panel-actions">
-            <button class="btn-explore-graph" (click)="onExploreInGraphClick()">
+            <button
+              class="btn-explore-graph"
+              (click)="onExploreInGraphClick()"
+              data-testid="lesson-explore-graph"
+            >
               <span class="btn-icon">🔭</span>
               Explore in Full Graph
             </button>
@@ -554,10 +561,8 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   private rendererSubscription: Subscription | null = null;
   private readonly destroy$ = new Subject<void>();
 
-  constructor(
-    private readonly rendererRegistry: RendererRegistryService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly rendererRegistry = inject(RendererRegistryService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['content'] && this.content) {

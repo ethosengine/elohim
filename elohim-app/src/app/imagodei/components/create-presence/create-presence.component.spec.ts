@@ -6,30 +6,41 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CreatePresenceComponent } from './create-presence.component';
-import { PresenceService } from '../../services/presence.service';
+import { PRESENCE_LIFECYCLE } from '../../interfaces/presence.interface';
 import { ContentService } from '@app/lamad/services/content.service';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('CreatePresenceComponent', () => {
   let component: CreatePresenceComponent;
   let fixture: ComponentFixture<CreatePresenceComponent>;
-  let mockPresenceService: jasmine.SpyObj<PresenceService>;
-  let mockContentService: jasmine.SpyObj<ContentService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockPresenceService: any;
+  let mockContentService: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
     // Create mocks
-    mockPresenceService = jasmine.createSpyObj('PresenceService', ['createPresence']);
+    mockPresenceService = {
+      createPresence: vi.fn(),
+    };
 
-    mockContentService = jasmine.createSpyObj('ContentService', ['searchContent']);
+    mockContentService = {
+      searchContent: vi.fn(),
+    };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = {
+      navigate: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [CreatePresenceComponent],
       providers: [
-        { provide: PresenceService, useValue: mockPresenceService },
+        { provide: PRESENCE_LIFECYCLE, useValue: mockPresenceService },
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ContentService, useValue: mockContentService },
         { provide: Router, useValue: mockRouter },
       ],
@@ -189,12 +200,13 @@ describe('CreatePresenceComponent', () => {
   // Cancel
   // ==========================================================================
 
-  it('should emit cancelled when onCancel is called', (done) => {
-    component.cancelled.subscribe(() => {
-      done();
-    });
-    component.onCancel();
-  });
+  it('should emit cancelled when onCancel is called', () =>
+    new Promise<void>(done => {
+      component.cancelled.subscribe(() => {
+        done();
+      });
+      component.onCancel();
+    }));
 
   // ==========================================================================
   // New Identifier Initialization
@@ -259,20 +271,21 @@ describe('CreatePresenceComponent', () => {
       expect(identifiers[0].value).toBe('johndoe');
     });
 
-    it('should generate unique ID for each identifier', (done) => {
-      component.newIdentifier.set({ id: '', provider: 'github', value: 'user1' });
-      component.addIdentifier();
-
-      // Small delay to ensure different timestamps
-      setTimeout(() => {
-        component.newIdentifier.set({ id: '', provider: 'github', value: 'user2' });
+    it('should generate unique ID for each identifier', () =>
+      new Promise<void>(done => {
+        component.newIdentifier.set({ id: '', provider: 'github', value: 'user1' });
         component.addIdentifier();
 
-        const identifiers = component.identifiers();
-        expect(identifiers[0].id).not.toBe(identifiers[1].id);
-        done();
-      }, 10);
-    });
+        // Small delay to ensure different timestamps
+        setTimeout(() => {
+          component.newIdentifier.set({ id: '', provider: 'github', value: 'user2' });
+          component.addIdentifier();
+
+          const identifiers = component.identifiers();
+          expect(identifiers[0].id).not.toBe(identifiers[1].id);
+          done();
+        }, 10);
+      }));
 
     it('should trim identifier value', () => {
       component.newIdentifier.set({
@@ -462,7 +475,7 @@ describe('CreatePresenceComponent', () => {
         { id: 'content-2', title: 'Test Content 2' },
       ];
 
-      mockContentService.searchContent.and.returnValue({
+      mockContentService.searchContent.mockReturnValue({
         subscribe: (handlers: any) => {
           handlers.next(mockResults);
           return { unsubscribe: () => {} };
@@ -481,7 +494,7 @@ describe('CreatePresenceComponent', () => {
         title: `Content ${i}`,
       }));
 
-      mockContentService.searchContent.and.returnValue({
+      mockContentService.searchContent.mockReturnValue({
         subscribe: (handlers: any) => {
           handlers.next(mockResults);
           return { unsubscribe: () => {} };
@@ -495,7 +508,7 @@ describe('CreatePresenceComponent', () => {
     });
 
     it('should handle search error', () => {
-      mockContentService.searchContent.and.returnValue({
+      mockContentService.searchContent.mockReturnValue({
         subscribe: (handlers: any) => {
           handlers.error(new Error('Search failed'));
           return { unsubscribe: () => {} };
@@ -607,7 +620,7 @@ describe('CreatePresenceComponent', () => {
 
   describe('Form Submission - Success', () => {
     beforeEach(() => {
-      mockPresenceService.createPresence.and.returnValue(
+      mockPresenceService.createPresence.mockReturnValue(
         Promise.resolve({ id: 'presence-123' } as any)
       );
     });
@@ -619,7 +632,7 @@ describe('CreatePresenceComponent', () => {
       await component.onSubmit();
 
       expect(mockPresenceService.createPresence).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           displayName: 'John Doe',
           note: 'Test note',
         })
@@ -636,7 +649,7 @@ describe('CreatePresenceComponent', () => {
       await component.onSubmit();
 
       expect(mockPresenceService.createPresence).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           externalIdentifiers: [
             { provider: 'github', value: 'johndoe' },
             { provider: 'email', value: 'john@example.com' },
@@ -652,22 +665,23 @@ describe('CreatePresenceComponent', () => {
       await component.onSubmit();
 
       expect(mockPresenceService.createPresence).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           establishingContentIds: ['content-1', 'content-2'],
         })
       );
     });
 
-    it('should emit created event with presence ID', (done) => {
-      component.displayName.set('John Doe');
+    it('should emit created event with presence ID', () =>
+      new Promise<void>(done => {
+        component.displayName.set('John Doe');
 
-      component.created.subscribe((presenceId: string) => {
-        expect(presenceId).toBe('presence-123');
-        done();
-      });
+        component.created.subscribe((presenceId: string) => {
+          expect(presenceId).toBe('presence-123');
+          done();
+        });
 
-      void component.onSubmit();
-    });
+        void component.onSubmit();
+      }));
 
     it('should navigate to presence detail page', async () => {
       component.displayName.set('John Doe');
@@ -702,7 +716,7 @@ describe('CreatePresenceComponent', () => {
       await component.onSubmit();
 
       expect(mockPresenceService.createPresence).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           displayName: 'John Doe',
         })
       );
@@ -715,7 +729,7 @@ describe('CreatePresenceComponent', () => {
       await component.onSubmit();
 
       expect(mockPresenceService.createPresence).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           note: 'Test note',
         })
       );
@@ -727,7 +741,7 @@ describe('CreatePresenceComponent', () => {
 
       await component.onSubmit();
 
-      const callArgs = mockPresenceService.createPresence.calls.mostRecent().args[0];
+      const callArgs = mockPresenceService.createPresence.mock.lastCall[0];
       expect(callArgs.note).toBeUndefined();
     });
 
@@ -737,7 +751,7 @@ describe('CreatePresenceComponent', () => {
 
       await component.onSubmit();
 
-      const callArgs = mockPresenceService.createPresence.calls.mostRecent().args[0];
+      const callArgs = mockPresenceService.createPresence.mock.lastCall[0];
       expect(callArgs.externalIdentifiers).toBeUndefined();
     });
 
@@ -747,7 +761,7 @@ describe('CreatePresenceComponent', () => {
 
       await component.onSubmit();
 
-      const callArgs = mockPresenceService.createPresence.calls.mostRecent().args[0];
+      const callArgs = mockPresenceService.createPresence.mock.lastCall[0];
       expect(callArgs.establishingContentIds).toBeUndefined();
     });
   });
@@ -791,7 +805,7 @@ describe('CreatePresenceComponent', () => {
   describe('Form Submission - Service Errors', () => {
     it('should handle service error', async () => {
       component.displayName.set('John Doe');
-      mockPresenceService.createPresence.and.returnValue(
+      mockPresenceService.createPresence.mockReturnValue(
         Promise.reject(new Error('Network error'))
       );
 
@@ -802,7 +816,7 @@ describe('CreatePresenceComponent', () => {
 
     it('should handle non-Error exception', async () => {
       component.displayName.set('John Doe');
-      mockPresenceService.createPresence.and.returnValue(Promise.reject('String error'));
+      mockPresenceService.createPresence.mockReturnValue(Promise.reject('String error'));
 
       await component.onSubmit();
 
@@ -811,7 +825,7 @@ describe('CreatePresenceComponent', () => {
 
     it('should set isSubmitting to false after error', async () => {
       component.displayName.set('John Doe');
-      mockPresenceService.createPresence.and.returnValue(Promise.reject(new Error('Error')));
+      mockPresenceService.createPresence.mockReturnValue(Promise.reject(new Error('Error')));
 
       await component.onSubmit();
 
@@ -820,7 +834,7 @@ describe('CreatePresenceComponent', () => {
 
     it('should not navigate on error', async () => {
       component.displayName.set('John Doe');
-      mockPresenceService.createPresence.and.returnValue(Promise.reject(new Error('Error')));
+      mockPresenceService.createPresence.mockReturnValue(Promise.reject(new Error('Error')));
 
       await component.onSubmit();
 

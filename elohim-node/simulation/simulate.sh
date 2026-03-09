@@ -167,6 +167,30 @@ cmd_test() {
             fi
         done
 
+        # Verify data sync infrastructure between peers
+        log_info "Verifying data sync infrastructure..."
+        local sync_verified=0
+        for storage in "storage-a-1:8091" "storage-b-1:8092"; do
+            local name="${storage%%:*}"
+            local port="${storage##*:}"
+            local sync_response
+            sync_response=$(curl -sf "http://localhost:$port/sync/v1/elohim/docs" 2>/dev/null)
+            if echo "$sync_response" | grep -q '"total"'; then
+                local doc_count
+                doc_count=$(echo "$sync_response" | grep -o '"total":[0-9]*' | grep -o '[0-9]*' || echo "0")
+                echo -e "  ${GREEN}●${NC} $name - sync API active ($doc_count docs)"
+                sync_verified=$((sync_verified + 1))
+            else
+                echo -e "  ${YELLOW}!${NC} $name - sync API not responding (advisory)"
+            fi
+        done
+
+        if [[ $sync_verified -ge 2 ]]; then
+            echo -e "  ${GREEN}●${NC} Data sync infrastructure verified on both peers"
+        else
+            echo -e "  ${YELLOW}!${NC} Data sync not fully verified (advisory - sync API needs P2P enabled)"
+        fi
+
         # Test network partition and heal
         log_info "Testing network partition..."
         cmd_partition

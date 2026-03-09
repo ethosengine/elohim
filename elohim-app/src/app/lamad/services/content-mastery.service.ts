@@ -1,13 +1,13 @@
-import { Injectable, effect } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 
-// @coverage: 58.2% (2026-02-05)
+// @coverage: 58.8% (2026-02-24)
 
 import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 'rxjs';
 
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
 import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
@@ -72,12 +72,12 @@ export class ContentMasteryService {
   /** Tracks whether we've already synced since the last reconnect */
   private hasSyncedSinceConnect = false;
 
-  constructor(
-    private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService,
-    private readonly backend: LearnerBackendService,
-    private readonly holochainClient: HolochainClientService
-  ) {
+  private readonly sourceChain = inject(LocalSourceChainService);
+  private readonly sessionHuman = inject(SessionHumanService);
+  private readonly backend = inject(LEARNER_BACKEND);
+  private readonly holochainClient = inject(HolochainClientService);
+
+  constructor() {
     // Initialize when session is available
     this.sessionHuman.session$.subscribe(session => {
       if (session) {

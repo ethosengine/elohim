@@ -130,6 +130,22 @@ pub struct Args {
     #[arg(long, env = "STORAGE_URL")]
     pub storage_url: Option<String>,
 
+    /// URL of elohim-agent-sdk sidecar for AI agent invocation
+    /// (e.g., "http://localhost:8095")
+    /// Doorway proxies /api/v1/elohim/invoke requests here
+    #[arg(
+        long,
+        env = "ELOHIM_AGENT_URL",
+        default_value = "http://localhost:8095"
+    )]
+    pub elohim_agent_url: String,
+
+    /// URL of the elohim-node compute endpoint (e.g., "http://localhost:8091")
+    /// When set, doorway tries elohim-node first for /api/v1/elohim/* requests,
+    /// falling back to elohim-agent-sdk sidecar if node is unreachable.
+    #[arg(long, env = "ELOHIM_NODE_URL", default_value = "")]
+    pub elohim_node_url: String,
+
     /// URL of doorway-app for operator dashboard
     /// (e.g., "http://localhost:8081")
     /// Doorway proxies /threshold/* requests here
@@ -159,6 +175,12 @@ pub struct Args {
     /// Admin port for orchestrator mDNS advertisement (defaults to conductor admin port)
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,
+
+    /// Comma-separated list of allowed CORS origins.
+    /// In dev mode this is ignored (all origins allowed).
+    /// e.g. "https://elohim.host,https://alpha.elohim.host,tauri://localhost"
+    #[arg(long, env = "CORS_ORIGINS", value_delimiter = ',')]
+    pub cors_origins: Vec<String>,
 
     /// Comma-separated list of peer doorway URLs for federation discovery
     /// Each peer is queried at startup and periodically for cross-doorway awareness

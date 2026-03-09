@@ -1,5 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { WriteBufferService, WritePriority, WriteOpType, type WriteOperation } from './write-buffer.service';
+import {
+  WriteBufferService,
+  WritePriority,
+  WriteOpType,
+  type WriteOperation,
+} from './write-buffer.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
+import { vi, Mock } from 'vitest';
 
 /**
  * Unit tests for WriteBufferService
@@ -11,8 +18,17 @@ describe('WriteBufferService', () => {
   let service: WriteBufferService;
 
   beforeEach(() => {
+    const idbSpy = {
+      init: vi.fn(),
+      getMetadata: vi.fn(),
+      setMetadata: vi.fn(),
+    };
+    idbSpy.init.mockReturnValue(Promise.resolve(false));
+    idbSpy.getMetadata.mockReturnValue(Promise.resolve(null));
+    idbSpy.setMetadata.mockReturnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
-      providers: [WriteBufferService],
+      providers: [WriteBufferService, { provide: IndexedDBCacheService, useValue: idbSpy }],
     });
     service = TestBed.inject(WriteBufferService);
   });
@@ -29,7 +45,7 @@ describe('WriteBufferService', () => {
     it('should initialize successfully', async () => {
       const result = await service.initialize();
 
-      expect(result.success).toBeTrue();
+      expect(result.success).toBe(true);
       expect(service.state).toBe('ready');
       expect(['wasm', 'typescript']).toContain(result.implementation);
     });
@@ -38,7 +54,7 @@ describe('WriteBufferService', () => {
       // WASM may not be available in test environment
       const result = await service.initialize();
 
-      expect(result.success).toBeTrue();
+      expect(result.success).toBe(true);
       expect(service.implementationType).toBeTruthy();
     });
 
@@ -46,16 +62,16 @@ describe('WriteBufferService', () => {
       await service.initialize();
       const secondInit = await service.initialize();
 
-      expect(secondInit.success).toBeTrue();
+      expect(secondInit.success).toBe(true);
       expect(service.state).toBe('ready');
     });
 
     it('should set isReady flag', async () => {
-      expect(service.isReady).toBeFalse();
+      expect(service.isReady).toBe(false);
 
       await service.initialize();
 
-      expect(service.isReady).toBeTrue();
+      expect(service.isReady).toBe(true);
     });
   });
 
@@ -77,7 +93,7 @@ describe('WriteBufferService', () => {
       it('should queue a write operation', () => {
         const result = service.queueWrite('op-1', WriteOpType.CreateEntry, '{"data":"test"}');
 
-        expect(result).toBeTrue();
+        expect(result).toBe(true);
         expect(service.totalQueued()).toBe(1);
       });
 
@@ -113,7 +129,7 @@ describe('WriteBufferService', () => {
           const queued = service.queueWrite(`op-${i}`, WriteOpType.CreateEntry, '{"data":"x"}');
           if (!queued) {
             // Hit backpressure limit
-            expect(service.isBackpressured()).toBeTrue();
+            expect(service.isBackpressured()).toBe(true);
             break;
           }
         }
@@ -203,7 +219,7 @@ describe('WriteBufferService', () => {
     });
 
     it('should determine when to flush', () => {
-      expect(service.shouldFlush()).toBeFalse();
+      expect(service.shouldFlush()).toBe(false);
 
       // Queue enough to trigger flush
       for (let i = 0; i < 50; i++) {
@@ -211,7 +227,7 @@ describe('WriteBufferService', () => {
       }
 
       // Should recommend flushing
-      expect(service.shouldFlush()).toBeTrue();
+      expect(service.shouldFlush()).toBe(true);
     });
 
     it('should get pending batch', () => {
@@ -220,14 +236,14 @@ describe('WriteBufferService', () => {
 
       const batchResult = service.getPendingBatch();
 
-      expect(batchResult.hasBatch).toBeTrue();
+      expect(batchResult.hasBatch).toBe(true);
       expect(batchResult.batch?.operations.length).toBeGreaterThan(0);
     });
 
     it('should return no batch when queue is empty', () => {
       const batchResult = service.getPendingBatch();
 
-      expect(batchResult.hasBatch).toBeFalse();
+      expect(batchResult.hasBatch).toBe(false);
       expect(batchResult.batch).toBeNull();
     });
   });
@@ -240,11 +256,11 @@ describe('WriteBufferService', () => {
     it('should flush a single batch successfully', async () => {
       service.queueWrite('op-1', WriteOpType.CreateEntry, '{"data":"test"}');
 
-      const callback = jasmine.createSpy('callback').and.returnValue(Promise.resolve());
+      const callback = vi.fn().mockReturnValue(Promise.resolve());
       const result = await service.flushBatch(callback);
 
       expect(result).toBeTruthy();
-      expect(result?.success).toBeTrue();
+      expect(result?.success).toBe(true);
       expect(callback).toHaveBeenCalled();
       expect(service.totalQueued()).toBe(0);
     });
@@ -252,18 +268,16 @@ describe('WriteBufferService', () => {
     it('should handle flush callback errors', async () => {
       service.queueWrite('op-1', WriteOpType.CreateEntry, '{"data":"test"}');
 
-      const callback = jasmine
-        .createSpy('callback')
-        .and.returnValue(Promise.reject(new Error('Network error')));
+      const callback = vi.fn().mockReturnValue(Promise.reject(new Error('Network error')));
       const result = await service.flushBatch(callback);
 
       expect(result).toBeTruthy();
-      expect(result?.success).toBeFalse();
+      expect(result?.success).toBe(false);
       expect(result?.error).toContain('Network error');
     });
 
     it('should return null when no batch to flush', async () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       const result = await service.flushBatch(callback);
 
       expect(result).toBeNull();
@@ -274,7 +288,7 @@ describe('WriteBufferService', () => {
       service.queueWrite('op-1', WriteOpType.CreateEntry, '{"a":1}');
       service.queueWrite('op-2', WriteOpType.CreateEntry, '{"b":2}');
 
-      const callback = jasmine.createSpy('callback').and.returnValue(
+      const callback = vi.fn().mockReturnValue(
         Promise.resolve({
           success: false,
           operationResults: [
@@ -295,14 +309,14 @@ describe('WriteBufferService', () => {
     it('should set flushing state during flush', async () => {
       service.queueWrite('op-1', WriteOpType.CreateEntry, '{"data":"test"}');
 
-      const callback = jasmine.createSpy('callback').and.callFake(async () => {
-        expect(service.isFlushing).toBeTrue();
+      const callback = vi.fn().mockImplementation(async () => {
+        expect(service.isFlushing).toBe(true);
         return Promise.resolve();
       });
 
       await service.flushBatch(callback);
 
-      expect(service.isFlushing).toBeFalse();
+      expect(service.isFlushing).toBe(false);
     });
   });
 
@@ -317,7 +331,7 @@ describe('WriteBufferService', () => {
       }
 
       let batchesProcessed = 0;
-      const callback = jasmine.createSpy('callback').and.callFake(async () => {
+      const callback = vi.fn().mockImplementation(async () => {
         batchesProcessed++;
         return Promise.resolve();
       });
@@ -334,8 +348,8 @@ describe('WriteBufferService', () => {
         service.queueWrite(`op-${i}`, WriteOpType.CreateEntry, `{"idx":${i}}`);
       }
 
-      const progressSpy = jasmine.createSpy('progress');
-      const callback = jasmine.createSpy('callback').and.returnValue(Promise.resolve());
+      const progressSpy = vi.fn();
+      const callback = vi.fn().mockReturnValue(Promise.resolve());
 
       await service.flushAll(callback, progressSpy);
 
@@ -347,9 +361,7 @@ describe('WriteBufferService', () => {
         service.queueWrite(`op-${i}`, WriteOpType.CreateEntry, `{"idx":${i}}`);
       }
 
-      const callback = jasmine
-        .createSpy('callback')
-        .and.returnValue(Promise.reject(new Error('Conductor unavailable')));
+      const callback = vi.fn().mockReturnValue(Promise.reject(new Error('Conductor unavailable')));
 
       const committed = await service.flushAll(callback);
 
@@ -363,7 +375,7 @@ describe('WriteBufferService', () => {
         service.queueWrite(`op-${i}`, WriteOpType.CreateEntry, `{"idx":${i}}`);
       }
 
-      const callback = jasmine.createSpy('callback').and.returnValue(Promise.resolve());
+      const callback = vi.fn().mockReturnValue(Promise.resolve());
       const result = await service.flushAllWithDetails(callback);
 
       expect(result.totalCommitted).toBe(50);
@@ -379,7 +391,7 @@ describe('WriteBufferService', () => {
     });
 
     it('should start auto-flush', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
 
       service.startAutoFlush(callback, 100);
 
@@ -388,7 +400,7 @@ describe('WriteBufferService', () => {
     });
 
     it('should stop auto-flush', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
 
       service.startAutoFlush(callback, 100);
       service.stopAutoFlush();
@@ -398,7 +410,7 @@ describe('WriteBufferService', () => {
     });
 
     it('should flush automatically when queue fills', async () => {
-      const callback = jasmine.createSpy('callback').and.returnValue(Promise.resolve());
+      const callback = vi.fn().mockReturnValue(Promise.resolve());
 
       service.startAutoFlush(callback, 50);
 
@@ -444,7 +456,11 @@ describe('WriteBufferService', () => {
       const stats = service.getStats();
 
       expect(stats).toBeDefined();
-      const totalQueued = stats.highQueueCount + stats.normalQueueCount + stats.bulkQueueCount + stats.retryQueueCount;
+      const totalQueued =
+        stats.highQueueCount +
+        stats.normalQueueCount +
+        stats.bulkQueueCount +
+        stats.retryQueueCount;
       expect(totalQueued).toBeGreaterThan(0);
     });
 
@@ -458,37 +474,44 @@ describe('WriteBufferService', () => {
       expect(stats).toBeDefined();
     });
 
-    it('should expose stats as observable', done => {
-      let emissionCount = 0;
-      const subscription = service.stats$.subscribe(stats => {
-        if (stats) {
-          const totalQueued = stats.highQueueCount + stats.normalQueueCount + stats.bulkQueueCount + stats.retryQueueCount;
-          expect(totalQueued).toBeGreaterThanOrEqual(0);
-          emissionCount++;
-          if (emissionCount === 2) {
-            subscription.unsubscribe();
-            done();
+    it('should expose stats as observable', () =>
+      new Promise<void>(done => {
+        let emissionCount = 0;
+        const subscription = service.stats$.subscribe(stats => {
+          if (stats) {
+            const totalQueued =
+              stats.highQueueCount +
+              stats.normalQueueCount +
+              stats.bulkQueueCount +
+              stats.retryQueueCount;
+            expect(totalQueued).toBeGreaterThanOrEqual(0);
+            emissionCount++;
+            if (emissionCount === 2) {
+              subscription.unsubscribe();
+              done();
+            }
           }
-        }
-      });
+        });
 
-      service.queueWrite('op-1', WriteOpType.CreateEntry, '{"a":1}');
-    });
+        service.queueWrite('op-1', WriteOpType.CreateEntry, '{"a":1}');
+      }));
 
-    it('should expose state as observable', done => {
-      service.state$.subscribe(state => {
-        expect(['uninitialized', 'initializing', 'ready', 'flushing', 'error']).toContain(state);
-        done();
-      });
-    });
+    it('should expose state as observable', () =>
+      new Promise<void>(done => {
+        service.state$.subscribe(state => {
+          expect(['uninitialized', 'initializing', 'ready', 'flushing', 'error']).toContain(state);
+          done();
+        });
+      }));
 
-    it('should expose backpressure as observable', done => {
-      service.backpressure$.subscribe(level => {
-        expect(level).toBeGreaterThanOrEqual(0);
-        expect(level).toBeLessThanOrEqual(100);
-        done();
-      });
-    });
+    it('should expose backpressure as observable', () =>
+      new Promise<void>(done => {
+        service.backpressure$.subscribe(level => {
+          expect(level).toBeGreaterThanOrEqual(0);
+          expect(level).toBeLessThanOrEqual(100);
+          done();
+        });
+      }));
   });
 
   describe('configuration', () => {
@@ -507,7 +530,7 @@ describe('WriteBufferService', () => {
       const seedingService = TestBed.inject(WriteBufferService);
       const result = await seedingService.initialize({ preset: 'seeding' });
 
-      expect(result.success).toBeTrue();
+      expect(result.success).toBe(true);
     });
   });
 
@@ -614,7 +637,7 @@ describe('WriteBufferService', () => {
       // Even if WASM fails, should fall back to TypeScript
       const result = await service.initialize();
 
-      expect(result.success).toBeTrue();
+      expect(result.success).toBe(true);
       expect(result.implementation).toBeTruthy();
     });
   });
@@ -631,7 +654,7 @@ describe('WriteBufferService', () => {
       const batch = service.getPendingBatch();
 
       // High priority should be in batch first
-      expect(batch.hasBatch).toBeTrue();
+      expect(batch.hasBatch).toBe(true);
     });
 
     it('should process Normal priority before Bulk', () => {
@@ -640,7 +663,123 @@ describe('WriteBufferService', () => {
 
       const batch = service.getPendingBatch();
 
-      expect(batch.hasBatch).toBeTrue();
+      expect(batch.hasBatch).toBe(true);
+    });
+  });
+
+  describe('IDB persistence', () => {
+    let idbMock: any;
+    let persistService: WriteBufferService;
+
+    beforeEach(() => {
+      const idbSpy = {
+        init: vi.fn(),
+        getMetadata: vi.fn(),
+        setMetadata: vi.fn(),
+      };
+      idbSpy.init.mockReturnValue(Promise.resolve(true));
+      idbSpy.getMetadata.mockReturnValue(Promise.resolve(null));
+      idbSpy.setMetadata.mockReturnValue(Promise.resolve());
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [WriteBufferService, { provide: IndexedDBCacheService, useValue: idbSpy }],
+      });
+
+      persistService = TestBed.inject(WriteBufferService);
+      idbMock = TestBed.inject(IndexedDBCacheService) as {
+        [K in keyof IndexedDBCacheService]?: Mock;
+      };
+    });
+
+    it('should restore persisted operations on initialize', async () => {
+      const persistedOps: WriteOperation[] = [
+        {
+          opId: 'persisted-1',
+          opType: WriteOpType.CreateEntry,
+          payload: '{"restored":true}',
+          priority: WritePriority.Normal,
+          queuedAt: Date.now() - 5000,
+          retryCount: 0,
+          dedupKey: null,
+        },
+        {
+          opId: 'persisted-2',
+          opType: WriteOpType.CreateLink,
+          payload: '{"link":true}',
+          priority: WritePriority.High,
+          queuedAt: Date.now() - 3000,
+          retryCount: 1,
+          dedupKey: null,
+        },
+      ];
+      idbMock.getMetadata.mockReturnValue(Promise.resolve(persistedOps));
+
+      await persistService.initialize();
+
+      expect(persistService.totalQueued()).toBe(2);
+      expect(idbMock.getMetadata).toHaveBeenCalledWith('write-buffer-ops');
+      // Should clear persisted state after restore
+      expect(idbMock.setMetadata).toHaveBeenCalledWith('write-buffer-ops', []);
+    });
+
+    it('should persist operations via persistToIdb', async () => {
+      await persistService.initialize();
+
+      persistService.queueWrite('op-a', WriteOpType.CreateEntry, '{"a":1}');
+      persistService.queueWrite('op-b', WriteOpType.UpdateEntry, '{"b":2}');
+
+      await persistService.persistToIdb();
+
+      expect(idbMock.setMetadata).toHaveBeenCalledWith(
+        'write-buffer-ops',
+        expect.arrayContaining([
+          expect.objectContaining({ opId: 'op-a' }),
+          expect.objectContaining({ opId: 'op-b' }),
+        ])
+      );
+      // Buffer should still have ops (non-destructive persist)
+      expect(persistService.totalQueued()).toBe(2);
+    });
+
+    it('should skip persist when buffer is empty', async () => {
+      await persistService.initialize();
+
+      idbMock.setMetadata.mockClear();
+      await persistService.persistToIdb();
+
+      // Should clear stale data but not persist operations
+      expect(idbMock.setMetadata).toHaveBeenCalledWith('write-buffer-ops', []);
+    });
+
+    it('should handle IDB unavailable gracefully on restore', async () => {
+      idbMock.init.mockReturnValue(Promise.resolve(false));
+
+      await persistService.initialize();
+
+      expect(persistService.isReady).toBe(true);
+      expect(idbMock.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should handle IDB error gracefully on restore', async () => {
+      idbMock.init.mockReturnValue(Promise.reject(new Error('IDB broken')));
+
+      await persistService.initialize();
+
+      // Should still initialize successfully (IDB is non-critical)
+      expect(persistService.isReady).toBe(true);
+    });
+
+    it('should skip persist when IDB not available', async () => {
+      idbMock.init.mockReturnValue(Promise.resolve(false));
+
+      await persistService.initialize();
+      persistService.queueWrite('op-1', WriteOpType.CreateEntry, '{"x":1}');
+
+      idbMock.setMetadata.mockClear();
+      await persistService.persistToIdb();
+
+      expect(idbMock.setMetadata).not.toHaveBeenCalled();
     });
   });
 });

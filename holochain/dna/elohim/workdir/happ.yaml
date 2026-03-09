@@ -29,3 +29,12 @@ roles:
       deferred: false
     dna:
       path: "imagodei.dna"
+
+  # Node Registry DNA - Discovery & Health
+  - name: node_registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "../../node-registry/node-registry.dna"
+

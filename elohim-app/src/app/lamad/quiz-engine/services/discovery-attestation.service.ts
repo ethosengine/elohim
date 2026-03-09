@@ -15,16 +15,21 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 17.4% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
+import { type ReachLevel, reachEncompasses } from '@app/elohim/models/protocol-core.model';
 import { type Attestation } from '@app/imagodei/models/attestations.model';
+import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
+import { getDisplayConfigByFramework, getInstrument } from '../instruments/instrument-registry';
+import { type AggregationContext } from '../models/community-insights.model';
 import {
   type DiscoveryAssessment,
   type DiscoveryResult,
   type DiscoveryAttestation,
   type DiscoveryFramework,
   type DiscoveryCategory,
+  type DiscoveryProfile,
   type DiscoveryResultSummary,
   formatDiscoveryResult,
   formatDiscoveryShort,
@@ -40,6 +45,37 @@ const STORAGE_KEYS = {
   DISCOVERY_RESULTS: 'elohim:discovery-results',
   DISCOVERY_ATTESTATIONS: 'elohim:discovery-attestations',
 } as const;
+
+// =============================================================================
+// Consent Mapping
+// =============================================================================
+
+/** Maps the 4-value visibility enum to protocol ReachLevel. */
+export const VISIBILITY_TO_REACH: Record<DiscoveryAttestation['visibility'], ReachLevel> = {
+  private: 'private',
+  trusted: 'invited',
+  community: 'bioregional',
+  public: 'commons',
+};
+
+/** Ordered consent levels for comparison. */
+const CONSENT_ORDER: Record<ResearchConsentScope, number> = {
+  none: 0,
+  'aggregate-only': 1,
+  anonymized: 2,
+  identifiable: 3,
+};
+
+/**
+ * Check if a consent scope meets or exceeds a required level.
+ * Ordering: none < aggregate-only < anonymized < identifiable
+ */
+export function consentEncompasses(
+  scope: ResearchConsentScope,
+  required: ResearchConsentScope
+): boolean {
+  return CONSENT_ORDER[scope] >= CONSENT_ORDER[required];
+}
 
 // =============================================================================
 // Service
@@ -82,7 +118,8 @@ export class DiscoveryAttestationService {
     };
 
     for (const result of results) {
-      grouped[result.category].push(result);
+      const bucket = grouped[result.category] ?? (grouped[result.category] = []);
+      bucket.push(result);
     }
 
     return grouped;
@@ -111,10 +148,26 @@ export class DiscoveryAttestationService {
       .map(a => a.result);
   });
 
-  /** Public discovery results */
-  readonly publicResults = computed(() => {
+  /** Results eligible for community aggregation (bioregional reach + aggregate-only consent) */
+  readonly aggregatableResults = computed(() =>
+    this.getResultsForContext({ requiredReach: 'bioregional', minimumConsent: 'aggregate-only' })
+  );
+
+  /** Aggregated discovery profile for path adaptation and recommendations. */
+  readonly discoveryProfile = computed(() => {
     const results = this.resultsSignal();
-    return results.filter(r => r.isPublic);
+    if (results.length === 0) return null;
+
+    const byCategory = this.resultsByCategory();
+    const featured = this.featuredResults();
+
+    // Extract top traits from featured results for path recommendation context
+    const topTraits = featured.slice(0, 3).map(r => ({
+      framework: r.framework,
+      label: r.shortDisplay,
+    }));
+
+    return { byCategory, featured, totalAssessments: results.length, topTraits };
   });
 
   // ---------------------------------------------------------------------------
@@ -146,6 +199,7 @@ export class DiscoveryAttestationService {
       id,
       assessmentId: assessment.id,
       assessmentTitle: assessment.title,
+      contentNodeId: assessment.contentNodeId,
       framework: assessment.framework,
       category: assessment.category,
       humanId: this.getCurrentHumanId(),
@@ -155,7 +209,6 @@ export class DiscoveryAttestationService {
       subscaleScores,
       displayString: '', // Will be set below
       shortDisplay: '', // Will be set below
-      isPublic: true, // Default to public, user can change
     };
 
     // Generate display strings
@@ -170,6 +223,7 @@ export class DiscoveryAttestationService {
       result,
       earnedAt: now,
       visibility: 'community', // Default visibility
+      reach: VISIBILITY_TO_REACH['community'], // Derived from default visibility
       featured: this.shouldAutoFeature(assessment.framework),
       displayOrder: this.getNextDisplayOrder(),
     };
@@ -190,6 +244,57 @@ export class DiscoveryAttestationService {
     this.saveToStorage();
 
     return result;
+  }
+
+  /**
+   * Record a discovery result from raw completion data.
+   *
+   * Bridge method for completion flows (SophiaRenderer, DiscoveryQuiz) that
+   * don't have a full DiscoveryAssessment object. Looks up the instrument
+   * registry to derive framework and category, then delegates to
+   * recordDiscoveryResult().
+   */
+  recordFromCompletion(params: {
+    contentNodeId: string;
+    assessmentTitle: string;
+    instrumentId: string;
+    subscaleScores: Record<string, number>;
+    primaryType: DiscoveryResultSummary;
+    secondaryTypes?: DiscoveryResultSummary[];
+  }): DiscoveryResult {
+    const instrument = getInstrument(params.instrumentId);
+    const framework: DiscoveryFramework =
+      instrument?.displayConfig?.framework ?? instrument?.config.id ?? 'custom';
+    const category: DiscoveryCategory = instrument?.config.category ?? 'personality';
+
+    const assessment: DiscoveryAssessment = {
+      id: params.instrumentId,
+      title: params.assessmentTitle,
+      description: '',
+      category,
+      framework,
+      contentNodeId: params.contentNodeId,
+      estimatedMinutes: 0,
+      questions: [],
+      scoring: { subscales: Object.keys(params.subscaleScores), method: 'highest-subscale' },
+      resultTypes: [],
+      allowRetake: true,
+    };
+
+    return this.recordDiscoveryResult(
+      assessment,
+      params.subscaleScores,
+      params.primaryType,
+      params.secondaryTypes
+    );
+  }
+
+  /**
+   * Get the current discovery profile for path recommendations.
+   * Returns null if no discovery assessments have been completed.
+   */
+  getDiscoveryProfile(): DiscoveryProfile | null {
+    return this.discoveryProfile();
   }
 
   /**
@@ -214,34 +319,45 @@ export class DiscoveryAttestationService {
   }
 
   /**
+   * Get results filtered by an aggregation context (reach + consent).
+   *
+   * For each attestation, checks:
+   * 1. Attestation reach encompasses the required reach
+   * 2. Result's research consent (or user default 'aggregate-only') meets minimum
+   * 3. Result category is not in excluded domains
+   */
+  getResultsForContext(context: AggregationContext): DiscoveryResult[] {
+    const attestations = this.attestationsSignal();
+    const filtered: DiscoveryResult[] = [];
+
+    for (const attestation of attestations) {
+      // Check reach scope
+      if (!reachEncompasses(attestation.reach, context.requiredReach)) continue;
+
+      // Check research consent (per-result override or default 'aggregate-only')
+      const effectiveConsent = attestation.result.researchConsent ?? 'aggregate-only';
+      if (!consentEncompasses(effectiveConsent, context.minimumConsent)) continue;
+
+      // Check excluded domains
+      if (context.excludedDomains?.includes(attestation.result.category)) continue;
+
+      filtered.push(attestation.result);
+    }
+
+    return filtered;
+  }
+
+  /**
    * Update visibility for a discovery result.
    */
   updateVisibility(
     resultId: string,
     visibility: 'private' | 'trusted' | 'community' | 'public'
   ): void {
-    // Update result
-    this.resultsSignal.update(results =>
-      results.map(r =>
-        r.id === resultId
-          ? { ...r, isPublic: visibility === 'public' || visibility === 'community' }
-          : r
-      )
-    );
-
-    // Update attestation
+    // Update attestation (visibility + derived reach)
     this.attestationsSignal.update(attestations =>
       attestations.map(a =>
-        a.result.id === resultId
-          ? {
-              ...a,
-              visibility,
-              result: {
-                ...a.result,
-                isPublic: visibility === 'public' || visibility === 'community',
-              },
-            }
-          : a
+        a.result.id === resultId ? { ...a, visibility, reach: VISIBILITY_TO_REACH[visibility] } : a
       )
     );
 
@@ -393,7 +509,11 @@ export class DiscoveryAttestationService {
   }
 
   private shouldAutoFeature(framework: DiscoveryFramework): boolean {
-    // Auto-feature major personality assessments
+    // Try registry first (data-driven instruments carry autoFeature flag)
+    const displayConfig = getDisplayConfigByFramework(framework);
+    if (displayConfig !== undefined) return displayConfig.autoFeature;
+
+    // Fall back to hardcoded list for known frameworks without registered instruments
     const autoFeatured: DiscoveryFramework[] = [
       'enneagram',
       'mbti',
@@ -415,11 +535,16 @@ export class DiscoveryAttestationService {
       const attestationsJson = localStorage.getItem(STORAGE_KEYS.DISCOVERY_ATTESTATIONS);
 
       if (resultsJson) {
-        this.resultsSignal.set(JSON.parse(resultsJson));
+        this.resultsSignal.set(JSON.parse(resultsJson) as DiscoveryResult[]);
       }
 
       if (attestationsJson) {
-        this.attestationsSignal.set(JSON.parse(attestationsJson));
+        // Migrate old attestations without `reach` field
+        const parsed = JSON.parse(attestationsJson) as DiscoveryAttestation[];
+        const migrated = parsed.map(a =>
+          a.reach ? a : { ...a, reach: VISIBILITY_TO_REACH[a.visibility] }
+        );
+        this.attestationsSignal.set(migrated);
       }
     } catch {
       // localStorage read failed - fall back to empty state

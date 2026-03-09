@@ -26,7 +26,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::conductor_client::ConductorClient;
 use crate::error::StorageError;
@@ -158,6 +158,7 @@ pub struct ContentServerBridge {
     /// Cell ID (dna_hash + agent_pubkey) - cached after first discovery
     cell_id: Option<Vec<u8>>,
     /// Agent public key
+    #[allow(dead_code)]
     agent_pubkey: String,
     /// Registered content servers (action_hash by content_hash)
     registrations: std::collections::HashMap<String, Vec<u8>>,
@@ -201,8 +202,7 @@ impl ContentServerBridge {
     /// Get the cell ID (returns error if not set)
     fn get_cell_id(&self) -> Result<&[u8], StorageError> {
         self.cell_id
-            .as_ref()
-            .map(|v| v.as_slice())
+            .as_deref()
             .ok_or_else(|| StorageError::Config("Cell ID not set".into()))
     }
 
@@ -212,7 +212,8 @@ impl ContentServerBridge {
         content_hash: &str,
         capability: &str,
     ) -> Result<Vec<u8>, StorageError> {
-        self.register_content_with_endpoints(content_hash, capability, None).await
+        self.register_content_with_endpoints(content_hash, capability, None)
+            .await
     }
 
     /// Register this node as serving a content hash with explicit endpoints
@@ -229,7 +230,11 @@ impl ContentServerBridge {
         // Build endpoints list: use provided, or create from serve_url
         let endpoints = endpoints.or_else(|| {
             self.config.serve_url.as_ref().map(|url| {
-                let protocol = if url.starts_with("https://") { "https" } else { "http" };
+                let protocol = if url.starts_with("https://") {
+                    "https"
+                } else {
+                    "http"
+                };
                 vec![StorageEndpointInput {
                     url: url.clone(),
                     protocol: protocol.to_string(),
@@ -259,7 +264,12 @@ impl ContentServerBridge {
 
         let result = self
             .conductor_client
-            .call_zome(cell_id, &self.config.zome_name, "register_content_server", &payload)
+            .call_zome(
+                cell_id,
+                &self.config.zome_name,
+                "register_content_server",
+                &payload,
+            )
             .await?;
 
         // Parse response to get action_hash

@@ -19,41 +19,59 @@
  * - Are private by default (user controls visibility)
  */
 
-// Type-only import removed - ContentNode not used in this file
+import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
+import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
+
+import { getDisplayConfigByFramework } from '../instruments/instrument-registry';
+
+// @coverage: 100.0% (2026-02-24)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery Assessment Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Categories of discovery assessments.
- */
-export type DiscoveryCategory =
-  | 'personality' // Enneagram, MBTI, Big Five
-  | 'strengths' // CliftonStrengths, VIA Character Strengths
-  | 'values' // Personal values, political compass
-  | 'learning' // Learning styles, cognitive preferences
-  | 'emotional' // Attachment style, emotional intelligence
-  | 'relational' // Love languages, communication styles
-  | 'vocational' // Career interests, work preferences
-  | 'spiritual'; // Spiritual gifts, faith journey
+/** Well-known categories for type-safe references in existing code. */
+export const KNOWN_CATEGORIES = [
+  'personality', // Enneagram, MBTI, Big Five
+  'strengths', // CliftonStrengths, VIA Character Strengths
+  'values', // Personal values, political compass
+  'learning', // Learning styles, cognitive preferences
+  'emotional', // Attachment style, emotional intelligence
+  'relational', // Love languages, communication styles
+  'vocational', // Career interests, work preferences
+  'spiritual', // Spiritual gifts, faith journey
+] as const;
+export type KnownCategory = (typeof KNOWN_CATEGORIES)[number];
 
 /**
- * Well-known discovery assessment frameworks.
+ * Categories of discovery assessments.
+ * Open string - new categories can be added via content pipeline.
  */
-export type DiscoveryFramework =
-  | 'enneagram'
-  | 'mbti'
-  | 'big-five'
-  | 'clifton-strengths'
-  | 'via-strengths'
-  | 'disc'
-  | 'love-languages'
-  | 'attachment-style'
-  | 'learning-style'
-  | 'political-compass'
-  | 'values-hierarchy'
-  | 'custom';
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias: marks string as category identifier
+export type DiscoveryCategory = string;
+
+/** Well-known frameworks for type-safe references in existing code. */
+export const KNOWN_FRAMEWORKS = [
+  'enneagram',
+  'mbti',
+  'big-five',
+  'clifton-strengths', // eslint-disable-line sonarjs/no-duplicate-string -- canonical source for framework literals
+  'via-strengths',
+  'disc',
+  'love-languages',
+  'attachment-style',
+  'learning-style',
+  'political-compass',
+  'values-hierarchy',
+] as const;
+export type KnownFramework = (typeof KNOWN_FRAMEWORKS)[number];
+
+/**
+ * Discovery assessment frameworks.
+ * Open string - new frameworks can be added via content pipeline.
+ */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias: marks string as framework identifier
+export type DiscoveryFramework = string;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery Assessment Definition
@@ -243,14 +261,17 @@ export interface DiscoveryResult {
   /** Short display (for badges/chips) */
   shortDisplay: string;
 
-  /** Whether this result is visible on profile */
-  isPublic: boolean;
+  /** Per-result research consent override (when set, overrides user's default consent) */
+  researchConsent?: ResearchConsentScope;
 
   /** User's reflection on this result */
   reflection?: string;
 
   /** Content node ID for viewing full results */
   resultContentId?: string;
+
+  /** Content node ID of the source assessment (denormalized from DiscoveryAssessment) */
+  contentNodeId?: string;
 }
 
 /**
@@ -301,6 +322,9 @@ export interface DiscoveryAttestation {
 
   /** Visibility setting */
   visibility: 'private' | 'trusted' | 'community' | 'public';
+
+  /** Machine-readable reach scope for filtering (derived from visibility) */
+  reach: ReachLevel;
 
   /** Whether this attestation is featured on profile */
   featured: boolean;
@@ -381,13 +405,76 @@ export interface CliftonTheme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Discovery Profile (aggregated for path recommendations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aggregated discovery profile for path adaptation.
+ *
+ * Summarizes all completed discovery assessments into a shape
+ * that path recommendation and adaptation services can consume.
+ */
+export interface DiscoveryProfile {
+  /** Results grouped by category */
+  byCategory: Record<DiscoveryCategory, DiscoveryResult[]>;
+
+  /** Featured results for display */
+  featured: DiscoveryResult[];
+
+  /** Total assessments completed */
+  totalAssessments: number;
+
+  /** Top traits/results for quick path recommendation context */
+  topTraits: { framework: string; label: string }[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Template Interpolation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve a dot-path (e.g., "primaryType.name") against a data object.
+ */
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  let current: unknown = obj;
+  for (const key of path.split('.')) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
+/**
+ * Interpolate {{path}} placeholders in a template against a data object.
+ * Undefined values become empty strings. Result is trimmed.
+ */
+export function interpolateTemplate(template: string, data: Record<string, unknown>): string {
+  return template
+    .replace(/\{\{(\w[\w.]*)\}\}/g, (_, path: string) => {
+      const value = getNestedValue(data, path.trim());
+      return value !== null && value !== undefined ? String(value) : '';
+    })
+    .trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Factory Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Create a display string for a discovery result.
+ * Tries registry-backed display template first, falls back to framework-specific logic.
  */
 export function formatDiscoveryResult(result: DiscoveryResult): string {
+  const displayConfig = getDisplayConfigByFramework(result.framework);
+  if (displayConfig?.displayTemplate) {
+    const rendered = interpolateTemplate(
+      displayConfig.displayTemplate,
+      result as unknown as Record<string, unknown>
+    );
+    if (rendered) return rendered;
+  }
+
   switch (result.framework) {
     case 'enneagram': {
       const enneagram = result as EnneagramResult;
@@ -417,8 +504,18 @@ export function formatDiscoveryResult(result: DiscoveryResult): string {
 
 /**
  * Create a short display string (for badges).
+ * Tries registry-backed short template first, falls back to framework-specific logic.
  */
 export function formatDiscoveryShort(result: DiscoveryResult): string {
+  const displayConfig = getDisplayConfigByFramework(result.framework);
+  if (displayConfig?.shortTemplate) {
+    const rendered = interpolateTemplate(
+      displayConfig.shortTemplate,
+      result as unknown as Record<string, unknown>
+    );
+    if (rendered) return rendered;
+  }
+
   switch (result.framework) {
     case 'enneagram': {
       const enneagram = result as EnneagramResult;
@@ -445,8 +542,12 @@ export function formatDiscoveryShort(result: DiscoveryResult): string {
 
 /**
  * Get framework display name.
+ * Tries registry first, falls back to known names.
  */
 export function getFrameworkDisplayName(framework: DiscoveryFramework): string {
+  const displayConfig = getDisplayConfigByFramework(framework);
+  if (displayConfig) return displayConfig.frameworkDisplayName;
+
   const names: Record<DiscoveryFramework, string> = {
     enneagram: 'Enneagram',
     mbti: 'MBTI',

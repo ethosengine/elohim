@@ -1,5 +1,7 @@
+import { vi } from 'vitest';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
 
 import { DoorwayAdminService, ConnectionState } from './doorway-admin.service';
 import {
@@ -18,8 +20,7 @@ describe('DoorwayAdminService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [DoorwayAdminService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), DoorwayAdminService],
     });
 
     service = TestBed.inject(DoorwayAdminService);
@@ -41,7 +42,7 @@ describe('DoorwayAdminService', () => {
     });
 
     it('should have isConnected as false', () => {
-      expect(service.isConnected()).toBeFalse();
+      expect(service.isConnected()).toBe(false);
     });
 
     it('should have empty nodes array', () => {
@@ -268,7 +269,7 @@ describe('DoorwayAdminService', () => {
     }));
 
     it('should log warning on 503 after retries (orchestrator not enabled)', fakeAsync(() => {
-      spyOn(console, 'warn');
+      vi.spyOn(console, 'warn');
 
       service.getCustodians().subscribe();
 
@@ -280,7 +281,7 @@ describe('DoorwayAdminService', () => {
       }
 
       expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringContaining('Orchestrator not enabled')
+        expect.stringContaining('Orchestrator not enabled')
       );
     }));
   });
@@ -442,7 +443,7 @@ describe('DoorwayAdminService', () => {
     });
 
     it('should handle heartbeat message', () => {
-      spyOn(console, 'debug');
+      vi.spyOn(console, 'debug');
 
       callHandleMessage({ type: 'heartbeat' });
 
@@ -455,7 +456,7 @@ describe('DoorwayAdminService', () => {
     });
 
     it('should handle error message', () => {
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
 
       callHandleMessage({
         type: 'error',
@@ -475,24 +476,24 @@ describe('DoorwayAdminService', () => {
     };
 
     it('should return true for valid dashboard message', () => {
-      expect(callIsDashboardMessage({ type: 'heartbeat' })).toBeTrue();
-      expect(callIsDashboardMessage({ type: 'pong' })).toBeTrue();
-      expect(callIsDashboardMessage({ type: 'error', message: 'test' })).toBeTrue();
+      expect(callIsDashboardMessage({ type: 'heartbeat' })).toBe(true);
+      expect(callIsDashboardMessage({ type: 'pong' })).toBe(true);
+      expect(callIsDashboardMessage({ type: 'error', message: 'test' })).toBe(true);
     });
 
     it('should return false for null', () => {
-      expect(callIsDashboardMessage(null)).toBeFalse();
+      expect(callIsDashboardMessage(null)).toBe(false);
     });
 
     it('should return false for non-object', () => {
-      expect(callIsDashboardMessage('string')).toBeFalse();
-      expect(callIsDashboardMessage(123)).toBeFalse();
-      expect(callIsDashboardMessage(undefined)).toBeFalse();
+      expect(callIsDashboardMessage('string')).toBe(false);
+      expect(callIsDashboardMessage(123)).toBe(false);
+      expect(callIsDashboardMessage(undefined)).toBe(false);
     });
 
     it('should return false for object without type', () => {
-      expect(callIsDashboardMessage({})).toBeFalse();
-      expect(callIsDashboardMessage({ data: 'test' })).toBeFalse();
+      expect(callIsDashboardMessage({})).toBe(false);
+      expect(callIsDashboardMessage({ data: 'test' })).toBe(false);
     });
   });
 });

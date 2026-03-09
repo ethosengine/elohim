@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elohim-site-alpha-ingress
+  namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-alpha
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: public
+  rules:
+  - host: alpha.elohim.host
+    http:
+      paths:
+      - backend:
+          service:
+            name: elohim-ui-playground-alpha-service
+            port:
+              number: 80
+        path: /ui-playground
+        pathType: Prefix
+      - backend:
+          service:
+            name: elohim-site-alpha-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - alpha.elohim.host
+    secretName: alpha-elohim-site-tls-cert

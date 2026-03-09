@@ -93,6 +93,53 @@
         }
       ]
     },
+    "testid-sync": {
+      "description": "data-testid attributes in Angular templates must stay in sync with page object selectors",
+      "skill": ".claude/skills/page-model/SKILL.md",
+      "selectors": "genesis/a2o/src/framework/pages/selectors.ts",
+      "sync_rules": [
+        {
+          "trigger_pattern": "doorway-app/src/app/components/login/threshold-login.component.ts",
+          "notify": ["skill"],
+          "message": "Threshold login template changed - check data-testid attributes and update selectors.ts if needed"
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/elohim/components/elohim-navigator/*.html",
+          "notify": ["skill"],
+          "message": "Navigator template changed - check data-testid attributes and update selectors.ts if needed"
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/imagodei/components/login/*.html",
+          "notify": ["skill"],
+          "message": "Login template changed - check data-testid attributes and update selectors.ts if needed"
+        }
+      ]
+    },
+    "a2o-sync": {
+      "description": "Implementation changes should have corresponding a2o acceptance scenarios",
+      "sync_rules": [
+        {
+          "trigger_pattern": "elohim-app/src/app/lamad/**/*.ts",
+          "notify": [],
+          "message": "Lamad implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/lamad/. If exploring, capture intent in .claude/data/dev-intent.jsonl before commit."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/imagodei/**/*.ts",
+          "notify": [],
+          "message": "ImagoDei implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/auth/."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/qahal/**/*.ts",
+          "notify": [],
+          "message": "Qahal implementation changed. Story-first: check genesis/a2o/features/ for governance scenarios."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/shefa/**/*.ts",
+          "notify": [],
+          "message": "Shefa implementation changed. Story-first: is there an a2o scenario for this? Check genesis/a2o/features/ for economy/stewardship scenarios."
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [

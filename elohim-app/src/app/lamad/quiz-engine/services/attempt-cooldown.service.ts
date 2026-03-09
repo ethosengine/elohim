@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 78.6% (2026-02-05)
+// @coverage: 78.6% (2026-02-24)
 
 import { BehaviorSubject, Observable, interval, map, startWith } from 'rxjs';
 
@@ -274,7 +274,7 @@ export class AttemptCooldownService {
 
     // Also check localStorage for any we haven't loaded
     this.loadAllFromStorageForHuman(humanId).forEach(record => {
-      if (!records.find(r => r.contentId === record.contentId)) {
+      if (!records.some(r => r.contentId === record.contentId)) {
         records.push(record);
       }
     });

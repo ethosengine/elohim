@@ -5,56 +5,39 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
-
 import { ShefaHomeComponent } from './shefa-home.component';
-import { AppreciationService } from '../../services/appreciation.service';
-import { EconomicService } from '../../services/economic.service';
+import { ECONOMIC_EVENT_FACTORY } from '../../interfaces';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { vi } from 'vitest';
 
 describe('ShefaHomeComponent', () => {
   let component: ShefaHomeComponent;
   let fixture: ComponentFixture<ShefaHomeComponent>;
-  let mockEconomicService: jasmine.SpyObj<EconomicService>;
-  let mockAppreciationService: jasmine.SpyObj<AppreciationService>;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockEconomicService: any;
+  let mockHolochainClient: any;
 
   beforeEach(async () => {
-    mockEconomicService = jasmine.createSpyObj('EconomicService', [
-      'testAvailability',
-      'isAvailable',
-      'getEventsForAgent',
-    ]);
-    mockEconomicService.testAvailability.and.returnValue(Promise.resolve(true));
-    mockEconomicService.isAvailable.and.returnValue(false);
-    mockEconomicService.getEventsForAgent.and.returnValue(of([]));
+    mockEconomicService = {
+      getEventsByProvider: vi.fn(),
+      getEventsByReceiver: vi.fn(),
+      getAppreciationsFor: vi.fn(),
+    };
+    mockEconomicService.getEventsByProvider.mockReturnValue(Promise.resolve([]));
+    mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
+    mockEconomicService.getAppreciationsFor.mockReturnValue(Promise.resolve([]));
 
-    mockAppreciationService = jasmine.createSpyObj('AppreciationService', [
-      'testAvailability',
-      'isAvailable',
-      'getAppreciationsFor',
-    ]);
-    mockAppreciationService.testAvailability.and.returnValue(Promise.resolve(true));
-    mockAppreciationService.isAvailable.and.returnValue(false);
-    mockAppreciationService.getAppreciationsFor.and.returnValue(of([]));
-
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['testAdminConnection'],
-      {
-        isConnected: jasmine.createSpy('isConnected').and.returnValue(false),
-      }
-    );
-    mockHolochainClient.testAdminConnection.and.returnValue(
-      Promise.resolve({ success: false })
-    );
+    mockHolochainClient = {
+      testAdminConnection: vi.fn(),
+      isConnected: vi.fn(),
+    };
+    mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: false }));
+    mockHolochainClient.isConnected.mockReturnValue(false);
 
     await TestBed.configureTestingModule({
       imports: [ShefaHomeComponent],
       providers: [
         provideRouter([]),
-        { provide: EconomicService, useValue: mockEconomicService },
-        { provide: AppreciationService, useValue: mockAppreciationService },
+        { provide: ECONOMIC_EVENT_FACTORY, useValue: mockEconomicService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
       ],
     }).compileComponents();
@@ -77,8 +60,8 @@ describe('ShefaHomeComponent', () => {
       fixture.detectChanges(); // Triggers ngOnInit
       await fixture.whenStable();
 
-      expect(mockEconomicService.testAvailability).toHaveBeenCalled();
-      expect(mockAppreciationService.testAvailability).toHaveBeenCalled();
+      expect(mockEconomicService.getEventsByProvider).toHaveBeenCalled();
+      expect(mockEconomicService.getAppreciationsFor).toHaveBeenCalled();
     });
 
     it('should set loading state during init', () => {
@@ -101,8 +84,22 @@ describe('ShefaHomeComponent', () => {
   describe('Computed Stats', () => {
     it('should calculate total events count', () => {
       component.events.set([
-        { id: '1', action: 'use', provider: 'a', receiver: 'b', hasPointInTime: '', state: 'validated' },
-        { id: '2', action: 'produce', provider: 'c', receiver: 'd', hasPointInTime: '', state: 'validated' },
+        {
+          id: '1',
+          action: 'use',
+          provider: 'a',
+          receiver: 'b',
+          hasPointInTime: '',
+          state: 'validated',
+        },
+        {
+          id: '2',
+          action: 'produce',
+          provider: 'c',
+          receiver: 'd',
+          hasPointInTime: '',
+          state: 'validated',
+        },
       ] as any);
 
       expect(component.totalEvents()).toBe(2);
@@ -110,8 +107,26 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate total appreciations count', () => {
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'a', appreciationTo: 'b', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '2', appreciationOf: 'y', appreciatedBy: 'c', appreciationTo: 'd', quantityValue: 20, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'a',
+          appreciationTo: 'b',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '2',
+          appreciationOf: 'y',
+          appreciatedBy: 'c',
+          appreciationTo: 'd',
+          quantityValue: 20,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.totalAppreciations()).toBe(2);
@@ -119,12 +134,35 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate unique agents from events and appreciations', () => {
       component.events.set([
-        { id: '1', action: 'use', provider: 'agent-1', receiver: 'agent-2', hasPointInTime: '', state: 'validated' },
-        { id: '2', action: 'produce', provider: 'agent-2', receiver: 'agent-3', hasPointInTime: '', state: 'validated' },
+        {
+          id: '1',
+          action: 'use',
+          provider: 'agent-1',
+          receiver: 'agent-2',
+          hasPointInTime: '',
+          state: 'validated',
+        },
+        {
+          id: '2',
+          action: 'produce',
+          provider: 'agent-2',
+          receiver: 'agent-3',
+          hasPointInTime: '',
+          state: 'validated',
+        },
       ] as any);
 
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'agent-1', appreciationTo: 'agent-4', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'agent-1',
+          appreciationTo: 'agent-4',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.uniqueAgents()).toBe(4);
@@ -132,9 +170,36 @@ describe('ShefaHomeComponent', () => {
 
     it('should calculate total recognition points', () => {
       component.appreciations.set([
-        { id: '1', appreciationOf: 'x', appreciatedBy: 'a', appreciationTo: 'b', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '2', appreciationOf: 'y', appreciatedBy: 'c', appreciationTo: 'd', quantityValue: 25, quantityUnit: 'points', note: null, createdAt: '' },
-        { id: '3', appreciationOf: 'z', appreciatedBy: 'e', appreciationTo: 'f', quantityValue: 15, quantityUnit: 'points', note: null, createdAt: '' },
+        {
+          id: '1',
+          appreciationOf: 'x',
+          appreciatedBy: 'a',
+          appreciationTo: 'b',
+          quantityValue: 10,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '2',
+          appreciationOf: 'y',
+          appreciatedBy: 'c',
+          appreciationTo: 'd',
+          quantityValue: 25,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
+        {
+          id: '3',
+          appreciationOf: 'z',
+          appreciatedBy: 'e',
+          appreciationTo: 'f',
+          quantityValue: 15,
+          quantityUnit: 'points',
+          note: null,
+          createdAt: '',
+        },
       ]);
 
       expect(component.totalRecognition()).toBe(50);
@@ -150,45 +215,89 @@ describe('ShefaHomeComponent', () => {
   // Data Loading - Success Cases
   // ==========================================================================
 
+  /**
+   * Helper: wait for the component's loadData() to finish.
+   * ngOnInit calls `void this.loadData()` — an untracked promise.
+   * whenStable() may return before it resolves in sequential test runs.
+   * We hook into a loading→false transition via a signal watch.
+   */
+  async function waitForLoadData(): Promise<void> {
+    return new Promise<void>(resolve => {
+      if (!component.loading()) {
+        resolve();
+        return;
+      }
+      // Poll until loading becomes false
+      const interval = setInterval(() => {
+        if (!component.loading()) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 5);
+      // Timeout safety
+      setTimeout(() => {
+        clearInterval(interval);
+        resolve();
+      }, 2000);
+    });
+  }
+
   describe('Data Loading - Success', () => {
     beforeEach(() => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.resolve(true));
-      mockEconomicService.isAvailable.and.returnValue(true);
-      mockEconomicService.getEventsForAgent.and.returnValue(of([
-        { id: 'event-1', action: 'use', provider: 'p1', receiver: 'r1', hasPointInTime: new Date().toISOString(), state: 'validated' },
-      ] as any));
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.resolve([
+          {
+            id: 'event-1',
+            action: 'use',
+            provider: 'p1',
+            receiver: 'r1',
+            hasPointInTime: new Date().toISOString(),
+            state: 'validated',
+          },
+        ] as any)
+      );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
 
-      mockAppreciationService.testAvailability.and.returnValue(Promise.resolve(true));
-      mockAppreciationService.isAvailable.and.returnValue(true);
-      mockAppreciationService.getAppreciationsFor.and.returnValue(of([
-        { id: 'app-1', appreciationOf: 'content', appreciatedBy: 'user1', appreciationTo: 'user2', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: new Date().toISOString() },
-      ]));
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
+        Promise.resolve([
+          {
+            id: 'app-1',
+            appreciationOf: 'content',
+            appreciatedBy: 'user1',
+            appreciationTo: 'user2',
+            quantityValue: 10,
+            quantityUnit: 'points',
+            note: null,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      );
     });
 
     it('should load events when service is available', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.events().length).toBeGreaterThan(0);
     });
 
     it('should load appreciations when service is available', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.appreciations().length).toBeGreaterThan(0);
     });
 
     it('should set loading to false after data loads', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.loading()).toBe(false);
     });
 
     it('should not set error on successful load', async () => {
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.error()).toBeNull();
     });
@@ -200,31 +309,52 @@ describe('ShefaHomeComponent', () => {
 
   describe('Data Loading - Errors', () => {
     it('should load demo data when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
-      mockEconomicService.isAvailable.and.returnValue(false);
-      mockAppreciationService.isAvailable.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
+      mockEconomicService.getEventsByProvider.mockReturnValue(Promise.resolve([]));
+      mockEconomicService.getEventsByReceiver.mockReturnValue(Promise.resolve([]));
+      mockEconomicService.getAppreciationsFor.mockReturnValue(Promise.resolve([]));
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.events().length).toBeGreaterThan(0);
       expect(component.appreciations().length).toBeGreaterThan(0);
     });
 
-    it('should show error message when connection fails', async () => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.reject(new Error('Connection failed')));
+    it('should load demo data when all API calls fail silently', async () => {
+      mockHolochainClient.isConnected.mockReturnValue(false);
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
+        Promise.reject(new Error('Connection failed'))
+      );
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
-      expect(component.error()).toContain('Failed to connect');
+      // Individual .catch() handlers swallow errors, returning empty arrays.
+      // Empty data + not connected = demo data loaded.
+      expect(component.events().length).toBeGreaterThan(0);
+      expect(component.loading()).toBe(false);
     });
 
     it('should set loading to false even on error', async () => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.reject(new Error('Error')));
+      mockEconomicService.getEventsByProvider.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
+      mockEconomicService.getEventsByReceiver.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
+      mockEconomicService.getAppreciationsFor.mockReturnValue(
+        Promise.reject(new Error('Error'))
+      );
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
       expect(component.loading()).toBe(false);
     });
@@ -267,17 +397,25 @@ describe('ShefaHomeComponent', () => {
 
   describe('User Actions', () => {
     it('should refresh data when refreshData is called', async () => {
-      mockEconomicService.testAvailability.calls.reset();
-      mockAppreciationService.testAvailability.calls.reset();
+      // Wait for initial load to complete first
+      fixture.detectChanges();
+      await waitForLoadData();
 
-      await component.refreshData();
+      mockEconomicService.getEventsByProvider.mockClear();
+      mockEconomicService.getAppreciationsFor.mockClear();
+      mockEconomicService.getEventsByReceiver.mockClear();
 
-      expect(mockEconomicService.testAvailability).toHaveBeenCalled();
-      expect(mockAppreciationService.testAvailability).toHaveBeenCalled();
+      // refreshData() calls `void this.loadData()` - hook loadData to detect when it runs
+      component.refreshData();
+      // loadData sets loading=true synchronously, so we wait for it to complete
+      await waitForLoadData();
+
+      expect(mockEconomicService.getEventsByProvider).toHaveBeenCalled();
+      expect(mockEconomicService.getAppreciationsFor).toHaveBeenCalled();
     });
 
     it('should test connection when testConnection is called', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.resolve({ success: true }));
+      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: true }));
 
       await component.testConnection();
 
@@ -285,7 +423,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error when connection test fails', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.resolve({ success: false }));
+      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: false }));
 
       await component.testConnection();
 
@@ -293,7 +431,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should handle exception in testConnection', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.reject(new Error('Network error')));
+      mockHolochainClient.testAdminConnection.mockReturnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.testConnection();
 
@@ -422,7 +562,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show connection status', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
@@ -432,7 +572,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show disconnected status', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
@@ -442,12 +582,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should display stats grid when not loading', async () => {
-      // Manually set loading to false without triggering ngOnInit
-      component.loading.set(false);
-      // Initial render
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
-      // Second render to ensure template updates
+      await waitForLoadData();
       fixture.detectChanges();
 
       const statsGrid = fixture.nativeElement.querySelector('.stats-grid');
@@ -455,9 +592,9 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should display action buttons', async () => {
-      component.loading.set(false);
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
       fixture.detectChanges();
 
       const refreshButton = fixture.nativeElement.querySelector('.action-btn.primary');
@@ -466,15 +603,13 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error banner when error is set', async () => {
-      // First render the component with initialization
+      // Trigger init and wait for it to settle
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
 
-      // Now set the error state
+      // Set the error state
       component.loading.set(false);
       component.error.set('Test error message');
-
-      // Trigger change detection to reflect the new state
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -484,11 +619,12 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should call refreshData when refresh button is clicked', async () => {
-      const refreshSpy = spyOn(component, 'refreshData');
-      component.loading.set(false);
+      // Trigger ngOnInit, wait for loadData() to complete (sets loading=false)
       fixture.detectChanges();
-      await fixture.whenStable();
+      await waitForLoadData();
       fixture.detectChanges();
+
+      const refreshSpy = vi.spyOn(component, 'refreshData').mockImplementation(() => {});
 
       const refreshButton = fixture.nativeElement.querySelector('.action-btn.primary');
       expect(refreshButton).toBeTruthy();

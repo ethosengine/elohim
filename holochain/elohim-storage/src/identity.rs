@@ -133,10 +133,7 @@ impl NodeIdentity {
     }
 
     /// Load identity from a file (or generate if not exists)
-    pub fn load_or_generate(
-        path: &Path,
-        agent_pubkey: String,
-    ) -> Result<Self, StorageError> {
+    pub fn load_or_generate(path: &Path, agent_pubkey: String) -> Result<Self, StorageError> {
         if path.exists() {
             Self::load(path, agent_pubkey)
         } else {
@@ -165,7 +162,9 @@ impl NodeIdentity {
         }
 
         // Encode keypair to protobuf format
-        let bytes = self.keypair.to_protobuf_encoding()
+        let bytes = self
+            .keypair
+            .to_protobuf_encoding()
             .map_err(|e| StorageError::Identity(format!("Failed to encode keypair: {}", e)))?;
 
         std::fs::write(path, bytes)?;
@@ -213,7 +212,7 @@ impl NodeIdentity {
     }
 
     /// Check if this node should serve a given agent
-    pub fn should_serve(&self, requester_agent: &str) -> bool {
+    pub fn should_serve(&self, _requester_agent: &str) -> bool {
         if self.capabilities.serve_public {
             return true;
         }

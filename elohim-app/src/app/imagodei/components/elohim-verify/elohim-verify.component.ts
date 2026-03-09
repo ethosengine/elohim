@@ -19,7 +19,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, signal, computed, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 28.6% (2026-02-05)
+// @coverage: 28.6% (2026-02-24)
 
 /** Question from the doorway */
 interface VerificationQuestion {
@@ -170,6 +170,10 @@ export class ElohimVerifyComponent implements OnDestroy {
     const newAnswers = new Map(this.answers());
     newAnswers.set(questionId, answer);
     this.answers.set(newAnswers);
+  }
+
+  onAnswerInput(questionId: string, event: Event): void {
+    this.setAnswer(questionId, (event.target as HTMLTextAreaElement).value);
   }
 
   nextQuestion(): void {

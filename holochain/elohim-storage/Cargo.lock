@@ -473,6 +473,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor4ii"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b544cf8c89359205f4f990d0e6f3828db42df85b5dac95d09157a250eb0749c4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -541,6 +550,8 @@ dependencies = [
  "core2",
  "multibase",
  "multihash",
+ "serde",
+ "serde_bytes",
  "unsigned-varint 0.8.0",
 ]
 
@@ -1172,6 +1183,7 @@ dependencies = [
  "hyper 1.8.1",
  "hyper-tungstenite",
  "hyper-util",
+ "ipld-core",
  "libp2p",
  "lz4_flex",
  "multihash-codetable",
@@ -1181,6 +1193,8 @@ dependencies = [
  "rmpv",
  "rusqlite",
  "serde",
+ "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
  "serde_json",
  "serde_urlencoded",
  "sha2",
@@ -2545,6 +2559,17 @@ dependencies = [
  "widestring",
  "windows-sys 0.48.0",
  "winreg",
+]
+
+[[package]]
+name = "ipld-core"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090f624976d72f0b0bb71b86d58dc16c15e069193067cb3a3a09d655246cbbda"
+dependencies = [
+ "cid",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -4793,6 +4818,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_ipld_dagcbor"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46182f4f08349a02b45c998ba3215d3f9de826246ba02bb9dddfe9a2a2100778"
+dependencies = [
+ "cbor4ii",
+ "ipld-core",
+ "scopeguard",
+ "serde",
+]
+
+[[package]]
+name = "serde_ipld_dagjson"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d2d9d1f29999ee9a3d774fe2a5db4cc199da5178d0350f5e4482ea04252aee"
+dependencies = [
+ "ipld-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "serde_json"
 version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5642,7 +5690,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e640d9b0964e9d39df633548591090ab92f7a4567bc31d3891af23471a3365c6"
 dependencies = [
  "lazy_static",
- "serde_json",
  "thiserror 2.0.17",
  "ts-rs-macros",
 ]

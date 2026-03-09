@@ -129,8 +129,8 @@ impl SledRecordStore {
     }
 
     fn deserialize_record(data: &[u8]) -> Result<Record, String> {
-        let stored: StoredRecord =
-            rmp_serde::from_slice(data).map_err(|e| format!("Failed to deserialize record: {}", e))?;
+        let stored: StoredRecord = rmp_serde::from_slice(data)
+            .map_err(|e| format!("Failed to deserialize record: {}", e))?;
         Ok(stored.into_record())
     }
 
@@ -140,9 +140,12 @@ impl SledRecordStore {
     }
 
     fn deserialize_providers(data: &[u8]) -> Result<Vec<ProviderRecord>, String> {
-        let stored: Vec<StoredProvider> =
-            rmp_serde::from_slice(data).map_err(|e| format!("Failed to deserialize providers: {}", e))?;
-        Ok(stored.into_iter().filter_map(|s| s.into_provider_record()).collect())
+        let stored: Vec<StoredProvider> = rmp_serde::from_slice(data)
+            .map_err(|e| format!("Failed to deserialize providers: {}", e))?;
+        Ok(stored
+            .into_iter()
+            .filter_map(|s| s.into_provider_record())
+            .collect())
     }
 
     /// Flush all pending writes to disk
@@ -319,7 +322,7 @@ mod tests {
         let db = sled::open(dir.path()).unwrap();
         let mut store = SledRecordStore::from_db(db).unwrap();
 
-        let key = RecordKey::new(&b"test-key"[..]);
+        let key = RecordKey::new(b"test-key");
         let record = Record {
             key: key.clone(),
             value: b"test-value".to_vec(),
@@ -340,7 +343,7 @@ mod tests {
     fn test_records_persist_across_reopen() {
         let dir = tempfile::tempdir().unwrap();
 
-        let key = RecordKey::new(&b"persist-key"[..]);
+        let key = RecordKey::new(b"persist-key");
         let record = Record {
             key: key.clone(),
             value: b"persist-value".to_vec(),

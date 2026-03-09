@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-site-staging
+  namespace: elohim-staging
+  labels:
+    app: elohim-site-staging
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-staging
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-site-staging
+  template:
+    metadata:
+      labels:
+        app: elohim-site-staging
+        app.kubernetes.io/name: elohim-site
+        app.kubernetes.io/instance: elohim-site-staging
+        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      containers:
+      - name: elohim-site-staging
+        image: harbor.ethosengine.com/ethosengine/elohim-site:SITE_TAG_PLACEHOLDER
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/nginx/html/assets/config.json
+          subPath: config.json
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: elohim-config-staging

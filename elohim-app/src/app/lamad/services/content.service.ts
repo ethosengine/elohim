@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 85.2% (2026-02-05)
+// @coverage: 85.8% (2026-02-24)
 
 import { map, switchMap, catchError } from 'rxjs/operators';
 
@@ -118,10 +118,8 @@ const REACH_HIERARCHY: ContentReach[] = [
  */
 @Injectable({ providedIn: 'root' })
 export class ContentService {
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly agentService: AgentService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly agentService = inject(AgentService);
 
   /**
    * Get content by ID.

@@ -31,9 +31,9 @@
  */
 
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 97.9% (2026-02-05)
+// @coverage: 97.9% (2026-02-24)
 
 import { map, catchError, timeout, retry } from 'rxjs/operators';
 
@@ -150,7 +150,9 @@ export class DoorwayClientService {
   /** Maximum retries for failed requests */
   private maxRetries = 3;
 
-  constructor(private readonly http: HttpClient) {
+  private readonly http = inject(HttpClient);
+
+  constructor() {
     // Use environment config or default to same origin
     this.baseUrl = environment.doorwayUrl ?? '';
   }

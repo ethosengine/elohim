@@ -1,0 +1,15 @@
+{
+  "id": "pete-pastor",
+  "displayName": "Pastor Pete",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["foundations-christian-technology"],
+  "claimedAgentId": "agent-pete-pastor",
+  "note": "Shepherd of Community Church. Stewards faith-and-technology content, bridging Christian theology with digital wisdom.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-faith-technology",
+    "affinityDomains": ["fct", "scripture"],
+    "humanId": "human-pete-pastor"
+  }
+}

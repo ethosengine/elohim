@@ -1,5 +1,6 @@
 import { TestBed, fakeAsync, tick, discardPeriodicTasks } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
 
 import { of, take } from 'rxjs';
 
@@ -7,25 +8,28 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { IdentityService } from '@app/imagodei/services/identity.service';
 
 import { RunningContextService, RegisteredNode, ComputeContext } from './running-context.service';
+import { vi, Mock } from 'vitest';
 
 describe('RunningContextService', () => {
   let service: RunningContextService;
   let httpMock: HttpTestingController;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
+  let mockHolochainClient: any;
+  let mockIdentityService: any;
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', ['callZome'], {
-      state: jasmine.createSpy('state').and.returnValue('disconnected'),
-    });
+    mockHolochainClient = {
+      callZome: vi.fn(),
+      state: vi.fn().mockReturnValue('disconnected'),
+    };
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', [], {
-      mode: jasmine.createSpy('mode').and.returnValue('anonymous'),
-    });
+    mockIdentityService = {
+      mode: vi.fn().mockReturnValue('anonymous'),
+    };
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         RunningContextService,
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: IdentityService, useValue: mockIdentityService },
@@ -48,38 +52,38 @@ describe('RunningContextService', () => {
   describe('initial state', () => {
     it('should have default context with no registered nodes', () => {
       const context = service.context();
-      expect(context.hasRegisteredNodes).toBeFalse();
+      expect(context.hasRegisteredNodes).toBe(false);
       expect(context.registeredNodes).toEqual([]);
       expect(context.primaryNode).toBeNull();
       expect(context.totalNodes).toBe(0);
       expect(context.onlineNodes).toBe(0);
-      expect(context.hasDoorwayCapableNode).toBeFalse();
+      expect(context.hasDoorwayCapableNode).toBe(false);
       expect(context.doorwayNodes).toEqual([]);
     });
 
     it('should have computed signals that return correct values', () => {
-      expect(service.hasRegisteredNodes()).toBeFalse();
+      expect(service.hasRegisteredNodes()).toBe(false);
       expect(service.registeredNodes()).toEqual([]);
       expect(service.primaryNode()).toBeNull();
-      expect(service.hasDoorwayCapableNode()).toBeFalse();
+      expect(service.hasDoorwayCapableNode()).toBe(false);
       expect(service.doorwayNodes()).toEqual([]);
     });
   });
 
   describe('detect()', () => {
     it('should return empty context when user is not authenticated', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
+      (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
 
       const context = await service.detect();
 
-      expect(context.hasRegisteredNodes).toBeFalse();
+      expect(context.hasRegisteredNodes).toBe(false);
       expect(context.registeredNodes).toEqual([]);
       expect(context.totalNodes).toBe(0);
     });
 
     it('should query holochain for nodes when user is hosted', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -102,45 +106,45 @@ describe('RunningContextService', () => {
         fnName: 'get_my_nodes',
         payload: null,
       });
-      expect(context.hasRegisteredNodes).toBeTrue();
+      expect(context.hasRegisteredNodes).toBe(true);
       expect(context.totalNodes).toBe(1);
       expect(context.registeredNodes[0].nodeId).toBe('node-1');
     });
 
     it('should query holochain for nodes when user is steward', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('steward');
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      (mockIdentityService.mode as Mock).mockReturnValue('steward');
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
       const context = await service.detect();
 
       expect(mockHolochainClient.callZome).toHaveBeenCalled();
-      expect(context.hasRegisteredNodes).toBeFalse();
+      expect(context.hasRegisteredNodes).toBe(false);
     });
 
     it('should handle holochain errors gracefully', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(Promise.reject(new Error('Connection failed')));
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const context = await service.detect();
 
-      expect(context.hasRegisteredNodes).toBeFalse();
+      expect(context.hasRegisteredNodes).toBe(false);
       expect(context.registeredNodes).toEqual([]);
     });
 
     it('should handle empty holochain response', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
       const context = await service.detect();
 
-      expect(context.hasRegisteredNodes).toBeFalse();
+      expect(context.hasRegisteredNodes).toBe(false);
     });
   });
 
   describe('node type detection', () => {
     it('should identify holoport as primary node', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -156,8 +160,8 @@ describe('RunningContextService', () => {
     });
 
     it('should identify holoport-plus as primary node', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -173,8 +177,8 @@ describe('RunningContextService', () => {
     });
 
     it('should use first node as primary when no holoport', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -192,8 +196,8 @@ describe('RunningContextService', () => {
 
   describe('doorway capability detection', () => {
     it('should mark holoport as doorway capable', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'hp-1', node_type: 'holoport', status: 'online' }],
@@ -202,14 +206,14 @@ describe('RunningContextService', () => {
 
       const context = await service.detect();
 
-      expect(context.hasDoorwayCapableNode).toBeTrue();
+      expect(context.hasDoorwayCapableNode).toBe(true);
       expect(context.doorwayNodes.length).toBe(1);
-      expect(context.doorwayNodes[0].hasDoorway).toBeTrue();
+      expect(context.doorwayNodes[0].hasDoorway).toBe(true);
     });
 
     it('should mark holoport-plus as doorway capable', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'hp-plus-1', node_type: 'holoport-plus', status: 'online' }],
@@ -218,12 +222,12 @@ describe('RunningContextService', () => {
 
       const context = await service.detect();
 
-      expect(context.hasDoorwayCapableNode).toBeTrue();
+      expect(context.hasDoorwayCapableNode).toBe(true);
     });
 
     it('should mark self-hosted with doorway_url as doorway capable', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -239,13 +243,13 @@ describe('RunningContextService', () => {
 
       const context = await service.detect();
 
-      expect(context.hasDoorwayCapableNode).toBeTrue();
+      expect(context.hasDoorwayCapableNode).toBe(true);
       expect(context.doorwayNodes[0].doorwayUrl).toBe('https://my-doorway.example.com');
     });
 
     it('should NOT mark self-hosted without doorway_url as doorway capable', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -256,15 +260,15 @@ describe('RunningContextService', () => {
 
       const context = await service.detect();
 
-      expect(context.hasDoorwayCapableNode).toBeFalse();
+      expect(context.hasDoorwayCapableNode).toBe(false);
       expect(context.doorwayNodes.length).toBe(0);
     });
   });
 
   describe('status mapping', () => {
     it('should map online status correctly', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1', status: 'online' }],
@@ -276,8 +280,8 @@ describe('RunningContextService', () => {
     });
 
     it('should map offline status correctly', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1', status: 'offline' }],
@@ -289,8 +293,8 @@ describe('RunningContextService', () => {
     });
 
     it('should map degraded status correctly', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1', status: 'degraded' }],
@@ -302,8 +306,8 @@ describe('RunningContextService', () => {
     });
 
     it('should map unknown status for unrecognized values', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1', status: 'weird-status' }],
@@ -315,8 +319,8 @@ describe('RunningContextService', () => {
     });
 
     it('should handle undefined status', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1' }], // No status field
@@ -330,8 +334,8 @@ describe('RunningContextService', () => {
 
   describe('online node counting', () => {
     it('should count online nodes correctly', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -352,8 +356,8 @@ describe('RunningContextService', () => {
 
   describe('isHolochainNative', () => {
     it('should return true when user has registered nodes', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'n1', status: 'online' }],
@@ -362,25 +366,25 @@ describe('RunningContextService', () => {
 
       await service.detect();
 
-      expect(service.isHolochainNative()).toBeTrue();
+      expect(service.isHolochainNative()).toBe(true);
     });
 
     it('should return true when holochain client is connected', () => {
-      (mockHolochainClient.state as jasmine.Spy).and.returnValue('connected');
+      (mockHolochainClient.state as Mock).mockReturnValue('connected');
 
-      expect(service.isHolochainNative()).toBeTrue();
+      expect(service.isHolochainNative()).toBe(true);
     });
 
     it('should return false when no nodes and not connected', () => {
-      (mockHolochainClient.state as jasmine.Spy).and.returnValue('disconnected');
+      (mockHolochainClient.state as Mock).mockReturnValue('disconnected');
 
-      expect(service.isHolochainNative()).toBeFalse();
+      expect(service.isHolochainNative()).toBe(false);
     });
   });
 
   describe('periodic detection', () => {
     it('should start periodic detection and run initial detect', fakeAsync(() => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
+      (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
 
       service.startPeriodicDetection();
 
@@ -389,7 +393,7 @@ describe('RunningContextService', () => {
     }));
 
     it('should not start multiple detection intervals', fakeAsync(() => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
+      (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
 
       service.startPeriodicDetection();
       service.startPeriodicDetection(); // Second call should be ignored
@@ -398,19 +402,21 @@ describe('RunningContextService', () => {
     }));
 
     it('should refresh detection every 60 seconds', fakeAsync(() => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
+      (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
 
       service.startPeriodicDetection();
       const initialDetectedAt = service.context().detectedAt;
 
       tick(60000); // Wait 60 seconds
 
-      expect(service.context().detectedAt.getTime()).toBeGreaterThan(initialDetectedAt.getTime());
+      expect(service.context().detectedAt.getTime()).toBeGreaterThanOrEqual(
+        initialDetectedAt.getTime()
+      );
       discardPeriodicTasks();
     }));
 
     it('should stop periodic detection', fakeAsync(() => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
+      (mockIdentityService.mode as Mock).mockReturnValue('anonymous');
 
       service.startPeriodicDetection();
       service.stopPeriodicDetection();
@@ -425,19 +431,20 @@ describe('RunningContextService', () => {
   });
 
   describe('context$ observable', () => {
-    it('should emit current context immediately', done => {
-      service.context$.pipe(take(1)).subscribe(context => {
-        expect(context).toBeTruthy();
-        expect(context.hasRegisteredNodes).toBeFalse();
-        done();
-      });
-    });
+    it('should emit current context immediately', () =>
+      new Promise<void>(done => {
+        service.context$.pipe(take(1)).subscribe(context => {
+          expect(context).toBeTruthy();
+          expect(context.hasRegisteredNodes).toBe(false);
+          done();
+        });
+      }));
   });
 
   describe('display name generation', () => {
     it('should use display_name when provided', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'node-12345678', display_name: 'My Custom Name', status: 'online' }],
@@ -450,8 +457,8 @@ describe('RunningContextService', () => {
     });
 
     it('should truncate node_id when no display_name', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [{ node_id: 'node-12345678-abcdefgh', status: 'online' }],

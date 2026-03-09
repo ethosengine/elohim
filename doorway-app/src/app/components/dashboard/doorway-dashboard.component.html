@@ -10,8 +10,8 @@
         <span class="status-dot"></span>
         {{ connectionState() | titlecase }}
       </span>
-      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()">
-        <span class="icon">&#8635;</span>
+      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()" data-testid="dashboard-refresh" aria-label="Refresh dashboard data">
+        <span class="icon" aria-hidden="true">&#8635;</span>
         Refresh
       </button>
     </div>
@@ -29,7 +29,7 @@
   @if (error()) {
     <div class="error-state">
       <p>{{ error() }}</p>
-      <button (click)="refresh()">Retry</button>
+      <button (click)="refresh()" data-testid="dashboard-error-retry">Retry</button>
     </div>
   }
 
@@ -79,47 +79,68 @@
     }
 
     <!-- Tabs -->
-    <nav class="tabs">
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'overview'"
         [class.active]="activeTab() === 'overview'"
-        (click)="setTab('overview')">
+        (click)="setTab('overview')"
+        data-testid="dashboard-tab-overview">
         Overview
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'nodes'"
         [class.active]="activeTab() === 'nodes'"
-        (click)="setTab('nodes')">
+        (click)="setTab('nodes')"
+        data-testid="dashboard-tab-nodes">
         Nodes ({{ nodes().length }})
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'resources'"
         [class.active]="activeTab() === 'resources'"
-        (click)="setTab('resources')">
+        (click)="setTab('resources')"
+        data-testid="dashboard-tab-resources">
         Resources
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'users'"
         [class.active]="activeTab() === 'users'"
-        (click)="setTab('users')">
+        (click)="setTab('users')"
+        data-testid="dashboard-tab-users">
         Users ({{ usersTotal() }})
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'pipeline'"
         [class.active]="activeTab() === 'pipeline'"
-        (click)="setTab('pipeline')">
+        (click)="setTab('pipeline')"
+        data-testid="dashboard-tab-pipeline">
         Pipeline
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'federation'"
         [class.active]="activeTab() === 'federation'"
-        (click)="setTab('federation')">
+        (click)="setTab('federation')"
+        data-testid="dashboard-tab-federation">
         Federation
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'graduation'"
         [class.active]="activeTab() === 'graduation'"
-        (click)="setTab('graduation')">
+        (click)="setTab('graduation')"
+        data-testid="dashboard-tab-graduation">
         Graduation
       </button>
     </nav>
@@ -272,7 +293,7 @@
         <div class="nodes-panel">
           <!-- Filters -->
           <div class="filters">
-            <select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)">
+            <select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)" data-testid="nodes-status-filter">
               <option value="all">All Status</option>
               <option value="online">Online</option>
               <option value="degraded">Degraded</option>
@@ -285,31 +306,31 @@
           <table class="nodes-table">
             <thead>
               <tr>
-                <th (click)="setSort('nodeId')" class="sortable">
+                <th (click)="setSort('nodeId')" class="sortable" data-testid="nodes-sort-id">
                   Node ID
                   @if (sortField() === 'nodeId') {
                     <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                   }
                 </th>
-                <th (click)="setSort('status')" class="sortable">
+                <th (click)="setSort('status')" class="sortable" data-testid="nodes-sort-status">
                   Status
                   @if (sortField() === 'status') {
                     <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                   }
                 </th>
-                <th (click)="setSort('stewardTier')" class="sortable">
+                <th (click)="setSort('stewardTier')" class="sortable" data-testid="nodes-sort-tier">
                   Tier
                   @if (sortField() === 'stewardTier') {
                     <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                   }
                 </th>
-                <th (click)="setSort('trustScore')" class="sortable">
+                <th (click)="setSort('trustScore')" class="sortable" data-testid="nodes-sort-trust">
                   Trust
                   @if (sortField() === 'trustScore') {
                     <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                   }
                 </th>
-                <th (click)="setSort('combinedScore')" class="sortable">
+                <th (click)="setSort('combinedScore')" class="sortable" data-testid="nodes-sort-score">
                   Score
                   @if (sortField() === 'combinedScore') {
                     <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
@@ -484,19 +505,20 @@
               placeholder="Search users..."
               [value]="usersSearch()"
               (input)="searchUsers($any($event.target).value)"
+              data-testid="users-search"
             />
-            <select [value]="usersPermFilter()" (change)="filterByPermission($any($event.target).value)">
+            <select [value]="usersPermFilter()" (change)="filterByPermission($any($event.target).value)" data-testid="users-permission-filter">
               <option value="all">All Permissions</option>
               <option value="ADMIN">Admin</option>
               <option value="AUTHENTICATED">Authenticated</option>
               <option value="PUBLIC">Public</option>
             </select>
-            <select [value]="usersActiveFilter()" (change)="filterByActive($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')">
+            <select [value]="usersActiveFilter()" (change)="filterByActive($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')" data-testid="users-active-filter">
               <option value="all">All Status</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <select [value]="usersQuotaFilter()" (change)="filterByQuota($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')">
+            <select [value]="usersQuotaFilter()" (change)="filterByQuota($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')" data-testid="users-quota-filter">
               <option value="all">All Quota</option>
               <option value="true">Over Quota</option>
               <option value="false">Within Quota</option>
@@ -514,31 +536,31 @@
             <table class="users-table">
               <thead>
                 <tr>
-                  <th (click)="setUserSort('identifier')" class="sortable">
+                  <th (click)="setUserSort('identifier')" class="sortable" data-testid="users-sort-identifier">
                     Identifier
                     @if (userSortField() === 'identifier') {
                       <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                     }
                   </th>
-                  <th (click)="setUserSort('permissionLevel')" class="sortable">
+                  <th (click)="setUserSort('permissionLevel')" class="sortable" data-testid="users-sort-permission">
                     Permission
                     @if (userSortField() === 'permissionLevel') {
                       <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                     }
                   </th>
-                  <th (click)="setUserSort('isActive')" class="sortable">
+                  <th (click)="setUserSort('isActive')" class="sortable" data-testid="users-sort-status">
                     Status
                     @if (userSortField() === 'isActive') {
                       <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                     }
                   </th>
-                  <th (click)="setUserSort('storagePercent')" class="sortable">
+                  <th (click)="setUserSort('storagePercent')" class="sortable" data-testid="users-sort-storage">
                     Storage
                     @if (userSortField() === 'storagePercent') {
                       <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
                     }
                   </th>
-                  <th (click)="setUserSort('createdAt')" class="sortable">
+                  <th (click)="setUserSort('createdAt')" class="sortable" data-testid="users-sort-created">
                     Created
                     @if (userSortField() === 'createdAt') {
                       <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
@@ -599,13 +621,15 @@
               <div class="pagination">
                 <button
                   [disabled]="usersPage() <= 1"
-                  (click)="setUsersPage(usersPage() - 1)">
+                  (click)="setUsersPage(usersPage() - 1)"
+                  data-testid="users-page-prev">
                   Previous
                 </button>
                 <span>Page {{ usersPage() }} of {{ usersTotalPages() }}</span>
                 <button
                   [disabled]="usersPage() >= usersTotalPages()"
-                  (click)="setUsersPage(usersPage() + 1)">
+                  (click)="setUsersPage(usersPage() + 1)"
+                  data-testid="users-page-next">
                   Next
                 </button>
               </div>
@@ -618,11 +642,11 @@
 
   <!-- User Detail Modal -->
   @if (showUserDetail() && selectedUser()) {
-    <div class="modal-overlay" (click)="closeUserDetail()" (keydown.enter)="closeUserDetail()" tabindex="0" role="button">
+    <div class="modal-overlay" (click)="closeUserDetail()" (keydown.enter)="closeUserDetail()" tabindex="0" role="button" data-testid="user-detail-overlay">
       <div class="modal-content user-detail-modal" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" tabindex="0" role="button">
         <header class="modal-header">
           <h2>User Details</h2>
-          <button class="close-btn" (click)="closeUserDetail()">&times;</button>
+          <button class="close-btn" (click)="closeUserDetail()" data-testid="user-detail-close">&times;</button>
         </header>
 
         <div class="modal-body">
@@ -648,7 +672,7 @@
             </div>
             <div class="info-row">
               <span class="label">Permission:</span>
-              <select [value]="selectedUser()?.permissionLevel" (change)="updateUserPermission(selectedUser()!.id, $any($event.target).value)">
+              <select [value]="selectedUser()?.permissionLevel" (change)="updateUserPermission(selectedUser()!.id, $any($event.target).value)" data-testid="user-detail-permission">
                 <option value="PUBLIC">Public</option>
                 <option value="AUTHENTICATED">Authenticated</option>
                 <option value="ADMIN">Admin</option>
@@ -713,12 +737,12 @@
           <section class="actions-section">
             <h3>Actions</h3>
             <div class="action-buttons">
-              <button class="btn" (click)="toggleUserStatus(selectedUser()!.id, selectedUser()!.isActive)">
+              <button class="btn" (click)="toggleUserStatus(selectedUser()!.id, selectedUser()!.isActive)" data-testid="user-detail-toggle-status">
                 {{ selectedUser()?.isActive ? '🔒 Deactivate' : '🔓 Activate' }}
               </button>
-              <button class="btn" (click)="forceUserLogout(selectedUser()!.id)">🚪 Force Logout</button>
-              <button class="btn" (click)="resetUserUsage(selectedUser()!.id)">🔄 Reset Usage</button>
-              <button class="btn btn-danger" (click)="deleteUser(selectedUser()!.id)">🗑 Delete User</button>
+              <button class="btn" (click)="forceUserLogout(selectedUser()!.id)" data-testid="user-detail-logout">🚪 Force Logout</button>
+              <button class="btn" (click)="resetUserUsage(selectedUser()!.id)" data-testid="user-detail-reset-usage">🔄 Reset Usage</button>
+              <button class="btn btn-danger" (click)="deleteUser(selectedUser()!.id)" data-testid="user-detail-delete">🗑 Delete User</button>
             </div>
           </section>
         </div>

@@ -20,6 +20,10 @@ const RUST_SOURCE = path.resolve(
 );
 
 const OUTPUT_FILE = path.resolve(__dirname, 'generated/schema-enums.ts');
+const APP_OUTPUT_FILE = path.resolve(
+  __dirname,
+  '../../../elohim-app/src/app/generated/schema-enums.ts'
+);
 
 interface ParsedConstant {
   name: string;
@@ -143,6 +147,14 @@ function main() {
 
   fs.writeFileSync(OUTPUT_FILE, typescript);
   console.log(`✅ Generated: ${OUTPUT_FILE}`);
+
+  // Also write to elohim-app for direct import
+  const appOutputDir = path.dirname(APP_OUTPUT_FILE);
+  if (!fs.existsSync(appOutputDir)) {
+    fs.mkdirSync(appOutputDir, { recursive: true });
+  }
+  fs.writeFileSync(APP_OUTPUT_FILE, typescript);
+  console.log(`✅ Generated: ${APP_OUTPUT_FILE}`);
 }
 
 main();

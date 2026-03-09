@@ -1,0 +1,15 @@
+{
+  "id": "eve-firstwoman",
+  "displayName": "Eve",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["public-observer-epic", "social-medium-epic"],
+  "claimedAgentId": "agent-eve-firstwoman",
+  "note": "First to reach for knowledge. Stewards truth-seeking and digital relationship content. Natural affinity for public-observer and social-medium content where courage meets curiosity.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-truth-seeking",
+    "affinityDomains": ["public-observer", "social-medium"],
+    "humanId": "human-eve-firstwoman"
+  }
+}

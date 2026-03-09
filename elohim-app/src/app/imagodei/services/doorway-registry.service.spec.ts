@@ -5,16 +5,18 @@
  */
 
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DoorwayRegistryService } from './doorway-registry.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { signal } from '@angular/core';
 import type { DoorwayInfo } from '../models/doorway.model';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('DoorwayRegistryService', () => {
   let service: DoorwayRegistryService;
   let httpMock: HttpTestingController;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockHolochainClient: any;
   let localStorageMock: { [key: string]: string };
 
   const mockDoorway: DoorwayInfo = {
@@ -44,28 +46,32 @@ describe('DoorwayRegistryService', () => {
   };
 
   beforeEach(() => {
-    // Setup localStorage mock
+    // Setup localStorage mock using Storage.prototype (works reliably in jsdom/vitest)
     localStorageMock = {};
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
+      (key: string) => localStorageMock[key] ?? null
+    );
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
 
     // Create mock Holochain client
     const isConnectedSignal = signal(false);
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', ['callZome'], {
-      isConnected: jasmine.createSpy().and.callFake(() => isConnectedSignal()),
-    });
-    mockHolochainClient.callZome.and.returnValue(
+    mockHolochainClient = {
+      callZome: vi.fn(),
+      isConnected: vi.fn().mockImplementation(() => isConnectedSignal()),
+    };
+    mockHolochainClient.callZome.mockReturnValue(
       Promise.resolve({ success: false, error: 'Not connected' })
     );
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         DoorwayRegistryService,
         { provide: HolochainClientService, useValue: mockHolochainClient },
       ],
@@ -76,6 +82,8 @@ describe('DoorwayRegistryService', () => {
   });
 
   afterEach(() => {
+    // Cancel any pending requests left over from async service internals
+    httpMock.match(() => true).forEach(r => r.error(new ProgressEvent('error')));
     httpMock.verify();
   });
 
@@ -133,7 +141,7 @@ describe('DoorwayRegistryService', () => {
     it('should persist selection to localStorage', () => {
       service.selectDoorway(mockDoorway);
 
-      expect(localStorage.setItem).toHaveBeenCalled();
+      expect(Storage.prototype.setItem).toHaveBeenCalled();
     });
 
     it('should mark explicit selection', () => {
@@ -177,7 +185,7 @@ describe('DoorwayRegistryService', () => {
       service.selectDoorway(mockDoorway);
       service.clearSelection();
 
-      expect(localStorage.removeItem).toHaveBeenCalled();
+      expect(Storage.prototype.removeItem).toHaveBeenCalled();
     });
   });
 
@@ -188,8 +196,8 @@ describe('DoorwayRegistryService', () => {
   describe('selectDoorwayByUrl', () => {
     it('should select a known doorway by URL', async () => {
       // Load doorways first so there are known ones
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway] })
       );
       await service.loadDoorways();
@@ -290,15 +298,15 @@ describe('DoorwayRegistryService', () => {
     });
 
     it('should try DHT first when Holochain connected', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway, mockDoorway2] })
       );
 
       const result = await service.loadDoorways();
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'infrastructure',
           fnName: 'get_doorways_by_region',
         })
@@ -307,8 +315,8 @@ describe('DoorwayRegistryService', () => {
     });
 
     it('should fall back to REST API when DHT fails', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'DHT error' })
       );
 
@@ -330,7 +338,7 @@ describe('DoorwayRegistryService', () => {
     });
 
     it('should use bootstrap list as last resort', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
       const loadPromise = service.loadDoorways();
 
@@ -345,19 +353,19 @@ describe('DoorwayRegistryService', () => {
     });
 
     it('should cache results', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway] })
       );
 
       await service.loadDoorways();
 
-      expect(localStorage.setItem).toHaveBeenCalled();
+      expect(Storage.prototype.setItem).toHaveBeenCalled();
     });
 
     it('should clear error on successful load', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway] })
       );
 
@@ -380,8 +388,8 @@ describe('DoorwayRegistryService', () => {
 
     it('should check health of all doorways', async () => {
       // Load doorways first
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway, mockDoorway2] })
       );
 
@@ -460,7 +468,7 @@ describe('DoorwayRegistryService', () => {
       service = TestBed.inject(DoorwayRegistryService);
 
       // Check localStorage.getItem was called
-      expect(localStorage.getItem).toHaveBeenCalled();
+      expect(Storage.prototype.getItem).toHaveBeenCalled();
     });
   });
 
@@ -470,8 +478,8 @@ describe('DoorwayRegistryService', () => {
 
   describe('computed signals', () => {
     it('doorwaysWithHealth should include health info', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [mockDoorway] })
       );
 
@@ -480,7 +488,7 @@ describe('DoorwayRegistryService', () => {
       const withHealth = service.doorwaysWithHealth();
       expect(withHealth.length).toBe(1);
       expect(withHealth[0]).toEqual(
-        jasmine.objectContaining({
+        expect.objectContaining({
           id: 'doorway-1',
           name: 'Test Doorway',
         })

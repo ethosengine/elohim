@@ -7,7 +7,6 @@
 
 import * as fs from 'fs';
 
-import { KuzuClient } from '../db/kuzu-client';
 import { HolochainImportConfig } from '../models/holochain.model';
 import { HolochainClientService } from '../services/holochain-client.service';
 import { HolochainImportService } from '../services/holochain-import.service';
@@ -216,13 +215,6 @@ export class ServiceContainer {
     this.trust = config.trust || this.createRealTrust();
     this.scaffold = config.scaffold || this.createRealScaffold();
     this.human = config.human || this.createRealHuman();
-  }
-
-  /**
-   * Create Kuzu database client
-   */
-  createKuzuClient(dbPath: string): KuzuClient {
-    return new KuzuClient(dbPath);
   }
 
   /**

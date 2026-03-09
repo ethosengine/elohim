@@ -15,11 +15,12 @@ import {
 } from '@app/lamad/models/feedback-profile.model';
 
 import { ReactionBarComponent } from './reaction-bar.component';
+import { vi } from 'vitest';
 
 describe('ReactionBarComponent', () => {
   let component: ReactionBarComponent;
   let fixture: ComponentFixture<ReactionBarComponent>;
-  let mockSignalService: jasmine.SpyObj<GovernanceSignalService>;
+  let mockSignalService: any;
   let signalChanges$: Subject<any>;
 
   const mockReactionCounts: ReactionCounts = {
@@ -39,16 +40,15 @@ describe('ReactionBarComponent', () => {
 
   beforeEach(async () => {
     signalChanges$ = new Subject();
-    mockSignalService = jasmine.createSpyObj(
-      'GovernanceSignalService',
-      ['recordReaction', 'getReactionCounts', 'recordMediationProceed'],
-      {
-        signalChanges$: signalChanges$.asObservable(),
-      }
-    );
-    mockSignalService.getReactionCounts.and.returnValue(of(mockReactionCounts));
-    mockSignalService.recordReaction.and.returnValue(of(true));
-    mockSignalService.recordMediationProceed.and.returnValue(of(true));
+    mockSignalService = {
+      recordReaction: vi.fn(),
+      getReactionCounts: vi.fn(),
+      recordMediationProceed: vi.fn(),
+      signalChanges$: signalChanges$.asObservable(),
+    };
+    mockSignalService.getReactionCounts.mockReturnValue(of(mockReactionCounts));
+    mockSignalService.recordReaction.mockReturnValue(of(true));
+    mockSignalService.recordMediationProceed.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
       imports: [ReactionBarComponent],
@@ -70,8 +70,8 @@ describe('ReactionBarComponent', () => {
 
   describe('initialization', () => {
     it('should have default values', () => {
-      expect(component.showCounts).toBeTrue();
-      expect(component.compact).toBeFalse();
+      expect(component.showCounts).toBe(true);
+      expect(component.compact).toBe(false);
       expect(component.contentType).toBe('learning-content');
     });
 
@@ -176,7 +176,7 @@ describe('ReactionBarComponent', () => {
 
       const concernedReaction = component.availableReactions.find(r => r.type === 'concerned');
       expect(concernedReaction).toBeDefined();
-      expect(concernedReaction?.mediated).toBeTrue();
+      expect(concernedReaction?.mediated).toBe(true);
     }));
 
     it('should set correct labels for reactions', fakeAsync(() => {
@@ -212,7 +212,7 @@ describe('ReactionBarComponent', () => {
 
       expect(mockSignalService.recordReaction).toHaveBeenCalledWith(
         'content-1',
-        jasmine.objectContaining({ type: 'moved' })
+        expect.objectContaining({ type: 'moved' })
       );
     }));
 
@@ -242,7 +242,7 @@ describe('ReactionBarComponent', () => {
       const concernedReaction = component.availableReactions.find(r => r.type === 'concerned')!;
       component.onReactionClick(concernedReaction);
 
-      expect(component.showMediationDialog).toBeTrue();
+      expect(component.showMediationDialog).toBe(true);
       expect(component.mediationContext?.reaction.type).toBe('concerned');
     }));
 
@@ -255,7 +255,7 @@ describe('ReactionBarComponent', () => {
     }));
 
     it('should refresh counts after reaction', fakeAsync(() => {
-      mockSignalService.getReactionCounts.calls.reset();
+      mockSignalService.getReactionCounts.mockClear();
       const movedReaction = component.availableReactions.find(r => r.type === 'moved')!;
       component.onReactionClick(movedReaction);
       tick();
@@ -299,7 +299,7 @@ describe('ReactionBarComponent', () => {
       tick();
 
       expect(mockSignalService.recordMediationProceed).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           contentId: 'content-1',
           reactionType: 'concerned',
           proceededAnyway: true,
@@ -314,7 +314,7 @@ describe('ReactionBarComponent', () => {
 
       expect(mockSignalService.recordReaction).toHaveBeenCalledWith(
         'content-1',
-        jasmine.objectContaining({ type: 'concerned' })
+        expect.objectContaining({ type: 'concerned' })
       );
     }));
 
@@ -355,25 +355,25 @@ describe('ReactionBarComponent', () => {
       tick();
 
       expect(mockSignalService.recordMediationProceed).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           proceededAnyway: false,
           alternativeChosen: 'challenged',
         })
       );
       expect(mockSignalService.recordReaction).toHaveBeenCalledWith(
         'content-1',
-        jasmine.objectContaining({ type: 'challenged' })
+        expect.objectContaining({ type: 'challenged' })
       );
     }));
 
     it('should close dialog on any response', fakeAsync(() => {
       component.onReactionClick(mediatedReaction);
-      expect(component.showMediationDialog).toBeTrue();
+      expect(component.showMediationDialog).toBe(true);
 
       component.onMediationResponse(true);
       tick();
 
-      expect(component.showMediationDialog).toBeFalse();
+      expect(component.showMediationDialog).toBe(false);
       expect(component.mediationContext).toBeNull();
     }));
 
@@ -390,7 +390,7 @@ describe('ReactionBarComponent', () => {
 
       component.closeMediationDialog();
 
-      expect(component.showMediationDialog).toBeFalse();
+      expect(component.showMediationDialog).toBe(false);
       expect(component.mediationContext).toBeNull();
     });
   });
@@ -438,17 +438,17 @@ describe('ReactionBarComponent', () => {
   describe('isUserReaction()', () => {
     it('should return true when matches user reaction', () => {
       component.userReaction = 'moved';
-      expect(component.isUserReaction('moved')).toBeTrue();
+      expect(component.isUserReaction('moved')).toBe(true);
     });
 
     it('should return false when does not match', () => {
       component.userReaction = 'grateful';
-      expect(component.isUserReaction('moved')).toBeFalse();
+      expect(component.isUserReaction('moved')).toBe(false);
     });
 
     it('should return false when no user reaction', () => {
       component.userReaction = null;
-      expect(component.isUserReaction('moved')).toBeFalse();
+      expect(component.isUserReaction('moved')).toBe(false);
     });
   });
 
@@ -457,7 +457,7 @@ describe('ReactionBarComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getReactionCounts.calls.reset();
+      mockSignalService.getReactionCounts.mockClear();
 
       signalChanges$.next({
         type: 'reaction',
@@ -472,7 +472,7 @@ describe('ReactionBarComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getReactionCounts.calls.reset();
+      mockSignalService.getReactionCounts.mockClear();
 
       signalChanges$.next({
         type: 'reaction',
@@ -487,7 +487,7 @@ describe('ReactionBarComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockSignalService.getReactionCounts.calls.reset();
+      mockSignalService.getReactionCounts.mockClear();
 
       signalChanges$.next({
         type: 'graduated-feedback',

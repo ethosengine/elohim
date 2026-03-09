@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { map, shareReplay } from 'rxjs/operators';
 
@@ -102,10 +102,8 @@ export class GovernanceService {
   private proposalsCache$: Observable<ProposalRecord[]> | null = null;
   private precedentsCache$: Observable<PrecedentRecord[]> | null = null;
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly sessionUser: SessionHumanService
-  ) {}
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly sessionUser = inject(SessionHumanService);
 
   // =========================================================================
   // Governance Index & Overview

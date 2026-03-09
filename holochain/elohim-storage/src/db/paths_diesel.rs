@@ -9,7 +9,7 @@ use super::context::AppContext;
 use super::diesel_schema::{chapters, path_attestations, path_tags, paths, steps};
 use super::models::{
     Chapter, ChapterWithSteps, NewChapter, NewPath, NewPathAttestation, NewPathTag, NewStep, Path,
-    PathAttestation, PathTag, PathWithDetails, PathWithSteps, Step,
+    PathAttestation, PathWithDetails, PathWithSteps, Step,
 };
 use crate::error::StorageError;
 
@@ -434,10 +434,7 @@ pub fn delete_path(
 // ============================================================================
 
 /// Get path count for an app
-pub fn path_count(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-) -> Result<i64, StorageError> {
+pub fn path_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     paths::table
         .filter(paths::app_id.eq(&ctx.app_id))
         .count()

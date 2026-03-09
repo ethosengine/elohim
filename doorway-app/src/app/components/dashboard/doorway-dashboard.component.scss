@@ -1,5 +1,8 @@
 /**
  * Doorway Operator Dashboard Styles
+ *
+ * All colors use --dw-* design tokens from styles.css.
+ * Dark/light mode handled globally — no per-component media queries needed.
  */
 
 .doorway-dashboard {
@@ -16,19 +19,19 @@
   align-items: flex-start;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--dw-border);
 
   .header-content {
     h1 {
       font-size: 1.75rem;
       font-weight: 600;
       margin: 0;
-      color: var(--text-primary, #111827);
+      color: var(--dw-text-primary);
     }
 
     .subtitle {
       font-size: 0.875rem;
-      color: var(--text-secondary, #6b7280);
+      color: var(--dw-text-secondary);
       margin: 0.25rem 0 0 0;
     }
   }
@@ -45,18 +48,18 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--dw-text-secondary);
 
   .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #9ca3af;
+    background: var(--dw-text-muted);
   }
 
-  &.connected .status-dot { background: #10b981; }
-  &.connecting .status-dot { background: #f59e0b; animation: pulse 1s infinite; }
-  &.error .status-dot { background: #ef4444; }
+  &.connected .status-dot { background: var(--dw-success); }
+  &.connecting .status-dot { background: var(--dw-warning); animation: pulse 1s infinite; }
+  &.error .status-dot { background: var(--dw-error); }
 }
 
 @keyframes pulse {
@@ -69,14 +72,15 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--border-color, #d1d5db);
+  border: 1px solid var(--dw-border);
   border-radius: 0.375rem;
-  background: white;
+  background: var(--dw-bg-surface);
+  color: var(--dw-text-primary);
   cursor: pointer;
   font-size: 0.875rem;
 
   &:hover:not(:disabled) {
-    background: var(--bg-hover, #f3f4f6);
+    background: var(--dw-bg-hover);
   }
 
   &:disabled {
@@ -97,14 +101,14 @@
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--dw-text-secondary);
 }
 
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #3b82f6;
+  border: 3px solid var(--dw-spinner-track);
+  border-top-color: var(--dw-info);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 1rem;
@@ -115,12 +119,12 @@
 }
 
 .error-state {
-  color: #ef4444;
+  color: var(--dw-error);
 
   button {
     margin-top: 1rem;
     padding: 0.5rem 1rem;
-    background: #ef4444;
+    background: var(--dw-error);
     color: white;
     border: none;
     border-radius: 0.375rem;
@@ -137,26 +141,26 @@
 }
 
 .stat-card {
-  background: white;
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
   border-radius: 0.5rem;
   padding: 1rem;
 
   .stat-value {
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 
   .stat-label {
     font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     margin-top: 0.25rem;
   }
 
   .stat-bar {
     height: 4px;
-    background: #e5e7eb;
+    background: var(--dw-spinner-track);
     border-radius: 2px;
     margin-top: 0.75rem;
     overflow: hidden;
@@ -166,10 +170,10 @@
       border-radius: 2px;
       transition: width 0.3s ease;
 
-      &.health { background: #10b981; }
-      &.trust { background: #6366f1; }
-      &.impact { background: #8b5cf6; }
-      &.success { background: #3b82f6; }
+      &.health { background: var(--dw-success); }
+      &.trust { background: var(--dw-accent-primary); }
+      &.impact { background: var(--dw-violet); }
+      &.success { background: var(--dw-info); }
     }
   }
 }
@@ -177,7 +181,7 @@
 // Tabs
 .tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--dw-border);
   margin-bottom: 1.5rem;
 }
 
@@ -188,23 +192,23 @@
   border-bottom: 2px solid transparent;
   cursor: pointer;
   font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--dw-text-secondary);
   transition: all 0.2s;
 
   &:hover {
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 
   &.active {
-    color: var(--primary, #3b82f6);
-    border-bottom-color: var(--primary, #3b82f6);
+    color: var(--dw-accent-primary);
+    border-bottom-color: var(--dw-accent-primary);
   }
 }
 
 // Cards
 .card {
-  background: white;
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
   border-radius: 0.5rem;
   padding: 1.25rem;
 
@@ -212,7 +216,7 @@
     font-size: 1rem;
     font-weight: 600;
     margin: 0 0 1rem 0;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 }
 
@@ -236,12 +240,12 @@
   .capacity-value {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 
   .capacity-label {
     font-size: 0.75rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
   }
 }
 
@@ -260,13 +264,13 @@
   .tier-name {
     width: 80px;
     font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
   }
 
   .tier-bar {
     flex: 1;
     height: 8px;
-    background: #e5e7eb;
+    background: var(--dw-spinner-track);
     border-radius: 4px;
     overflow: hidden;
 
@@ -274,10 +278,10 @@
       height: 100%;
       border-radius: 4px;
 
-      &.pioneer { background: #8b5cf6; }
-      &.steward { background: #6366f1; }
-      &.guardian { background: #3b82f6; }
-      &.caretaker { background: #10b981; }
+      &.pioneer { background: var(--dw-violet); }
+      &.steward { background: var(--dw-accent-primary); }
+      &.guardian { background: var(--dw-info); }
+      &.caretaker { background: var(--dw-success); }
     }
   }
 
@@ -286,7 +290,7 @@
     text-align: right;
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 }
 
@@ -303,23 +307,23 @@
   align-items: center;
   padding: 0.5rem;
   border-radius: 0.375rem;
-  background: #f9fafb;
+  background: var(--dw-bg-tertiary);
   opacity: 0.5;
 
   &.active {
     opacity: 1;
-    background: #eff6ff;
+    background: var(--dw-accent-subtle);
   }
 
   .reach-count {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 
   .reach-name {
     font-size: 0.625rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -343,19 +347,19 @@
     .value {
       font-size: 1.25rem;
       font-weight: 600;
-      color: var(--text-primary, #111827);
+      color: var(--dw-text-primary);
     }
 
     .cache-label,
     .label {
       font-size: 0.75rem;
-      color: var(--text-secondary, #6b7280);
+      color: var(--dw-text-secondary);
     }
   }
 }
 
 .card.human-scale {
-  background: linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%);
+  background: linear-gradient(135deg, var(--dw-accent-subtle) 0%, var(--dw-bg-surface) 100%);
 }
 
 // Nodes Table
@@ -365,9 +369,10 @@
 
     select {
       padding: 0.5rem 2rem 0.5rem 0.75rem;
-      border: 1px solid var(--border-color, #d1d5db);
+      border: 1px solid var(--dw-border);
       border-radius: 0.375rem;
-      background: white;
+      background: var(--dw-bg-surface);
+      color: var(--dw-text-primary);
       font-size: 0.875rem;
     }
   }
@@ -381,19 +386,19 @@
   th, td {
     padding: 0.75rem 1rem;
     text-align: left;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    border-bottom: 1px solid var(--dw-border);
   }
 
   th {
-    background: #f9fafb;
+    background: var(--dw-bg-tertiary);
     font-weight: 500;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
 
     &.sortable {
       cursor: pointer;
 
       &:hover {
-        color: var(--text-primary, #111827);
+        color: var(--dw-text-primary);
       }
     }
 
@@ -404,7 +409,7 @@
   }
 
   tbody tr:hover {
-    background: #f9fafb;
+    background: var(--dw-bg-hover);
   }
 
   .node-id {
@@ -414,7 +419,7 @@
 
   .empty-state {
     text-align: center;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     padding: 2rem;
   }
 }
@@ -426,11 +431,21 @@
   font-size: 0.75rem;
   font-weight: 500;
 
-  &.online { background: #d1fae5; color: #065f46; }
-  &.degraded { background: #fef3c7; color: #92400e; }
-  &.offline { background: #f3f4f6; color: #4b5563; }
-  &.failed { background: #fee2e2; color: #991b1b; }
-  &.discovered, &.registering { background: #dbeafe; color: #1e40af; }
+  &.online { background: var(--dw-success-bg); color: var(--dw-success-text); }
+  &.degraded { background: var(--dw-warning-bg); color: var(--dw-warning-text); }
+  &.offline { background: var(--dw-bg-tertiary); color: var(--dw-text-secondary); }
+  &.failed { background: var(--dw-error-bg); color: var(--dw-error); }
+  &.discovered, &.registering { background: var(--dw-accent-subtle); color: var(--dw-accent-text); }
+
+  &.active {
+    background: var(--dw-success-bg);
+    color: var(--dw-success);
+  }
+
+  &.inactive {
+    background: var(--dw-error-bg);
+    color: var(--dw-error);
+  }
 }
 
 .tier-badge {
@@ -440,24 +455,24 @@
   font-size: 0.75rem;
   font-weight: 500;
 
-  &.pioneer { background: #ede9fe; color: #5b21b6; }
-  &.steward { background: #e0e7ff; color: #3730a3; }
-  &.guardian { background: #dbeafe; color: #1e40af; }
-  &.caretaker { background: #d1fae5; color: #065f46; }
-  &.unknown { background: #f3f4f6; color: #6b7280; }
+  &.pioneer { background: var(--dw-violet-bg); color: var(--dw-violet-text); }
+  &.steward { background: var(--dw-accent-subtle); color: var(--dw-accent-text); }
+  &.guardian { background: var(--dw-accent-subtle); color: var(--dw-info); }
+  &.caretaker { background: var(--dw-success-bg); color: var(--dw-success-text); }
+  &.unknown { background: var(--dw-bg-tertiary); color: var(--dw-text-secondary); }
 }
 
 .score-bar {
   position: relative;
   height: 20px;
-  background: #e5e7eb;
+  background: var(--dw-spinner-track);
   border-radius: 4px;
   overflow: hidden;
   min-width: 80px;
 
   .score-fill {
     height: 100%;
-    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    background: linear-gradient(90deg, var(--dw-info), var(--dw-violet));
     transition: width 0.3s ease;
   }
 
@@ -478,7 +493,7 @@
   .empty-state {
     text-align: center;
     padding: 3rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
   }
 }
 
@@ -489,8 +504,8 @@
 }
 
 .resource-card {
-  background: white;
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
   border-radius: 0.5rem;
   padding: 1.25rem;
 
@@ -498,20 +513,20 @@
     font-size: 1rem;
     font-weight: 600;
     margin: 0 0 1rem 0;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 }
 
 .resource-gauge {
   height: 8px;
-  background: #e5e7eb;
+  background: var(--dw-spinner-track);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 1rem;
 
   .gauge-fill {
     height: 100%;
-    background: linear-gradient(90deg, #10b981, #3b82f6);
+    background: linear-gradient(90deg, var(--dw-success), var(--dw-info));
     transition: width 0.3s ease;
   }
 }
@@ -527,52 +542,13 @@
     font-size: 0.875rem;
 
     .label {
-      color: var(--text-secondary, #6b7280);
+      color: var(--dw-text-secondary);
     }
 
     .value {
       font-weight: 500;
-      color: var(--text-primary, #111827);
+      color: var(--dw-text-primary);
     }
-  }
-}
-
-// Dark mode support
-@media (prefers-color-scheme: dark) {
-  .doorway-dashboard {
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --border-color: #374151;
-    --bg-hover: #374151;
-  }
-
-  .stat-card,
-  .card,
-  .resource-card,
-  .nodes-table th {
-    background: #1f2937;
-    border-color: #374151;
-  }
-
-  .refresh-btn {
-    background: #1f2937;
-    border-color: #374151;
-    color: #f9fafb;
-  }
-
-  .reach-item {
-    background: #374151;
-
-    &.active {
-      background: #1e3a5f;
-    }
-  }
-
-  .score-bar,
-  .resource-gauge,
-  .stat-bar,
-  .tier-bar {
-    background: #374151;
   }
 }
 
@@ -594,17 +570,20 @@
     flex: 1;
     min-width: 200px;
     padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--dw-border);
     border-radius: 0.5rem;
     font-size: 0.875rem;
+    background: var(--dw-bg-surface);
+    color: var(--dw-text-primary);
   }
 
   select {
     padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--dw-border);
     border-radius: 0.5rem;
     font-size: 0.875rem;
-    background: white;
+    background: var(--dw-bg-surface);
+    color: var(--dw-text-primary);
   }
 }
 
@@ -616,13 +595,13 @@
   th, td {
     padding: 0.75rem 1rem;
     text-align: left;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    border-bottom: 1px solid var(--dw-border);
   }
 
   th {
-    background: var(--bg-secondary, #f9fafb);
+    background: var(--dw-bg-tertiary);
     font-weight: 600;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
   }
 
   .sortable {
@@ -630,13 +609,13 @@
     user-select: none;
 
     &:hover {
-      color: var(--text-primary, #111827);
+      color: var(--dw-text-primary);
     }
   }
 
   tbody tr {
     &:hover {
-      background: var(--bg-hover, #f3f4f6);
+      background: var(--dw-bg-hover);
     }
 
     &.inactive {
@@ -653,7 +632,7 @@
   }
 
   .date {
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     font-size: 0.813rem;
   }
 
@@ -671,43 +650,25 @@
   font-weight: 500;
 
   &.admin {
-    background: #f3e8ff;
-    color: #7c3aed;
+    background: var(--dw-accent-subtle);
+    color: var(--dw-accent-text);
   }
 
   &.authenticated {
-    background: #dbeafe;
-    color: #1d4ed8;
+    background: var(--dw-accent-subtle);
+    color: var(--dw-info);
   }
 
   &.public {
-    background: #f3f4f6;
-    color: #6b7280;
-  }
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-
-  &.active {
-    background: #d1fae5;
-    color: #059669;
-  }
-
-  &.inactive {
-    background: #fee2e2;
-    color: #dc2626;
+    background: var(--dw-bg-tertiary);
+    color: var(--dw-text-secondary);
   }
 }
 
 .storage-bar {
   position: relative;
   height: 1.5rem;
-  background: var(--bg-secondary, #f3f4f6);
+  background: var(--dw-bg-tertiary);
   border-radius: 0.25rem;
   overflow: hidden;
   min-width: 120px;
@@ -719,10 +680,10 @@
     height: 100%;
     border-radius: 0.25rem;
 
-    &.text-green-600 { background: #10b981; }
-    &.text-blue-600 { background: #3b82f6; }
-    &.text-yellow-600 { background: #f59e0b; }
-    &.text-red-600 { background: #ef4444; }
+    &.text-green-600 { background: var(--dw-success); }
+    &.text-blue-600 { background: var(--dw-info); }
+    &.text-yellow-600 { background: var(--dw-warning); }
+    &.text-red-600 { background: var(--dw-error); }
   }
 
   .storage-text {
@@ -733,7 +694,7 @@
     justify-content: center;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 }
 
@@ -744,8 +705,8 @@
   border-radius: 0.25rem;
   font-size: 0.625rem;
   font-weight: 600;
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--dw-error-bg);
+  color: var(--dw-error);
 }
 
 .btn-icon {
@@ -772,9 +733,10 @@
 
   button {
     padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--dw-border);
     border-radius: 0.375rem;
-    background: white;
+    background: var(--dw-bg-surface);
+    color: var(--dw-text-primary);
     font-size: 0.875rem;
     cursor: pointer;
 
@@ -784,13 +746,13 @@
     }
 
     &:hover:not(:disabled) {
-      background: var(--bg-secondary, #f9fafb);
+      background: var(--dw-bg-hover);
     }
   }
 
   span {
     font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
   }
 }
 
@@ -809,9 +771,10 @@
 }
 
 .modal-content {
-  background: white;
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
   border-radius: 0.75rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--dw-shadow-lg);
   max-width: 600px;
   width: 90%;
   max-height: 90vh;
@@ -823,24 +786,25 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--dw-border);
 
   h2 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 600;
+    color: var(--dw-text-primary);
   }
 
   .close-btn {
     background: none;
     border: none;
     font-size: 1.5rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     cursor: pointer;
     line-height: 1;
 
     &:hover {
-      color: var(--text-primary, #111827);
+      color: var(--dw-text-primary);
     }
   }
 }
@@ -856,17 +820,18 @@
     display: flex;
     align-items: center;
     padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-color, #f3f4f6);
+    border-bottom: 1px solid var(--dw-border-subtle);
 
     .label {
       width: 120px;
       font-size: 0.875rem;
-      color: var(--text-secondary, #6b7280);
+      color: var(--dw-text-secondary);
     }
 
     .value {
       flex: 1;
       font-size: 0.875rem;
+      color: var(--dw-text-primary);
 
       &.monospace {
         font-family: monospace;
@@ -876,9 +841,11 @@
 
     select {
       padding: 0.25rem 0.5rem;
-      border: 1px solid var(--border-color, #e5e7eb);
+      border: 1px solid var(--dw-border);
       border-radius: 0.25rem;
       font-size: 0.875rem;
+      background: var(--dw-bg-surface);
+      color: var(--dw-text-primary);
     }
   }
 }
@@ -890,6 +857,7 @@
     font-size: 1rem;
     font-weight: 600;
     margin: 0 0 1rem 0;
+    color: var(--dw-text-primary);
   }
 }
 
@@ -903,35 +871,35 @@
   .usage-label {
     display: block;
     font-size: 0.75rem;
-    color: var(--text-secondary, #6b7280);
+    color: var(--dw-text-secondary);
     margin-bottom: 0.25rem;
   }
 
   .usage-bar {
     height: 0.5rem;
-    background: var(--bg-secondary, #f3f4f6);
+    background: var(--dw-bg-tertiary);
     border-radius: 0.25rem;
     overflow: hidden;
     margin-bottom: 0.25rem;
 
     .usage-fill {
       height: 100%;
-      background: #3b82f6;
+      background: var(--dw-info);
       border-radius: 0.25rem;
     }
   }
 
   .usage-value {
     font-size: 0.813rem;
-    color: var(--text-primary, #111827);
+    color: var(--dw-text-primary);
   }
 }
 
 .over-quota-warning {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--dw-error-bg);
+  color: var(--dw-error);
   border-radius: 0.5rem;
   font-size: 0.875rem;
 
@@ -945,6 +913,7 @@
     font-size: 1rem;
     font-weight: 600;
     margin: 0 0 1rem 0;
+    color: var(--dw-text-primary);
   }
 }
 
@@ -955,94 +924,25 @@
 
   .btn {
     padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--dw-border);
     border-radius: 0.5rem;
-    background: white;
+    background: var(--dw-bg-surface);
+    color: var(--dw-text-primary);
     font-size: 0.875rem;
     cursor: pointer;
     transition: background 0.15s;
 
     &:hover {
-      background: var(--bg-secondary, #f9fafb);
+      background: var(--dw-bg-hover);
     }
 
     &.btn-danger {
-      border-color: #fca5a5;
-      color: #dc2626;
+      border-color: var(--dw-error);
+      color: var(--dw-error);
 
       &:hover {
-        background: #fee2e2;
+        background: var(--dw-error-bg);
       }
-    }
-  }
-}
-
-// Dark mode adjustments for users panel
-@media (prefers-color-scheme: dark) {
-  .users-filters {
-    .search-input,
-    select {
-      background: #1f2937;
-      border-color: #374151;
-      color: #f9fafb;
-    }
-  }
-
-  .users-table {
-    th {
-      background: #1f2937;
-    }
-
-    tbody tr:hover {
-      background: #374151;
-    }
-  }
-
-  .perm-badge {
-    &.admin {
-      background: #4c1d95;
-      color: #c4b5fd;
-    }
-
-    &.authenticated {
-      background: #1e3a5f;
-      color: #93c5fd;
-    }
-
-    &.public {
-      background: #374151;
-      color: #9ca3af;
-    }
-  }
-
-  .storage-bar {
-    background: #374151;
-  }
-
-  .modal-content {
-    background: #111827;
-    border: 1px solid #374151;
-  }
-
-  .modal-header {
-    border-color: #374151;
-  }
-
-  .user-info .info-row {
-    border-color: #374151;
-  }
-
-  .usage-bar {
-    background: #374151;
-  }
-
-  .action-buttons .btn {
-    background: #1f2937;
-    border-color: #374151;
-    color: #f9fafb;
-
-    &:hover {
-      background: #374151;
     }
   }
 }

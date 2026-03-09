@@ -1,0 +1,15 @@
+{
+  "id": "dan-developer",
+  "displayName": "Dan",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["elohim-lamad"],
+  "claimedAgentId": "agent-dan-developer",
+  "note": "EthosEngine developer. Stewards technical foundation content - distributed systems, protocol architecture, and engineering specifications.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-technical",
+    "affinityDomains": ["foundation", "general"],
+    "humanId": "human-dan-developer"
+  }
+}

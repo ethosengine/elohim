@@ -1,6 +1,6 @@
 import { Injectable, inject, afterNextRender } from '@angular/core';
 
-// @coverage: 20.7% (2026-02-05)
+// @coverage: 20.6% (2026-02-24)
 
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
@@ -52,6 +52,44 @@ import {
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
+
+// Content index types
+export interface ContentIndexEntry {
+  id: string;
+  title: string;
+  description: string;
+  contentType: string;
+  tags?: string[];
+  reach?: string;
+  trustScore?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ContentIndex {
+  nodes: ContentIndexEntry[];
+  totalCount?: number;
+  byType?: Record<string, number>;
+  lastUpdated?: string;
+}
+
+/** Mutable index maps accumulated during graph traversal. */
+interface GraphIndexes {
+  nodes: Map<string, ContentNode>;
+  relationships: Map<string, ContentRelationship>;
+  nodesByType: Map<string, Set<string>>;
+  nodesByTag: Map<string, Set<string>>;
+  nodesByCategory: Map<string, Set<string>>;
+  adjacency: Map<string, Set<string>>;
+  reverseAdjacency: Map<string, Set<string>>;
+}
+
+/** Recursive graph node shape from simplified Holochain graph responses. */
+interface GraphNodeData {
+  contentId: string;
+  relationshipType: string;
+  children: GraphNodeData[];
+}
 
 // Assessment types (inline until models are expanded)
 export interface AssessmentIndex {
@@ -217,10 +255,10 @@ export class DataLoaderService {
   /** Structured logger */
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
-  constructor(
-    private readonly holochainContent: HolochainContentService,
-    private readonly idbCache: IndexedDBCacheService
-  ) {
+  private readonly holochainContent = inject(HolochainContentService);
+  private readonly idbCache = inject(IndexedDBCacheService);
+
+  constructor() {
     // Defer cache initialization until after first render to avoid async in constructor.
     // Conductor is only used for agent-centric data (identity, attestations, points).
     afterNextRender(() => void this.initCaches());
@@ -286,12 +324,32 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
+
+        // "Not found" is a data issue, not connectivity — don't try cache
         if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
           this.logger.warn('Path not found (may be stale reference)', { pathId });
-        } else {
-          this.logger.error('Error loading path', err, { pathId });
+          throw err;
         }
-        throw err; // Re-throw - paths are critical, can't use placeholder
+
+        this.logger.warn('Error loading path, trying IDB cache', { pathId, error: errMsg });
+
+        if (!this.idbInitialized) {
+          throw err;
+        }
+
+        return from(this.idbCache.getPath(pathId)).pipe(
+          map(cached => {
+            if (cached) {
+              this.logger.info('Served path from IDB cache (offline fallback)', { pathId });
+              return cached;
+            }
+            this.logger.debug('IDB cache miss for path', { pathId });
+            throw err;
+          }),
+          catchError(() => {
+            throw err;
+          })
+        );
       })
     );
   }
@@ -417,8 +475,23 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn('Error loading content', { resourceId, error: errMsg });
-        return of(this.createPlaceholderContent(resourceId, errMsg));
+        this.logger.warn('Error loading content, trying IDB cache', { resourceId, error: errMsg });
+
+        if (!this.idbInitialized) {
+          return of(this.createPlaceholderContent(resourceId, errMsg));
+        }
+
+        return from(this.idbCache.getContent(resourceId)).pipe(
+          map(cached => {
+            if (cached) {
+              this.logger.info('Served content from IDB cache (offline fallback)', { resourceId });
+              return cached;
+            }
+            this.logger.debug('IDB cache miss for content', { resourceId });
+            return this.createPlaceholderContent(resourceId, errMsg);
+          }),
+          catchError(() => of(this.createPlaceholderContent(resourceId, errMsg)))
+        );
       })
     );
   }
@@ -461,16 +534,42 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn('Batch load error', {
+        this.logger.warn('Batch load error, trying IDB cache', {
           count: resourceIds.length,
           error: errMsg,
         });
-        // Return placeholders for all
-        const contentMap = new Map<string, ContentNode>();
-        for (const id of resourceIds) {
-          contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+
+        if (!this.idbInitialized) {
+          const contentMap = new Map<string, ContentNode>();
+          for (const id of resourceIds) {
+            contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+          }
+          return of(contentMap);
         }
-        return of(contentMap);
+
+        return from(this.idbCache.getContentBatch(resourceIds)).pipe(
+          map(cachedMap => {
+            const resultMap = new Map<string, ContentNode>(cachedMap);
+            const cacheHits = cachedMap.size;
+            const cacheMisses = resourceIds.length - cacheHits;
+
+            this.logger.info('Batch IDB cache fallback', { cacheHits, cacheMisses });
+
+            for (const id of resourceIds) {
+              if (!resultMap.has(id)) {
+                resultMap.set(id, this.createPlaceholderContent(id, errMsg));
+              }
+            }
+            return resultMap;
+          }),
+          catchError(() => {
+            const contentMap = new Map<string, ContentNode>();
+            for (const id of resourceIds) {
+              contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+            }
+            return of(contentMap);
+          })
+        );
       })
     );
   }
@@ -536,7 +635,7 @@ export class DataLoaderService {
   }
 
   /** Cached content index for search/discovery */
-  private contentIndexCache$: Observable<any> | null = null;
+  private contentIndexCache$: Observable<ContentIndex> | null = null;
 
   /** Cached readiness check */
   private readinessCache$: Observable<boolean> | null = null;
@@ -580,7 +679,7 @@ export class DataLoaderService {
    * NOTE: This is a heavy operation (loads up to 1000 items).
    * Use checkReadiness() if you just need to verify data is available.
    */
-  getContentIndex(): Observable<any> {
+  getContentIndex(): Observable<ContentIndex> {
     this.contentIndexCache$ ??= this.contentService.queryContent({ limit: 1000 }).pipe(
       map(nodes => ({
         nodes: nodes.map(node => ({
@@ -751,33 +850,66 @@ export class DataLoaderService {
 
   /**
    * Load agent progress for a specific path.
-   * Uses localStorage for prototype. In Holochain, this will read from private source chain.
+   * Reads from IndexedDB first, falls back to localStorage, migrates on read.
    */
   getAgentProgress(agentId: string, pathId: string): Observable<AgentProgress | null> {
-    // Use localStorage directly instead of fetching from JSON files
-    // This avoids 404 errors and keeps all progress client-side
-    const progress = this.getLocalProgress(agentId, pathId);
-    return of(progress);
+    if (!this.idbInitialized) {
+      return of(this.getLocalProgress(agentId, pathId));
+    }
+
+    const idbKey = `progress-${agentId}-${pathId}`;
+    return from(this.idbCache.getMetadata<AgentProgress>(idbKey)).pipe(
+      map(idbProgress => {
+        if (idbProgress) return idbProgress;
+
+        // Fall back to localStorage and migrate if found
+        const localProgress = this.getLocalProgress(agentId, pathId);
+        if (localProgress) {
+          // Migrate: write to IDB and remove from localStorage
+          const lsKey = `lamad-progress-${agentId}-${pathId}`;
+          this.idbCache
+            .setMetadata(idbKey, localProgress)
+            .then(() => {
+              try {
+                localStorage.removeItem(lsKey);
+              } catch {
+                /* ignore */
+              }
+              this.logger.debug('Migrated progress to IDB', { agentId, pathId });
+            })
+            .catch(() => undefined);
+        }
+        return localProgress;
+      }),
+      catchError(() => of(this.getLocalProgress(agentId, pathId)))
+    );
   }
 
   /**
    * Save agent progress.
-   * In prototype: Updates localStorage (JSON files are read-only).
-   * In Holochain: Writes to private source chain.
+   * Dual-writes to IndexedDB (primary) and localStorage (fallback).
    */
   saveAgentProgress(progress: AgentProgress): Observable<void> {
-    const key = `lamad-progress-${progress.agentId}-${progress.pathId}`;
+    const lsKey = `lamad-progress-${progress.agentId}-${progress.pathId}`;
+
+    // Always write to localStorage as fallback
     try {
-      localStorage.setItem(key, JSON.stringify(progress));
+      localStorage.setItem(lsKey, JSON.stringify(progress));
     } catch {
-      // Silently ignore localStorage quota errors - progress will be lost on refresh
-      // but the app continues to function
+      // Silently ignore localStorage quota errors
     }
+
+    // Write to IDB if available (non-blocking)
+    if (this.idbInitialized) {
+      const idbKey = `progress-${progress.agentId}-${progress.pathId}`;
+      this.idbCache.setMetadata(idbKey, progress).catch(() => undefined);
+    }
+
     return of(undefined);
   }
 
   /**
-   * Load progress from localStorage (prototype fallback).
+   * Load progress from localStorage (fallback).
    */
   getLocalProgress(agentId: string, pathId: string): AgentProgress | null {
     const key = `lamad-progress-${agentId}-${pathId}`;
@@ -1563,7 +1695,7 @@ export class DataLoaderService {
       contentId: string;
       relationshipType: string;
       confidence: number;
-      children: unknown[];
+      children: GraphNodeData[];
     }[];
     totalNodes: number;
   }): ContentGraph {
@@ -1580,7 +1712,7 @@ export class DataLoaderService {
     // For now, just build the relationship structure.
 
     const processNode = (
-      nodeData: { contentId: string; relationshipType: string; children: any[] },
+      nodeData: { contentId: string; relationshipType: string; children: GraphNodeData[] },
       parentId?: string
     ): void => {
       const nodeId = nodeData.contentId;
@@ -1660,8 +1792,7 @@ export class DataLoaderService {
     }
 
     // Process related nodes recursively
-    this.processHolochainGraphNodes(
-      hcGraph.related,
+    const indexes: GraphIndexes = {
       nodes,
       relationships,
       nodesByType,
@@ -1669,8 +1800,8 @@ export class DataLoaderService {
       nodesByCategory,
       adjacency,
       reverseAdjacency,
-      hcGraph.root?.content.id
-    );
+    };
+    this.processHolochainGraphNodes(hcGraph.related, indexes, hcGraph.root?.content.id);
 
     return {
       nodes,
@@ -1734,31 +1865,25 @@ export class DataLoaderService {
    */
   private processHolochainGraphNodes(
     graphNodes: HolochainContentGraphNode[],
-    nodes: Map<string, ContentNode>,
-    relationships: Map<string, ContentRelationship>,
-    nodesByType: Map<string, Set<string>>,
-    nodesByTag: Map<string, Set<string>>,
-    nodesByCategory: Map<string, Set<string>>,
-    adjacency: Map<string, Set<string>>,
-    reverseAdjacency: Map<string, Set<string>>,
+    indexes: GraphIndexes,
     parentId?: string
   ): void {
     for (const graphNode of graphNodes) {
       const node = this.transformHolochainContentToNode(graphNode.content);
       this.addNodeToGraphIndexes(
         node,
-        nodes,
-        nodesByType,
-        nodesByTag,
-        nodesByCategory,
-        adjacency,
-        reverseAdjacency
+        indexes.nodes,
+        indexes.nodesByType,
+        indexes.nodesByTag,
+        indexes.nodesByCategory,
+        indexes.adjacency,
+        indexes.reverseAdjacency
       );
 
       // Add relationship from parent to this node
       if (parentId) {
         const relId = `${parentId}-${node.id}`;
-        relationships.set(relId, {
+        indexes.relationships.set(relId, {
           id: relId,
           sourceNodeId: parentId,
           targetNodeId: node.id,
@@ -1766,26 +1891,17 @@ export class DataLoaderService {
         });
 
         // Update adjacency
-        if (!adjacency.has(parentId)) adjacency.set(parentId, new Set());
-        adjacency.get(parentId)!.add(node.id);
+        if (!indexes.adjacency.has(parentId)) indexes.adjacency.set(parentId, new Set());
+        indexes.adjacency.get(parentId)!.add(node.id);
 
-        if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
-        reverseAdjacency.get(node.id)!.add(parentId);
+        if (!indexes.reverseAdjacency.has(node.id))
+          indexes.reverseAdjacency.set(node.id, new Set());
+        indexes.reverseAdjacency.get(node.id)!.add(parentId);
       }
 
       // Process children recursively
       if (graphNode.children.length > 0) {
-        this.processHolochainGraphNodes(
-          graphNode.children,
-          nodes,
-          relationships,
-          nodesByType,
-          nodesByTag,
-          nodesByCategory,
-          adjacency,
-          reverseAdjacency,
-          node.id
-        );
+        this.processHolochainGraphNodes(graphNode.children, indexes, node.id);
       }
     }
   }

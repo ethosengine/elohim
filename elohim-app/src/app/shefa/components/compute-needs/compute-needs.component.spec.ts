@@ -6,18 +6,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { ComputeNeedsComponent } from './compute-needs.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { COMPUTE_DASHBOARD } from '../../interfaces';
+import { vi } from 'vitest';
 
 describe('ComputeNeedsComponent', () => {
   let component: ComputeNeedsComponent;
   let fixture: ComponentFixture<ComputeNeedsComponent>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
+  let mockShefaCompute: any;
 
   beforeEach(async () => {
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', [
-      'getComputeNeedsAssessment',
-    ]);
-    mockShefaCompute.getComputeNeedsAssessment.and.returnValue(
+    mockShefaCompute = {
+      getComputeNeedsAssessment: vi.fn(),
+    };
+    mockShefaCompute.getComputeNeedsAssessment.mockReturnValue(
       of({
         operatorId: 'test-operator',
         assessmentDate: new Date().toISOString(),
@@ -33,7 +34,7 @@ describe('ComputeNeedsComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ComputeNeedsComponent],
-      providers: [{ provide: ShefaComputeService, useValue: mockShefaCompute }],
+      providers: [{ provide: COMPUTE_DASHBOARD, useValue: mockShefaCompute }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ComputeNeedsComponent);

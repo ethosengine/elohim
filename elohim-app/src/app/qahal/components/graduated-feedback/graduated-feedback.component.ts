@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -110,7 +110,7 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly signalService: GovernanceSignalService) {}
+  private readonly signalService = inject(GovernanceSignalService);
 
   ngOnInit(): void {
     if (this.showAggregates) {

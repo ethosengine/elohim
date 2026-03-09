@@ -1,14 +1,17 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 98.6% (2026-02-05)
+// @coverage: 98.6% (2026-02-24)
 
 import { EconomicEvent, REAAction } from '@app/elohim/models';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
-import { AppreciationService, AppreciationDisplay } from '../../services/appreciation.service';
-import { EconomicService } from '../../services/economic.service';
+import {
+  ECONOMIC_EVENT_FACTORY,
+  type IEconomicEventFactory,
+  type AppreciationDisplay,
+} from '../../interfaces';
 
 const RECOGNITION_POINTS_UNIT = 'recognition-points';
 
@@ -598,11 +601,8 @@ export class ShefaHomeComponent implements OnInit {
   // Connection status
   isConnected = computed(() => this.holochainClient.isConnected());
 
-  constructor(
-    private readonly economicService: EconomicService,
-    private readonly appreciationService: AppreciationService,
-    private readonly holochainClient: HolochainClientService
-  ) {}
+  private readonly economicService = inject(ECONOMIC_EVENT_FACTORY);
+  private readonly holochainClient = inject(HolochainClientService);
 
   ngOnInit(): void {
     void this.loadData();
@@ -613,37 +613,24 @@ export class ShefaHomeComponent implements OnInit {
     this.error.set(null);
 
     try {
-      // Test availability first
-      await this.economicService.testAvailability();
-      await this.appreciationService.testAvailability();
+      // Load events and appreciations in parallel
+      const [providerEvents, receiverEvents, appreciations] = await Promise.all([
+        this.economicService.getEventsByProvider('current').catch(() => [] as EconomicEvent[]),
+        this.economicService.getEventsByReceiver('current').catch(() => [] as EconomicEvent[]),
+        this.economicService.getAppreciationsFor('current').catch(() => [] as AppreciationDisplay[]),
+      ]);
 
-      // If services are available, try to load some data
-      if (this.economicService.isAvailable()) {
-        // Try to load events for current agent (or a sample)
-        this.economicService.getEventsForAgent('current', 'both').subscribe({
-          next: events => this.events.set(events),
-          error: _err => {
-            // Handle error silently
-          },
-        });
-      }
+      const events = [...providerEvents, ...receiverEvents];
 
-      if (this.appreciationService.isAvailable()) {
-        // Try to load appreciations
-        this.appreciationService.getAppreciationsFor('current').subscribe({
-          next: appreciations => this.appreciations.set(appreciations),
-          error: _err => {
-            // Handle error silently
-          },
-        });
-      }
-
-      // If not connected, show demo data
-      if (!this.isConnected()) {
+      if (events.length > 0 || appreciations.length > 0) {
+        this.events.set(events);
+        this.appreciations.set(appreciations);
+      } else if (!this.isConnected()) {
+        // No data and not connected - show demo data
         this.loadDemoData();
       }
     } catch {
-      // Holochain connection failed - fallback to demo data
+      // Connection failed - fallback to demo data
       this.error.set('Failed to connect to Holochain. Showing demo data.');
       this.loadDemoData();
     } finally {

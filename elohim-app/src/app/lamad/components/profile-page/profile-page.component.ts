@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { RouterModule, Router } from '@angular/router';
 
-// @coverage: 45.5% (2026-02-05)
+// @coverage: 60.0% (2026-02-24)
 
 import { takeUntil, catchError } from 'rxjs/operators';
 
@@ -95,7 +95,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     const mode = this.identityMode();
     switch (mode) {
       case 'hosted':
-        return 'cloud_done';
+        return 'backup';
       case 'steward':
         return 'verified_user';
       case 'session':

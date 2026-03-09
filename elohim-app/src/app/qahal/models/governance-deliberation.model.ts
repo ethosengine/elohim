@@ -212,6 +212,8 @@ export interface FeedbackOption {
 /**
  * Pre-defined feedback scales based on context.
  */
+const LIGHT_GREEN = 'light-green';
+
 export const FEEDBACK_SCALES: Record<FeedbackContext, FeedbackOption[]> = {
   // Accuracy scale (fact-checking)
   accuracy: [
@@ -230,7 +232,7 @@ export const FEEDBACK_SCALES: Record<FeedbackContext, FeedbackOption[]> = {
       label: 'Mostly Accurate',
       description: 'Minor issues',
       icon: '~',
-      color: 'light-green',
+      color: LIGHT_GREEN,
       requiresReasoning: true,
       reasoningPrompt: 'What needs correction?',
     },
@@ -291,7 +293,7 @@ export const FEEDBACK_SCALES: Record<FeedbackContext, FeedbackOption[]> = {
       label: 'Useful',
       description: 'Somewhat helpful',
       icon: '✓',
-      color: 'light-green',
+      color: LIGHT_GREEN,
       requiresReasoning: false,
     },
     {
@@ -332,7 +334,7 @@ export const FEEDBACK_SCALES: Record<FeedbackContext, FeedbackOption[]> = {
       label: 'Agree',
       description: 'Support with minor concerns',
       icon: '✓',
-      color: 'light-green',
+      color: LIGHT_GREEN,
       requiresReasoning: false,
     },
     {

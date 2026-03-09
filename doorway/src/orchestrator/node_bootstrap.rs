@@ -25,7 +25,7 @@
 //! ```
 
 use super::{
-    inventory::{InventoryAnnouncement, NodeInventory},
+    inventory::{InventoryAnnouncement, NodeCapacity, NodeInventory},
     nats_provisioning::NatsProvisioner,
     OrchestratorState,
 };
@@ -105,6 +105,78 @@ impl NodeBootstrap {
     pub async fn process_announcement(&self, announcement: InventoryAnnouncement) -> Result<()> {
         process_node_announcement(announcement, Arc::clone(&self.state), &self.config).await
     }
+}
+
+/// Collect available memory in GB from /proc/meminfo (Linux).
+///
+/// Returns 0 if the file cannot be read or parsed, which is safe — the
+/// dashboard will simply show 0 GB rather than crashing.
+fn read_memory_gb_from_proc() -> u32 {
+    let content = match std::fs::read_to_string("/proc/meminfo") {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+    for line in content.lines() {
+        // MemTotal:       16384000 kB
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            let kb: u64 = rest
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            return (kb / (1024 * 1024)) as u32; // kB -> GB
+        }
+    }
+    0
+}
+
+/// Build a [`NodeInventory`] representing this doorway process and return it.
+///
+/// Uses only `std` and existing dependencies — no new crates required:
+/// - CPU cores via `std::thread::available_parallelism`
+/// - Memory via `/proc/meminfo` (Linux), falls back to 0
+/// - Storage defaults to 0.0 (not relevant for a gateway process)
+/// - Bandwidth defaults to 1 000 Mbps (typical datacenter uplink)
+///
+/// The returned inventory has `steward_tier = "gateway"` to distinguish the
+/// doorway from regular Holochain agent nodes.
+pub async fn register_self(config: &NodeBootstrapConfig) -> Result<NodeInventory> {
+    let cpu_cores = std::thread::available_parallelism()
+        .map(|n| n.get() as u32)
+        .unwrap_or(1);
+
+    let memory_gb = read_memory_gb_from_proc();
+
+    // Derive a stable node ID from the hostname so it survives restarts.
+    let hostname = std::env::var("HOSTNAME")
+        .or_else(|_| std::fs::read_to_string("/etc/hostname").map(|s| s.trim().to_string()))
+        .unwrap_or_else(|_| "doorway".to_string());
+    let node_id = format!("doorway-{}", hostname);
+
+    let capacity = NodeCapacity {
+        cpu_cores,
+        memory_gb,
+        storage_tb: 0.0,
+        bandwidth_mbps: 1000,
+    };
+
+    let inventory = NodeInventory::new(
+        node_id.clone(),
+        String::new(), // doorway is not a Holochain agent — no agent pub key
+        capacity,
+        config.region.clone(),
+    )
+    .with_steward_tier("gateway");
+
+    info!(
+        node_id = %node_id,
+        cpu_cores = %cpu_cores,
+        memory_gb = %memory_gb,
+        region = %config.region,
+        "Self-registered doorway as a node"
+    );
+
+    Ok(inventory)
 }
 
 /// Run the mDNS listener loop

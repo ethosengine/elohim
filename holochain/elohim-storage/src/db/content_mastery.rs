@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::context::AppContext;
 use super::diesel_schema::content_mastery;
-use super::models::{ContentMastery, NewContentMastery, mastery_levels, current_timestamp};
+use super::models::{current_timestamp, mastery_levels, ContentMastery, NewContentMastery};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -29,7 +29,9 @@ pub struct CreateMasteryInput {
     pub content_version_at_mastery: Option<String>,
 }
 
-fn default_mastery_level() -> String { mastery_levels::NOT_STARTED.to_string() }
+fn default_mastery_level() -> String {
+    mastery_levels::NOT_STARTED.to_string()
+}
 
 /// Query parameters for listing mastery records - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -53,7 +55,9 @@ pub struct MasteryQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Result of bulk operation
 #[derive(Debug, Clone, Serialize)]
@@ -155,7 +159,8 @@ pub fn list_mastery(
     // Filter by minimum mastery level using index
     if let Some(ref min_level) = query.min_mastery_level {
         if let Some(min_index) = mastery_levels::index_of(min_level) {
-            base_query = base_query.filter(content_mastery::mastery_level_index.ge(min_index as i32));
+            base_query =
+                base_query.filter(content_mastery::mastery_level_index.ge(min_index as i32));
         }
     }
 
@@ -181,11 +186,15 @@ pub fn get_mastery_for_human(
     ctx: &AppContext,
     human_id: &str,
 ) -> Result<Vec<ContentMastery>, StorageError> {
-    list_mastery(conn, ctx, &MasteryQuery {
-        human_id: Some(human_id.to_string()),
-        limit: 10000, // High limit for full mastery profile
-        ..Default::default()
-    })
+    list_mastery(
+        conn,
+        ctx,
+        &MasteryQuery {
+            human_id: Some(human_id.to_string()),
+            limit: 10000, // High limit for full mastery profile
+            ..Default::default()
+        },
+    )
 }
 
 /// Get content items needing refresh for a human
@@ -243,8 +252,7 @@ pub fn upsert_mastery(
         )));
     }
 
-    let mastery_index = mastery_levels::index_of(&input.mastery_level)
-        .unwrap_or(0) as i32;
+    let mastery_index = mastery_levels::index_of(&input.mastery_level).unwrap_or(0) as i32;
 
     // Check if exists
     let existing = get_mastery_for_content(conn, ctx, &input.human_id, &input.content_id)?;
@@ -254,12 +262,13 @@ pub fn upsert_mastery(
         diesel::update(
             content_mastery::table
                 .filter(content_mastery::app_id.eq(&ctx.app_id))
-                .filter(content_mastery::id.eq(&existing.id))
+                .filter(content_mastery::id.eq(&existing.id)),
         )
         .set((
             content_mastery::mastery_level.eq(&input.mastery_level),
             content_mastery::mastery_level_index.eq(mastery_index),
-            content_mastery::content_version_at_mastery.eq(input.content_version_at_mastery.as_deref()),
+            content_mastery::content_version_at_mastery
+                .eq(input.content_version_at_mastery.as_deref()),
             content_mastery::updated_at.eq(current_timestamp()),
         ))
         .execute(conn)
@@ -306,13 +315,17 @@ pub fn record_engagement(
         Some(m) => (m.id.clone(), m.engagement_count),
         None => {
             // Create initial mastery
-            let created = upsert_mastery(conn, ctx, CreateMasteryInput {
-                id: None,
-                human_id: human_id.to_string(),
-                content_id: content_id.to_string(),
-                mastery_level: mastery_levels::REMEMBER.to_string(), // First engagement = remember
-                content_version_at_mastery: None,
-            })?;
+            let created = upsert_mastery(
+                conn,
+                ctx,
+                CreateMasteryInput {
+                    id: None,
+                    human_id: human_id.to_string(),
+                    content_id: content_id.to_string(),
+                    mastery_level: mastery_levels::REMEMBER.to_string(), // First engagement = remember
+                    content_version_at_mastery: None,
+                },
+            )?;
             (created.id, 0)
         }
     };
@@ -321,7 +334,7 @@ pub fn record_engagement(
     diesel::update(
         content_mastery::table
             .filter(content_mastery::app_id.eq(&ctx.app_id))
-            .filter(content_mastery::id.eq(&id))
+            .filter(content_mastery::id.eq(&id)),
     )
     .set((
         content_mastery::engagement_count.eq(current_count + 1),
@@ -361,15 +374,17 @@ pub fn advance_mastery(
     // Get or create mastery
     let mastery = match get_mastery_for_content(conn, ctx, human_id, content_id)? {
         Some(m) => m,
-        None => {
-            upsert_mastery(conn, ctx, CreateMasteryInput {
+        None => upsert_mastery(
+            conn,
+            ctx,
+            CreateMasteryInput {
                 id: None,
                 human_id: human_id.to_string(),
                 content_id: content_id.to_string(),
                 mastery_level: mastery_levels::NOT_STARTED.to_string(),
                 content_version_at_mastery: None,
-            })?
-        }
+            },
+        )?,
     };
 
     let previous_level = mastery.mastery_level.clone();
@@ -380,7 +395,7 @@ pub fn advance_mastery(
     diesel::update(
         content_mastery::table
             .filter(content_mastery::app_id.eq(&ctx.app_id))
-            .filter(content_mastery::id.eq(&mastery.id))
+            .filter(content_mastery::id.eq(&mastery.id)),
     )
     .set((
         content_mastery::mastery_level.eq(new_level),
@@ -429,18 +444,19 @@ pub fn apply_freshness_decay(
 
     for record in records {
         let new_freshness = (record.freshness_score * decay_factor).max(0.0);
-        let needs_refresh = if new_freshness < REFRESH_THRESHOLD { 1 } else { 0 };
+        let needs_refresh = if new_freshness < REFRESH_THRESHOLD {
+            1
+        } else {
+            0
+        };
 
-        diesel::update(
-            content_mastery::table
-                .filter(content_mastery::id.eq(&record.id))
-        )
-        .set((
-            content_mastery::freshness_score.eq(new_freshness),
-            content_mastery::needs_refresh.eq(needs_refresh),
-        ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+        diesel::update(content_mastery::table.filter(content_mastery::id.eq(&record.id)))
+            .set((
+                content_mastery::freshness_score.eq(new_freshness),
+                content_mastery::needs_refresh.eq(needs_refresh),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
         updated_count += 1;
     }
@@ -458,7 +474,7 @@ pub fn update_privileges(
     diesel::update(
         content_mastery::table
             .filter(content_mastery::app_id.eq(&ctx.app_id))
-            .filter(content_mastery::id.eq(id))
+            .filter(content_mastery::id.eq(id)),
     )
     .set((
         content_mastery::privileges_json.eq(privileges_json),
@@ -480,7 +496,7 @@ pub fn delete_mastery(
     let deleted = diesel::delete(
         content_mastery::table
             .filter(content_mastery::app_id.eq(&ctx.app_id))
-            .filter(content_mastery::id.eq(id))
+            .filter(content_mastery::id.eq(id)),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -503,27 +519,33 @@ pub fn calculate_path_mastery(
     let mastery_records = get_mastery_for_contents(conn, ctx, human_id, content_ids)?;
 
     let total_content = content_ids.len();
-    let mastered_content = mastery_records.iter()
+    let mastered_content = mastery_records
+        .iter()
         .filter(|m| mastery_levels::is_mastered(&m.mastery_level))
         .count();
 
     let average_mastery_index = if mastery_records.is_empty() {
         0.0
     } else {
-        mastery_records.iter()
+        mastery_records
+            .iter()
             .map(|m| m.mastery_level_index as f32)
-            .sum::<f32>() / mastery_records.len() as f32
+            .sum::<f32>()
+            / mastery_records.len() as f32
     };
 
     let average_freshness = if mastery_records.is_empty() {
         1.0
     } else {
-        mastery_records.iter()
+        mastery_records
+            .iter()
             .map(|m| m.freshness_score)
-            .sum::<f32>() / mastery_records.len() as f32
+            .sum::<f32>()
+            / mastery_records.len() as f32
     };
 
-    let needs_refresh_count = mastery_records.iter()
+    let needs_refresh_count = mastery_records
+        .iter()
         .filter(|m| m.needs_refresh == 1)
         .count();
 
@@ -558,10 +580,7 @@ pub fn calculate_path_mastery(
 // ============================================================================
 
 /// Get mastery record count for an app
-pub fn mastery_count(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-) -> Result<i64, StorageError> {
+pub fn mastery_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content_mastery::table
         .filter(content_mastery::app_id.eq(&ctx.app_id))
         .count()
@@ -626,28 +645,28 @@ pub fn bulk_upsert_mastery(
         for input in inputs {
             // Check if exists
             let existing = get_mastery_for_content(conn, ctx, &input.human_id, &input.content_id)
-                .map_err(|e| diesel::result::Error::RollbackTransaction)?;
+                .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
 
             match existing {
-                Some(_) => {
-                    match upsert_mastery(conn, ctx, input.clone()) {
-                        Ok(_) => updated += 1,
-                        Err(e) => {
-                            errors.push(format!("{}/{}: {}", input.human_id, input.content_id, e));
-                        }
+                Some(_) => match upsert_mastery(conn, ctx, input.clone()) {
+                    Ok(_) => updated += 1,
+                    Err(e) => {
+                        errors.push(format!("{}/{}: {}", input.human_id, input.content_id, e));
                     }
-                }
-                None => {
-                    match upsert_mastery(conn, ctx, input.clone()) {
-                        Ok(_) => created += 1,
-                        Err(e) => {
-                            errors.push(format!("{}/{}: {}", input.human_id, input.content_id, e));
-                        }
+                },
+                None => match upsert_mastery(conn, ctx, input.clone()) {
+                    Ok(_) => created += 1,
+                    Err(e) => {
+                        errors.push(format!("{}/{}: {}", input.human_id, input.content_id, e));
                     }
-                }
+                },
             }
         }
 
-        Ok(BulkMasteryResult { created, updated, errors })
+        Ok(BulkMasteryResult {
+            created,
+            updated,
+            errors,
+        })
     })
 }

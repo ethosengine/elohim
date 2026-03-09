@@ -1,6 +1,6 @@
-import { Injectable, Optional, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 
-// @coverage: 90.8% (2026-02-05)
+// @coverage: 90.8% (2026-02-24)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -43,7 +43,9 @@ export class AffinityTrackingService implements OnDestroy {
   public readonly changes$: Observable<AffinityChangeEvent | null> =
     this.changeSubject.asObservable();
 
-  constructor(@Optional() private readonly sessionHumanService: SessionHumanService | null) {
+  private readonly sessionHumanService = inject(SessionHumanService, { optional: true });
+
+  constructor() {
     // Re-load if session changes
     if (this.sessionHumanService) {
       this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {

@@ -743,9 +743,9 @@ Schemas are defined in `/projects/elohim/mcp-servers/elohim-content/src/schemas/
 - `assessmentSchema` - Quiz and assessment instruments
 - `questionSchema` - Individual assessment questions
 
-## Legacy CLI Commands
+## CLI Commands
 
-The CLI in `elohim-library/projects/elohim-service/` provides exploration commands:
+The CLI in `elohim-library/projects/elohim-service/` provides import and exploration commands:
 
 ```bash
 # List epics

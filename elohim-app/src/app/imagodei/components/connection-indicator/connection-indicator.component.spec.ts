@@ -25,7 +25,10 @@ function createComponent(overrides: {
   selectedDoorway?: unknown;
   graduationStatus?: string;
   peerCount?: number;
-}): { fixture: ComponentFixture<ConnectionIndicatorComponent>; component: ConnectionIndicatorComponent } {
+}): {
+  fixture: ComponentFixture<ConnectionIndicatorComponent>;
+  component: ConnectionIndicatorComponent;
+} {
   const modeSignal = signal(overrides.mode ?? 'session');
   const stateSignal = signal(overrides.holochainState ?? 'disconnected');
   const selectedSignal = signal(overrides.selectedDoorway ?? null);

@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
-// @coverage: 95.8% (2026-02-05)
+// @coverage: 95.8% (2026-02-24)
 
 import { SearchResult } from '../../models/search.model';
 import { SearchService } from '../../services/search.service';
@@ -21,8 +21,11 @@ import { SearchService } from '../../services/search.service';
           (keyup.enter)="performSearch()"
           placeholder="Search..."
           class="search-input"
+          data-testid="search-input"
         />
-        <button (click)="performSearch()" class="search-btn">Search</button>
+        <button (click)="performSearch()" class="search-btn" data-testid="search-submit">
+          Search
+        </button>
       </div>
 
       <div class="results-section" *ngIf="hasSearched">
@@ -139,10 +142,8 @@ export class SearchComponent implements OnInit {
   hasSearched = false;
   isLoading = false;
 
-  constructor(
-    private readonly route: ActivatedRoute,
-    private readonly searchService: SearchService
-  ) {}
+  private readonly route = inject(ActivatedRoute);
+  private readonly searchService = inject(SearchService);
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {

@@ -34,23 +34,23 @@ describe('MarkdownFormatPlugin', () => {
 
   describe('Capabilities', () => {
     it('should support import', () => {
-      expect(plugin.canImport).toBeTrue();
+      expect(plugin.canImport).toBe(true);
     });
 
     it('should support export', () => {
-      expect(plugin.canExport).toBeTrue();
+      expect(plugin.canExport).toBe(true);
     });
 
     it('should support validation', () => {
-      expect(plugin.canValidate).toBeTrue();
+      expect(plugin.canValidate).toBe(true);
     });
 
     it('should support rendering', () => {
-      expect(plugin.canRender).toBeTrue();
+      expect(plugin.canRender).toBe(true);
     });
 
     it('should not support custom editing', () => {
-      expect(plugin.canEdit).toBeFalse();
+      expect(plugin.canEdit).toBe(false);
     });
   });
 
@@ -77,9 +77,9 @@ describe('MarkdownFormatPlugin', () => {
       const config = plugin.getEditorConfig();
 
       expect(config.editorMode).toBe('code');
-      expect(config.supportsLivePreview).toBeTrue();
-      expect(config.showLineNumbers).toBeTrue();
-      expect(config.wordWrap).toBeTrue();
+      expect(config.supportsLivePreview).toBe(true);
+      expect(config.showLineNumbers).toBe(true);
+      expect(config.wordWrap).toBe(true);
     });
 
     it('should include markdown toolbar actions', () => {
@@ -262,7 +262,7 @@ Content here.`;
 
       const result = await plugin.validate(content);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
 
@@ -273,8 +273,8 @@ Just content.`;
 
       const result = await plugin.validate(content);
 
-      expect(result.valid).toBeTrue();
-      expect(result.warnings.some(w => w.code === 'NO_FRONTMATTER')).toBeTrue();
+      expect(result.valid).toBe(true);
+      expect(result.warnings.some(w => w.code === 'NO_FRONTMATTER')).toBe(true);
     });
 
     it('should error on unclosed frontmatter', async () => {
@@ -285,8 +285,8 @@ title: Unclosed
 
       const result = await plugin.validate(content);
 
-      expect(result.valid).toBeFalse();
-      expect(result.errors.some(e => e.code === 'UNCLOSED_FRONTMATTER')).toBeTrue();
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'UNCLOSED_FRONTMATTER')).toBe(true);
     });
 
     it('should warn when no title in frontmatter', async () => {
@@ -298,7 +298,7 @@ description: No title field
 
       const result = await plugin.validate(content);
 
-      expect(result.warnings.some(w => w.code === 'NO_TITLE')).toBeTrue();
+      expect(result.warnings.some(w => w.code === 'NO_TITLE')).toBe(true);
     });
 
     it('should warn when no H1 heading', async () => {
@@ -312,7 +312,7 @@ Content`;
 
       const result = await plugin.validate(content);
 
-      expect(result.warnings.some(w => w.code === 'NO_H1')).toBeTrue();
+      expect(result.warnings.some(w => w.code === 'NO_H1')).toBe(true);
     });
 
     it('should warn when multiple H1 headings', async () => {
@@ -324,7 +324,7 @@ Content`;
 
       const result = await plugin.validate(content);
 
-      expect(result.warnings.some(w => w.code === 'MULTIPLE_H1')).toBeTrue();
+      expect(result.warnings.some(w => w.code === 'MULTIPLE_H1')).toBe(true);
     });
 
     it('should warn on empty references', async () => {
@@ -334,7 +334,7 @@ See [Feature: ] for details.`;
 
       const result = await plugin.validate(content);
 
-      expect(result.warnings.some(w => w.code === 'EMPTY_REFERENCE')).toBeTrue();
+      expect(result.warnings.some(w => w.code === 'EMPTY_REFERENCE')).toBe(true);
     });
 
     it('should return stats in validation result', async () => {
@@ -380,7 +380,7 @@ tags: [a, b]
 
       const result = await plugin.validate(file);
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
     });
   });
 
@@ -468,7 +468,7 @@ Check [link](url) and **bold** text.
       expect(metadata.displayName).toBe('Markdown');
       expect(metadata.icon).toBe('description');
       expect(metadata.category).toBe('document');
-      expect(metadata.supportsRoundTrip).toBeTrue();
+      expect(metadata.supportsRoundTrip).toBe(true);
       expect(metadata.priority).toBe(10);
     });
 

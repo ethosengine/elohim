@@ -1,12 +1,15 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
 import { ContentService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
+import { HeliaFetchService } from './helia-fetch.service';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+import { vi } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Unit tests for ContentService
@@ -16,8 +19,8 @@ import { LearningPath } from '../../lamad/models/learning-path.model';
 describe('ContentService', () => {
   let service: ContentService;
   let httpMock: HttpTestingController;
-  let mockClient: jasmine.SpyObj<ElohimClient>;
-  let mockStorageClient: jasmine.SpyObj<StorageClientService>;
+  let mockClient: any;
+  let mockStorageClient: any;
 
   const mockContentNode = {
     id: 'test-content-1',
@@ -46,24 +49,38 @@ describe('ContentService', () => {
   };
 
   beforeEach(() => {
-    mockClient = jasmine.createSpyObj('ElohimClient', [
-      'get',
-      'query',
-      'getBatch',
-      'fetch',
-      'supportsOffline',
-      'backpressure',
-    ]);
+    mockClient = {
+      get: vi.fn(),
+      query: vi.fn(),
+      getBatch: vi.fn(),
+      fetch: vi.fn(),
+      supportsOffline: vi.fn(),
+      backpressure: vi.fn(),
+    };
 
-    mockStorageClient = jasmine.createSpyObj('StorageClientService', ['getBlobUrl']);
-    mockStorageClient.getBlobUrl.and.callFake((hash: string) => `/blob/${hash}`);
+    mockStorageClient = {
+      getBlobUrl: vi.fn(),
+    };
+    mockStorageClient.getBlobUrl.mockImplementation((hash: string) => `/blob/${hash}`);
+
+    const mockHeliaFetch = {
+      fetchVerified: vi.fn(),
+    };
+    mockHeliaFetch.fetchVerified.mockImplementation((cid: string) => {
+      if (cid.includes('failblob')) {
+        return Promise.reject(new Error('Blob not found'));
+      }
+      return Promise.resolve(new TextEncoder().encode(`# Blob content for ${cid}`));
+    });
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         ContentService,
         { provide: ELOHIM_CLIENT, useValue: mockClient },
         { provide: StorageClientService, useValue: mockStorageClient },
+        { provide: HeliaFetchService, useValue: mockHeliaFetch },
       ],
     });
 
@@ -85,7 +102,7 @@ describe('ContentService', () => {
 
   describe('getContent', () => {
     it('should fetch content by ID', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockContentNode));
+      mockClient.get.mockReturnValue(Promise.resolve(mockContentNode));
 
       let result: ContentNode | null = null;
       service.getContent('test-content-1').subscribe(content => {
@@ -100,7 +117,7 @@ describe('ContentService', () => {
     }));
 
     it('should return null for missing content', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(null));
+      mockClient.get.mockReturnValue(Promise.resolve(null));
 
       let result: ContentNode | null = undefined as unknown as ContentNode | null;
       service.getContent('non-existent').subscribe(content => {
@@ -112,7 +129,7 @@ describe('ContentService', () => {
     }));
 
     it('should cache content and return cached value on subsequent calls', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockContentNode));
+      mockClient.get.mockReturnValue(Promise.resolve(mockContentNode));
 
       // First call
       let result1: ContentNode | null = null;
@@ -141,7 +158,7 @@ describe('ContentService', () => {
         contentBody: 'sha256:abc123def456',
         blobCid: 'sha256:abc123def456',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithBlobRef));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
 
       let result: ContentNode | null = null;
       service.getContent('blob-content').subscribe(content => {
@@ -149,14 +166,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      // Should make HTTP request for blob
-      const req = httpMock.expectOne('/blob/sha256-abc123def456');
-      expect(req.request.method).toBe('GET');
-      req.flush('# Blob Content Here');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Blob Content Here');
+      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
     }));
 
     it('should resolve sha256- blob references', fakeAsync(() => {
@@ -164,7 +175,7 @@ describe('ContentService', () => {
         ...mockContentNode,
         contentBody: 'sha256-abc123def456',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithBlobRef));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
 
       let result: ContentNode | null = null;
       service.getContent('blob-content-2').subscribe(content => {
@@ -172,12 +183,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-abc123def456');
-      req.flush('# More Blob Content');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# More Blob Content');
+      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
     }));
 
     it('should fetch blob when contentBody is empty but blobCid exists', fakeAsync(() => {
@@ -186,7 +193,7 @@ describe('ContentService', () => {
         contentBody: '',
         blobCid: 'sha256-xyz789',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithBlobCid));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobCid));
 
       let result: ContentNode | null = null;
       service.getContent('sparse-content').subscribe(content => {
@@ -194,12 +201,8 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-xyz789');
-      req.flush('# Sparse Content');
-      tick();
-
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Sparse Content');
+      expect(result!.content).toBe('# Blob content for sha256-xyz789');
     }));
 
     it('should fall back gracefully when blob fetch fails', fakeAsync(() => {
@@ -207,7 +210,7 @@ describe('ContentService', () => {
         ...mockContentNode,
         contentBody: 'sha256:failblob',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithBlobRef));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
 
       let result: ContentNode | null = null;
       service.getContent('fail-blob-content').subscribe(content => {
@@ -215,17 +218,13 @@ describe('ContentService', () => {
       });
       tick();
 
-      const req = httpMock.expectOne('/blob/sha256-failblob');
-      req.error(new ProgressEvent('error'), { status: 404 });
-      tick();
-
-      // Should still return content without blob
+      // Blob fetcher mock rejects for 'failblob' — service should fall back
       expect(result).toBeTruthy();
       expect(result!.id).toBe('test-content-1');
     }));
 
     it('should handle client errors gracefully', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.reject(new Error('Network error')));
+      mockClient.get.mockReturnValue(Promise.reject(new Error('Network error')));
 
       let result: ContentNode | null = undefined as unknown as ContentNode | null;
       service.getContent('error-content').subscribe(content => {
@@ -245,7 +244,7 @@ describe('ContentService', () => {
         contentFormat: 'sophia-quiz-json',
         tags: [],
       };
-      mockClient.get.and.returnValue(Promise.resolve(sophiaContent));
+      mockClient.get.mockReturnValue(Promise.resolve(sophiaContent));
 
       let result: ContentNode | null = null;
       service.getContent('sophia-quiz-1').subscribe(content => {
@@ -268,7 +267,7 @@ describe('ContentService', () => {
         contentFormat: 'html5-app',
         tags: [],
       };
-      mockClient.get.and.returnValue(Promise.resolve(html5Content));
+      mockClient.get.mockReturnValue(Promise.resolve(html5Content));
 
       let result: ContentNode | null = null;
       service.getContent('html5-app-1').subscribe(content => {
@@ -287,7 +286,7 @@ describe('ContentService', () => {
         contentBody: '{"not":"json-parsed"}',
         contentFormat: 'markdown',
       };
-      mockClient.get.and.returnValue(Promise.resolve(markdownContent));
+      mockClient.get.mockReturnValue(Promise.resolve(markdownContent));
 
       let result: ContentNode | null = null;
       service.getContent('markdown-json').subscribe(content => {
@@ -307,7 +306,7 @@ describe('ContentService', () => {
 
   describe('queryContent', () => {
     it('should query content with filters', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.resolve([mockContentNode]));
+      mockClient.query.mockReturnValue(Promise.resolve([mockContentNode]));
 
       let result: ContentNode[] = [];
       service.queryContent({ tags: ['test'], limit: 10 }).subscribe(content => {
@@ -325,7 +324,7 @@ describe('ContentService', () => {
         { ...mockContentNode, id: '2', contentType: 'quiz' },
         { ...mockContentNode, id: '3', contentType: 'article' },
       ];
-      mockClient.query.and.returnValue(Promise.resolve(items));
+      mockClient.query.mockReturnValue(Promise.resolve(items));
 
       let result: ContentNode[] = [];
       service
@@ -336,7 +335,7 @@ describe('ContentService', () => {
       tick();
 
       expect(result.length).toBe(2);
-      expect(result.every(c => (c.contentType as string) === 'article')).toBeTrue();
+      expect(result.every(c => (c.contentType as string) === 'article')).toBe(true);
     }));
 
     it('should filter by reach locally', fakeAsync(() => {
@@ -345,7 +344,7 @@ describe('ContentService', () => {
         { ...mockContentNode, id: '2', reach: 'private' },
         { ...mockContentNode, id: '3', reach: 'commons' },
       ];
-      mockClient.query.and.returnValue(Promise.resolve(items));
+      mockClient.query.mockReturnValue(Promise.resolve(items));
 
       let result: ContentNode[] = [];
       service.queryContent({ reach: 'commons' }).subscribe(content => {
@@ -354,11 +353,11 @@ describe('ContentService', () => {
       tick();
 
       expect(result.length).toBe(2);
-      expect(result.every(c => c.reach === 'commons')).toBeTrue();
+      expect(result.every(c => c.reach === 'commons')).toBe(true);
     }));
 
     it('should return empty array on error', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.reject(new Error('Query failed')));
+      mockClient.query.mockReturnValue(Promise.reject(new Error('Query failed')));
 
       let result: ContentNode[] = [];
       service.queryContent({ search: 'test' }).subscribe(content => {
@@ -380,7 +379,7 @@ describe('ContentService', () => {
         ['id-1', { ...mockContentNode, id: 'id-1' }],
         ['id-2', { ...mockContentNode, id: 'id-2' }],
       ]);
-      mockClient.getBatch.and.returnValue(Promise.resolve(batchResult));
+      mockClient.getBatch.mockReturnValue(Promise.resolve(batchResult));
 
       let result: Map<string, ContentNode> | null = null;
       service.batchGetContent(['id-1', 'id-2']).subscribe(content => {
@@ -394,7 +393,7 @@ describe('ContentService', () => {
     }));
 
     it('should return empty map on error', fakeAsync(() => {
-      mockClient.getBatch.and.returnValue(Promise.reject(new Error('Batch failed')));
+      mockClient.getBatch.mockReturnValue(Promise.reject(new Error('Batch failed')));
 
       let result: Map<string, ContentNode> = new Map();
       service.batchGetContent(['id-1']).subscribe(content => {
@@ -412,7 +411,7 @@ describe('ContentService', () => {
 
   describe('searchContent', () => {
     it('should search content with query string', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.resolve([mockContentNode]));
+      mockClient.query.mockReturnValue(Promise.resolve([mockContentNode]));
 
       let result: ContentNode[] = [];
       service.searchContent('hello').subscribe(content => {
@@ -422,7 +421,7 @@ describe('ContentService', () => {
 
       expect(result.length).toBe(1);
       expect(mockClient.query).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           search: 'hello',
           limit: 50,
         })
@@ -430,13 +429,13 @@ describe('ContentService', () => {
     }));
 
     it('should respect custom limit', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.resolve([]));
+      mockClient.query.mockReturnValue(Promise.resolve([]));
 
       service.searchContent('test', 25).subscribe();
       tick();
 
       expect(mockClient.query).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           limit: 25,
         })
       );
@@ -449,7 +448,7 @@ describe('ContentService', () => {
 
   describe('getPath', () => {
     it('should fetch path by ID', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockPathData));
+      mockClient.get.mockReturnValue(Promise.resolve(mockPathData));
 
       let result: LearningPath | null = null;
       service.getPath('test-path-1').subscribe(path => {
@@ -463,7 +462,7 @@ describe('ContentService', () => {
     }));
 
     it('should return null for missing path', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(null));
+      mockClient.get.mockReturnValue(Promise.resolve(null));
 
       let result: LearningPath | null = undefined as unknown as LearningPath | null;
       service.getPath('non-existent').subscribe(path => {
@@ -475,7 +474,7 @@ describe('ContentService', () => {
     }));
 
     it('should cache paths', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockPathData));
+      mockClient.get.mockReturnValue(Promise.resolve(mockPathData));
 
       // First call
       service.getPath('test-path-1').subscribe();
@@ -501,7 +500,7 @@ describe('ContentService', () => {
         ],
         ungroupedSteps: [],
       };
-      mockClient.get.and.returnValue(Promise.resolve(nestedResponse as any));
+      mockClient.get.mockReturnValue(Promise.resolve(nestedResponse as any));
 
       let result: LearningPath | null = null;
       service.getPath('nested-path').subscribe(path => {
@@ -517,7 +516,7 @@ describe('ContentService', () => {
 
   describe('queryPaths', () => {
     it('should query paths with filters', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.resolve([mockPathData]));
+      mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
       let result: LearningPath[] = [];
       service.queryPaths({ visibility: 'public', limit: 10 }).subscribe(paths => {
@@ -533,7 +532,7 @@ describe('ContentService', () => {
         { ...mockPathData, id: '1', difficulty: 'beginner' },
         { ...mockPathData, id: '2', difficulty: 'advanced' },
       ];
-      mockClient.query.and.returnValue(Promise.resolve(items));
+      mockClient.query.mockReturnValue(Promise.resolve(items));
 
       let result: LearningPath[] = [];
       service.queryPaths({ difficulty: 'beginner' }).subscribe(paths => {
@@ -548,7 +547,7 @@ describe('ContentService', () => {
 
   describe('getAllPaths', () => {
     it('should get all public paths', fakeAsync(() => {
-      mockClient.query.and.returnValue(Promise.resolve([mockPathData]));
+      mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
       let result: LearningPath[] = [];
       service.getAllPaths().subscribe(paths => {
@@ -566,7 +565,7 @@ describe('ContentService', () => {
 
   describe('getRelationships', () => {
     it('should fetch relationships for content', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(
+      mockClient.fetch.mockReturnValue(
         Promise.resolve({
           items: [
             {
@@ -591,7 +590,7 @@ describe('ContentService', () => {
     }));
 
     it('should return empty array on error', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(Promise.reject(new Error('Failed')));
+      mockClient.fetch.mockReturnValue(Promise.reject(new Error('Failed')));
 
       let result: any[] = [];
       service.getRelationships('content-1').subscribe(rels => {
@@ -605,7 +604,7 @@ describe('ContentService', () => {
 
   describe('getContentGraph', () => {
     it('should fetch content graph', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(
+      mockClient.fetch.mockReturnValue(
         Promise.resolve({
           rootId: 'root-1',
           related: [],
@@ -630,7 +629,7 @@ describe('ContentService', () => {
 
   describe('getKnowledgeMap', () => {
     it('should fetch knowledge map by ID', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(
+      mockClient.fetch.mockReturnValue(
         Promise.resolve({
           id: 'map-1',
           mapType: 'domain',
@@ -658,7 +657,7 @@ describe('ContentService', () => {
 
   describe('queryKnowledgeMaps', () => {
     it('should query knowledge maps with filters', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(
+      mockClient.fetch.mockReturnValue(
         Promise.resolve({
           items: [{ id: 'map-1', mapType: 'domain', title: 'Map' }],
         })
@@ -680,7 +679,7 @@ describe('ContentService', () => {
 
   describe('getPathExtension', () => {
     it('should fetch path extension by ID', fakeAsync(() => {
-      mockClient.fetch.and.returnValue(
+      mockClient.fetch.mockReturnValue(
         Promise.resolve({
           id: 'ext-1',
           basePathId: 'path-1',
@@ -708,7 +707,7 @@ describe('ContentService', () => {
 
   describe('cache management', () => {
     it('should clear all caches', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockContentNode));
+      mockClient.get.mockReturnValue(Promise.resolve(mockContentNode));
 
       // Populate cache
       service.getContent('test-1').subscribe();
@@ -725,7 +724,7 @@ describe('ContentService', () => {
     }));
 
     it('should invalidate specific content', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockContentNode));
+      mockClient.get.mockReturnValue(Promise.resolve(mockContentNode));
 
       // Populate cache
       service.getContent('test-1').subscribe();
@@ -742,7 +741,7 @@ describe('ContentService', () => {
     }));
 
     it('should invalidate specific path', fakeAsync(() => {
-      mockClient.get.and.returnValue(Promise.resolve(mockPathData));
+      mockClient.get.mockReturnValue(Promise.resolve(mockPathData));
 
       // Populate cache
       service.getPath('path-1').subscribe();
@@ -765,14 +764,14 @@ describe('ContentService', () => {
 
   describe('client info', () => {
     it('should check offline support', () => {
-      mockClient.supportsOffline.and.returnValue(true);
+      mockClient.supportsOffline.mockReturnValue(true);
 
-      expect(service.supportsOffline()).toBeTrue();
+      expect(service.supportsOffline()).toBe(true);
       expect(mockClient.supportsOffline).toHaveBeenCalled();
     });
 
     it('should check backpressure', async () => {
-      mockClient.backpressure.and.returnValue(Promise.resolve(0.5));
+      mockClient.backpressure.mockReturnValue(Promise.resolve(0.5));
 
       const result = await service.backpressure();
 
@@ -791,7 +790,7 @@ describe('ContentService', () => {
         ...mockContentNode,
         thumbnailUrl: 'sha256-thumbnail123',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithThumbnail));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithThumbnail));
 
       let result: any = null;
       service.getContent('with-thumbnail').subscribe(content => {
@@ -809,7 +808,7 @@ describe('ContentService', () => {
         ...mockContentNode,
         thumbnailUrl: 'https://example.com/image.jpg',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithFullUrl));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithFullUrl));
 
       let result: any = null;
       service.getContent('with-full-url').subscribe(content => {
@@ -826,7 +825,7 @@ describe('ContentService', () => {
         ...mockContentNode,
         thumbnailUrl: '/blob/sha256-abc',
       };
-      mockClient.get.and.returnValue(Promise.resolve(contentWithBlobPath));
+      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobPath));
 
       let result: any = null;
       service.getContent('with-blob-path').subscribe(content => {

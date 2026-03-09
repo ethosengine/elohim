@@ -8,6 +8,8 @@
 
 import { Observable } from 'rxjs';
 
+// @coverage: 66.7% (2026-02-24)
+
 import type { AlertAction, AlertData, AlertSeverity } from '../../shared/components/alert-banner';
 
 /**

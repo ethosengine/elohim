@@ -6,8 +6,7 @@
  * domain-specific layers (like Lamad) compose for their use cases.
  *
  * Services:
- * - EconomicService: hREA EconomicEvent operations (value flows)
- * - AppreciationService: Recognition/appreciation flows
+ * - IEconomicEventFactory (via ECONOMIC_EVENT_FACTORY token): hREA EconomicEvent + appreciation operations
  *
  * Domain-specific services (Lamad):
  * - ContributorService: Contributor dashboards and impact tracking
@@ -18,17 +17,24 @@
 // SHEFA SERVICES (Domain-Agnostic hREA Primitives)
 // =============================================================================
 
-// Economic events (immutable value flow records)
-export { EconomicService } from './economic.service';
-export type { CreateEconomicEventInput } from './economic.service';
-
-// Appreciation (recognition flows)
-export { AppreciationService } from './appreciation.service';
-export type { AppreciationDisplay, CreateAppreciationInput } from './appreciation.service';
-
 // Event service (elohim-storage backend)
-export { EventService, LamadEventTypes, REAActions } from './event.service';
-export type { LamadEventType, REAAction } from './event.service';
+export { EventService, LamadEventTypes } from './event.service';
+export type { LamadEventType } from './event.service';
 
 // Device stewardship (unified device view)
 export { DeviceStewardshipService } from './device-stewardship.service';
+
+// Resource explorer (Drive-like resource browsing)
+export { ResourceExplorerService } from './resource-explorer.service';
+
+// Custodian metrics API (thin HTTP client)
+export { CustodianMetricsApiService } from './custodian-metrics-api.service';
+
+// Data protection API (protection monitoring + derived accessors)
+export { DataProtectionApiService } from './data-protection-api.service';
+
+// Compute dashboard API (thin HTTP client for unified dashboard state)
+export { ComputeDashboardApiService } from './compute-dashboard-api.service';
+
+// Flow planning API (thin HTTP client for planning, budgets, goals, scenarios)
+export { FlowPlanningApiService } from './flow-planning-api.service';

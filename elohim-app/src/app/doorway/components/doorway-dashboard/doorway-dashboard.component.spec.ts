@@ -18,11 +18,15 @@ import {
   ResourceSummary,
   CustodianNetwork,
 } from '../../models/doorway.model';
+import { vi } from 'vitest';
+
+/** Flush pending Promise microtasks without waiting for Zone.js stability. */
+const nextTick = () => new Promise<void>(resolve => resolve());
 
 describe('DoorwayDashboardComponent', () => {
   let component: DoorwayDashboardComponent;
   let fixture: ComponentFixture<DoorwayDashboardComponent>;
-  let mockAdminService: jasmine.SpyObj<DoorwayAdminService>;
+  let mockAdminService: any;
 
   const mockNodesResponse: NodesResponse = {
     total: 3,
@@ -99,19 +103,21 @@ describe('DoorwayDashboardComponent', () => {
   };
 
   beforeEach(async () => {
-    mockAdminService = jasmine.createSpyObj(
-      'DoorwayAdminService',
-      ['getNodes', 'getClusterMetrics', 'getResources', 'getCustodians', 'connect', 'disconnect'],
-      {
-        connectionState: jasmine.createSpy('connectionState').and.returnValue('disconnected'),
-        isConnected: jasmine.createSpy('isConnected').and.returnValue(false),
-      }
-    );
+    mockAdminService = {
+      getNodes: vi.fn(),
+      getClusterMetrics: vi.fn(),
+      getResources: vi.fn(),
+      getCustodians: vi.fn(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      connectionState: vi.fn().mockReturnValue('disconnected'),
+      isConnected: vi.fn().mockReturnValue(false),
+    };
 
-    mockAdminService.getNodes.and.returnValue(of(mockNodesResponse));
-    mockAdminService.getClusterMetrics.and.returnValue(of(mockClusterMetrics));
-    mockAdminService.getResources.and.returnValue(of(mockResources));
-    mockAdminService.getCustodians.and.returnValue(of(mockCustodians));
+    mockAdminService.getNodes.mockReturnValue(of(mockNodesResponse));
+    mockAdminService.getClusterMetrics.mockReturnValue(of(mockClusterMetrics));
+    mockAdminService.getResources.mockReturnValue(of(mockResources));
+    mockAdminService.getCustodians.mockReturnValue(of(mockCustodians));
 
     await TestBed.configureTestingModule({
       imports: [DoorwayDashboardComponent],
@@ -153,35 +159,39 @@ describe('DoorwayDashboardComponent', () => {
       discardPeriodicTasks();
     }));
 
-    it('should set loading to false after data loads', fakeAsync(() => {
-      expect(component.loading()).toBeTrue();
+    it('should set loading to false after data loads', async () => {
+      expect(component.loading()).toBe(true);
 
       fixture.detectChanges();
-      tick();
+      // Flush Promise microtasks so loadData() completes
+      // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
-      expect(component.loading()).toBeFalse();
+      expect(component.loading()).toBe(false);
+    });
 
-      discardPeriodicTasks();
-    }));
-
-    it('should populate nodes signal with fetched data', fakeAsync(() => {
+    it('should populate nodes signal with fetched data', async () => {
       fixture.detectChanges();
-      tick();
+      // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
       expect(component.nodes().length).toBe(3);
       expect(component.nodes()[0].nodeId).toBe('node-1');
+    });
 
-      discardPeriodicTasks();
-    }));
-
-    it('should populate cluster signal with fetched data', fakeAsync(() => {
+    it('should populate cluster signal with fetched data', async () => {
       fixture.detectChanges();
-      tick();
+      // Allow Promise microtasks to flush (multiple rounds for Promise.all chains)
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
       expect(component.cluster()?.totalNodes).toBe(3);
-
-      discardPeriodicTasks();
-    }));
+    });
   });
 
   describe('ngOnDestroy', () => {
@@ -274,7 +284,7 @@ describe('DoorwayDashboardComponent', () => {
       component.setStatusFilter('online');
       const sorted = component.sortedNodes();
       expect(sorted.length).toBe(2);
-      expect(sorted.every(n => n.status === 'online')).toBeTrue();
+      expect(sorted.every(n => n.status === 'online')).toBe(true);
     });
 
     it('should sort by combinedScore descending', () => {
@@ -404,7 +414,7 @@ describe('DoorwayDashboardComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockAdminService.getNodes.calls.reset();
+      mockAdminService.getNodes.mockClear();
 
       component.refresh();
       tick();
@@ -417,8 +427,10 @@ describe('DoorwayDashboardComponent', () => {
 
   describe('error handling', () => {
     it('should set error signal on load failure', fakeAsync(() => {
-      mockAdminService.getNodes.and.returnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
-      mockAdminService.getClusterMetrics.and.throwError('Network error');
+      mockAdminService.getNodes.mockReturnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
+      mockAdminService.getClusterMetrics.mockImplementation(() => {
+        throw 'Network error';
+      });
 
       fixture.detectChanges();
       tick();

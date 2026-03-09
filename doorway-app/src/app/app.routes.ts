@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+import { authGuard } from './core/guards/auth.guard';
+
 export const routes: Routes = [
   {
     path: '',
@@ -16,6 +18,7 @@ export const routes: Routes = [
         m => m.DoorwayDashboardComponent
       ),
     title: 'Operator Dashboard',
+    canActivate: [authGuard],
   },
   {
     path: 'login',
@@ -48,6 +51,7 @@ export const routes: Routes = [
         m => m.DoorwayAccountComponent
       ),
     title: 'My Account',
+    canActivate: [authGuard],
   },
   {
     path: '**',

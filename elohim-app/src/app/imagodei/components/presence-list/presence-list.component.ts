@@ -13,8 +13,9 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 38.3% (2026-02-05)
+// @coverage: 38.3% (2026-02-24)
 
+import { PRESENCE_LIFECYCLE } from '../../interfaces';
 import {
   type ContributorPresenceView,
   type CreatePresenceRequest,
@@ -22,7 +23,6 @@ import {
   getPresenceStateLabel,
 } from '../../models/presence.model';
 import { IdentityService } from '../../services/identity.service';
-import { PresenceService } from '../../services/presence.service';
 
 type FilterState = 'all' | PresenceState;
 
@@ -34,7 +34,7 @@ type FilterState = 'all' | PresenceState;
   styleUrls: ['./presence-list.component.css'],
 })
 export class PresenceListComponent implements OnInit {
-  private readonly presenceService = inject(PresenceService);
+  private readonly presenceService = inject(PRESENCE_LIFECYCLE);
   private readonly identityService = inject(IdentityService);
 
   // ==========================================================================
@@ -42,11 +42,13 @@ export class PresenceListComponent implements OnInit {
   // ==========================================================================
 
   readonly filter = signal<FilterState>('all');
+  readonly isLoading = signal(false);
   readonly isCreating = signal(false);
   readonly showCreateForm = signal(false);
   readonly actionInProgress = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
+  readonly myStewardedPresences = signal<ContributorPresenceView[]>([]);
 
   /** Form for creating a new presence */
   createForm = {
@@ -55,11 +57,9 @@ export class PresenceListComponent implements OnInit {
   };
 
   // ==========================================================================
-  // Service Signals
+  // Identity Signals
   // ==========================================================================
 
-  readonly isLoading = this.presenceService.isLoading;
-  readonly myStewardedPresences = this.presenceService.myStewardedPresences;
   readonly isAuthenticated = this.identityService.isAuthenticated;
   readonly agentPubKey = this.identityService.agentPubKey;
 
@@ -121,6 +121,7 @@ export class PresenceListComponent implements OnInit {
    * Load all presences.
    */
   async loadPresences(): Promise<void> {
+    this.isLoading.set(true);
     try {
       // Load presences by each state and combine
       const [unclaimed, stewarded, claimed] = await Promise.all([
@@ -133,6 +134,8 @@ export class PresenceListComponent implements OnInit {
     } catch (error) {
       console.error('[PresenceList] Failed to load presences:', error);
       this.error.set('Failed to load presences');
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
@@ -143,7 +146,8 @@ export class PresenceListComponent implements OnInit {
     if (!this.isAuthenticated()) return;
 
     try {
-      await this.presenceService.getMyStewardedPresences();
+      const stewarded = await this.presenceService.getMyStewardedPresences();
+      this.myStewardedPresences.set(stewarded);
     } catch (error) {
       // Intentionally silent - stewarded presence load failure is non-critical for list display
       console.warn('[PresenceList] Non-critical stewarded presences load failed:', error);

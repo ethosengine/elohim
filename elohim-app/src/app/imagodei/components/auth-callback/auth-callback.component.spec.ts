@@ -11,14 +11,15 @@ import { AuthCallbackComponent } from './auth-callback.component';
 import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+import { vi } from 'vitest';
 
 describe('AuthCallbackComponent', () => {
   let component: AuthCallbackComponent;
   let fixture: ComponentFixture<AuthCallbackComponent>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockOAuthProvider: jasmine.SpyObj<OAuthAuthProvider>;
-  let mockSeoService: jasmine.SpyObj<SeoService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockAuthService: any;
+  let mockOAuthProvider: any;
+  let mockSeoService: any;
+  let mockRouter: any;
   let originalLocation: Location;
 
   beforeEach(async () => {
@@ -26,21 +27,27 @@ describe('AuthCallbackComponent', () => {
     originalLocation = window.location;
 
     // Create mocks with correct methods
-    mockAuthService = jasmine.createSpyObj('AuthService', ['setAuthFromResult']);
+    mockAuthService = {
+      setAuthFromResult: vi.fn(),
+    };
 
-    mockOAuthProvider = jasmine.createSpyObj('OAuthAuthProvider', [
-      'getCallbackParams',
-      'handleCallback',
-      'clearCallbackParams',
-      'consumeReturnUrl',
-    ]);
-    mockOAuthProvider.consumeReturnUrl.and.returnValue(null);
+    mockOAuthProvider = {
+      getCallbackParams: vi.fn(),
+      handleCallback: vi.fn(),
+      clearCallbackParams: vi.fn(),
+      consumeReturnUrl: vi.fn(),
+    };
+    mockOAuthProvider.consumeReturnUrl.mockReturnValue(null);
 
-    mockSeoService = jasmine.createSpyObj('SeoService', ['setTitle']);
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockSeoService = {
+      setTitle: vi.fn(),
+    };
+    mockRouter = {
+      navigate: vi.fn(),
+    };
 
     // Configure default mock returns
-    mockOAuthProvider.getCallbackParams.and.returnValue(null);
+    mockOAuthProvider.getCallbackParams.mockReturnValue(null);
 
     await TestBed.configureTestingModule({
       imports: [AuthCallbackComponent],
@@ -146,12 +153,12 @@ describe('AuthCallbackComponent', () => {
 
   describe('OAuth Callback - Success Flow', () => {
     beforeEach(() => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-auth-code-123',
         state: 'test-state-456',
       });
 
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({
           success: true,
           token: 'test-jwt-token',
@@ -162,11 +169,11 @@ describe('AuthCallbackComponent', () => {
         })
       );
 
-      jasmine.clock().install();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jasmine.clock().uninstall();
+      vi.useRealTimers();
     });
 
     it('should process callback on initialization', async () => {
@@ -211,19 +218,19 @@ describe('AuthCallbackComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      jasmine.clock().tick(1500);
+      vi.advanceTimersByTime(1500);
 
       expect(mockOAuthProvider.consumeReturnUrl).toHaveBeenCalled();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad']);
     });
 
     it('should redirect to stored returnUrl after delay', async () => {
-      mockOAuthProvider.consumeReturnUrl.and.returnValue('/community/governance');
+      mockOAuthProvider.consumeReturnUrl.mockReturnValue('/community/governance');
 
       fixture.detectChanges();
       await fixture.whenStable();
 
-      jasmine.clock().tick(1500);
+      vi.advanceTimersByTime(1500);
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/community/governance']);
     });
@@ -235,7 +242,7 @@ describe('AuthCallbackComponent', () => {
 
   describe('OAuth Callback - Error Flows', () => {
     it('should handle no callback params', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue(null);
+      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
       setWindowUrl('http://localhost/auth/callback');
 
       fixture.detectChanges();
@@ -246,7 +253,7 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should handle OAuth error in URL', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue(null);
+      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
       setWindowUrl('http://localhost/auth/callback?error=access_denied');
 
       fixture.detectChanges();
@@ -256,12 +263,12 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should handle token exchange failure', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
 
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({
           success: false,
           error: 'Token exchange failed',
@@ -276,14 +283,12 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should handle exception during callback', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
 
-      mockOAuthProvider.handleCallback.and.returnValue(
-        Promise.reject(new Error('Network error'))
-      );
+      mockOAuthProvider.handleCallback.mockReturnValue(Promise.reject(new Error('Network error')));
 
       fixture.detectChanges();
       await fixture.whenStable();
@@ -293,12 +298,12 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should handle non-Error exception', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
 
-      mockOAuthProvider.handleCallback.and.returnValue(Promise.reject('String error'));
+      mockOAuthProvider.handleCallback.mockReturnValue(Promise.reject('String error'));
 
       fixture.detectChanges();
       await fixture.whenStable();
@@ -314,7 +319,7 @@ describe('AuthCallbackComponent', () => {
 
   describe('OAuth Error Messages', () => {
     beforeEach(() => {
-      mockOAuthProvider.getCallbackParams.and.returnValue(null);
+      mockOAuthProvider.getCallbackParams.mockReturnValue(null);
     });
 
     const errorCases = [
@@ -369,12 +374,20 @@ describe('AuthCallbackComponent', () => {
   // ==========================================================================
 
   describe('Template State Rendering', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should show processing state initially', () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(new Promise(() => {})); // Never resolves
+      mockOAuthProvider.handleCallback.mockReturnValue(new Promise(() => {})); // Never resolves
 
       fixture.detectChanges();
 
@@ -384,11 +397,11 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should show success state after successful auth', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({
           success: true,
           token: 'test-token',
@@ -409,11 +422,11 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should show error state on failure', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({ success: false, error: 'Test error' })
       );
 
@@ -428,11 +441,11 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should show retry and home buttons on error', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({ success: false, error: 'Test error' })
       );
 
@@ -447,11 +460,11 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should trigger retry when retry button clicked', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({ success: false, error: 'Test error' })
       );
 
@@ -466,11 +479,11 @@ describe('AuthCallbackComponent', () => {
     });
 
     it('should trigger goHome when home button clicked', async () => {
-      mockOAuthProvider.getCallbackParams.and.returnValue({
+      mockOAuthProvider.getCallbackParams.mockReturnValue({
         code: 'test-code',
         state: 'test-state',
       });
-      mockOAuthProvider.handleCallback.and.returnValue(
+      mockOAuthProvider.handleCallback.mockReturnValue(
         Promise.resolve({ success: false, error: 'Test error' })
       );
 

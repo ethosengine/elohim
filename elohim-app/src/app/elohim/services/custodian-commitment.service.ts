@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 92.2% (2026-02-05)
+// @coverage: 92.2% (2026-02-24)
 
 import { HolochainClientService } from './holochain-client.service';
 
@@ -63,7 +63,7 @@ export interface CustodianCommitment {
   stewardTier: 1 | 2 | 3 | 4;
 
   /** Metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable({

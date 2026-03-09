@@ -12,8 +12,8 @@ tokio = { version = "1", features = ["full"] }
 # Sync engine
 automerge = "0.5"
 
-# P2P networking
-libp2p = { version = "0.53", features = [
+# P2P networking (matches elohim-storage 0.54)
+libp2p = { version = "0.54", features = [
     "tokio",
     "tcp",
     "quic",
@@ -27,10 +27,20 @@ libp2p = { version = "0.53", features = [
     "request-response",
     "macros",
     "ed25519",
+    "autonat",
+    "serde",
 ] }
 
-# Storage
-rusqlite = { version = "0.31", features = ["bundled"] }
+# Storage (elohim-storage as library for unified P2P)
+rusqlite = { version = "0.37", features = ["bundled"] }
+elohim-storage = { path = "../holochain/elohim-storage", default-features = false, features = ["p2p"] }
+elohim-bitswap = { path = "../holochain/elohim-bitswap" }
+sled = "0.34"
+cid = "0.11"
+
+# AI agent orchestration
+elohim-agent = { path = "../elohim/elohim-agent", default-features = false }
+constitution = { path = "../elohim/constitution" }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -66,6 +76,7 @@ thiserror = "1"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
 hostname = "0.3"
 num_cpus = "1.16"
 async-trait = "0.1"
@@ -90,3 +101,4 @@ path = "src/main.rs"
 
 [features]
 default = []
+bitswap = []

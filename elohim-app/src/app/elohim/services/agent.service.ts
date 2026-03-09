@@ -1,6 +1,6 @@
-import { Injectable, Optional, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 
-// @coverage: 62.7% (2026-02-05)
+// @coverage: 62.7% (2026-02-24)
 
 import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
 
@@ -58,10 +58,10 @@ export class AgentService implements OnDestroy {
   // Attestations set
   private readonly attestations = new Set<string>();
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    @Optional() private readonly sessionHumanService: SessionHumanService | null
-  ) {
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly sessionHumanService = inject(SessionHumanService, { optional: true });
+
+  constructor() {
     this.initializeAgent();
   }
 
@@ -644,7 +644,23 @@ export class AgentService implements OnDestroy {
     );
   }
 
-  private buildLearningAnalytics(progressRecords: AgentProgress[]): any {
+  private buildLearningAnalytics(progressRecords: AgentProgress[]): {
+    totalPathsStarted: number;
+    totalPathsCompleted: number;
+    totalContentNodesCompleted: number;
+    totalStepsCompleted: number;
+    totalLearningTime: number;
+    lastActivityDate: string;
+    firstActivityDate: string;
+    currentStreak: number;
+    longestStreak: number;
+    mostActivePathId: string | null;
+    mostRecentPathId: string | null;
+    averageAffinity: number;
+    highAffinityPaths: string[];
+    totalAttestationsEarned: number;
+    attestationIds: string[];
+  } {
     const pathProgress = progressRecords.filter(p => p.pathId !== '__global__');
     const globalProgress = progressRecords.find(p => p.pathId === '__global__');
 

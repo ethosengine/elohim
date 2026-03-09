@@ -4,16 +4,19 @@ import { of } from 'rxjs';
 import { MasteryGateComponent } from './mastery-gate.component';
 import { PathAdaptationService } from '../../services/path-adaptation.service';
 import { AttemptCooldownService } from '../../services/attempt-cooldown.service';
+import { vi } from 'vitest';
 
 describe('MasteryGateComponent', () => {
   let component: MasteryGateComponent;
   let fixture: ComponentFixture<MasteryGateComponent>;
-  let mockAdaptationService: jasmine.SpyObj<PathAdaptationService>;
-  let mockCooldownService: jasmine.SpyObj<AttemptCooldownService>;
+  let mockAdaptationService: any;
+  let mockCooldownService: any;
 
   beforeEach(async () => {
-    mockAdaptationService = jasmine.createSpyObj('PathAdaptationService', ['getGateStatus$']);
-    mockAdaptationService.getGateStatus$.and.returnValue(
+    mockAdaptationService = {
+      getGateStatus$: vi.fn(),
+    };
+    mockAdaptationService.getGateStatus$.mockReturnValue(
       of({
         sectionId: 'test-section',
         locked: true,
@@ -24,8 +27,10 @@ describe('MasteryGateComponent', () => {
       })
     );
 
-    mockCooldownService = jasmine.createSpyObj('AttemptCooldownService', ['getCooldownStatus$']);
-    mockCooldownService.getCooldownStatus$.and.returnValue(
+    mockCooldownService = {
+      getCooldownStatus$: vi.fn(),
+    };
+    mockCooldownService.getCooldownStatus$.mockReturnValue(
       of({
         inCooldown: false,
         remainingMs: 0,

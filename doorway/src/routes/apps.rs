@@ -18,22 +18,17 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::body::Incoming;
-use hyper::{Method, Request, Response, StatusCode};
+use hyper::{Request, Response, StatusCode};
 use tracing::{debug, info, warn};
 
 /// Handle app proxy requests
 ///
 /// Forwards all /apps/* requests to elohim-storage
 pub async fn handle_app_request(
-    req: Request<Incoming>,
+    _req: Request<Incoming>,
     storage_url: Option<String>,
     path: &str,
 ) -> Response<Full<Bytes>> {
-    // Handle CORS preflight requests
-    if req.method() == Method::OPTIONS {
-        return cors_preflight();
-    }
-
     let storage_url = match storage_url {
         Some(url) => url,
         None => {
@@ -41,7 +36,6 @@ pub async fn handle_app_request(
             return Response::builder()
                 .status(StatusCode::SERVICE_UNAVAILABLE)
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(
                     r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#,
                 )))
@@ -101,7 +95,6 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                     let mut builder = Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
-                        .header("Access-Control-Allow-Origin", "*")
                         // Required for COEP: require-corp in Angular app
                         .header("Cross-Origin-Resource-Policy", "cross-origin")
                         // Required for iframes embedded in COEP pages
@@ -122,7 +115,6 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
                         .header("Content-Type", "application/json")
-                        .header("Access-Control-Allow-Origin", "*")
                         .body(Full::new(Bytes::from(format!(
                             r#"{{"error": "Failed to read storage response: {e}"}}"#
                         ))))
@@ -135,23 +127,10 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
             Response::builder()
                 .status(StatusCode::BAD_GATEWAY)
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(format!(
                     r#"{{"error": "Failed to connect to storage: {e}"}}"#
                 ))))
                 .unwrap()
         }
     }
-}
-
-/// CORS preflight response
-fn cors_preflight() -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::NO_CONTENT)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type")
-        .header("Access-Control-Max-Age", "86400")
-        .body(Full::new(Bytes::new()))
-        .unwrap()
 }

@@ -14,13 +14,15 @@
  * This cannot be changed without updating the Rust zomes.
  */
 
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 
-// @coverage: 86.4% (2026-02-05)
+// @coverage: 86.4% (2026-02-24)
 
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of, throwError, firstValueFrom } from 'rxjs';
+
+import { BlobMetadataAnchor } from '@app/elohim/integrity';
 
 import { StorageClientService } from '../../elohim/services/storage-client.service';
 import { ContentBlob } from '../models/content-node.model';
@@ -136,11 +138,10 @@ export class BlobManagerService {
   /** Storage client for strategy-aware blob URLs (lazy injected) */
   private storageClient: StorageClientService | null = null;
 
-  constructor(
-    private readonly verificationService: BlobVerificationService,
-    private readonly fallbackService: BlobFallbackService,
-    private readonly injector: Injector
-  ) {}
+  private readonly blobMetadataAnchor = inject(BlobMetadataAnchor);
+  private readonly verificationService = inject(BlobVerificationService);
+  private readonly fallbackService = inject(BlobFallbackService);
+  private readonly injector = inject(Injector);
 
   // =========================================================================
   // Strategy-Aware Blob URL Methods
@@ -622,34 +623,10 @@ export class BlobManagerService {
 
   /**
    * Call Holochain zome function to get blobs for content.
-   * Uses lazy Injector to avoid circular dependency issues.
+   * Delegates to BlobMetadataAnchor for DHT integrity verification.
    */
   private async callGetBlobsForContent(contentId: string): Promise<BlobsForContentOutput | null> {
-    try {
-      // Lazily inject HolochainClientService to avoid circular dependency
-      const HolochainClientService = (await import('@app/elohim/services/holochain-client.service'))
-        .HolochainClientService;
-      const holochainClient = this.injector.get(HolochainClientService);
-
-      const result = await holochainClient.callZome<BlobsForContentOutput>({
-        zomeName: 'content_store',
-        fnName: 'get_blobs_by_content_id',
-        payload: { content_id: contentId },
-      });
-
-      if (!result.success || !result.data) {
-        return null;
-      }
-
-      return result.data;
-    } catch (error) {
-      // Blob retrieval failure is non-critical - returns null to allow content to load without blobs
-      // This can happen if Holochain is unavailable or content has no associated blobs
-      if (error instanceof Error) {
-        console.warn('[BlobManagerService] Failed to retrieve blobs for content:', error.message);
-      }
-      return null;
-    }
+    return this.blobMetadataAnchor.verify(contentId);
   }
 
   /**

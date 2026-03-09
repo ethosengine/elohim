@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { CallToActionComponent } from './call-to-action.component';
 
@@ -9,6 +11,7 @@ describe('CallToActionComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [CallToActionComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CallToActionComponent);

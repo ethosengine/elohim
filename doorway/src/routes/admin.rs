@@ -810,7 +810,6 @@ fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Byt
         Ok(json) => Response::builder()
             .status(status)
             .header("Content-Type", "application/json")
-            .header("Access-Control-Allow-Origin", "*")
             .body(Full::new(Bytes::from(json)))
             .unwrap_or_else(|_| {
                 Response::builder()

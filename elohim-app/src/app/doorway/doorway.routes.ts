@@ -29,6 +29,16 @@ export const DOORWAY_ROUTES: Routes = [
     },
   },
   {
+    path: 'elohim',
+    loadComponent: async () =>
+      import('../elohim/components/elohim-config/elohim-config.component').then(
+        m => m.ElohimConfigComponent
+      ),
+    data: {
+      title: 'Elohim Backend',
+    },
+  },
+  {
     path: 'config',
     loadComponent: async () =>
       import('./components/doorway-dashboard/doorway-dashboard.component').then(

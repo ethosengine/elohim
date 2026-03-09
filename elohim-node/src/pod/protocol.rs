@@ -194,7 +194,7 @@ impl MessageBuilder {
 
     /// Create a consensus request
     pub fn consensus_request(sender: &str, request: ConsensusRequest) -> WireMessage {
-        WireMessage::new(sender, AgentMessage::ConsensusRequest(request))
+        WireMessage::new(sender, AgentMessage::ConsensusRequest(Box::new(request)))
     }
 
     /// Create a consensus response

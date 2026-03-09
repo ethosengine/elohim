@@ -16,8 +16,9 @@ import { Component, OnInit, inject, signal, computed, input, output } from '@ang
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 98.1% (2026-02-05)
+// @coverage: 98.1% (2026-02-24)
 
+import { STEWARDSHIP_POLICY } from '../../interfaces/stewardship-policy.interface';
 import {
   type StewardshipGrant,
   type StewardshipAppeal,
@@ -26,7 +27,6 @@ import {
   type AuthorityBasis,
   getAuthorityBasisLabel,
 } from '../../models/stewardship.model';
-import { StewardshipService } from '../../services/stewardship.service';
 
 /** Appeal wizard step */
 type WizardStep = 'type' | 'grounds' | 'advocate' | 'review';
@@ -67,7 +67,7 @@ const APPEAL_GROUNDS: Record<AppealType, string[]> = {
   styleUrls: ['./appeal-wizard.component.css'],
 })
 export class AppealWizardComponent implements OnInit {
-  private readonly stewardship = inject(StewardshipService);
+  private readonly stewardship = inject(STEWARDSHIP_POLICY);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

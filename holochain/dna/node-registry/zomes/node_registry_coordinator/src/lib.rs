@@ -5,6 +5,7 @@ use node_registry_integrity::*;
 // Re-export integrity types for convenience
 pub use node_registry_integrity::{
     NodeRegistration, NodeHeartbeat, HealthAttestation, CustodianAssignment,
+    ShardAssignment, ShardStatus, ShardingStrategy,
     EntryTypes, LinkTypes,
 };
 
@@ -200,7 +201,7 @@ pub fn heartbeat(heartbeat_data: NodeHeartbeat) -> ExternResult<ActionHash> {
 pub fn attest_health(attestation: HealthAttestation) -> ExternResult<ActionHash> {
     // Prevent self-attestation
     let my_agent_info = agent_info()?;
-    let my_node = get_node_by_agent(my_agent_info.agent_latest_pubkey)?;
+    let my_node = get_node_by_agent(my_agent_info.agent_initial_pubkey)?;
 
     if my_node.node_id == attestation.subject_node_id {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -307,9 +308,8 @@ pub fn get_nodes_by_region(region: String) -> ExternResult<Vec<NodeRegistration>
     };
     let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(region_anchor_hash, LinkTypes::RegionToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(region_anchor_hash, LinkTypes::RegionToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut nodes = Vec::new();
     for link in links {
@@ -347,9 +347,8 @@ pub fn get_available_custodians(filters: CustodianFilters) -> ExternResult<Vec<N
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut candidates = Vec::new();
     for link in links {
@@ -411,9 +410,8 @@ pub fn get_nodes_by_tier(tier: String) -> ExternResult<Vec<NodeRegistration>> {
     };
     let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(tier_anchor_hash, LinkTypes::TierToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(tier_anchor_hash, LinkTypes::TierToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut nodes = Vec::new();
     for link in links {
@@ -477,9 +475,8 @@ pub fn get_assignments_for_content(content_id: String) -> ExternResult<Vec<Custo
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -504,9 +501,8 @@ pub fn get_assignments_for_node(node_id: String) -> ExternResult<Vec<CustodianAs
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?.build()
-    )?;
+    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut assignments = Vec::new();
     for link in links {
@@ -704,9 +700,8 @@ pub fn detect_failed_nodes(_: ()) -> ExternResult<Vec<String>> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut failed_nodes = Vec::new();
     let now = sys_time()?;
@@ -809,6 +804,154 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
 }
 
 // ============================================================================
+// SHARD ASSIGNMENT FUNCTIONS
+// ============================================================================
+
+#[hdk_extern]
+pub fn create_shard_assignment(assignment: ShardAssignment) -> ExternResult<ActionHash> {
+    let mut assignment = assignment;
+    assignment.created_at = timestamp_now()?;
+    assignment.updated_at = assignment.created_at.clone();
+    
+    // Create the assignment entry
+    let hash = create_entry(EntryTypes::ShardAssignment(assignment.clone()))?;
+    
+    // Update self-reference hash
+    assignment.assignment_hash = Some(hash.to_string());
+    let _ = update_entry(hash.clone(), &EntryTypes::ShardAssignment(assignment.clone()))?;
+
+    // Link from content to assignment
+    let content_anchor = StringAnchor {
+        anchor_type: "content_hash".to_string(),
+        anchor_value: assignment.content_hash.clone(),
+    };
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(
+        content_anchor_hash,
+        hash.clone(),
+        LinkTypes::ContentToShardAssignment,
+        (),
+    )?;
+
+    // Link from custodian to assignment
+    let custodian_anchor = StringAnchor {
+        anchor_type: "custodian_did".to_string(),
+        anchor_value: assignment.custodian_did.clone(),
+    };
+    let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
+    create_link(
+        custodian_anchor_hash,
+        hash.clone(),
+        LinkTypes::CustodianToShardAssignment,
+        (),
+    )?;
+
+    // Link from content:shard_index to assignment
+    let shard_index_anchor = StringAnchor {
+        anchor_type: "content_hash:shard_index".to_string(),
+        anchor_value: format!("{}:{}", assignment.content_hash, assignment.shard_index),
+    };
+    let shard_index_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_index_anchor))?;
+    create_link(
+        shard_index_anchor_hash,
+        hash.clone(),
+        LinkTypes::ShardIndexToAssignment,
+        (),
+    )?;
+
+    // Emit signal for projection
+    emit_signal(Signal::ShardAssignmentCommitted {
+        content_hash: assignment.content_hash,
+        shard_index: assignment.shard_index,
+        custodian_did: assignment.custodian_did,
+        status: assignment.status,
+    })?;
+
+    Ok(hash)
+}
+
+#[hdk_extern]
+pub fn get_shard_assignments_for_content(content_hash: String) -> ExternResult<Vec<ShardAssignment>> {
+    let content_anchor = StringAnchor {
+        anchor_type: "content_hash".to_string(),
+        anchor_value: content_hash,
+    };
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
+
+    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToShardAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut assignments = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(assignment) = deserialize_shard_assignment(&record)? {
+                    assignments.push(assignment);
+                }
+            }
+        }
+    }
+
+    Ok(assignments)
+}
+
+#[hdk_extern]
+pub fn get_shard_assignments_for_custodian(custodian_did: String) -> ExternResult<Vec<ShardAssignment>> {
+    let custodian_anchor = StringAnchor {
+        anchor_type: "custodian_did".to_string(),
+        anchor_value: custodian_did,
+    };
+    let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
+
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToShardAssignment)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut assignments = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(assignment) = deserialize_shard_assignment(&record)? {
+                    assignments.push(assignment);
+                }
+            }
+        }
+    }
+
+    Ok(assignments)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateShardStatusInput {
+    pub assignment_hash: ActionHash,
+    pub new_status: ShardStatus,
+}
+
+#[hdk_extern]
+pub fn update_shard_status(input: UpdateShardStatusInput) -> ExternResult<ActionHash> {
+    if let Some(record) = get(input.assignment_hash.clone(), GetOptions::default())? {
+        if let Some(mut assignment) = deserialize_shard_assignment(&record)? {
+            assignment.status = input.new_status;
+            assignment.updated_at = timestamp_now()?;
+            return update_entry(input.assignment_hash, &EntryTypes::ShardAssignment(assignment));
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Assignment not found".to_string())))
+}
+
+#[hdk_extern]
+pub fn update_shard_verified_at(assignment_hash: ActionHash) -> ExternResult<ActionHash> {
+    if let Some(record) = get(assignment_hash.clone(), GetOptions::default())? {
+        if let Some(mut assignment) = deserialize_shard_assignment(&record)? {
+            assignment.verified_at = Some(timestamp_now()?);
+            assignment.updated_at = timestamp_now()?;
+            return update_entry(assignment_hash, &EntryTypes::ShardAssignment(assignment));
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Assignment not found".to_string())))
+}
+
+// ============================================================================
 // SIGNAL DEFINITIONS
 // ============================================================================
 
@@ -826,6 +969,12 @@ pub enum Signal {
         from_custodians: Vec<String>,
         to_custodian: String,
         strategy: String,
+    },
+    ShardAssignmentCommitted {
+        content_hash: String,
+        shard_index: u32,
+        custodian_did: String,
+        status: ShardStatus,
     },
 }
 
@@ -897,6 +1046,22 @@ fn deserialize_custodian_assignment(record: &Record) -> ExternResult<Option<Cust
     }
 }
 
+/// Deserialize a ShardAssignment from a Record
+fn deserialize_shard_assignment(record: &Record) -> ExternResult<Option<ShardAssignment>> {
+    match record.entry().as_option() {
+        Some(entry) => {
+            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
+            let assignment: ShardAssignment = sb.try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+            })?;
+            Ok(Some(assignment))
+        }
+        None => Ok(None),
+    }
+}
+
 fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration> {
     let id_anchor = StringAnchor {
         anchor_type: "node_id".to_string(),
@@ -904,9 +1069,8 @@ fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
-    )?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -934,9 +1098,8 @@ fn get_node_registration_hash(node_id: &str) -> ExternResult<ActionHash> {
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
-    )?;
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -957,9 +1120,8 @@ fn get_node_by_agent(agent_key: AgentPubKey) -> ExternResult<NodeRegistration> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
-    )?;
+    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
@@ -985,9 +1147,8 @@ fn get_latest_heartbeat(node_id: &str) -> ExternResult<NodeHeartbeat> {
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?.build()
-    )?;
+    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1018,9 +1179,8 @@ fn get_recent_attestations(node_id: &str, max_age_seconds: i64) -> ExternResult<
     };
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?.build()
-    )?;
+    let query = LinkQuery::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let now = sys_time()?;
     let mut recent_attestations = Vec::new();

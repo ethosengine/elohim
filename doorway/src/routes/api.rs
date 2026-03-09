@@ -32,6 +32,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+use crate::auth::{extract_token_from_header, JwtValidator};
 use crate::projection::ProjectionQuery;
 use crate::server::AppState;
 use crate::worker::RequesterIdentity;
@@ -81,7 +82,6 @@ fn error_response(status: StatusCode, message: &str, code: &'static str) -> Resp
         .status(status)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "no-cache")
-        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap_or_else(|_| {
             Response::builder()
@@ -97,7 +97,6 @@ fn json_response(data: Vec<u8>) -> Response<Full<Bytes>> {
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "public, max-age=60")
-        .header("Access-Control-Allow-Origin", "*")
         // Required for COEP: require-corp in Angular app
         .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::from(data)))
@@ -124,23 +123,53 @@ fn parse_query_params(query: &str) -> HashMap<String, String> {
 /// Parse requester identity from auth header
 ///
 /// Supports formats:
-/// - "Bearer <JWT>" - Extract agent ID from JWT claims
-/// - "Agent <pubkey>" - Direct agent public key
-fn parse_requester_identity(auth_header: Option<&str>) -> Option<RequesterIdentity> {
+/// - "Bearer <JWT>" - Extract agent_pub_key from validated JWT claims
+/// - "Agent <pubkey>" - Direct agent public key (dev/internal use)
+fn parse_requester_identity(
+    auth_header: Option<&str>,
+    state: &AppState,
+) -> Option<RequesterIdentity> {
     let header = auth_header?;
 
-    // Simple parsing - in production would validate JWT properly
     if header.starts_with("Bearer ") {
-        // JWT token - extract agent_id from claims (simplified)
-        let _token = header.strip_prefix("Bearer ")?;
-        // TODO: Properly decode JWT and extract agent_id
-        Some(RequesterIdentity {
-            agent_id: None, // Would come from JWT claims
-            location: None,
-            authenticated: true,
-        })
+        // JWT token - validate and extract agent_pub_key from claims
+        let token = extract_token_from_header(Some(header))?;
+
+        // Build validator from state (mirrors get_jwt_validator in auth_routes.rs)
+        let validator = if state.args.dev_mode {
+            JwtValidator::new_dev()
+        } else {
+            match &state.args.jwt_secret {
+                Some(secret) => {
+                    JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
+                }
+                None => return None,
+            }
+        };
+
+        let result = validator.verify_token(token);
+        if result.valid {
+            let claims = result.claims?;
+            Some(RequesterIdentity {
+                agent_id: Some(claims.agent_pub_key),
+                location: None,
+                authenticated: true,
+            })
+        } else {
+            debug!(
+                error = ?result.error,
+                "JWT validation failed for API request"
+            );
+            // Return unauthenticated identity rather than blocking the request;
+            // the DNA layer enforces access control based on authenticated = false.
+            Some(RequesterIdentity {
+                agent_id: None,
+                location: None,
+                authenticated: false,
+            })
+        }
     } else if header.starts_with("Agent ") {
-        // Direct agent pubkey
+        // Direct agent pubkey (dev/internal use)
         let agent_id = header.strip_prefix("Agent ")?.to_string();
         Some(RequesterIdentity {
             agent_id: Some(agent_id),
@@ -179,7 +208,7 @@ pub async fn handle_api_request(
     };
 
     // Parse requester identity from auth header (passed to DNA for access control)
-    let requester = parse_requester_identity(auth_header.as_deref());
+    let requester = parse_requester_identity(auth_header.as_deref(), &state);
 
     debug!(
         "Cache request: type={}, id={:?}, has_identity={}",

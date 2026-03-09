@@ -8,33 +8,29 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RecoveryInterviewComponent } from './recovery-interview.component';
 import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('RecoveryInterviewComponent', () => {
   let component: RecoveryInterviewComponent;
   let fixture: ComponentFixture<RecoveryInterviewComponent>;
-  let mockRecoveryService: jasmine.SpyObj<RecoveryCoordinatorService>;
+  let mockRecoveryService: any;
 
   beforeEach(async () => {
     // Create mocks
-    mockRecoveryService = jasmine.createSpyObj(
-      'RecoveryCoordinatorService',
-      [
-        'loadPendingRequests',
-        'startInterview',
-        'generateQuestions',
-        'submitAttestation',
-        'rejectAttestation',
-        'abandonInterview',
-        'submitResponse',
-        'clearError',
-      ],
-      {
-        pendingRequests: signal([]),
-        conductingInterview: signal(null),
-        isLoading: signal(false),
-        error: signal(null),
-      }
-    );
+    mockRecoveryService = {
+      loadPendingRequests: vi.fn(),
+      startInterview: vi.fn(),
+      generateQuestions: vi.fn(),
+      submitAttestation: vi.fn(),
+      rejectAttestation: vi.fn(),
+      abandonInterview: vi.fn(),
+      submitResponse: vi.fn(),
+      clearError: vi.fn(),
+      pendingRequests: signal([]),
+      conductingInterview: signal(null),
+      isLoading: signal(false),
+      error: signal(null),
+    };
 
     await TestBed.configureTestingModule({
       imports: [RecoveryInterviewComponent],
@@ -172,7 +168,7 @@ describe('RecoveryInterviewComponent', () => {
   });
 
   it('should call loadPendingRequests on init', async () => {
-    mockRecoveryService.loadPendingRequests.and.returnValue(Promise.resolve());
+    mockRecoveryService.loadPendingRequests.mockReturnValue(Promise.resolve());
 
     await component.ngOnInit();
 
@@ -204,8 +200,8 @@ describe('RecoveryInterviewComponent', () => {
     ];
 
     it('should start interview and load questions on success', async () => {
-      mockRecoveryService.startInterview.and.returnValue(Promise.resolve(true));
-      mockRecoveryService.generateQuestions.and.returnValue(Promise.resolve(mockQuestions));
+      mockRecoveryService.startInterview.mockReturnValue(Promise.resolve(true));
+      mockRecoveryService.generateQuestions.mockReturnValue(Promise.resolve(mockQuestions));
 
       await component.startInterview('recovery-123');
 
@@ -217,7 +213,7 @@ describe('RecoveryInterviewComponent', () => {
     });
 
     it('should not change view if interview start fails', async () => {
-      mockRecoveryService.startInterview.and.returnValue(Promise.resolve(false));
+      mockRecoveryService.startInterview.mockReturnValue(Promise.resolve(false));
       component.viewMode.set('queue');
 
       await component.startInterview('recovery-123');
@@ -229,8 +225,8 @@ describe('RecoveryInterviewComponent', () => {
     it('should reset answers when starting new interview', async () => {
       component.answers.set(new Map([['old-q', 'old answer']]));
 
-      mockRecoveryService.startInterview.and.returnValue(Promise.resolve(true));
-      mockRecoveryService.generateQuestions.and.returnValue(Promise.resolve(mockQuestions));
+      mockRecoveryService.startInterview.mockReturnValue(Promise.resolve(true));
+      mockRecoveryService.generateQuestions.mockReturnValue(Promise.resolve(mockQuestions));
 
       await component.startInterview('recovery-123');
 
@@ -316,7 +312,7 @@ describe('RecoveryInterviewComponent', () => {
 
     it('should submit answer and move to next question', async () => {
       component.answers.set(new Map([['q1', 'My answer']]));
-      mockRecoveryService.submitResponse.and.returnValue(Promise.resolve(null));
+      mockRecoveryService.submitResponse.mockReturnValue(Promise.resolve(null));
 
       await component.submitAnswer();
 
@@ -328,7 +324,7 @@ describe('RecoveryInterviewComponent', () => {
     it('should move to attestation view after last question', async () => {
       component.currentQuestionIndex.set(1);
       component.answers.set(new Map([['q2', 'Final answer']]));
-      mockRecoveryService.submitResponse.and.returnValue(Promise.resolve(null));
+      mockRecoveryService.submitResponse.mockReturnValue(Promise.resolve(null));
 
       await component.submitAnswer();
 
@@ -399,11 +395,15 @@ describe('RecoveryInterviewComponent', () => {
       component.confidence = 85;
       component.notes = 'Strong match';
 
-      mockRecoveryService.submitAttestation.and.returnValue(Promise.resolve(true));
+      mockRecoveryService.submitAttestation.mockReturnValue(Promise.resolve(true));
 
       await component.submitAttestation();
 
-      expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith('affirm', 85, 'Strong match');
+      expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith(
+        'affirm',
+        85,
+        'Strong match'
+      );
     });
 
     it('should reset state and return to queue on success', async () => {
@@ -423,7 +423,7 @@ describe('RecoveryInterviewComponent', () => {
       component.answers.set(new Map([['q1', 'answer']]));
       component.currentQuestionIndex.set(1);
 
-      mockRecoveryService.submitAttestation.and.returnValue(Promise.resolve(true));
+      mockRecoveryService.submitAttestation.mockReturnValue(Promise.resolve(true));
 
       await component.submitAttestation();
 
@@ -440,7 +440,7 @@ describe('RecoveryInterviewComponent', () => {
       component.decision = 'affirm';
       component.viewMode.set('attestation');
 
-      mockRecoveryService.submitAttestation.and.returnValue(Promise.resolve(false));
+      mockRecoveryService.submitAttestation.mockReturnValue(Promise.resolve(false));
 
       await component.submitAttestation();
 
@@ -450,26 +450,26 @@ describe('RecoveryInterviewComponent', () => {
 
     it('should pass undefined for empty notes', async () => {
       component.notes = '';
-      mockRecoveryService.submitAttestation.and.returnValue(Promise.resolve(true));
+      mockRecoveryService.submitAttestation.mockReturnValue(Promise.resolve(true));
 
       await component.submitAttestation();
 
       expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith(
-        jasmine.any(String),
-        jasmine.any(Number),
+        expect.any(String),
+        expect.any(Number),
         undefined
       );
     });
 
     it('should trim notes before checking if empty', async () => {
       component.notes = '   ';
-      mockRecoveryService.submitAttestation.and.returnValue(Promise.resolve(true));
+      mockRecoveryService.submitAttestation.mockReturnValue(Promise.resolve(true));
 
       await component.submitAttestation();
 
       expect(mockRecoveryService.submitAttestation).toHaveBeenCalledWith(
-        jasmine.any(String),
-        jasmine.any(Number),
+        expect.any(String),
+        expect.any(Number),
         undefined
       );
     });
@@ -623,8 +623,22 @@ describe('RecoveryInterviewComponent', () => {
 
     it('should round progress percentage', () => {
       component.questions.set([
-        { id: 'q1', type: 'network-history', question: '1', difficulty: 1, points: 10, verifiable: true },
-        { id: 'q2', type: 'relationship', question: '2', difficulty: 1, points: 10, verifiable: true },
+        {
+          id: 'q1',
+          type: 'network-history',
+          question: '1',
+          difficulty: 1,
+          points: 10,
+          verifiable: true,
+        },
+        {
+          id: 'q2',
+          type: 'relationship',
+          question: '2',
+          difficulty: 1,
+          points: 10,
+          verifiable: true,
+        },
         { id: 'q3', type: 'content', question: '3', difficulty: 1, points: 10, verifiable: true },
       ]);
       component.currentQuestionIndex.set(2);

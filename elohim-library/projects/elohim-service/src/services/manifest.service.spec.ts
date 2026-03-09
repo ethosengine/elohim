@@ -22,13 +22,13 @@ import {
 } from './manifest.service';
 import { ContentManifest, createEmptyManifest } from '../models/manifest.model';
 
-jest.mock('fs');
+vi.mock('fs');
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockFs = vi.mocked(fs);
 
 describe('manifest.service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('loadManifest', () => {
@@ -85,7 +85,7 @@ describe('manifest.service', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue('invalid json');
 
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation();
 
       // Act
       const result = loadManifest('/test/output');
@@ -115,8 +115,8 @@ describe('manifest.service', () => {
         'utf-8'
       );
 
-      const writtenData = (mockFs.writeFileSync as jest.Mock).mock.calls[0][1];
-      const parsed = JSON.parse(writtenData);
+      const writtenData = vi.mocked(mockFs.writeFileSync).mock.calls[0][1];
+      const parsed = JSON.parse(writtenData as string);
       expect(parsed.lastUpdated).toBeDefined();
     });
 

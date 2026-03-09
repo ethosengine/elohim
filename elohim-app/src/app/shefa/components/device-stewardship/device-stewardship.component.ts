@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-24)
+
 import { AGENCY_STAGES, getNextStage } from '@app/imagodei/models/agency.model';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { getTriggerLabel, formatPoints } from '@app/lamad/models/learning-points.model';

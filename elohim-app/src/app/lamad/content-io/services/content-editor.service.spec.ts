@@ -1,15 +1,36 @@
 import { TestBed } from '@angular/core/testing';
-import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
-import { ContentFormatRegistryService } from './content-format-registry.service';
+
+import { of, throwError } from 'rxjs';
+
+import { ContextAssemblyService } from '@app/elohim';
+
 import { ContentNode } from '../../models/content-node.model';
 import {
   ContentFormatPlugin,
   DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 
+import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
+import { ContentFormatRegistryService } from './content-format-registry.service';
+
+import type { ContextAssemblyResult } from '@app/elohim';
+import { vi } from 'vitest';
+
 describe('ContentEditorService', () => {
   let service: ContentEditorService;
-  let mockRegistry: jasmine.SpyObj<ContentFormatRegistryService>;
+  let mockRegistry: any;
+  let mockContextAssembly: any;
+
+  const buildAssemblyResult = (
+    overrides: Partial<ContextAssemblyResult> = {}
+  ): ContextAssemblyResult =>
+    ({
+      createContext: { layers: {} },
+      negotiationResult: { grantedReach: 'local', reasoning: 'test' },
+      birthContext: { negotiatedReach: 'local', createdAt: new Date().toISOString() },
+      timedOut: false,
+      ...overrides,
+    }) as unknown as ContextAssemblyResult;
 
   const createMockNode = (overrides: Partial<ContentNode> = {}): ContentNode => ({
     id: 'test-node-1',
@@ -27,19 +48,25 @@ describe('ContentEditorService', () => {
   });
 
   beforeEach(() => {
-    mockRegistry = jasmine.createSpyObj('ContentFormatRegistryService', [
-      'getPlugin',
-      'getEditorComponent',
-      'getEditorConfig',
-    ]);
-    mockRegistry.getPlugin.and.returnValue(undefined);
-    mockRegistry.getEditorComponent.and.returnValue(null);
-    mockRegistry.getEditorConfig.and.returnValue(DEFAULT_EDITOR_CONFIG);
+    mockRegistry = {
+      getPlugin: vi.fn(),
+      getEditorComponent: vi.fn(),
+      getEditorConfig: vi.fn(),
+    };
+    mockRegistry.getPlugin.mockReturnValue(undefined);
+    mockRegistry.getEditorComponent.mockReturnValue(null);
+    mockRegistry.getEditorConfig.mockReturnValue(DEFAULT_EDITOR_CONFIG);
+
+    mockContextAssembly = {
+      assembleAndNegotiate: vi.fn(),
+    };
+    mockContextAssembly.assembleAndNegotiate.mockReturnValue(of(buildAssemblyResult()));
 
     TestBed.configureTestingModule({
       providers: [
         ContentEditorService,
         { provide: ContentFormatRegistryService, useValue: mockRegistry },
+        { provide: ContextAssemblyService, useValue: mockContextAssembly },
       ],
     });
     service = TestBed.inject(ContentEditorService);
@@ -52,42 +79,42 @@ describe('ContentEditorService', () => {
   describe('canEdit', () => {
     it('should return true for regular content nodes', () => {
       const node = createMockNode({ id: 'epic-intro-1' });
-      expect(service.canEdit(node)).toBeTrue();
+      expect(service.canEdit(node)).toBe(true);
     });
 
     it('should return false for null node', () => {
-      expect(service.canEdit(null)).toBeFalse();
+      expect(service.canEdit(null)).toBe(false);
     });
 
     it('should return false for path-prefixed IDs (dynamically generated)', () => {
       const node = createMockNode({ id: 'path-123-step-0' });
-      expect(service.canEdit(node)).toBeFalse();
+      expect(service.canEdit(node)).toBe(false);
     });
 
     it('should return true for path content type without path- prefix', () => {
       const node = createMockNode({ id: 'learning-path-1', contentType: 'path' });
-      expect(service.canEdit(node)).toBeTrue();
+      expect(service.canEdit(node)).toBe(true);
     });
 
     it('should return false for nodes with path- prefix regardless of content type', () => {
       const node = createMockNode({ id: 'path-abc-step-2', contentType: 'epic' });
-      expect(service.canEdit(node)).toBeFalse();
+      expect(service.canEdit(node)).toBe(false);
     });
   });
 
   describe('canEditFormat', () => {
     it('should return true when editor component is available', () => {
       const mockEditor = {} as any;
-      mockRegistry.getEditorComponent.and.returnValue(mockEditor);
+      mockRegistry.getEditorComponent.mockReturnValue(mockEditor);
 
-      expect(service.canEditFormat('markdown')).toBeTrue();
+      expect(service.canEditFormat('markdown')).toBe(true);
       expect(mockRegistry.getEditorComponent).toHaveBeenCalledWith('markdown');
     });
 
     it('should return false when no editor component available', () => {
-      mockRegistry.getEditorComponent.and.returnValue(null);
+      mockRegistry.getEditorComponent.mockReturnValue(null);
 
-      expect(service.canEditFormat('unknown')).toBeFalse();
+      expect(service.canEditFormat('unknown')).toBe(false);
     });
   });
 
@@ -104,7 +131,7 @@ describe('ContentEditorService', () => {
       expect(draft.content.content).toBe(node.content);
       expect(draft.content.contentFormat).toBe(node.contentFormat);
       expect(draft.content.tags).toEqual(node.tags);
-      expect(draft.isDirty).toBeFalse();
+      expect(draft.isDirty).toBe(false);
     });
 
     it('should create unique draft IDs', () => {
@@ -134,7 +161,7 @@ describe('ContentEditorService', () => {
       expect(draft.content.title).toBe('Untitled');
       expect(draft.content.content).toBe('');
       expect(draft.content.contentFormat).toBe('markdown');
-      expect(draft.isDirty).toBeTrue(); // New content is always dirty
+      expect(draft.isDirty).toBe(true); // New content is always dirty
     });
 
     it('should use provided initial data', () => {
@@ -176,7 +203,7 @@ describe('ContentEditorService', () => {
 
       expect(updated).toBeDefined();
       expect(updated!.content.title).toBe('New Title');
-      expect(updated!.isDirty).toBeTrue();
+      expect(updated!.isDirty).toBe(true);
     });
 
     it('should preserve unchanged fields', () => {
@@ -220,14 +247,14 @@ describe('ContentEditorService', () => {
 
       const deleted = service.deleteDraft(draft.id);
 
-      expect(deleted).toBeTrue();
+      expect(deleted).toBe(true);
       expect(service.getDraft(draft.id)).toBeUndefined();
     });
 
     it('should return false if draft does not exist', () => {
       const deleted = service.deleteDraft('nonexistent');
 
-      expect(deleted).toBeFalse();
+      expect(deleted).toBe(false);
     });
   });
 
@@ -256,28 +283,28 @@ describe('ContentEditorService', () => {
       const draft = service.createDraft(node);
       service.updateDraft(draft.id, { title: 'Changed' });
 
-      expect(service.hasDraft('node-1')).toBeTrue();
+      expect(service.hasDraft('node-1')).toBe(true);
     });
 
     it('should return false when node has clean draft', () => {
       const node = createMockNode({ id: 'node-1' });
       service.createDraft(node);
 
-      expect(service.hasDraft('node-1')).toBeFalse();
+      expect(service.hasDraft('node-1')).toBe(false);
     });
 
     it('should return false when no draft exists', () => {
-      expect(service.hasDraft('nonexistent')).toBeFalse();
+      expect(service.hasDraft('nonexistent')).toBe(false);
     });
   });
 
   describe('validateContent', () => {
     it('should return warning when no plugin available', async () => {
-      mockRegistry.getPlugin.and.returnValue(undefined);
+      mockRegistry.getPlugin.mockReturnValue(undefined);
 
       const result = await service.validateContent('unknown', '# Content');
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(result.warnings.length).toBeGreaterThan(0);
       expect(result.warnings[0].code).toBe('NO_PLUGIN');
     });
@@ -285,15 +312,15 @@ describe('ContentEditorService', () => {
     it('should use plugin validation when available', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
         canValidate: true,
-        validate: jasmine
-          .createSpy('validate')
-          .and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+        validate: vi
+          .fn()
+          .mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
       };
-      mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
+      mockRegistry.getPlugin.mockReturnValue(mockPlugin as ContentFormatPlugin);
 
       const result = await service.validateContent('markdown', '# Content');
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(mockPlugin.validate).toHaveBeenCalled();
     });
 
@@ -301,58 +328,189 @@ describe('ContentEditorService', () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
         canValidate: false,
       };
-      mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
+      mockRegistry.getPlugin.mockReturnValue(mockPlugin as ContentFormatPlugin);
 
       const result = await service.validateContent('markdown', '# Content');
 
-      expect(result.valid).toBeTrue();
+      expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
   });
 
   describe('saveContent', () => {
-    it('should mark draft as saved', done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
-      service.updateDraft(draft.id, { title: 'Changed' });
+    it('should mark draft as saved', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+        service.updateDraft(draft.id, { title: 'Changed' });
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.success).toBeTrue();
-          expect(draft.isDirty).toBeFalse();
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(draft.isDirty).toBe(false);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return error for unknown draft', done => {
-      service.saveContent('nonexistent').subscribe({
-        next: () => done.fail('Should have thrown'),
-        error: err => {
-          expect(err.message).toContain('Draft not found');
-          done();
-        },
-      });
-    });
+    it('should return error for unknown draft', () =>
+      new Promise<void>(done => {
+        service.saveContent('nonexistent').subscribe({
+          next: () => done.fail('Should have thrown'),
+          error: err => {
+            expect(err.message).toContain('Draft not found');
+            done();
+          },
+        });
+      }));
 
-    it('should return node ID in save result', done => {
-      const node = createMockNode();
-      const draft = service.createDraft(node);
+    it('should return node ID in save result', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
 
-      service.saveContent(draft.id).subscribe({
-        next: (result: SaveResult) => {
-          expect(result.nodeId).toBe(node.id);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.nodeId).toBe(node.id);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Context assembly integration
+    // ═════════════════════════════════════════════════════════════════════════
+
+    it('should call assembleAndNegotiate with CreatePayload', () =>
+      new Promise<void>(done => {
+        const node = createMockNode({ contentType: 'concept', contentFormat: 'markdown' });
+        const draft = service.createDraft(node);
+        service.updateDraft(draft.id, { title: 'Changed' });
+
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledWith(
+              expect.objectContaining({
+                actionType: 'content-create',
+                contentType: 'concept',
+                contentFormat: 'markdown',
+              })
+            );
+            expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledTimes(1);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should include birthContext in save result', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.birthContext).toBeDefined();
+            expect(result.birthContext!.negotiatedReach).toBe('local');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should include contextAssembly in save result', () =>
+      new Promise<void>(done => {
+        const assemblyResult = buildAssemblyResult();
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(of(assemblyResult));
+
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.contextAssembly).toBe(assemblyResult);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should succeed even when assembly fails', () =>
+      new Promise<void>(done => {
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(
+          throwError(() => new Error('Assembly failed'))
+        );
+
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(result.contextAssembly).toBeUndefined();
+            expect(result.message).toContain('unavailable');
+            done();
+          },
+          error: () => done.fail('Should not error — assembly failure is caught'),
+        });
+      }));
+
+    it('should reflect timeout in message', () =>
+      new Promise<void>(done => {
+        mockContextAssembly.assembleAndNegotiate.mockReturnValue(
+          of(buildAssemblyResult({ timedOut: true }))
+        );
+
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+
+        service.saveContent(draft.id).subscribe({
+          next: (result: SaveResult) => {
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('timed out');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should map requestedReach from draft', () =>
+      new Promise<void>(done => {
+        const node = createMockNode();
+        const draft = service.createDraft(node);
+        draft.requestedReach = 'commons';
+
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
+            expect(payload.requestedReach).toBe('commons');
+            done();
+          },
+          error: done.fail,
+        });
+      }));
+
+    it('should map relatedNodeIds to citedContentIds', () =>
+      new Promise<void>(done => {
+        const node = createMockNode({ relatedNodeIds: ['ref-1', 'ref-2'] });
+        const draft = service.createDraft(node);
+
+        service.saveContent(draft.id).subscribe({
+          next: () => {
+            const payload = mockContextAssembly.assembleAndNegotiate.mock.lastCall[0];
+            expect(payload.citedContentIds).toEqual(['ref-1', 'ref-2']);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('exportContent', () => {
     it('should return content as-is when no plugin', async () => {
-      mockRegistry.getPlugin.and.returnValue(undefined);
+      mockRegistry.getPlugin.mockReturnValue(undefined);
 
       const result = await service.exportContent({
         title: 'Test',
@@ -369,9 +527,9 @@ describe('ContentEditorService', () => {
 
     it('should use plugin export when available', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
-        export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
+        export: vi.fn().mockReturnValue(Promise.resolve('exported')),
       };
-      mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
+      mockRegistry.getPlugin.mockReturnValue(mockPlugin as ContentFormatPlugin);
 
       const result = await service.exportContent({
         title: 'Test',
@@ -388,7 +546,7 @@ describe('ContentEditorService', () => {
     });
 
     it('should JSON stringify object content when no plugin', async () => {
-      mockRegistry.getPlugin.and.returnValue(undefined);
+      mockRegistry.getPlugin.mockReturnValue(undefined);
       const contentObj = { key: 'value' };
 
       const result = await service.exportContent({

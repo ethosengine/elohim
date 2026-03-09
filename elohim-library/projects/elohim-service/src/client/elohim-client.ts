@@ -487,7 +487,8 @@ export class ElohimClient {
     const route = contentType === 'path' ? 'paths' : contentType;
 
     const params = new URLSearchParams();
-    if (query.contentType) params.set('content_type', query.contentType);
+    // Note: query.contentType is used for route selection (line 486-487), NOT as a filter.
+    // Sending it as content_type would filter by literal value 'content' which matches nothing.
     if (query.tags?.length) params.set('tags', query.tags.join(','));
     if (query.search) params.set('search', query.search);
     if (query.limit) params.set('limit', String(query.limit));

@@ -363,12 +363,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private async readFile(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
-      reader.readAsText(file);
-    });
+    return file.text();
   }
 
   private extractTitle(items: PerseusItem[], _fallback: string): string {

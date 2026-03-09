@@ -79,7 +79,10 @@ pub async fn discover_cell_id(
     // Build list_apps request
     // Note: Holochain 0.6+ uses "value" not "data" for request parameters
     let inner = Value::Map(vec![
-        (Value::String("type".into()), Value::String("list_apps".into())),
+        (
+            Value::String("type".into()),
+            Value::String("list_apps".into()),
+        ),
         (Value::String("value".into()), Value::Map(vec![])),
     ]);
 
@@ -111,8 +114,14 @@ where
 
     // Build envelope: { id, type: "request", data: <inner bytes> }
     let envelope = Value::Map(vec![
-        (Value::String("id".into()), Value::Integer(request_id.into())),
-        (Value::String("type".into()), Value::String("request".into())),
+        (
+            Value::String("id".into()),
+            Value::Integer(request_id.into()),
+        ),
+        (
+            Value::String("type".into()),
+            Value::String("request".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_buf)),
     ]);
 
@@ -122,7 +131,7 @@ where
 
     // Send request
     write
-        .send(Message::Binary(envelope_buf.into()))
+        .send(Message::Binary(envelope_buf))
         .await
         .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 
@@ -133,8 +142,9 @@ where
             match msg {
                 Ok(Message::Binary(data)) => {
                     let mut cursor = Cursor::new(&data[..]);
-                    let value = rmpv::decode::read_value(&mut cursor)
-                        .map_err(|e| StorageError::Parse(format!("Failed to parse response: {}", e)))?;
+                    let value = rmpv::decode::read_value(&mut cursor).map_err(|e| {
+                        StorageError::Parse(format!("Failed to parse response: {}", e))
+                    })?;
 
                     if let Value::Map(ref map) = value {
                         // Check for error response
@@ -209,8 +219,15 @@ fn parse_cell_id_from_apps(
         }
         Value::Map(map) => {
             // Log available keys for debugging
-            let keys: Vec<_> = map.iter()
-                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(String::from) } else { None })
+            let keys: Vec<_> = map
+                .iter()
+                .filter_map(|(k, _)| {
+                    if let Value::String(s) = k {
+                        s.as_str().map(String::from)
+                    } else {
+                        None
+                    }
+                })
                 .collect();
             debug!(keys = ?keys, "Map response with keys");
 
@@ -239,7 +256,8 @@ fn parse_cell_id_from_apps(
             );
             return Err(StorageError::NotFound(format!(
                 "App '{}' not found - unexpected response format: {:?}",
-                app_id, std::mem::discriminant(response)
+                app_id,
+                std::mem::discriminant(response)
             )));
         }
     };
@@ -271,7 +289,9 @@ fn parse_cell_id_from_apps(
                                 if let Value::Map(cell_map) = cell {
                                     // Try Holochain 0.3+ provisioned format first
                                     // Format: { type: "provisioned", value: { cell_id: { dna_hash, agent_pub_key } } }
-                                    if let Some((dna, agent)) = extract_provisioned_cell_id(cell_map) {
+                                    if let Some((dna, agent)) =
+                                        extract_provisioned_cell_id(cell_map)
+                                    {
                                         info!(
                                             app_id = app_id,
                                             role = ?role_name,
@@ -287,7 +307,9 @@ fn parse_cell_id_from_apps(
 
                                     // Try JS client format: { provisioned: { cell_id: [dna, agent] } }
                                     // This is the format returned by @holochain/client JS library
-                                    if let Some((dna, agent)) = extract_js_provisioned_cell_id(cell_map) {
+                                    if let Some((dna, agent)) =
+                                        extract_js_provisioned_cell_id(cell_map)
+                                    {
                                         info!(
                                             app_id = app_id,
                                             role = ?role_name,
@@ -302,7 +324,9 @@ fn parse_cell_id_from_apps(
                                     }
 
                                     // Fall back to legacy format: { cell_id: [dna, agent] }
-                                    if let Some(Value::Array(cell_id)) = get_field(cell_map, "cell_id") {
+                                    if let Some(Value::Array(cell_id)) =
+                                        get_field(cell_map, "cell_id")
+                                    {
                                         if cell_id.len() >= 2 {
                                             let dna = extract_bytes(&cell_id[0])?;
                                             let agent = extract_bytes(&cell_id[1])?;
@@ -322,8 +346,15 @@ fn parse_cell_id_from_apps(
                                     }
 
                                     // No format matched - log cell structure for debugging
-                                    let cell_keys: Vec<_> = cell_map.iter()
-                                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(String::from) } else { None })
+                                    let cell_keys: Vec<_> = cell_map
+                                        .iter()
+                                        .filter_map(|(k, _)| {
+                                            if let Value::String(s) = k {
+                                                s.as_str().map(String::from)
+                                            } else {
+                                                None
+                                            }
+                                        })
                                         .collect();
                                     debug!(
                                         role = ?role_name,
@@ -349,7 +380,9 @@ fn parse_cell_id_from_apps(
     Err(StorageError::NotFound(format!(
         "App '{}' not found or has no cells{}",
         app_id,
-        role_filter.map(|r| format!(" (role: {})", r)).unwrap_or_default()
+        role_filter
+            .map(|r| format!(" (role: {})", r))
+            .unwrap_or_default()
     )))
 }
 
@@ -421,16 +454,34 @@ fn extract_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, 
     match cell_id {
         // New format: { dna_hash: <bytes>, agent_pub_key: <bytes> }
         Value::Map(id_map) => {
-            let dna = get_field(id_map, "dna_hash")
-                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
-            let agent = get_field(id_map, "agent_pub_key")
-                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            let dna = get_field(id_map, "dna_hash").and_then(|v| {
+                if let Value::Binary(b) = v {
+                    Some(b.clone())
+                } else {
+                    None
+                }
+            })?;
+            let agent = get_field(id_map, "agent_pub_key").and_then(|v| {
+                if let Value::Binary(b) = v {
+                    Some(b.clone())
+                } else {
+                    None
+                }
+            })?;
             Some((dna, agent))
         }
         // Also handle legacy format just in case: [dna, agent]
         Value::Array(arr) if arr.len() >= 2 => {
-            let dna = if let Value::Binary(b) = &arr[0] { Some(b.clone()) } else { None }?;
-            let agent = if let Value::Binary(b) = &arr[1] { Some(b.clone()) } else { None }?;
+            let dna = if let Value::Binary(b) = &arr[0] {
+                Some(b.clone())
+            } else {
+                None
+            }?;
+            let agent = if let Value::Binary(b) = &arr[1] {
+                Some(b.clone())
+            } else {
+                None
+            }?;
             Some((dna, agent))
         }
         _ => None,
@@ -454,16 +505,34 @@ fn extract_js_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8
     match cell_id {
         // Format: [dna, agent] as binary arrays
         Value::Array(arr) if arr.len() >= 2 => {
-            let dna = if let Value::Binary(b) = &arr[0] { Some(b.clone()) } else { None }?;
-            let agent = if let Value::Binary(b) = &arr[1] { Some(b.clone()) } else { None }?;
+            let dna = if let Value::Binary(b) = &arr[0] {
+                Some(b.clone())
+            } else {
+                None
+            }?;
+            let agent = if let Value::Binary(b) = &arr[1] {
+                Some(b.clone())
+            } else {
+                None
+            }?;
             Some((dna, agent))
         }
         // Also handle map format: { dna_hash, agent_pub_key }
         Value::Map(id_map) => {
-            let dna = get_field(id_map, "dna_hash")
-                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
-            let agent = get_field(id_map, "agent_pub_key")
-                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            let dna = get_field(id_map, "dna_hash").and_then(|v| {
+                if let Value::Binary(b) = v {
+                    Some(b.clone())
+                } else {
+                    None
+                }
+            })?;
+            let agent = get_field(id_map, "agent_pub_key").and_then(|v| {
+                if let Value::Binary(b) = v {
+                    Some(b.clone())
+                } else {
+                    None
+                }
+            })?;
             Some((dna, agent))
         }
         _ => None,
@@ -478,11 +547,17 @@ mod tests {
     fn test_parse_cell_id() {
         // Mock response from list_apps
         let response = Value::Map(vec![
-            (Value::String("type".into()), Value::String("apps_listed".into())),
+            (
+                Value::String("type".into()),
+                Value::String("apps_listed".into()),
+            ),
             (
                 Value::String("data".into()),
                 Value::Array(vec![Value::Map(vec![
-                    (Value::String("installed_app_id".into()), Value::String("elohim".into())),
+                    (
+                        Value::String("installed_app_id".into()),
+                        Value::String("elohim".into()),
+                    ),
                     (
                         Value::String("cell_info".into()),
                         Value::Map(vec![(
@@ -490,8 +565,8 @@ mod tests {
                             Value::Array(vec![Value::Map(vec![(
                                 Value::String("cell_id".into()),
                                 Value::Array(vec![
-                                    Value::Binary(vec![1, 2, 3, 4]),  // dna_hash
-                                    Value::Binary(vec![5, 6, 7, 8]),  // agent_pub_key
+                                    Value::Binary(vec![1, 2, 3, 4]), // dna_hash
+                                    Value::Binary(vec![5, 6, 7, 8]), // agent_pub_key
                                 ]),
                             )])]),
                         )]),
@@ -511,11 +586,17 @@ mod tests {
     fn test_parse_js_client_format() {
         // JS client format: { provisioned: { cell_id: [dna, agent] } }
         let response = Value::Map(vec![
-            (Value::String("type".into()), Value::String("apps_listed".into())),
+            (
+                Value::String("type".into()),
+                Value::String("apps_listed".into()),
+            ),
             (
                 Value::String("data".into()),
                 Value::Array(vec![Value::Map(vec![
-                    (Value::String("installed_app_id".into()), Value::String("elohim".into())),
+                    (
+                        Value::String("installed_app_id".into()),
+                        Value::String("elohim".into()),
+                    ),
                     (
                         Value::String("cell_info".into()),
                         Value::Map(vec![(
@@ -525,8 +606,8 @@ mod tests {
                                 Value::Map(vec![(
                                     Value::String("cell_id".into()),
                                     Value::Array(vec![
-                                        Value::Binary(vec![1, 2, 3, 4]),  // dna_hash
-                                        Value::Binary(vec![5, 6, 7, 8]),  // agent_pub_key
+                                        Value::Binary(vec![1, 2, 3, 4]), // dna_hash
+                                        Value::Binary(vec![5, 6, 7, 8]), // agent_pub_key
                                     ]),
                                 )]),
                             )])]),
@@ -537,7 +618,11 @@ mod tests {
         ]);
 
         let result = parse_cell_id_from_apps(&response, "elohim", Some("lamad"));
-        assert!(result.is_ok(), "Should parse JS client format: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Should parse JS client format: {:?}",
+            result
+        );
         let cell_id = result.unwrap();
         assert_eq!(cell_id.dna_hash, vec![1, 2, 3, 4]);
         assert_eq!(cell_id.agent_pub_key, vec![5, 6, 7, 8]);

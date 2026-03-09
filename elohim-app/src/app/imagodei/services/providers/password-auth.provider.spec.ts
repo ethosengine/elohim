@@ -3,7 +3,7 @@
  */
 
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { PasswordAuthProvider } from './password-auth.provider';
 import { DoorwayRegistryService } from '../doorway-registry.service';
 import { environment } from '../../../../environments/environment';
@@ -12,11 +12,13 @@ import type {
   RegisterCredentials,
   AuthResponse,
 } from '../../models/auth.model';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('PasswordAuthProvider', () => {
   let provider: PasswordAuthProvider;
   let httpMock: HttpTestingController;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockDoorwayRegistry: any;
 
   const mockAuthResponse: AuthResponse = {
     token: 'jwt-token-123',
@@ -27,13 +29,12 @@ describe('PasswordAuthProvider', () => {
   };
 
   beforeEach(() => {
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', [], {
-      selectedUrl: jasmine.createSpy().and.returnValue(null),
-    });
+    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue(null) };
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         PasswordAuthProvider,
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
       ],
@@ -101,9 +102,7 @@ describe('PasswordAuthProvider', () => {
     });
 
     it('should use selected doorway URL when available', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(
-        'https://my-doorway.example.com'
-      );
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue('https://my-doorway.example.com');
 
       const loginPromise = provider.login(validCredentials);
 
@@ -170,7 +169,7 @@ describe('PasswordAuthProvider', () => {
       const req = httpMock.expectOne(req => req.url.endsWith('/auth/register'));
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(
-        jasmine.objectContaining({
+        expect.objectContaining({
           identifier: 'new@example.com',
           identifierType: 'email',
           password: 'password123',
@@ -304,9 +303,7 @@ describe('PasswordAuthProvider', () => {
 
   describe('URL resolution', () => {
     it('should prioritize selected doorway URL', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(
-        'https://custom-doorway.com'
-      );
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue('https://custom-doorway.com');
 
       const loginPromise = provider.login({
         type: 'password',
@@ -321,7 +318,7 @@ describe('PasswordAuthProvider', () => {
     });
 
     it('should use environment authUrl as fallback', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(null);
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(null);
 
       // The actual URL depends on environment config
       const loginPromise = provider.login({

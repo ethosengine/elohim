@@ -3,7 +3,12 @@
   <div class="header-content">
     <div class="left-nav-group">
       <!-- App Logo - links to context home -->
-      <a [routerLink]="currentApp.route" class="app-logo-link" [title]="currentApp.name + ' Home'">
+      <a
+        [routerLink]="currentApp.route"
+        class="app-logo-link"
+        [title]="currentApp.name + ' Home'"
+        data-testid="nav-app-logo"
+      >
         <span class="app-icon">{{ currentApp.icon }}</span>
         <span class="app-name">{{ currentApp.name }}</span>
       </a>
@@ -17,6 +22,7 @@
           [attr.aria-expanded]="showContextSwitcher"
           aria-haspopup="true"
           title="Switch context"
+          data-testid="nav-context-toggle"
         >
           <svg
             class="dropdown-arrow"
@@ -65,7 +71,9 @@
     <span class="header-separator">|</span>
 
     <!-- Protocol Link -->
-    <a routerLink="/" class="protocol-link" title="Elohim Protocol">by Elohim Protocol</a>
+    <a routerLink="/" class="protocol-link" title="Elohim Protocol" data-testid="nav-protocol-link">
+      by Elohim Protocol
+    </a>
 
     <!-- Center: Search (optional) -->
     <div class="search-container" *ngIf="showSearch">
@@ -76,8 +84,14 @@
           name="search"
           placeholder="Search {{ currentApp.name }}..."
           class="search-input"
+          data-testid="nav-search-input"
         />
-        <button type="submit" class="search-button" aria-label="Search">
+        <button
+          type="submit"
+          class="search-button"
+          aria-label="Search"
+          data-testid="nav-search-submit"
+        >
           <svg
             class="search-icon"
             viewBox="0 0 24 24"
@@ -104,6 +118,7 @@
         <button
           type="button"
           class="profile-bubble"
+          data-testid="profile-bubble"
           (click)="toggleProfileTray($event)"
           [attr.aria-expanded]="showProfileTray"
           aria-haspopup="true"
@@ -113,7 +128,7 @@
         </button>
 
         <!-- Profile Tray Dropdown -->
-        <div class="profile-tray" *ngIf="showProfileTray" role="menu">
+        <div class="profile-tray" data-testid="profile-tray" *ngIf="showProfileTray" role="menu">
           <!-- Identity Header - links to Imago Dei profile -->
           <button
             type="button"
@@ -121,6 +136,7 @@
             (click)="goToIdentityProfile()"
             role="menuitem"
             title="Manage your identity"
+            data-testid="nav-identity-link"
           >
             <div class="profile-avatar-large">{{ getInitials() }}</div>
             <div class="profile-info">
@@ -174,6 +190,7 @@
               <button
                 type="button"
                 class="profile-action logout-action"
+                data-testid="logout-button"
                 (click)="onLogout()"
                 role="menuitem"
               >
@@ -222,8 +239,20 @@
       }
       <!-- Visitor: Show Login/Register Buttons -->
       <div class="auth-buttons">
-        <button type="button" class="auth-btn auth-btn-link" (click)="goToLogin()">Log In</button>
-        <button type="button" class="auth-btn auth-btn-primary" (click)="goToRegister()">
+        <button
+          type="button"
+          class="auth-btn auth-btn-link"
+          (click)="goToLogin()"
+          data-testid="nav-login-button"
+        >
+          Log In
+        </button>
+        <button
+          type="button"
+          class="auth-btn auth-btn-primary"
+          (click)="goToRegister()"
+          data-testid="nav-signup-button"
+        >
           Sign Up
         </button>
       </div>

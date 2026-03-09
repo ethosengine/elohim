@@ -10,9 +10,10 @@ import {
   ChangeDetectorRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 
-// @coverage: 48.8% (2026-02-05)
+// @coverage: 48.8% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -101,6 +102,7 @@ export interface InlineQuizCompletionEvent {
           class="collapse-btn"
           [attr.aria-expanded]="!collapsed()"
           aria-controls="quiz-content"
+          data-testid="quiz-header-toggle"
         >
           {{ collapsed() ? '▼' : '▲' }}
         </button>
@@ -140,7 +142,12 @@ export interface InlineQuizCompletionEvent {
               <!-- Answer controls -->
               <div class="answer-controls">
                 @if (!showFeedback()) {
-                  <button class="btn-check" [disabled]="!hasAnswer()" (click)="checkAnswer()">
+                  <button
+                    class="btn-check"
+                    [disabled]="!hasAnswer()"
+                    (click)="checkAnswer()"
+                    data-testid="quiz-check"
+                  >
                     Check Answer
                   </button>
                 } @else {
@@ -155,7 +162,7 @@ export interface InlineQuizCompletionEvent {
                       }
                     </div>
                     @if (!streakAchieved()) {
-                      <button class="btn-next" (click)="nextQuestion()">
+                      <button class="btn-next" (click)="nextQuestion()" data-testid="quiz-next">
                         {{ getNextButtonLabel() }}
                       </button>
                     }
@@ -590,13 +597,11 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   private readonly sophiaWrapper: SophiaWrapperComponent | null = null;
   private pendingRecognition: Recognition | null = null;
 
-  constructor(
-    private readonly streakTracker: StreakTrackerService,
-    private readonly soundService: QuizSoundService,
-    private readonly poolService: QuestionPoolService,
-    private readonly governanceSignalService: GovernanceSignalService,
-    private readonly cdr: ChangeDetectorRef
-  ) {}
+  private readonly streakTracker = inject(StreakTrackerService);
+  private readonly soundService = inject(QuizSoundService);
+  private readonly poolService = inject(QuestionPoolService);
+  private readonly governanceSignalService = inject(GovernanceSignalService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadQuestions();

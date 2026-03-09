@@ -19,19 +19,39 @@
 
     <!-- Navigation Options -->
     <div class="actions">
-      <button type="button" class="btn btn-primary" (click)="goToLamadHome()">
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="goToLamadHome()"
+        data-testid="not-found-browse-paths"
+      >
         <i class="fa-solid fa-book-open"></i>
         Browse Paths
       </button>
-      <button type="button" class="btn btn-secondary" (click)="goToSearch()">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="goToSearch()"
+        data-testid="not-found-search"
+      >
         <i class="fa-solid fa-search"></i>
         Search Content
       </button>
-      <button type="button" class="btn btn-secondary" (click)="goToExplore()">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="goToExplore()"
+        data-testid="not-found-explore"
+      >
         <i class="fa-solid fa-compass"></i>
         Explore Map
       </button>
-      <button type="button" class="btn btn-ghost" (click)="goBack()">
+      <button
+        type="button"
+        class="btn btn-ghost"
+        (click)="goBack()"
+        data-testid="not-found-go-back"
+      >
         <i class="fa-solid fa-arrow-left"></i>
         Go Back
       </button>

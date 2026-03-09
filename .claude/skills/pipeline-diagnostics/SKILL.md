@@ -216,7 +216,7 @@ Use mcp__jenkins__triggerBuild with:
 | File | Purpose |
 |------|---------|
 | `/projects/elohim/Jenkinsfile` | Root orchestrator |
-| `/projects/elohim/orchestrator/Jenkinsfile` | Pipeline controller |
+| `/projects/elohim/genesis/orchestrator/Jenkinsfile` | Pipeline controller |
 | `/projects/elohim/holochain/Jenkinsfile` | DNA/hApp builds |
 | `/projects/elohim/genesis/Jenkinsfile` | Seeding pipeline |
 | `/projects/elohim/steward/Jenkinsfile` | Desktop app |

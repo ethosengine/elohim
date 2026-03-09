@@ -1,0 +1,15 @@
+{
+  "id": "frank-farmer",
+  "displayName": "Frank",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["value-scanner-epic"],
+  "claimedAgentId": "agent-frank-farmer",
+  "note": "Third-generation farmer. Stewards ecological and local economy content - regenerative agriculture, soil health, and bioregional governance.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-local-economy",
+    "affinityDomains": ["value-scanner", "economic-coordination", "local-economy"],
+    "humanId": "human-frank-farmer"
+  }
+}

@@ -1,0 +1,301 @@
+{
+  "$schema": "./collectives.schema.json",
+  "description": "Collective definitions — governance contexts with graduated participation",
+  "version": "1.0.0",
+  "collectives": [
+    {
+      "id": "household-dowell",
+      "name": "Dowell Household",
+      "governanceLayer": "family",
+      "description": "Core family + workplace — the founders and builders",
+      "reach": "private"
+    },
+    {
+      "id": "household-eden",
+      "name": "Eden Household",
+      "governanceLayer": "family",
+      "description": "The originals + community connectors",
+      "reach": "private"
+    },
+    {
+      "id": "household-valley-economy",
+      "name": "Valley Economy",
+      "governanceLayer": "neighborhood",
+      "description": "Local economy workers, builders, and faith community",
+      "reach": "local"
+    },
+    {
+      "id": "household-extended",
+      "name": "Extended Network",
+      "governanceLayer": "neighborhood",
+      "description": "Investors, gig workers, newcomers, visitors",
+      "reach": "local"
+    },
+    {
+      "id": "community-local-church",
+      "name": "Valley Community Church",
+      "governanceLayer": "faith",
+      "description": "Local faith community in Tech Valley",
+      "reach": "community"
+    },
+    {
+      "id": "community-homeschool-coop",
+      "name": "Valley Homeschool Co-op",
+      "governanceLayer": "education",
+      "description": "Homeschooling families sharing resources",
+      "reach": "community"
+    },
+    {
+      "id": "community-garden-club",
+      "name": "Eden Valley Garden Club",
+      "governanceLayer": "interest",
+      "description": "Gardeners and growers sharing knowledge",
+      "reach": "community"
+    },
+    {
+      "id": "community-neighborhood-association",
+      "name": "Valley Neighborhood Association",
+      "governanceLayer": "geographic",
+      "description": "Local neighborhood governance",
+      "reach": "community"
+    },
+    {
+      "id": "community-regen-ag-network",
+      "name": "Regenerative Agriculture Network",
+      "governanceLayer": "interest",
+      "description": "Farmers and growers practicing regenerative methods",
+      "reach": "community"
+    },
+    {
+      "id": "community-rust-meetup",
+      "name": "Rust Language Meetup",
+      "governanceLayer": "interest",
+      "description": "Local Rust programming community",
+      "reach": "community"
+    },
+    {
+      "id": "community-holochain-devs",
+      "name": "Holochain Developers",
+      "governanceLayer": "interest",
+      "description": "Holochain protocol developers",
+      "reach": "community"
+    },
+    {
+      "id": "community-pastoral-network",
+      "name": "Pastoral Care Network",
+      "governanceLayer": "faith",
+      "description": "Pastoral support and counseling network",
+      "reach": "community"
+    },
+    {
+      "id": "community-educators-network",
+      "name": "Valley Educators Network",
+      "governanceLayer": "education",
+      "description": "Teachers and educators sharing practices",
+      "reach": "community"
+    },
+    {
+      "id": "community-impact-investors",
+      "name": "Impact Investors Circle",
+      "governanceLayer": "economic",
+      "description": "Values-aligned investors supporting local enterprise",
+      "reach": "community"
+    },
+    {
+      "id": "community-farmers-market",
+      "name": "Valley Farmers Market",
+      "governanceLayer": "economic",
+      "description": "Local producers and consumers marketplace",
+      "reach": "community"
+    },
+    {
+      "id": "community-local-business",
+      "name": "Valley Local Business Alliance",
+      "governanceLayer": "economic",
+      "description": "Local business owners supporting each other",
+      "reach": "community"
+    },
+    {
+      "id": "community-manufacturers-guild",
+      "name": "Valley Manufacturers Guild",
+      "governanceLayer": "economic",
+      "description": "Local manufacturing cooperative",
+      "reach": "community"
+    },
+    {
+      "id": "community-builders-guild",
+      "name": "Builders Guild",
+      "governanceLayer": "economic",
+      "description": "Construction professionals sharing knowledge",
+      "reach": "community"
+    },
+    {
+      "id": "community-apprenticeship-program",
+      "name": "Valley Apprenticeship Program",
+      "governanceLayer": "education",
+      "description": "Trade apprenticeship matching and support",
+      "reach": "community"
+    },
+    {
+      "id": "community-gig-workers-alliance",
+      "name": "Gig Workers Alliance",
+      "governanceLayer": "economic",
+      "description": "Independent workers advocating for fair conditions",
+      "reach": "community"
+    },
+    {
+      "id": "community-rideshare-drivers",
+      "name": "Valley Rideshare Drivers",
+      "governanceLayer": "economic",
+      "description": "Rideshare drivers mutual support",
+      "reach": "community"
+    },
+    {
+      "id": "community-mining-town",
+      "name": "Mining Town Community",
+      "governanceLayer": "geographic",
+      "description": "Mining community residents",
+      "reach": "community"
+    },
+    {
+      "id": "community-utility-workers",
+      "name": "Utility Workers Network",
+      "governanceLayer": "economic",
+      "description": "Power and utility workers community",
+      "reach": "community"
+    },
+    {
+      "id": "community-immigrant-support",
+      "name": "Immigrant Support Network",
+      "governanceLayer": "community",
+      "description": "Supporting newcomers and immigrants",
+      "reach": "community"
+    },
+    {
+      "id": "community-esl-program",
+      "name": "ESL Learning Program",
+      "governanceLayer": "education",
+      "description": "English as second language learning community",
+      "reach": "community"
+    },
+    {
+      "id": "community-refugee-resettlement",
+      "name": "Refugee Resettlement Network",
+      "governanceLayer": "community",
+      "description": "Supporting refugee integration",
+      "reach": "community"
+    },
+    {
+      "id": "community-engineers-network",
+      "name": "Engineers Network",
+      "governanceLayer": "interest",
+      "description": "Professional engineers community",
+      "reach": "community"
+    },
+    {
+      "id": "org-ethosengine",
+      "name": "EthosEngine",
+      "governanceLayer": "workplace",
+      "description": "Protocol development organization",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-community-church",
+      "name": "Valley Community Church (organization)",
+      "governanceLayer": "workplace",
+      "description": "Church as workplace for staff",
+      "reach": "community"
+    },
+    {
+      "id": "org-valley-school-district",
+      "name": "Valley School District",
+      "governanceLayer": "workplace",
+      "description": "Local school district",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-teachers-union",
+      "name": "Valley Teachers Union",
+      "governanceLayer": "workplace",
+      "description": "Teachers union local chapter",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-learning-collective",
+      "name": "Valley Learning Collective",
+      "governanceLayer": "education",
+      "description": "Collaborative learning facilitation",
+      "reach": "community"
+    },
+    {
+      "id": "org-community-foundation",
+      "name": "Valley Community Foundation",
+      "governanceLayer": "economic",
+      "description": "Community development foundation",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-franks-farm",
+      "name": "Frank's Family Farm",
+      "governanceLayer": "workplace",
+      "description": "Family-owned regenerative farm",
+      "reach": "local"
+    },
+    {
+      "id": "org-valley-market",
+      "name": "Valley Market",
+      "governanceLayer": "workplace",
+      "description": "Local grocery and market",
+      "reach": "local"
+    },
+    {
+      "id": "org-valley-machine-works",
+      "name": "Valley Machine Works",
+      "governanceLayer": "workplace",
+      "description": "Local manufacturing business",
+      "reach": "local"
+    },
+    {
+      "id": "org-bub-construction",
+      "name": "Bub's Construction",
+      "governanceLayer": "workplace",
+      "description": "General contracting and construction",
+      "reach": "local"
+    },
+    {
+      "id": "org-consolidated-mining",
+      "name": "Consolidated Mining Corp",
+      "governanceLayer": "workplace",
+      "description": "Mining corporation",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-miners-union-local-347",
+      "name": "Miners Union Local 347",
+      "governanceLayer": "workplace",
+      "description": "Mining workers union local",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-valley-power-electric",
+      "name": "Valley Power & Electric",
+      "governanceLayer": "workplace",
+      "description": "Local power utility",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-ibew-local-123",
+      "name": "IBEW Local 123",
+      "governanceLayer": "workplace",
+      "description": "Electrical workers union local",
+      "reach": "municipal"
+    },
+    {
+      "id": "org-pure-valley-association",
+      "name": "Pure Valley Community Association",
+      "governanceLayer": "geographic",
+      "description": "Community governance association",
+      "reach": "community"
+    }
+  ]
+}

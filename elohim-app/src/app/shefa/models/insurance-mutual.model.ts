@@ -38,6 +38,8 @@ import { Measure, GovernanceLayer } from '@app/elohim/models/rea-bridge.model';
  * information disadvantage; Elohim Mutual profits from helping members
  * reduce risk.
  */
+export type RiskTier = 'low' | 'standard' | 'high' | 'uninsurable';
+
 export interface MemberRiskProfile {
   /** Unique identifier */
   id: string;
@@ -92,7 +94,7 @@ export interface MemberRiskProfile {
    * Risk tier based on score.
    * Used for premium calculation and coverage determination.
    */
-  riskTier: 'low' | 'standard' | 'high' | 'uninsurable';
+  riskTier: RiskTier;
 
   /**
    * Risk tier rationale (why this tier).
@@ -168,8 +170,8 @@ export interface MemberRiskProfile {
    */
   governanceOverrides?: {
     date: string;
-    previousTier: 'low' | 'standard' | 'high' | 'uninsurable';
-    newTier: 'low' | 'standard' | 'high' | 'uninsurable';
+    previousTier: RiskTier;
+    newTier: RiskTier;
     reason: string;
     authorizedBy: string; // Agent ID of governance authority
   }[];

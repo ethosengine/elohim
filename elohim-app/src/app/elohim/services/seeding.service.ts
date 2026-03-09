@@ -26,7 +26,7 @@
 
 import { Injectable, inject, OnDestroy } from '@angular/core';
 
-// @coverage: 79.3% (2026-02-05)
+// @coverage: 79.3% (2026-02-24)
 
 import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 

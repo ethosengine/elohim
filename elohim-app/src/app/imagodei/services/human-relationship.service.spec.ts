@@ -10,11 +10,15 @@ import { of, throwError } from 'rxjs';
 import { HumanRelationshipService } from './human-relationship.service';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 import type { HumanRelationshipView } from '@app/elohim/adapters/storage-types.adapter';
-import type { CreateHumanRelationshipInput, IntimacyLevel } from '@app/imagodei/models/human-relationship.model';
+import type {
+  CreateHumanRelationshipInput,
+  IntimacyLevel,
+} from '@app/imagodei/models/human-relationship.model';
+import { vi, Mock } from 'vitest';
 
 describe('HumanRelationshipService', () => {
   let service: HumanRelationshipService;
-  let mockStorageApi: jasmine.SpyObj<StorageApiService>;
+  let mockStorageApi: any;
 
   // Mock relationship data
   const mockRelationship: HumanRelationshipView = {
@@ -69,12 +73,12 @@ describe('HumanRelationshipService', () => {
 
   beforeEach(() => {
     // Create mock storage API
-    mockStorageApi = jasmine.createSpyObj('StorageApiService', [
-      'getHumanRelationships',
-      'createHumanRelationship',
-      'updateHumanRelationshipConsent',
-      'updateHumanRelationshipCustody',
-    ]);
+    mockStorageApi = {
+      getHumanRelationships: vi.fn(),
+      createHumanRelationship: vi.fn(),
+      updateHumanRelationshipConsent: vi.fn(),
+      updateHumanRelationshipCustody: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -91,114 +95,131 @@ describe('HumanRelationshipService', () => {
   // ==========================================================================
 
   describe('getRelationshipsForPerson', () => {
-    it('should fetch all relationships for a person', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship, mockRelationship2]));
+    it('should fetch all relationships for a person', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(
+          of([mockRelationship, mockRelationship2])
+        );
 
-      service.getRelationshipsForPerson('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship, mockRelationship2]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({ partyId: 'human-1' });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsForPerson('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship, mockRelationship2]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return empty array when no relationships exist', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([]));
+    it('should return empty array when no relationships exist', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([]));
 
-      service.getRelationshipsForPerson('human-3').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([]);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsForPerson('human-3').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([]);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRelationshipsAsPartyA', () => {
-    it('should fetch relationships where person is party A', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should fetch relationships where person is party A', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.getRelationshipsAsPartyA('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({ partyAId: 'human-1' });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsAsPartyA('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyAId: 'human-1',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRelationshipsAsPartyB', () => {
-    it('should fetch relationships where person is party B', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should fetch relationships where person is party B', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.getRelationshipsAsPartyB('human-2').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({ partyBId: 'human-2' });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsAsPartyB('human-2').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyBId: 'human-2',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRelationshipsByType', () => {
-    it('should filter relationships by type', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should filter relationships by type', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.getRelationshipsByType('human-1', 'friend').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
-            partyId: 'human-1',
-            relationshipType: 'friend',
-          });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsByType('human-1', 'friend').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+              relationshipType: 'friend',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRelationshipsByIntimacy', () => {
-    it('should filter relationships by minimum intimacy level', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship2]));
+    it('should filter relationships by minimum intimacy level', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship2]));
 
-      service.getRelationshipsByIntimacy('human-1', 'trusted').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship2]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
-            partyId: 'human-1',
-            minIntimacyLevel: 'trusted',
-          });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipsByIntimacy('human-1', 'trusted').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship2]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+              minIntimacyLevel: 'trusted',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getConsentedRelationships', () => {
-    it('should filter relationships requiring full consent', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship, mockRelationship2]));
+    it('should filter relationships requiring full consent', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(
+          of([mockRelationship, mockRelationship2])
+        );
 
-      service.getConsentedRelationships('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship, mockRelationship2]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
-            partyId: 'human-1',
-            fullyConsentedOnly: true,
-          });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getConsentedRelationships('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship, mockRelationship2]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+              fullyConsentedOnly: true,
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -206,68 +227,74 @@ describe('HumanRelationshipService', () => {
   // ==========================================================================
 
   describe('getCustodyRelationships', () => {
-    it('should fetch relationships with custody enabled', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should fetch relationships with custody enabled', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.getCustodyRelationships('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
-            partyId: 'human-1',
-            custodyEnabledOnly: true,
-          });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getCustodyRelationships('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+              custodyEnabledOnly: true,
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getAutoCustodyRelationships', () => {
-    it('should filter relationships with auto-custody enabled', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship, mockRelationship2]));
+    it('should filter relationships with auto-custody enabled', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(
+          of([mockRelationship, mockRelationship2])
+        );
 
-      service.getAutoCustodyRelationships('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship2]);
-          expect(relationships[0].autoCustodyEnabled).toBe(true);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getAutoCustodyRelationships('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship2]);
+            expect(relationships[0].autoCustodyEnabled).toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return empty array when no auto-custody relationships exist', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should return empty array when no auto-custody relationships exist', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.getAutoCustodyRelationships('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([]);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getAutoCustodyRelationships('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([]);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRecoveryContacts', () => {
-    it('should fetch recovery-enabled contacts with full criteria', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship2]));
+    it('should fetch recovery-enabled contacts with full criteria', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship2]));
 
-      service.getRecoveryContacts('human-1').subscribe({
-        next: (relationships) => {
-          expect(relationships).toEqual([mockRelationship2]);
-          expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
-            partyId: 'human-1',
-            fullyConsentedOnly: true,
-            custodyEnabledOnly: true,
-            minIntimacyLevel: 'trusted',
-          });
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRecoveryContacts('human-1').subscribe({
+          next: relationships => {
+            expect(relationships).toEqual([mockRelationship2]);
+            expect(mockStorageApi.getHumanRelationships).toHaveBeenCalledWith({
+              partyId: 'human-1',
+              fullyConsentedOnly: true,
+              custodyEnabledOnly: true,
+              minIntimacyLevel: 'trusted',
+            });
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -275,108 +302,117 @@ describe('HumanRelationshipService', () => {
   // ==========================================================================
 
   describe('createRelationship', () => {
-    it('should create a new relationship', (done) => {
-      const input: CreateHumanRelationshipInput = {
-        partyAId: 'human-1',
-        partyBId: 'human-2',
-        relationshipType: 'friend',
-        intimacyLevel: 'acquaintance',
-      };
+    it('should create a new relationship', () =>
+      new Promise<void>(done => {
+        const input: CreateHumanRelationshipInput = {
+          partyAId: 'human-1',
+          partyBId: 'human-2',
+          relationshipType: 'friend',
+          intimacyLevel: 'acquaintance',
+        };
 
-      mockStorageApi.createHumanRelationship.and.returnValue(of(mockRelationship));
+        mockStorageApi.createHumanRelationship.mockReturnValue(of(mockRelationship));
 
-      service.createRelationship(input).subscribe({
-        next: (relationship) => {
-          expect(relationship).toEqual(mockRelationship);
-          expect(mockStorageApi.createHumanRelationship).toHaveBeenCalledWith(input);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.createRelationship(input).subscribe({
+          next: relationship => {
+            expect(relationship).toEqual(mockRelationship);
+            expect(mockStorageApi.createHumanRelationship).toHaveBeenCalledWith(input);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should handle creation errors', (done) => {
-      const input: CreateHumanRelationshipInput = {
-        partyAId: 'human-1',
-        partyBId: 'human-2',
-        relationshipType: 'friend',
-        intimacyLevel: 'acquaintance',
-      };
+    it('should handle creation errors', () =>
+      new Promise<void>(done => {
+        const input: CreateHumanRelationshipInput = {
+          partyAId: 'human-1',
+          partyBId: 'human-2',
+          relationshipType: 'friend',
+          intimacyLevel: 'acquaintance',
+        };
 
-      mockStorageApi.createHumanRelationship.and.returnValue(
-        throwError(() => new Error('Network error'))
-      );
+        mockStorageApi.createHumanRelationship.mockReturnValue(
+          throwError(() => new Error('Network error'))
+        );
 
-      service.createRelationship(input).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('Network error');
-          done();
-        },
-      });
-    });
+        service.createRelationship(input).subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('Network error');
+            done();
+          },
+        });
+      }));
   });
 
   describe('updateConsent', () => {
-    it('should update consent status', (done) => {
-      mockStorageApi.updateHumanRelationshipConsent.and.returnValue(of(void 0));
+    it('should update consent status', () =>
+      new Promise<void>(done => {
+        mockStorageApi.updateHumanRelationshipConsent.mockReturnValue(of(void 0));
 
-      service.updateConsent('rel-123', true).subscribe({
-        next: () => {
-          expect(mockStorageApi.updateHumanRelationshipConsent).toHaveBeenCalledWith('rel-123', true);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.updateConsent('rel-123', true).subscribe({
+          next: () => {
+            expect(mockStorageApi.updateHumanRelationshipConsent).toHaveBeenCalledWith(
+              'rel-123',
+              true
+            );
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should handle consent update errors', (done) => {
-      mockStorageApi.updateHumanRelationshipConsent.and.returnValue(
-        throwError(() => new Error('Update failed'))
-      );
+    it('should handle consent update errors', () =>
+      new Promise<void>(done => {
+        mockStorageApi.updateHumanRelationshipConsent.mockReturnValue(
+          throwError(() => new Error('Update failed'))
+        );
 
-      service.updateConsent('rel-123', true).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('Update failed');
-          done();
-        },
-      });
-    });
+        service.updateConsent('rel-123', true).subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('Update failed');
+            done();
+          },
+        });
+      }));
   });
 
   describe('updateCustody', () => {
-    it('should update custody settings', (done) => {
-      mockStorageApi.updateHumanRelationshipCustody.and.returnValue(of(void 0));
+    it('should update custody settings', () =>
+      new Promise<void>(done => {
+        mockStorageApi.updateHumanRelationshipCustody.mockReturnValue(of(void 0));
 
-      service.updateCustody('rel-123', true, false).subscribe({
-        next: () => {
-          expect(mockStorageApi.updateHumanRelationshipCustody).toHaveBeenCalledWith(
-            'rel-123',
-            true,
-            false
-          );
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.updateCustody('rel-123', true, false).subscribe({
+          next: () => {
+            expect(mockStorageApi.updateHumanRelationshipCustody).toHaveBeenCalledWith(
+              'rel-123',
+              true,
+              false
+            );
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should enable auto-custody when requested', (done) => {
-      mockStorageApi.updateHumanRelationshipCustody.and.returnValue(of(void 0));
+    it('should enable auto-custody when requested', () =>
+      new Promise<void>(done => {
+        mockStorageApi.updateHumanRelationshipCustody.mockReturnValue(of(void 0));
 
-      service.updateCustody('rel-123', true, true).subscribe({
-        next: () => {
-          expect(mockStorageApi.updateHumanRelationshipCustody).toHaveBeenCalledWith(
-            'rel-123',
-            true,
-            true
-          );
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.updateCustody('rel-123', true, true).subscribe({
+          next: () => {
+            expect(mockStorageApi.updateHumanRelationshipCustody).toHaveBeenCalledWith(
+              'rel-123',
+              true,
+              true
+            );
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   // ==========================================================================
@@ -384,67 +420,78 @@ describe('HumanRelationshipService', () => {
   // ==========================================================================
 
   describe('relationshipExists', () => {
-    it('should return true when relationship exists', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([mockRelationship]));
+    it('should return true when relationship exists', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([mockRelationship]));
 
-      service.relationshipExists('human-1', 'human-2').subscribe({
-        next: (exists) => {
-          expect(exists).toBe(true);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.relationshipExists('human-1', 'human-2').subscribe({
+          next: exists => {
+            expect(exists).toBe(true);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return false when no relationship exists', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValue(of([]));
+    it('should return false when no relationship exists', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships.mockReturnValue(of([]));
 
-      service.relationshipExists('human-1', 'human-3').subscribe({
-        next: (exists) => {
-          expect(exists).toBe(false);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.relationshipExists('human-1', 'human-3').subscribe({
+          next: exists => {
+            expect(exists).toBe(false);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('getRelationshipBetween', () => {
-    it('should find relationship in forward direction', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValues(of([mockRelationship]), of([]));
+    it('should find relationship in forward direction', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships
+          .mockReturnValueOnce(of([mockRelationship]))
+          .mockReturnValueOnce(of([]));
 
-      service.getRelationshipBetween('human-1', 'human-2').subscribe({
-        next: (relationship) => {
-          expect(relationship).toEqual(mockRelationship);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipBetween('human-1', 'human-2').subscribe({
+          next: relationship => {
+            expect(relationship).toEqual(mockRelationship);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should find relationship in reverse direction', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValues(of([]), of([mockRelationship2]));
+    it('should find relationship in reverse direction', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships
+          .mockReturnValueOnce(of([]))
+          .mockReturnValueOnce(of([mockRelationship2]));
 
-      service.getRelationshipBetween('human-1', 'human-2').subscribe({
-        next: (relationship) => {
-          expect(relationship).toEqual(mockRelationship2);
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipBetween('human-1', 'human-2').subscribe({
+          next: relationship => {
+            expect(relationship).toEqual(mockRelationship2);
+            done();
+          },
+          error: done.fail,
+        });
+      }));
 
-    it('should return null when no relationship exists in either direction', (done) => {
-      mockStorageApi.getHumanRelationships.and.returnValues(of([]), of([]));
+    it('should return null when no relationship exists in either direction', () =>
+      new Promise<void>(done => {
+        mockStorageApi.getHumanRelationships
+          .mockReturnValueOnce(of([]))
+          .mockReturnValueOnce(of([]));
 
-      service.getRelationshipBetween('human-1', 'human-3').subscribe({
-        next: (relationship) => {
-          expect(relationship).toBeNull();
-          done();
-        },
-        error: done.fail,
-      });
-    });
+        service.getRelationshipBetween('human-1', 'human-3').subscribe({
+          next: relationship => {
+            expect(relationship).toBeNull();
+            done();
+          },
+          error: done.fail,
+        });
+      }));
   });
 
   describe('isIntimacyAtLeast', () => {

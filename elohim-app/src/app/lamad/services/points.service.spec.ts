@@ -1,23 +1,21 @@
 import { TestBed } from '@angular/core/testing';
 import { PointsService } from './points.service';
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LEARNER_BACKEND } from '@app/elohim/interfaces';
+import { vi } from 'vitest';
 
 describe('PointsService', () => {
   let service: PointsService;
-  let backendSpy: jasmine.SpyObj<LearnerBackendService>;
+  let backendSpy: any;
 
   beforeEach(() => {
-    backendSpy = jasmine.createSpyObj('LearnerBackendService', [
-      'getMyLamadPointBalance',
-      'earnLamadPoints',
-      'getMyLamadPointHistory',
-    ]);
+    backendSpy = {
+      getMyLamadPointBalance: vi.fn(),
+      earnLamadPoints: vi.fn(),
+      getMyLamadPointHistory: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
-      providers: [
-        PointsService,
-        { provide: LearnerBackendService, useValue: backendSpy },
-      ],
+      providers: [PointsService, { provide: LEARNER_BACKEND, useValue: backendSpy }],
     });
     service = TestBed.inject(PointsService);
   });
@@ -55,7 +53,7 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.getMyLamadPointBalance.and.returnValue(
+      backendSpy.getMyLamadPointBalance.mockReturnValue(
         Promise.resolve({
           action_hash: new Uint8Array(),
           balance: {
@@ -85,32 +83,33 @@ describe('PointsService', () => {
       expect(typeof service.refreshBalance).toBe('function');
     });
 
-    it('should call backend getMyLamadPointBalance', (done) => {
-      backendSpy.getMyLamadPointBalance.and.returnValue(
-        Promise.resolve({
-          action_hash: new Uint8Array(),
-          balance: {
-            id: 'balance-1',
-            agent_id: 'agent-1',
-            total_points: 100,
-            points_by_trigger_json: '{}',
-            total_earned: 100,
-            total_spent: 0,
-            last_point_event_id: null,
-            last_point_event_at: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        })
-      );
+    it('should call backend getMyLamadPointBalance', () =>
+      new Promise<void>(done => {
+        backendSpy.getMyLamadPointBalance.mockReturnValue(
+          Promise.resolve({
+            action_hash: new Uint8Array(),
+            balance: {
+              id: 'balance-1',
+              agent_id: 'agent-1',
+              total_points: 100,
+              points_by_trigger_json: '{}',
+              total_earned: 100,
+              total_spent: 0,
+              last_point_event_id: null,
+              last_point_event_at: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          })
+        );
 
-      service.refreshBalance();
+        service.refreshBalance();
 
-      setTimeout(() => {
-        expect(backendSpy.getMyLamadPointBalance).toHaveBeenCalled();
-        done();
-      }, 100);
-    });
+        setTimeout(() => {
+          expect(backendSpy.getMyLamadPointBalance).toHaveBeenCalled();
+          done();
+        }, 100);
+      }));
   });
 
   describe('getBalanceSync()', () => {
@@ -149,30 +148,31 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       const result = service.earnPoints('engagement_view', 'content-123');
       expect(result).toBeDefined();
       expect(result.subscribe).toBeDefined();
     });
 
-    it('should call backend earnLamadPoints', (done) => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+    it('should call backend earnLamadPoints', () =>
+      new Promise<void>(done => {
+        backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
 
-      service.earnPoints('engagement_view', 'content-123').subscribe(() => {
-        expect(backendSpy.earnLamadPoints).toHaveBeenCalled();
-        done();
-      });
-    });
+        service.earnPoints('engagement_view', 'content-123').subscribe(() => {
+          expect(backendSpy.earnLamadPoints).toHaveBeenCalled();
+          done();
+        });
+      }));
 
     it('should accept trigger parameter', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       expect(() => {
         service.earnPoints('engagement_view', 'content-123');
       }).not.toThrow();
     });
 
     it('should accept optional parameters', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       expect(() => {
         service.earnPoints(
           'path_step_complete',
@@ -193,7 +193,7 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       const result = service.earnViewPoints('content-123');
       expect(result.subscribe).toBeDefined();
     });
@@ -206,7 +206,7 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       const result = service.earnPracticePoints('content-123');
       expect(result.subscribe).toBeDefined();
     });
@@ -219,7 +219,7 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       const result = service.earnPathStepPoints('path-123', 'content-456');
       expect(result.subscribe).toBeDefined();
     });
@@ -232,7 +232,7 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.earnLamadPoints.and.returnValue(Promise.resolve(null));
+      backendSpy.earnLamadPoints.mockReturnValue(Promise.resolve(null));
       const result = service.earnPathCompletePoints('path-123');
       expect(result.subscribe).toBeDefined();
     });
@@ -263,13 +263,13 @@ describe('PointsService', () => {
     });
 
     it('should return observable', () => {
-      backendSpy.getMyLamadPointHistory.and.returnValue(Promise.resolve([]));
+      backendSpy.getMyLamadPointHistory.mockReturnValue(Promise.resolve([]));
       const result = service.loadHistory();
       expect(result.subscribe).toBeDefined();
     });
 
     it('should accept optional limit parameter', () => {
-      backendSpy.getMyLamadPointHistory.and.returnValue(Promise.resolve([]));
+      backendSpy.getMyLamadPointHistory.mockReturnValue(Promise.resolve([]));
       const result = service.loadHistory(10);
       expect(result.subscribe).toBeDefined();
     });

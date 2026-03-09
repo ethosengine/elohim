@@ -31,88 +31,91 @@ describe('ElohimStubService', () => {
       expect(typeof service.categorizeTransactions).toBe('function');
     });
 
-    it('should return observable', (done) => {
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon Purchase',
-          merchantName: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should return observable', () =>
+      new Promise<void>(done => {
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon Purchase',
+            merchantName: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Groceries', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Groceries', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe((categorized) => {
-        expect(categorized).toBeDefined();
-        expect(categorized.length).toBeGreaterThan(0);
-        done();
-      });
-    });
+        result.subscribe(categorized => {
+          expect(categorized).toBeDefined();
+          expect(categorized.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should categorize amazon purchases as Shopping', (done) => {
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon Purchase',
-          merchantName: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should categorize amazon purchases as Shopping', () =>
+      new Promise<void>(done => {
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon Purchase',
+            merchantName: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Groceries', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Groceries', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe((categorized) => {
-        expect(categorized[0].category).toBe('Shopping');
-        expect(categorized[0].confidence).toBeGreaterThan(0);
-        done();
-      });
-    });
+        result.subscribe(categorized => {
+          expect(categorized[0].category).toBe('Shopping');
+          expect(categorized[0].confidence).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should generate alternatives for uncertain matches', (done) => {
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Unknown Store',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should generate alternatives for uncertain matches', () =>
+      new Promise<void>(done => {
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Unknown Store',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Groceries', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Groceries', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe((categorized) => {
-        expect(categorized[0]?.alternatives).toBeDefined();
-        expect(categorized[0]?.alternatives?.length).toBeGreaterThan(0);
-        done();
-      });
-    });
+        result.subscribe(categorized => {
+          expect(categorized[0]?.alternatives).toBeDefined();
+          expect(categorized[0]?.alternatives?.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
   });
 
   describe('adjudicateClaim', () => {
@@ -121,83 +124,87 @@ describe('ElohimStubService', () => {
       expect(typeof service.adjudicateClaim).toBe('function');
     });
 
-    it('should return observable', (done) => {
-      const result = service.adjudicateClaim({
-        claimId: 'claim-1',
-        claimType: 'health',
-        amount: 5000,
-        evidence: ['Doctor letter', 'Receipt'],
-        memberHistory: {
-          claimsCount: 2,
-          riskScore: 50,
-          memberSince: '2025-01-01',
-        },
-      });
+    it('should return observable', () =>
+      new Promise<void>(done => {
+        const result = service.adjudicateClaim({
+          claimId: 'claim-1',
+          claimType: 'health',
+          amount: 5000,
+          evidence: ['Doctor letter', 'Receipt'],
+          memberHistory: {
+            claimsCount: 2,
+            riskScore: 50,
+            memberSince: '2025-01-01',
+          },
+        });
 
-      result.subscribe((decision) => {
-        expect(decision).toBeDefined();
-        expect(decision.decision).toBeDefined();
-        done();
-      });
-    });
+        result.subscribe(decision => {
+          expect(decision).toBeDefined();
+          expect(decision.decision).toBeDefined();
+          done();
+        });
+      }));
 
-    it('should approve low-amount claims with evidence', (done) => {
-      const result = service.adjudicateClaim({
-        claimId: 'claim-1',
-        claimType: 'health',
-        amount: 500,
-        evidence: ['Doctor letter'],
-        memberHistory: {
-          claimsCount: 1,
-          riskScore: 40,
-          memberSince: '2025-01-01',
-        },
-      });
+    it('should approve low-amount claims with evidence', () =>
+      new Promise<void>(done => {
+        const result = service.adjudicateClaim({
+          claimId: 'claim-1',
+          claimType: 'health',
+          amount: 500,
+          evidence: ['Doctor letter'],
+          memberHistory: {
+            claimsCount: 1,
+            riskScore: 40,
+            memberSince: '2025-01-01',
+          },
+        });
 
-      result.subscribe((decision) => {
-        expect(decision.decision).toBe('approve');
-        expect(decision.confidence).toBeGreaterThan(0);
-        done();
-      });
-    });
+        result.subscribe(decision => {
+          expect(decision.decision).toBe('approve');
+          expect(decision.confidence).toBeGreaterThan(0);
+          done();
+        });
+      }));
 
-    it('should flag high-risk members for review', (done) => {
-      const result = service.adjudicateClaim({
-        claimId: 'claim-1',
-        claimType: 'health',
-        amount: 5000,
-        evidence: ['Doctor letter'],
-        memberHistory: {
-          claimsCount: 10,
-          riskScore: 85,
-          memberSince: '2025-01-01',
-        },
-      });
+    it('should flag high-risk members for review', () =>
+      new Promise<void>(done => {
+        const result = service.adjudicateClaim({
+          claimId: 'claim-1',
+          claimType: 'health',
+          amount: 5000,
+          evidence: ['Doctor letter'],
+          memberHistory: {
+            claimsCount: 10,
+            riskScore: 85,
+            memberSince: '2025-01-01',
+          },
+        });
 
-      result.subscribe((decision) => {
-        expect(decision.decision).toBe('review');
-        done();
-      });
-    });
+        result.subscribe(decision => {
+          expect(decision.decision).toBe('review');
+          done();
+        });
+      }));
 
-    it('should flag claims without evidence for review', (done) => {
-      const result = service.adjudicateClaim({
-        claimId: 'claim-1',
-        claimType: 'health',
-        amount: 5000,
-        evidence: [],
-        memberHistory: {
-          claimsCount: 1,
-          riskScore: 50,
-          memberSince: '2025-01-01',
-        },
-      });
+    it('should flag claims without evidence for review', () =>
+      new Promise<void>(done => {
+        const result = service.adjudicateClaim({
+          claimId: 'claim-1',
+          claimType: 'health',
+          amount: 5000,
+          evidence: [],
+          memberHistory: {
+            claimsCount: 1,
+            riskScore: 50,
+            memberSince: '2025-01-01',
+          },
+        });
 
-      result.subscribe((decision) => {
-        expect(decision.decision).toBe('review');
-        done();
-      });
-    });
+        result.subscribe(decision => {
+          expect(decision.decision).toBe('review');
+          done();
+        });
+      }));
   });
 
   describe('getCallLogs', () => {
@@ -208,7 +215,7 @@ describe('ElohimStubService', () => {
 
     it('should return array of call logs', () => {
       const result = service.getCallLogs();
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should initially be empty', () => {
@@ -217,34 +224,35 @@ describe('ElohimStubService', () => {
       expect(result.length).toBe(0);
     });
 
-    it('should record call logs after categorization', (done) => {
-      service.clearLogs();
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should record call logs after categorization', () =>
+      new Promise<void>(done => {
+        service.clearLogs();
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe(() => {
-        const logs = service.getCallLogs();
-        expect(logs.length).toBeGreaterThan(0);
-        expect(logs[0].agentType).toBe('categorizer');
-        done();
-      });
-    });
+        result.subscribe(() => {
+          const logs = service.getCallLogs();
+          expect(logs.length).toBeGreaterThan(0);
+          expect(logs[0].agentType).toBe('categorizer');
+          done();
+        });
+      }));
   });
 
   describe('getCallsByAgent', () => {
@@ -259,34 +267,35 @@ describe('ElohimStubService', () => {
       expect(result.length).toBe(0);
     });
 
-    it('should filter logs by agent type', (done) => {
-      service.clearLogs();
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should filter logs by agent type', () =>
+      new Promise<void>(done => {
+        service.clearLogs();
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe(() => {
-        const logs = service.getCallsByAgent('categorizer');
-        expect(logs.length).toBeGreaterThan(0);
-        expect(logs.every(log => log.agentType === 'categorizer')).toBeTrue();
-        done();
-      });
-    });
+        result.subscribe(() => {
+          const logs = service.getCallsByAgent('categorizer');
+          expect(logs.length).toBeGreaterThan(0);
+          expect(logs.every(log => log.agentType === 'categorizer')).toBe(true);
+          done();
+        });
+      }));
   });
 
   describe('clearLogs', () => {
@@ -295,33 +304,34 @@ describe('ElohimStubService', () => {
       expect(typeof service.clearLogs).toBe('function');
     });
 
-    it('should clear all logs', (done) => {
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should clear all logs', () =>
+      new Promise<void>(done => {
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe(() => {
-        expect(service.getCallLogs().length).toBeGreaterThan(0);
-        service.clearLogs();
-        expect(service.getCallLogs().length).toBe(0);
-        done();
-      });
-    });
+        result.subscribe(() => {
+          expect(service.getCallLogs().length).toBeGreaterThan(0);
+          service.clearLogs();
+          expect(service.getCallLogs().length).toBe(0);
+          done();
+        });
+      }));
   });
 
   describe('exportLogs', () => {
@@ -343,34 +353,35 @@ describe('ElohimStubService', () => {
       expect(parsed).toEqual([]);
     });
 
-    it('should export logs as valid JSON', (done) => {
-      service.clearLogs();
-      const transactions: StagedTransaction[] = [
-        {
-          id: 'txn-1',
-          plaidTransactionId: 'plaid-1',
-          plaidAccountId: 'acc-1',
-          amount: { value: 100, currency: 'USD' },
-          timestamp: new Date().toISOString(),
-          description: 'Amazon',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ];
+    it('should export logs as valid JSON', () =>
+      new Promise<void>(done => {
+        service.clearLogs();
+        const transactions: StagedTransaction[] = [
+          {
+            id: 'txn-1',
+            plaidTransactionId: 'plaid-1',
+            plaidAccountId: 'acc-1',
+            amount: { value: 100, currency: 'USD' },
+            timestamp: new Date().toISOString(),
+            description: 'Amazon',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any,
+        ];
 
-      const result = service.categorizeTransactions({
-        transactions,
-        categories: ['Shopping', 'Other'],
-        stewardId: 'steward-1',
-      });
+        const result = service.categorizeTransactions({
+          transactions,
+          categories: ['Shopping', 'Other'],
+          stewardId: 'steward-1',
+        });
 
-      result.subscribe(() => {
-        const exported = service.exportLogs();
-        const parsed = JSON.parse(exported);
-        expect(parsed).toEqual(jasmine.any(Array));
-        expect(parsed.length).toBeGreaterThan(0);
-        done();
-      });
-    });
+        result.subscribe(() => {
+          const exported = service.exportLogs();
+          const parsed = JSON.parse(exported);
+          expect(parsed).toEqual(expect.any(Array));
+          expect(parsed.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
   });
 });

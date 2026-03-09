@@ -10,14 +10,15 @@ import { Router } from '@angular/router';
 import { TauriAuthService } from './tauri-auth.service';
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
+import { type Mock, vi } from 'vitest';
 
 describe('TauriAuthService', () => {
   let service: TauriAuthService;
-  let mockRouter: jasmine.SpyObj<Router>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockRouter: any;
+  let mockAuthService: any;
+  let mockDoorwayRegistry: any;
   let mockTauriWindow: any;
-  let fetchSpy: jasmine.Spy;
+  let fetchSpy: Mock;
   let originalWindow: any;
 
   const mockDoorway = {
@@ -49,27 +50,33 @@ describe('TauriAuthService', () => {
     originalWindow = (window as any).__TAURI__;
 
     // Mock Router
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = {
+      navigate: vi.fn(),
+    };
 
     // Mock AuthService
-    mockAuthService = jasmine.createSpyObj('AuthService', ['setTauriSession', 'logout']);
+    mockAuthService = {
+      setTauriSession: vi.fn(),
+      logout: vi.fn(),
+    };
 
     // Mock DoorwayRegistryService
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', ['clearSelection'], {
-      selected: jasmine.createSpy().and.returnValue(mockDoorway),
-    });
+    mockDoorwayRegistry = {
+      clearSelection: vi.fn(),
+      selected: vi.fn().mockReturnValue(mockDoorway),
+    };
 
     // Mock Tauri window - will be set by individual tests as needed
     mockTauriWindow = {
       __TAURI__: {
         event: {
-          listen: jasmine.createSpy('listen').and.returnValue(Promise.resolve(() => {})),
+          listen: vi.fn().mockReturnValue(Promise.resolve(() => {})),
         },
       },
     };
 
     // Mock fetch
-    fetchSpy = jasmine.createSpy('fetch');
+    fetchSpy = vi.fn();
     (window as any).fetch = fetchSpy;
 
     TestBed.configureTestingModule({
@@ -153,11 +160,13 @@ describe('TauriAuthService', () => {
     it('should check for existing session on initialization', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(mockSession),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockSession),
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -169,10 +178,12 @@ describe('TauriAuthService', () => {
     it('should set needs_login when no session exists', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -185,7 +196,7 @@ describe('TauriAuthService', () => {
 
       // getActiveSession() catches errors internally and returns null,
       // so initialize() will set status to 'needs_login', not 'error'
-      fetchSpy.and.returnValue(Promise.reject(new Error('Network error')));
+      fetchSpy.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await service.initialize();
 
@@ -195,21 +206,23 @@ describe('TauriAuthService', () => {
     it('should set up event listeners', async () => {
       (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
 
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
       expect(mockTauriWindow.__TAURI__.event.listen).toHaveBeenCalledWith(
         'oauth-callback',
-        jasmine.any(Function)
+        expect.any(Function)
       );
 
       expect(mockTauriWindow.__TAURI__.event.listen).toHaveBeenCalledWith(
         'deep-link-error',
-        jasmine.any(Function)
+        expect.any(Function)
       );
     });
   });
@@ -220,11 +233,13 @@ describe('TauriAuthService', () => {
 
   describe('getActiveSession', () => {
     it('should fetch active session from storage', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(mockSession),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockSession),
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -233,10 +248,12 @@ describe('TauriAuthService', () => {
     });
 
     it('should return null when no session exists (404)', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -244,7 +261,7 @@ describe('TauriAuthService', () => {
     });
 
     it('should return null on network errors', async () => {
-      fetchSpy.and.returnValue(Promise.reject(new Error('Network error')));
+      fetchSpy.mockReturnValue(Promise.reject(new Error('Network error')));
 
       const session = await service.getActiveSession();
 
@@ -252,10 +269,12 @@ describe('TauriAuthService', () => {
     });
 
     it('should handle non-404 errors', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 500,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 500,
+        } as Response)
+      );
 
       const session = await service.getActiveSession();
 
@@ -289,32 +308,39 @@ describe('TauriAuthService', () => {
 
     it('should handle OAuth callback successfully', async () => {
       // Mock fetch responses in order
-      fetchSpy.and.returnValues(
+      fetchSpy
         // 1. initialize() → getActiveSession() (no existing session)
-        Promise.resolve({
-          ok: false,
-          status: 404,
-        } as Response),
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: false,
+            status: 404,
+          } as Response)
+        )
         // 2. Token exchange
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockTokenResponse),
-        } as Response),
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockTokenResponse),
+          } as Response)
+        )
         // 3. Native handoff
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockHandoffResponse),
-        } as Response),
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockHandoffResponse),
+          } as Response)
+        )
         // 4. Create session
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSession),
-        } as Response)
-      );
+        .mockReturnValueOnce(
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockSession),
+          } as Response)
+        );
 
       // Set up event listener and capture the callback
       let oauthCallbackHandler: any;
-      mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
+      mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
         if (event === 'oauth-callback') {
           oauthCallbackHandler = handler;
         }
@@ -338,14 +364,16 @@ describe('TauriAuthService', () => {
     });
 
     it('should handle token exchange failure', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 400,
-        text: () => Promise.resolve('Invalid grant'),
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('Invalid grant'),
+        } as Response)
+      );
 
       let oauthCallbackHandler: any;
-      mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
+      mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
         if (event === 'oauth-callback') {
           oauthCallbackHandler = handler;
         }
@@ -367,16 +395,18 @@ describe('TauriAuthService', () => {
     });
 
     it('should handle missing doorway selection', async () => {
-      (mockDoorwayRegistry.selected as jasmine.Spy).and.returnValue(null);
+      (mockDoorwayRegistry.selected as Mock).mockReturnValue(null);
 
       // Mock 404 for initial session check during initialize()
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       let oauthCallbackHandler: any;
-      mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
+      mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
         if (event === 'oauth-callback') {
           oauthCallbackHandler = handler;
         }
@@ -409,17 +439,19 @@ describe('TauriAuthService', () => {
 
     it('should handle deep link errors', async () => {
       let errorHandler: any;
-      mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
+      mockTauriWindow.__TAURI__.event.listen.mockImplementation((event: string, handler: any) => {
         if (event === 'deep-link-error') {
           errorHandler = handler;
         }
         return Promise.resolve(() => {});
       });
 
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.initialize();
 
@@ -442,9 +474,11 @@ describe('TauriAuthService', () => {
 
   describe('logout', () => {
     it('should delete session and redirect to identity page', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: true,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: true,
+        } as Response)
+      );
 
       service.currentSession.set(mockSession);
       service.status.set('authenticated');
@@ -461,7 +495,7 @@ describe('TauriAuthService', () => {
     });
 
     it('should continue logout even if session deletion fails', async () => {
-      fetchSpy.and.returnValue(Promise.reject(new Error('Network error')));
+      fetchSpy.mockReturnValue(Promise.reject(new Error('Network error')));
 
       service.currentSession.set(mockSession);
       service.status.set('authenticated');
@@ -495,18 +529,19 @@ describe('TauriAuthService', () => {
     });
 
     it('should unsubscribe from event listeners', async () => {
-      const unsubscribeOAuth = jasmine.createSpy('unsubscribeOAuth');
-      const unsubscribeError = jasmine.createSpy('unsubscribeError');
+      const unsubscribeOAuth = vi.fn();
+      const unsubscribeError = vi.fn();
 
-      mockTauriWindow.__TAURI__.event.listen.and.returnValues(
-        Promise.resolve(unsubscribeOAuth),
-        Promise.resolve(unsubscribeError)
+      mockTauriWindow.__TAURI__.event.listen
+        .mockReturnValueOnce(Promise.resolve(unsubscribeOAuth))
+        .mockReturnValueOnce(Promise.resolve(unsubscribeError));
+
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
       );
-
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
 
       await service.initialize();
 
@@ -537,7 +572,7 @@ describe('TauriAuthService', () => {
     });
 
     it('should call Tauri IPC and set confirmed on success', async () => {
-      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(Promise.resolve());
+      const mockInvoke = vi.fn().mockReturnValue(Promise.resolve());
       (window as any).__TAURI__ = {
         ...mockTauriWindow.__TAURI__,
         core: { invoke: mockInvoke },
@@ -546,15 +581,15 @@ describe('TauriAuthService', () => {
       const result = await service.confirmStewardship('password123');
 
       expect(result).toBe(true);
-      expect(mockInvoke).toHaveBeenCalledWith('doorway_confirm_stewardship', { password: 'password123' });
+      expect(mockInvoke).toHaveBeenCalledWith('doorway_confirm_stewardship', {
+        password: 'password123',
+      });
       expect(service.graduationStatus()).toBe('confirmed');
       expect(service.status()).toBe('authenticated');
     });
 
     it('should set error status on IPC failure', async () => {
-      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(
-        Promise.reject(new Error('Invalid password'))
-      );
+      const mockInvoke = vi.fn().mockReturnValue(Promise.reject(new Error('Invalid password')));
       (window as any).__TAURI__ = {
         ...mockTauriWindow.__TAURI__,
         core: { invoke: mockInvoke },
@@ -569,8 +604,10 @@ describe('TauriAuthService', () => {
 
     it('should set confirming status during IPC call', async () => {
       let resolveInvoke: () => void;
-      const invokePromise = new Promise<void>(resolve => { resolveInvoke = resolve; });
-      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(invokePromise);
+      const invokePromise = new Promise<void>(resolve => {
+        resolveInvoke = resolve;
+      });
+      const mockInvoke = vi.fn().mockReturnValue(invokePromise);
       (window as any).__TAURI__ = {
         ...mockTauriWindow.__TAURI__,
         core: { invoke: mockInvoke },
@@ -633,10 +670,12 @@ describe('TauriAuthService', () => {
 
   describe('storage URL configuration', () => {
     it('should use default storage URL', async () => {
-      fetchSpy.and.returnValue(Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response));
+      fetchSpy.mockReturnValue(
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response)
+      );
 
       await service.getActiveSession();
 

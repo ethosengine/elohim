@@ -4,9 +4,9 @@
 //! without requiring actual network connectivity.
 
 use automerge::transaction::Transactable;
-use automerge::ReadDoc;
 use automerge::Automerge;
-use elohim_storage::sync::{DocStore, DocStoreConfig, SyncManager, StreamTracker};
+use automerge::ReadDoc;
+use elohim_storage::sync::{DocStore, DocStoreConfig, StreamTracker, SyncManager};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -35,7 +35,10 @@ async fn test_single_node_document_lifecycle() {
     let (manager, _temp) = create_sync_manager("node1").await;
 
     // Create a document
-    let mut doc = manager.get_or_create_doc(TEST_APP_ID, "graph:test").await.unwrap();
+    let mut doc = manager
+        .get_or_create_doc(TEST_APP_ID, "graph:test")
+        .await
+        .unwrap();
 
     // Make some changes
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
@@ -46,22 +49,24 @@ async fn test_single_node_document_lifecycle() {
     .unwrap();
 
     // Get heads before saving
-    let heads_before: Vec<String> = doc
-        .get_heads()
-        .iter()
-        .map(|h| hex::encode(h.0))
-        .collect();
+    let _heads_before: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
 
     // Save via apply_changes (simulating receiving changes)
     let changes = doc.save();
-    manager.apply_changes(TEST_APP_ID, "graph:test", vec![changes]).await.unwrap();
+    manager
+        .apply_changes(TEST_APP_ID, "graph:test", vec![changes])
+        .await
+        .unwrap();
 
     // Retrieve and verify
     let heads = manager.get_heads(TEST_APP_ID, "graph:test").await.unwrap();
     assert!(!heads.is_empty());
 
     // List documents
-    let (docs, total) = manager.list_documents(TEST_APP_ID, Some("graph"), 0, 10).await.unwrap();
+    let (docs, total) = manager
+        .list_documents(TEST_APP_ID, Some("graph"), 0, 10)
+        .await
+        .unwrap();
     assert_eq!(total, 1);
     assert_eq!(docs[0].doc_id, "graph:test");
 }
@@ -85,18 +90,27 @@ async fn test_two_node_sync() {
 
     // Save to node 1
     let changes = doc.save();
-    let node1_heads = node1.apply_changes(TEST_APP_ID, doc_id, vec![changes.clone()]).await.unwrap();
+    let node1_heads = node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![changes.clone()])
+        .await
+        .unwrap();
 
     // Node 2 doesn't have the document yet
     let node2_heads = node2.get_heads(TEST_APP_ID, doc_id).await.unwrap();
     assert!(node2_heads.is_empty());
 
     // Simulate sync: node 2 asks node 1 for changes since empty heads
-    let (changes_to_send, _) = node1.get_changes_since(TEST_APP_ID, doc_id, &[]).await.unwrap();
+    let (changes_to_send, _) = node1
+        .get_changes_since(TEST_APP_ID, doc_id, &[])
+        .await
+        .unwrap();
     assert!(!changes_to_send.is_empty());
 
     // Node 2 applies the changes
-    let node2_heads_after = node2.apply_changes(TEST_APP_ID, doc_id, changes_to_send).await.unwrap();
+    let node2_heads_after = node2
+        .apply_changes(TEST_APP_ID, doc_id, changes_to_send)
+        .await
+        .unwrap();
 
     // Both nodes should have the same heads
     assert_eq!(node1_heads, node2_heads_after);
@@ -135,8 +149,14 @@ async fn test_offline_merge() {
         .unwrap();
 
     let initial_changes = initial_doc.save();
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![initial_changes.clone()]).await.unwrap();
-    node2.apply_changes(TEST_APP_ID, doc_id, vec![initial_changes]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![initial_changes.clone()])
+        .await
+        .unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, vec![initial_changes])
+        .await
+        .unwrap();
 
     // Verify both nodes have same heads initially
     let node1_heads_initial = node1.get_heads(TEST_APP_ID, doc_id).await.unwrap();
@@ -152,7 +172,7 @@ async fn test_offline_merge() {
         Ok(())
     })
     .unwrap();
-    let node1_offline_changes = doc1.save_after(
+    let _node1_offline_changes = doc1.save_after(
         &node1_heads_initial
             .iter()
             .filter_map(|h| {
@@ -167,7 +187,10 @@ async fn test_offline_merge() {
             })
             .collect::<Vec<_>>(),
     );
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()])
+        .await
+        .unwrap();
 
     // Node 2 adds a different field
     let mut doc2 = node2.get_or_create_doc(TEST_APP_ID, doc_id).await.unwrap();
@@ -176,7 +199,10 @@ async fn test_offline_merge() {
         Ok(())
     })
     .unwrap();
-    node2.apply_changes(TEST_APP_ID, doc_id, vec![doc2.save()]).await.unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc2.save()])
+        .await
+        .unwrap();
 
     // Heads should now be different
     let node1_heads_offline = node1.get_heads(TEST_APP_ID, doc_id).await.unwrap();
@@ -198,8 +224,14 @@ async fn test_offline_merge() {
         .unwrap();
 
     // Both apply each other's changes
-    node2.apply_changes(TEST_APP_ID, doc_id, changes_1_to_2).await.unwrap();
-    node1.apply_changes(TEST_APP_ID, doc_id, changes_2_to_1).await.unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, changes_1_to_2)
+        .await
+        .unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, changes_2_to_1)
+        .await
+        .unwrap();
 
     // --- VERIFY: Both nodes have merged state ---
 
@@ -218,25 +250,35 @@ async fn test_offline_merge() {
     let doc2_final = node2.get_or_create_doc(TEST_APP_ID, doc_id).await.unwrap();
 
     let get_str = |doc: &Automerge, key: &str| -> Option<String> {
-        doc.get(automerge::ROOT, key)
-            .unwrap()
-            .and_then(|(v, _)| {
-                if let automerge::Value::Scalar(s) = v {
-                    if let automerge::ScalarValue::Str(smol) = s.as_ref() {
-                        return Some(smol.to_string());
-                    }
+        doc.get(automerge::ROOT, key).unwrap().and_then(|(v, _)| {
+            if let automerge::Value::Scalar(s) = v {
+                if let automerge::ScalarValue::Str(smol) = s.as_ref() {
+                    return Some(smol.to_string());
                 }
-                None
-            })
+            }
+            None
+        })
     };
 
     // Node 1 should have both fields
-    assert_eq!(get_str(&doc1_final, "node1_field"), Some("from node 1".to_string()));
-    assert_eq!(get_str(&doc1_final, "node2_field"), Some("from node 2".to_string()));
+    assert_eq!(
+        get_str(&doc1_final, "node1_field"),
+        Some("from node 1".to_string())
+    );
+    assert_eq!(
+        get_str(&doc1_final, "node2_field"),
+        Some("from node 2".to_string())
+    );
 
     // Node 2 should have both fields
-    assert_eq!(get_str(&doc2_final, "node1_field"), Some("from node 1".to_string()));
-    assert_eq!(get_str(&doc2_final, "node2_field"), Some("from node 2".to_string()));
+    assert_eq!(
+        get_str(&doc2_final, "node1_field"),
+        Some("from node 1".to_string())
+    );
+    assert_eq!(
+        get_str(&doc2_final, "node2_field"),
+        Some("from node 2".to_string())
+    );
 }
 
 /// Test incremental sync (only sending missing changes)
@@ -255,11 +297,20 @@ async fn test_incremental_sync() {
     })
     .unwrap();
 
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![doc.save()]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc.save()])
+        .await
+        .unwrap();
 
     // Sync to node 2
-    let (initial_changes, _) = node1.get_changes_since(TEST_APP_ID, doc_id, &[]).await.unwrap();
-    let shared_heads = node2.apply_changes(TEST_APP_ID, doc_id, initial_changes).await.unwrap();
+    let (initial_changes, _) = node1
+        .get_changes_since(TEST_APP_ID, doc_id, &[])
+        .await
+        .unwrap();
+    let shared_heads = node2
+        .apply_changes(TEST_APP_ID, doc_id, initial_changes)
+        .await
+        .unwrap();
 
     // Node 1 makes more changes
     let mut doc1 = node1.get_or_create_doc(TEST_APP_ID, doc_id).await.unwrap();
@@ -268,7 +319,10 @@ async fn test_incremental_sync() {
         Ok(())
     })
     .unwrap();
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()])
+        .await
+        .unwrap();
 
     // Request only changes since shared_heads (incremental)
     let (incremental_changes, new_heads) = node1
@@ -281,7 +335,10 @@ async fn test_incremental_sync() {
 
     // Apply incremental changes to node 2
     if !incremental_changes.is_empty() {
-        node2.apply_changes(TEST_APP_ID, doc_id, incremental_changes).await.unwrap();
+        node2
+            .apply_changes(TEST_APP_ID, doc_id, incremental_changes)
+            .await
+            .unwrap();
     }
 
     // Verify node 2 has version 2
@@ -318,8 +375,14 @@ async fn test_concurrent_same_field_edits() {
         .unwrap();
 
     let initial_changes = initial_doc.save();
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![initial_changes.clone()]).await.unwrap();
-    node2.apply_changes(TEST_APP_ID, doc_id, vec![initial_changes]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![initial_changes.clone()])
+        .await
+        .unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, vec![initial_changes])
+        .await
+        .unwrap();
 
     let initial_heads = node1.get_heads(TEST_APP_ID, doc_id).await.unwrap();
 
@@ -330,7 +393,10 @@ async fn test_concurrent_same_field_edits() {
         Ok(())
     })
     .unwrap();
-    node1.apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()]).await.unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc1.save()])
+        .await
+        .unwrap();
 
     let mut doc2 = node2.get_or_create_doc(TEST_APP_ID, doc_id).await.unwrap();
     doc2.transact::<_, _, automerge::AutomergeError>(|tx| {
@@ -338,14 +404,29 @@ async fn test_concurrent_same_field_edits() {
         Ok(())
     })
     .unwrap();
-    node2.apply_changes(TEST_APP_ID, doc_id, vec![doc2.save()]).await.unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, vec![doc2.save()])
+        .await
+        .unwrap();
 
     // Exchange changes
-    let (changes_1, _) = node1.get_changes_since(TEST_APP_ID, doc_id, &initial_heads).await.unwrap();
-    let (changes_2, _) = node2.get_changes_since(TEST_APP_ID, doc_id, &initial_heads).await.unwrap();
+    let (changes_1, _) = node1
+        .get_changes_since(TEST_APP_ID, doc_id, &initial_heads)
+        .await
+        .unwrap();
+    let (changes_2, _) = node2
+        .get_changes_since(TEST_APP_ID, doc_id, &initial_heads)
+        .await
+        .unwrap();
 
-    node2.apply_changes(TEST_APP_ID, doc_id, changes_1).await.unwrap();
-    node1.apply_changes(TEST_APP_ID, doc_id, changes_2).await.unwrap();
+    node2
+        .apply_changes(TEST_APP_ID, doc_id, changes_1)
+        .await
+        .unwrap();
+    node1
+        .apply_changes(TEST_APP_ID, doc_id, changes_2)
+        .await
+        .unwrap();
 
     // Both nodes should converge to the same value (deterministic winner)
     let doc1_final = node1.get_or_create_doc(TEST_APP_ID, doc_id).await.unwrap();

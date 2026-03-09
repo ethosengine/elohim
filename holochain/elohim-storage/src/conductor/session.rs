@@ -37,6 +37,8 @@ use super::protocol::{decode_response, encode_zome_call};
 use super::transport::{Transport, WsSink, WsStream};
 use crate::error::StorageError;
 
+type PendingMap = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>>;
+
 /// Configuration for establishing a session.
 #[derive(Debug, Clone)]
 pub struct SessionConfig {
@@ -86,7 +88,7 @@ pub struct Session {
     /// Request ID counter
     next_id: AtomicU64,
     /// Pending response channels, keyed by request ID
-    pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>>,
+    pending: PendingMap,
     /// Handle to the receiver task
     recv_task: tokio::task::JoinHandle<()>,
 }
@@ -133,8 +135,7 @@ impl Session {
         let (sink, stream) = transport.split();
 
         // Step 5: Set up pending response tracking
-        let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
+        let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
 
         // Step 6: Spawn receiver task
         let pending_for_recv = Arc::clone(&pending);
@@ -253,10 +254,7 @@ impl Drop for Session {
 ///
 /// Receives responses from the conductor and routes them to the
 /// appropriate pending request channel.
-async fn receiver_loop(
-    mut stream: WsStream,
-    pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>>,
-) {
+async fn receiver_loop(mut stream: WsStream, pending: PendingMap) {
     use futures_util::StreamExt;
     use tokio_tungstenite::tungstenite::protocol::Message;
 
@@ -270,9 +268,7 @@ async fn receiver_loop(
                     Ok(response) => {
                         let mut pending = pending.lock().await;
                         if let Some(tx) = pending.remove(&response.id) {
-                            let result = response
-                                .result
-                                .map_err(|e| StorageError::Conductor(e));
+                            let result = response.result.map_err(StorageError::Conductor);
                             let _ = tx.send(result);
                         }
                     }

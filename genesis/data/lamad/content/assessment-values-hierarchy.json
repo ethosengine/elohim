@@ -6,378 +6,867 @@
   "content": [
     {
       "id": "val-q1",
-      "question": {
-        "content": "CREATIVITY - uniqueness, imagination, independent thinking\n\n[[☃ widget 1]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "CREATIVITY - uniqueness, imagination, independent thinking\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "openness": 1 },
+          "2": { "openness": 2 },
+          "3": { "openness": 3 },
+          "4": { "openness": 4 },
+          "5": { "openness": 5 },
+          "6": { "openness": 6 },
+          "7": { "openness": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "openness"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q2",
-      "question": {
-        "content": "SECURITY - safety, harmony, stability of society and relationships\n\n[[☃ widget 2]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "CURIOSITY - interest in exploring ideas, discovering new things\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 2": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "openness": 1 },
+          "2": { "openness": 2 },
+          "3": { "openness": 3 },
+          "4": { "openness": 4 },
+          "5": { "openness": 5 },
+          "6": { "openness": 6 },
+          "7": { "openness": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "conservation"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q3",
-      "question": {
-        "content": "BENEVOLENCE - preserving and enhancing the welfare of people close to you\n\n[[☃ widget 3]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "INDEPENDENCE - self-reliance, choosing one's own goals and actions\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 3": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "openness": 1 },
+          "2": { "openness": 2 },
+          "3": { "openness": 3 },
+          "4": { "openness": 4 },
+          "5": { "openness": 5 },
+          "6": { "openness": 6 },
+          "7": { "openness": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-transcendence"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q4",
-      "question": {
-        "content": "ACHIEVEMENT - personal success through demonstrating competence\n\n[[☃ widget 4]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "A VARIED LIFE - filled with challenge, novelty, and change\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 4": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "openness": 1 },
+          "2": { "openness": 2 },
+          "3": { "openness": 3 },
+          "4": { "openness": 4 },
+          "5": { "openness": 5 },
+          "6": { "openness": 6 },
+          "7": { "openness": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-enhancement"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q5",
-      "question": {
-        "content": "UNIVERSALISM - understanding, tolerance, and protection for all people\n\n[[☃ widget 5]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "AN EXCITING LIFE - stimulating experiences, adventure, and risk\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 5": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "openness": 1 },
+          "2": { "openness": 2 },
+          "3": { "openness": 3 },
+          "4": { "openness": 4 },
+          "5": { "openness": 5 },
+          "6": { "openness": 6 },
+          "7": { "openness": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-transcendence"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
-      "id": "val-rank",
-      "question": {
-        "content": "Rank the following values:\n\n*Rank these in order of importance to you:*\n\n[[☃ widget 6]]",
+      "id": "val-q6",
+      "purpose": "discovery",
+      "content": {
+        "content": "NATIONAL SECURITY - protection of the nation from enemies, preservation of safety\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "widget 6": {
-            "type": "sorter",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "correct": [
-                "Family and close relationships",
-                "Personal achievement and success",
-                "Service to others and community",
-                "Personal growth and learning",
-                "Security and stability"
-              ],
-              "layout": "vertical",
-              "padding": true
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "conservation": 1 },
+          "2": { "conservation": 2 },
+          "3": { "conservation": 3 },
+          "4": { "conservation": 4 },
+          "5": { "conservation": 5 },
+          "6": { "conservation": 6 },
+          "7": { "conservation": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "priorities"
-        ]
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q7",
+      "purpose": "discovery",
+      "content": {
+        "content": "SOCIAL ORDER - stability of society, maintenance of order and rules\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "conservation": 1 },
+          "2": { "conservation": 2 },
+          "3": { "conservation": 3 },
+          "4": { "conservation": 4 },
+          "5": { "conservation": 5 },
+          "6": { "conservation": 6 },
+          "7": { "conservation": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q8",
+      "purpose": "discovery",
+      "content": {
+        "content": "RESPECT FOR TRADITION - preserving and upholding the customs and practices of culture\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "conservation": 1 },
+          "2": { "conservation": 2 },
+          "3": { "conservation": 3 },
+          "4": { "conservation": 4 },
+          "5": { "conservation": 5 },
+          "6": { "conservation": 6 },
+          "7": { "conservation": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q9",
+      "purpose": "discovery",
+      "content": {
+        "content": "POLITENESS - courtesy, good manners, and respect for social conventions\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "conservation": 1 },
+          "2": { "conservation": 2 },
+          "3": { "conservation": 3 },
+          "4": { "conservation": 4 },
+          "5": { "conservation": 5 },
+          "6": { "conservation": 6 },
+          "7": { "conservation": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q10",
+      "purpose": "discovery",
+      "content": {
+        "content": "SELF-DISCIPLINE - restraint, resistance to temptation, staying within limits\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "conservation": 1 },
+          "2": { "conservation": 2 },
+          "3": { "conservation": 3 },
+          "4": { "conservation": 4 },
+          "5": { "conservation": 5 },
+          "6": { "conservation": 6 },
+          "7": { "conservation": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q11",
+      "purpose": "discovery",
+      "content": {
+        "content": "EQUALITY - equal opportunity and treatment for all people\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-transcendence": 1 },
+          "2": { "self-transcendence": 2 },
+          "3": { "self-transcendence": 3 },
+          "4": { "self-transcendence": 4 },
+          "5": { "self-transcendence": 5 },
+          "6": { "self-transcendence": 6 },
+          "7": { "self-transcendence": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q12",
+      "purpose": "discovery",
+      "content": {
+        "content": "A WORLD AT PEACE - free of war and conflict\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-transcendence": 1 },
+          "2": { "self-transcendence": 2 },
+          "3": { "self-transcendence": 3 },
+          "4": { "self-transcendence": 4 },
+          "5": { "self-transcendence": 5 },
+          "6": { "self-transcendence": 6 },
+          "7": { "self-transcendence": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q13",
+      "purpose": "discovery",
+      "content": {
+        "content": "SOCIAL JUSTICE - correcting injustice, protecting the weak\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-transcendence": 1 },
+          "2": { "self-transcendence": 2 },
+          "3": { "self-transcendence": 3 },
+          "4": { "self-transcendence": 4 },
+          "5": { "self-transcendence": 5 },
+          "6": { "self-transcendence": 6 },
+          "7": { "self-transcendence": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q14",
+      "purpose": "discovery",
+      "content": {
+        "content": "HELPFUL - working for the welfare of others\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-transcendence": 1 },
+          "2": { "self-transcendence": 2 },
+          "3": { "self-transcendence": 3 },
+          "4": { "self-transcendence": 4 },
+          "5": { "self-transcendence": 5 },
+          "6": { "self-transcendence": 6 },
+          "7": { "self-transcendence": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q15",
+      "purpose": "discovery",
+      "content": {
+        "content": "LOYALTY - faithfulness to friends, groups, and obligations\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-transcendence": 1 },
+          "2": { "self-transcendence": 2 },
+          "3": { "self-transcendence": 3 },
+          "4": { "self-transcendence": 4 },
+          "5": { "self-transcendence": 5 },
+          "6": { "self-transcendence": 6 },
+          "7": { "self-transcendence": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q16",
+      "purpose": "discovery",
+      "content": {
+        "content": "AMBITIOUS - working hard, aspiring to achieve more\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-enhancement": 1 },
+          "2": { "self-enhancement": 2 },
+          "3": { "self-enhancement": 3 },
+          "4": { "self-enhancement": 4 },
+          "5": { "self-enhancement": 5 },
+          "6": { "self-enhancement": 6 },
+          "7": { "self-enhancement": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q17",
+      "purpose": "discovery",
+      "content": {
+        "content": "INFLUENTIAL - having impact on people and events\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-enhancement": 1 },
+          "2": { "self-enhancement": 2 },
+          "3": { "self-enhancement": 3 },
+          "4": { "self-enhancement": 4 },
+          "5": { "self-enhancement": 5 },
+          "6": { "self-enhancement": 6 },
+          "7": { "self-enhancement": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q18",
+      "purpose": "discovery",
+      "content": {
+        "content": "CAPABLE - being competent, effective, and getting things done\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-enhancement": 1 },
+          "2": { "self-enhancement": 2 },
+          "3": { "self-enhancement": 3 },
+          "4": { "self-enhancement": 4 },
+          "5": { "self-enhancement": 5 },
+          "6": { "self-enhancement": 6 },
+          "7": { "self-enhancement": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q19",
+      "purpose": "discovery",
+      "content": {
+        "content": "SUCCESSFUL - achieving goals and receiving recognition for achievements\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-enhancement": 1 },
+          "2": { "self-enhancement": 2 },
+          "3": { "self-enhancement": 3 },
+          "4": { "self-enhancement": 4 },
+          "5": { "self-enhancement": 5 },
+          "6": { "self-enhancement": 6 },
+          "7": { "self-enhancement": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
+      }
+    },
+    {
+      "id": "val-q20",
+      "purpose": "discovery",
+      "content": {
+        "content": "AUTHORITY - the right to lead or direct others\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Not Important",
+              "maxLabel": "Supreme Importance"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "self-enhancement": 1 },
+          "2": { "self-enhancement": 2 },
+          "3": { "self-enhancement": 3 },
+          "4": { "self-enhancement": 4 },
+          "5": { "self-enhancement": 5 },
+          "6": { "self-enhancement": 6 },
+          "7": { "self-enhancement": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
+  "contentFormat": "sophia",
   "tags": [
     "assessment",
+    "discovery",
     "values",
     "self-knowledge",
     "psychometric"
   ],
-  "sourcePath": "generated/assessment-values-hierarchy.json",
   "relatedNodeIds": [
     "know-thyself-path"
   ],
   "metadata": {
-    "instrumentType": "discovery",
+    "assessmentType": "discovery",
     "domain": "values",
-    "estimatedTime": "20-30 minutes",
+    "estimatedTime": "15-20 minutes",
     "attestationId": "values-examined",
+    "instrumentId": "values-hierarchy-discovery",
+    "questionCount": 20,
     "validation": {
       "inspired_by": "Schwartz Values Survey",
       "reliability": "Adapted for educational purposes"
     },
-    "sourceFormat": "assessment-json",
-    "migratedAt": "2025-12-26T05:45:22.690Z",
-    "questionCount": 6,
     "interpretation": {
       "method": "profile",
       "dimensions": [
@@ -386,8 +875,9 @@
         "self-transcendence",
         "self-enhancement"
       ]
-    }
+    },
+    "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479929",
-  "updatedAt": "2025-11-28T00:09:03.479932"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }

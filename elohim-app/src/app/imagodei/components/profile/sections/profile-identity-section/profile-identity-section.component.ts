@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, input } from '@angular/core';
 
+// @coverage: 14.3% (2026-02-24)
+
 import {
   type HumanProfile,
   type ProfileReach,

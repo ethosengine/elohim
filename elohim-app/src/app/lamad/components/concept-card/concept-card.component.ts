@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 
-// @coverage: 52.9% (2026-02-05)
+// @coverage: 52.9% (2026-02-24)
 
 import { ContentNode } from '../../models/content-node.model';
 import { RelationshipType } from '../../models/exploration-context.model';

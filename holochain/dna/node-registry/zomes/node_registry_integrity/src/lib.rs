@@ -13,6 +13,7 @@
 //! - Opt-in-by-default participation ("organ donation" model)
 
 use hdi::prelude::*;
+use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // Constants
@@ -40,6 +41,9 @@ pub const STEWARD_TIERS: [&str; 4] = [
     "steward",   // Tier 3: Significant commitment
     "pioneer",   // Tier 4: Network backbone
 ];
+
+/// Maximum shard index for 4+3 Reed-Solomon (7 shards, indices 0-6)
+pub const MAX_SHARD_INDEX: u32 = 6;
 
 // =============================================================================
 // Node Registration
@@ -168,6 +172,44 @@ pub struct StringAnchor {
 }
 
 // =============================================================================
+// Recovery Protocol: Shard Assignment
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum ShardStatus {
+    Active,
+    Stale,
+    Failed,
+    Migrating,
+    Reconstructing,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum ShardingStrategy {
+    Geographic,
+    TrustTier,
+    FamilyCluster,
+    Manual,
+}
+
+/// Tracks which custodian holds which shard of a Reed-Solomon encoded blob
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ShardAssignment {
+    pub assignment_hash: Option<String>, // Self-reference for updates
+    pub content_hash: String,
+    pub custodian_did: String,
+    pub shard_index: u32, // 0-6 for a 4+3 RS encoding
+    pub strategy: ShardingStrategy,
+    pub status: ShardStatus,
+    pub verified_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
 // Entry Types Enum
 // =============================================================================
 
@@ -179,6 +221,7 @@ pub enum EntryTypes {
     HealthAttestation(HealthAttestation),
     CustodianAssignment(CustodianAssignment),
     StringAnchor(StringAnchor),
+    ShardAssignment(ShardAssignment),
 }
 
 // =============================================================================
@@ -201,6 +244,11 @@ pub enum LinkTypes {
     // Custodian assignments
     ContentToAssignment,       // Anchor(content_id) -> CustodianAssignment
     NodeToAssignment,          // NodeRegistration -> CustodianAssignment (what node custodies)
+
+    // Shard assignments
+    ContentToShardAssignment,   // Anchor(content_hash) -> ShardAssignment
+    CustodianToShardAssignment, // Anchor(custodian_did) -> ShardAssignment
+    ShardIndexToAssignment,     // Anchor(content_hash:shard_index) -> ShardAssignment
 }
 
 // =============================================================================
@@ -209,21 +257,79 @@ pub enum LinkTypes {
 
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    // Simplified validation - accept all entries for now
-    // TODO: Implement proper validation in production:
-    // - Verify signatures match agent keys
-    // - Ensure reasonable capacity values (no overflow attacks)
-    // - Validate timestamps are recent
-    // - Validate status/tier/strategy values against constants
-    // - Prevent self-attestation in HealthAttestation
-    // - Verify quorum votes in CustodianAssignment
-
-    match op {
-        Op::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
-        Op::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        Op::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
-        Op::RegisterCreateLink(_) => Ok(ValidateCallbackResult::Valid),
-        Op::RegisterDeleteLink(_) => Ok(ValidateCallbackResult::Valid),
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
+            OpEntry::UpdateEntry { app_entry, .. } => validate_create_entry(&app_entry),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+        // TODO: Add link validation (e.g., verify link targets are valid entry types)
+        FlatOp::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
+}
+
+fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
+    match app_entry {
+        EntryTypes::ShardAssignment(assignment) => validate_shard_assignment(assignment),
+        // TODO: Add validation for NodeRegistration, NodeHeartbeat,
+        // HealthAttestation, CustodianAssignment
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_shard_assignment(
+    assignment: &ShardAssignment,
+) -> ExternResult<ValidateCallbackResult> {
+    if assignment.content_hash.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ShardAssignment content_hash cannot be empty".to_string(),
+        ));
+    }
+
+    if assignment.custodian_did.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ShardAssignment custodian_did cannot be empty".to_string(),
+        ));
+    }
+
+    if assignment.shard_index > MAX_SHARD_INDEX {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "ShardAssignment shard_index {} exceeds maximum {} (4+3 RS encoding)",
+                assignment.shard_index, MAX_SHARD_INDEX
+            ),
+        ));
+    }
+
+    if assignment.created_at.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ShardAssignment created_at cannot be empty".to_string(),
+        ));
+    }
+
+    if assignment.updated_at.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ShardAssignment updated_at cannot be empty".to_string(),
+        ));
+    }
+
+    if let Some(ref verified) = assignment.verified_at {
+        if verified.is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "ShardAssignment verified_at must not be empty when present".to_string(),
+            ));
+        }
+    }
+
+    if let Some(ref hash) = assignment.assignment_hash {
+        if hash.is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "ShardAssignment assignment_hash must not be empty when present".to_string(),
+            ));
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
 }

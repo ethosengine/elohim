@@ -13,9 +13,9 @@
  * - Auto-create TransactionRules from high-confidence patterns
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
-// @coverage: 15.0% (2026-02-05)
+// @coverage: 15.0% (2026-02-24)
 
 import { map, catchError } from 'rxjs/operators';
 
@@ -49,7 +49,9 @@ export class AICategorizationService {
   private readonly corrections: CorrectionRecord[] = [];
   private readonly merchantPatterns = new Map<string, { category: string; confidence: number }>();
 
-  constructor(private readonly elohimStub: ElohimStubService) {
+  private readonly elohimStub = inject(ElohimStubService);
+
+  constructor() {
     this.initializeDefaultPatterns();
   }
 

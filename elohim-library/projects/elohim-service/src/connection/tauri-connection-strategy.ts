@@ -336,7 +336,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
   getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string {
     const storageUrl = config.storageUrl || `http://localhost:${DEFAULT_STORAGE_PORT}`;
-    return `${storageUrl}/store/${encodeURIComponent(blobHash)}`;
+    return `${storageUrl}/blob/${encodeURIComponent(blobHash)}`;
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {
