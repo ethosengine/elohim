@@ -111,13 +111,13 @@ spec:
                     operator: In
                     values:
                       - operations
-            - weight: 60
+            - weight: 70
               preference:
                 matchExpressions:
                   - key: node-type
                     operator: In
                     values:
-                      - compute
+                      - performance
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
