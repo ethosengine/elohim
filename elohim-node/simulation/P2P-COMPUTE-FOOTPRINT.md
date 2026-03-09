@@ -107,6 +107,104 @@ Deploy 3 DNA versions with migration bridge zomes.
 
 **Tests**: forward/backward compatibility, cross-version reads, schema coexistence.
 
+## Phase 1 Lightweight Testnet (No Docker, No Conductors)
+
+Phase 1 skips Holochain conductors entirely and tests elohim-node's Automerge CRDT
+sync layer, cluster discovery, pod orchestration, and network partition behavior.
+
+### Why Process-Per-Node (Not Docker)
+
+Each elohim-node is a single Rust async binary: ~50-100 MB RAM idle.
+20 processes on loopback use ~1-2 GB total. Docker adds:
+- ~10-20 MB overhead per container (cgroups, overlay fs)
+- Network namespace complexity (mDNS needs bridge config)
+- Image build time on every change
+
+For Phase 1 testing, **20 bare processes with different configs** is simpler,
+faster, and uses fewer resources than 20 containers.
+
+### What Makes Each Node Unique
+
+Only 3 things differ between nodes:
+
+| Parameter | How It Varies | Effect |
+|-----------|--------------|--------|
+| `data_dir` | `/tmp/testnet/node-N/` | Separate keypair, documents, blobs |
+| `listen_addrs` | `/ip4/127.0.0.1/tcp/400N` | No port conflicts |
+| `api.http_port` | `808N` | Separate dashboards |
+
+Everything else (mDNS, Kademlia, sync protocol) works identically on
+loopback as it does across a real network. libp2p doesn't distinguish.
+
+### Resource Estimates (Phase 1, elohim-node only)
+
+| Nodes | RAM | CPU (idle) | CPU (sync storm) | Disk |
+|-------|-----|-----------|-------------------|------|
+| 5 | ~500 MB | <1 core | 2-4 cores | 5 GB |
+| 10 | ~1 GB | <2 cores | 4-8 cores | 10 GB |
+| 20 | ~2 GB | <4 cores | 8-16 cores | 20 GB |
+
+A 16 GB / 8-core box runs 20 Phase 1 nodes comfortably.
+
+### Topology Options
+
+**Flat mesh** (all nodes discover each other via mDNS on loopback):
+```
+20 nodes → all on 127.0.0.1, mDNS discovers all 19 peers
+Good for: sync convergence, CRDT correctness, pod decision-making
+Bad for: realistic latency, trust topology testing
+```
+
+**Multi-cluster** (4 families × 5 nodes, mDNS per cluster, bootstrap across):
+```
+Family A: nodes 1-5, cluster_name = "family-a"
+Family B: nodes 6-10, cluster_name = "family-b"
+Family C: nodes 11-15, cluster_name = "family-c"
+Family D: nodes 16-20, cluster_name = "family-d"
+
+Intra-cluster: mDNS discovery (instant)
+Cross-cluster: bootstrap_nodes pointing to each family's primary
+```
+
+Multi-cluster requires network namespaces or Docker to isolate mDNS.
+The `spawn-testnet.sh` script supports both modes.
+
+### Adding Network Realism (tc netem)
+
+On Linux, `tc` can add per-port latency/loss on loopback:
+
+```bash
+# Add 50ms latency to node-5's traffic
+tc qdisc add dev lo root handle 1: prio
+tc qdisc add dev lo parent 1:3 handle 30: netem delay 50ms 10ms
+tc filter add dev lo parent 1:0 protocol ip u32 \
+  match ip dport 4005 0xffff flowid 1:3
+```
+
+The spawn script's `--netem` flag automates this (requires root/sudo).
+
+### Usage
+
+```bash
+# Quick: 5 nodes, flat mesh
+./spawn-testnet.sh start 5
+
+# Full: 20 nodes, 4 families
+./spawn-testnet.sh start 20 --families 4
+
+# Check status
+./spawn-testnet.sh status
+
+# Simulate partition: disconnect node-5
+./spawn-testnet.sh partition 5
+
+# Heal
+./spawn-testnet.sh heal 5
+
+# Stop everything
+./spawn-testnet.sh stop
+```
+
 ## What Exists vs. What's Missing
 
 ### Exists
@@ -115,6 +213,7 @@ Deploy 3 DNA versions with migration bridge zomes.
 - Sync coordinator with stream positions
 - 27 humans fully modeled with relationships, consent, and red-team personas
 - Reed-Solomon blob sharding (4+3) in storage
+- Phase 1 lightweight testnet scripts (spawn-testnet.sh, gen-configs.sh)
 
 ### Missing
 - Per-agent seeding script (keypair generation + per-conductor WebSocket calls)
