@@ -97,7 +97,7 @@ export class StewardshipDashboardComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    this.loadPortfolio();
+    void this.loadPortfolio();
   }
 
   // ===========================================================================
@@ -135,7 +135,7 @@ export class StewardshipDashboardComponent implements OnInit {
    * Refresh portfolio data.
    */
   refresh(): void {
-    this.loadPortfolio();
+    void this.loadPortfolio();
   }
 
   // ===========================================================================
