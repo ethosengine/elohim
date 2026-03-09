@@ -12,6 +12,61 @@ Feature: Persona Testnet — 20 Humans on One Box
     Given a persona testnet is running with 20 humans in 4 clusters
     And compute budget tracking is active
 
+  # ─── Graduated Scaling (1→5 conductors) ──────────────────────────────────
+
+  @scaling @compute
+  Scenario: Step 1 — Single conductor seeds Matthew's stewardship content
+    Given 1 conductor is running for "Matthew"
+    And content is filtered by stewardedBy for "human-matthew-manager"
+    When genesis content is seeded to Matthew's conductor
+    Then Matthew's conductor has content where he is highest-affinity steward
+    And baseline compute is measured
+      | metric | unit        |
+      | cpu    | millicores  |
+      | memory | megabytes   |
+      | time   | seconds     |
+    And compute usage is recorded as shefa EconomicEvent
+
+  @scaling @compute
+  Scenario: Step 2 — Household replication between Matthew and Susan
+    Given 2 conductors are running for "Matthew" and "Susan"
+    And each conductor is seeded with its stewardship content
+    When household replication activates via spouse relationship
+    Then Susan can see Matthew's content at neighborhood reach or above
+    And Susan cannot see Matthew's private-reach content
+    And Matthew can see Susan's content at neighborhood reach or above
+    And compute for 2 conductors is within budget
+      | resource | budget | unit       |
+      | cpu      | 2000   | millicores |
+      | memory   | 4000   | megabytes  |
+
+  @scaling @compute
+  Scenario: Step 3 — Cross-cluster bridge to Pastor Pete
+    Given 3 conductors are running for "Matthew", "Susan", and "Pastor Pete"
+    And each conductor is seeded with its stewardship content
+    When cross-cluster discovery activates via congregation_member relationship
+    Then Pastor Pete can see community-reach content from Matthew's household
+    And Pastor Pete cannot see family-private content
+    And content replication follows trust topology not bulk access
+    And compute for 3 conductors is within budget
+      | resource | budget | unit       |
+      | cpu      | 3000   | millicores |
+      | memory   | 6000   | megabytes  |
+
+  @scaling @compute
+  Scenario: Step 5 — Five conductors with multi-hop content discovery
+    Given 5 conductors are running for "Matthew", "Susan", "Pastor Pete", "Timothy", and "Frank"
+    And each conductor is seeded with its stewardship content
+    When all conductors have discovered their peers
+    Then Timothy sees learning content via Susan's learning_partner bridge
+    And Frank's economy content is NOT directly visible to Matthew
+    And content discovery paths match the relationship graph
+    And compute for 5 conductors is within budget
+      | resource | budget | unit       |
+      | cpu      | 5000   | millicores |
+      | memory   | 10000  | megabytes  |
+    And per-conductor compute is recorded in shefa vocabulary
+
   # ─── Cluster Formation ──────────────────────────────────────────────────
 
   Scenario: Matthew's household discovers each other
