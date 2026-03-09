@@ -1,0 +1,217 @@
+{
+  "_comment": "Maps 20 genesis humans to testnet nodes, grouped by trust topology.",
+  "_source": "Derived from genesis/data/lamad/content/humans/ and graph/human-relationships.json",
+  "_excluded": "Red-team (Charlie, Sam, Dr. Dolittle, Tiffany, Renold), Traveler, Matthew Dowell (operator), Janice (no JSON yet)",
+  "clusters": [
+    {
+      "name": "matthews-household",
+      "description": "Core family + close workplace. Intimate/trusted relationships. Same LAN.",
+      "trustFloor": "trusted",
+      "personas": [
+        {
+          "nodeIndex": 1,
+          "humanId": "human-matthew-manager",
+          "displayName": "Matthew",
+          "category": "core-family",
+          "role": "cluster-primary",
+          "designIntent": "Founder persona. Hub node with most connections. Tests network centrality."
+        },
+        {
+          "nodeIndex": 2,
+          "humanId": "human-susan-spouse",
+          "displayName": "Susan",
+          "category": "core-family",
+          "role": "cluster-member",
+          "designIntent": "Spouse. Cross-cluster bridge to economy (Georgina) and learning (Timothy)."
+        },
+        {
+          "nodeIndex": 3,
+          "humanId": "human-sammy-son",
+          "displayName": "Sammy",
+          "category": "core-family",
+          "role": "cluster-member",
+          "designIntent": "Minor with guardians. Tests guardian-consent flows and restricted reach."
+        },
+        {
+          "nodeIndex": 4,
+          "humanId": "human-gertrude-grandma",
+          "displayName": "Gertrude",
+          "category": "core-family",
+          "role": "cluster-member",
+          "designIntent": "Elder. Lower trust connection count. Tests sparse-peer sync."
+        },
+        {
+          "nodeIndex": 5,
+          "humanId": "human-dan-developer",
+          "displayName": "Dan",
+          "category": "workplace",
+          "role": "cluster-member",
+          "designIntent": "Coworker on same LAN. Tests org-scoped data replication."
+        }
+      ]
+    },
+    {
+      "name": "faith-community",
+      "description": "Congregation + learning network. Trusted/connection relationships. Shared affinity.",
+      "trustFloor": "connection",
+      "personas": [
+        {
+          "nodeIndex": 6,
+          "humanId": "human-pete-pastor",
+          "displayName": "Pastor Pete",
+          "category": "affinity",
+          "role": "cluster-primary",
+          "designIntent": "Community hub. Connected to 6 humans across 3 clusters. Tests high-degree sync."
+        },
+        {
+          "nodeIndex": 7,
+          "humanId": "human-timothy-tutor",
+          "displayName": "Timothy",
+          "category": "affinity",
+          "role": "cluster-member",
+          "designIntent": "Tutor. Learning partner (Susan) + mentee (Sammy). Cross-cluster bridge."
+        },
+        {
+          "nodeIndex": 8,
+          "humanId": "human-tommy-teacher",
+          "displayName": "Tommy",
+          "category": "affinity",
+          "role": "cluster-member",
+          "designIntent": "Teacher. Workplace relationship (Janice, not in sim). Tests partial graph."
+        },
+        {
+          "nodeIndex": 9,
+          "humanId": "human-meriadoc-moneybags",
+          "displayName": "Meriadoc",
+          "category": "affinity",
+          "role": "cluster-member",
+          "designIntent": "Wealthy patron. Network connections to Matthew + Pete. Tests resource asymmetry."
+        },
+        {
+          "nodeIndex": 10,
+          "humanId": "human-pam-polarized",
+          "displayName": "Pam",
+          "category": "community",
+          "role": "cluster-member",
+          "designIntent": "Polarizing views. Congregation member + neighbor. Tests content filtering."
+        }
+      ]
+    },
+    {
+      "name": "local-economy",
+      "description": "Business partners and workers. Connection/trusted relationships. Economic flows.",
+      "trustFloor": "connection",
+      "personas": [
+        {
+          "nodeIndex": 11,
+          "humanId": "human-frank-farmer",
+          "displayName": "Frank",
+          "category": "local-economy",
+          "role": "cluster-primary",
+          "designIntent": "Producer. Business partner (Georgina, Bub). Tests supply-chain data flows."
+        },
+        {
+          "nodeIndex": 12,
+          "humanId": "human-georgina-grocer",
+          "displayName": "Georgina",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Retailer. Cross-cluster bridge to Susan (community_member). Tests economic events."
+        },
+        {
+          "nodeIndex": 13,
+          "humanId": "human-bub-builder",
+          "displayName": "Bub",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Builder. 4 relationships including cross-cluster (Pete). Highest economy-cluster degree."
+        },
+        {
+          "nodeIndex": 14,
+          "humanId": "human-manny-manufacturer",
+          "displayName": "Manny",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Manufacturer. Single business_partner link (Bub). Tests low-connectivity peer."
+        },
+        {
+          "nodeIndex": 15,
+          "humanId": "human-lenny-lineworker",
+          "displayName": "Lenny",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Worker. Acquaintance (Bub) + congregation (Pete). Cross-cluster bridge."
+        }
+      ]
+    },
+    {
+      "name": "extended-network",
+      "description": "Neighbors, newcomers, gig economy. Recognition/connection relationships. Edge of graph.",
+      "trustFloor": "recognition",
+      "personas": [
+        {
+          "nodeIndex": 16,
+          "humanId": "human-nancy-neighbor",
+          "displayName": "Nancy",
+          "category": "community",
+          "role": "cluster-primary",
+          "designIntent": "Neighbor. Connected to Matthew + Pam. Tests neighborhood-scoped replication."
+        },
+        {
+          "nodeIndex": 17,
+          "humanId": "human-mary-migrant",
+          "displayName": "Maria",
+          "category": "newcomer",
+          "role": "cluster-member",
+          "designIntent": "Newcomer. No existing relationships. Tests cold-start peer discovery."
+        },
+        {
+          "nodeIndex": 18,
+          "humanId": "human-ronald-refugee",
+          "displayName": "Ronald",
+          "category": "newcomer",
+          "role": "cluster-member",
+          "designIntent": "Refugee. Accessibility needs (translation). Tests i18n + foreign credential flows."
+        },
+        {
+          "nodeIndex": 19,
+          "humanId": "human-ginny-gigworker",
+          "displayName": "Ginny",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Gig worker. Single network_connection (Mary miner). Tests transient peer."
+        },
+        {
+          "nodeIndex": 20,
+          "humanId": "human-mary-miner",
+          "displayName": "Mary",
+          "category": "local-economy",
+          "role": "cluster-member",
+          "designIntent": "Miner. Single network_connection (Ginny). Tests resource-heavy compute node."
+        }
+      ]
+    }
+  ],
+  "crossClusterBridges": [
+    { "from": "human-matthew-manager", "to": "human-pete-pastor", "via": "congregation_member" },
+    { "from": "human-susan-spouse", "to": "human-timothy-tutor", "via": "learning_partner" },
+    { "from": "human-sammy-son", "to": "human-timothy-tutor", "via": "mentee" },
+    { "from": "human-matthew-manager", "to": "human-nancy-neighbor", "via": "neighbor" },
+    { "from": "human-georgina-grocer", "to": "human-susan-spouse", "via": "community_member" },
+    { "from": "human-bub-builder", "to": "human-pete-pastor", "via": "congregation_member" },
+    { "from": "human-lenny-lineworker", "to": "human-pete-pastor", "via": "congregation_member" },
+    { "from": "human-pam-polarized", "to": "human-nancy-neighbor", "via": "neighbor" },
+    { "from": "human-meriadoc-moneybags", "to": "human-matthew-manager", "via": "network_connection" }
+  ],
+  "computeBudget": {
+    "_comment": "Phase 1 budget using shefa vocabulary. Tracked per-cluster and per-node.",
+    "unit": "cpu-second",
+    "totalBudget": 7200,
+    "perClusterBudget": 1800,
+    "perNodeBudget": 360,
+    "memoryUnit": "megabyte",
+    "perNodeMemoryLimit": 150,
+    "totalMemoryLimit": 3000,
+    "trackingInterval": "10s"
+  }
+}
