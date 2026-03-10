@@ -251,6 +251,64 @@ pub fn update_commitment_state(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated commitment".into()))
 }
 
+/// Upsert a commitment with DHT anchor hash — insert or update anchor if it already exists.
+/// Used by REA projection signal handler to anchor commitments onto the DHT.
+pub fn upsert_with_anchor(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: CreateReaCommitmentInput,
+    dht_anchor_hash: Option<&str>,
+) -> Result<ReaCommitment, StorageError> {
+    let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    let existing = get_commitment(conn, ctx, &id)?;
+
+    if existing.is_some() {
+        // Update dht_anchor_hash on existing record
+        diesel::update(
+            rea_commitments::table
+                .filter(rea_commitments::app_id.eq(&ctx.app_id))
+                .filter(rea_commitments::id.eq(&id)),
+        )
+        .set(rea_commitments::dht_anchor_hash.eq(dht_anchor_hash))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+    } else {
+        let new = NewReaCommitment {
+            id: &id,
+            app_id: &ctx.app_id,
+            action: &input.action,
+            provider: &input.provider,
+            receiver: &input.receiver,
+            resource_conforms_to: input.resource_conforms_to.as_deref(),
+            resource_classified_as: input.resource_classified_as.as_deref(),
+            resource_quantity_value: input.resource_quantity_value,
+            resource_quantity_unit: input.resource_quantity_unit.as_deref(),
+            effort_quantity_value: input.effort_quantity_value,
+            effort_quantity_unit: input.effort_quantity_unit.as_deref(),
+            has_beginning: input.has_beginning.as_deref(),
+            has_end: input.has_end.as_deref(),
+            due: input.due.as_deref(),
+            clause_of: input.clause_of.as_deref(),
+            in_scope_of: input.in_scope_of.as_deref(),
+            medium_of_exchange_id: input.medium_of_exchange_id.as_deref(),
+            state: "proposed",
+            finished: 0,
+            note: input.note.as_deref(),
+            metadata_json: input.metadata_json.as_deref(),
+            dht_anchor_hash,
+        };
+
+        diesel::insert_into(rea_commitments::table)
+            .values(&new)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    }
+
+    get_commitment(conn, ctx, &id)?
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve upserted commitment".into()))
+}
+
 // ============================================================================
 // Stats
 // ============================================================================

@@ -577,6 +577,81 @@ pub fn update_event_state(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated event".into()))
 }
 
+/// Upsert an economic event with DHT anchor hash — insert or update anchor if it already exists.
+/// Used by REA projection signal handler to anchor events onto the DHT.
+pub fn upsert_with_anchor(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: CreateEconomicEventInput,
+    dht_anchor_hash: Option<&str>,
+) -> Result<EconomicEvent, StorageError> {
+    let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    let existing = get_economic_event(conn, ctx, &id)?;
+
+    if existing.is_some() {
+        // Update dht_anchor_hash on existing record
+        diesel::update(
+            economic_events::table
+                .filter(economic_events::app_id.eq(&ctx.app_id))
+                .filter(economic_events::id.eq(&id)),
+        )
+        .set(economic_events::dht_anchor_hash.eq(dht_anchor_hash))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
+    } else {
+        // Convert resource_classified_as to JSON
+        let classified_json = if input.resource_classified_as.is_empty() {
+            None
+        } else {
+            Some(
+                serde_json::to_string(&input.resource_classified_as)
+                    .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?,
+            )
+        };
+
+        let point_in_time = input
+            .has_point_in_time
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
+
+        let new_event = NewEconomicEvent {
+            id: &id,
+            app_id: &ctx.app_id,
+            action: &input.action,
+            provider: &input.provider,
+            receiver: &input.receiver,
+            resource_conforms_to: input.resource_conforms_to.as_deref(),
+            resource_inventoried_as: input.resource_inventoried_as.as_deref(),
+            resource_classified_as_json: classified_json.as_deref(),
+            resource_quantity_value: input.resource_quantity_value,
+            resource_quantity_unit: input.resource_quantity_unit.as_deref(),
+            effort_quantity_value: input.effort_quantity_value,
+            effort_quantity_unit: input.effort_quantity_unit.as_deref(),
+            has_point_in_time: &point_in_time,
+            has_duration: input.has_duration.as_deref(),
+            input_of: input.input_of.as_deref(),
+            output_of: input.output_of.as_deref(),
+            lamad_event_type: input.lamad_event_type.as_deref(),
+            content_id: input.content_id.as_deref(),
+            contributor_presence_id: input.contributor_presence_id.as_deref(),
+            path_id: input.path_id.as_deref(),
+            triggered_by: input.triggered_by.as_deref(),
+            state: "recorded",
+            note: input.note.as_deref(),
+            metadata_json: input.metadata_json.as_deref(),
+            dht_anchor_hash,
+        };
+
+        diesel::insert_into(economic_events::table)
+            .values(&new_event)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    }
+
+    get_economic_event(conn, ctx, &id)?
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve upserted event".into()))
+}
+
 // ============================================================================
 // Stats & Aggregations
 // ============================================================================
