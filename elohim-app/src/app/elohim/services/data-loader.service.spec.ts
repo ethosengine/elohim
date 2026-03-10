@@ -6,7 +6,8 @@ import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 import { AgentProgress } from '../models/agent.model';
 import { DataLoaderService } from './data-loader.service';
-import { HolochainContentService } from './holochain-content.service';
+import { GOVERNANCE } from '../interfaces/governance.interface';
+import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';
@@ -17,7 +18,8 @@ import { provideHttpClient } from '@angular/common/http';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
-  let holochainMock: any;
+  let governanceMock: any;
+  let attestationMock: any;
   let idbMock: any;
   let projectionApiMock: any;
   let contentResolverMock: any;
@@ -25,10 +27,18 @@ describe('DataLoaderService', () => {
   let loggerMock: any;
 
   beforeEach(() => {
-    const holochainSpy = {
-      isAvailable: vi.fn(),
-      clearCache: vi.fn(),
-      prefetchRelatedContent: vi.fn(),
+    const governanceSpy = {
+      getGovernanceState: vi.fn().mockResolvedValue(null),
+      queryGovernanceStates: vi.fn().mockResolvedValue([]),
+      queryChallenges: vi.fn().mockResolvedValue([]),
+      queryProposals: vi.fn().mockResolvedValue([]),
+      queryPrecedents: vi.fn().mockResolvedValue([]),
+      queryDiscussions: vi.fn().mockResolvedValue([]),
+    };
+    const attestationSpy = {
+      queryAttestationsForContent: vi.fn().mockResolvedValue([]),
+      queryAttestationsByAttestor: vi.fn().mockResolvedValue([]),
+      getAttestation: vi.fn().mockResolvedValue(null),
     };
     const idbSpy = {
       init: vi.fn(),
@@ -68,7 +78,6 @@ describe('DataLoaderService', () => {
     };
 
     // Setup default return values
-    holochainSpy.isAvailable.mockReturnValue(false);
     idbSpy.init.mockReturnValue(Promise.resolve(false));
     idbSpy.getStats.mockReturnValue(
       Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false })
@@ -102,7 +111,8 @@ describe('DataLoaderService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         DataLoaderService,
-        { provide: HolochainContentService, useValue: holochainSpy },
+        { provide: GOVERNANCE, useValue: governanceSpy },
+        { provide: CONTENT_ATTESTATION, useValue: attestationSpy },
         { provide: IndexedDBCacheService, useValue: idbSpy },
         { provide: ProjectionAPIService, useValue: projectionApiSpy },
         { provide: ContentResolverService, useValue: contentResolverSpy },
@@ -112,7 +122,8 @@ describe('DataLoaderService', () => {
     });
 
     service = TestBed.inject(DataLoaderService);
-    holochainMock = holochainSpy;
+    governanceMock = governanceSpy;
+    attestationMock = attestationSpy;
     idbMock = idbSpy;
     projectionApiMock = projectionApiSpy;
     contentResolverMock = contentResolverSpy;

@@ -46,7 +46,6 @@ import {
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
-import { HolochainContentService, HolochainPathWithSteps } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 
@@ -164,7 +163,6 @@ export class ContentResolverService implements OnDestroy {
   // Injected fetcher services
   private readonly idbCache = inject(IndexedDBCacheService);
   private readonly projectionApi = inject(ProjectionAPIService);
-  private readonly holochainContent = inject(HolochainContentService);
 
   /** Observable resolver service state */
   readonly state$ = this.stateSubject.asObservable();
@@ -642,9 +640,8 @@ export class ContentResolverService implements OnDestroy {
    */
   private isSourceReady(source: SourceInfo): boolean {
     if (source.id === 'conductor') {
-      if (!this.holochainContent.isAvailable()) return false;
-      this.resolver!.setSourceAvailable('conductor', true);
-      return true;
+      // Conductor is deprecated for content resolution — always skip
+      return false;
     }
     return this.resolver!.isSourceAvailable(source.id);
   }
@@ -859,47 +856,6 @@ export class ContentResolverService implements OnDestroy {
     this.resolver?.removeContentLocation(contentId, 'indexeddb');
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     this.idbCache.removeContent(contentId).catch(() => {});
-  }
-
-  /**
-   * Transform Holochain path to LearningPath model.
-   */
-  private transformHolochainPath(hcPath: HolochainPathWithSteps): LearningPath {
-    let chapters: LearningPath['chapters'] | undefined;
-    const metadata = hcPath.path.metadata ?? {};
-    if (metadata && typeof metadata === 'object' && 'chapters' in metadata) {
-      const metadataObj = metadata as Record<string, unknown>;
-      if (Array.isArray(metadataObj['chapters'])) {
-        chapters = metadataObj['chapters'] as LearningPath['chapters'];
-      }
-    }
-
-    return {
-      id: hcPath.path.id,
-      version: hcPath.path.version,
-      title: hcPath.path.title,
-      description: hcPath.path.description,
-      purpose: hcPath.path.purpose ?? '',
-      createdBy: hcPath.path.createdBy,
-      contributors: [],
-      createdAt: hcPath.path.createdAt,
-      updatedAt: hcPath.path.updatedAt,
-      difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
-      estimatedDuration: hcPath.path.estimatedDuration ?? '',
-      tags: hcPath.path.tags,
-      visibility: hcPath.path.visibility as LearningPath['visibility'],
-      chapters,
-      steps: hcPath.steps.map((s, index) => ({
-        order: s.step.orderIndex,
-        stepType: (s.step.stepType || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
-        resourceId: s.step.resourceId,
-        stepTitle: s.step.stepTitle ?? `Step ${index + 1}`,
-        stepNarrative: s.step.stepNarrative ?? '',
-        learningObjectives: [],
-        optional: s.step.isOptional,
-        completionCriteria: [],
-      })),
-    };
   }
 
   // ==========================================================================

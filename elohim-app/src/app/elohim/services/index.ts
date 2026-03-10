@@ -9,7 +9,8 @@
 export { DataLoaderService } from './data-loader.service';
 export { LocalSourceChainService } from './local-source-chain.service';
 export { HolochainClientService } from './holochain-client.service';
-export { HolochainContentService } from './holochain-content.service';
+export { GovernanceApiService } from './governance-api.service';
+export { ContentAttestationApiService } from './content-attestation-api.service';
 export { LearnerBackendApiService } from './learner-backend-api.service';
 
 // Agent & Trust

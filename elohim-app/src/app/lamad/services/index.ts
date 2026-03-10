@@ -79,11 +79,11 @@ export { MasteryStatsService } from './mastery-stats.service';
 export { StewardshipAllocationService } from './stewardship-allocation.service';
 export type { StewardPortfolio, RecognitionDistribution } from './stewardship-allocation.service';
 
-// Contributor dashboard & impact tracking
-export { ContributorService } from './contributor.service';
+// Contributor dashboard & impact tracking (thin HTTP API)
+export { ContributorApiService } from './contributor-api.service';
 
-// Steward economy (credentials, gates, access, revenue)
-export { StewardService } from './steward.service';
+// Steward economy (thin HTTP API)
+export { StewardApiService } from './steward-api.service';
 
 // Scope & Sequence lens (path hierarchy for resource explorer)
 export { ScopeSequenceLensProvider } from './scope-sequence-lens.provider';

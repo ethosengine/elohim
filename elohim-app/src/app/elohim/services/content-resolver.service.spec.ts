@@ -19,7 +19,6 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { ContentResolverService, SourceTier, ResolverStats } from './content-resolver.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
-import { HolochainContentService } from './holochain-content.service';
 import { createConnectionStrategy } from '@elohim/service/connection';
 import { vi, Mock } from 'vitest';
 
@@ -28,7 +27,6 @@ describe('ContentResolverService', () => {
   let idbCacheMock: any;
   let projectionMock: any;
   let holochainMock: any;
-
   const mockContent = {
     id: 'test-content',
     title: 'Test Content',
@@ -80,12 +78,6 @@ describe('ContentResolverService', () => {
       isHealthy: vi.fn(),
       enabled: true,
     };
-    const holochainSpy = {
-      isAvailable: vi.fn(),
-      getContent: vi.fn(),
-      getPathWithSteps: vi.fn(),
-    };
-
     idbSpy.init.mockReturnValue(Promise.resolve(true));
     idbSpy.isAvailable.mockReturnValue(false);
     idbSpy.getContent.mockReturnValue(Promise.resolve(null));
@@ -104,23 +96,23 @@ describe('ContentResolverService', () => {
     projectionSpy.getPathNode.mockReturnValue(of(null));
     projectionSpy.isHealthy.mockReturnValue(Promise.resolve(true));
 
-    holochainSpy.isAvailable.mockReturnValue(true);
-    holochainSpy.getContent.mockReturnValue(of(null));
-    holochainSpy.getPathWithSteps.mockReturnValue(Promise.resolve(null));
-
     TestBed.configureTestingModule({
       providers: [
         ContentResolverService,
         { provide: IndexedDBCacheService, useValue: idbSpy },
         { provide: ProjectionAPIService, useValue: projectionSpy },
-        { provide: HolochainContentService, useValue: holochainSpy },
       ],
     });
 
     service = TestBed.inject(ContentResolverService);
     idbCacheMock = idbSpy;
     projectionMock = projectionSpy;
-    holochainMock = holochainSpy;
+    // Holochain conductor tier removed — stub mock for legacy test assertions
+    holochainMock = {
+      getContent: vi.fn().mockReturnValue(of(null)),
+      getPathWithSteps: vi.fn().mockReturnValue(Promise.resolve(null)),
+      isAvailable: vi.fn().mockReturnValue(false),
+    };
   });
 
   it('should be created', () => {

@@ -8,7 +8,6 @@ import { environment } from '../environments/environment';
 
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
-import { HolochainContentService } from './elohim/services/holochain-content.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
@@ -35,7 +34,6 @@ export class AppComponent implements OnInit, OnDestroy {
   showFloatingToggle = false;
 
   private readonly holochainService = inject(HolochainClientService);
-  private readonly holochainContent = inject(HolochainContentService);
   private readonly blobBootstrap = inject(BlobBootstrapService);
   private readonly authService = inject(AuthService);
   private readonly tauriAuth = inject(TauriAuthService);
@@ -254,12 +252,7 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.holochainService.connect();
 
       if (this.holochainService.isConnected()) {
-        // Connection successful, testing zome availability
-
-        // Test if we can make zome calls (for agent-centric data)
-        await this.holochainContent.testAvailability();
-
-        // Reset retry counter on success
+        // Connection successful - reset retry counter
         this.connectionAttempt = 0;
       }
     } catch {

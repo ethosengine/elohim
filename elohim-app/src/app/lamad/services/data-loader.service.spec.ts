@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
+import { GOVERNANCE } from '@app/elohim/interfaces/governance.interface';
+import { CONTENT_ATTESTATION } from '@app/elohim/interfaces/content-attestation.interface';
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
@@ -51,15 +52,17 @@ describe('DataLoaderService', () => {
 
   beforeEach(() => {
     mockHolochainContent = {
-      getContent: vi.fn(),
-      getContentByType: vi.fn(),
-      getStats: vi.fn(),
-      clearCache: vi.fn(),
-      isAvailable: vi.fn(),
-      getPathIndex: vi.fn(),
-      getPathWithSteps: vi.fn(),
-      // Signal property - callable function that returns availability
-      available: vi.fn().mockReturnValue(true),
+      getGovernanceState: vi.fn().mockResolvedValue(null),
+      queryGovernanceStates: vi.fn().mockResolvedValue([]),
+      queryChallenges: vi.fn().mockResolvedValue([]),
+      queryProposals: vi.fn().mockResolvedValue([]),
+      queryPrecedents: vi.fn().mockResolvedValue([]),
+      queryDiscussions: vi.fn().mockResolvedValue([]),
+    };
+    const mockAttestation = {
+      queryAttestationsForContent: vi.fn().mockResolvedValue([]),
+      queryAttestationsByAttestor: vi.fn().mockResolvedValue([]),
+      getAttestation: vi.fn().mockResolvedValue(null),
     };
 
     mockIndexedDBCache = {
@@ -107,14 +110,6 @@ describe('DataLoaderService', () => {
     mockProjectionApi.getRelated.mockReturnValue(of([]));
     mockProjectionApi.getStats.mockReturnValue(of(null));
     mockProjectionApi.isHealthy.mockReturnValue(of(false));
-
-    // Default mock returns
-    mockHolochainContent.getStats.mockReturnValue(of({ totalCount: 0, byType: {} }));
-    mockHolochainContent.isAvailable.mockReturnValue(true);
-    (mockHolochainContent.getPathIndex as Mock).mockReturnValue(
-      Promise.resolve({ paths: [], totalCount: 0, lastUpdated: '' })
-    );
-    (mockHolochainContent.getPathWithSteps as Mock).mockReturnValue(Promise.resolve(null));
 
     // IndexedDB mock returns (disabled by default to use Holochain)
     mockIndexedDBCache.init.mockReturnValue(Promise.resolve(false));
@@ -173,7 +168,8 @@ describe('DataLoaderService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         DataLoaderService,
-        { provide: HolochainContentService, useValue: mockHolochainContent },
+        { provide: GOVERNANCE, useValue: mockHolochainContent },
+        { provide: CONTENT_ATTESTATION, useValue: mockAttestation },
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
         { provide: ContentResolverService, useValue: mockContentResolver },
@@ -422,9 +418,8 @@ describe('DataLoaderService', () => {
   });
 
   describe('clearCache', () => {
-    it('should clear Holochain content cache', () => {
-      service.clearCache();
-      expect(mockHolochainContent.clearCache).toHaveBeenCalled();
+    it('should clear internal caches without error', () => {
+      expect(() => service.clearCache()).not.toThrow();
     });
   });
 });

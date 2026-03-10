@@ -40,15 +40,12 @@ import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentService } from './content.service';
-import {
-  HolochainContentService,
-  HolochainPathOverview,
-  HolochainAgentEntry,
-  HolochainAttestationEntry,
-  HolochainContentGraph,
-  HolochainContentGraphNode,
-  HolochainContentAttestationEntry,
-} from './holochain-content.service';
+import { GOVERNANCE } from '../interfaces/governance.interface';
+import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
+
+import type { IGovernance } from '../interfaces/governance.interface';
+import type { IContentAttestation } from '../interfaces/content-attestation.interface';
+import type { GovernanceStateView, ChallengeView, DiscussionView } from '@elohim/storage-client/generated';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
@@ -74,16 +71,6 @@ export interface ContentIndex {
 }
 
 /** Mutable index maps accumulated during graph traversal. */
-interface GraphIndexes {
-  nodes: Map<string, ContentNode>;
-  relationships: Map<string, ContentRelationship>;
-  nodesByType: Map<string, Set<string>>;
-  nodesByTag: Map<string, Set<string>>;
-  nodesByCategory: Map<string, Set<string>>;
-  adjacency: Map<string, Set<string>>;
-  reverseAdjacency: Map<string, Set<string>>;
-}
-
 /** Recursive graph node shape from simplified Holochain graph responses. */
 interface GraphNodeData {
   contentId: string;
@@ -255,7 +242,8 @@ export class DataLoaderService {
   /** Structured logger */
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
-  private readonly holochainContent = inject(HolochainContentService);
+  private readonly governance = inject(GOVERNANCE);
+  private readonly attestation = inject(CONTENT_ATTESTATION);
   private readonly idbCache = inject(IndexedDBCacheService);
 
   constructor() {
@@ -288,7 +276,7 @@ export class DataLoaderService {
       // Set source availability
       this.contentResolver.setSourceAvailable('indexeddb', this.idbInitialized);
       this.contentResolver.setSourceAvailable('projection', this.projectionApi.enabled);
-      this.contentResolver.setSourceAvailable('conductor', this.holochainContent.isAvailable());
+      this.contentResolver.setSourceAvailable('conductor', false); // Conductor deprecated for content
 
       this.logger.debug('ContentResolver initialized with sources');
     } catch (err) {
@@ -415,39 +403,6 @@ export class DataLoaderService {
    * Transform path overview to LearningPath model.
    * Returns path with empty steps array - use getPath() for full steps.
    */
-  private transformHolochainPathOverview(hcPath: HolochainPathOverview): LearningPath {
-    // Extract chapters from metadata if available
-    let chapters: LearningPath['chapters'] | undefined;
-    const metadata = hcPath.path.metadata ?? {};
-    if (metadata && typeof metadata === 'object' && 'chapters' in metadata) {
-      const metadataObj = metadata as Record<string, unknown>;
-      if (Array.isArray(metadataObj['chapters'])) {
-        chapters = metadataObj['chapters'] as LearningPath['chapters'];
-      }
-    }
-
-    return {
-      id: hcPath.path.id,
-      version: hcPath.path.version,
-      title: hcPath.path.title,
-      description: hcPath.path.description,
-      purpose: hcPath.path.purpose ?? '',
-      createdBy: hcPath.path.createdBy,
-      contributors: [],
-      createdAt: hcPath.path.createdAt,
-      updatedAt: hcPath.path.updatedAt,
-      difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
-      estimatedDuration: hcPath.path.estimatedDuration ?? '',
-      tags: hcPath.path.tags,
-      visibility: hcPath.path.visibility as LearningPath['visibility'],
-      chapters,
-      // Empty steps - use getPath() for full step data
-      steps: [],
-      // Store step count in metadata for UI display
-      stepCount: hcPath.stepCount,
-    } as LearningPath & { stepCount?: number };
-  }
-
   /**
    * Load a ContentNode by ID.
    * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
@@ -593,8 +548,10 @@ export class DataLoaderService {
       return;
     }
 
-    // Fire and forget - don't block the UI
-    this.holochainContent.prefetchRelatedContent(uncachedIds);
+    // Prefetch via content resolver (projection tier)
+    for (const id of uncachedIds) {
+      this.contentResolver.resolveContent(id).catch(() => undefined);
+    }
   }
 
   /**
@@ -831,21 +788,9 @@ export class DataLoaderService {
   /**
    * Load agent profile from Holochain.
    */
-  getAgent(agentId: string): Observable<Agent | null> {
-    if (!this.holochainContent.isAvailable()) {
-      return of(null);
-    }
-
-    return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
-      map(result => (result ? this.transformHolochainAgent(result.agent) : null)),
-      catchError((err: unknown) => {
-        this.logger.warn('Failed to load agent', {
-          agentId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        return of(null);
-      })
-    );
+  // TODO: Create AgentApiService (thin HTTP client) to replace direct zome calls
+  getAgent(_agentId: string): Observable<Agent | null> {
+    return of(null);
   }
 
   /**
@@ -938,8 +883,7 @@ export class DataLoaderService {
     this.relationshipByNodeCache.clear();
     this.pathIndexCache$ = null;
     this.contentIndexCache$ = null;
-    // Also clear Holochain content cache
-    this.holochainContent.clearCache();
+    // Note: Holochain content cache removed — content served from projection tier
 
     // Optionally clear IndexedDB persistent cache
     if (includeIndexedDB && this.idbInitialized) {
@@ -1029,22 +973,9 @@ export class DataLoaderService {
    * Use getAgentAttestations() for agent credentials.
    */
   getAttestations(): Observable<ContentAttestation[]> {
-    if (!this.holochainContent.isAvailable()) {
-      this.attestationCache$ ??= of([]);
-      return this.attestationCache$;
-    }
-
-    this.attestationCache$ ??= defer(() =>
-      from(this.holochainContent.queryContentAttestations({ status: 'active' }))
-    ).pipe(
-      map(results =>
-        results.map(r => this.transformHolochainContentAttestation(r.contentAttestation))
-      ),
-      shareReplay(1),
-      catchError(_err => {
-        return of([]);
-      })
-    );
+    // TODO: IContentAttestation doesn't yet support queryAll with status filter.
+    // For now, return empty. Wire up when attestation list endpoint is added.
+    this.attestationCache$ ??= of([]);
     return this.attestationCache$;
   }
 
@@ -1054,79 +985,11 @@ export class DataLoaderService {
    * These are different from content attestations - they represent
    * achievements earned by agents (domain-mastery, path-completion, etc.)
    */
-  getAgentAttestations(agentId?: string, category?: string): Observable<AgentAttestation[]> {
-    if (!this.holochainContent.isAvailable()) {
-      return of([]);
-    }
-
-    return defer(() =>
-      from(
-        this.holochainContent.getAttestations({
-          agentId: agentId,
-          category: category,
-        })
-      )
-    ).pipe(
-      map(results => results.map(r => this.transformHolochainAttestation(r.attestation))),
-      catchError(_err => {
-        return of([]);
-      })
-    );
+  // TODO: Create AgentAttestationApiService for agent credential queries
+  getAgentAttestations(_agentId?: string, _category?: string): Observable<AgentAttestation[]> {
+    return of([]);
   }
 
-  /**
-   * Transform Holochain attestation entry to frontend AgentAttestation model.
-   */
-  private transformHolochainAttestation(hcAtt: HolochainAttestationEntry): AgentAttestation {
-    const earnedVia = (hcAtt.earnedVia ?? {}) as AgentAttestation['earnedVia'];
-
-    return {
-      id: hcAtt.id,
-      agentId: hcAtt.agentId,
-      category: hcAtt.category as AgentAttestation['category'],
-      attestationType: hcAtt.attestationType,
-      displayName: hcAtt.displayName,
-      description: hcAtt.description,
-      iconUrl: hcAtt.iconUrl ?? undefined,
-      tier: hcAtt.tier as AgentAttestation['tier'],
-      earnedVia,
-      issuedAt: hcAtt.issuedAt,
-      issuedBy: hcAtt.issuedBy,
-      expiresAt: hcAtt.expiresAt ?? undefined,
-      proof: hcAtt.proof ?? undefined,
-    };
-  }
-
-  /**
-   * Transform Holochain content attestation entry to frontend ContentAttestation model.
-   */
-  private transformHolochainContentAttestation(
-    hcAtt: HolochainContentAttestationEntry
-  ): ContentAttestation {
-    const grantedBy = hcAtt.grantedBy ?? {
-      type: 'system',
-      grantorId: 'unknown',
-    };
-    const revocation = hcAtt.revocation ?? undefined;
-    const evidence = hcAtt.evidence ?? undefined;
-    const scope = hcAtt.scope ?? undefined;
-    const metadata = (hcAtt.metadata ?? {}) as ContentAttestation['metadata'];
-
-    return {
-      id: hcAtt.id,
-      contentId: hcAtt.contentId,
-      attestationType: hcAtt.attestationType as ContentAttestation['attestationType'],
-      reachGranted: hcAtt.reachGranted as ContentAttestation['reachGranted'],
-      grantedBy,
-      grantedAt: hcAtt.grantedAt,
-      expiresAt: hcAtt.expiresAt ?? undefined,
-      status: hcAtt.status as ContentAttestation['status'],
-      revocation,
-      evidence,
-      scope,
-      metadata,
-    };
-  }
 
   /**
    * Get attestations for a specific content node.
@@ -1138,15 +1001,18 @@ export class DataLoaderService {
       return of(this.attestationsByContentCache.get(contentId)!);
     }
 
-    if (!this.holochainContent.isAvailable()) {
-      return of([]);
-    }
-
-    return defer(() => from(this.holochainContent.getAttestationsForContent(contentId))).pipe(
+    return defer(() => from(this.attestation.queryAttestationsForContent(contentId))).pipe(
       map(results => {
-        const attestations = results.map(r =>
-          this.transformHolochainContentAttestation(r.contentAttestation)
-        );
+        const attestations: ContentAttestation[] = results.map(r => ({
+          id: r.id,
+          contentId: r.contentId,
+          attestationType: r.attestationType as ContentAttestation['attestationType'],
+          reachGranted: (r as Record<string, unknown>)['reachGranted'] as ContentAttestation['reachGranted'] ?? 'commons',
+          grantedBy: (r as Record<string, unknown>)['grantedBy'] as ContentAttestation['grantedBy'] ?? { type: 'system', grantorId: 'unknown' },
+          grantedAt: r.createdAt,
+          status: (r.isRevoked ? 'revoked' : 'active') as ContentAttestation['status'],
+          metadata: {} as ContentAttestation['metadata'],
+        }));
         this.attestationsByContentCache.set(contentId, attestations);
         return attestations;
       }),
@@ -1168,37 +1034,13 @@ export class DataLoaderService {
   /**
    * Load the agent index (all known agents) from Holochain.
    */
+  // TODO: Create AgentApiService (thin HTTP client) to replace direct zome calls
   getAgentIndex(): Observable<{ agents: Agent[] }> {
-    if (!this.holochainContent.isAvailable()) {
-      return of({ agents: [] });
-    }
-
-    return defer(() => from(this.holochainContent.queryAgents({}))).pipe(
-      map(results => ({
-        agents: results.map(r => this.transformHolochainAgent(r.agent)),
-      })),
+    return of({ agents: [] }).pipe(
       catchError(_err => {
         return of({ agents: [] });
       })
     );
-  }
-
-  /**
-   * Transform Holochain agent entry to frontend Agent model.
-   */
-  private transformHolochainAgent(hcAgent: HolochainAgentEntry): Agent {
-    return {
-      id: hcAgent.id,
-      displayName: hcAgent.displayName,
-      type: hcAgent.agentType as Agent['type'],
-      bio: hcAgent.bio ?? undefined,
-      avatar: hcAgent.avatar ?? undefined,
-      visibility: hcAgent.visibility as Agent['visibility'],
-      createdAt: hcAgent.createdAt,
-      updatedAt: hcAgent.updatedAt,
-      did: hcAgent.did ?? undefined,
-      activityPubType: hcAgent.activityPubType as Agent['activityPubType'],
-    };
   }
 
   // =========================================================================
@@ -1209,7 +1051,7 @@ export class DataLoaderService {
    * Load the knowledge map index from content service.
    */
   getKnowledgeMapIndex(): Observable<KnowledgeMapIndex> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
@@ -1229,7 +1071,7 @@ export class DataLoaderService {
    * Load a specific knowledge map from content service.
    */
   getKnowledgeMap(mapId: string): Observable<KnowledgeMap | null> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
@@ -1371,7 +1213,7 @@ export class DataLoaderService {
    * Load a specific path extension from content service.
    */
   getPathExtension(extensionId: string): Observable<PathExtension | null> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
@@ -1531,7 +1373,7 @@ export class DataLoaderService {
    */
   getGraph(): Observable<ContentGraph> {
     if (!this.graphCache$) {
-      if (this.holochainContent.isAvailable()) {
+      if (true) { // Content graph served from projection tier
         // Build graph from Holochain relationships
         this.graphCache$ = this.buildGraphFromHolochain().pipe(
           shareReplay(1),
@@ -1593,7 +1435,7 @@ export class DataLoaderService {
     contentId: string,
     direction: 'outgoing' | 'incoming' | 'both'
   ): Observable<ContentRelationship[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1766,178 +1608,6 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain ContentGraph to frontend ContentGraph structure.
-   */
-  private transformHolochainGraph(hcGraph: HolochainContentGraph): ContentGraph {
-    const nodes = new Map<string, ContentNode>();
-    const relationships = new Map<string, ContentRelationship>();
-    const nodesByType = new Map<string, Set<string>>();
-    const nodesByTag = new Map<string, Set<string>>();
-    const nodesByCategory = new Map<string, Set<string>>();
-    const adjacency = new Map<string, Set<string>>();
-    const reverseAdjacency = new Map<string, Set<string>>();
-
-    // Add root node if present
-    if (hcGraph.root) {
-      const rootNode = this.transformHolochainContentToNode(hcGraph.root);
-      this.addNodeToGraphIndexes(
-        rootNode,
-        nodes,
-        nodesByType,
-        nodesByTag,
-        nodesByCategory,
-        adjacency,
-        reverseAdjacency
-      );
-    }
-
-    // Process related nodes recursively
-    const indexes: GraphIndexes = {
-      nodes,
-      relationships,
-      nodesByType,
-      nodesByTag,
-      nodesByCategory,
-      adjacency,
-      reverseAdjacency,
-    };
-    this.processHolochainGraphNodes(hcGraph.related, indexes, hcGraph.root?.content.id);
-
-    return {
-      nodes,
-      relationships,
-      nodesByType,
-      nodesByTag,
-      nodesByCategory,
-      adjacency,
-      reverseAdjacency,
-      metadata: {
-        nodeCount: hcGraph.totalNodes,
-        relationshipCount: relationships.size,
-        lastUpdated: new Date().toISOString(),
-        version: '1.0.0',
-      },
-    };
-  }
-
-  /**
-   * Transform HolochainContentOutput to ContentNode.
-   */
-  private transformHolochainContentToNode(output: {
-    content: {
-      id: string;
-      contentType: string;
-      title: string;
-      description: string;
-      content: string;
-      contentFormat: string;
-      tags: string[];
-      sourcePath: string | null;
-      relatedNodeIds: string[];
-      metadata: unknown;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }): ContentNode {
-    const entry = output.content;
-    const metadata = (
-      entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
-    ) as Record<string, unknown>;
-
-    return {
-      id: entry.id,
-      contentType: entry.contentType as ContentNode['contentType'],
-      title: entry.title,
-      description: entry.description,
-      content: entry.content,
-      contentFormat: entry.contentFormat as ContentNode['contentFormat'],
-      tags: entry.tags,
-      sourcePath: entry.sourcePath ?? undefined,
-      relatedNodeIds: entry.relatedNodeIds,
-      metadata,
-      createdAt: entry.createdAt,
-      updatedAt: entry.updatedAt,
-    };
-  }
-
-  /**
-   * Process graph nodes recursively from Holochain tree structure.
-   */
-  private processHolochainGraphNodes(
-    graphNodes: HolochainContentGraphNode[],
-    indexes: GraphIndexes,
-    parentId?: string
-  ): void {
-    for (const graphNode of graphNodes) {
-      const node = this.transformHolochainContentToNode(graphNode.content);
-      this.addNodeToGraphIndexes(
-        node,
-        indexes.nodes,
-        indexes.nodesByType,
-        indexes.nodesByTag,
-        indexes.nodesByCategory,
-        indexes.adjacency,
-        indexes.reverseAdjacency
-      );
-
-      // Add relationship from parent to this node
-      if (parentId) {
-        const relId = `${parentId}-${node.id}`;
-        indexes.relationships.set(relId, {
-          id: relId,
-          sourceNodeId: parentId,
-          targetNodeId: node.id,
-          relationshipType: graphNode.relationshipType as ContentRelationshipType,
-        });
-
-        // Update adjacency
-        if (!indexes.adjacency.has(parentId)) indexes.adjacency.set(parentId, new Set());
-        indexes.adjacency.get(parentId)!.add(node.id);
-
-        if (!indexes.reverseAdjacency.has(node.id))
-          indexes.reverseAdjacency.set(node.id, new Set());
-        indexes.reverseAdjacency.get(node.id)!.add(parentId);
-      }
-
-      // Process children recursively
-      if (graphNode.children.length > 0) {
-        this.processHolochainGraphNodes(graphNode.children, indexes, node.id);
-      }
-    }
-  }
-
-  /**
-   * Add a node to all graph indexes.
-   */
-  private addNodeToGraphIndexes(
-    node: ContentNode,
-    nodes: Map<string, ContentNode>,
-    nodesByType: Map<string, Set<string>>,
-    nodesByTag: Map<string, Set<string>>,
-    nodesByCategory: Map<string, Set<string>>,
-    adjacency: Map<string, Set<string>>,
-    reverseAdjacency: Map<string, Set<string>>
-  ): void {
-    nodes.set(node.id, node);
-    this.addToSetMap(nodesByType, node.contentType, node.id);
-    for (const tag of node.tags ?? []) {
-      this.addToSetMap(nodesByTag, tag, node.id);
-    }
-    const category =
-      ((node.metadata as Record<string, unknown>)?.['category'] as string) ?? 'uncategorized';
-    this.addToSetMap(nodesByCategory, category, node.id);
-    if (!adjacency.has(node.id)) adjacency.set(node.id, new Set());
-    if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
-  }
-
-  private addToSetMap(map: Map<string, Set<string>>, key: string, value: string): void {
-    if (!map.has(key)) {
-      map.set(key, new Set());
-    }
-    map.get(key)!.add(value);
-  }
-
-  /**
    * Create empty ContentGraph for error fallback.
    */
   private createEmptyGraph(): ContentGraph {
@@ -1967,7 +1637,7 @@ export class DataLoaderService {
    * Builds from Content entries with assessment contentType.
    */
   getAssessmentIndex(): Observable<AssessmentIndex> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
@@ -2022,7 +1692,7 @@ export class DataLoaderService {
    * Aggregates counts from all governance entity types.
    */
   getGovernanceIndex(): Observable<GovernanceIndex> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of({
         lastUpdated: new Date().toISOString(),
         challengeCount: 0,
@@ -2032,13 +1702,14 @@ export class DataLoaderService {
       });
     }
 
-    // Query all governance types in parallel
+    // Query all governance types in parallel via thin API
+    // Note: thin API queryChallenges/etc require a contentId — use empty string for "all"
     return defer(async () =>
       Promise.all([
-        this.holochainContent.queryChallenges({}),
-        this.holochainContent.queryProposals({}),
-        this.holochainContent.queryPrecedents({}),
-        this.holochainContent.queryDiscussions({}),
+        this.governance.queryGovernanceStates('challenge'),
+        this.governance.queryGovernanceStates('proposal'),
+        this.governance.queryGovernanceStates('precedent'),
+        this.governance.queryGovernanceStates('discussion'),
       ])
     ).pipe(
       map(([challenges, proposals, precedents, discussions]) => ({
@@ -2064,12 +1735,12 @@ export class DataLoaderService {
    * Load all challenges from Holochain.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryChallenges({}))).pipe(
-      map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
+    return defer(() => from(this.governance.queryGovernanceStates('challenge'))).pipe(
+      map(results => results.map(r => this.transformGovernanceStateToChallenge(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2080,19 +1751,14 @@ export class DataLoaderService {
    * Get challenges for a specific entity.
    */
   getChallengesForEntity(entityType: string, entityId: string): Observable<ChallengeRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
     return defer(() =>
-      from(
-        this.holochainContent.queryChallenges({
-          entityType: entityType,
-          entityId: entityId,
-        })
-      )
+      from(this.governance.queryChallenges(entityId))
     ).pipe(
-      map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
+      map(results => results.map(r => this.transformChallengeView(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2100,42 +1766,34 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain challenge entry to frontend ChallengeRecord model.
+   * Transform GovernanceStateView to ChallengeRecord (adapter for thin API).
    */
-  private transformHolochainChallenge(hcChallenge: {
-    id: string;
-    entityType: string;
-    entityId: string;
-    challengerId: string;
-    challengerName: string;
-    challengerStanding: string;
-    grounds: string;
-    description: string;
-    evidence: unknown;
-    status: string;
-    filedAt: string;
-    slaDeadline: string | null;
-    assignedElohim: string | null;
-    resolution: unknown;
-  }): ChallengeRecord {
-    const resolution = (hcChallenge.resolution ?? undefined) as ChallengeRecord['resolution'];
-
+  private transformGovernanceStateToChallenge(state: GovernanceStateView): ChallengeRecord {
     return {
-      id: hcChallenge.id,
-      entityType: hcChallenge.entityType,
-      entityId: hcChallenge.entityId,
-      challenger: {
-        agentId: hcChallenge.challengerId,
-        displayName: hcChallenge.challengerName,
-        standing: hcChallenge.challengerStanding,
-      },
-      grounds: hcChallenge.grounds,
-      description: hcChallenge.description,
-      status: hcChallenge.status,
-      filedAt: hcChallenge.filedAt,
-      slaDeadline: hcChallenge.slaDeadline ?? undefined,
-      assignedElohim: hcChallenge.assignedElohim ?? undefined,
-      resolution,
+      id: state.id,
+      entityType: state.entityType,
+      entityId: state.entityId,
+      challenger: { agentId: '', displayName: '', standing: '' },
+      grounds: '',
+      description: '',
+      status: state.votingState,
+      filedAt: state.createdAt,
+    };
+  }
+
+  /**
+   * Transform ChallengeView to ChallengeRecord.
+   */
+  private transformChallengeView(view: ChallengeView): ChallengeRecord {
+    return {
+      id: view.id,
+      entityType: 'content',
+      entityId: view.contentId,
+      challenger: { agentId: view.challengerPresenceId, displayName: '', standing: '' },
+      grounds: view.reason,
+      description: view.reason,
+      status: view.status,
+      filedAt: view.createdAt,
     };
   }
 
@@ -2143,12 +1801,12 @@ export class DataLoaderService {
    * Load all proposals from Holochain.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryProposals({}))).pipe(
-      map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
+    return defer(() => from(this.governance.queryGovernanceStates('proposal'))).pipe(
+      map(results => results.map(r => this.transformGovernanceStateToProposal(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2159,12 +1817,14 @@ export class DataLoaderService {
    * Get proposals by status (voting, discussion, decided).
    */
   getProposalsByStatus(status: string): Observable<ProposalRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryProposals({ status }))).pipe(
-      map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
+    return defer(() => from(this.governance.queryGovernanceStates('proposal'))).pipe(
+      map(results => results
+        .filter(r => (r as Record<string, unknown>)['status'] === status)
+        .map(r => this.transformGovernanceStateToProposal(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2172,41 +1832,18 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain proposal entry to frontend ProposalRecord model.
+   * Transform GovernanceStateView to ProposalRecord (adapter for thin API).
    */
-  private transformHolochainProposal(hcProposal: {
-    id: string;
-    title: string;
-    proposalType: string;
-    description: string;
-    proposerId: string;
-    proposerName: string;
-    status: string;
-    phase: string;
-    votingConfig: unknown;
-    currentVotes: unknown;
-    outcome: unknown;
-    createdAt: string;
-  }): ProposalRecord {
-    const votingConfig = (hcProposal.votingConfig ?? undefined) as ProposalRecord['votingConfig'];
-    const currentVotes = (hcProposal.currentVotes ?? undefined) as ProposalRecord['currentVotes'];
-    const outcome = (hcProposal.outcome ?? undefined) as ProposalRecord['outcome'];
-
+  private transformGovernanceStateToProposal(state: GovernanceStateView): ProposalRecord {
     return {
-      id: hcProposal.id,
-      title: hcProposal.title,
-      proposalType: hcProposal.proposalType,
-      description: hcProposal.description,
-      proposer: {
-        agentId: hcProposal.proposerId,
-        displayName: hcProposal.proposerName,
-      },
-      status: hcProposal.status,
-      phase: hcProposal.phase,
-      createdAt: hcProposal.createdAt,
-      votingConfig,
-      currentVotes,
-      outcome,
+      id: state.id,
+      title: '',
+      proposalType: '',
+      description: '',
+      proposer: { agentId: '', displayName: '' },
+      status: state.votingState,
+      phase: state.votingState,
+      createdAt: state.createdAt,
     };
   }
 
@@ -2214,12 +1851,12 @@ export class DataLoaderService {
    * Load all precedents from Holochain.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryPrecedents({}))).pipe(
-      map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
+    return defer(() => from(this.governance.queryGovernanceStates('precedent'))).pipe(
+      map(results => results.map(r => this.transformGovernanceStateToPrecedent(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2230,12 +1867,14 @@ export class DataLoaderService {
    * Get precedents by binding level (constitutional, binding-network, binding-local, persuasive).
    */
   getPrecedentsByBinding(binding: string): Observable<PrecedentRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryPrecedents({ binding }))).pipe(
-      map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
+    return defer(() => from(this.governance.queryGovernanceStates('precedent'))).pipe(
+      map(results => results
+        .filter(r => (r as Record<string, unknown>)['binding'] === binding)
+        .map(r => this.transformGovernanceStateToPrecedent(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2243,29 +1882,18 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain precedent entry to frontend PrecedentRecord model.
+   * Transform GovernanceStateView to PrecedentRecord (adapter for thin API).
    */
-  private transformHolochainPrecedent(hcPrecedent: {
-    id: string;
-    title: string;
-    summary: string;
-    fullReasoning: string;
-    binding: string;
-    scope: unknown;
-    citations: number;
-    status: string;
-  }): PrecedentRecord {
-    const scope = (hcPrecedent.scope ?? { entityTypes: [] }) as PrecedentRecord['scope'];
-
+  private transformGovernanceStateToPrecedent(state: GovernanceStateView): PrecedentRecord {
     return {
-      id: hcPrecedent.id,
-      title: hcPrecedent.title,
-      summary: hcPrecedent.summary,
-      fullReasoning: hcPrecedent.fullReasoning,
-      binding: hcPrecedent.binding,
-      scope,
-      citations: hcPrecedent.citations,
-      status: hcPrecedent.status,
+      id: state.id,
+      title: '',
+      summary: '',
+      fullReasoning: '',
+      binding: '',
+      scope: { entityTypes: [] },
+      citations: 0,
+      status: state.votingState,
     };
   }
 
@@ -2273,12 +1901,12 @@ export class DataLoaderService {
    * Load all discussion threads from Holochain.
    */
   getDiscussions(): Observable<DiscussionRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryDiscussions({}))).pipe(
-      map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
+    return defer(() => from(this.governance.queryGovernanceStates('discussion'))).pipe(
+      map(results => results.map(r => this.transformGovernanceStateToDiscussion(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2289,19 +1917,14 @@ export class DataLoaderService {
    * Get discussions for a specific entity.
    */
   getDiscussionsForEntity(entityType: string, entityId: string): Observable<DiscussionRecord[]> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
     return defer(() =>
-      from(
-        this.holochainContent.queryDiscussions({
-          entityType: entityType,
-          entityId: entityId,
-        })
-      )
+      from(this.governance.queryDiscussions(entityId))
     ).pipe(
-      map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
+      map(results => results.map(r => this.transformDiscussionView(r))),
       catchError(_err => {
         return of([]);
       })
@@ -2309,31 +1932,34 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain discussion entry to frontend DiscussionRecord model.
+   * Transform GovernanceStateView to DiscussionRecord (adapter for thin API).
    */
-  private transformHolochainDiscussion(hcDiscussion: {
-    id: string;
-    entityType: string;
-    entityId: string;
-    category: string;
-    title: string;
-    messages: unknown;
-    status: string;
-    messageCount: number;
-  }): DiscussionRecord {
-    const messages = (
-      Array.isArray(hcDiscussion.messages) ? hcDiscussion.messages : []
-    ) as DiscussionRecord['messages'];
-
+  private transformGovernanceStateToDiscussion(state: GovernanceStateView): DiscussionRecord {
     return {
-      id: hcDiscussion.id,
-      entityType: hcDiscussion.entityType,
-      entityId: hcDiscussion.entityId,
-      category: hcDiscussion.category,
-      title: hcDiscussion.title,
-      messages,
-      status: hcDiscussion.status,
-      messageCount: hcDiscussion.messageCount,
+      id: state.id,
+      entityType: state.entityType,
+      entityId: state.entityId,
+      category: '',
+      title: '',
+      messages: [],
+      status: state.votingState,
+      messageCount: 0,
+    };
+  }
+
+  /**
+   * Transform DiscussionView to DiscussionRecord.
+   */
+  private transformDiscussionView(view: DiscussionView): DiscussionRecord {
+    return {
+      id: view.id,
+      entityType: 'content',
+      entityId: view.contentId,
+      category: '',
+      title: '',
+      messages: [{ id: view.id, authorId: view.authorPresenceId, authorName: '', content: view.body, createdAt: view.createdAt }] as DiscussionRecord['messages'],
+      status: 'open',
+      messageCount: 1,
     };
   }
 
@@ -2344,20 +1970,15 @@ export class DataLoaderService {
     entityType: string,
     entityId: string
   ): Observable<GovernanceStateRecord | null> {
-    if (!this.holochainContent.isAvailable()) {
+    if (false) { // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
     return defer(() =>
-      from(
-        this.holochainContent.getGovernanceState({
-          entityType: entityType,
-          entityId: entityId,
-        })
-      )
+      from(this.governance.getGovernanceState(entityType, entityId))
     ).pipe(
       map(result =>
-        result ? this.transformHolochainGovernanceState(result.governanceState) : null
+        result ? this.transformGovernanceStateView(result) : null
       ),
       catchError(_err => {
         return of(null);
@@ -2366,39 +1987,21 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform Holochain governance state entry to frontend GovernanceStateRecord model.
+   * Transform GovernanceStateView to frontend GovernanceStateRecord model.
    */
-  private transformHolochainGovernanceState(hcState: {
-    entityType: string;
-    entityId: string;
-    status: string;
-    statusBasis: unknown;
-    labels: unknown;
-    activeChallenges: unknown;
-    lastUpdated: string;
-  }): GovernanceStateRecord {
-    const statusBasis = (hcState.statusBasis ?? {
-      method: '',
-      reasoning: '',
-      deciderId: '',
-      deciderType: '',
-      decidedAt: '',
-    }) as GovernanceStateRecord['statusBasis'];
+  private transformGovernanceStateView(view: GovernanceStateView): GovernanceStateRecord {
     const labels = (
-      Array.isArray(hcState.labels) ? hcState.labels : []
+      Array.isArray(view.labels) ? view.labels : []
     ) as GovernanceStateRecord['labels'];
-    const activeChallenges = (
-      Array.isArray(hcState.activeChallenges) ? hcState.activeChallenges : []
-    ) as string[];
 
     return {
-      entityType: hcState.entityType,
-      entityId: hcState.entityId,
-      status: hcState.status,
-      statusBasis,
+      entityType: view.entityType,
+      entityId: view.entityId,
+      status: view.votingState,
+      statusBasis: { method: '', reasoning: '', deciderId: '', deciderType: '', decidedAt: '' },
       labels,
-      activeChallenges,
-      lastUpdated: hcState.lastUpdated,
+      activeChallenges: [],
+      lastUpdated: view.updatedAt,
     };
   }
 

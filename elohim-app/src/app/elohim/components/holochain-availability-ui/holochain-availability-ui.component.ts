@@ -4,7 +4,6 @@ import { Component, inject, computed, signal } from '@angular/core';
 // @coverage: 30.2% (2026-02-24)
 
 import { HolochainClientService } from '../../services/holochain-client.service';
-import { HolochainContentService } from '../../services/holochain-content.service';
 
 /**
  * Holochain Availability UI Component
@@ -32,13 +31,13 @@ import { HolochainContentService } from '../../services/holochain-content.servic
 })
 export class HolochainAvailabilityUiComponent {
   private readonly holochainClient = inject(HolochainClientService);
-  private readonly holochainContent = inject(HolochainContentService);
 
   // Exposed state from services
   readonly connectionState = this.holochainClient.state;
   readonly isConnected = this.holochainClient.isConnected;
   readonly error = this.holochainClient.error;
-  readonly contentAvailable = this.holochainContent.available;
+  /** @deprecated Content availability is now determined by doorway projection, not Holochain */
+  readonly contentAvailable = this.isConnected;
 
   // Local component state
   readonly isDismissed = signal(false);

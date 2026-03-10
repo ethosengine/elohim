@@ -7,7 +7,6 @@ import { Observable, Subject } from 'rxjs';
 
 import { AppComponent } from './app.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
-import { HolochainContentService } from './elohim/services/holochain-content.service';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
@@ -17,7 +16,6 @@ describe('AppComponent', () => {
   let routerEventsSubject: Subject<NavigationEnd>;
   let mockRouter: { events: Observable<NavigationEnd>; url: string; navigate: Mock };
   let mockHolochainClient: any;
-  let mockHolochainContent: any;
   let mockAuthService: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let mockTauriAuth: any;
   let mockBlobBootstrap: any;
@@ -34,9 +32,6 @@ describe('AppComponent', () => {
       connect: vi.fn(),
       isConnected: vi.fn(),
     };
-    mockHolochainContent = {
-      testAvailability: vi.fn(),
-    };
     mockTauriAuth = {
       isTauriEnvironment: vi.fn(),
       initialize: vi.fn(),
@@ -51,7 +46,6 @@ describe('AppComponent', () => {
     // Default mock behavior
     mockHolochainClient.connect.mockReturnValue(Promise.resolve());
     mockHolochainClient.isConnected.mockReturnValue(true);
-    mockHolochainContent.testAvailability.mockReturnValue(Promise.resolve(true));
     mockTauriAuth.isTauriEnvironment.mockReturnValue(false);
     mockTauriAuth.initialize.mockReturnValue(Promise.resolve());
     mockTauriAuth.needsLogin.mockReturnValue(false);
@@ -64,7 +58,6 @@ describe('AppComponent', () => {
         provideHttpClient(),
         { provide: Router, useValue: mockRouter },
         { provide: HolochainClientService, useValue: mockHolochainClient },
-        { provide: HolochainContentService, useValue: mockHolochainContent },
         { provide: AuthService, useValue: mockAuthService },
         { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: BlobBootstrapService, useValue: mockBlobBootstrap },
@@ -348,14 +341,6 @@ describe('AppComponent', () => {
       expect(mockHolochainClient.connect).toHaveBeenCalled();
     });
 
-    it('should test holochain content availability after connection', async () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(mockHolochainContent.testAvailability).toHaveBeenCalled();
-    });
-
     it('should handle connection failure gracefully', async () => {
       mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
@@ -369,24 +354,6 @@ describe('AppComponent', () => {
       expect((app as any).connectionAttempt).toBe(1);
 
       // Clean up scheduled timeout
-      app.ngOnDestroy();
-    });
-
-    it('should handle content availability test failure', async () => {
-      mockHolochainContent.testAvailability.mockReturnValue(
-        Promise.reject(new Error('Zome unavailable'))
-      );
-
-      const fixture = TestBed.createComponent(AppComponent);
-      const app = fixture.componentInstance;
-
-      // Call attemptConnection directly to test error handling
-      await (app as any).attemptConnection();
-
-      // Should still increment counter and schedule retry
-      expect((app as any).connectionAttempt).toBe(1);
-
-      // Clean up
       app.ngOnDestroy();
     });
 

@@ -2,14 +2,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { HolochainAvailabilityUiComponent } from './holochain-availability-ui.component';
 import { HolochainClientService } from '../../services/holochain-client.service';
-import { HolochainContentService } from '../../services/holochain-content.service';
 import { vi } from 'vitest';
 
 describe('HolochainAvailabilityUiComponent', () => {
   let component: HolochainAvailabilityUiComponent;
   let fixture: ComponentFixture<HolochainAvailabilityUiComponent>;
   let mockHolochainClient: any;
-  let mockHolochainContent: any;
 
   beforeEach(async () => {
     // Create mock services with signal properties
@@ -20,13 +18,10 @@ describe('HolochainAvailabilityUiComponent', () => {
       error: vi.fn().mockReturnValue(null),
     };
 
-    mockHolochainContent = { available: vi.fn().mockReturnValue(false) };
-
     await TestBed.configureTestingModule({
       imports: [HolochainAvailabilityUiComponent],
       providers: [
         { provide: HolochainClientService, useValue: mockHolochainClient },
-        { provide: HolochainContentService, useValue: mockHolochainContent },
       ],
     }).compileComponents();
 
