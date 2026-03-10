@@ -2,7 +2,7 @@
  * Elohim Edge Infrastructure Pipeline (elohim-edge)
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * Triggered by orchestrator when doorway/, holochain/elohim-storage/, or holochain/edgenode/ change.
+ * Triggered by orchestrator when doorway/, elohim/elohim-storage/, or elohim/holochain/edgenode/ change.
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
@@ -23,7 +23,7 @@
  *   - Fallback: current branch → dev → main
  *
  * @see genesis/orchestrator/Jenkinsfile for central trigger logic
- * @see holochain/dna/Jenkinsfile for DNA builds
+ * @see elohim/holochain/dna/Jenkinsfile for DNA builds
  */
 
 // ============================================================================
@@ -165,7 +165,7 @@ def checkEdgeNodeHealth(String url) {
  * Requires Docker Compose and the elohim-storage Dockerfile.
  */
 def runSimulationTest() {
-    dir('elohim-node/simulation') {
+    dir('steward/node/simulation') {
         sh './simulate.sh test'
     }
 }
@@ -458,7 +458,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        // NOTE: Build WASM Cache Core and Build DNA stages moved to holochain/dna/Jenkinsfile
+        // NOTE: Build WASM Cache Core and Build DNA stages moved to elohim/holochain/dna/Jenkinsfile
         // This pipeline now only builds infrastructure (container images)
 
         stage('Quality Gate: Doorway') {
@@ -476,7 +476,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     --target check \\
-                                    -f doorway/Dockerfile .
+                                    -f doorway/doorway-service/Dockerfile .
                             """
                         } catch (Exception e) {
                             echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
@@ -502,14 +502,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                # Build from repo root with doorway/Dockerfile
+                                # Build from repo root with doorway/doorway-service/Dockerfile
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     --build-arg GIT_COMMIT_SHORT=\$(echo ${GIT_COMMIT_HASH} | cut -c1-7) \\
                                     --build-arg GIT_COMMIT_FULL=${GIT_COMMIT_HASH} \\
                                     --build-arg BUILD_TIMESTAMP=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \\
                                     -t elohim-doorway:${IMAGE_TAG} \\
-                                    -f doorway/Dockerfile .
+                                    -f doorway/doorway-service/Dockerfile .
 
                                 nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
                             """
@@ -525,7 +525,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder') {
                     script {
                         try {
-                            dir('doorway-app') {
+                            dir('doorway/doorway-app') {
                                 sh 'pnpm install --frozen-lockfile && pnpm exec eslint src --ext .ts,.html'
                             }
                         } catch (Exception e) {
@@ -552,7 +552,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd doorway-app
+                                cd doorway/doorway-app
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
@@ -582,7 +582,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd elohim/elohim-agent-sdk
+                                cd elohim/elohim-agent/elohim-agent-sdk
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
@@ -612,7 +612,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain/elohim-storage
+                                cd elohim/elohim-storage
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
@@ -632,8 +632,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     anyOf {
-                        changeset "holochain/elohim-storage/src/p2p/**"
-                        changeset "elohim-node/simulation/**"
+                        changeset "elohim/elohim-storage/src/p2p/**"
+                        changeset "steward/node/simulation/**"
                         expression { return params.FORCE_BUILD == true }
                     }
                 }
@@ -661,7 +661,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
                             echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/elohim.happ')
+                            def haveHapp = fetchHappFromHarbor('elohim/holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
                                 // DNA version awareness (Sprint 5)
@@ -682,7 +682,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                    cd holochain/edgenode
+                                    cd elohim/holochain/edgenode
 
                                     BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                         nerdctl -n k8s.io build \\
@@ -714,7 +714,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
                             echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/scripts/elohim.happ')
+                            def haveHapp = fetchHappFromHarbor('elohim/holochain/edgenode/scripts/elohim.happ')
 
                             if (haveHapp) {
                                 sh """#!/bin/bash
@@ -722,7 +722,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                    cd holochain/edgenode/scripts
+                                    cd elohim/holochain/edgenode/scripts
 
                                     BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                         nerdctl -n k8s.io build \\
@@ -909,8 +909,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         allOf {
                             anyOf {
                                 changeset "doorway/**"
-                                changeset "holochain/elohim-storage/**"
-                                changeset "holochain/edgenode/**"
+                                changeset "elohim/elohim-storage/**"
+                                changeset "elohim/holochain/edgenode/**"
                             }
                             anyOf {
                                 expression { return env.BRANCH_NAME ==~ /feat-.+/ }

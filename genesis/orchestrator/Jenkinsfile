@@ -27,8 +27,8 @@ import groovy.transform.Field
 
 @Field def PIPELINES = [
     'elohim-holochain': [
-        jenkinsPath: 'holochain/dna/Jenkinsfile',
-        changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/', 'VERSION'],
+        jenkinsPath: 'elohim/holochain/dna/Jenkinsfile',
+        changePatterns: ['elohim/holochain/dna/', 'elohim/holochain/holochain-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
         cascades: false,      // Sprint 5: DNA changes don't auto-trigger Edge rebuilds
@@ -36,8 +36,8 @@ import groovy.transform.Field
         deploymentCheck: null  // No deployment, just artifacts
     ],
     'elohim-edge': [
-        jenkinsPath: 'holochain/Jenkinsfile',
-        changePatterns: ['doorway/', 'doorway-app/', 'elohim/elohim-agent-sdk/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/crates/', 'VERSION'],
+        jenkinsPath: 'elohim/holochain/Jenkinsfile',
+        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'crates/', 'VERSION'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-agent-sdk', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,
@@ -49,7 +49,7 @@ import groovy.transform.Field
     ],
     'elohim': [
         jenkinsPath: 'Jenkinsfile',
-        changePatterns: ['elohim-app/', 'elohim-library/', 'holochain/sdk/', 'VERSION'],
+        changePatterns: ['elohim-app/', 'elohim-library/', 'elohim/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
         dependsOn: ['elohim-sophia'],  // rebuild app when sophia UMD bundle changes
         triggersGenesis: true,
@@ -68,7 +68,7 @@ import groovy.transform.Field
         deploymentCheck: null
     ],
     'elohim-steward': [
-        jenkinsPath: 'steward/Jenkinsfile',
+        jenkinsPath: 'steward/device/Jenkinsfile',
         changePatterns: ['steward/'],
         artifacts: ['steward-desktop'],
         dependsOn: ['elohim-holochain'],

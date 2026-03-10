@@ -5,7 +5,7 @@
  * For those who run their own Holochain nodes as stewards of co-creation.
  *
  * This is a multibranch pipeline within the elohim mono-repo.
- * Jenkins job configured to look at steward/Jenkinsfile
+ * Jenkins job configured to look at steward/device/Jenkinsfile
  *
  * Platforms:
  *   - Linux: AppImage, .deb (default)
@@ -157,7 +157,7 @@ spec:
             // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('steward/device') {
                         script {
                             echo 'Configuring Nix with Holochain and Darksoil Cachix...'
                             sh '''
@@ -175,10 +175,10 @@ spec:
             // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('steward/device') {
                         script {
                             // Read HAPP_VERSION from VERSION file
-                            def versionContent = readFile('../VERSION').trim()
+                            def versionContent = readFile('../../VERSION').trim()
                             def versionMap = [:]
                             versionContent.split('\n').each { line ->
                                 def parts = line.split('=')
@@ -265,7 +265,7 @@ spec:
                                     echo "    directory = *" >> "$HOME/.gitconfig"
                                     export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
-                                    cd ../holochain/dna/elohim
+                                    cd ../../elohim/holochain/dna/elohim
 
                                     echo "Building hApp from source (this will take 20-40 minutes)..."
                                     nix develop --impure --accept-flake-config --command bash -c '
@@ -275,7 +275,7 @@ spec:
                                         hc app pack workdir -o elohim.happ
                                     '
 
-                                    cp elohim.happ ../../../steward/workdir/elohim.happ
+                                    cp elohim.happ ../../../../steward/device/workdir/elohim.happ
                                     echo "✅ Local hApp build completed"
                                 '''
                             }
@@ -296,7 +296,7 @@ spec:
             // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('steward/device') {
                         script {
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -336,7 +336,7 @@ spec:
                             } else {
                                 echo "⚠️ Could not fetch UI from pipeline - building locally"
                                 sh '''
-                                    cd ..
+                                    cd ../..
 
                                     # 1. Init and build sophia (UMD bundle for prebuild check)
                                     git submodule update --init sophia
@@ -350,13 +350,13 @@ spec:
                                     cd elohim-library && pnpm install --frozen-lockfile && cd ..
 
                                     # 3. Build storage-client-ts (provides @elohim/storage-client/generated)
-                                    cd holochain/sdk/storage-client-ts && pnpm install --frozen-lockfile && pnpm run build && cd ../../..
+                                    cd elohim/sdk/storage-client-ts && pnpm install --frozen-lockfile && pnpm run build && cd ../../..
 
                                     # 4. Build elohim-app
                                     cd elohim-app
                                     pnpm install --frozen-lockfile
                                     pnpm run build
-                                    cp -r dist/elohim-app/browser/* ../steward/ui/
+                                    cp -r dist/elohim-app/browser/* ../steward/device/ui/
                                 '''
                             }
 
@@ -371,7 +371,7 @@ spec:
             // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('steward/device') {
                         script {
                             echo 'Building Steward app with Nix + Tauri...'
                             echo 'First build may take 30-60 minutes. Subsequent builds use cache.'
@@ -550,7 +550,7 @@ DEDUP_SCRIPT
             }
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('steward/device') {
                         script {
                             def version = readFile('VERSION').trim()
                             echo "Publishing release steward-v${version} to GitHub..."

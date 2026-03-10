@@ -481,7 +481,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     script {
                         echo 'Fetching holochain-cache-core WASM module from Harbor...'
 
-                        def wasmDir = 'holochain/holochain-cache-core/pkg'
+                        def wasmDir = 'elohim/holochain/holochain-cache-core/pkg'
 
                         // Read HAPP_VERSION from VERSION file
                         def versionContent = readFile('VERSION').trim()
@@ -570,7 +570,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'pnpm install --frozen-lockfile'
                         }
                     }
-                    dir('holochain/sdk/storage-client-ts') {
+                    dir('elohim/sdk/storage-client-ts') {
                         script {
                             echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
                             sh 'pnpm install --frozen-lockfile && pnpm run build'
@@ -584,7 +584,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Copy WASM files from fetched location to node_modules
                             // This is needed because Angular expects WASM in node_modules/holochain-cache-core
-                            def wasmSrc = '../holochain/holochain-cache-core/pkg'
+                            def wasmSrc = '../elohim/holochain/holochain-cache-core/pkg'
                             def wasmDest = 'node_modules/holochain-cache-core'
                             if (fileExists(wasmSrc)) {
                                 echo 'Copying holochain-cache-core WASM to node_modules...'

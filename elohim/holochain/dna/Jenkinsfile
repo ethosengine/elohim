@@ -2,7 +2,7 @@
  * Elohim DNA Pipeline (elohim-holochain)
  *
  * Builds DNA/hApp artifacts only - NO container images, NO deployments.
- * Triggered by orchestrator when holochain/dna/ or holochain/holochain-cache-core/ change.
+ * Triggered by orchestrator when elohim/holochain/dna/ or elohim/holochain/holochain-cache-core/ change.
  *
  * Artifacts produced:
  *   - elohim.happ (multi-DNA bundle: lamad + imagodei + infrastructure)
@@ -232,7 +232,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
-                    dir('holochain/dna/elohim') {
+                    dir('elohim/holochain/dna/elohim') {
                         script {
                             echo 'Building holochain-cache-core WASM module...'
 
@@ -267,7 +267,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
                         }
                     }
-                    dir('holochain/holochain-cache-core') {
+                    dir('elohim/holochain/holochain-cache-core') {
                         archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
                         stash name: 'wasm-cache-core', includes: 'pkg/**'
                         echo "holochain-cache-core WASM module built and archived"
@@ -280,7 +280,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
-                    dir('holochain/dna/elohim') {
+                    dir('elohim/holochain/dna/elohim') {
                         script {
                             echo 'Building Holochain DNA with Nix...'
                             echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
@@ -382,7 +382,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
-                    dir('holochain/dna/elohim') {
+                    dir('elohim/holochain/dna/elohim') {
                         script {
                             def props = loadBuildVars()
                             def version = props.IMAGE_TAG ?: 'dev'
@@ -474,7 +474,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             ${env.BUILD_URL}artifact/
 
             To trigger infrastructure rebuild:
-            - Push to holochain/doorway/**, holochain/edgenode/**
+            - Push to doorway/**, elohim/holochain/edgenode/**
             - Or run elohim-edge with FORCE_BUILD=true
             ═══════════════════════════════════════════════════════════
             """
