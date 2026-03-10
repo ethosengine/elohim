@@ -14,6 +14,7 @@
 //! db/*.rs (models)            — Diesel queries, ORM models
 //! ```
 
+pub mod agreements;
 pub mod attestations;
 pub mod compute;
 pub mod contributors;
@@ -55,7 +56,10 @@ pub async fn handle_api_request(
     let app_ctx = extract_app_context(&req);
 
     // Dispatch to domain controllers
-    if sub_path.starts_with("presence") {
+    if sub_path.starts_with("agreements") {
+        let resource_path = sub_path.strip_prefix("agreements").unwrap_or("");
+        agreements::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("presence") {
         let resource_path = sub_path.strip_prefix("presence").unwrap_or("");
         presence::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("stewardship") {

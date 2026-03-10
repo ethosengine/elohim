@@ -19,6 +19,7 @@
 //! SQLite Database
 //! ```
 
+pub mod agreement_service;
 pub mod content_service;
 pub mod economic_event_service;
 pub mod events;

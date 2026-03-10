@@ -8,6 +8,8 @@
  */
 
 export * from './AccountIdentityView';
+export * from './AgreementView';
+export * from './CreateAgreementInputView';
 export * from './AccountImportResultView';
 export * from './AccountPackageInputView';
 export * from './AccountPackageView';

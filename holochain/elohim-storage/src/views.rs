@@ -85,12 +85,12 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 
 use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
-    AccessGrant, App, Challenge, Chapter, ChapterWithSteps, Content, ContentAttestation,
-    ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard, ContributorPresence,
-    CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human, HumanRelationship,
-    LocalSession, Path, PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate,
-    Proposal, ReaCommitment, Relationship, RelationshipWithContent, Step, StewardCredential,
-    StewardshipAllocation, StewardshipAllocationWithPresence,
+    AccessGrant, AgreementRow, App, Challenge, Chapter, ChapterWithSteps, Content,
+    ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
+    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human,
+    HumanRelationship, LocalSession, Path, PathAttestation, PathWithDetails, PathWithSteps,
+    Precedent, PremiumGate, Proposal, ReaCommitment, Relationship, RelationshipWithContent, Step,
+    StewardCredential, StewardshipAllocation, StewardshipAllocationWithPresence,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -3811,6 +3811,59 @@ impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
         Self {
             state: v.state,
             finished: v.finished,
+        }
+    }
+}
+
+// ============================================================================
+// Agreement Views
+// ============================================================================
+
+/// REA Agreement — API output
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AgreementView {
+    pub id: String,
+    pub name: Option<String>,
+    pub note: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub metadata: Option<JsonVal>,
+    pub created_at: String,
+}
+
+impl From<AgreementRow> for AgreementView {
+    fn from(a: AgreementRow) -> Self {
+        Self {
+            id: a.id,
+            name: a.name,
+            note: a.note,
+            dht_anchor_hash: a.dht_anchor_hash,
+            metadata: parse_json_opt(&a.metadata_json),
+            created_at: a.created_at,
+        }
+    }
+}
+
+/// Create agreement — API input
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateAgreementInputView {
+    #[serde(default)]
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub note: Option<String>,
+    pub metadata: Option<JsonVal>,
+}
+
+impl From<CreateAgreementInputView> for crate::db::agreements::CreateAgreementInput {
+    fn from(v: CreateAgreementInputView) -> Self {
+        Self {
+            id: v.id,
+            name: v.name,
+            note: v.note,
+            metadata_json: serialize_json_opt(&v.metadata),
         }
     }
 }

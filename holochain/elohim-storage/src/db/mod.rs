@@ -39,6 +39,7 @@ pub mod models;
 pub mod paths_diesel;
 
 // Diesel modules for graph relationships and domain models
+pub mod agreements;
 pub mod collectives;
 pub mod content_mastery;
 pub mod contributor_presences;

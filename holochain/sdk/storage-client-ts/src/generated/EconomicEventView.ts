@@ -9,4 +9,4 @@ resourceClassifiedAs: JsonValue | null, resourceQuantityValue: number | null, re
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, createdAt: string, };
+metadata: JsonValue | null, dhtAnchorHash: string | null, createdAt: string, };

@@ -5,4 +5,4 @@ import type { MeasureView } from "./MeasureView";
 /**
  * REA Commitment — API output
  */
-export type ReaCommitmentView = { id: string, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceClassifiedAs: Array<string> | null, resourceQuantity: MeasureView | null, effortQuantity: MeasureView | null, hasBeginning: string | null, hasEnd: string | null, due: string | null, clauseOf: string | null, inScopeOf: Array<string> | null, mediumOfExchangeId: string | null, state: string, finished: boolean, note: string | null, metadata: JsonValue | null, createdAt: string, };
+export type ReaCommitmentView = { id: string, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceClassifiedAs: Array<string> | null, resourceQuantity: MeasureView | null, effortQuantity: MeasureView | null, hasBeginning: string | null, hasEnd: string | null, due: string | null, clauseOf: string | null, inScopeOf: Array<string> | null, mediumOfExchangeId: string | null, state: string, finished: boolean, note: string | null, metadata: JsonValue | null, dhtAnchorHash: string | null, createdAt: string, };

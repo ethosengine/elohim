@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::diesel_schema::{
-    access_grants, apps, challenges, chapters, collective_participations, collectives, content,
-    content_attestations, content_mastery, content_tags, contributor_dashboards,
+    access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
+    content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     governance_states, human_relationships, humans, local_sessions, path_attestations, path_tags,
     paths, precedents, premium_gates, proposals, rea_commitments, relationships, steps,
@@ -1704,4 +1704,33 @@ pub struct NewReaCommitment<'a> {
     pub note: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
+}
+
+// ============================================================================
+// Agreement
+// ============================================================================
+
+/// REA Agreement — a mutually understood arrangement between agents.
+/// Commitments reference agreements via `clause_of`.
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = agreements)]
+pub struct AgreementRow {
+    pub id: String,
+    pub app_id: String,
+    pub name: Option<String>,
+    pub note: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub metadata_json: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = agreements)]
+pub struct NewAgreement<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub name: Option<&'a str>,
+    pub note: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
+    pub metadata_json: Option<&'a str>,
 }
