@@ -11264,3 +11264,404 @@ pub fn get_current_author_for_content(content_id: String) -> ExternResult<Option
 
     Ok(latest.map(|s| s.entry.successor_author_key.clone()))
 }
+
+// =============================================================================
+// REA Agreement — Coordinator
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAgreementInput {
+    pub id: String,
+    pub name: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgreementOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub agreement: Agreement,
+}
+
+#[hdk_extern]
+pub fn create_agreement(input: CreateAgreementInput) -> ExternResult<AgreementOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let agreement = Agreement {
+        id: input.id.clone(),
+        name: input.name,
+        note: input.note,
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Agreement(agreement.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Agreement(agreement.clone()))?;
+
+    // StringAnchor link for ID-based lookup
+    let id_anchor = StringAnchor::new("agreement_id", &agreement.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToAgreement,
+        (),
+    )?;
+
+    Ok(AgreementOutput { action_hash, entry_hash, agreement })
+}
+
+#[hdk_extern]
+pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
+    let id_anchor = StringAnchor::new("agreement_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToAgreement)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Agreement record not found".into())))?;
+        let agreement: Agreement = record.entry().to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
+        let entry_hash = hash_entry(&EntryTypes::Agreement(agreement.clone()))?;
+        Ok(Some(AgreementOutput { action_hash, entry_hash, agreement }))
+    } else {
+        Ok(None)
+    }
+}
+
+// =============================================================================
+// REA Commitment — Coordinator
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateReaCommitmentInput {
+    pub id: String,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    #[serde(default)]
+    pub resource_classified_as: Vec<String>,
+    pub resource_quantity_value: Option<f64>,
+    pub resource_quantity_unit: Option<String>,
+    pub effort_quantity_value: Option<f64>,
+    pub effort_quantity_unit: Option<String>,
+    pub has_beginning: Option<String>,
+    pub has_end: Option<String>,
+    pub due: Option<String>,
+    pub clause_of: Option<String>,
+    #[serde(default)]
+    pub in_scope_of: Vec<String>,
+    pub note: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReaCommitmentOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub commitment: Commitment,
+}
+
+#[hdk_extern]
+pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<ReaCommitmentOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let resource_classified_as_json = serde_json::to_string(&input.resource_classified_as)
+        .unwrap_or_else(|_| "[]".to_string());
+    let in_scope_of_json = serde_json::to_string(&input.in_scope_of)
+        .unwrap_or_else(|_| "[]".to_string());
+
+    let commitment = Commitment {
+        id: input.id.clone(),
+        action: input.action,
+        provider: input.provider.clone(),
+        receiver: input.receiver.clone(),
+        resource_conforms_to: None,
+        resource_inventoried_as: None,
+        resource_classified_as_json,
+        resource_quantity_value: input.resource_quantity_value,
+        resource_quantity_unit: input.resource_quantity_unit,
+        effort_quantity_value: input.effort_quantity_value,
+        effort_quantity_unit: input.effort_quantity_unit,
+        has_point_in_time: None,
+        has_beginning: input.has_beginning,
+        has_end: input.has_end,
+        due: input.due,
+        clause_of: input.clause_of.clone(),
+        agreed_in: None,
+        input_of: None,
+        output_of: None,
+        satisfies: None,
+        in_scope_of_json,
+        finished: false,
+        state: "created".to_string(),
+        note: input.note,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Commitment(commitment.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+
+    // ID anchor
+    let id_anchor = StringAnchor::new("commitment_id", &commitment.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToCommitment,
+        (),
+    )?;
+
+    // Provider anchor
+    let provider_anchor = StringAnchor::new("commitment_provider", &commitment.provider);
+    let provider_anchor_hash = hash_entry(&EntryTypes::StringAnchor(provider_anchor))?;
+    create_link(
+        provider_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::CommitmentByProvider,
+        (),
+    )?;
+
+    // Receiver anchor
+    let receiver_anchor = StringAnchor::new("commitment_receiver", &commitment.receiver);
+    let receiver_anchor_hash = hash_entry(&EntryTypes::StringAnchor(receiver_anchor))?;
+    create_link(
+        receiver_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::CommitmentByReceiver,
+        (),
+    )?;
+
+    // Agreement link if clause_of is set
+    if let Some(ref agreement_id) = input.clause_of {
+        let agreement_anchor = StringAnchor::new("agreement_id", agreement_id);
+        let agreement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agreement_anchor))?;
+        create_link(
+            agreement_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::AgreementToCommitment,
+            (),
+        )?;
+    }
+
+    Ok(ReaCommitmentOutput { action_hash, entry_hash, commitment })
+}
+
+#[hdk_extern]
+pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput>> {
+    let id_anchor = StringAnchor::new("commitment_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitment)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment record not found".into())))?;
+        let commitment: Commitment = record.entry().to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
+        let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+        Ok(Some(ReaCommitmentOutput { action_hash, entry_hash, commitment }))
+    } else {
+        Ok(None)
+    }
+}
+
+#[hdk_extern]
+pub fn get_commitments_by_agreement(agreement_id: String) -> ExternResult<Vec<ReaCommitmentOutput>> {
+    let agreement_anchor = StringAnchor::new("agreement_id", &agreement_id);
+    let agreement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agreement_anchor))?;
+
+    let query = LinkQuery::try_new(agreement_anchor_hash, LinkTypes::AgreementToCommitment)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in &links {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten() {
+                let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+                results.push(ReaCommitmentOutput { action_hash, entry_hash, commitment });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// REA EconomicEvent — Coordinator
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateReaEconomicEventInput {
+    pub id: String,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    #[serde(default)]
+    pub resource_classified_as: Vec<String>,
+    pub resource_quantity_value: Option<f64>,
+    pub resource_quantity_unit: Option<String>,
+    pub effort_quantity_value: Option<f64>,
+    pub effort_quantity_unit: Option<String>,
+    pub has_point_in_time: String,
+    #[serde(default)]
+    pub fulfills: Vec<String>,
+    pub realization_of: Option<String>,
+    pub lamad_event_type: Option<String>,
+    pub note: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReaEconomicEventOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub event: EconomicEvent,
+    pub fulfillment_links: Vec<ActionHash>,
+}
+
+#[hdk_extern]
+pub fn create_rea_economic_event(input: CreateReaEconomicEventInput) -> ExternResult<ReaEconomicEventOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let resource_classified_as_json = serde_json::to_string(&input.resource_classified_as)
+        .unwrap_or_else(|_| "[]".to_string());
+    let fulfills_json = serde_json::to_string(&input.fulfills)
+        .unwrap_or_else(|_| "[]".to_string());
+
+    let event = EconomicEvent {
+        id: input.id.clone(),
+        action: input.action,
+        provider: input.provider.clone(),
+        receiver: input.receiver.clone(),
+        resource_conforms_to: None,
+        resource_inventoried_as: None,
+        to_resource_inventoried_as: None,
+        resource_classified_as_json,
+        resource_quantity_value: input.resource_quantity_value,
+        resource_quantity_unit: input.resource_quantity_unit,
+        effort_quantity_value: input.effort_quantity_value,
+        effort_quantity_unit: input.effort_quantity_unit,
+        has_point_in_time: input.has_point_in_time,
+        has_duration: None,
+        input_of: None,
+        output_of: None,
+        fulfills_json,
+        realization_of: input.realization_of.clone(),
+        satisfies_json: "[]".to_string(),
+        in_scope_of_json: "[]".to_string(),
+        note: input.note,
+        state: "completed".to_string(),
+        triggered_by: None,
+        at_location: None,
+        image: None,
+        lamad_event_type: input.lamad_event_type,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::EconomicEvent(event.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::EconomicEvent(event.clone()))?;
+
+    // ID anchor
+    let id_anchor = StringAnchor::new("event_id", &event.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToEvent,
+        (),
+    )?;
+
+    // Provider anchor
+    let provider_anchor = StringAnchor::new("event_provider", &event.provider);
+    let provider_anchor_hash = hash_entry(&EntryTypes::StringAnchor(provider_anchor))?;
+    create_link(
+        provider_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProviderToEvent,
+        (),
+    )?;
+
+    // Fulfillment links: Event -> Commitment
+    let mut fulfillment_links = Vec::new();
+    for commitment_id in &input.fulfills {
+        let commitment_anchor = StringAnchor::new("commitment_id", commitment_id);
+        let commitment_anchor_hash = hash_entry(&EntryTypes::StringAnchor(commitment_anchor))?;
+
+        let query = LinkQuery::try_new(commitment_anchor_hash, LinkTypes::IdToCommitment)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        if let Some(link) = links.first() {
+            let commitment_action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".into())))?;
+            create_link(
+                action_hash.clone(),
+                commitment_action_hash.clone(),
+                LinkTypes::EventFulfillsCommitment,
+                (),
+            )?;
+            fulfillment_links.push(commitment_action_hash);
+        }
+    }
+
+    // Agreement link if realization_of is set
+    if let Some(ref agreement_id) = input.realization_of {
+        let agreement_anchor = StringAnchor::new("agreement_id", agreement_id);
+        let agreement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agreement_anchor))?;
+        create_link(
+            agreement_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::AgreementToEvent,
+            (),
+        )?;
+    }
+
+    Ok(ReaEconomicEventOutput { action_hash, entry_hash, event, fulfillment_links })
+}
+
+#[hdk_extern]
+pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEventOutput>> {
+    let id_anchor = StringAnchor::new("event_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToEvent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Event record not found".into())))?;
+        let event: EconomicEvent = record.entry().to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
+        let entry_hash = hash_entry(&EntryTypes::EconomicEvent(event.clone()))?;
+
+        // Fetch fulfillment links
+        let fulfills_query = LinkQuery::try_new(action_hash.clone(), LinkTypes::EventFulfillsCommitment)?;
+        let fulfills_links = get_links(fulfills_query, GetStrategy::default())?;
+        let fulfillment_links: Vec<ActionHash> = fulfills_links.iter()
+            .filter_map(|l| ActionHash::try_from(l.target.clone()).ok())
+            .collect();
+
+        Ok(Some(ReaEconomicEventOutput { action_hash, entry_hash, event, fulfillment_links }))
+    } else {
+        Ok(None)
+    }
+}
