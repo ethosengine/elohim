@@ -166,6 +166,7 @@ diesel::table! {
         state -> Text,
         note -> Nullable<Text>,
         metadata_json -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
     }
 }
@@ -546,6 +547,19 @@ diesel::table! {
         finished -> Integer,
         note -> Nullable<Text>,
         metadata_json -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    agreements (id) {
+        id -> Text,
+        app_id -> Text,
+        name -> Nullable<Text>,
+        note -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        metadata_json -> Nullable<Text>,
         created_at -> Text,
     }
 }
@@ -560,6 +574,7 @@ diesel::joinable!(steps -> paths (path_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
+    agreements,
     apps,
     challenges,
     chapters,

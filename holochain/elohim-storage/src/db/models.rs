@@ -531,6 +531,7 @@ pub struct EconomicEvent {
     pub state: String,
     pub note: Option<String>,
     pub metadata_json: Option<String>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -562,6 +563,7 @@ pub struct NewEconomicEvent<'a> {
     pub state: &'a str,
     pub note: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
 }
 
 // ============================================================================
@@ -1672,6 +1674,7 @@ pub struct ReaCommitment {
     pub finished: i32,
     pub note: Option<String>,
     pub metadata_json: Option<String>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -1700,4 +1703,5 @@ pub struct NewReaCommitment<'a> {
     pub finished: i32,
     pub note: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
 }

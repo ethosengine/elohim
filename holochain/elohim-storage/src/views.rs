@@ -777,6 +777,7 @@ pub struct EconomicEventView {
     pub note: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
     pub metadata: Option<JsonVal>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -807,6 +808,7 @@ impl From<EconomicEvent> for EconomicEventView {
             state: e.state,
             note: e.note,
             metadata: parse_json_opt(&e.metadata_json),
+            dht_anchor_hash: e.dht_anchor_hash,
             created_at: e.created_at,
         }
     }
@@ -848,6 +850,7 @@ pub struct ReaCommitmentView {
     pub finished: bool,
     pub note: Option<String>,
     pub metadata: Option<JsonVal>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -890,6 +893,7 @@ impl From<ReaCommitment> for ReaCommitmentView {
             finished: c.finished != 0,
             note: c.note,
             metadata: parse_json_opt(&c.metadata_json),
+            dht_anchor_hash: c.dht_anchor_hash,
             created_at: c.created_at,
         }
     }

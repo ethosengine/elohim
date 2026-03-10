@@ -203,6 +203,7 @@ pub fn create_commitment(
         finished: 0,
         note: input.note.as_deref(),
         metadata_json: input.metadata_json.as_deref(),
+        dht_anchor_hash: None,
     };
 
     diesel::insert_into(rea_commitments::table)
