@@ -13,9 +13,10 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::diesel_schema::{
-    apps, chapters, collective_participations, collectives, content, content_mastery, content_tags,
-    contributor_presences, custodian_metrics, device_policies, economic_events, human_relationships,
-    humans, local_sessions, path_attestations, path_tags, paths, relationships, steps,
+    apps, challenges, chapters, collective_participations, collectives, content, content_mastery,
+    content_tags, contributor_presences, custodian_metrics, device_policies, discussions,
+    economic_events, governance_states, human_relationships, humans, local_sessions,
+    path_attestations, path_tags, paths, precedents, proposals, relationships, steps,
     stewardship_allocations,
 };
 
@@ -1109,8 +1110,8 @@ pub mod contribution_types {
     }
 }
 
-/// Governance state constants
-pub mod governance_states {
+/// Governance state constants for stewardship allocations
+pub mod allocation_governance_states {
     pub const ACTIVE: &str = "active";
     pub const DISPUTED: &str = "disputed";
     pub const PENDING_REVIEW: &str = "pending_review";
@@ -1343,4 +1344,142 @@ pub struct UpsertCustodianMetrics {
     pub economic_json: String,
     pub collected_at: i64,
     pub last_updated_at: i64,
+}
+
+// ============================================================================
+// Governance Models (v7)
+// ============================================================================
+
+/// Governance state for an entity
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = governance_states)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct GovernanceState {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub reach: String,
+    pub labels: String,
+    pub voting_state: String,
+    pub signal_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New governance state for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = governance_states)]
+pub struct NewGovernanceState<'a> {
+    pub id: &'a str,
+    pub entity_type: &'a str,
+    pub entity_id: &'a str,
+    pub reach: &'a str,
+    pub labels: &'a str,
+    pub voting_state: &'a str,
+}
+
+/// Challenge on content
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = challenges)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Challenge {
+    pub id: String,
+    pub content_id: String,
+    pub challenger_presence_id: String,
+    pub reason: String,
+    pub status: String,
+    pub evidence: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New challenge for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = challenges)]
+pub struct NewChallenge<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub challenger_presence_id: &'a str,
+    pub reason: &'a str,
+    pub status: &'a str,
+    pub evidence: &'a str,
+}
+
+/// Governance proposal
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = proposals)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Proposal {
+    pub id: String,
+    pub content_id: String,
+    pub proposer_presence_id: String,
+    pub proposal_type: String,
+    pub title: String,
+    pub body: String,
+    pub status: String,
+    pub votes_for: i32,
+    pub votes_against: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New proposal for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = proposals)]
+pub struct NewProposal<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub proposer_presence_id: &'a str,
+    pub proposal_type: &'a str,
+    pub title: &'a str,
+    pub body: &'a str,
+}
+
+/// Governance precedent
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = precedents)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Precedent {
+    pub id: String,
+    pub content_id: String,
+    pub principle: String,
+    pub interpretation: String,
+    pub established_by: String,
+    pub created_at: String,
+}
+
+/// New precedent for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = precedents)]
+pub struct NewPrecedent<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub principle: &'a str,
+    pub interpretation: &'a str,
+    pub established_by: &'a str,
+}
+
+/// Discussion entry on content
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = discussions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Discussion {
+    pub id: String,
+    pub content_id: String,
+    pub author_presence_id: String,
+    pub body: String,
+    pub parent_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New discussion for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = discussions)]
+pub struct NewDiscussion<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub author_presence_id: &'a str,
+    pub body: &'a str,
+    pub parent_id: Option<&'a str>,
 }

@@ -50,6 +50,9 @@ pub mod local_sessions;
 pub mod relationships_diesel;
 pub mod stewardship_allocations;
 
+// Governance tables (v7)
+pub mod governance;
+
 // Custodian node metrics
 pub mod custodian_metrics;
 

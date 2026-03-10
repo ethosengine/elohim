@@ -6,7 +6,7 @@ use tracing::info;
 use crate::error::StorageError;
 
 /// Current schema version for migrations
-pub const SCHEMA_VERSION: i32 = 6;
+pub const SCHEMA_VERSION: i32 = 7;
 
 /// Initialize the database schema
 pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
@@ -131,6 +131,27 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         current = 6;
     }
 
+    // Migration: v6 -> v7: Add governance tables
+    if current == 6 {
+        info!("Migrating v6 -> v7: Adding governance tables");
+        conn.execute_batch(GOVERNANCE_STATES_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create governance_states table: {}", e))
+        })?;
+        conn.execute_batch(CHALLENGES_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create challenges table: {}", e))
+        })?;
+        conn.execute_batch(PROPOSALS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create proposals table: {}", e))
+        })?;
+        conn.execute_batch(PRECEDENTS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create precedents table: {}", e))
+        })?;
+        conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create discussions table: {}", e))
+        })?;
+        current = 7;
+    }
+
     set_schema_version(conn, current)?;
     Ok(())
 }
@@ -173,6 +194,21 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     })?;
     conn.execute_batch(HUMANS_SCHEMA)
         .map_err(|e| StorageError::Internal(format!("Failed to create humans table: {}", e)))?;
+    conn.execute_batch(GOVERNANCE_STATES_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create governance_states table: {}", e))
+    })?;
+    conn.execute_batch(CHALLENGES_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create challenges table: {}", e))
+    })?;
+    conn.execute_batch(PROPOSALS_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create proposals table: {}", e))
+    })?;
+    conn.execute_batch(PRECEDENTS_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create precedents table: {}", e))
+    })?;
+    conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create discussions table: {}", e))
+    })?;
     Ok(())
 }
 
@@ -734,4 +770,88 @@ CREATE TABLE IF NOT EXISTS humans (
 );
 CREATE INDEX IF NOT EXISTS idx_humans_agent_pub_key ON humans(agent_pub_key);
 CREATE INDEX IF NOT EXISTS idx_humans_app_id ON humans(app_id);
+"#;
+
+// ============================================================================
+// Schema V7: Governance Tables
+// ============================================================================
+
+/// Governance states — per-entity governance metadata
+const GOVERNANCE_STATES_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS governance_states (
+    id TEXT PRIMARY KEY NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    reach TEXT NOT NULL DEFAULT 'community',
+    labels TEXT NOT NULL DEFAULT '[]',
+    voting_state TEXT NOT NULL DEFAULT 'none',
+    signal_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_governance_states_entity ON governance_states(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_governance_states_voting ON governance_states(voting_state);
+"#;
+
+/// Challenges — content challenges with evidence
+const CHALLENGES_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS challenges (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL,
+    challenger_presence_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    evidence TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_challenges_content ON challenges(content_id);
+CREATE INDEX IF NOT EXISTS idx_challenges_status ON challenges(status);
+"#;
+
+/// Proposals — governance proposals for content
+const PROPOSALS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS proposals (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL,
+    proposer_presence_id TEXT NOT NULL,
+    proposal_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    votes_for INTEGER NOT NULL DEFAULT 0,
+    votes_against INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_proposals_content ON proposals(content_id);
+CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status);
+"#;
+
+/// Precedents — established governance precedents
+const PRECEDENTS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS precedents (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL,
+    principle TEXT NOT NULL,
+    interpretation TEXT NOT NULL,
+    established_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_precedents_content ON precedents(content_id);
+"#;
+
+/// Discussions — threaded discussion on content
+const DISCUSSIONS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS discussions (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL,
+    author_presence_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    parent_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_discussions_content ON discussions(content_id);
+CREATE INDEX IF NOT EXISTS idx_discussions_parent ON discussions(parent_id);
 "#;

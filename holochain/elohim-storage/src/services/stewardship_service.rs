@@ -10,7 +10,7 @@
 use chrono::Utc;
 use serde_json::Value;
 
-use crate::db::models::governance_states;
+use crate::db::models::allocation_governance_states;
 use crate::db::models::{ContentStewardship, StewardshipAllocation};
 use crate::db::stewardship_allocations::{
     self, AllocationQuery, CreateAllocationInput, UpdateAllocationInput,
@@ -141,12 +141,12 @@ impl StewardshipService {
 
         // Verify current state allows transitioning to DISPUTED
         let allocation = stewardship_allocations::get_allocation_by_id(conn, ctx, allocation_id)?;
-        if allocation.governance_state == governance_states::DISPUTED {
+        if allocation.governance_state == allocation_governance_states::DISPUTED {
             return Err(StorageError::InvalidInput(
                 "Allocation already has an active dispute".into(),
             ));
         }
-        if allocation.governance_state == governance_states::SUPERSEDED {
+        if allocation.governance_state == allocation_governance_states::SUPERSEDED {
             return Err(StorageError::InvalidInput(
                 "Cannot dispute a superseded allocation".into(),
             ));
@@ -183,9 +183,9 @@ impl StewardshipService {
         }
 
         let allowed_target_states = [
-            governance_states::ACTIVE,
-            governance_states::PENDING_REVIEW,
-            governance_states::SUPERSEDED,
+            allocation_governance_states::ACTIVE,
+            allocation_governance_states::PENDING_REVIEW,
+            allocation_governance_states::SUPERSEDED,
         ];
         if !allowed_target_states.contains(&new_state) {
             return Err(StorageError::InvalidInput(format!(

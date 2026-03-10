@@ -11,7 +11,7 @@ use uuid::Uuid;
 use super::context::AppContext;
 use super::diesel_schema::stewardship_allocations;
 use super::models::{
-    allocation_methods, contribution_types, current_timestamp, governance_states,
+    allocation_methods, contribution_types, current_timestamp, allocation_governance_states,
     ContentStewardship, ContributorPresence, NewStewardshipAllocation, StewardshipAllocation,
     StewardshipAllocationWithPresence,
 };
@@ -121,7 +121,7 @@ pub fn create_allocation(
         allocation_method: &input.allocation_method,
         contribution_type: &input.contribution_type,
         contribution_evidence_json: input.contribution_evidence_json.as_deref(),
-        governance_state: governance_states::ACTIVE,
+        governance_state: allocation_governance_states::ACTIVE,
         note: input.note.as_deref(),
         metadata_json: input.metadata_json.as_deref(),
     };
@@ -178,7 +178,7 @@ pub fn list_allocations(
     }
 
     if query.active_only.unwrap_or(false) {
-        q = q.filter(stewardship_allocations::governance_state.eq(governance_states::ACTIVE));
+        q = q.filter(stewardship_allocations::governance_state.eq(allocation_governance_states::ACTIVE));
         q = q.filter(stewardship_allocations::effective_until.is_null());
     }
 
@@ -275,7 +275,7 @@ pub fn get_content_stewardship(
     let total_allocation: f32 = allocations.iter().map(|a| a.allocation_ratio).sum();
     let has_disputes = allocations
         .iter()
-        .any(|a| a.governance_state == governance_states::DISPUTED);
+        .any(|a| a.governance_state == allocation_governance_states::DISPUTED);
 
     Ok(ContentStewardship {
         content_id: content_id.to_string(),
@@ -359,7 +359,7 @@ pub fn supersede_allocation(
         .filter(stewardship_allocations::id.eq(id))
         .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
         .set((
-            stewardship_allocations::governance_state.eq(governance_states::SUPERSEDED),
+            stewardship_allocations::governance_state.eq(allocation_governance_states::SUPERSEDED),
             stewardship_allocations::effective_until.eq(&now),
             stewardship_allocations::superseded_by.eq(replacement_id),
             stewardship_allocations::updated_at.eq(&now),
@@ -409,7 +409,7 @@ pub fn file_dispute(
         .filter(stewardship_allocations::id.eq(allocation_id))
         .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
         .set((
-            stewardship_allocations::governance_state.eq(governance_states::DISPUTED),
+            stewardship_allocations::governance_state.eq(allocation_governance_states::DISPUTED),
             stewardship_allocations::dispute_id.eq(dispute_id),
             stewardship_allocations::dispute_reason.eq(reason),
             stewardship_allocations::disputed_at.eq(&now),
@@ -432,7 +432,7 @@ pub fn resolve_dispute(
 ) -> Result<StewardshipAllocation, StorageError> {
     let now = current_timestamp();
 
-    if !governance_states::is_valid(new_state) {
+    if !allocation_governance_states::is_valid(new_state) {
         return Err(StorageError::InvalidInput(format!(
             "Invalid governance state: {}",
             new_state

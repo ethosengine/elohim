@@ -392,6 +392,72 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    governance_states (id) {
+        id -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        reach -> Text,
+        labels -> Text,
+        voting_state -> Text,
+        signal_count -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    challenges (id) {
+        id -> Text,
+        content_id -> Text,
+        challenger_presence_id -> Text,
+        reason -> Text,
+        status -> Text,
+        evidence -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    proposals (id) {
+        id -> Text,
+        content_id -> Text,
+        proposer_presence_id -> Text,
+        proposal_type -> Text,
+        title -> Text,
+        body -> Text,
+        status -> Text,
+        votes_for -> Integer,
+        votes_against -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    precedents (id) {
+        id -> Text,
+        content_id -> Text,
+        principle -> Text,
+        interpretation -> Text,
+        established_by -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    discussions (id) {
+        id -> Text,
+        content_id -> Text,
+        author_presence_id -> Text,
+        body -> Text,
+        parent_id -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -402,6 +468,7 @@ diesel::joinable!(steps -> paths (path_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     apps,
+    challenges,
     chapters,
     collective_participations,
     collectives,
@@ -411,13 +478,17 @@ diesel::allow_tables_to_appear_in_same_query!(
     contributor_presences,
     custodian_metrics,
     device_policies,
+    discussions,
     economic_events,
+    governance_states,
     human_relationships,
     humans,
     local_sessions,
     path_attestations,
     path_tags,
     paths,
+    precedents,
+    proposals,
     relationships,
     schema_version,
     stewardship_allocations,
