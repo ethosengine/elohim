@@ -13,11 +13,12 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::diesel_schema::{
-    apps, challenges, chapters, collective_participations, collectives, content, content_mastery,
-    content_tags, contributor_presences, custodian_metrics, device_policies, discussions,
-    economic_events, governance_states, human_relationships, humans, local_sessions,
-    path_attestations, path_tags, paths, precedents, proposals, relationships, steps,
-    stewardship_allocations,
+    access_grants, apps, challenges, chapters, collective_participations, collectives, content,
+    content_attestations, content_mastery, content_tags, contributor_dashboards,
+    contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
+    governance_states, human_relationships, humans, local_sessions, path_attestations, path_tags,
+    paths, precedents, premium_gates, proposals, relationships, steward_credentials, steps,
+    rea_commitments, stewardship_allocations,
 };
 
 // ============================================================================
@@ -1482,4 +1483,221 @@ pub struct NewDiscussion<'a> {
     pub author_presence_id: &'a str,
     pub body: &'a str,
     pub parent_id: Option<&'a str>,
+}
+
+// ============================================================================
+// Content Attestation Models
+// ============================================================================
+
+/// Content attestation row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = content_attestations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ContentAttestation {
+    pub id: String,
+    pub content_id: String,
+    pub attestor_presence_id: String,
+    pub scope: String,
+    pub attestation_type: String,
+    pub evidence: Option<String>,
+    pub grantor: Option<String>,
+    pub is_revoked: i32,
+    pub revocation: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New content attestation for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = content_attestations)]
+pub struct NewContentAttestation<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub attestor_presence_id: &'a str,
+    pub scope: &'a str,
+    pub attestation_type: &'a str,
+    pub evidence: Option<&'a str>,
+    pub grantor: Option<&'a str>,
+}
+
+// ============================================================================
+// Steward Credential Models
+// ============================================================================
+
+/// Steward credential row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = steward_credentials)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct StewardCredential {
+    pub id: String,
+    pub presence_id: String,
+    pub content_id: String,
+    pub affinity_coefficient: f32,
+    pub credential_type: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New steward credential for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = steward_credentials)]
+pub struct NewStewardCredential<'a> {
+    pub id: &'a str,
+    pub presence_id: &'a str,
+    pub content_id: &'a str,
+    pub affinity_coefficient: f32,
+    pub credential_type: &'a str,
+    pub status: &'a str,
+}
+
+// ============================================================================
+// Premium Gate Models
+// ============================================================================
+
+/// Premium gate row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = premium_gates)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PremiumGate {
+    pub id: String,
+    pub steward_credential_id: String,
+    pub steward_presence_id: String,
+    pub gated_resource_type: String,
+    pub gated_resource_ids: String,
+    pub gate_title: String,
+    pub gate_description: Option<String>,
+    pub created_at: String,
+}
+
+/// New premium gate for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = premium_gates)]
+pub struct NewPremiumGate<'a> {
+    pub id: &'a str,
+    pub steward_credential_id: &'a str,
+    pub steward_presence_id: &'a str,
+    pub gated_resource_type: &'a str,
+    pub gated_resource_ids: &'a str,
+    pub gate_title: &'a str,
+    pub gate_description: Option<&'a str>,
+}
+
+// ============================================================================
+// Access Grant Models
+// ============================================================================
+
+/// Access grant row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = access_grants)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct AccessGrant {
+    pub id: String,
+    pub gate_id: String,
+    pub grantee_presence_id: String,
+    pub contributor_presence_id: Option<String>,
+    pub granted_at: String,
+    pub expires_at: Option<String>,
+    pub status: String,
+}
+
+/// New access grant for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = access_grants)]
+pub struct NewAccessGrant<'a> {
+    pub id: &'a str,
+    pub gate_id: &'a str,
+    pub grantee_presence_id: &'a str,
+    pub contributor_presence_id: Option<&'a str>,
+    pub granted_at: &'a str,
+    pub expires_at: Option<&'a str>,
+    pub status: &'a str,
+}
+
+// ============================================================================
+// Contributor Dashboard Models
+// ============================================================================
+
+/// Contributor dashboard row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = contributor_dashboards)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ContributorDashboard {
+    pub presence_id: String,
+    pub total_contributions: i32,
+    pub total_recognitions: i32,
+    pub impact_score: f32,
+    pub last_contribution_at: Option<String>,
+    pub updated_at: String,
+}
+
+/// New contributor dashboard for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = contributor_dashboards)]
+pub struct NewContributorDashboard<'a> {
+    pub presence_id: &'a str,
+    pub total_contributions: i32,
+    pub total_recognitions: i32,
+    pub impact_score: f32,
+    pub last_contribution_at: Option<&'a str>,
+}
+
+// ============================================================================
+// REA Commitment
+// ============================================================================
+
+/// REA Commitment — a binding promise of future economic activity
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = rea_commitments)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ReaCommitment {
+    pub id: String,
+    pub app_id: String,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    pub resource_conforms_to: Option<String>,
+    pub resource_classified_as: Option<String>,
+    pub resource_quantity_value: Option<f32>,
+    pub resource_quantity_unit: Option<String>,
+    pub effort_quantity_value: Option<f32>,
+    pub effort_quantity_unit: Option<String>,
+    pub has_beginning: Option<String>,
+    pub has_end: Option<String>,
+    pub due: Option<String>,
+    pub clause_of: Option<String>,
+    pub in_scope_of: Option<String>,
+    pub medium_of_exchange_id: Option<String>,
+    pub state: String,
+    pub finished: i32,
+    pub note: Option<String>,
+    pub metadata_json: Option<String>,
+    pub created_at: String,
+}
+
+/// New REA commitment for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = rea_commitments)]
+pub struct NewReaCommitment<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub action: &'a str,
+    pub provider: &'a str,
+    pub receiver: &'a str,
+    pub resource_conforms_to: Option<&'a str>,
+    pub resource_classified_as: Option<&'a str>,
+    pub resource_quantity_value: Option<f32>,
+    pub resource_quantity_unit: Option<&'a str>,
+    pub effort_quantity_value: Option<f32>,
+    pub effort_quantity_unit: Option<&'a str>,
+    pub has_beginning: Option<&'a str>,
+    pub has_end: Option<&'a str>,
+    pub due: Option<&'a str>,
+    pub clause_of: Option<&'a str>,
+    pub in_scope_of: Option<&'a str>,
+    pub medium_of_exchange_id: Option<&'a str>,
+    pub state: &'a str,
+    pub finished: i32,
+    pub note: Option<&'a str>,
+    pub metadata_json: Option<&'a str>,
 }

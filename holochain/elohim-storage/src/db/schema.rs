@@ -149,6 +149,21 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
             StorageError::Internal(format!("Failed to create discussions table: {}", e))
         })?;
+        conn.execute_batch(CONTENT_ATTESTATIONS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create content_attestations table: {}", e))
+        })?;
+        conn.execute_batch(STEWARD_CREDENTIALS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create steward_credentials table: {}", e))
+        })?;
+        conn.execute_batch(PREMIUM_GATES_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create premium_gates table: {}", e))
+        })?;
+        conn.execute_batch(ACCESS_GRANTS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create access_grants table: {}", e))
+        })?;
+        conn.execute_batch(CONTRIBUTOR_DASHBOARDS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create contributor_dashboards table: {}", e))
+        })?;
         current = 7;
     }
 
@@ -209,6 +224,33 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create discussions table: {}", e))
     })?;
+    conn.execute_batch(CONTENT_ATTESTATIONS_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to create content_attestations table: {}",
+                e
+            ))
+        })?;
+    conn.execute_batch(STEWARD_CREDENTIALS_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to create steward_credentials table: {}",
+                e
+            ))
+        })?;
+    conn.execute_batch(PREMIUM_GATES_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create premium_gates table: {}", e))
+    })?;
+    conn.execute_batch(ACCESS_GRANTS_SCHEMA).map_err(|e| {
+        StorageError::Internal(format!("Failed to create access_grants table: {}", e))
+    })?;
+    conn.execute_batch(CONTRIBUTOR_DASHBOARDS_SCHEMA)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to create contributor_dashboards table: {}",
+                e
+            ))
+        })?;
     Ok(())
 }
 
@@ -854,4 +896,92 @@ CREATE TABLE IF NOT EXISTS discussions (
 );
 CREATE INDEX IF NOT EXISTS idx_discussions_content ON discussions(content_id);
 CREATE INDEX IF NOT EXISTS idx_discussions_parent ON discussions(parent_id);
+"#;
+
+// ============================================================================
+// Schema V7 (continued): Attestation, Steward, and Contributor Tables
+// ============================================================================
+
+/// Content attestations — scoped attestations with evidence
+const CONTENT_ATTESTATIONS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS content_attestations (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL,
+    attestor_presence_id TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    attestation_type TEXT NOT NULL,
+    evidence TEXT DEFAULT '[]',
+    grantor TEXT DEFAULT '{}',
+    is_revoked INTEGER NOT NULL DEFAULT 0,
+    revocation TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_content_attestations_content ON content_attestations(content_id);
+CREATE INDEX IF NOT EXISTS idx_content_attestations_attestor ON content_attestations(attestor_presence_id);
+CREATE INDEX IF NOT EXISTS idx_content_attestations_scope ON content_attestations(scope);
+CREATE INDEX IF NOT EXISTS idx_content_attestations_type ON content_attestations(attestation_type);
+CREATE INDEX IF NOT EXISTS idx_content_attestations_revoked ON content_attestations(is_revoked);
+"#;
+
+/// Steward credentials — steward qualifications per content
+const STEWARD_CREDENTIALS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS steward_credentials (
+    id TEXT PRIMARY KEY NOT NULL,
+    presence_id TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    affinity_coefficient REAL NOT NULL,
+    credential_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_steward_credentials_presence ON steward_credentials(presence_id);
+CREATE INDEX IF NOT EXISTS idx_steward_credentials_content ON steward_credentials(content_id);
+CREATE INDEX IF NOT EXISTS idx_steward_credentials_status ON steward_credentials(status);
+"#;
+
+/// Premium gates — access gates on resources
+const PREMIUM_GATES_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS premium_gates (
+    id TEXT PRIMARY KEY NOT NULL,
+    steward_credential_id TEXT NOT NULL,
+    steward_presence_id TEXT NOT NULL,
+    gated_resource_type TEXT NOT NULL,
+    gated_resource_ids TEXT NOT NULL DEFAULT '[]',
+    gate_title TEXT NOT NULL,
+    gate_description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_premium_gates_steward ON premium_gates(steward_presence_id);
+CREATE INDEX IF NOT EXISTS idx_premium_gates_resource_type ON premium_gates(gated_resource_type);
+CREATE INDEX IF NOT EXISTS idx_premium_gates_credential ON premium_gates(steward_credential_id);
+"#;
+
+/// Access grants — grants on premium gates
+const ACCESS_GRANTS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS access_grants (
+    id TEXT PRIMARY KEY NOT NULL,
+    gate_id TEXT NOT NULL,
+    grantee_presence_id TEXT NOT NULL,
+    contributor_presence_id TEXT,
+    granted_at TEXT NOT NULL,
+    expires_at TEXT,
+    status TEXT NOT NULL DEFAULT 'active'
+);
+CREATE INDEX IF NOT EXISTS idx_access_grants_gate ON access_grants(gate_id);
+CREATE INDEX IF NOT EXISTS idx_access_grants_grantee ON access_grants(grantee_presence_id);
+CREATE INDEX IF NOT EXISTS idx_access_grants_status ON access_grants(status);
+"#;
+
+/// Contributor dashboards — aggregated contributor metrics
+const CONTRIBUTOR_DASHBOARDS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS contributor_dashboards (
+    presence_id TEXT PRIMARY KEY NOT NULL,
+    total_contributions INTEGER NOT NULL DEFAULT 0,
+    total_recognitions INTEGER NOT NULL DEFAULT 0,
+    impact_score REAL NOT NULL DEFAULT 0.0,
+    last_contribution_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 "#;

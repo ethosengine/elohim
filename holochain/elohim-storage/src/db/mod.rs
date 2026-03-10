@@ -45,6 +45,7 @@ pub mod contributor_presences;
 pub mod device_policies;
 pub mod economic_events;
 pub mod human_relationships;
+pub mod rea_commitments;
 pub mod humans;
 pub mod local_sessions;
 pub mod relationships_diesel;
@@ -52,6 +53,11 @@ pub mod stewardship_allocations;
 
 // Governance tables (v7)
 pub mod governance;
+
+// Attestation, steward, and contributor tables (v7)
+pub mod content_attestations;
+pub mod contributors;
+pub mod steward_operations;
 
 // Custodian node metrics
 pub mod custodian_metrics;
