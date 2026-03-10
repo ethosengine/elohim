@@ -434,7 +434,7 @@ fn build_protection_status(
             location_country: None,
             data_stored_total_gb: m.storage.used_bytes as f64 / 1_073_741_824.0,
             data_stored_shard_count: 0,
-            data_stored_redundancy_level: m.tier as u32,
+            data_stored_redundancy_level: m.tier,
             health_up_percent: m.health.uptime_percent,
             health_last_heartbeat: m.last_updated_at.to_string(),
             health_response_time_ms: m.health.response_time_p50_ms,
