@@ -10215,6 +10215,27 @@ pub enum ProjectionSignal {
         summary: DoorwayHeartbeatSummary,
         author: AgentPubKey,
     },
+    /// REA Agreement committed to DHT
+    AgreementCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        agreement: Agreement,
+        author: AgentPubKey,
+    },
+    /// REA Commitment committed to DHT (not CustodianCommitment)
+    ReaCommitmentCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        commitment: Commitment,
+        author: AgentPubKey,
+    },
+    /// REA EconomicEvent committed to DHT
+    ReaEconomicEventCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        event: EconomicEvent,
+        author: AgentPubKey,
+    },
     /// Generic entry committed (for extension)
     EntryCommitted {
         action_hash: ActionHash,
@@ -10432,6 +10453,27 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
                 entry_hash,
                 summary,
+                author,
+            })?;
+        } else if let Some(agreement) = record.entry().to_app_option::<Agreement>().ok().flatten() {
+            emit_signal(ProjectionSignal::AgreementCommitted {
+                action_hash,
+                entry_hash,
+                agreement,
+                author,
+            })?;
+        } else if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten() {
+            emit_signal(ProjectionSignal::ReaCommitmentCommitted {
+                action_hash,
+                entry_hash,
+                commitment,
+                author,
+            })?;
+        } else if let Some(event) = record.entry().to_app_option::<EconomicEvent>().ok().flatten() {
+            emit_signal(ProjectionSignal::ReaEconomicEventCommitted {
+                action_hash,
+                entry_hash,
+                event,
                 author,
             })?;
         }
