@@ -1272,6 +1272,34 @@ async fn handle_request(
             ));
         }
 
+        // Governance API
+        (_, p) if p.starts_with("/api/v1/governance") => {
+            return Ok(to_boxed(
+                routes::handle_governance_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Attestations API
+        (_, p) if p.starts_with("/api/v1/attestations") => {
+            return Ok(to_boxed(
+                routes::handle_attestations_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Steward API (NOT stewardship — that's a different route)
+        (_, p) if p.starts_with("/api/v1/steward/") || p == "/api/v1/steward" => {
+            return Ok(to_boxed(
+                routes::handle_steward_api_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Contributors API
+        (_, p) if p.starts_with("/api/v1/contributors") => {
+            return Ok(to_boxed(
+                routes::handle_contributors_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };
