@@ -84,11 +84,15 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 }
 
 use crate::db::models::{
-    App, Chapter, ChapterWithSteps, Content, ContentMastery, ContentStewardship, ContentWithTags,
-    ContributorPresence, CustodianMetrics, EconomicEvent, Human, HumanRelationship, LocalSession,
-    Path, PathAttestation, PathWithDetails, PathWithSteps, Relationship, RelationshipWithContent,
-    Step, StewardshipAllocation, StewardshipAllocationWithPresence,
+    AccessGrant, App, Challenge, Chapter, ChapterWithSteps, Content, ContentAttestation,
+    ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard, ContributorPresence,
+    CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human, HumanRelationship,
+    LocalSession, Path, PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate,
+    Proposal, Relationship, RelationshipWithContent, Step, StewardCredential,
+    ReaCommitment, StewardshipAllocation, StewardshipAllocationWithPresence,
 };
+use crate::db::contributors::ImpactSummary;
+use crate::db::steward_operations::RevenueSummary;
 
 // Legacy rusqlite types (used by services until migration complete)
 use crate::db::content::ContentRow;
@@ -804,6 +808,89 @@ impl From<EconomicEvent> for EconomicEventView {
             note: e.note,
             metadata: parse_json_opt(&e.metadata_json),
             created_at: e.created_at,
+        }
+    }
+}
+
+// ============================================================================
+// REA Commitment Views
+// ============================================================================
+
+/// Measure — quantity + unit pair (ValueFlows)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct MeasureView {
+    pub has_numerical_value: f32,
+    pub has_unit: String,
+}
+
+/// REA Commitment — API output
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ReaCommitmentView {
+    pub id: String,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    pub resource_conforms_to: Option<String>,
+    pub resource_classified_as: Option<Vec<String>>,
+    pub resource_quantity: Option<MeasureView>,
+    pub effort_quantity: Option<MeasureView>,
+    pub has_beginning: Option<String>,
+    pub has_end: Option<String>,
+    pub due: Option<String>,
+    pub clause_of: Option<String>,
+    pub in_scope_of: Option<Vec<String>>,
+    pub medium_of_exchange_id: Option<String>,
+    pub state: String,
+    pub finished: bool,
+    pub note: Option<String>,
+    pub metadata: Option<JsonVal>,
+    pub created_at: String,
+}
+
+impl From<ReaCommitment> for ReaCommitmentView {
+    fn from(c: ReaCommitment) -> Self {
+        Self {
+            id: c.id,
+            action: c.action,
+            provider: c.provider,
+            receiver: c.receiver,
+            resource_conforms_to: c.resource_conforms_to,
+            resource_classified_as: c
+                .resource_classified_as
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok()),
+            resource_quantity: match (c.resource_quantity_value, &c.resource_quantity_unit) {
+                (Some(v), Some(u)) => Some(MeasureView {
+                    has_numerical_value: v,
+                    has_unit: u.clone(),
+                }),
+                _ => None,
+            },
+            effort_quantity: match (c.effort_quantity_value, &c.effort_quantity_unit) {
+                (Some(v), Some(u)) => Some(MeasureView {
+                    has_numerical_value: v,
+                    has_unit: u.clone(),
+                }),
+                _ => None,
+            },
+            has_beginning: c.has_beginning,
+            has_end: c.has_end,
+            due: c.due,
+            clause_of: c.clause_of,
+            in_scope_of: c
+                .in_scope_of
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok()),
+            medium_of_exchange_id: c.medium_of_exchange_id,
+            state: c.state,
+            finished: c.finished != 0,
+            note: c.note,
+            metadata: parse_json_opt(&c.metadata_json),
+            created_at: c.created_at,
         }
     }
 }
@@ -3227,6 +3314,501 @@ pub struct SheafaDashboardStateView {
     // Timestamps
     pub last_updated: String,
     pub update_frequency_ms: u32,
+}
+
+// ============================================================================
+// Governance Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceStateView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub reach: String,
+    pub labels: JsonVal,
+    pub voting_state: String,
+    pub signal_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<GovernanceState> for GovernanceStateView {
+    fn from(g: GovernanceState) -> Self {
+        Self {
+            id: g.id,
+            entity_type: g.entity_type,
+            entity_id: g.entity_id,
+            reach: g.reach,
+            labels: parse_json(&g.labels),
+            voting_state: g.voting_state,
+            signal_count: g.signal_count,
+            created_at: g.created_at,
+            updated_at: g.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ChallengeView {
+    pub id: String,
+    pub content_id: String,
+    pub challenger_presence_id: String,
+    pub reason: String,
+    pub status: String,
+    pub evidence: JsonVal,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<Challenge> for ChallengeView {
+    fn from(c: Challenge) -> Self {
+        Self {
+            id: c.id,
+            content_id: c.content_id,
+            challenger_presence_id: c.challenger_presence_id,
+            reason: c.reason,
+            status: c.status,
+            evidence: parse_json(&c.evidence),
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ProposalView {
+    pub id: String,
+    pub content_id: String,
+    pub proposer_presence_id: String,
+    pub proposal_type: String,
+    pub title: String,
+    pub body: String,
+    pub status: String,
+    pub votes_for: i32,
+    pub votes_against: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<Proposal> for ProposalView {
+    fn from(p: Proposal) -> Self {
+        Self {
+            id: p.id,
+            content_id: p.content_id,
+            proposer_presence_id: p.proposer_presence_id,
+            proposal_type: p.proposal_type,
+            title: p.title,
+            body: p.body,
+            status: p.status,
+            votes_for: p.votes_for,
+            votes_against: p.votes_against,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PrecedentView {
+    pub id: String,
+    pub content_id: String,
+    pub principle: String,
+    pub interpretation: String,
+    pub established_by: String,
+    pub created_at: String,
+}
+
+impl From<Precedent> for PrecedentView {
+    fn from(p: Precedent) -> Self {
+        Self {
+            id: p.id,
+            content_id: p.content_id,
+            principle: p.principle,
+            interpretation: p.interpretation,
+            established_by: p.established_by,
+            created_at: p.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DiscussionView {
+    pub id: String,
+    pub content_id: String,
+    pub author_presence_id: String,
+    pub body: String,
+    pub parent_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<Discussion> for DiscussionView {
+    fn from(d: Discussion) -> Self {
+        Self {
+            id: d.id,
+            content_id: d.content_id,
+            author_presence_id: d.author_presence_id,
+            body: d.body,
+            parent_id: d.parent_id,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+        }
+    }
+}
+
+// ============================================================================
+// Attestation Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContentAttestationView {
+    pub id: String,
+    pub content_id: String,
+    pub attestor_presence_id: String,
+    pub scope: String,
+    pub attestation_type: String,
+    pub evidence: Option<JsonVal>,
+    pub grantor: Option<JsonVal>,
+    pub is_revoked: bool,
+    pub revocation: Option<JsonVal>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<ContentAttestation> for ContentAttestationView {
+    fn from(c: ContentAttestation) -> Self {
+        Self {
+            id: c.id,
+            content_id: c.content_id,
+            attestor_presence_id: c.attestor_presence_id,
+            scope: c.scope,
+            attestation_type: c.attestation_type,
+            evidence: parse_json_opt(&c.evidence),
+            grantor: parse_json_opt(&c.grantor),
+            is_revoked: c.is_revoked == 1,
+            revocation: parse_json_opt(&c.revocation),
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateAttestationInputView {
+    pub content_id: String,
+    pub attestor_presence_id: String,
+    pub scope: String,
+    pub attestation_type: String,
+    pub evidence: Option<JsonVal>,
+    pub grantor: Option<JsonVal>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RevokeAttestationInputView {
+    pub revocation: Option<JsonVal>,
+}
+
+// ============================================================================
+// Steward Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardCredentialView {
+    pub id: String,
+    pub presence_id: String,
+    pub content_id: String,
+    pub affinity_coefficient: f32,
+    pub credential_type: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<StewardCredential> for StewardCredentialView {
+    fn from(s: StewardCredential) -> Self {
+        Self {
+            id: s.id,
+            presence_id: s.presence_id,
+            content_id: s.content_id,
+            affinity_coefficient: s.affinity_coefficient,
+            credential_type: s.credential_type,
+            status: s.status,
+            created_at: s.created_at,
+            updated_at: s.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PremiumGateView {
+    pub id: String,
+    pub steward_credential_id: String,
+    pub steward_presence_id: String,
+    pub gated_resource_type: String,
+    pub gated_resource_ids: JsonVal,
+    pub gate_title: String,
+    pub gate_description: Option<String>,
+    pub created_at: String,
+}
+
+impl From<PremiumGate> for PremiumGateView {
+    fn from(g: PremiumGate) -> Self {
+        Self {
+            id: g.id,
+            steward_credential_id: g.steward_credential_id,
+            steward_presence_id: g.steward_presence_id,
+            gated_resource_type: g.gated_resource_type,
+            gated_resource_ids: parse_json(&g.gated_resource_ids),
+            gate_title: g.gate_title,
+            gate_description: g.gate_description,
+            created_at: g.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccessGrantView {
+    pub id: String,
+    pub gate_id: String,
+    pub grantee_presence_id: String,
+    pub contributor_presence_id: Option<String>,
+    pub granted_at: String,
+    pub expires_at: Option<String>,
+    pub status: String,
+}
+
+impl From<AccessGrant> for AccessGrantView {
+    fn from(a: AccessGrant) -> Self {
+        Self {
+            id: a.id,
+            gate_id: a.gate_id,
+            grantee_presence_id: a.grantee_presence_id,
+            contributor_presence_id: a.contributor_presence_id,
+            granted_at: a.granted_at,
+            expires_at: a.expires_at,
+            status: a.status,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardRevenueSummaryView {
+    pub total_credentials: i64,
+    pub total_gates: i64,
+    pub total_grants: i64,
+}
+
+impl From<RevenueSummary> for StewardRevenueSummaryView {
+    fn from(r: RevenueSummary) -> Self {
+        Self {
+            total_credentials: r.total_credentials,
+            total_gates: r.total_gates,
+            total_grants: r.total_grants,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateCredentialInputView {
+    pub presence_id: String,
+    pub content_id: String,
+    pub affinity_coefficient: f32,
+    pub credential_type: String,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateGateInputView {
+    pub steward_credential_id: String,
+    pub steward_presence_id: String,
+    pub gated_resource_type: String,
+    pub gated_resource_ids: JsonVal,
+    pub gate_title: String,
+    pub gate_description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateGrantInputView {
+    pub gate_id: String,
+    pub grantee_presence_id: String,
+    pub contributor_presence_id: Option<String>,
+    pub expires_at: Option<String>,
+}
+
+// ============================================================================
+// Contributor Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContributorDashboardView {
+    pub presence_id: String,
+    pub total_contributions: i32,
+    pub total_recognitions: i32,
+    pub impact_score: f32,
+    pub last_contribution_at: Option<String>,
+    pub updated_at: String,
+}
+
+impl From<ContributorDashboard> for ContributorDashboardView {
+    fn from(d: ContributorDashboard) -> Self {
+        Self {
+            presence_id: d.presence_id,
+            total_contributions: d.total_contributions,
+            total_recognitions: d.total_recognitions,
+            impact_score: d.impact_score,
+            last_contribution_at: d.last_contribution_at,
+            updated_at: d.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContributorImpactView {
+    pub presence_id: String,
+    pub total_events: i64,
+    pub unique_content_ids: Vec<String>,
+}
+
+impl From<ImpactSummary> for ContributorImpactView {
+    fn from(i: ImpactSummary) -> Self {
+        Self {
+            presence_id: i.presence_id,
+            total_events: i.total_events,
+            unique_content_ids: i.unique_content_ids,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ContributorRecognitionView {
+    pub presence_id: String,
+    pub events: Vec<EconomicEventView>,
+}
+
+// ============================================================================
+// REA Commitment Input Views
+// ============================================================================
+
+use crate::db::rea_commitments::{CreateReaCommitmentInput, UpdateReaCommitmentState};
+
+/// REA Commitment — API input
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateReaCommitmentInputView {
+    #[serde(default)]
+    pub id: Option<String>,
+    pub action: String,
+    pub provider: String,
+    pub receiver: String,
+    #[serde(default)]
+    pub resource_conforms_to: Option<String>,
+    #[serde(default)]
+    pub resource_classified_as: Option<Vec<String>>,
+    #[serde(default)]
+    pub resource_quantity: Option<MeasureView>,
+    #[serde(default)]
+    pub effort_quantity: Option<MeasureView>,
+    #[serde(default)]
+    pub has_beginning: Option<String>,
+    #[serde(default)]
+    pub has_end: Option<String>,
+    #[serde(default)]
+    pub due: Option<String>,
+    #[serde(default)]
+    pub clause_of: Option<String>,
+    #[serde(default)]
+    pub in_scope_of: Option<Vec<String>>,
+    #[serde(default)]
+    pub medium_of_exchange_id: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+}
+
+impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
+    fn from(v: CreateReaCommitmentInputView) -> Self {
+        Self {
+            id: v.id,
+            action: v.action,
+            provider: v.provider,
+            receiver: v.receiver,
+            resource_conforms_to: v.resource_conforms_to,
+            resource_classified_as: v
+                .resource_classified_as
+                .map(|v| serde_json::to_string(&v).unwrap_or_default()),
+            resource_quantity_value: v.resource_quantity.as_ref().map(|m| m.has_numerical_value),
+            resource_quantity_unit: v.resource_quantity.map(|m| m.has_unit),
+            effort_quantity_value: v.effort_quantity.as_ref().map(|m| m.has_numerical_value),
+            effort_quantity_unit: v.effort_quantity.map(|m| m.has_unit),
+            has_beginning: v.has_beginning,
+            has_end: v.has_end,
+            due: v.due,
+            clause_of: v.clause_of,
+            in_scope_of: v
+                .in_scope_of
+                .map(|v| serde_json::to_string(&v).unwrap_or_default()),
+            medium_of_exchange_id: v.medium_of_exchange_id,
+            note: v.note,
+            metadata_json: serialize_json_opt(&v.metadata),
+        }
+    }
+}
+
+/// State update input
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateReaCommitmentStateView {
+    pub state: String,
+    #[serde(default)]
+    pub finished: Option<bool>,
+}
+
+impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
+    fn from(v: UpdateReaCommitmentStateView) -> Self {
+        Self {
+            state: v.state,
+            finished: v.finished,
+        }
+    }
 }
 
 // ============================================================================
