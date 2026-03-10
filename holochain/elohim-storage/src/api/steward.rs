@@ -110,9 +110,8 @@ pub async fn handle(
         // GET /api/v1/steward/credentials/{id}
         (&Method::GET, p) if p.starts_with("/credentials/") => {
             let sub = p.strip_prefix("/credentials").unwrap_or("");
-            let id = extract_id(sub).ok_or_else(|| {
-                StorageError::InvalidInput("Credential ID required".to_string())
-            })?;
+            let id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Credential ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = steward_operations::get_credential(&mut conn, id)?;
             Ok(response::from_option(
@@ -130,18 +129,20 @@ pub async fn handle(
             let mut conn = get_conn(pool)?;
 
             if let Some(presence_id) = &presence_params.presence_id {
-                let results = steward_operations::query_credentials_for_presence(
-                    &mut conn,
-                    presence_id,
-                )?;
-                let views: Vec<StewardCredentialView> =
-                    results.into_iter().map(StewardCredentialView::from).collect();
+                let results =
+                    steward_operations::query_credentials_for_presence(&mut conn, presence_id)?;
+                let views: Vec<StewardCredentialView> = results
+                    .into_iter()
+                    .map(StewardCredentialView::from)
+                    .collect();
                 Ok(response::ok(&views))
             } else if let Some(content_id) = &content_params.content_id {
                 let results =
                     steward_operations::query_credentials_for_content(&mut conn, content_id)?;
-                let views: Vec<StewardCredentialView> =
-                    results.into_iter().map(StewardCredentialView::from).collect();
+                let views: Vec<StewardCredentialView> = results
+                    .into_iter()
+                    .map(StewardCredentialView::from)
+                    .collect();
                 Ok(response::ok(&views))
             } else {
                 Ok(response::bad_request(
@@ -158,8 +159,8 @@ pub async fn handle(
         (&Method::POST, "/gates") => {
             let input: CreateGateInputView = parse_body(req).await?;
             let id = uuid::Uuid::new_v4().to_string();
-            let resource_ids_json = serde_json::to_string(&input.gated_resource_ids.0)
-                .map_err(|e| {
+            let resource_ids_json =
+                serde_json::to_string(&input.gated_resource_ids.0).map_err(|e| {
                     StorageError::InvalidInput(format!("Invalid gated_resource_ids JSON: {}", e))
                 })?;
             let new = NewPremiumGate {
@@ -179,9 +180,8 @@ pub async fn handle(
         // GET /api/v1/steward/gates/{id}
         (&Method::GET, p) if p.starts_with("/gates/") => {
             let sub = p.strip_prefix("/gates").unwrap_or("");
-            let id = extract_id(sub).ok_or_else(|| {
-                StorageError::InvalidInput("Gate ID required".to_string())
-            })?;
+            let id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Gate ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = steward_operations::get_gate(&mut conn, id)?;
             Ok(response::from_option(
@@ -233,9 +233,8 @@ pub async fn handle(
         // GET /api/v1/steward/grants/{id}
         (&Method::GET, p) if p.starts_with("/grants/") => {
             let sub = p.strip_prefix("/grants").unwrap_or("");
-            let id = extract_id(sub).ok_or_else(|| {
-                StorageError::InvalidInput("Grant ID required".to_string())
-            })?;
+            let id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Grant ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = steward_operations::get_grant(&mut conn, id)?;
             Ok(response::from_option(
@@ -273,9 +272,10 @@ pub async fn handle(
                 ));
             }
             let mut conn = get_conn(pool)?;
-            let has_access =
-                steward_operations::check_access(&mut conn, gate_id, grantee_id)?;
-            Ok(response::ok(&serde_json::json!({ "hasAccess": has_access })))
+            let has_access = steward_operations::check_access(&mut conn, gate_id, grantee_id)?;
+            Ok(response::ok(
+                &serde_json::json!({ "hasAccess": has_access }),
+            ))
         }
 
         // ====================================================================
@@ -285,9 +285,8 @@ pub async fn handle(
         // GET /api/v1/steward/revenue/{presenceId}
         (&Method::GET, p) if p.starts_with("/revenue/") => {
             let sub = p.strip_prefix("/revenue").unwrap_or("");
-            let presence_id = extract_id(sub).ok_or_else(|| {
-                StorageError::InvalidInput("Presence ID required".to_string())
-            })?;
+            let presence_id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Presence ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = steward_operations::get_revenue_summary(&mut conn, presence_id)?;
             Ok(response::ok(&StewardRevenueSummaryView::from(result)))

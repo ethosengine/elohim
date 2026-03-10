@@ -49,9 +49,7 @@ pub async fn handle(
         (&Method::GET, "metrics/alerts") => handle_alerts(pool, ctx).await,
 
         // GET /api/v1/custodians/metrics/{id}/recommendations
-        (&Method::GET, p)
-            if p.starts_with("metrics/") && p.ends_with("/recommendations") =>
-        {
+        (&Method::GET, p) if p.starts_with("metrics/") && p.ends_with("/recommendations") => {
             let id = p
                 .strip_prefix("metrics/")
                 .unwrap()
@@ -67,9 +65,7 @@ pub async fn handle(
         }
 
         // GET /api/v1/custodians/protection/*
-        (&Method::GET, p) if p.starts_with("protection") => {
-            handle_protection(p, pool, ctx).await
-        }
+        (&Method::GET, p) if p.starts_with("protection") => handle_protection(p, pool, ctx).await,
 
         _ => Ok(response::not_found(&format!(
             "Unknown custodians route: /api/v1/custodians/{}",
@@ -89,8 +85,7 @@ async fn handle_list_metrics(
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let query_str = req.uri().query().unwrap_or("");
-    let query: CustodianMetricsQuery =
-        serde_urlencoded::from_str(query_str).unwrap_or_default();
+    let query: CustodianMetricsQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
     let mut conn = get_conn(pool)?;
     let rows = list_metrics(&mut conn, ctx, &query)?;
@@ -169,10 +164,7 @@ async fn handle_alerts(
                 custodian_id: view.custodian_id.clone(),
                 severity: "critical".into(),
                 category: "availability".into(),
-                message: format!(
-                    "Custodian {} is currently unavailable",
-                    view.custodian_id
-                ),
+                message: format!("Custodian {} is currently unavailable", view.custodian_id),
                 suggestion: Some(
                     "Check node connectivity and restart the elohim-node service.".into(),
                 ),
@@ -220,9 +212,7 @@ async fn handle_alerts(
                     "Custodian {} storage utilisation is {:.1}%",
                     view.custodian_id, view.storage.utilization_percent
                 ),
-                suggestion: Some(
-                    "Expand storage capacity or reduce committed data volume.".into(),
-                ),
+                suggestion: Some("Expand storage capacity or reduce committed data volume.".into()),
             });
         }
     }
@@ -259,7 +249,8 @@ async fn handle_recommendations(
         recs.push(CustodianRecommendationView {
             custodian_id: id.to_string(),
             category: "storage".into(),
-            opportunity: "Accept additional stewardship commitments — storage is under-utilised".into(),
+            opportunity: "Accept additional stewardship commitments — storage is under-utilised"
+                .into(),
             potential_revenue: Some(
                 (view.storage.free_bytes as f64 / 1_073_741_824.0) * view.economic.price_per_gb,
             ),
@@ -346,7 +337,10 @@ async fn handle_protection(
             let avg_uptime = if all_metrics.is_empty() {
                 0.0
             } else {
-                all_metrics.iter().map(|m| m.health.uptime_percent).sum::<f64>()
+                all_metrics
+                    .iter()
+                    .map(|m| m.health.uptime_percent)
+                    .sum::<f64>()
                     / all_metrics.len() as f64
             };
 
@@ -419,10 +413,7 @@ fn build_geographic_distribution(metrics: &[CustodianMetricsView]) -> Vec<Region
 fn build_protection_status(
     all_metrics: Vec<CustodianMetricsView>,
 ) -> FamilyCommunityProtectionStatusView {
-    let available_count = all_metrics
-        .iter()
-        .filter(|m| m.health.availability)
-        .count();
+    let available_count = all_metrics.iter().filter(|m| m.health.availability).count();
     let total = all_metrics.len();
 
     let protection_level = if available_count >= 4 {

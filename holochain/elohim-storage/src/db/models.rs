@@ -17,8 +17,8 @@ use super::diesel_schema::{
     content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     governance_states, human_relationships, humans, local_sessions, path_attestations, path_tags,
-    paths, precedents, premium_gates, proposals, relationships, steward_credentials, steps,
-    rea_commitments, stewardship_allocations,
+    paths, precedents, premium_gates, proposals, rea_commitments, relationships, steps,
+    steward_credentials, stewardship_allocations,
 };
 
 // ============================================================================

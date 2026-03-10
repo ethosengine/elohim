@@ -149,21 +149,30 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
             StorageError::Internal(format!("Failed to create discussions table: {}", e))
         })?;
-        conn.execute_batch(CONTENT_ATTESTATIONS_SCHEMA).map_err(|e| {
-            StorageError::Internal(format!("Failed to create content_attestations table: {}", e))
-        })?;
-        conn.execute_batch(STEWARD_CREDENTIALS_SCHEMA).map_err(|e| {
-            StorageError::Internal(format!("Failed to create steward_credentials table: {}", e))
-        })?;
+        conn.execute_batch(CONTENT_ATTESTATIONS_SCHEMA)
+            .map_err(|e| {
+                StorageError::Internal(format!(
+                    "Failed to create content_attestations table: {}",
+                    e
+                ))
+            })?;
+        conn.execute_batch(STEWARD_CREDENTIALS_SCHEMA)
+            .map_err(|e| {
+                StorageError::Internal(format!("Failed to create steward_credentials table: {}", e))
+            })?;
         conn.execute_batch(PREMIUM_GATES_SCHEMA).map_err(|e| {
             StorageError::Internal(format!("Failed to create premium_gates table: {}", e))
         })?;
         conn.execute_batch(ACCESS_GRANTS_SCHEMA).map_err(|e| {
             StorageError::Internal(format!("Failed to create access_grants table: {}", e))
         })?;
-        conn.execute_batch(CONTRIBUTOR_DASHBOARDS_SCHEMA).map_err(|e| {
-            StorageError::Internal(format!("Failed to create contributor_dashboards table: {}", e))
-        })?;
+        conn.execute_batch(CONTRIBUTOR_DASHBOARDS_SCHEMA)
+            .map_err(|e| {
+                StorageError::Internal(format!(
+                    "Failed to create contributor_dashboards table: {}",
+                    e
+                ))
+            })?;
         current = 7;
     }
 
@@ -212,15 +221,12 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
     conn.execute_batch(GOVERNANCE_STATES_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create governance_states table: {}", e))
     })?;
-    conn.execute_batch(CHALLENGES_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create challenges table: {}", e))
-    })?;
-    conn.execute_batch(PROPOSALS_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create proposals table: {}", e))
-    })?;
-    conn.execute_batch(PRECEDENTS_SCHEMA).map_err(|e| {
-        StorageError::Internal(format!("Failed to create precedents table: {}", e))
-    })?;
+    conn.execute_batch(CHALLENGES_SCHEMA)
+        .map_err(|e| StorageError::Internal(format!("Failed to create challenges table: {}", e)))?;
+    conn.execute_batch(PROPOSALS_SCHEMA)
+        .map_err(|e| StorageError::Internal(format!("Failed to create proposals table: {}", e)))?;
+    conn.execute_batch(PRECEDENTS_SCHEMA)
+        .map_err(|e| StorageError::Internal(format!("Failed to create precedents table: {}", e)))?;
     conn.execute_batch(DISCUSSIONS_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create discussions table: {}", e))
     })?;
@@ -233,10 +239,7 @@ fn create_pillar_tables(conn: &Connection) -> Result<(), StorageError> {
         })?;
     conn.execute_batch(STEWARD_CREDENTIALS_SCHEMA)
         .map_err(|e| {
-            StorageError::Internal(format!(
-                "Failed to create steward_credentials table: {}",
-                e
-            ))
+            StorageError::Internal(format!("Failed to create steward_credentials table: {}", e))
         })?;
     conn.execute_batch(PREMIUM_GATES_SCHEMA).map_err(|e| {
         StorageError::Internal(format!("Failed to create premium_gates table: {}", e))

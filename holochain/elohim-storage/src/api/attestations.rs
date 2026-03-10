@@ -12,7 +12,9 @@ use crate::db::models::NewContentAttestation;
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
-use crate::views::{ContentAttestationView, CreateAttestationInputView, RevokeAttestationInputView};
+use crate::views::{
+    ContentAttestationView, CreateAttestationInputView, RevokeAttestationInputView,
+};
 
 use super::{get_conn, parse_body};
 
@@ -92,9 +94,8 @@ pub async fn handle(
         // POST /api/v1/attestations/{id}/revoke
         (&Method::POST, p) if p.ends_with("/revoke") => {
             let id_part = p.strip_suffix("/revoke").unwrap_or("");
-            let id = extract_id(id_part).ok_or_else(|| {
-                StorageError::InvalidInput("Attestation ID required".to_string())
-            })?;
+            let id = extract_id(id_part)
+                .ok_or_else(|| StorageError::InvalidInput("Attestation ID required".to_string()))?;
             let _input: RevokeAttestationInputView = parse_body(req).await?;
             let mut conn = get_conn(pool)?;
             let result = content_attestations::revoke_attestation(&mut conn, id)?;
@@ -109,14 +110,18 @@ pub async fn handle(
             if let Some(content_id) = &params.content_id {
                 let results =
                     content_attestations::query_attestations_for_content(&mut conn, content_id)?;
-                let views: Vec<ContentAttestationView> =
-                    results.into_iter().map(ContentAttestationView::from).collect();
+                let views: Vec<ContentAttestationView> = results
+                    .into_iter()
+                    .map(ContentAttestationView::from)
+                    .collect();
                 Ok(response::ok(&views))
             } else if let Some(attestor_id) = &params.attestor_id {
                 let results =
                     content_attestations::query_attestations_by_attestor(&mut conn, attestor_id)?;
-                let views: Vec<ContentAttestationView> =
-                    results.into_iter().map(ContentAttestationView::from).collect();
+                let views: Vec<ContentAttestationView> = results
+                    .into_iter()
+                    .map(ContentAttestationView::from)
+                    .collect();
                 Ok(response::ok(&views))
             } else {
                 Ok(response::bad_request(
@@ -127,9 +132,8 @@ pub async fn handle(
 
         // GET /api/v1/attestations/{id}
         (&Method::GET, p) => {
-            let id = extract_id(p).ok_or_else(|| {
-                StorageError::InvalidInput("Attestation ID required".to_string())
-            })?;
+            let id = extract_id(p)
+                .ok_or_else(|| StorageError::InvalidInput("Attestation ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = content_attestations::get_attestation(&mut conn, id)?;
             Ok(response::from_option(

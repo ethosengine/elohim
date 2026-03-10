@@ -83,9 +83,7 @@ pub async fn handle(
         }
 
         // POST /api/v1/economic-events/appreciations
-        (&Method::POST, "appreciations") => {
-            handle_create_appreciation(req, pool, ctx).await
-        }
+        (&Method::POST, "appreciations") => handle_create_appreciation(req, pool, ctx).await,
 
         _ => Ok(response::not_found(&format!(
             "Unknown economic-events route: {} /api/v1/economic-events/{}",
@@ -243,8 +241,7 @@ async fn handle_appreciations_query(
     }
 
     let raw = req.uri().query().unwrap_or("");
-    let params: AppreciationQueryParams =
-        serde_urlencoded::from_str(raw).unwrap_or_default();
+    let params: AppreciationQueryParams = serde_urlencoded::from_str(raw).unwrap_or_default();
 
     let query = EconomicEventQuery {
         action: Some(rea_actions::APPRECIATE.to_string()),

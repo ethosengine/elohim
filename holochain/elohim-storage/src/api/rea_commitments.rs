@@ -6,7 +6,9 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
 
-use crate::db::rea_commitments::{CreateReaCommitmentInput, ReaCommitmentQuery, UpdateReaCommitmentState};
+use crate::db::rea_commitments::{
+    CreateReaCommitmentInput, ReaCommitmentQuery, UpdateReaCommitmentState,
+};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::rea_commitment_service::ReaCommitmentService;
@@ -66,7 +68,9 @@ async fn handle_list(
     let query: ReaCommitmentQuery =
         serde_urlencoded::from_str(req.uri().query().unwrap_or("")).unwrap_or_default();
     let mut conn = get_conn(pool)?;
-    Ok(from_result(ReaCommitmentService::list(&mut conn, ctx, &query)))
+    Ok(from_result(ReaCommitmentService::list(
+        &mut conn, ctx, &query,
+    )))
 }
 
 async fn handle_create(

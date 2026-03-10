@@ -11,8 +11,7 @@ use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
 use crate::views::{
-    ContributorDashboardView, ContributorImpactView, ContributorRecognitionView,
-    EconomicEventView,
+    ContributorDashboardView, ContributorImpactView, ContributorRecognitionView, EconomicEventView,
 };
 
 use super::get_conn;
@@ -64,9 +63,8 @@ pub async fn handle(
         // GET /api/v1/contributors/{id}/dashboard
         (&Method::GET, p) if p.ends_with("/dashboard") => {
             let id_part = p.strip_suffix("/dashboard").unwrap_or("");
-            let id = extract_id(id_part).ok_or_else(|| {
-                StorageError::InvalidInput("Contributor ID required".to_string())
-            })?;
+            let id = extract_id(id_part)
+                .ok_or_else(|| StorageError::InvalidInput("Contributor ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = contributors::get_dashboard(&mut conn, id)?;
             Ok(response::from_option(
@@ -78,9 +76,8 @@ pub async fn handle(
         // GET /api/v1/contributors/{id}/impact
         (&Method::GET, p) if p.ends_with("/impact") => {
             let id_part = p.strip_suffix("/impact").unwrap_or("");
-            let id = extract_id(id_part).ok_or_else(|| {
-                StorageError::InvalidInput("Contributor ID required".to_string())
-            })?;
+            let id = extract_id(id_part)
+                .ok_or_else(|| StorageError::InvalidInput("Contributor ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = contributors::get_impact(&mut conn, id)?;
             Ok(response::ok(&ContributorImpactView::from(result)))
@@ -89,9 +86,8 @@ pub async fn handle(
         // GET /api/v1/contributors/{id}/recognition
         (&Method::GET, p) if p.ends_with("/recognition") => {
             let id_part = p.strip_suffix("/recognition").unwrap_or("");
-            let id = extract_id(id_part).ok_or_else(|| {
-                StorageError::InvalidInput("Contributor ID required".to_string())
-            })?;
+            let id = extract_id(id_part)
+                .ok_or_else(|| StorageError::InvalidInput("Contributor ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let events = contributors::get_recognition_history(&mut conn, id)?;
             let view = ContributorRecognitionView {
