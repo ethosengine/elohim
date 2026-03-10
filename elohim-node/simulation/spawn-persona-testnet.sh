@@ -7,6 +7,7 @@
 #
 # Usage:
 #   ./spawn-persona-testnet.sh start [--dir DIR] [--binary PATH]
+#   ./spawn-persona-testnet.sh start-subset PERSONA1,PERSONA2,... [REQUESTER] [--dir DIR] [--binary PATH]
 #   ./spawn-persona-testnet.sh stop  [--dir DIR]
 #   ./spawn-persona-testnet.sh status [--dir DIR]
 #   ./spawn-persona-testnet.sh verify [--dir DIR]     # Health + budget check
@@ -192,6 +193,166 @@ cmd_start() {
   echo "  $0 clean                            # Archive + remove"
 }
 
+# Emit a CoordinationEnvelope to the envelopes ledger
+emit_envelope() {
+  local verb="$1"
+  local action="$2"
+  local persona="$3"
+  local value="$4"
+  local envelope_dir="$TESTNET_DIR/envelopes"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  mkdir -p "$envelope_dir"
+
+  jq -n \
+    --arg verb "$verb" \
+    --arg action "$action" \
+    --arg persona "$persona" \
+    --arg value "$value" \
+    --arg ts "$timestamp" \
+    --arg sender "${TESTNET_REQUESTER:-matthew}" \
+    '{
+      verb: $verb,
+      scope: { agents: (if ($persona | length) > 0 then [$persona] else [] end) },
+      routing: { urgency: "near-realtime", fallback: "queue" },
+      payload: {
+        economicEvent: {
+          action: $action,
+          provider: $persona,
+          resourceQuantity: { value: ($value | tonumber), unit: "cpu-second" },
+          settlement: (if $action == "budget-exceeded" then "partial" else "pending" end)
+        }
+      },
+      sender: { agentId: $sender, delegationChain: [] },
+      timestamp: $ts
+    }' >> "$envelope_dir/envelopes.jsonl"
+}
+
+# Emit a provision envelope with ServiceRequest payload
+emit_provision_envelope() {
+  local personas_json="$1"
+  local requester="$2"
+  local count="$3"
+  local envelope_dir="$TESTNET_DIR/envelopes"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  mkdir -p "$envelope_dir"
+
+  jq -n \
+    --argjson agents "$personas_json" \
+    --arg requester "$requester" \
+    --arg count "$count" \
+    --arg ts "$timestamp" \
+    '{
+      verb: "provision",
+      scope: { agents: $agents },
+      routing: { urgency: "near-realtime", fallback: "queue" },
+      payload: {
+        serviceRequest: {
+          resourceQuantity: { value: (($count | tonumber) * 360), unit: "cpu-second" },
+          duration: { value: 30, unit: "minute" },
+          trustFloor: "Community"
+        }
+      },
+      sender: { agentId: $requester, delegationChain: [] },
+      timestamp: $ts
+    }' >> "$envelope_dir/envelopes.jsonl"
+}
+
+cmd_start_subset() {
+  local persona_list="$1"; shift || true
+  local requester="${1:-matthew}"; shift || true
+  parse_flags "$@"
+
+  if [[ -z "$persona_list" ]]; then
+    log_error "Usage: $0 start-subset <persona1,persona2,...> [requester]"
+    exit 1
+  fi
+
+  IFS=',' read -ra REQUESTED_PERSONAS <<< "$persona_list"
+  local count=${#REQUESTED_PERSONAS[@]}
+
+  local binary="${DEFAULT_BINARY}"
+  if [[ -z "$binary" ]]; then binary="$(find_binary)"; fi
+  if [[ -z "$binary" || ! -x "$binary" ]]; then
+    log_error "Cannot find elohim-node binary."
+    echo "  Build it:  cd $SCRIPT_DIR/.. && RUSTFLAGS=\"\" cargo build --release"
+    echo "  Or specify: $0 start-subset personas requester --binary /path/to/elohim-node"
+    exit 1
+  fi
+  log_info "Using binary: $binary"
+
+  local pids_dir="$TESTNET_DIR/pids"
+  local logs_dir="$TESTNET_DIR/logs"
+  mkdir -p "$pids_dir" "$logs_dir"
+
+  echo ""
+  log_info "Starting $count of 20 persona nodes (requester: $requester)"
+  echo "  Personas: ${REQUESTED_PERSONAS[*]}"
+  echo ""
+
+  # Emit provision envelope
+  local agents_json
+  agents_json=$(printf '%s\n' "${REQUESTED_PERSONAS[@]}" | jq -R . | jq -s .)
+  export TESTNET_REQUESTER="$requester"
+  emit_provision_envelope "$agents_json" "$requester" "$count"
+
+  # Generate configs for all personas (subset will only spawn some)
+  log_info "Generating persona configs..."
+  bash "$SCRIPT_DIR/gen-persona-configs.sh" --out "$TESTNET_DIR"
+
+  local spawned=0
+  for human_id in $(all_human_ids); do
+    # Check if this persona is in the requested list
+    local matched=false
+    for req in "${REQUESTED_PERSONAS[@]}"; do
+      if [[ "$human_id" == *"$req"* ]]; then
+        matched=true
+        break
+      fi
+    done
+    [[ "$matched" == "true" ]] || continue
+
+    local name node_index config_file node_dir log_file pidfile http_port
+    name=$(display_name_for "$human_id")
+    node_index=$(node_index_for "$human_id")
+    config_file="$TESTNET_DIR/configs/$human_id.toml"
+    node_dir="$TESTNET_DIR/$human_id"
+    log_file="$logs_dir/$human_id.log"
+    pidfile="$pids_dir/$human_id.pid"
+    http_port=$((8080 + node_index))
+
+    mkdir -p "$node_dir"
+
+    ELOHIM_DATA_DIR="$node_dir" \
+    RUST_LOG="${RUST_LOG:-info,elohim_node=debug}" \
+      "$binary" --config "$config_file" \
+      > "$log_file" 2>&1 &
+
+    local pid=$!
+    echo "$pid" > "$pidfile"
+    spawned=$((spawned + 1))
+
+    printf "  ${GREEN}●${NC} %-20s  %-25s  pid=%-7d  http=:%d\n" \
+      "$name" "$human_id" "$pid" "$http_port"
+  done
+
+  echo "$binary" > "$TESTNET_DIR/.binary_path"
+
+  echo ""
+  log_info "Started $spawned of $count requested personas."
+  if [[ "$spawned" -lt "$count" ]]; then
+    log_warn "Some personas not matched. Check humanId patterns in personas.json."
+  fi
+
+  echo ""
+  log_info "Budget tracking:"
+  echo "  Start:   $SCRIPT_DIR/compute-budget.sh watch --dir $TESTNET_DIR"
+  echo "  With circuit breaker: COMPUTE_KILL_ON_EXCEED=true COMPUTE_TTL_SECONDS=1800 $SCRIPT_DIR/compute-budget.sh watch --dir $TESTNET_DIR"
+}
+
 cmd_stop() {
   parse_flags "$@"
   local pids_dir="$TESTNET_DIR/pids"
@@ -200,6 +361,31 @@ cmd_stop() {
     log_warn "No persona testnet found at $TESTNET_DIR"
     return 0
   fi
+
+  log_info "Emitting settle envelopes..."
+  local ledger_file="$TESTNET_DIR/compute-ledger.jsonl"
+
+  for pidfile in "$pids_dir"/*.pid; do
+    [[ -f "$pidfile" ]] || continue
+    local node_name
+    node_name=$(basename "$pidfile" .pid)
+
+    # Get final CPU from ledger (if it exists)
+    local final_cpu="0"
+    if [[ -f "$ledger_file" ]]; then
+      final_cpu=$(grep "\"humanId\":\"$node_name\"" "$ledger_file" 2>/dev/null \
+        | tail -1 | jq -r '.cpuSeconds // 0' 2>/dev/null || echo "0")
+    fi
+    [[ -z "$final_cpu" || "$final_cpu" == "null" ]] && final_cpu="0"
+
+    # Don't emit for already-settled (budget-exceeded) nodes
+    local status_file="${pidfile}.status"
+    if [[ -f "$status_file" ]] && grep -q "killed" "$status_file" 2>/dev/null; then
+      continue
+    fi
+
+    emit_envelope "settle" "deliver-service" "$node_name" "$final_cpu"
+  done
 
   log_info "Stopping persona testnet..."
   local stopped=0
@@ -217,7 +403,7 @@ cmd_stop() {
       echo -e "  ${YELLOW}○${NC} $name ($node_name, pid=$pid) stopped"
       stopped=$((stopped + 1))
     fi
-    rm -f "$pidfile"
+    rm -f "$pidfile" "${pidfile}.status"
   done
 
   log_info "Stopped $stopped personas."
@@ -399,11 +585,12 @@ cmd_clean() {
   # Archive ledger before deletion
   if [[ -f "$TESTNET_DIR/compute-ledger.jsonl" ]]; then
     local archive="$TESTNET_DIR/../persona-testnet-$(date +%Y%m%d-%H%M%S).tar.gz"
-    log_info "Archiving compute ledger and economic events..."
+    log_info "Archiving compute ledger, economic events, and envelopes..."
     tar czf "$archive" \
       -C "$(dirname "$TESTNET_DIR")" \
       "$(basename "$TESTNET_DIR")/compute-ledger.jsonl" \
       "$(basename "$TESTNET_DIR")/economic-events.json" \
+      "$(basename "$TESTNET_DIR")/envelopes/" \
       2>/dev/null || true
     log_info "Archive: $archive"
   fi
@@ -424,6 +611,7 @@ cmd_help() {
   echo ""
   echo "Commands:"
   echo "  start                     Start all 20 personas"
+  echo "  start-subset P1,P2,...    Start a subset (e.g. matthew,susan,pete)"
   echo "  stop                      Stop all personas"
   echo "  status                    Health check by cluster"
   echo "  verify                    Health + compute budget check"
@@ -456,8 +644,9 @@ cmd_help() {
 
 # Dispatch
 case "${1:-help}" in
-  start)     shift; cmd_start "$@" ;;
-  stop)      shift; cmd_stop "$@" ;;
+  start)         shift; cmd_start "$@" ;;
+  start-subset)  shift; cmd_start_subset "$@" ;;
+  stop)          shift; cmd_stop "$@" ;;
   status)    shift; cmd_status "$@" ;;
   verify)    shift; cmd_verify "$@" ;;
   settle)    shift; cmd_settle "$@" ;;
