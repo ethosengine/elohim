@@ -5,8 +5,17 @@
  */
 
 const VALID_VERBS = [
-  'invoke', 'sense', 'respond', 'aggregate', 'route',
-  'delegate', 'escalate', 'ratify', 'recall', 'provision', 'federate',
+  'invoke',
+  'sense',
+  'respond',
+  'aggregate',
+  'route',
+  'delegate',
+  'escalate',
+  'ratify',
+  'recall',
+  'provision',
+  'federate',
   'settle',
 ] as const;
 

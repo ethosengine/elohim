@@ -60,7 +60,7 @@ export interface CreateEconomicEventInput {
 }
 
 export class StorageClient {
-  constructor(private baseUrl: string = DEFAULT_BASE_URL) {}
+  constructor(private readonly baseUrl: string = DEFAULT_BASE_URL) {}
 
   async isHealthy(): Promise<boolean> {
     try {
@@ -89,7 +89,7 @@ export class StorageClient {
   async updateCommitmentState(
     id: string,
     state: string,
-    finished?: boolean,
+    finished?: boolean
   ): Promise<CommitmentView> {
     const res = await fetch(`${this.baseUrl}/api/v1/commitments/${id}`, {
       method: 'PATCH',
@@ -138,15 +138,12 @@ export class StorageClient {
 }
 
 export class ConductorClient {
-  constructor(private _wsUrl: string = 'ws://localhost:8888') {}
+  constructor(private readonly _wsUrl = 'ws://localhost:8888') {}
 
-  async callZome<T>(input: {
-    zomeName: string;
-    fnName: string;
-    payload: unknown;
-  }): Promise<T> {
-    // For now, fall back to storage HTTP API
-    // TODO: Wire actual WebSocket zome calls when conductor is available
-    throw new Error('Conductor zome calls not yet implemented — use StorageClient fallback');
+  // Deferred: wire WebSocket zome calls when conductor available (notary-anchors plan)
+  async callZome<T>(_input: { zomeName: string; fnName: string; payload: unknown }): Promise<T> {
+    return Promise.reject(
+      new Error('Conductor zome calls not yet implemented — use StorageClient fallback')
+    );
   }
 }

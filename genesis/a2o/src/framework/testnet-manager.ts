@@ -1,3 +1,5 @@
+/* eslint-disable sonarjs/os-command, sonarjs/no-os-command-from-path, sonarjs/publicly-writable-directories, sonarjs/no-duplicate-string, sonarjs/cognitive-complexity -- testnet manager intentionally spawns shell processes and uses /tmp */
+
 /**
  * Write Path Transition:
  *
@@ -25,10 +27,11 @@
  */
 
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { StorageClient, ConductorClient } from './storage-client.js';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { StorageClient, ConductorClient } from './storage-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,16 +89,17 @@ export async function startTestnet(opts: {
   const personaList = opts.personas.join(',');
 
   // eslint-disable-next-line no-console
-  console.log(
-    `\n  Starting testnet: ${personaList} (requester: ${requester}, TTL: ${ttl}s)\n`,
-  );
+  console.log(`\n  Starting testnet: ${personaList} (requester: ${requester}, TTL: ${ttl}s)\n`);
 
   // Spawn subset via shell script
-  execSync(`bash "${SPAWN_SCRIPT}" start-subset "${personaList}" "${requester}" --dir "${testnetDir}"`, {
-    stdio: 'inherit',
-    timeout: 60_000,
-    env: { ...process.env, TESTNET_REQUESTER: requester },
-  });
+  execSync(
+    `bash "${SPAWN_SCRIPT}" start-subset "${personaList}" "${requester}" --dir "${testnetDir}"`,
+    {
+      stdio: 'inherit',
+      timeout: 60_000,
+      env: { ...process.env, TESTNET_REQUESTER: requester },
+    }
+  );
 
   // Start budget watcher in background
   const budgetWatcher = spawn(
@@ -110,7 +114,7 @@ export async function startTestnet(opts: {
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
-    },
+    }
   );
 
   budgetWatcher.stdout?.on('data', (data: Buffer) => {
@@ -124,7 +128,6 @@ export async function startTestnet(opts: {
   budgetWatcher.stderr?.on('data', (data: Buffer) => {
     const line = data.toString().trim();
     if (line) {
-      // eslint-disable-next-line no-console
       console.error(`  [budget:err] ${line}`);
     }
   });
@@ -186,10 +189,12 @@ export async function startTestnet(opts: {
 
     usedConductor = true;
     // eslint-disable-next-line no-console
-    console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments via conductor (DHT notarized)`);
+    console.log(
+      `  REA: Created ${commitmentIds.size + 1} paired commitments via conductor (DHT notarized)`
+    );
   } catch {
     // Fall back to storage-only (transitional, dht_anchor_hash = null)
-    // eslint-disable-next-line no-console
+
     console.warn('  Conductor unavailable — falling back to storage-only writes');
   }
 
@@ -233,11 +238,9 @@ export async function startTestnet(opts: {
         // eslint-disable-next-line no-console
         console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments`);
       } else {
-        // eslint-disable-next-line no-console
         console.warn('  elohim-storage not available — skipping REA persistence');
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(`  REA commitment creation failed (non-fatal): ${err}`);
     }
   }
@@ -272,7 +275,6 @@ export async function stopTestnet(): Promise<void> {
       timeout: 30_000,
     });
   } catch {
-    // eslint-disable-next-line no-console
     console.warn('  Settlement failed (non-fatal)');
   }
 
@@ -283,7 +285,6 @@ export async function stopTestnet(): Promise<void> {
       timeout: 30_000,
     });
   } catch {
-    // eslint-disable-next-line no-console
     console.warn('  Testnet stop failed (non-fatal)');
   }
 
@@ -315,7 +316,7 @@ export async function stopTestnet(): Promise<void> {
         await sc.updateCommitmentState(
           commitmentId,
           isExceeded ? 'breached' : 'fulfilled',
-          !isExceeded,
+          !isExceeded
         );
       }
 
@@ -339,7 +340,6 @@ export async function stopTestnet(): Promise<void> {
       // eslint-disable-next-line no-console
       console.log(`  REA: Persisted ${cIds.size + 1} economic events`);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(`  REA settlement failed (non-fatal): ${err}`);
     }
   }
@@ -357,15 +357,12 @@ export function getEnvelopes(testnetDir?: string): Record<string, unknown>[] {
   return readFileSync(file, 'utf-8')
     .trim()
     .split('\n')
-    .filter((line) => line.startsWith('{'))
-    .map((line) => JSON.parse(line) as Record<string, unknown>);
+    .filter(line => line.startsWith('{'))
+    .map(line => JSON.parse(line) as Record<string, unknown>);
 }
 
-export function getEnvelopesByVerb(
-  verb: string,
-  testnetDir?: string,
-): Record<string, unknown>[] {
-  return getEnvelopes(testnetDir).filter((e) => e.verb === verb);
+export function getEnvelopesByVerb(verb: string, testnetDir?: string): Record<string, unknown>[] {
+  return getEnvelopes(testnetDir).filter(e => e.verb === verb);
 }
 
 /**
@@ -378,13 +375,15 @@ export function getComputeSummary(testnetDir?: string): ComputeSummary {
   let totalCpu = 0;
 
   for (const env of settles) {
-    const payload = env.payload as {
-      economicEvent?: {
-        action?: string;
-        provider?: string;
-        resourceQuantity?: { value?: number };
-      };
-    } | undefined;
+    const payload = env.payload as
+      | {
+          economicEvent?: {
+            action?: string;
+            provider?: string;
+            resourceQuantity?: { value?: number };
+          };
+        }
+      | undefined;
     const event = payload?.economicEvent;
     if (!event?.provider) continue;
 
@@ -420,16 +419,14 @@ export function writeComputeReport(summary: ComputeSummary): void {
   // eslint-disable-next-line no-console
   console.log('├─────────────────────────┬───────────────────┤');
   // eslint-disable-next-line no-console
+  console.log(`│ Total CPU               │ ${String(summary.totalCpuSeconds).padStart(12)}s │`);
+  // eslint-disable-next-line no-console
   console.log(
-    `│ Total CPU               │ ${String(summary.totalCpuSeconds).padStart(12)}s │`,
+    `│ Duration                │ ${String(Math.round(summary.durationMs / 1000)).padStart(12)}s │`
   );
   // eslint-disable-next-line no-console
   console.log(
-    `│ Duration                │ ${String(Math.round(summary.durationMs / 1000)).padStart(12)}s │`,
-  );
-  // eslint-disable-next-line no-console
-  console.log(
-    `│ Budget exceeded         │ ${String(summary.budgetExceeded.length).padStart(12)}  │`,
+    `│ Budget exceeded         │ ${String(summary.budgetExceeded.length).padStart(12)}  │`
   );
   // eslint-disable-next-line no-console
   console.log('├─────────────────────────┼───────────────────┤');
@@ -438,9 +435,7 @@ export function writeComputeReport(summary: ComputeSummary): void {
     const name = persona.replace('human-', '').substring(0, 23);
     const marker = metrics.action === 'budget-exceeded' ? ' !' : '  ';
     // eslint-disable-next-line no-console
-    console.log(
-      `│${marker}${name.padEnd(23)} │ ${String(metrics.cpuSeconds).padStart(12)}s │`,
-    );
+    console.log(`│${marker}${name.padEnd(23)} │ ${String(metrics.cpuSeconds).padStart(12)}s │`);
   }
 
   // eslint-disable-next-line no-console

@@ -42,7 +42,10 @@ export default function () {
     },
     testnet: {
       ...base,
-      paths: ['features/elohim/compute-allocation.feature', 'features/deployment/persona-testnet-validation.feature'],
+      paths: [
+        'features/elohim/compute-allocation.feature',
+        'features/deployment/persona-testnet-validation.feature',
+      ],
     },
   };
 }

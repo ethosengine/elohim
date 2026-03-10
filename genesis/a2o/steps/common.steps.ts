@@ -24,14 +24,14 @@ import {
   type CapturedConsoleLog,
   type CapturedPageError,
 } from '../src/framework/devices/playwright-device.js';
-import { isSpaRoutingNoise } from '../src/framework/utils/console-filters.js';
-import { retry } from '../src/framework/utils/retry.js';
 import {
   isTestnetActive,
   stopTestnet,
   getComputeSummary,
   writeComputeReport,
 } from '../src/framework/testnet-manager.js';
+import { isSpaRoutingNoise } from '../src/framework/utils/console-filters.js';
+import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 setWorldConstructor(E2EWorld);
