@@ -458,6 +458,98 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    content_attestations (id) {
+        id -> Text,
+        content_id -> Text,
+        attestor_presence_id -> Text,
+        scope -> Text,
+        attestation_type -> Text,
+        evidence -> Nullable<Text>,
+        grantor -> Nullable<Text>,
+        is_revoked -> Integer,
+        revocation -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    steward_credentials (id) {
+        id -> Text,
+        presence_id -> Text,
+        content_id -> Text,
+        affinity_coefficient -> Float,
+        credential_type -> Text,
+        status -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    premium_gates (id) {
+        id -> Text,
+        steward_credential_id -> Text,
+        steward_presence_id -> Text,
+        gated_resource_type -> Text,
+        gated_resource_ids -> Text,
+        gate_title -> Text,
+        gate_description -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    access_grants (id) {
+        id -> Text,
+        gate_id -> Text,
+        grantee_presence_id -> Text,
+        contributor_presence_id -> Nullable<Text>,
+        granted_at -> Text,
+        expires_at -> Nullable<Text>,
+        status -> Text,
+    }
+}
+
+diesel::table! {
+    contributor_dashboards (presence_id) {
+        presence_id -> Text,
+        total_contributions -> Integer,
+        total_recognitions -> Integer,
+        impact_score -> Float,
+        last_contribution_at -> Nullable<Text>,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    rea_commitments (id) {
+        id -> Text,
+        app_id -> Text,
+        action -> Text,
+        provider -> Text,
+        receiver -> Text,
+        resource_conforms_to -> Nullable<Text>,
+        resource_classified_as -> Nullable<Text>,
+        resource_quantity_value -> Nullable<Float>,
+        resource_quantity_unit -> Nullable<Text>,
+        effort_quantity_value -> Nullable<Float>,
+        effort_quantity_unit -> Nullable<Text>,
+        has_beginning -> Nullable<Text>,
+        has_end -> Nullable<Text>,
+        due -> Nullable<Text>,
+        clause_of -> Nullable<Text>,
+        in_scope_of -> Nullable<Text>,
+        medium_of_exchange_id -> Nullable<Text>,
+        state -> Text,
+        finished -> Integer,
+        note -> Nullable<Text>,
+        metadata_json -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -467,14 +559,17 @@ diesel::joinable!(steps -> chapters (chapter_id));
 diesel::joinable!(steps -> paths (path_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    access_grants,
     apps,
     challenges,
     chapters,
     collective_participations,
     collectives,
     content,
+    content_attestations,
     content_mastery,
     content_tags,
+    contributor_dashboards,
     contributor_presences,
     custodian_metrics,
     device_policies,
@@ -488,9 +583,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     path_tags,
     paths,
     precedents,
+    premium_gates,
     proposals,
+    rea_commitments,
     relationships,
     schema_version,
+    steward_credentials,
     stewardship_allocations,
     steps,
 );
