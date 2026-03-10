@@ -11,6 +11,7 @@
  */
 
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import { StorageClient } from './storage-client.js';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +30,9 @@ export interface TestnetSession {
   startedAt: number;
   ttlSeconds: number;
   testnetDir: string;
+  storageClient: StorageClient | null;
+  commitmentIds: Map<string, string>;
+  matthewCommitmentId: string | null;
 }
 
 export interface ComputeSummary {
@@ -48,13 +52,14 @@ export function getActiveSession(): TestnetSession | null {
   return activeSession;
 }
 
-export function startTestnet(opts: {
+export async function startTestnet(opts: {
   personas: string[];
   requester?: string;
   ttlSeconds?: number;
   killOnExceed?: boolean;
   testnetDir?: string;
-}): void {
+  storageUrl?: string;
+}): Promise<void> {
   if (activeSession) {
     // eslint-disable-next-line no-console
     console.log('Testnet already active, reusing session');
@@ -110,6 +115,57 @@ export function startTestnet(opts: {
     }
   });
 
+  // Create REA Commitments if storage is available
+  let storageClient: StorageClient | null = null;
+  const commitmentIds = new Map<string, string>();
+  let matthewCommitmentId: string | null = null;
+
+  try {
+    storageClient = new StorageClient(opts.storageUrl ?? 'http://localhost:8090');
+    if (await storageClient.isHealthy()) {
+      const now = new Date().toISOString();
+      const totalBudget = opts.personas.length * 360;
+
+      // Matthew's 'take' commitment
+      const takeCommitment = await storageClient.createCommitment({
+        action: 'take',
+        provider: requester,
+        receiver: requester,
+        resourceClassifiedAs: ['compute'],
+        resourceQuantity: { hasNumericalValue: totalBudget, hasUnit: 'cpu-second' },
+        hasBeginning: now,
+        mediumOfExchangeId: 'cpu-mutual-credit',
+        note: `Compute allocation: ${opts.personas.length} peers for ${totalBudget} cpu-seconds`,
+      });
+      matthewCommitmentId = takeCommitment.id;
+
+      // Per-persona 'give' commitments
+      for (const persona of opts.personas) {
+        const giveCommitment = await storageClient.createCommitment({
+          action: 'give',
+          provider: persona,
+          receiver: requester,
+          resourceClassifiedAs: ['compute'],
+          resourceQuantity: { hasNumericalValue: 360, hasUnit: 'cpu-second' },
+          effortQuantity: { hasNumericalValue: 150, hasUnit: 'megabyte' },
+          hasBeginning: now,
+          mediumOfExchangeId: 'cpu-mutual-credit',
+          note: `Provide compute to ${requester}`,
+        });
+        commitmentIds.set(persona, giveCommitment.id);
+      }
+
+      // eslint-disable-next-line no-console
+      console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn('  elohim-storage not available — skipping REA persistence');
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`  REA commitment creation failed (non-fatal): ${err}`);
+  }
+
   activeSession = {
     personas: opts.personas,
     requester,
@@ -117,10 +173,13 @@ export function startTestnet(opts: {
     startedAt: Date.now(),
     ttlSeconds: ttl,
     testnetDir,
+    storageClient,
+    commitmentIds,
+    matthewCommitmentId,
   };
 }
 
-export function stopTestnet(): void {
+export async function stopTestnet(): Promise<void> {
   if (!activeSession) return;
 
   const { testnetDir, budgetWatcher } = activeSession;
@@ -150,6 +209,63 @@ export function stopTestnet(): void {
   } catch {
     // eslint-disable-next-line no-console
     console.warn('  Testnet stop failed (non-fatal)');
+  }
+
+  // Persist REA settlement to elohim-storage
+  const { storageClient: sc, commitmentIds: cIds, matthewCommitmentId: mId } = activeSession;
+  if (sc && cIds.size > 0) {
+    try {
+      const summary = getComputeSummary();
+      const now = new Date().toISOString();
+
+      // Per-persona deliver-service events
+      for (const [persona, commitmentId] of cIds) {
+        const metrics = summary.perPersona[persona] ?? { cpuSeconds: 0, action: 'unknown' };
+        const isExceeded = summary.budgetExceeded.includes(persona);
+
+        await sc.createEconomicEvent({
+          action: 'deliver-service',
+          provider: persona,
+          receiver: activeSession.requester,
+          resourceClassifiedAs: ['compute'],
+          resourceQuantityValue: metrics.cpuSeconds,
+          resourceQuantityUnit: 'cpu-second',
+          hasPointInTime: now,
+          fulfills: [commitmentId],
+          lamadEventType: 'compute-deliver',
+          note: isExceeded ? 'Budget exceeded — partial delivery' : 'Compute delivered',
+        });
+
+        await sc.updateCommitmentState(
+          commitmentId,
+          isExceeded ? 'breached' : 'fulfilled',
+          !isExceeded,
+        );
+      }
+
+      // Matthew's aggregate take event
+      if (mId) {
+        await sc.createEconomicEvent({
+          action: 'take',
+          provider: activeSession.requester,
+          receiver: activeSession.requester,
+          resourceClassifiedAs: ['compute'],
+          resourceQuantityValue: summary.totalCpuSeconds,
+          resourceQuantityUnit: 'cpu-second',
+          hasPointInTime: now,
+          fulfills: [mId],
+          lamadEventType: 'compute-take',
+        });
+
+        await sc.updateCommitmentState(mId, 'fulfilled', true);
+      }
+
+      // eslint-disable-next-line no-console
+      console.log(`  REA: Persisted ${cIds.size + 1} economic events`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`  REA settlement failed (non-fatal): ${err}`);
+    }
   }
 
   activeSession = null;
