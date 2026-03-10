@@ -33,3 +33,7 @@ export type {
 } from './storage-writer.interface';
 export { LEARNER_BACKEND } from './learner-backend.interface';
 export type { ILearnerBackend } from './learner-backend.interface';
+export { GOVERNANCE } from './governance.interface';
+export type { IGovernance } from './governance.interface';
+export { CONTENT_ATTESTATION } from './content-attestation.interface';
+export type { IContentAttestation } from './content-attestation.interface';
