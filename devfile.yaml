@@ -200,7 +200,7 @@ commands:
   - id: build-happ
     exec:
       component: tools
-      workingDir: /projects/elohim/holochain/dna/elohim
+      workingDir: /projects/elohim/elohim/holochain/dna/elohim
       commandLine: |
         echo "Building Holochain WASM zomes..."
         cargo build --release --target wasm32-unknown-unknown
