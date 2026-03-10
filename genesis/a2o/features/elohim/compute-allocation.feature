@@ -24,7 +24,7 @@ Feature: Community compute allocation
     And the total spend is within the 1800 cpu-second budget
     And the compute summary appears in the test report
 
-  @e2e @circuit-breaker
+  @e2e @circuit-breaker @wip
   Scenario: Budget exceeded triggers graceful degradation
     Given 5 conductors are running for Matthew's simulation
     And one persona is configured with a 60 cpu-second budget

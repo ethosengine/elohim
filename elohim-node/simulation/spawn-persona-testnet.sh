@@ -205,7 +205,7 @@ emit_envelope() {
 
   mkdir -p "$envelope_dir"
 
-  jq -n \
+  jq -cn \
     --arg verb "$verb" \
     --arg action "$action" \
     --arg persona "$persona" \
@@ -240,7 +240,7 @@ emit_provision_envelope() {
 
   mkdir -p "$envelope_dir"
 
-  jq -n \
+  jq -cn \
     --argjson agents "$personas_json" \
     --arg requester "$requester" \
     --arg count "$count" \

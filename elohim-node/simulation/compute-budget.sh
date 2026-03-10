@@ -53,7 +53,7 @@ emit_envelope() {
   mkdir -p "$ENVELOPE_DIR"
 
   local envelope
-  envelope=$(jq -n \
+  envelope=$(jq -cn \
     --arg verb "$verb" \
     --arg action "$action" \
     --arg persona "$persona" \

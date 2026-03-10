@@ -165,7 +165,7 @@ export function getEnvelopes(testnetDir?: string): Record<string, unknown>[] {
   return readFileSync(file, 'utf-8')
     .trim()
     .split('\n')
-    .filter(Boolean)
+    .filter((line) => line.startsWith('{'))
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
