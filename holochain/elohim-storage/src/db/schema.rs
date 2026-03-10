@@ -789,7 +789,7 @@ CREATE TABLE IF NOT EXISTS governance_states (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_governance_states_entity ON governance_states(entity_type, entity_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_governance_states_entity ON governance_states(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_governance_states_voting ON governance_states(voting_state);
 "#;
 
