@@ -26,6 +26,12 @@ import {
 } from '../src/framework/devices/playwright-device.js';
 import { isSpaRoutingNoise } from '../src/framework/utils/console-filters.js';
 import { retry } from '../src/framework/utils/retry.js';
+import {
+  isTestnetActive,
+  stopTestnet,
+  getComputeSummary,
+  writeComputeReport,
+} from '../src/framework/testnet-manager.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 setWorldConstructor(E2EWorld);
@@ -196,8 +202,15 @@ After(async function (this: E2EWorld, scenario) {
 });
 
 /**
- * Close the shared Playwright browser after all scenarios complete.
+ * Close the shared Playwright browser and tear down testnet after all scenarios complete.
  */
 AfterAll(async function () {
   await E2EWorld.closeBrowser();
+
+  // Testnet lifecycle cleanup — settle, report, stop
+  if (isTestnetActive()) {
+    const summary = getComputeSummary();
+    writeComputeReport(summary);
+    stopTestnet();
+  }
 });
