@@ -15,6 +15,11 @@
 #   ./compute-budget.sh settle [--dir DIR]              # Final report (economic events)
 #   ./compute-budget.sh check  [--dir DIR]              # Budget compliance check
 #
+# Environment variables for watch mode:
+#   COMPUTE_TTL_SECONDS=1800       # Hard TTL (default 30 min)
+#   COMPUTE_KILL_ON_EXCEED=true    # SIGTERM nodes that exceed budget
+#   TESTNET_REQUESTER=matthew      # Agent ID for envelope sender
+#
 # Requires: jq, /proc filesystem (Linux)
 
 set -euo pipefail
@@ -33,6 +38,88 @@ NC='\033[0m'
 TESTNET_DIR="/tmp/elohim-persona-testnet"
 INTERVAL=10
 LEDGER_FILE=""
+ENVELOPE_DIR=""
+
+# Emit a CoordinationEnvelope (provision, sense, settle)
+# Usage: emit_envelope <verb> <action> <persona> <value>
+emit_envelope() {
+  local verb="$1"
+  local action="$2"
+  local persona="$3"
+  local value="$4"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  mkdir -p "$ENVELOPE_DIR"
+
+  local envelope
+  envelope=$(jq -n \
+    --arg verb "$verb" \
+    --arg action "$action" \
+    --arg persona "$persona" \
+    --arg value "$value" \
+    --arg ts "$timestamp" \
+    --arg sender "${TESTNET_REQUESTER:-matthew}" \
+    '{
+      verb: $verb,
+      scope: { agents: (if ($persona | length) > 0 then [$persona] else [] end) },
+      routing: { urgency: "near-realtime", fallback: "queue" },
+      payload: {
+        economicEvent: {
+          action: $action,
+          provider: $persona,
+          resourceQuantity: { value: ($value | tonumber), unit: "cpu-second" },
+          settlement: (if $action == "budget-exceeded" then "partial" else "pending" end)
+        }
+      },
+      sender: { agentId: $sender, delegationChain: [] },
+      timestamp: $ts
+    }')
+
+  echo "$envelope" >> "$ENVELOPE_DIR/envelopes.jsonl"
+}
+
+# Check per-node budgets and SIGTERM any that exceed limits
+check_and_kill_overages() {
+  local budget_cpu="${PER_NODE_BUDGET_CPU:-360}"
+  local pids_dir="$TESTNET_DIR/pids"
+
+  for pidfile in "$pids_dir"/*.pid; do
+    [ -f "$pidfile" ] || continue
+    local node_name
+    node_name=$(basename "$pidfile" .pid)
+    local pid
+    pid=$(cat "$pidfile")
+
+    # Skip dead processes
+    kill -0 "$pid" 2>/dev/null || continue
+
+    # Read latest metrics from ledger for this node
+    local cpu_total
+    cpu_total=$(grep "\"humanId\":\"$node_name\"" "$LEDGER_FILE" 2>/dev/null \
+      | tail -1 | jq -r '.cpuSeconds // 0' 2>/dev/null || echo "0")
+
+    # Handle empty/zero
+    [[ -z "$cpu_total" || "$cpu_total" == "null" ]] && cpu_total=0
+
+    local cpu_pct
+    cpu_pct=$(echo "scale=0; ($cpu_total * 100) / $budget_cpu" | bc 2>/dev/null || echo 0)
+
+    # Soft warn at 80%
+    if [[ "$cpu_pct" -ge 80 ]] && [[ "$cpu_pct" -lt 100 ]]; then
+      echo -e "  ${YELLOW}WARN${NC}: $node_name at ${cpu_pct}% CPU budget (${cpu_total}/${budget_cpu}s)"
+      emit_envelope "sense" "budget-warning" "$node_name" "$cpu_total"
+    fi
+
+    # Hard kill at 100%
+    if [[ "$cpu_pct" -ge 100 ]]; then
+      echo -e "  ${RED}KILL${NC}: $node_name exceeded CPU budget (${cpu_total}/${budget_cpu}s)"
+      emit_envelope "settle" "budget-exceeded" "$node_name" "$cpu_total"
+      kill -TERM "$pid" 2>/dev/null
+      echo "killed" > "${pidfile}.status"
+    fi
+  done
+}
 
 # Parse flags after command
 parse_flags() {
@@ -44,6 +131,7 @@ parse_flags() {
     esac
   done
   LEDGER_FILE="$TESTNET_DIR/compute-ledger.jsonl"
+  ENVELOPE_DIR="$TESTNET_DIR/envelopes"
 }
 
 # Get CPU time (user + system) for a PID in seconds
@@ -172,24 +260,51 @@ cmd_sample() {
   echo ""
 }
 
-# Watch continuously
+# Watch continuously with TTL + budget circuit breaker
 cmd_watch() {
   parse_flags "$@"
+  local ttl="${COMPUTE_TTL_SECONDS:-1800}"
+  local kill_on_exceed="${COMPUTE_KILL_ON_EXCEED:-false}"
+  local start_epoch
+  start_epoch=$(date +%s)
+
   echo -e "${GREEN}Compute budget tracker — sampling every ${INTERVAL}s${NC}"
   echo "  Ledger: $LEDGER_FILE"
+  echo "  TTL: ${ttl}s | Kill on exceed: ${kill_on_exceed}"
   echo "  Press Ctrl+C to stop and run 'settle' for final report."
   echo ""
 
   # Record ServiceRequest (the test run)
   local start_time
   start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  echo "{\"type\":\"ServiceRequest\",\"action\":\"request-compute\",\"description\":\"Persona testnet run\",\"startTime\":\"$start_time\",\"interval\":$INTERVAL}" >> "$LEDGER_FILE"
+  echo "{\"type\":\"ServiceRequest\",\"action\":\"request-compute\",\"description\":\"Persona testnet run\",\"startTime\":\"$start_time\",\"interval\":$INTERVAL,\"ttl\":$ttl}" >> "$LEDGER_FILE"
 
   while true; do
     clear
     echo -e "${GREEN}═══ Persona Testnet — Compute Budget ═══${NC}"
     echo "  $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+
+    # TTL check
+    local now_epoch
+    now_epoch=$(date +%s)
+    local elapsed=$(( now_epoch - start_epoch ))
+    local remaining=$(( ttl - elapsed ))
+    echo -e "  ${CYAN}Elapsed: ${elapsed}s / ${ttl}s TTL (${remaining}s remaining)${NC}"
+
+    if [[ "$elapsed" -ge "$ttl" ]]; then
+      echo -e "\n  ${RED}TTL expired (${elapsed}s >= ${ttl}s). Settling and shutting down.${NC}"
+      emit_envelope "settle" "ttl-expired" "" "$elapsed"
+      cmd_settle "$@"
+      exit 0
+    fi
+
     cmd_sample "$@"
+
+    # Budget circuit breaker
+    if [[ "$kill_on_exceed" == "true" ]]; then
+      check_and_kill_overages
+    fi
+
     sleep "$INTERVAL"
   done
 }
@@ -336,9 +451,14 @@ cmd_help() {
   echo ""
   echo "Commands:"
   echo "  sample     One-shot snapshot of all personas"
-  echo "  watch      Continuous monitoring (Ctrl+C to stop)"
+  echo "  watch      Continuous monitoring with TTL + circuit breaker"
   echo "  settle     Produce final EconomicEvent records"
   echo "  check      CI-friendly budget compliance check (exit 0/1)"
+  echo ""
+  echo "Environment (watch mode):"
+  echo "  COMPUTE_TTL_SECONDS=1800       Hard TTL (default 30 min)"
+  echo "  COMPUTE_KILL_ON_EXCEED=true    SIGTERM nodes that exceed budget"
+  echo "  TESTNET_REQUESTER=matthew      Agent ID for envelope sender"
   echo ""
 }
 
