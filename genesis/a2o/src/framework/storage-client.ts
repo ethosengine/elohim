@@ -138,7 +138,7 @@ export class StorageClient {
 }
 
 export class ConductorClient {
-  constructor(private wsUrl: string = 'ws://localhost:8888') {}
+  constructor(private _wsUrl: string = 'ws://localhost:8888') {}
 
   async callZome<T>(input: {
     zomeName: string;

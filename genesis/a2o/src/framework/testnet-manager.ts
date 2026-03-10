@@ -145,25 +145,48 @@ export async function startTestnet(opts: {
       payload: { id: agreementId, name: `Compute sharing: ${personaList}` },
     });
 
-    // Create commitments via conductor
+    // Matthew's 'take' commitment via conductor
+    const takeResult = await conductorClient.callZome<{ commitment: { id: string } }>({
+      zomeName: 'content_store',
+      fnName: 'create_rea_commitment',
+      payload: {
+        id: `commitment-take-${Date.now()}`,
+        action: 'take',
+        provider: requester,
+        receiver: requester,
+        resource_classified_as: ['compute'],
+        resource_quantity_value: opts.personas.length * 360,
+        resource_quantity_unit: 'cpu-second',
+        clause_of: agreementId,
+      },
+    });
+    matthewCommitmentId = takeResult.commitment.id;
+
+    // Per-persona 'give' commitments via conductor
     for (const persona of opts.personas) {
-      await conductorClient.callZome({
+      const giveResult = await conductorClient.callZome<{ commitment: { id: string } }>({
         zomeName: 'content_store',
-        fnName: 'create_commitment',
+        fnName: 'create_rea_commitment',
         payload: {
+          id: `commitment-give-${persona}-${Date.now()}`,
           action: 'give',
           provider: persona,
           receiver: requester,
-          resourceClassifiedAs: ['compute'],
-          resourceQuantity: { hasNumericalValue: 360, hasUnit: 'cpu-second' },
-          clauseOf: agreementId,
+          resource_classified_as: ['compute'],
+          resource_quantity_value: 360,
+          resource_quantity_unit: 'cpu-second',
+          clause_of: agreementId,
         },
       });
+      commitmentIds.set(persona, giveResult.commitment.id);
     }
+
+    // Storage client still needed for settlement reads/updates
+    storageClient = new StorageClient(opts.storageUrl ?? 'http://localhost:8090');
 
     usedConductor = true;
     // eslint-disable-next-line no-console
-    console.log(`  REA: Created commitments via conductor (DHT notarized)`);
+    console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments via conductor (DHT notarized)`);
   } catch {
     // Fall back to storage-only (transitional, dht_anchor_hash = null)
     // eslint-disable-next-line no-console
