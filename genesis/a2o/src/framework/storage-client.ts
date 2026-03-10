@@ -136,3 +136,17 @@ export class StorageClient {
     return (await res.json()) as CommitmentView[];
   }
 }
+
+export class ConductorClient {
+  constructor(private wsUrl: string = 'ws://localhost:8888') {}
+
+  async callZome<T>(input: {
+    zomeName: string;
+    fnName: string;
+    payload: unknown;
+  }): Promise<T> {
+    // For now, fall back to storage HTTP API
+    // TODO: Wire actual WebSocket zome calls when conductor is available
+    throw new Error('Conductor zome calls not yet implemented — use StorageClient fallback');
+  }
+}

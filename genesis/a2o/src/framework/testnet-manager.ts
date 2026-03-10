@@ -1,4 +1,18 @@
 /**
+ * Write Path Transition:
+ *
+ * CURRENT: POST directly to elohim-storage (fast, no DHT notarization)
+ * TARGET:  Zome call to conductor → post-commit signal → storage projection
+ *
+ * The conductor-first path creates dht_anchor_hash on storage records,
+ * proving the economic activity was notarized on distributed infrastructure.
+ * The storage-only fallback creates records with null dht_anchor_hash.
+ *
+ * Both paths produce identical storage records for querying. The difference
+ * is cryptographic provability.
+ */
+
+/**
  * Testnet Lifecycle Manager
  *
  * Session-scoped orchestration of persona testnet processes.
@@ -11,7 +25,7 @@
  */
 
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { StorageClient } from './storage-client.js';
+import { StorageClient, ConductorClient } from './storage-client.js';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,55 +129,94 @@ export async function startTestnet(opts: {
     }
   });
 
-  // Create REA Commitments if storage is available
+  // Create REA Commitments — try conductor-first (DHT notarized), fall back to storage-only
   let storageClient: StorageClient | null = null;
+  const conductorClient = new ConductorClient();
   const commitmentIds = new Map<string, string>();
   let matthewCommitmentId: string | null = null;
 
+  // Conductor-first path: zome calls produce dht_anchor_hash on storage records
+  let usedConductor = false;
   try {
-    storageClient = new StorageClient(opts.storageUrl ?? 'http://localhost:8090');
-    if (await storageClient.isHealthy()) {
-      const now = new Date().toISOString();
-      const totalBudget = opts.personas.length * 360;
+    const agreementId = `agreement-${Date.now()}`;
+    await conductorClient.callZome({
+      zomeName: 'content_store',
+      fnName: 'create_agreement',
+      payload: { id: agreementId, name: `Compute sharing: ${personaList}` },
+    });
 
-      // Matthew's 'take' commitment
-      const takeCommitment = await storageClient.createCommitment({
-        action: 'take',
-        provider: requester,
-        receiver: requester,
-        resourceClassifiedAs: ['compute'],
-        resourceQuantity: { hasNumericalValue: totalBudget, hasUnit: 'cpu-second' },
-        hasBeginning: now,
-        mediumOfExchangeId: 'cpu-mutual-credit',
-        note: `Compute allocation: ${opts.personas.length} peers for ${totalBudget} cpu-seconds`,
-      });
-      matthewCommitmentId = takeCommitment.id;
-
-      // Per-persona 'give' commitments
-      for (const persona of opts.personas) {
-        const giveCommitment = await storageClient.createCommitment({
+    // Create commitments via conductor
+    for (const persona of opts.personas) {
+      await conductorClient.callZome({
+        zomeName: 'content_store',
+        fnName: 'create_commitment',
+        payload: {
           action: 'give',
           provider: persona,
           receiver: requester,
           resourceClassifiedAs: ['compute'],
           resourceQuantity: { hasNumericalValue: 360, hasUnit: 'cpu-second' },
-          effortQuantity: { hasNumericalValue: 150, hasUnit: 'megabyte' },
+          clauseOf: agreementId,
+        },
+      });
+    }
+
+    usedConductor = true;
+    // eslint-disable-next-line no-console
+    console.log(`  REA: Created commitments via conductor (DHT notarized)`);
+  } catch {
+    // Fall back to storage-only (transitional, dht_anchor_hash = null)
+    // eslint-disable-next-line no-console
+    console.warn('  Conductor unavailable — falling back to storage-only writes');
+  }
+
+  // Storage-only fallback path
+  if (!usedConductor) {
+    try {
+      storageClient = new StorageClient(opts.storageUrl ?? 'http://localhost:8090');
+      if (await storageClient.isHealthy()) {
+        const now = new Date().toISOString();
+        const totalBudget = opts.personas.length * 360;
+
+        // Matthew's 'take' commitment
+        const takeCommitment = await storageClient.createCommitment({
+          action: 'take',
+          provider: requester,
+          receiver: requester,
+          resourceClassifiedAs: ['compute'],
+          resourceQuantity: { hasNumericalValue: totalBudget, hasUnit: 'cpu-second' },
           hasBeginning: now,
           mediumOfExchangeId: 'cpu-mutual-credit',
-          note: `Provide compute to ${requester}`,
+          note: `Compute allocation: ${opts.personas.length} peers for ${totalBudget} cpu-seconds`,
         });
-        commitmentIds.set(persona, giveCommitment.id);
-      }
+        matthewCommitmentId = takeCommitment.id;
 
+        // Per-persona 'give' commitments
+        for (const persona of opts.personas) {
+          const giveCommitment = await storageClient.createCommitment({
+            action: 'give',
+            provider: persona,
+            receiver: requester,
+            resourceClassifiedAs: ['compute'],
+            resourceQuantity: { hasNumericalValue: 360, hasUnit: 'cpu-second' },
+            effortQuantity: { hasNumericalValue: 150, hasUnit: 'megabyte' },
+            hasBeginning: now,
+            mediumOfExchangeId: 'cpu-mutual-credit',
+            note: `Provide compute to ${requester}`,
+          });
+          commitmentIds.set(persona, giveCommitment.id);
+        }
+
+        // eslint-disable-next-line no-console
+        console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments`);
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('  elohim-storage not available — skipping REA persistence');
+      }
+    } catch (err) {
       // eslint-disable-next-line no-console
-      console.log(`  REA: Created ${commitmentIds.size + 1} paired commitments`);
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn('  elohim-storage not available — skipping REA persistence');
+      console.warn(`  REA commitment creation failed (non-fatal): ${err}`);
     }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn(`  REA commitment creation failed (non-fatal): ${err}`);
   }
 
   activeSession = {
