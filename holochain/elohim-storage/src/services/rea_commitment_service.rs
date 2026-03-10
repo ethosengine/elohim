@@ -26,8 +26,7 @@ impl ReaCommitmentService {
         ctx: &AppContext,
         id: &str,
     ) -> Result<Option<ReaCommitmentView>, StorageError> {
-        rea_commitments::get_commitment(conn, ctx, id)
-            .map(|opt| opt.map(ReaCommitmentView::from))
+        rea_commitments::get_commitment(conn, ctx, id).map(|opt| opt.map(ReaCommitmentView::from))
     }
 
     pub fn list(

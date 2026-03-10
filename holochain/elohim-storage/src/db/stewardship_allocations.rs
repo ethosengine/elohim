@@ -11,7 +11,7 @@ use uuid::Uuid;
 use super::context::AppContext;
 use super::diesel_schema::stewardship_allocations;
 use super::models::{
-    allocation_methods, contribution_types, current_timestamp, allocation_governance_states,
+    allocation_governance_states, allocation_methods, contribution_types, current_timestamp,
     ContentStewardship, ContributorPresence, NewStewardshipAllocation, StewardshipAllocation,
     StewardshipAllocationWithPresence,
 };
@@ -178,7 +178,9 @@ pub fn list_allocations(
     }
 
     if query.active_only.unwrap_or(false) {
-        q = q.filter(stewardship_allocations::governance_state.eq(allocation_governance_states::ACTIVE));
+        q = q.filter(
+            stewardship_allocations::governance_state.eq(allocation_governance_states::ACTIVE),
+        );
         q = q.filter(stewardship_allocations::effective_until.is_null());
     }
 
