@@ -130,10 +130,16 @@ run_gate() {
         pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
         ;;
-      doorway|elohim-node)
+      doorway)
         cargo fmt --check 2>&1 && \
         RUSTFLAGS="" cargo clippy -- -D warnings 2>&1 && \
         RUSTFLAGS="" cargo test --lib --bins 2>&1
+        rc=$?
+        ;;
+      elohim-node)
+        cargo fmt --check 2>&1 && \
+        RUSTFLAGS="" cargo clippy -- -D warnings 2>&1 && \
+        RUSTFLAGS="" cargo test 2>&1
         rc=$?
         ;;
       doorway-app)
