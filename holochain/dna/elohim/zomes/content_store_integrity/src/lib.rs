@@ -1338,6 +1338,26 @@ pub struct Intent {
 }
 
 // =============================================================================
+// Shefa: Agreement Entry
+// =============================================================================
+
+/// Agreement — bilateral contract linking paired Commitments.
+///
+/// Deliberately thin: the Commitments carry the terms (quantities, timing,
+/// actions). The Agreement just proves "these commitments belong together."
+/// If a capability could be centralized for rent extraction, it must be
+/// notarized on distributed infrastructure — Agreement is the anchor that
+/// makes paired give/take commitments cryptographically provable.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Agreement {
+    pub id: String,
+    pub name: Option<String>,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+// =============================================================================
 // Shefa: Commitment Entry
 // =============================================================================
 
@@ -4073,6 +4093,7 @@ pub enum EntryTypes {
     CustodianCommitment(CustodianCommitment), // Digital presence stewardship
 
     // Shefa: Economy (REA/ValueFlows)
+    Agreement(Agreement),
     EconomicEvent(EconomicEvent),
     EconomicResource(EconomicResource),
 
@@ -4357,6 +4378,13 @@ pub enum LinkTypes {
     ProcessToCommitment,        // Process -> Commitment
 
     // =========================================================================
+    // Shefa: Agreement links (REA bilateral contracts)
+    // =========================================================================
+    AgreementToCommitment,      // Agreement → Commitment (clause_of reverse)
+    AgreementToEvent,           // Agreement → EconomicEvent (realization_of reverse)
+    IdToAgreement,              // StringAnchor(id) → Agreement
+
+    // =========================================================================
     // Shefa: Appreciation links
     // =========================================================================
     IdToAppreciation,           // Anchor(appreciation_id) -> Appreciation
@@ -4478,9 +4506,8 @@ pub enum LinkTypes {
     // CommonsContribution
     IdToCommonsContribution,    // Anchor(contribution_id) -> CommonsContribution
     StewardToContribution,      // Anchor(steward_id) -> CommonsContribution
-    TransitionToContribution,   // Anchor(transition_path_id) -> CommonsContribution
-    PoolToContribution,         // Anchor(commons_pool_id) -> CommonsContribution
-    ContributionByRecognition,  // Anchor(public_recognition) -> CommonsContribution
+    // TransitionToContribution, PoolToContribution, ContributionByRecognition
+    // removed — query via projection (reclaimed for Agreement link slots)
 
     // =========================================================================
     // Shefa: Flow Planning links (Consolidated - essential navigation only)
