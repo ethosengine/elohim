@@ -211,6 +211,6 @@ AfterAll(async function () {
   if (isTestnetActive()) {
     const summary = getComputeSummary();
     writeComputeReport(summary);
-    stopTestnet();
+    await stopTestnet();
   }
 });

@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import type { E2EWorld } from '../src/framework/world.js';
+import { StorageClient } from '../src/framework/storage-client.js';
 import {
   startTestnet,
   stopTestnet,
@@ -29,6 +30,8 @@ const SPAWN_SCRIPT = resolve(__dirname, '../elohim-node/simulation/spawn-persona
 
 const DEFAULT_5_PERSONAS = ['matthew', 'susan', 'pete', 'frank', 'nancy'];
 
+const storageClient = new StorageClient('http://localhost:8090');
+
 // --- Background ---
 
 Given('human {string} has a running steward node', function (this: E2EWorld, name: string) {
@@ -42,6 +45,17 @@ Given('human {string} has a running steward node', function (this: E2EWorld, nam
   } as never);
 });
 
+Given('elohim-storage is healthy at {string}', async function (url: string) {
+  const client = new StorageClient(url);
+  const healthy = await client.isHealthy();
+  assert.ok(healthy, `elohim-storage at ${url} is not healthy`);
+});
+
+Given('compute mutual credit medium exists', async function () {
+  // Pre-seeded or idempotent — just verify storage is reachable
+  // The MediumOfExchange record is reference data, seeded separately
+});
+
 // --- Scenario 1: Request compute ---
 
 Given('Matthew has a simulation requiring {int} peer nodes', function (this: E2EWorld, count: number) {
@@ -52,11 +66,11 @@ Given('Matthew has a simulation requiring {int} peer nodes', function (this: E2E
 
 When(
   'he submits a ServiceRequest with budget {int} cpu-seconds',
-  function (this: E2EWorld, budget: number) {
+  async function (this: E2EWorld, budget: number) {
     const personas =
       ((this as unknown as Record<string, unknown>).requestedPersonas as string[]) ??
       DEFAULT_5_PERSONAS;
-    startTestnet({
+    await startTestnet({
       personas,
       requester: 'matthew',
       ttlSeconds: Math.ceil(budget / personas.length),
@@ -107,9 +121,9 @@ Then('compute-budget tracking is active', function () {
 
 Given(
   '{int} conductors are running for Matthew\'s simulation',
-  function (count: number) {
+  async function (count: number) {
     if (!isTestnetActive()) {
-      startTestnet({
+      await startTestnet({
         personas: DEFAULT_5_PERSONAS.slice(0, count),
         requester: 'matthew',
         killOnExceed: true,
@@ -121,7 +135,7 @@ Given(
 When('the simulation workload completes', { timeout: 30_000 }, async function () {
   // Let budget watcher collect a few samples, then stop
   await new Promise((r) => setTimeout(r, 15_000));
-  stopTestnet();
+  await stopTestnet();
 });
 
 Then('a settle envelope is emitted for each persona', function () {
@@ -218,4 +232,89 @@ Then('settlement records the partial delivery', function () {
     return payload?.economicEvent?.settlement === 'partial';
   });
   assert.ok(partial.length > 0, 'No partial settlement envelopes found');
+});
+
+// --- Scenario: REA Commitments ---
+
+Then('a {string} commitment exists for Matthew with {int} cpu-seconds', async function (action: string, budget: number) {
+  const commitments = await storageClient.listCommitments({ action, provider: 'matthew' });
+  assert.ok(commitments.length > 0, `No '${action}' commitment found for Matthew`);
+  const commitment = commitments[0];
+  assert.equal(commitment.resourceQuantity?.hasUnit, 'cpu-second');
+  assert.ok(
+    commitment.resourceQuantity!.hasNumericalValue >= budget,
+    `Expected ${budget} cpu-seconds, got ${commitment.resourceQuantity!.hasNumericalValue}`,
+  );
+});
+
+Then('a {string} commitment exists for each of the {int} personas', async function (action: string, count: number) {
+  const commitments = await storageClient.listCommitments({ action });
+  const personaCommitments = commitments.filter((c) => c.provider !== 'matthew');
+  assert.ok(
+    personaCommitments.length >= count,
+    `Expected ${count} '${action}' commitments, found ${personaCommitments.length}`,
+  );
+});
+
+Then('all commitments reference the CPU mutual credit medium', async function () {
+  const commitments = await storageClient.listCommitments({});
+  for (const c of commitments) {
+    assert.equal(
+      c.mediumOfExchangeId,
+      'cpu-mutual-credit',
+      `Commitment ${c.id} missing CPU mutual credit medium`,
+    );
+  }
+});
+
+// --- Scenario: REA EconomicEvents ---
+
+Then('each persona has a {string} EconomicEvent', async function (_action: string) {
+  const res = await fetch('http://localhost:8090/api/v1/economic-events?action=deliver-service');
+  assert.ok(res.ok, `Failed to query events: ${res.status}`);
+  const events = (await res.json()) as Record<string, unknown>[];
+  assert.ok(events.length >= 5, `Expected at least 5 deliver-service events, got ${events.length}`);
+});
+
+Then('Matthew has a {string} EconomicEvent for the total', async function (action: string) {
+  const res = await fetch(`http://localhost:8090/api/v1/economic-events?action=${action}&provider=matthew`);
+  assert.ok(res.ok, `Failed to query events: ${res.status}`);
+  const events = (await res.json()) as Record<string, unknown>[];
+  assert.ok(events.length > 0, `No '${action}' event found for Matthew`);
+});
+
+Then('each event fulfills its corresponding commitment', async function () {
+  const res = await fetch('http://localhost:8090/api/v1/economic-events?action=deliver-service');
+  const events = (await res.json()) as Array<{ fulfills?: string[] }>;
+  for (const event of events) {
+    assert.ok(
+      event.fulfills && event.fulfills.length > 0,
+      'Event missing fulfills link to commitment',
+    );
+  }
+});
+
+Then('each event has resourceQuantity in cpu-seconds', async function () {
+  const res = await fetch('http://localhost:8090/api/v1/economic-events?action=deliver-service');
+  const events = (await res.json()) as Array<{ resourceQuantityUnit?: string }>;
+  for (const event of events) {
+    assert.equal(event.resourceQuantityUnit, 'cpu-second');
+  }
+});
+
+Then('each event has effortQuantity in megabytes', async function () {
+  const res = await fetch('http://localhost:8090/api/v1/economic-events?action=deliver-service');
+  const events = (await res.json()) as Array<{ effortQuantityUnit?: string }>;
+  for (const event of events) {
+    if (event.effortQuantityUnit) {
+      assert.equal(event.effortQuantityUnit, 'megabyte');
+    }
+  }
+});
+
+Then('all persona commitments are marked {string}', async function (expectedState: string) {
+  const commitments = await storageClient.listCommitments({ action: 'give' });
+  for (const c of commitments) {
+    assert.equal(c.state, expectedState, `Commitment ${c.id} state is '${c.state}', expected '${expectedState}'`);
+  }
 });

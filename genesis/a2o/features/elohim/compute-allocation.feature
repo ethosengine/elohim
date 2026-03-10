@@ -6,6 +6,8 @@ Feature: Community compute allocation
 
   Background:
     Given human "Matthew" has a running steward node
+    And elohim-storage is healthy at "http://localhost:8090"
+    And compute mutual credit medium exists
 
   @e2e
   Scenario: Matthew requests compute from 5 community peers
@@ -23,6 +25,25 @@ Feature: Community compute allocation
     And each EconomicEvent contains cpu-seconds and memory-mb
     And the total spend is within the 1800 cpu-second budget
     And the compute summary appears in the test report
+
+  @e2e @rea
+  Scenario: Compute commitments are persisted as REA records
+    Given Matthew has a simulation requiring 5 peer nodes
+    When he submits a ServiceRequest with budget 1800 cpu-seconds
+    Then a 'take' commitment exists for Matthew with 1800 cpu-seconds
+    And a 'give' commitment exists for each of the 5 personas
+    And all commitments reference the CPU mutual credit medium
+
+  @e2e @rea
+  Scenario: Settlement produces paired EconomicEvents
+    Given 5 conductors are running for Matthew's simulation
+    When the simulation workload completes
+    Then each persona has a 'deliver-service' EconomicEvent
+    And Matthew has a 'take' EconomicEvent for the total
+    And each event fulfills its corresponding commitment
+    And each event has resourceQuantity in cpu-seconds
+    And each event has effortQuantity in megabytes
+    And all persona commitments are marked 'fulfilled'
 
   @e2e @circuit-breaker @wip
   Scenario: Budget exceeded triggers graceful degradation
