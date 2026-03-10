@@ -83,15 +83,15 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
     Ok(())
 }
 
+use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
     AccessGrant, App, Challenge, Chapter, ChapterWithSteps, Content, ContentAttestation,
     ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard, ContributorPresence,
     CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human, HumanRelationship,
     LocalSession, Path, PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate,
-    Proposal, Relationship, RelationshipWithContent, Step, StewardCredential,
-    ReaCommitment, StewardshipAllocation, StewardshipAllocationWithPresence,
+    Proposal, ReaCommitment, Relationship, RelationshipWithContent, Step, StewardCredential,
+    StewardshipAllocation, StewardshipAllocationWithPresence,
 };
-use crate::db::contributors::ImpactSummary;
 use crate::db::steward_operations::RevenueSummary;
 
 // Legacy rusqlite types (used by services until migration complete)
@@ -2557,8 +2557,8 @@ pub struct CustodianRecommendationView {
 impl From<CustodianMetrics> for CustodianMetricsView {
     fn from(m: CustodianMetrics) -> Self {
         // Metric groups are stored as JSON blobs; parse or fall back to defaults.
-        let health: CustodianHealthView = serde_json::from_str(&m.health_json)
-            .unwrap_or_else(|_| CustodianHealthView {
+        let health: CustodianHealthView =
+            serde_json::from_str(&m.health_json).unwrap_or_else(|_| CustodianHealthView {
                 uptime_percent: 0.0,
                 availability: false,
                 response_time_p50_ms: 0.0,
