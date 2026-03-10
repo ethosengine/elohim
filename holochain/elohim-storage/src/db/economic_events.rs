@@ -585,7 +585,10 @@ pub fn upsert_with_anchor(
     input: CreateEconomicEventInput,
     dht_anchor_hash: Option<&str>,
 ) -> Result<EconomicEvent, StorageError> {
-    let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+    let id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     let existing = get_economic_event(conn, ctx, &id)?;
 
@@ -605,8 +608,9 @@ pub fn upsert_with_anchor(
             None
         } else {
             Some(
-                serde_json::to_string(&input.resource_classified_as)
-                    .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?,
+                serde_json::to_string(&input.resource_classified_as).map_err(|e| {
+                    StorageError::Internal(format!("JSON serialization failed: {}", e))
+                })?,
             )
         };
 

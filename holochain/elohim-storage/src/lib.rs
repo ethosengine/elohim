@@ -53,8 +53,8 @@ pub mod hc_client;
 pub mod http;
 pub mod import_handler;
 pub mod metadata;
-pub mod sharding;
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
+pub mod sharding;
 pub mod signals; // Official holochain_client wrapper with signing support
 pub use hc_client::{ConductorHealth, HcClient, HcClientConfig, NetworkHealth, StorageHealth};
 pub mod cell_discovery;

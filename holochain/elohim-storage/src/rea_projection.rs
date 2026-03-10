@@ -170,10 +170,7 @@ pub fn handle_rea_signal(
             };
             rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }
-        ReaProjectionSignal::ReaEconomicEventCommitted {
-            action_hash,
-            event,
-        } => {
+        ReaProjectionSignal::ReaEconomicEventCommitted { action_hash, event } => {
             info!(id = %event.id, hash = %action_hash, "Projecting EconomicEvent from DHT");
             let input = CreateEconomicEventInput {
                 id: Some(event.id),
