@@ -67,14 +67,14 @@
       "description": "Doorway types must stay in sync with doorway-client crate",
       "sync_rules": [
         {
-          "trigger_pattern": "doorway/src/types/*.rs",
+          "trigger_pattern": "doorway/doorway-service/src/types/*.rs",
           "notify": [],
-          "message": "Doorway types changed - check holochain/crates/doorway-client/src/ for compatibility"
+          "message": "Doorway types changed - check crates/doorway-client/src/ for compatibility"
         },
         {
-          "trigger_pattern": "holochain/crates/doorway-client/src/*.rs",
+          "trigger_pattern": "crates/doorway-client/src/*.rs",
           "notify": [],
-          "message": "doorway-client crate changed - check doorway/src/types/ for compatibility"
+          "message": "doorway-client crate changed - check doorway/doorway-service/src/types/ for compatibility"
         }
       ]
     },
@@ -99,7 +99,7 @@
       "selectors": "genesis/a2o/src/framework/pages/selectors.ts",
       "sync_rules": [
         {
-          "trigger_pattern": "doorway-app/src/app/components/login/threshold-login.component.ts",
+          "trigger_pattern": "doorway/doorway-app/src/app/components/login/threshold-login.component.ts",
           "notify": ["skill"],
           "message": "Threshold login template changed - check data-testid attributes and update selectors.ts if needed"
         },

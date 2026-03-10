@@ -28,7 +28,7 @@ pnpm run hc:start:seed             # Start with content seeding
 
 ### doorway (Rust gateway service)
 ```bash
-cd doorway
+cd doorway/doorway-service
 RUSTFLAGS="" cargo build --release     # MUST override RUSTFLAGS (see gotchas)
 RUSTFLAGS="" cargo test --lib --bins   # Unit tests
 RUSTFLAGS="" cargo clippy -- -D warnings
@@ -37,7 +37,7 @@ cargo fmt --check
 
 ### doorway-app (Angular admin UI)
 ```bash
-cd doorway-app
+cd doorway/doorway-app
 pnpm install                       # Or from repo root
 pnpm start                         # Dev server
 pnpm run build
@@ -62,16 +62,16 @@ pnpm install                       # Or from repo root
 cd projects/elohim-service && pnpm test   # Vitest tests for elohim-service
 ```
 
-### elohim-node (Rust P2P runtime)
+### steward/node (Rust P2P runtime)
 ```bash
-cd elohim-node
+cd steward/node
 RUSTFLAGS="" cargo build           # MUST override RUSTFLAGS
 RUSTFLAGS="" cargo test
 ```
 
-### holochain/elohim-storage (Rust storage service)
+### elohim/elohim-storage (Rust storage service)
 ```bash
-cd holochain/elohim-storage
+cd elohim/elohim-storage
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 cargo test export_bindings         # Regenerate TypeScript types
 ```
@@ -101,7 +101,7 @@ Import via barrel exports: `import { ContentService } from '@app/lamad'`. The `e
 Types flow from Rust through auto-generation to TypeScript:
 
 1. **elohim-storage** (`views.rs`) defines View types with `#[serde(rename_all = "camelCase")]` and `#[derive(TS)]`
-2. **`cargo test export_bindings`** generates TypeScript types to `holochain/sdk/storage-client-ts/src/generated/`
+2. **`cargo test export_bindings`** generates TypeScript types to `elohim/sdk/storage-client-ts/src/generated/`
 3. **storage-client-ts** (`@elohim/storage-client`) exports ready-to-use camelCase types
 4. **Adapters** (`elohim-app/src/app/elohim/adapters/`) add computed/derived fields only - never transform wire format
 
@@ -154,10 +154,10 @@ When story-first isn't practical (prototyping, spikes), capture implementation i
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required
-The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds. This breaks native Rust builds for doorway and elohim-node. Always use:
+The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds. This breaks native Rust builds for doorway and steward/node. Always use:
 ```bash
-RUSTFLAGS="" cargo build   # For doorway, elohim-node
-RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build  # For elohim-storage
+RUSTFLAGS="" cargo build   # For doorway/doorway-service, steward/node
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build  # For elohim/elohim-storage
 ```
 
 ### Jenkinsfile Size Limit
@@ -175,7 +175,7 @@ cd sophia && pnpm install && pnpm build && pnpm build:umd
 ### pnpm Workspace
 All TypeScript/Node.js projects use pnpm workspaces. Run `pnpm install` from the repo root to install all dependencies. Sophia is excluded (git submodule with its own pnpm workspace). Use `pnpm --filter <package-name> <command>` to target specific packages. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
 
-### libp2p 0.53 API (elohim-node)
+### libp2p 0.53 API (steward/node)
 Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for request-response. Swarm uses `StreamExt::next()` not `select_next_event()`.
 
 ## CI/CD
@@ -185,8 +185,8 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 | Pipeline | Jenkinsfile | Trigger |
 |----------|-------------|---------|
 | App | `Jenkinsfile` (root) | Auto via orchestrator |
-| Edge | `holochain/Jenkinsfile` | Auto via orchestrator |
-| DNA | `holochain/dna/Jenkinsfile` | Auto via orchestrator |
+| Edge | `elohim/holochain/Jenkinsfile` | Auto via orchestrator |
+| DNA | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
 | Genesis | `genesis/Jenkinsfile` | Auto via orchestrator |
 | Sophia | `sophia/Jenkinsfile` | Auto via orchestrator |
 | Steward | `steward/Jenkinsfile` | Manual only |
@@ -202,7 +202,7 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 
 ### Rust
 - `cargo fmt` + clippy with `-D warnings`
-- `clippy.toml` and `rustfmt.toml` in doorway/
+- `clippy.toml` and `rustfmt.toml` in doorway/doorway-service/
 
 ### Sophia (React/TypeScript)
 - pnpm workspace, Jest + @testing-library/react
