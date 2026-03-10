@@ -40,5 +40,9 @@ export default function () {
       ...base,
       paths: ['features/**/*.feature', '../docs/content/elohim-protocol/**/*.feature'],
     },
+    testnet: {
+      ...base,
+      paths: ['features/elohim/compute-allocation.feature', 'features/deployment/persona-testnet-validation.feature'],
+    },
   };
 }

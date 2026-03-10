@@ -19,6 +19,7 @@
     "test:browser:e2e": "E2E_DEVICE_MODE=playwright cucumber-js --tags '@e2e'",
     "test:local": "E2E_MODE=local cucumber-js --tags '@e2e'",
     "test:steward": "E2E_MODE=steward cucumber-js --tags '@e2e'",
+    "test:testnet": "cucumber-js --profile testnet --tags '@testnet and @e2e and not @wip'",
     "test:genesis:dry": "cucumber-js --dry-run '../docs/content/elohim-protocol/**/*.feature'",
     "test:genesis:epic": "cucumber-js --dry-run --tags '@epic:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "test:genesis:layer": "cucumber-js --dry-run --tags '@governance_layer:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
