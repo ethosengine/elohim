@@ -19,6 +19,7 @@ pub mod custodians;
 pub mod economic_events;
 pub mod exchange;
 pub mod flow_planning;
+pub mod governance;
 pub mod identity;
 pub mod mastery;
 pub mod presence;
@@ -74,6 +75,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("flow-planning") {
         let resource_path = sub_path.strip_prefix("flow-planning").unwrap_or("");
         flow_planning::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("governance") {
+        let resource_path = sub_path.strip_prefix("governance").unwrap_or("");
+        governance::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("compute") {
         let resource_path = sub_path.strip_prefix("compute").unwrap_or("");
         compute::handle(req, method, resource_path, &pool, &app_ctx).await
