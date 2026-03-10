@@ -3,10 +3,10 @@ packages:
   - doorway-app
   - elohim-library
   - elohim-library/projects/elohim-service
-  - steward
+  - steward/device
   - genesis/seeder
   - genesis/a2o
   - genesis/orchestrator
-  - holochain/sdk/storage-client-ts
+  - elohim/sdk/storage-client-ts
   - elohim/elohim-agent/mcp-servers/elohim-content
   - elohim/elohim-agent/elohim-agent-sdk

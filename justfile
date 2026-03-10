@@ -12,20 +12,20 @@ set dotenv-load := false
 root := justfile_directory()
 
 # Key directories
-hc_dir      := root / "holochain"
+elohim_dir  := root / "elohim"
 app_dir     := root / "elohim-app"
-steward_dir := root / "steward"
+steward_dir := root / "steward" / "device"
 doorway_dir := root / "doorway"
-node_dir    := root / "elohim-node"
+node_dir    := root / "steward" / "node"
 genesis_dir := root / "genesis"
 sophia_dir  := root / "sophia"
 
 # Derived paths
-local_dev   := hc_dir / "local-dev"
+local_dev   := elohim_dir / "holochain" / "local-dev"
 ports_file  := local_dev / ".hc_ports"
-storage_bin := hc_dir / "target/release/elohim-storage"
+storage_bin := elohim_dir / "elohim-storage/target/release/elohim-storage"
 doorway_bin := doorway_dir / "target/release/doorway"
-happ_path   := hc_dir / "dna/elohim/workdir/elohim.happ"
+happ_path   := elohim_dir / "holochain/dna/elohim/workdir/elohim.happ"
 
 # Default ports
 storage_port := env("STORAGE_PORT", "8090")
@@ -79,7 +79,7 @@ steward-build:
 # TAURI_CONFIG injects bundle.resources so elohim-storage is included in the package
 steward-bundle:
     just storage-build
-    TAURI_CONFIG='{"bundle":{"resources":{"../holochain/target/release/elohim-storage":"bin/"}}}' just steward-build
+    TAURI_CONFIG='{"bundle":{"resources":{"../elohim/elohim-storage/target/release/elohim-storage":"bin/"}}}' just steward-build
 
 # ─────────────────────────────────────────────────────────────────────
 # Storage
@@ -87,7 +87,7 @@ steward-bundle:
 
 # Build elohim-storage binary (delegates to per-project justfile)
 storage-build:
-    just --justfile {{hc_dir}}/elohim-storage/justfile --working-directory {{hc_dir}}/elohim-storage build
+    just --justfile {{elohim_dir}}/elohim-storage/justfile --working-directory {{elohim_dir}}/elohim-storage build
 
 # Start elohim-storage (wraps existing script)
 storage-start:
@@ -173,26 +173,26 @@ stack-reset:
 dna-build: dna-lamad dna-imagodei dna-infrastructure dna-node-registry
     #!/usr/bin/env bash
     set -e
-    WORKDIR="{{hc_dir}}/dna/elohim/workdir"
+    WORKDIR="{{elohim_dir}}/holochain/dna/elohim/workdir"
     echo "Packing elohim.happ..."
     hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
     echo "DNAs built (lamad + imagodei + infrastructure + node-registry)"
 
 # Build lamad DNA
 dna-lamad:
-    just --justfile {{hc_dir}}/dna/elohim/justfile --working-directory {{hc_dir}}/dna/elohim pack
+    just --justfile {{elohim_dir}}/holochain/dna/elohim/justfile --working-directory {{elohim_dir}}/holochain/dna/elohim pack
 
 # Build imagodei DNA
 dna-imagodei:
-    just --justfile {{hc_dir}}/dna/imagodei/justfile --working-directory {{hc_dir}}/dna/imagodei pack
+    just --justfile {{elohim_dir}}/holochain/dna/imagodei/justfile --working-directory {{elohim_dir}}/holochain/dna/imagodei pack
 
 # Build infrastructure DNA
 dna-infrastructure:
-    just --justfile {{hc_dir}}/dna/infrastructure/justfile --working-directory {{hc_dir}}/dna/infrastructure pack
+    just --justfile {{elohim_dir}}/holochain/dna/infrastructure/justfile --working-directory {{elohim_dir}}/holochain/dna/infrastructure pack
 
 # Build node-registry DNA
 dna-node-registry:
-    just --justfile {{hc_dir}}/dna/node-registry/justfile --working-directory {{hc_dir}}/dna/node-registry pack
+    just --justfile {{elohim_dir}}/holochain/dna/node-registry/justfile --working-directory {{elohim_dir}}/holochain/dna/node-registry pack
 
 # Build doorway gateway (delegates to per-project justfile)
 doorway-build:
