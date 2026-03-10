@@ -39,7 +39,7 @@ sled = "0.34"
 cid = "0.11"
 
 # AI agent orchestration
-elohim-agent = { path = "../../elohim/elohim-agent", default-features = false }
+elohim-agent = { path = "../../elohim/elohim-agent/elohim-agent-service", default-features = false }
 constitution = { path = "../../elohim/constitution" }
 
 # Serialization
