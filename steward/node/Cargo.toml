@@ -33,14 +33,14 @@ libp2p = { version = "0.54", features = [
 
 # Storage (elohim-storage as library for unified P2P)
 rusqlite = { version = "0.37", features = ["bundled"] }
-elohim-storage = { path = "../holochain/elohim-storage", default-features = false, features = ["p2p"] }
-elohim-bitswap = { path = "../holochain/elohim-bitswap" }
+elohim-storage = { path = "../../elohim/elohim-storage", default-features = false, features = ["p2p"] }
+elohim-bitswap = { path = "../../elohim/elohim-bitswap" }
 sled = "0.34"
 cid = "0.11"
 
 # AI agent orchestration
-elohim-agent = { path = "../elohim/elohim-agent", default-features = false }
-constitution = { path = "../elohim/constitution" }
+elohim-agent = { path = "../../elohim/elohim-agent", default-features = false }
+constitution = { path = "../../elohim/constitution" }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
