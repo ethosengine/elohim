@@ -2606,8 +2606,8 @@ impl From<CustodianMetrics> for CustodianMetricsView {
                 specialization_bonus: 0.0,
                 commitment_fulfillment: 0.0,
             });
-        let economic: CustodianEconomicView = serde_json::from_str(&m.economic_json)
-            .unwrap_or(CustodianEconomicView {
+        let economic: CustodianEconomicView =
+            serde_json::from_str(&m.economic_json).unwrap_or(CustodianEconomicView {
                 steward_tier: 0,
                 price_per_gb: 0.0,
                 monthly_earnings: 0.0,
