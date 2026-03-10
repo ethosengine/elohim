@@ -3,6 +3,7 @@ import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
+import { GOVERNANCE, CONTENT_ATTESTATION } from '@app/elohim/interfaces';
 import { vi } from 'vitest';
 
 describe('LamadLayoutComponent', () => {
@@ -23,6 +24,8 @@ describe('LamadLayoutComponent', () => {
         provideRouter([]),
         provideHttpClient(),
         { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+        { provide: GOVERNANCE, useValue: {} },
+        { provide: CONTENT_ATTESTATION, useValue: {} },
       ],
     }).compileComponents();
 

@@ -12,6 +12,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 import { provideElohimClient } from '@app/elohim/providers/elohim-client.provider';
+import { GOVERNANCE, CONTENT_ATTESTATION } from '@app/elohim/interfaces';
 import { vi, Mock } from 'vitest';
 
 describe('PathNavigatorComponent', () => {
@@ -144,6 +145,8 @@ describe('PathNavigatorComponent', () => {
         { provide: PathContextService, useValue: pathContextServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: GovernanceSignalService, useValue: governanceSignalServiceSpy },
+        { provide: GOVERNANCE, useValue: {} },
+        { provide: CONTENT_ATTESTATION, useValue: {} },
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() },
