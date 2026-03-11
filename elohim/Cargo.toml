@@ -5,6 +5,13 @@ members = [
     "elohim-agent/elohim-agent-service",
     "eae",
 ]
+exclude = [
+    "elohim-bitswap",
+    "elohim-storage",
+    "holochain",
+    "rust-ipfs",
+    "sdk",
+]
 
 [workspace.package]
 version = "0.1.0"
