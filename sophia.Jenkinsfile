@@ -126,6 +126,9 @@ spec:
             steps {
                 container('node') {
                     checkout scm
+                    // Remove parent workspace config so pnpm treats sophia as standalone.
+                    // Must happen after checkout, before any pnpm command.
+                    sh 'rm -f pnpm-workspace.yaml .npmrc package.json'
                     echo "Building Sophia for branch: ${env.BRANCH_NAME}"
                 }
             }
@@ -135,9 +138,6 @@ spec:
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('node') {
-                    // Remove parent workspace config so pnpm treats sophia as standalone
-                    sh 'rm -f pnpm-workspace.yaml .npmrc'
-
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
