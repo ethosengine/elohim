@@ -500,7 +500,7 @@ Resource limits are tuned for the operations node (Intel NUC i5, 8 cores, 16GB):
 
 ## Angular Integration
 
-The HolochainClientService (`elohim-app/src/app/elohim/services/holochain-client.service.ts`) manages:
+The HolochainClientService (`app/elohim-app/src/app/elohim/services/holochain-client.service.ts`) manages:
 
 1. AdminWebsocket connection
 2. Agent key generation
@@ -509,7 +509,7 @@ The HolochainClientService (`elohim-app/src/app/elohim/services/holochain-client
 5. AppWebsocket connection with auth token
 6. Zome calls
 
-Environment config (`elohim-app/src/environments/environment.ts`):
+Environment config (`app/elohim-app/src/environments/environment.ts`):
 ```typescript
 holochain: {
   adminUrl: 'wss://holochain-dev.elohim.host',  // IP whitelist protected
@@ -1114,14 +1114,14 @@ stewardService.checkAccess('gate-id').subscribe(grant => {
 
 ### Available Services
 
-**Shefa (Domain-Agnostic)** - `elohim-app/src/app/shefa/services/`
+**Shefa (Domain-Agnostic)** - `app/elohim-app/src/app/shefa/services/`
 
 | Service | What You Can Do |
 |---------|-----------------|
 | `EconomicService` | Query economic events by agent or action type, create new events |
 | `AppreciationService` | Query recognition given/received, create appreciation records |
 
-**Lamad (Learning-Specific)** - `elohim-app/src/app/lamad/services/`
+**Lamad (Learning-Specific)** - `app/elohim-app/src/app/lamad/services/`
 
 | Service | What You Can Do |
 |---------|-----------------|
@@ -1129,7 +1129,7 @@ stewardService.checkAccess('gate-id').subscribe(grant => {
 | `StewardService` | Create/query credentials and gates, check/grant access, get revenue reports |
 
 ### Steward Economy Types
-Location: `elohim-app/src/app/lamad/models/steward-economy.model.ts`
+Location: `app/elohim-app/src/app/lamad/models/steward-economy.model.ts`
 
 - `StewardTier`: 'caretaker' | 'curator' | 'expert' | 'pioneer'
 - `PricingModel`: 'one_time' | 'subscription' | 'pay_what_you_can' | 'free_with_attribution' | 'commons_sponsored'
@@ -1160,9 +1160,9 @@ All three verticals are now complete and integrated:
 
 | Vertical | Status | Documentation |
 |----------|--------|---------------|
-| 1. Human Identity | **COMPLETE** | `elohim-app/src/app/imagodei/claude.md` |
-| 2. Lamad Learner | **COMPLETE** | `elohim-app/src/app/lamad/BLOOM-MASTERY-DESIGN.md` |
-| 3. Economic Attribution | **COMPLETE** | `elohim-app/src/app/elohim/models/` |
+| 1. Human Identity | **COMPLETE** | `app/elohim-app/src/app/imagodei/claude.md` |
+| 2. Lamad Learner | **COMPLETE** | `app/elohim-app/src/app/lamad/BLOOM-MASTERY-DESIGN.md` |
+| 3. Economic Attribution | **COMPLETE** | `app/elohim-app/src/app/elohim/models/` |
 
 ### Integration Points Wired
 
@@ -1184,11 +1184,11 @@ All three verticals are now complete and integrated:
 
 ## Related Files
 
-- `elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client service
-- `elohim-app/src/app/elohim/services/learner-backend.service.ts` - Lamad zome call wrappers
-- `elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Types
-- `elohim-app/src/environments/environment*.ts` - Endpoint configuration
-- `elohim-app/scripts/hc-start.sh` - Automated dev stack startup
+- `app/elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client service
+- `app/elohim-app/src/app/elohim/services/learner-backend.service.ts` - Lamad zome call wrappers
+- `app/elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Types
+- `app/elohim-app/src/environments/environment*.ts` - Endpoint configuration
+- `app/elohim-app/scripts/hc-start.sh` - Automated dev stack startup
 - `holochain/seeder/src/seed.ts` - Content and path seeder
 - `holochain/doorway/src/main.rs` - Rust WebSocket gateway (Doorway) for dev and production
 - `holochain/sdk/src/types.ts` - SDK type definitions (Shefa + Lamad)

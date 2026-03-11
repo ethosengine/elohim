@@ -1272,9 +1272,9 @@ See these files for the implementation:
 - `zomes/imagodei_integrity/src/stewardship.rs` - Entry types
 - `zomes/imagodei/src/stewardship.rs` - Coordinator functions
 - `elohim-storage/src/db/policy_cache.rs` - Offline enforcement
-- `elohim-app/src/app/imagodei/services/stewardship.service.ts` - Client SDK
-- `elohim-app/src/app/imagodei/models/stewardship.model.ts` - TypeScript types
-- `elohim-app/src/app/imagodei/components/capabilities-dashboard/` - Transparency UI
+- `app/elohim-app/src/app/imagodei/services/stewardship.service.ts` - Client SDK
+- `app/elohim-app/src/app/imagodei/models/stewardship.model.ts` - TypeScript types
+- `app/elohim-app/src/app/imagodei/components/capabilities-dashboard/` - Transparency UI
 
 ---
 

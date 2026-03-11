@@ -57,7 +57,7 @@ You don't just scan for known vulnerabilities—you creatively explore attack su
 ### 1. Reconnaissance
 ```bash
 # Find authentication code
-grep -r "password\|token\|secret\|key" --include="*.ts" elohim-app/src/
+grep -r "password\|token\|secret\|key" --include="*.ts" app/elohim-app/src/
 
 # Find validation logic
 grep -r "validate\|verify\|check" --include="*.rs" holochain/dna/

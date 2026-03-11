@@ -225,19 +225,19 @@ src/app/lamad/services/content.service.ts:67   response: any
 ### Find All Implementations of a Pattern
 ```bash
 # All services with BehaviorSubject
-grep -l "BehaviorSubject" elohim-app/src/**/*.service.ts
+grep -l "BehaviorSubject" app/elohim-app/src/**/*.service.ts
 
 # All zomes with validation
 grep -l "fn validate" holochain/dna/**/*.rs
 
 # All tests using mocks
-grep -l "jasmine.createSpyObj" elohim-app/src/**/*.spec.ts
+grep -l "jasmine.createSpyObj" app/elohim-app/src/**/*.spec.ts
 ```
 
 ### Find Deviations from Pattern
 ```bash
 # Services WITHOUT proper cleanup
-for f in $(find elohim-app/src -name "*.service.ts"); do
+for f in $(find app/elohim-app/src -name "*.service.ts"); do
   grep -L "ngOnDestroy\|takeUntil" "$f"
 done
 
@@ -248,7 +248,7 @@ grep -B5 "unwrap()" holochain/dna/**/*.rs
 ### Find Coupling Patterns
 ```bash
 # Which services depend on HolochainClientService?
-grep -l "HolochainClientService" elohim-app/src/**/*.ts
+grep -l "HolochainClientService" app/elohim-app/src/**/*.ts
 
 # Cross-module dependencies
 grep -rn "from '\.\./\.\./\.\." --include="*.ts" | head -20

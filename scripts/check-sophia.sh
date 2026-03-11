@@ -4,7 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SOPHIA_DIR="$PROJECT_ROOT/sophia"
+SOPHIA_DIR="$PROJECT_ROOT/app/sophia"
 REQUIRED_FILES=(
   "packages/sophia-element/dist/sophia-element.umd.js"
 )
@@ -20,7 +20,7 @@ fi
 for file in "${REQUIRED_FILES[@]}"; do
   if [ ! -f "$SOPHIA_DIR/$file" ]; then
     echo "ERROR: sophia not built - missing $file"
-    echo "Run: cd sophia && pnpm install && pnpm build && pnpm build:umd"
+    echo "Run: cd app/sophia && pnpm install && pnpm build && pnpm build:umd"
     exit 1
   fi
 done
@@ -39,7 +39,7 @@ data = open('$UMD_FILE').read()
 sys.exit(0 if '\"$widget\"' in data else 1)
 " 2>/dev/null; then
     echo "ERROR: Widget '$widget' not found in sophia UMD bundle"
-    echo "  Ensure it's registered in sophia/packages/sophia/src/basic-widgets.ts"
+    echo "  Ensure it's registered in app/sophia/packages/sophia/src/basic-widgets.ts"
     exit 1
   fi
 done

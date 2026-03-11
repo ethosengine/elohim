@@ -49,7 +49,7 @@ import groovy.transform.Field
     ],
     'elohim': [
         jenkinsPath: 'Jenkinsfile',
-        changePatterns: ['elohim-app/', 'elohim-library/', 'elohim/sdk/', 'VERSION'],
+        changePatterns: ['app/elohim-app/', 'app/elohim-library/', 'elohim/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
         dependsOn: ['elohim-sophia'],  // rebuild app when sophia UMD bundle changes
         triggersGenesis: true,
@@ -77,8 +77,8 @@ import groovy.transform.Field
         deploymentCheck: null
     ],
     'elohim-sophia': [
-        jenkinsPath: 'sophia/Jenkinsfile',
-        changePatterns: ['sophia/'],
+        jenkinsPath: 'app/sophia/Jenkinsfile',
+        changePatterns: ['app/sophia/'],
         artifacts: ['sophia-element'],
         dependsOn: [],
         cascades: true,        // sophia changes should trigger elohim (app) rebuild

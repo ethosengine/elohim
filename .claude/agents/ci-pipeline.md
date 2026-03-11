@@ -24,7 +24,7 @@ elohim-holochain (DNA/hApp, WASM artifacts)
 ```groovy
 'elohim-holochain': ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/'],
 'elohim-edge': ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/crates/'],
-'elohim': ['elohim-app/', 'elohim-library/', 'VERSION'],
+'elohim': ['app/elohim-app/', 'app/elohim-library/', 'VERSION'],
 'elohim-genesis': ['genesis/', 'data/'],
 'elohim-steward': ['steward/'] // manual only
 ```

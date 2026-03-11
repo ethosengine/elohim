@@ -4,13 +4,13 @@
 #
 # Detects which projects changed and runs `just gate` in each.
 # Each project's justfile defines its own quality checks:
-#   elohim-app/              → build + unit tests
+#   app/elohim-app/          → build + unit tests
 #   doorway/                 → cargo fmt + clippy + tests
-#   doorway-app/             → eslint + build
-#   sophia/                  → pnpm lint + typecheck + test
+#   doorway/doorway-app/     → eslint + build
+#   app/sophia/              → pnpm lint + typecheck + test
 #   holochain/elohim-storage → cargo fmt + clippy + tests
 #   elohim-node/             → cargo fmt + clippy + tests
-#   elohim-library/          → tsc type-check + jest tests
+#   app/elohim-library/      → tsc type-check + jest tests
 #   genesis/                 → schema validation + tests
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
@@ -65,16 +65,16 @@ fi
 PROJECTS=""
 
 # doorway-app must be checked BEFORE doorway (prefix overlap)
-if echo "$CHANGED" | grep -q "^doorway-app/"; then
+if echo "$CHANGED" | grep -q "^doorway/doorway-app/"; then
   PROJECTS="$PROJECTS doorway-app"
 fi
-if echo "$CHANGED" | grep "^doorway/" | grep -qv "^doorway-app/"; then
+if echo "$CHANGED" | grep "^doorway/" | grep -qv "^doorway/doorway-app/"; then
   PROJECTS="$PROJECTS doorway"
 fi
-if echo "$CHANGED" | grep -q "^elohim-app/"; then
+if echo "$CHANGED" | grep -q "^app/elohim-app/"; then
   PROJECTS="$PROJECTS elohim-app"
 fi
-if echo "$CHANGED" | grep -q "^sophia/"; then
+if echo "$CHANGED" | grep -q "^app/sophia/"; then
   PROJECTS="$PROJECTS sophia"
 fi
 if echo "$CHANGED" | grep -q "^holochain/elohim-storage/"; then
@@ -83,7 +83,7 @@ fi
 if echo "$CHANGED" | grep -q "^elohim-node/"; then
   PROJECTS="$PROJECTS elohim-node"
 fi
-if echo "$CHANGED" | grep -q "^elohim-library/"; then
+if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
   PROJECTS="$PROJECTS elohim-library"
 fi
 if echo "$CHANGED" | grep -q "^genesis/"; then
@@ -238,6 +238,10 @@ for PROJECT in $PROJECTS; do
 
   # Map project name to directory
   case "$PROJECT" in
+    elohim-app)       PROJECT_DIR="app/elohim-app" ;;
+    elohim-library)   PROJECT_DIR="app/elohim-library" ;;
+    sophia)           PROJECT_DIR="app/sophia" ;;
+    doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
     elohim-storage)   PROJECT_DIR="holochain/elohim-storage" ;;
     genesis)          PROJECT_DIR="genesis/seeder" ;;
     genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;

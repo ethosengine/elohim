@@ -13,12 +13,12 @@ root := justfile_directory()
 
 # Key directories
 elohim_dir  := root / "elohim"
-app_dir     := root / "elohim-app"
+app_dir     := root / "app" / "elohim-app"
 steward_dir := root / "steward" / "device"
 doorway_dir := root / "doorway"
 node_dir    := root / "steward" / "node"
 genesis_dir := root / "genesis"
-sophia_dir  := root / "sophia"
+sophia_dir  := root / "app" / "sophia"
 
 # Derived paths
 local_dev   := elohim_dir / "holochain" / "local-dev"

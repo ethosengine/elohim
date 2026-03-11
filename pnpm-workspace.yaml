@@ -1,8 +1,8 @@
 packages:
-  - elohim-app
-  - doorway-app
-  - elohim-library
-  - elohim-library/projects/elohim-service
+  - app/elohim-app
+  - doorway/doorway-app
+  - app/elohim-library
+  - app/elohim-library/projects/elohim-service
   - steward/device
   - genesis/seeder
   - genesis/a2o

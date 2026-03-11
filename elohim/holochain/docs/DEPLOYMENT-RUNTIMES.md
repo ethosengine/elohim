@@ -60,7 +60,7 @@ This guide explains the different runtime environments for developing and deploy
 
 **Start the stack:**
 ```bash
-npm run hc:start  # In elohim-app/
+npm run hc:start  # In app/elohim-app/
 ```
 
 ---
@@ -290,7 +290,7 @@ The seeder populates Holochain with structured content from `/data/lamad`.
 ### Local Seeding
 
 ```bash
-# From elohim-app/
+# From app/elohim-app/
 npm run hc:seed              # Full seed
 npm run hc:seed:sample       # Sample (10 items)
 ```
@@ -351,4 +351,4 @@ For detailed seeder documentation, see `holochain/seeder/README.md`.
 - `holochain/claude.md` - Main architecture documentation
 - `holochain/edgenode/README.md` - Edge node quick reference
 - `holochain/seeder/README.md` - Seeder documentation
-- `elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client implementation
+- `app/elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client implementation

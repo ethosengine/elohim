@@ -12,7 +12,7 @@ Your north star: **Angular services should be thin.** They bind backend data to 
 
 ## Module Structure
 
-**elohim-app/src/app/** organized by domain:
+**app/elohim-app/src/app/** organized by domain:
 
 | Module | Purpose | Key Services |
 |--------|---------|--------------|
@@ -223,7 +223,7 @@ Angular is where the network comes alive through the person's interaction. Prefe
 
 **EPR Links over `<a>` tags**: Use `epr:{id}` references for content navigation. Every EPR link carries knowledge + value + governance context — it's not just a URL, it's a protocol-aware reference that resolves through the connection strategy.
 
-**Connection Strategy Abstraction**: Components never know whether they're in doorway (web2) or Tauri (P2P-native) mode. The `IConnectionStrategy` seam (`elohim-library/.../connection/`) handles runtime detection. Services call `strategy.getStorageBaseUrl()` or `strategy.getBlobStorageUrl()` — never hardcode endpoints.
+**Connection Strategy Abstraction**: Components never know whether they're in doorway (web2) or Tauri (P2P-native) mode. The `IConnectionStrategy` seam (`app/elohim-library/.../connection/`) handles runtime detection. Services call `strategy.getStorageBaseUrl()` or `strategy.getBlobStorageUrl()` — never hardcode endpoints.
 
 **Make the network feel natural**: The person shouldn't think about plumbing. EPR links, content resolution, and blob fetching should feel like native navigation — not API calls. The protocol's richness (knowledge + value + governance in every reference) should enhance the experience, not complicate it.
 

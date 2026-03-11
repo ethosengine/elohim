@@ -351,10 +351,10 @@ Remaining: Y manual issues
 ## Configuration Files
 
 ### ESLint (eslint.config.js)
-Uses ESLint 9 flat config format. See `elohim-app/eslint.config.js` for the full configuration.
+Uses ESLint 9 flat config format. See `app/elohim-app/eslint.config.js` for the full configuration.
 
 ### Prettier (.prettierrc.js)
-See `elohim-app/.prettierrc.js` for the full configuration (100 char width, single quotes, trailing commas).
+See `app/elohim-app/.prettierrc.js` for the full configuration (100 char width, single quotes, trailing commas).
 
 ### Clippy (clippy.toml)
 ```toml

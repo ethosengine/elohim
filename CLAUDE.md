@@ -11,7 +11,7 @@ Polyglot monorepo for the Elohim Protocol - a distributed learning platform buil
 ### elohim-app (Angular 19 - main frontend)
 ```bash
 pnpm install                       # From repo root (workspace install)
-cd elohim-app
+cd app/elohim-app
 pnpm start                         # Dev server at localhost:4200 (proxies to doorway at :8888)
 pnpm run build                     # Production build
 pnpm run lint                      # ESLint
@@ -46,7 +46,7 @@ pnpm exec eslint src --ext .ts,.html
 
 ### sophia (assessment engine - git submodule, pnpm)
 ```bash
-cd sophia
+cd app/sophia
 pnpm install
 pnpm build                         # Build all packages in dependency order
 pnpm test                          # Jest tests
@@ -57,7 +57,7 @@ pnpm typecheck                     # Full type-check
 
 ### elohim-library (shared Angular libraries)
 ```bash
-cd elohim-library
+cd app/elohim-library
 pnpm install                       # Or from repo root
 cd projects/elohim-service && pnpm test   # Vitest tests for elohim-service
 ```
@@ -81,7 +81,7 @@ The `.husky/pre-push` hook auto-detects changed projects and runs their quality 
 
 ## Architecture
 
-### Domain Pillars (elohim-app/src/app/)
+### Domain Pillars (app/elohim-app/src/app/)
 
 The Angular app is organized into Hebrew-named domain pillars, each with its own services, models, and components:
 
@@ -103,7 +103,7 @@ Types flow from Rust through auto-generation to TypeScript:
 1. **elohim-storage** (`views.rs`) defines View types with `#[serde(rename_all = "camelCase")]` and `#[derive(TS)]`
 2. **`cargo test export_bindings`** generates TypeScript types to `elohim/sdk/storage-client-ts/src/generated/`
 3. **storage-client-ts** (`@elohim/storage-client`) exports ready-to-use camelCase types
-4. **Adapters** (`elohim-app/src/app/elohim/adapters/`) add computed/derived fields only - never transform wire format
+4. **Adapters** (`app/elohim-app/src/app/elohim/adapters/`) add computed/derived fields only - never transform wire format
 
 **Key rule**: snake_case never leaves the Rust boundary. TypeScript receives camelCase with parsed JSON and proper booleans. No `JSON.parse()`, no case conversion, no `toWire/fromWire` functions in TypeScript.
 
@@ -169,7 +169,7 @@ MultiBranch pipeline params are null until the Jenkinsfile runs once. Always use
 ### sophia-element UMD Must Be Pre-built
 The sophia-element UMD bundle must be built before elohim-app builds. The `prebuild` script checks for it. Build with:
 ```bash
-cd sophia && pnpm install && pnpm build && pnpm build:umd
+cd app/sophia && pnpm install && pnpm build && pnpm build:umd
 ```
 
 ### pnpm Workspace
@@ -188,7 +188,7 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 | Edge | `elohim/holochain/Jenkinsfile` | Auto via orchestrator |
 | DNA | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
 | Genesis | `genesis/Jenkinsfile` | Auto via orchestrator |
-| Sophia | `sophia/Jenkinsfile` | Auto via orchestrator |
+| Sophia | `app/sophia/Jenkinsfile` | Auto via orchestrator |
 | Steward | `steward/Jenkinsfile` | Manual only |
 
 ## Code Style
@@ -198,7 +198,7 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 - Prettier: 100 char width, single quotes, trailing commas
 - Import order: builtin -> external -> `@app/*` -> `@elohim/*`
 - Strict TypeScript with Angular strict templates
-- Path aliases defined in `elohim-app/tsconfig.json`
+- Path aliases defined in `app/elohim-app/tsconfig.json`
 
 ### Rust
 - `cargo fmt` + clippy with `-D warnings`

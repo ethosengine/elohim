@@ -49,10 +49,10 @@ Each graduation REDUCES the steward's conductor load while INCREASING the networ
 | SyncCoordinator | `elohim-node/src/sync/coordinator.rs` | S14 | tokio::select! peer sync orchestration |
 | ReplicationPolicy | `elohim-node/src/storage/reach.rs` | S14 | Reach-based replication (family/extended/public) |
 | Bootstrap client | `elohim-node/src/network/registration.rs` | S14 | Doorway bootstrap MessagePack client |
-| Graduation IPC (Tauri) | `elohim-app/.../tauri-auth.service.ts` | S13 | confirmStewardship() via Tauri core.invoke |
-| Graduation UX (Profile) | `elohim-app/.../profile/profile.component.*` | S13 | Upgrade section, password form, browser download path |
-| Graduating indicator | `elohim-app/.../connection-indicator.*` | S13 | Amber pulsing state during graduation |
-| Agency badge upgrade | `elohim-app/.../agency-badge.component.ts` | S13 | onUpgrade() navigates to profile#upgrade |
+| Graduation IPC (Tauri) | `app/elohim-app/.../tauri-auth.service.ts` | S13 | confirmStewardship() via Tauri core.invoke |
+| Graduation UX (Profile) | `app/elohim-app/.../profile/profile.component.*` | S13 | Upgrade section, password form, browser download path |
+| Graduating indicator | `app/elohim-app/.../connection-indicator.*` | S13 | Amber pulsing state during graduation |
+| Agency badge upgrade | `app/elohim-app/.../agency-badge.component.ts` | S13 | onUpgrade() navigates to profile#upgrade |
 | ZomeCaller | `doorway/src/services/zome_caller.rs` | S15 | Generic zome call (single-conn, auth, MessagePack) |
 | FederationService | `doorway/src/services/federation.rs` | S15 | DHT registration, heartbeat, cross-doorway fetch |
 | Federation routes | `doorway/src/routes/federation.rs` | S15 | /api/v1/federation/doorways, /.well-known/doorway-keys |
@@ -214,22 +214,22 @@ Original Sprint 12 was "Source Chain Migration (Graduation Protocol)". Reframed 
 
 **Angular UX (this sprint):**
 
-1. **TauriAuthService graduation IPC** — `elohim-app/.../tauri-auth.service.ts` (MODIFY)
+1. **TauriAuthService graduation IPC** — `app/elohim-app/.../tauri-auth.service.ts` (MODIFY)
    - Extended `Window.__TAURI__` declaration with `core.invoke`
    - `graduationStatus` / `graduationError` signals
    - `confirmStewardship(password)` — calls `doorway_confirm_stewardship` Tauri IPC
    - `isGraduationEligible` computed signal (Tauri + authenticated)
 
-2. **Profile graduation section** — `elohim-app/.../profile/profile.component.*` (MODIFY)
+2. **Profile graduation section** — `app/elohim-app/.../profile/profile.component.*` (MODIFY)
    - Upgrade card with next-stage benefits list
    - Tauri path: password form → confirm stewardship → success message
    - Browser path: download instructions with link to elohim.host/download
    - Styled with highlighted card, green success state, form styling
 
-3. **Connection indicator graduating state** — `elohim-app/.../connection-indicator.*` (MODIFY)
+3. **Connection indicator graduating state** — `app/elohim-app/.../connection-indicator.*` (MODIFY)
    - Amber "Graduating..." state with pulsing animation during confirmation
 
-4. **Agency badge upgrade wiring** — `elohim-app/.../agency-badge.component.ts` (MODIFY)
+4. **Agency badge upgrade wiring** — `app/elohim-app/.../agency-badge.component.ts` (MODIFY)
    - `onUpgrade()` navigates to `/identity/profile#upgrade`
 
 **Backend (pre-existing):**

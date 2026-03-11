@@ -63,7 +63,7 @@ DNS, federation, custodial hosting, account recovery. Exists because web2 exists
 
 ### The Seam (owned by neither architect, used by both)
 
-**Connection Strategy** (`elohim-library/.../connection/`):
+**Connection Strategy** (`app/elohim-library/.../connection/`):
 Abstracts doorway vs Tauri runtime via `IConnectionStrategy`. Angular doesn't know which world it's in. Rust doesn't care who's asking. Implementations: `DoorwayConnectionStrategy`, `DirectConnectionStrategy`, `TauriConnectionStrategy`.
 
 ## The Boundary Stack

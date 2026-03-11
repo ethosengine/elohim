@@ -192,8 +192,8 @@ cd /projects/elohim/elohim-app
 npm test -- --no-watch --code-coverage
 
 # Coverage report location
-# coverage/elohim-app/index.html
-# coverage/elohim-app/lcov.info
+# coverage/app/elohim-app/index.html
+# coverage/app/elohim-app/lcov.info
 ```
 
 ### Rust/Holochain
@@ -211,10 +211,10 @@ cargo tarpaulin --out Html
 ### 1. Assess Current State
 ```bash
 # Find existing test files
-find elohim-app/src -name "*.spec.ts" | head -20
+find app/elohim-app/src -name "*.spec.ts" | head -20
 
 # Check coverage report
-cat coverage/elohim-app/lcov.info | grep -A 3 "SF:"
+cat coverage/app/elohim-app/lcov.info | grep -A 3 "SF:"
 ```
 
 ### 2. Identify Gaps

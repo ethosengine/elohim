@@ -339,24 +339,24 @@ spec:
                                     cd ../..
 
                                     # 1. Init and build sophia (UMD bundle for prebuild check)
-                                    git submodule update --init sophia
-                                    cd sophia
+                                    git submodule update --init app/sophia
+                                    cd app/sophia
                                     pnpm install --frozen-lockfile
                                     pnpm build
                                     pnpm --filter @ethosengine/sophia-element build:umd
-                                    cd ..
+                                    cd ../..
 
                                     # 2. Install elohim-library deps (provides @angular/core for elohim-service)
-                                    cd elohim-library && pnpm install --frozen-lockfile && cd ..
+                                    cd app/elohim-library && pnpm install --frozen-lockfile && cd ../..
 
                                     # 3. Build storage-client-ts (provides @elohim/storage-client/generated)
                                     cd elohim/sdk/storage-client-ts && pnpm install --frozen-lockfile && pnpm run build && cd ../../..
 
                                     # 4. Build elohim-app
-                                    cd elohim-app
+                                    cd app/elohim-app
                                     pnpm install --frozen-lockfile
                                     pnpm run build
-                                    cp -r dist/elohim-app/browser/* ../steward/device/ui/
+                                    cp -r dist/elohim-app/browser/* ../../steward/device/ui/
                                 '''
                             }
 
