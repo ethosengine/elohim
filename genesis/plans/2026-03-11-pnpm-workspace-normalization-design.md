@@ -10,6 +10,7 @@
 - Cross-project references use filesystem paths (e.g. `../../../elohim-app/src/app/generated/`) that break on restructure
 - Code generation (`generate-schema-types.ts`) writes directly into another package's source tree
 - Only 2 of ~11 workspace packages use `workspace:*` protocol today
+- Sophia and elohim-ui-playground stuck on older version of storybook, because newer versions aren't published to the npm registry. (developer note: if we established our own npm sonatype registry (community edition), could we self-host, and provide artifacts for github site deployments and our own build resiliency in dev and jenkins)
 
 ## Current State
 
@@ -37,6 +38,18 @@
 5. **Update pnpm-lock.yaml**
 6. **Update CI** if any pipeline references package names
 
+## Submodule CI/CD Problem
+
+Jenkins cannot read Jenkinsfiles from inside git submodules — the GitHub Contents API returns a gitlink object instead of directory contents, and Jenkins' lightweight checkout (used to read the Jenkinsfile before the build starts) doesn't initialize submodules. This forces us to maintain duplicate "shim" Jenkinsfiles at root level outside the submodule boundary, disconnected from the code they build.
+
+If sophia were published to a registry (npm or self-hosted Sonatype), the elohim-app pipeline could consume it as a versioned dependency instead of building it inline from source via submodule. The sophia repo would have its own standalone CI (GitHub Actions already does this for storybook). The parent repo would just pull the artifact. This eliminates:
+- The Jenkinsfile-in-submodule discovery problem entirely
+- The pnpm workspace boundary violations (sophia would be a registry dep, not a workspace member)
+- The UMD bundle copy step in the app Jenkinsfile
+- The submodule pointer as a fragile coupling mechanism
+
+This pattern extends to any future submodules or extractable packages — publish to registry, consume as dependency, build independently.
+
 ## Anti-pattern to fix
 
 `genesis/seeder/src/generate-schema-types.ts` writes directly into `app/elohim-app/src/app/generated/`. Instead, the generated types should live in `@ethosengine/elohim-service` and both seeder and app should consume them via `workspace:*`.
@@ -46,3 +59,5 @@
 - Sophia stays `@ethosengine/sophia-*` / `@khanacademy/*` (separate workspace, git submodule)
 - Consider adding `publishConfig` to packages that should eventually be on npm
 - This is a devops cleanup, not a feature — no user-facing changes
+
+
