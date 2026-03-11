@@ -23,6 +23,7 @@ const CONTENT_DIR = path.join(GENESIS_DIR, 'data', 'lamad', 'content');
 const APP_GENERATED = path.resolve(
   GENESIS_DIR,
   '..',
+  'app',
   'elohim-app',
   'src',
   'app',

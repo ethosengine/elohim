@@ -22,7 +22,7 @@ const RUST_SOURCE = path.resolve(
 const OUTPUT_FILE = path.resolve(__dirname, 'generated/schema-enums.ts');
 const APP_OUTPUT_FILE = path.resolve(
   __dirname,
-  '../../../elohim-app/src/app/generated/schema-enums.ts'
+  '../../../app/elohim-app/src/app/generated/schema-enums.ts'
 );
 
 interface ParsedConstant {
