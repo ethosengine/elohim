@@ -135,6 +135,9 @@ spec:
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('node') {
+                    // Remove parent workspace config so pnpm treats sophia as standalone
+                    sh 'rm -f pnpm-workspace.yaml .npmrc'
+
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
