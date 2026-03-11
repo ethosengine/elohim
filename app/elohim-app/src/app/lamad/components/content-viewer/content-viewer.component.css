@@ -199,6 +199,20 @@
   line-height: 1.3;
 }
 
+/* Resilience info placeholder — will become the dynamic resilience icon */
+.resilience-info {
+  font-size: 0.5em;
+  vertical-align: super;
+  cursor: help;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  margin-left: 0.25em;
+}
+
+.resilience-info:hover {
+  opacity: 1;
+}
+
 .content-description {
   font-size: 1.2rem;
   color: var(--lamad-text-secondary);

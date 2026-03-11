@@ -53,7 +53,14 @@
           <span class="type-label">{{ getContentTypeDisplay() }}</span>
         </div>
 
-        <h1 class="content-title">{{ node.title }}</h1>
+        <h1 class="content-title">
+          {{ node.title }}
+          <span
+            class="resilience-info"
+            [title]="getResilienceTooltip()"
+            data-testid="viewer-resilience-info"
+          >ⓘ</span>
+        </h1>
         <p class="content-description">{{ node.description }}</p>
 
         <div class="content-meta">

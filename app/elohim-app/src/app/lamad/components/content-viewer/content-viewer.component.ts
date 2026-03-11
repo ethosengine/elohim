@@ -803,6 +803,40 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     return this.node.metadata['version'];
   }
 
+  /**
+   * Build a tooltip string showing resilience/stewardship data for this content node.
+   * Placeholder for the future dynamic resilience icon.
+   */
+  getResilienceTooltip(): string {
+    if (!this.node) return '';
+
+    const lines: string[] = [];
+
+    // Reach level
+    if (this.node.reach) {
+      lines.push(`Reach: ${this.node.reach}`);
+    }
+
+    // Stewards
+    if (this.node.stewardedBy?.length) {
+      const stewards = this.node.stewardedBy
+        .sort((a, b) => b.affinity - a.affinity)
+        .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
+        .join(', ');
+      lines.push(`Stewards: ${stewards}`);
+    }
+
+    // Trust score
+    if (this.node.trustScore != null) {
+      lines.push(`Trust: ${Math.round(this.node.trustScore * 100)}%`);
+    }
+
+    // Content ID (proves data pipeline)
+    lines.push(`ID: ${this.node.id}`);
+
+    return lines.join('\n') || 'No resilience data available';
+  }
+
   // =========================================================================
   // Path Context & Return Navigation Methods
   // =========================================================================
