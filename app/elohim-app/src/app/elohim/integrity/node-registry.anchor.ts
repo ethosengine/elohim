@@ -38,6 +38,7 @@ export class NodeRegistryAnchor implements IIntegrityAnchor<null, RawRegisteredN
         zomeName: this.zomeName,
         fnName: this.fnName,
         payload: null,
+        roleName: 'node_registry',
       });
 
       if (!result.success || !result.data) {

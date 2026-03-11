@@ -2,7 +2,7 @@
  * Validation Constants for Seeder Pre-flight Validation
  *
  * These constants are AUTO-GENERATED from the Rust DNA schema.
- * Source: holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
+ * Source: elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
  *
  * To regenerate:
  *   1. Run hc-rna-schema with --export-enums --constants-file healing.rs

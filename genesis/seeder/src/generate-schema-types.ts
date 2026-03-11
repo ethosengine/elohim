@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 const RUST_SOURCE = path.resolve(
   __dirname,
-  '../../../holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs'
+  '../../../elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs'
 );
 
 const OUTPUT_FILE = path.resolve(__dirname, 'generated/schema-enums.ts');
@@ -72,7 +72,7 @@ function generateTypeScript(constants: ParsedConstant[]): string {
   const lines: string[] = [
     '// AUTO-GENERATED from healing.rs - DO NOT EDIT',
     `// Generated at: ${new Date().toISOString()}`,
-    '// Source: holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs',
+    '// Source: elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs',
     '',
   ];
 

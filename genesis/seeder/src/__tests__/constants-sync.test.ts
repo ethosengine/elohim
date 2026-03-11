@@ -34,6 +34,7 @@ const SEEDER_GENERATED = path.resolve(SEEDER_DIR, 'src', 'generated', 'schema-en
 const HEALING_RS = path.resolve(
   GENESIS_DIR,
   '..',
+  'elohim',
   'holochain',
   'dna',
   'elohim',

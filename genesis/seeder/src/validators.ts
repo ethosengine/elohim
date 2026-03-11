@@ -2,7 +2,7 @@
  * Pre-flight Validators for Seeder
  *
  * These validation functions mirror the Rust validation in:
- * holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
+ * elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
  *
  * Running validation BEFORE uploading blobs catches issues immediately
  * instead of failing during zome calls after 20+ minutes of seeding.
