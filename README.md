@@ -42,85 +42,72 @@ This manifesto proposes technology that actively defends against corruption whil
 
 ## Repository Structure
 
+Organized by system boundary: core runtime, frontend apps, deployment shells, optional gateway, and meta/ops.
+
 ```
-├── devfile.yaml              # Eclipse Che workspace configuration
-├── Jenkinsfile               # CI/CD pipeline definition
-├── VERSION                   # Semantic versioning
+├── elohim/                        # Core Runtime
+│   ├── constitution/              # Constitutional AI constraints
+│   ├── eae/                       # Elohim Autonomous Entities
+│   ├── elohim-agent/              # Agent boundary
+│   │   ├── elohim-agent-service/  # Autonomous agent runtime (Rust)
+│   │   ├── elohim-agent-sdk/      # Agent SDK (TypeScript)
+│   │   └── mcp-servers/           # Model Context Protocol servers
+│   ├── elohim-storage/            # P2P content storage service (Rust)
+│   ├── elohim-bitswap/            # IPFS Bitswap protocol
+│   ├── rust-ipfs/                 # IPFS implementation (git submodule)
+│   ├── sdk/                       # TypeScript client libraries
+│   │   └── storage-client-ts/     # Generated types from Rust
+│   └── holochain/                 # Holochain-specific layer
+│       ├── dna/                   # DNA definitions (zomes, hApp packaging)
+│       ├── holochain-cache-core/  # WASM cache module
+│       ├── rna/                   # Schema templates & fixtures
+│       ├── edgenode/              # hApp container runtime
+│       └── elohim-wasm/           # Client-side WASM verification
 │
-├── genesis/
-│   ├── orchestrator/         # CI/CD Orchestrator
-│   │   ├── Jenkinsfile       # Central pipeline controller
-│   │   ├── environments/     # Environment configurations
-│   │   └── manifests/        # Orchestrator deployments
-│   ├── a2o/                  # Alpha-to-omega E2E validation
-│   ├── docs/                 # Genesis content (BDD scenarios)
-│   └── seeder/               # Content seeding tools
+├── app/                           # Frontend Applications
+│   ├── elohim-app/                # Angular 19 main platform
+│   │   └── src/app/
+│   │       ├── elohim/            # Core infrastructure services
+│   │       ├── imagodei/          # Human identity & stewardship
+│   │       ├── lamad/             # Learning infrastructure
+│   │       ├── qahal/             # Community governance
+│   │       ├── shefa/             # Resource flows & economics
+│   │       └── doorway/           # Gateway integration
+│   ├── elohim-library/            # Shared Angular libraries
+│   │   └── projects/
+│   │       └── elohim-service/    # Import pipeline, content models
+│   └── sophia/                    # Assessment engine (git submodule)
+│       └── packages/
+│           ├── sophia-element/    # <sophia-question> web component
+│           ├── sophia-core/       # Core types (Moment, Recognition)
+│           ├── perseus-score/     # Mastery scoring (graded)
+│           └── psyche-survey/     # Discovery & reflection (psychometric)
 │
-├── genesis/                  # Content Pipeline: source → seed → validate
-│   ├── Jenkinsfile           # Seed + validate pipeline
-│   ├── docs/                 # Raw source documentation (markdown, Gherkin)
-│   ├── data/                 # Structured seed data (JSON)
-│   ├── blobs/                # Binary content (images, videos)
-│   ├── assets/               # Static assets
-│   └── seeder/               # Holochain seeding tools
+├── steward/                       # Deployment Shells
+│   ├── device/                    # Tauri desktop app
+│   │   ├── src-tauri/             # Rust backend with Holochain
+│   │   └── ui/                    # Desktop UI
+│   └── node/                      # Headless P2P runtime (libp2p)
+│       ├── src/                   # Always-on family node daemon
+│       └── simulation/            # Network simulation tooling
 │
-├── elohim-app/               # Angular Application (Main Platform)
-│   └── src/app/
-│       ├── components/       # Landing page components
-│       ├── core/             # Core utilities and guards
-│       ├── elohim/           # Core infrastructure services
-│       ├── imagodei/         # Human identity & stewardship
-│       ├── lamad/            # Learning infrastructure
-│       ├── qahal/            # Community governance
-│       ├── shefa/            # Resource flows & economics
-│       ├── doorway/          # Gateway integration
-│       └── services/         # Shared services
+├── doorway/                       # Optional Hosted Gateway
+│   ├── doorway-service/           # Rust gateway (bootstrap, signal, proxy)
+│   └── doorway-app/               # Angular admin UI
 │
-├── elohim-library/           # Shared Libraries
-│   └── projects/
-│       ├── elohim-service/   # Import pipeline, content models, CLI
-│       ├── lamad-ui/         # UI Pattern Library
-│       └── html5-app-plugin/ # HTML5 app integration
+├── crates/                        # Shared Rust Crates
+│   ├── doorway-client/            # Gateway client traits
+│   ├── elohim-sdk/                # Core SDK
+│   └── elohim-storage-client/     # Storage HTTP client
 │
-├── sophia/                   # Sophia Assessment Engine (git submodule)
-│   └── packages/             # Person-centered assessment rendering
-│       ├── sophia-element/   # <sophia-question> web component
-│       ├── sophia-core/      # Core types (Moment, Recognition)
-│       ├── perseus-score/    # Mastery scoring (graded)
-│       └── psyche-survey/    # Discovery & reflection (psychometric)
+├── genesis/                       # Meta / Ops / Content
+│   ├── orchestrator/              # CI/CD central controller
+│   ├── a2o/                       # Alpha-to-omega E2E validation
+│   ├── docs/                      # Source content (markdown, Gherkin)
+│   ├── seeder/                    # Content seeding tools
+│   └── manifests/                 # K8s deployment manifests
 │
-├── doorway/                  # Rust Gateway Service
-│   └── src/                  # Bootstrap, Signal, Gateway consolidation
-│
-├── doorway-app/              # Angular Doorway UI
-│   └── src/                  # Doorway admin interface
-│
-├── elohim/                   # Rust Agent Infrastructure
-│   ├── constitution/         # Constitutional AI constraints
-│   ├── elohim-agent/         # Autonomous agent runtime
-│   └── eae/                  # Elohim Autonomous Entities
-│
-├── elohim-node/              # Rust Node Runtime
-│   └── src/                  # Always-on family node daemon
-│
-├── steward/                  # Tauri Desktop Application
-│   ├── src-tauri/            # Rust backend with Holochain
-│   └── ui/                   # Desktop UI
-│
-├── holochain/                # Holochain Infrastructure
-│   ├── dna/                  # DNA definitions (elohim, imagodei, lamad, etc.)
-│   ├── edgenode/             # Edge node implementation
-│   ├── elohim-storage/       # P2P blob storage layer
-│   ├── sdk/                  # TypeScript SDK for Holochain
-│   ├── rna/                  # RNA components
-│   └── manifests/            # K8s deployments for Edge Nodes
-│
-├── mcp-servers/              # Model Context Protocol Servers
-│   └── elohim-content/       # Content management MCP
-│
-└── research/                 # Research & Exploration
-    ├── matrix/               # Matrix protocol research
-    └── economic/             # Economic model research
+└── scripts/                       # Developer tooling
 ```
 
 ## Progressive Stewardship
@@ -140,26 +127,24 @@ This progressive model ensures no one is excluded due to technical barriers, whi
 
 The protocol runs on [Holochain](https://holochain.org/), a framework for distributed applications without global consensus. Each user maintains their own source chain, validated by peers through a distributed hash table (DHT).
 
-**DNA Modules** (`holochain/dna/`):
+**DNA Modules** (`elohim/holochain/dna/`):
 - **elohim**: Core protocol coordination
 - **imagodei**: Human identity and stewardship
 - **lamad-v1**: Learning content and paths
 - **infrastructure**: Network coordination
 - **node-registry**: Node discovery and health
 
-**Edge Nodes** (`holochain/edgenode/`) provide network infrastructure:
+**Edge Nodes** (`elohim/holochain/edgenode/`) provide network infrastructure:
 - Run the Holochain conductor with protocol hApps
 - Serve as DHT shard holders and bootstrap nodes
 - Enable web browsers to connect via Doorway gateway
 
-**Elohim Storage** (`holochain/elohim-storage/`) provides P2P blob storage:
+**Elohim Storage** (`elohim/elohim-storage/`) provides P2P blob storage:
 - Large content that exceeds Holochain's DHT limits
 - Reed-Solomon erasure coding for redundancy
 - Integration with content seeder pipeline
 
-**SDK** (`holochain/sdk/`) provides TypeScript bindings for frontend integration.
-
-See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and configuration.
+**SDK** (`elohim/sdk/`) provides TypeScript bindings for frontend integration.
 
 ## Lamad Learning System
 
@@ -169,7 +154,7 @@ See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and confi
 - **Journey (LearningPath)**: Curated paths that add narrative meaning and sequence
 - **Traveler (Agent)**: Learners whose progress and attestations shape their experience
 
-See [`elohim-app/src/app/lamad/README.md`](./elohim-app/src/app/lamad/README.md) for detailed documentation.
+See [`app/elohim-app/src/app/lamad/README.md`](./app/elohim-app/src/app/lamad/README.md) for detailed documentation.
 
 ## Key Infrastructure Components
 
@@ -180,27 +165,22 @@ The consolidated Web2 gateway that makes P2P networks accessible:
 - **Signal**: WebRTC signaling ("Connect to peers")
 - **Gateway**: Conductor access with caching ("Get the data")
 
-One domain (`doorway.elohim.host`) serves all three functions. See [`doorway/ARCHITECTURE.md`](./doorway/ARCHITECTURE.md).
+One domain (`doorway.elohim.host`) serves all three functions. See [`doorway/doorway-service/ARCHITECTURE.md`](./doorway/doorway-service/ARCHITECTURE.md).
 
 ### Elohim Agents (Constitutional AI)
 
-Rust infrastructure for autonomous AI agents:
+Rust infrastructure for autonomous AI agents (`elohim/elohim-agent/`):
 - **constitution/**: Runtime constitutional constraints (not trained values)
-- **elohim-agent/**: Agent runtime with streaming LLM backends
+- **elohim-agent-service/**: Agent runtime with streaming LLM backends
+- **elohim-agent-sdk/**: TypeScript SDK for agent integration
+- **mcp-servers/**: Model Context Protocol servers for AI tooling
 - **eae/**: Elohim Autonomous Entities (worker-owned AI organizations)
 
-### Elohim Node (Family Infrastructure)
+### Steward (Deployment Shells)
 
-Always-on nodes that form the network backbone:
-- Device-to-node sync (phone/laptop to family node)
-- Cluster-to-cluster replication
-- Backup and recovery
-
-See [`elohim-node/README.md`](./elohim-node/README.md).
-
-### Steward (Desktop App)
-
-Tauri-based desktop application for running your own Holochain node as a steward of co-creation.
+Two deployment form factors in `steward/`:
+- **device/** (Tauri): Desktop app for running your own Holochain node as a steward of co-creation
+- **node/** (libp2p): Always-on headless P2P runtime for family infrastructure — device-to-node sync, cluster replication, backup and recovery
 
 ### Sophia (Assessment Engine)
 
@@ -209,7 +189,7 @@ Person-centered assessment rendering infrastructure, transforming Khan Academy's
 - **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
 - **Reflection**: Open-ended capture without grading
 
-Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`app/sophia/README.md`](./app/sophia/README.md).
 
 ## CI/CD
 
@@ -229,7 +209,7 @@ This repository is configured for development with Eclipse Che / OpenShift Dev S
 
 ```bash
 pnpm install          # From repo root (workspace install)
-pnpm app:dev          # Or: cd elohim-app && pnpm start
+pnpm app:dev          # Or: cd app/elohim-app && pnpm start
 ```
 
 The application will be available at `http://localhost:4200/`
@@ -241,7 +221,7 @@ The project includes:
 - **Jenkinsfile**: CI/CD pipeline for automated builds, testing, and deployment
 - **Angular dev server**: Configured for remote development with host checking disabled
 - **pnpm workspace**: All Node.js projects managed via pnpm workspaces from repo root
-- **Kubernetes manifests**: Production deployment configurations in `manifests/`
+- **Kubernetes manifests**: Production deployment configurations in `genesis/manifests/`
 
 ## Philosophy
 
