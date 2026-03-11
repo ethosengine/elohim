@@ -126,6 +126,7 @@ spec:
             steps {
                 container('node') {
                     checkout scm
+                    sh 'git submodule update --init --recursive sophia'
                     // Remove parent workspace config so pnpm treats sophia as standalone.
                     // Must happen after checkout, before any pnpm command.
                     sh 'rm -f pnpm-workspace.yaml .npmrc package.json'
