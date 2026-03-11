@@ -368,6 +368,32 @@ async fn main() -> anyhow::Result<()> {
         info!("P2P status polling enabled (every 30s from elohim-storage)");
     }
 
+    // Self-register the steward's elohim-storage as the first peer in the route registry.
+    // Fetches GET {STORAGE_URL}/manifest and compiles the returned routes.
+    // Non-fatal: if storage is not yet up, dynamic routes are simply unavailable until
+    // the operator restarts doorway or peers register manually.
+    if let Some(ref storage_url) = state.args.storage_url {
+        match state
+            .route_registry
+            .register_steward_peer(storage_url)
+            .await
+        {
+            Ok(count) => {
+                tracing::info!(
+                    routes = count,
+                    storage_url = %storage_url,
+                    "Steward storage self-registered as first peer"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to self-register steward storage — dynamic routes unavailable"
+                );
+            }
+        }
+    }
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)

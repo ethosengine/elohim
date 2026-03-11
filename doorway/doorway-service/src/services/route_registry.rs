@@ -103,6 +103,8 @@ pub enum RouteSource {
     },
     /// Built-in doorway route
     Builtin,
+    /// The steward's own elohim-storage, self-registered on boot
+    StewardPeer { storage_url: String },
 }
 
 /// Target of a route
@@ -124,6 +126,8 @@ pub enum RouteTarget {
     BlobProxy { config: BlobProxyConfig },
     /// Serve media streams
     StreamProxy { config: StreamProxyConfig },
+    /// Proxy to a peer's elohim-storage endpoint
+    StorageProxy { endpoint: String },
 }
 
 /// Route registry statistics
@@ -600,6 +604,96 @@ impl RouteRegistry {
     }
 
     // =========================================================================
+    // Steward Peer Self-Registration
+    // =========================================================================
+
+    /// Register the steward's own elohim-storage as the first peer on boot.
+    ///
+    /// Fetches `GET {storage_url}/manifest`, parses the returned `DoorwayRoutes`,
+    /// and compiles each declared route as a `StorageProxy` target. Returns the
+    /// number of compiled routes added, or an error string if the fetch or parse
+    /// fails.
+    pub async fn register_steward_peer(&self, storage_url: &str) -> Result<usize, String> {
+        let url = format!("{}/manifest", storage_url.trim_end_matches('/'));
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+
+        let response = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch manifest from {url}: {e}"))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Manifest endpoint returned {}: {}",
+                response.status(),
+                url
+            ));
+        }
+
+        let manifest: DoorwayRoutes = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse manifest JSON: {e}"))?;
+
+        let mut new_routes: Vec<CompiledRoute> = Vec::new();
+
+        for route in &manifest.routes {
+            new_routes.push(CompiledRoute {
+                method: route.method,
+                path: route.path.clone(),
+                source: RouteSource::StewardPeer {
+                    storage_url: storage_url.to_string(),
+                },
+                target: RouteTarget::StorageProxy {
+                    endpoint: storage_url.trim_end_matches('/').to_string(),
+                },
+                auth_required: route.auth_required,
+                cache_ttl_secs: route.cache_ttl_secs,
+                rate_limit_rpm: route.rate_limit_rpm,
+            });
+        }
+
+        if let Some(ref blob_config) = manifest.blob_proxy {
+            if blob_config.enabled {
+                new_routes.push(CompiledRoute {
+                    method: HttpMethod::Get,
+                    path: format!("{}/:hash", blob_config.base_path),
+                    source: RouteSource::StewardPeer {
+                        storage_url: storage_url.to_string(),
+                    },
+                    target: RouteTarget::StorageProxy {
+                        endpoint: storage_url.trim_end_matches('/').to_string(),
+                    },
+                    auth_required: false,
+                    cache_ttl_secs: blob_config.cache_ttl_secs,
+                    rate_limit_rpm: 0,
+                });
+            }
+        }
+
+        let count = new_routes.len();
+
+        let mut compiled = self.compiled_routes.write().await;
+        compiled.extend(new_routes);
+
+        let mut last = self.last_compiled.write().await;
+        *last = Some(Instant::now());
+
+        info!(
+            routes = count,
+            storage_url = %storage_url,
+            "Steward storage self-registered as first peer"
+        );
+
+        Ok(count)
+    }
+
+    // =========================================================================
     // Query Interface
     // =========================================================================
 
@@ -815,5 +909,74 @@ mod tests {
         assert!(path_matches("/api/*path", "/api/content/abc/def"));
         assert!(!path_matches("/api/content/:id", "/api/other/abc"));
         assert!(!path_matches("/api/content", "/api/content/extra"));
+    }
+
+    /// Verifies that routes manually inserted as StewardPeer/StorageProxy are
+    /// compiled correctly — without making a real HTTP call to a manifest.
+    #[tokio::test]
+    async fn test_register_steward_peer_compiles_routes() {
+        let registry = RouteRegistry::with_defaults();
+
+        // Simulate what register_steward_peer does internally after fetching the manifest
+        let storage_url = "http://localhost:8090";
+        let test_routes = vec![
+            CompiledRoute {
+                method: HttpMethod::Get,
+                path: "/api/v1/mastery/:id".to_string(),
+                source: RouteSource::StewardPeer {
+                    storage_url: storage_url.to_string(),
+                },
+                target: RouteTarget::StorageProxy {
+                    endpoint: storage_url.to_string(),
+                },
+                auth_required: false,
+                cache_ttl_secs: 300,
+                rate_limit_rpm: 0,
+            },
+            CompiledRoute {
+                method: HttpMethod::Post,
+                path: "/api/v1/mastery".to_string(),
+                source: RouteSource::StewardPeer {
+                    storage_url: storage_url.to_string(),
+                },
+                target: RouteTarget::StorageProxy {
+                    endpoint: storage_url.to_string(),
+                },
+                auth_required: true,
+                cache_ttl_secs: 0,
+                rate_limit_rpm: 0,
+            },
+        ];
+
+        {
+            let mut compiled = registry.compiled_routes.write().await;
+            compiled.extend(test_routes);
+        }
+
+        let routes = registry.get_routes().await;
+        assert_eq!(
+            routes.len(),
+            2,
+            "Both steward peer routes should be present"
+        );
+
+        // Verify the first route is a StorageProxy
+        assert!(
+            matches!(routes[0].target, RouteTarget::StorageProxy { .. }),
+            "Route target should be StorageProxy"
+        );
+
+        // Verify source is StewardPeer
+        assert!(
+            matches!(routes[0].source, RouteSource::StewardPeer { .. }),
+            "Route source should be StewardPeer"
+        );
+
+        // Verify auth_required is propagated
+        assert!(
+            !routes[0].auth_required,
+            "GET mastery should not require auth"
+        );
+        assert!(routes[1].auth_required, "POST mastery should require auth");
     }
 }

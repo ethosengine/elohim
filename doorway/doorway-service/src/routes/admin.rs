@@ -24,6 +24,7 @@ use std::sync::Arc;
 use crate::db::schemas::{UserDoc, USER_COLLECTION};
 use crate::orchestrator::{NodeHealthStatus, SocialMetrics};
 use crate::server::AppState;
+use crate::services::RouteSource;
 
 // ============================================================================
 // Node Details Response
@@ -766,6 +767,97 @@ pub async fn handle_admin_pipeline(state: Arc<AppState>) -> Response<Full<Bytes>
             hosted_total,
             graduating_count,
             steward_count,
+        },
+    )
+}
+
+// ============================================================================
+// Route Registry
+// ============================================================================
+
+/// Summary of a single route source group
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteSourceInfo {
+    pub source_type: String,
+    pub route_count: usize,
+    pub endpoint: Option<String>,
+}
+
+/// Response for GET /admin/routes
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteRegistryResponse {
+    pub total_routes: usize,
+    pub steward_registered: bool,
+    pub steward_url: Option<String>,
+    pub route_sources: Vec<RouteSourceInfo>,
+}
+
+/// Handle GET /admin/routes
+pub async fn handle_route_registry(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let routes = state.route_registry.get_routes().await;
+    let total_routes = routes.len();
+
+    let mut steward_registered = false;
+    let mut steward_url: Option<String> = None;
+
+    // Group routes by source type for the summary
+    let mut dna_count = 0usize;
+    let mut steward_count = 0usize;
+    let mut agent_count = 0usize;
+    let mut builtin_count = 0usize;
+
+    for route in &routes {
+        match &route.source {
+            RouteSource::StewardPeer { storage_url } => {
+                steward_registered = true;
+                steward_url = Some(storage_url.clone());
+                steward_count += 1;
+            }
+            RouteSource::Dna { .. } => dna_count += 1,
+            RouteSource::ExternalAgent { .. } => agent_count += 1,
+            RouteSource::Builtin => builtin_count += 1,
+        }
+    }
+
+    let mut route_sources: Vec<RouteSourceInfo> = Vec::new();
+    if steward_count > 0 {
+        route_sources.push(RouteSourceInfo {
+            source_type: "steward_peer".to_string(),
+            route_count: steward_count,
+            endpoint: steward_url.clone(),
+        });
+    }
+    if dna_count > 0 {
+        route_sources.push(RouteSourceInfo {
+            source_type: "dna".to_string(),
+            route_count: dna_count,
+            endpoint: None,
+        });
+    }
+    if agent_count > 0 {
+        route_sources.push(RouteSourceInfo {
+            source_type: "external_agent".to_string(),
+            route_count: agent_count,
+            endpoint: None,
+        });
+    }
+    if builtin_count > 0 {
+        route_sources.push(RouteSourceInfo {
+            source_type: "builtin".to_string(),
+            route_count: builtin_count,
+            endpoint: None,
+        });
+    }
+
+    json_response(
+        StatusCode::OK,
+        RouteRegistryResponse {
+            total_routes,
+            steward_registered,
+            steward_url,
+            route_sources,
         },
     )
 }
