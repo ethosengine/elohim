@@ -33,6 +33,7 @@
 //! ```
 
 use crate::blob_store::BlobStore;
+use doorway_client::{DoorwayRoutesBuilder, Route};
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
 };
@@ -521,6 +522,9 @@ impl HttpServer {
                 }
             }
 
+            // Route manifest — declares the API surface for doorway dynamic discovery
+            (Method::GET, "/manifest") => self.handle_manifest().await,
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -575,6 +579,23 @@ impl HttpServer {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap())
+    }
+
+    /// GET /manifest - Declare the route surface for doorway dynamic discovery
+    ///
+    /// Returns a `DoorwayRoutes` JSON payload listing all `/api/v1/*` and `/db/*`
+    /// routes that doorway should proxy to clients, plus the blob proxy config.
+    /// Infrastructure endpoints (/health, /shard/*, /sync/*, /import/*) are
+    /// intentionally omitted — doorway proxies only API routes.
+    async fn handle_manifest(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        let routes = build_manifest();
+        let body = serde_json::to_string(&routes)
+            .map_err(|e| StorageError::Internal(format!("Failed to serialize manifest: {}", e)))?;
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(body)))
             .unwrap())
     }
 
@@ -5830,6 +5851,297 @@ impl HttpServer {
     }
 }
 
+/// Build the static route manifest for doorway discovery.
+///
+/// Declares every `/api/v1/*` and `/db/*` route that elohim-storage serves.
+/// Used by `GET /manifest` and consumed by doorway's dynamic route registry.
+///
+/// Design rule: list only routes that doorway should proxy to clients.
+/// Infrastructure routes (/health, /shard/*, /blob/*, /sync/*, /import/*,
+/// /p2p/*, /epr-head/*, /ipfs/*, /dag/*, /session, /account/*) are
+/// intentionally omitted — doorway handles them independently or not at all.
+pub fn build_manifest() -> doorway_client::DoorwayRoutes {
+    DoorwayRoutesBuilder::new()
+        // =====================================================================
+        // /api/v1/mastery — Content mastery lifecycle
+        // =====================================================================
+        .route(Route::get("/api/v1/mastery").handler("list_mastery").cache_ttl(60).build())
+        .route(Route::post("/api/v1/mastery").handler("initialize_mastery").auth_required().build())
+        .route(Route::post("/api/v1/mastery/engagement").handler("record_engagement").auth_required().build())
+        .route(Route::post("/api/v1/mastery/assessment").handler("record_assessment").auth_required().build())
+        .route(Route::post("/api/v1/mastery/batch").handler("batch_query_mastery").auth_required().build())
+        .route(Route::post("/api/v1/mastery/check-privilege").handler("check_privilege").auth_required().build())
+        .route(Route::get("/api/v1/mastery/stats").handler("mastery_stats").cache_ttl(300).build())
+        .route(Route::get("/api/v1/mastery/pool/{id}").handler("get_practice_pool").auth_required().build())
+        .route(Route::get("/api/v1/mastery/path/{path_id}").handler("mastery_for_path").cache_ttl(60).build())
+        .route(Route::get("/api/v1/mastery/{id}").handler("get_mastery").cache_ttl(60).build())
+
+        // =====================================================================
+        // /api/v1/governance — Governance state and deliberation
+        // =====================================================================
+        .route(Route::get("/api/v1/governance/state").handler("governance_state").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/states").handler("list_governance_states").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/challenges").handler("list_challenges").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/challenges/{id}").handler("get_challenge").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/proposals").handler("list_proposals").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/proposals/{id}").handler("get_proposal").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/precedents").handler("list_precedents").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/precedents/{id}").handler("get_precedent").cache_ttl(300).build())
+        .route(Route::get("/api/v1/governance/discussions").handler("list_discussions").cache_ttl(60).build())
+        .route(Route::get("/api/v1/governance/discussions/{id}").handler("get_discussion").cache_ttl(60).build())
+
+        // =====================================================================
+        // /api/v1/economic-events — REA economic events
+        // =====================================================================
+        .route(Route::get("/api/v1/economic-events").handler("list_economic_events").cache_ttl(60).build())
+        .route(Route::post("/api/v1/economic-events").handler("create_economic_event").auth_required().build())
+        .route(Route::post("/api/v1/economic-events/bulk").handler("bulk_create_economic_events").auth_required().build())
+        .route(Route::post("/api/v1/economic-events/from-staged").handler("economic_events_from_staged").auth_required().build())
+        .route(Route::get("/api/v1/economic-events/agent/{agent_id}").handler("economic_events_by_agent").cache_ttl(60).build())
+        .route(Route::get("/api/v1/economic-events/content/{content_id}").handler("economic_events_by_content").cache_ttl(60).build())
+        .route(Route::get("/api/v1/economic-events/appreciations").handler("list_appreciations").cache_ttl(60).build())
+        .route(Route::post("/api/v1/economic-events/appreciations").handler("create_appreciation").auth_required().build())
+        .route(Route::get("/api/v1/economic-events/{id}").handler("get_economic_event").cache_ttl(60).build())
+
+        // =====================================================================
+        // /api/v1/stewardship — Stewardship allocations and policy
+        // =====================================================================
+        .route(Route::get("/api/v1/stewardship/policy").handler("get_stewardship_policy").cache_ttl(300).build())
+        .route(Route::get("/api/v1/stewardship/grants").handler("list_stewardship_grants").cache_ttl(60).build())
+        .route(Route::post("/api/v1/stewardship/grants").handler("create_stewardship_grant").auth_required().build())
+        .route(Route::get("/api/v1/stewardship/grants/{id}").handler("get_stewardship_grant").cache_ttl(60).build())
+        .route(Route::post("/api/v1/stewardship/grants/{id}/delegate").handler("delegate_stewardship_grant").auth_required().build())
+        .route(Route::post("/api/v1/stewardship/appeals").handler("file_stewardship_appeal").auth_required().build())
+        .route(Route::post("/api/v1/stewardship/activity").handler("log_stewardship_activity").auth_required().build())
+        .route(Route::get("/api/v1/stewardship/allocations").handler("list_allocations").cache_ttl(60).build())
+        .route(Route::post("/api/v1/stewardship/allocations").handler("create_allocation").auth_required().build())
+        .route(Route::get("/api/v1/stewardship/allocations/content/{content_id}").handler("allocations_for_content").cache_ttl(60).build())
+        .route(Route::get("/api/v1/stewardship/allocations/steward/{steward_id}").handler("allocations_for_steward").cache_ttl(60).build())
+        .route(Route::get("/api/v1/stewardship/allocations/{id}").handler("get_allocation").cache_ttl(60).build())
+        .route(Route::put("/api/v1/stewardship/allocations/{id}").handler("update_allocation").auth_required().build())
+        .route(Route::delete("/api/v1/stewardship/allocations/{id}").handler("delete_allocation").auth_required().build())
+        .route(Route::post("/api/v1/stewardship/allocations/{id}/dispute").handler("dispute_allocation").auth_required().build())
+        .route(Route::post("/api/v1/stewardship/allocations/{id}/resolve").handler("resolve_allocation").auth_required().build())
+        .route(Route::post("/api/v1/stewardship/policies").handler("upsert_stewardship_policy").auth_required().build())
+        .route(Route::get("/api/v1/stewardship/policies").handler("list_stewardship_policies").cache_ttl(300).build())
+        .route(Route::get("/api/v1/stewardship/policies/me/chain").handler("my_policy_chain").auth_required().build())
+        .route(Route::get("/api/v1/stewardship/policies/{id}").handler("get_stewardship_policy_by_id").cache_ttl(300).build())
+        .route(Route::get("/api/v1/stewardship/policies/{id}/parent").handler("policy_parent").cache_ttl(300).build())
+        .route(Route::get("/api/v1/stewardship/policies/{id}/chain").handler("policy_chain").cache_ttl(300).build())
+        .route(Route::get("/api/v1/stewardship/access/time").handler("check_time_access").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/resources — REA resource management
+        // =====================================================================
+        .route(Route::get("/api/v1/resources").handler("list_resources").cache_ttl(300).build())
+        .route(Route::post("/api/v1/resources").handler("create_resource").auth_required().build())
+        .route(Route::get("/api/v1/resources/dashboard/{id}").handler("resource_dashboard").cache_ttl(60).build())
+        .route(Route::get("/api/v1/resources/constitutional-limits/{id}").handler("constitutional_limits").cache_ttl(300).build())
+        .route(Route::post("/api/v1/resources/{id}/allocations").handler("allocate_resource").auth_required().build())
+        .route(Route::post("/api/v1/resources/{id}/usage").handler("record_resource_usage").auth_required().build())
+        .route(Route::get("/api/v1/resources/{id}").handler("get_resource").cache_ttl(300).build())
+
+        // =====================================================================
+        // /api/v1/exchange — Requests and offers
+        // =====================================================================
+        .route(Route::get("/api/v1/exchange/requests").handler("list_requests").cache_ttl(60).build())
+        .route(Route::post("/api/v1/exchange/requests").handler("create_request").auth_required().build())
+        .route(Route::get("/api/v1/exchange/requests/{id}").handler("get_request").cache_ttl(60).build())
+        .route(Route::patch("/api/v1/exchange/requests/{id}").handler("update_request").auth_required().build())
+        .route(Route::delete("/api/v1/exchange/requests/{id}").handler("archive_request").auth_required().build())
+        .route(Route::post("/api/v1/exchange/requests/{id}/match").handler("match_request").auth_required().build())
+        .route(Route::get("/api/v1/exchange/offers").handler("list_offers").cache_ttl(60).build())
+        .route(Route::post("/api/v1/exchange/offers").handler("create_offer").auth_required().build())
+        .route(Route::get("/api/v1/exchange/offers/{id}").handler("get_offer").cache_ttl(60).build())
+        .route(Route::patch("/api/v1/exchange/offers/{id}").handler("update_offer").auth_required().build())
+        .route(Route::delete("/api/v1/exchange/offers/{id}").handler("archive_offer").auth_required().build())
+        .route(Route::post("/api/v1/exchange/offers/{id}/match").handler("match_offer").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/custodians — Infrastructure custodian metrics
+        // =====================================================================
+        .route(Route::get("/api/v1/custodians/metrics").handler("list_custodian_metrics").cache_ttl(60).build())
+        .route(Route::post("/api/v1/custodians/metrics").handler("report_custodian_metrics").auth_required().build())
+        .route(Route::get("/api/v1/custodians/metrics/alerts").handler("custodian_alerts").cache_ttl(60).build())
+        .route(Route::get("/api/v1/custodians/metrics/{id}").handler("get_custodian_metrics").cache_ttl(60).build())
+        .route(Route::get("/api/v1/custodians/metrics/{id}/recommendations").handler("custodian_recommendations").cache_ttl(300).build())
+        .route(Route::get("/api/v1/custodians/protection/{id}").handler("custodian_protection").cache_ttl(300).build())
+
+        // =====================================================================
+        // /api/v1/compute — Compute dashboard
+        // =====================================================================
+        .route(Route::get("/api/v1/compute/dashboard").handler("compute_dashboard").cache_ttl(60).build())
+        .route(Route::post("/api/v1/compute/dashboard/refresh").handler("refresh_compute_dashboard").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/flow-planning — Resource flow planning
+        // =====================================================================
+        .route(Route::get("/api/v1/flow-planning").handler("list_flow_plans").cache_ttl(300).build())
+        .route(Route::post("/api/v1/flow-planning").handler("create_flow_plan").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/attestations — Contributor attestations
+        // =====================================================================
+        .route(Route::get("/api/v1/attestations").handler("list_attestations").cache_ttl(300).build())
+        .route(Route::post("/api/v1/attestations").handler("create_attestation").auth_required().build())
+        .route(Route::post("/api/v1/attestations/{id}/revoke").handler("revoke_attestation").auth_required().build())
+        .route(Route::get("/api/v1/attestations/{id}").handler("get_attestation").cache_ttl(300).build())
+
+        // =====================================================================
+        // /api/v1/steward — Steward credentials, gates, grants, access
+        // =====================================================================
+        .route(Route::post("/api/v1/steward/credentials").handler("create_steward_credential").auth_required().build())
+        .route(Route::get("/api/v1/steward/credentials").handler("list_steward_credentials").auth_required().build())
+        .route(Route::get("/api/v1/steward/credentials/{id}").handler("get_steward_credential").auth_required().build())
+        .route(Route::post("/api/v1/steward/gates").handler("create_steward_gate").auth_required().build())
+        .route(Route::get("/api/v1/steward/gates").handler("list_steward_gates").cache_ttl(300).build())
+        .route(Route::get("/api/v1/steward/gates/{id}").handler("get_steward_gate").cache_ttl(300).build())
+        .route(Route::post("/api/v1/steward/grants").handler("create_steward_grant").auth_required().build())
+        .route(Route::get("/api/v1/steward/grants").handler("list_steward_grants").auth_required().build())
+        .route(Route::get("/api/v1/steward/grants/{id}").handler("get_steward_grant").auth_required().build())
+        .route(Route::get("/api/v1/steward/access").handler("steward_access").auth_required().build())
+        .route(Route::get("/api/v1/steward/revenue/{id}").handler("steward_revenue").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/contributors — Contributor dashboards
+        // =====================================================================
+        .route(Route::get("/api/v1/contributors/me/dashboard").handler("my_contributor_dashboard").auth_required().build())
+        .route(Route::get("/api/v1/contributors/{id}/dashboard").handler("contributor_dashboard").cache_ttl(60).build())
+        .route(Route::get("/api/v1/contributors/{id}/impact").handler("contributor_impact").cache_ttl(300).build())
+        .route(Route::get("/api/v1/contributors/{id}/recognition").handler("contributor_recognition").cache_ttl(300).build())
+
+        // =====================================================================
+        // /api/v1/presence — Contributor presences
+        // =====================================================================
+        .route(Route::get("/api/v1/presence").handler("list_presences").cache_ttl(60).build())
+        .route(Route::post("/api/v1/presence").handler("create_presence").auth_required().build())
+        .route(Route::get("/api/v1/presence/{id}").handler("get_presence").cache_ttl(60).build())
+        .route(Route::delete("/api/v1/presence/{id}").handler("delete_presence").auth_required().build())
+        .route(Route::post("/api/v1/presence/{id}/stewardship").handler("begin_stewardship").auth_required().build())
+        .route(Route::post("/api/v1/presence/{id}/claim").handler("initiate_claim").auth_required().build())
+        .route(Route::post("/api/v1/presence/{id}/verify-claim").handler("verify_claim").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/identity — Human identity registration
+        // =====================================================================
+        .route(Route::post("/api/v1/identity/register").handler("register_human").auth_required().build())
+        .route(Route::get("/api/v1/identity/me").handler("get_me").auth_required().build())
+        .route(Route::put("/api/v1/identity/me").handler("update_me").auth_required().build())
+
+        // =====================================================================
+        // /api/v1/agreements — REA agreements
+        // =====================================================================
+        .route(Route::get("/api/v1/agreements").handler("list_agreements").cache_ttl(300).build())
+        .route(Route::post("/api/v1/agreements").handler("create_agreement").auth_required().build())
+        .route(Route::get("/api/v1/agreements/{id}").handler("get_agreement").cache_ttl(300).build())
+
+        // =====================================================================
+        // /api/v1/commitments — REA commitments
+        // =====================================================================
+        .route(Route::get("/api/v1/commitments").handler("list_commitments").cache_ttl(300).build())
+        .route(Route::post("/api/v1/commitments").handler("create_commitment").auth_required().build())
+        .route(Route::get("/api/v1/commitments/agent/{agent_id}").handler("commitments_by_agent").cache_ttl(300).build())
+        .route(Route::get("/api/v1/commitments/{id}").handler("get_commitment").cache_ttl(300).build())
+        .route(Route::patch("/api/v1/commitments/{id}").handler("update_commitment_state").auth_required().build())
+
+        // =====================================================================
+        // /db/ — Structured local database (content, paths, relationships, etc.)
+        // =====================================================================
+        .route(Route::get("/db/stats").handler("db_stats").cache_ttl(300).build())
+        .route(Route::get("/db/schema").handler("db_schema").cache_ttl(3600).build())
+
+        // Content
+        .route(Route::get("/db/content").handler("list_content").cache_ttl(300).public_if_reach("commons").build())
+        .route(Route::post("/db/content").handler("create_content").auth_required().build())
+        .route(Route::post("/db/content/bulk").handler("bulk_create_content").auth_required().build())
+        .route(Route::get("/db/content/{id}").handler("get_content").cache_ttl(300).public_if_reach("commons").build())
+        .route(Route::delete("/db/content/{id}").handler("delete_content").auth_required().build())
+
+        // Learning paths
+        .route(Route::get("/db/paths").handler("list_paths").cache_ttl(300).build())
+        .route(Route::post("/db/paths").handler("create_path").auth_required().build())
+        .route(Route::post("/db/paths/bulk").handler("bulk_create_paths").auth_required().build())
+        .route(Route::get("/db/paths/{id}").handler("get_path").cache_ttl(300).build())
+        .route(Route::delete("/db/paths/{id}").handler("delete_path").auth_required().build())
+
+        // Knowledge graph relationships
+        .route(Route::get("/db/relationships").handler("list_relationships").cache_ttl(300).build())
+        .route(Route::post("/db/relationships").handler("create_relationship").auth_required().build())
+        .route(Route::post("/db/relationships/bulk").handler("bulk_create_relationships").auth_required().build())
+        .route(Route::get("/db/relationships/graph/{content_id}").handler("content_graph").cache_ttl(300).build())
+        .route(Route::get("/db/relationships/{id}").handler("get_relationship").cache_ttl(300).build())
+        .route(Route::delete("/db/relationships/{id}").handler("delete_relationship").auth_required().build())
+
+        // Knowledge maps
+        .route(Route::get("/db/knowledge-maps").handler("list_knowledge_maps").cache_ttl(300).build())
+        .route(Route::post("/db/knowledge-maps").handler("create_knowledge_map").auth_required().build())
+        .route(Route::get("/db/knowledge-maps/{id}").handler("get_knowledge_map").cache_ttl(300).build())
+        .route(Route::put("/db/knowledge-maps/{id}").handler("update_knowledge_map").auth_required().build())
+        .route(Route::delete("/db/knowledge-maps/{id}").handler("delete_knowledge_map").auth_required().build())
+
+        // Path extensions
+        .route(Route::get("/db/path-extensions").handler("list_path_extensions").cache_ttl(300).build())
+        .route(Route::post("/db/path-extensions").handler("create_path_extension").auth_required().build())
+        .route(Route::get("/db/path-extensions/{id}").handler("get_path_extension").cache_ttl(300).build())
+        .route(Route::put("/db/path-extensions/{id}").handler("update_path_extension").auth_required().build())
+        .route(Route::delete("/db/path-extensions/{id}").handler("delete_path_extension").auth_required().build())
+
+        // Human relationships
+        .route(Route::get("/db/human-relationships").handler("list_human_relationships").cache_ttl(60).build())
+        .route(Route::post("/db/human-relationships").handler("create_human_relationship").auth_required().build())
+        .route(Route::get("/db/human-relationships/{id}").handler("get_human_relationship").cache_ttl(60).build())
+        .route(Route::delete("/db/human-relationships/{id}").handler("delete_human_relationship").auth_required().build())
+        .route(Route::post("/db/human-relationships/{id}/consent").handler("update_relationship_consent").auth_required().build())
+        .route(Route::post("/db/human-relationships/{id}/custody").handler("update_relationship_custody").auth_required().build())
+
+        // Collectives (qahal)
+        .route(Route::get("/db/collectives").handler("list_collectives").cache_ttl(300).build())
+        .route(Route::post("/db/collectives").handler("create_collective").auth_required().build())
+        .route(Route::get("/db/collectives/{id}").handler("get_collective").cache_ttl(300).build())
+        .route(Route::get("/db/collectives/{id}/participants").handler("list_collective_participants").cache_ttl(60).build())
+        .route(Route::post("/db/collectives/{id}/participants").handler("join_collective").auth_required().build())
+        .route(Route::delete("/db/collectives/{id}/participants/{human_id}").handler("depart_collective").auth_required().build())
+        .route(Route::get("/db/participations/{human_id}").handler("participations_by_human").cache_ttl(60).build())
+
+        // Contributor presences
+        .route(Route::get("/db/presences").handler("list_db_presences").cache_ttl(60).build())
+        .route(Route::post("/db/presences").handler("create_db_presence").auth_required().build())
+        .route(Route::post("/db/presences/bulk").handler("bulk_create_presences").auth_required().build())
+        .route(Route::get("/db/presences/{id}").handler("get_db_presence").cache_ttl(60).build())
+        .route(Route::delete("/db/presences/{id}").handler("delete_db_presence").auth_required().build())
+        .route(Route::post("/db/presences/{id}/stewardship").handler("db_begin_stewardship").auth_required().build())
+        .route(Route::post("/db/presences/{id}/claim").handler("db_initiate_claim").auth_required().build())
+        .route(Route::post("/db/presences/{id}/verify-claim").handler("db_verify_claim").auth_required().build())
+
+        // Economic events
+        .route(Route::get("/db/events").handler("list_db_events").cache_ttl(60).build())
+        .route(Route::post("/db/events").handler("create_db_event").auth_required().build())
+        .route(Route::post("/db/events/bulk").handler("bulk_create_events").auth_required().build())
+        .route(Route::get("/db/events/{id}").handler("get_db_event").cache_ttl(60).build())
+
+        // Content mastery
+        .route(Route::get("/db/mastery").handler("list_db_mastery").cache_ttl(60).build())
+        .route(Route::post("/db/mastery").handler("create_db_mastery").auth_required().build())
+        .route(Route::post("/db/mastery/bulk").handler("bulk_create_mastery").auth_required().build())
+        .route(Route::get("/db/mastery/human/{human_id}").handler("mastery_for_human").cache_ttl(60).build())
+        .route(Route::get("/db/mastery/{id}").handler("get_db_mastery").cache_ttl(60).build())
+
+        // Stewardship allocations
+        .route(Route::get("/db/allocations").handler("list_db_allocations").cache_ttl(60).build())
+        .route(Route::post("/db/allocations").handler("create_db_allocation").auth_required().build())
+        .route(Route::post("/db/allocations/bulk").handler("bulk_create_allocations").auth_required().build())
+        .route(Route::get("/db/allocations/content/{content_id}").handler("db_allocations_for_content").cache_ttl(60).build())
+        .route(Route::get("/db/allocations/steward/{steward_id}").handler("db_allocations_for_steward").cache_ttl(60).build())
+        .route(Route::get("/db/allocations/{id}").handler("get_db_allocation").cache_ttl(60).build())
+        .route(Route::delete("/db/allocations/{id}").handler("delete_db_allocation").auth_required().build())
+        .route(Route::post("/db/allocations/{id}/dispute").handler("dispute_db_allocation").auth_required().build())
+        .route(Route::post("/db/allocations/{id}/resolve").handler("resolve_db_allocation").auth_required().build())
+
+        // Blob proxy: doorway caches blobs from /blob/{hash}
+        .with_blobs_at("/blob")
+        .build()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5839,5 +6151,25 @@ mod tests {
         let hash = BlobStore::compute_hash(b"test data");
         assert!(hash.starts_with("sha256-"));
         assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    }
+
+    #[test]
+    fn test_manifest_builds() {
+        let manifest = build_manifest();
+        assert!(!manifest.routes.is_empty());
+        assert!(manifest.blob_proxy.is_some());
+        // Spot-check a few known routes exist
+        let paths: Vec<&str> = manifest.routes.iter().map(|r| r.path.as_str()).collect();
+        assert!(paths.contains(&"/db/content"), "missing /db/content");
+        assert!(paths.contains(&"/db/paths"), "missing /db/paths");
+        assert!(paths.contains(&"/api/v1/mastery"), "missing /api/v1/mastery");
+        assert!(paths.contains(&"/api/v1/economic-events"), "missing /api/v1/economic-events");
+        assert!(paths.contains(&"/api/v1/presence"), "missing /api/v1/presence");
+        // Ensure infrastructure routes are NOT in the manifest
+        assert!(!paths.contains(&"/health"), "health should not be in manifest");
+        assert!(!paths.iter().any(|p| p.starts_with("/shard")), "shard routes should not be in manifest");
+        assert!(!paths.iter().any(|p| p.starts_with("/sync")), "sync routes should not be in manifest");
+        // Verify blob proxy points to /blob
+        assert_eq!(manifest.blob_proxy.unwrap().base_path, "/blob");
     }
 }

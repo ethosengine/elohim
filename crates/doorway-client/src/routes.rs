@@ -206,6 +206,11 @@ impl Route {
     pub fn delete(path: &str) -> RouteBuilder {
         RouteBuilder::new(HttpMethod::Delete, path)
     }
+
+    /// Create a PATCH route
+    pub fn patch(path: &str) -> RouteBuilder {
+        RouteBuilder::new(HttpMethod::Patch, path)
+    }
 }
 
 /// HTTP methods supported by route registration

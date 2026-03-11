@@ -7,6 +7,9 @@ authors = ["Elohim Protocol"]
 license = "AGPL-3.0"
 
 [dependencies]
+# Doorway route registration
+doorway-client = { path = "../../crates/doorway-client" }
+
 # Async runtime
 tokio = { version = "1", features = ["full", "fs"] }
 
