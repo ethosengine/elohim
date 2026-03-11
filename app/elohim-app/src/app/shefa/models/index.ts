@@ -18,3 +18,6 @@ export * from './device-stewardship.model';
 
 // Resource explorer (Drive-like resource browsing)
 export * from './resource-explorer.model';
+
+// Resilience profile (P2P data protection projection)
+export * from './resilience-profile.model';
