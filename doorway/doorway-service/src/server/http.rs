@@ -29,8 +29,8 @@ use crate::projection::{ProjectionConfig, ProjectionStore};
 use crate::routes;
 use crate::server::websocket;
 use crate::services::{
-    spawn_health_probe_task, CustodianService, CustodianServiceConfig, VerificationService,
-    VerifyBlobRequest,
+    spawn_health_probe_task, CustodianService, CustodianServiceConfig, RouteRegistry,
+    VerificationService, VerifyBlobRequest,
 };
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
 use crate::signing::{SigningConfig, SigningService};
@@ -103,6 +103,8 @@ pub struct AppState {
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
     /// CORS configuration (origin allowlist, dev-mode flag)
     pub cors_config: crate::cors::CorsConfig,
+    /// Dynamic route registry — steward peer routes + external agent routes
+    pub route_registry: Arc<RouteRegistry>,
 }
 
 impl AppState {
@@ -171,6 +173,7 @@ impl AppState {
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
+            route_registry: Arc::new(RouteRegistry::with_defaults()),
         }
     }
 
@@ -243,6 +246,7 @@ impl AppState {
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
+            route_registry: Arc::new(RouteRegistry::with_defaults()),
         }
     }
 
@@ -330,6 +334,7 @@ impl AppState {
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
+            route_registry: Arc::new(RouteRegistry::with_defaults()),
         }
     }
 
@@ -411,6 +416,7 @@ impl AppState {
             peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
+            route_registry: Arc::new(RouteRegistry::with_defaults()),
         })
     }
 
