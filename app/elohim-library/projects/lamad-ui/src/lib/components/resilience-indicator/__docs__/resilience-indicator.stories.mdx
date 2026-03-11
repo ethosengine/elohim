@@ -1,0 +1,97 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Design/Resilience Indicator" />
+
+# Resilience Indicator — Design Brief
+
+> **Status:** Story-only skeleton. No component implementation yet.
+> This captures the design direction for future visual work.
+
+## What It Represents
+
+The Resilience Indicator is a small, ambient icon that answers one question:
+**"Am I safe? And if not, what should I do?"**
+
+It's a visual projection of the `ResilienceProfile` — a shefa computation
+that composes shard distribution, mutual aid commitments, trust circle depth,
+and elohim assessment into a single at-a-glance signal.
+
+## Design Principles
+
+### Ambient When Protected
+When everything is healthy, the icon fades to background — like full WiFi bars,
+you stop noticing it. It should work at very small sizes (16x16, favicon, mobile
+status bar) and never demand attention when there's nothing to do.
+
+### Actionable When At Risk
+When protection degrades, the icon should communicate:
+1. **Something changed** (not alarming — a shift, not an alert)
+2. **What to do about it** (connect, diversify, renew, review, release)
+3. **How urgent it is** (whenever, soon, now)
+
+### Dense Information in Tiny Space
+A small visual element can carry layered meaning. Design inspiration:
+
+- **WiFi bars** — graduated signal strength, universally understood, tiny footprint.
+  Everyone knows what 2-of-4 bars means without a tooltip.
+
+- **Military chevrons** — rank, branch, specialty, and time-in-service encoded in
+  a few stripes on a sleeve. A sergeant's chevrons communicate years of context
+  at a glance. The resilience icon should aspire to this density.
+
+- **Protocol identity logos** — Hylo, Collaborative Technology Alliance — icons
+  that embody a protocol's values while functioning as status indicators. The
+  Elohim resilience indicator should feel like it belongs to this family.
+
+### Continuous Gradient, Not Discrete States
+The model has three named states (at-risk, partial, protected) but the underlying
+score is continuous (0-1). The icon should reflect the gradient — partial protection
+at 0.4 looks different from partial at 0.7.
+
+## What the Icon Must Convey
+
+| Dimension | At Risk | Partial | Protected |
+|-----------|---------|---------|-----------|
+| Overall safety | Vulnerable | Improving | Ambient |
+| Trust circles | None | Some | Deep |
+| Shard distribution | Concentrated | Spreading | Well-distributed |
+| Commitments | Missing | Building | Reciprocated |
+
+## Open Design Questions
+
+1. **Aggregate vs. contextual** — does the icon represent overall resilience, or
+   the resilience of the content you're currently viewing? (Both are computable.)
+
+2. **Degradation visual** — loss (bars disappearing) or change (color shift)?
+   Loss implies permanent damage; color shift implies temporary state.
+
+3. **Maslow graduation** — as base-level protection is satisfied, the icon could
+   shift to represent higher-order concerns: community governance participation,
+   stewardship reach, contribution to others' resilience.
+
+4. **Graceful release** — how do you represent "you have data that no longer needs
+   protecting"? Not degradation — maturity. A visual language for intentional forgetting.
+
+5. **The logo itself** — could the resilience indicator double as the Elohim
+   Protocol's identity mark? A living logo that reflects actual network participation.
+
+## Data Model Reference
+
+The icon is powered by `ResilienceProfile` from `@app/shefa/models`:
+
+- `overallScore: number` (0-1)
+- `protectionStatus: ProtectionStatus` (at-risk | partial | protected)
+- `shardHealth: ShardHealthSummary`
+- `commitmentHealth: CommitmentHealthSummary`
+- `trustCircleDepth: TrustCircleDepth`
+- `contentRiskBreakdown: ContentRiskBucket[]`
+- `nextAction?: ResilienceAction`
+- `elohimAssessment?: ElohimResilienceAssessment`
+
+## Next Steps
+
+1. Sketch 3-5 icon concepts exploring the wifi-bar/chevron/logo design space
+2. Test at multiple sizes (16x16, 24x24, 32x32, 48x48)
+3. Prototype the gradient animation (at-risk → partial → protected)
+4. Explore the Maslow graduation (safety → contribution)
+5. Build the Angular component backed by `RESILIENCE` injection token
