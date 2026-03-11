@@ -240,7 +240,8 @@ for PROJECT in $PROJECTS; do
   case "$PROJECT" in
     elohim-app)       PROJECT_DIR="app/elohim-app" ;;
     elohim-library)   PROJECT_DIR="app/elohim-library" ;;
-    sophia)           PROJECT_DIR="app/sophia" ;;
+    sophia)           PROJECT_DIR="sophia" ;;
+    doorway)          PROJECT_DIR="doorway/doorway-service" ;;
     doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
     elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
     steward-node)     PROJECT_DIR="steward/node" ;;
