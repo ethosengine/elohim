@@ -46,7 +46,7 @@ pnpm exec eslint src --ext .ts,.html
 
 ### sophia (assessment engine - git submodule, pnpm)
 ```bash
-cd app/sophia
+cd sophia
 pnpm install
 pnpm build                         # Build all packages in dependency order
 pnpm test                          # Jest tests
@@ -169,7 +169,7 @@ MultiBranch pipeline params are null until the Jenkinsfile runs once. Always use
 ### sophia-element UMD Must Be Pre-built
 The sophia-element UMD bundle must be built before elohim-app builds. The `prebuild` script checks for it. Build with:
 ```bash
-cd app/sophia && pnpm install && pnpm build && pnpm build:umd
+cd sophia && pnpm install && pnpm build && pnpm build:umd
 ```
 
 ### pnpm Workspace
@@ -188,7 +188,7 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 | Edge | `elohim/holochain/Jenkinsfile` | Auto via orchestrator |
 | DNA | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
 | Genesis | `genesis/Jenkinsfile` | Auto via orchestrator |
-| Sophia | `app/sophia/Jenkinsfile` | Auto via orchestrator |
+| Sophia | `sophia/Jenkinsfile` | Auto via orchestrator |
 | Steward | `steward/Jenkinsfile` | Manual only |
 
 ## Code Style

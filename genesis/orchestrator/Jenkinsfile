@@ -77,8 +77,8 @@ import groovy.transform.Field
         deploymentCheck: null
     ],
     'elohim-sophia': [
-        jenkinsPath: 'app/sophia.Jenkinsfile',
-        changePatterns: ['app/sophia/'],
+        jenkinsPath: 'sophia/Jenkinsfile',
+        changePatterns: ['sophia/'],
         artifacts: ['sophia-element'],
         dependsOn: [],
         cascades: true,        // sophia changes should trigger elohim (app) rebuild

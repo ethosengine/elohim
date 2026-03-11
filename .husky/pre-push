@@ -7,7 +7,7 @@
 #   app/elohim-app/          → build + unit tests
 #   doorway/                 → cargo fmt + clippy + tests
 #   doorway/doorway-app/     → eslint + build
-#   app/sophia/              → pnpm lint + typecheck + test
+#   sophia/              → pnpm lint + typecheck + test
 #   elohim/elohim-storage/   → cargo fmt + clippy + tests
 #   steward/node/            → cargo fmt + clippy + tests
 #   app/elohim-library/      → tsc type-check + jest tests
@@ -74,7 +74,7 @@ fi
 if echo "$CHANGED" | grep -q "^app/elohim-app/"; then
   PROJECTS="$PROJECTS elohim-app"
 fi
-if echo "$CHANGED" | grep -q "^app/sophia/"; then
+if echo "$CHANGED" | grep -q "^sophia/"; then
   PROJECTS="$PROJECTS sophia"
 fi
 if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then

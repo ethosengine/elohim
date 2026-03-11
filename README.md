@@ -73,15 +73,16 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │   │       ├── qahal/             # Community governance
 │   │       ├── shefa/             # Resource flows & economics
 │   │       └── doorway/           # Gateway integration
-│   ├── elohim-library/            # Shared Angular libraries
-│   │   └── projects/
-│   │       └── elohim-service/    # Import pipeline, content models
-│   └── sophia/                    # Assessment engine (git submodule)
-│       └── packages/
-│           ├── sophia-element/    # <sophia-question> web component
-│           ├── sophia-core/       # Core types (Moment, Recognition)
-│           ├── perseus-score/     # Mastery scoring (graded)
-│           └── psyche-survey/     # Discovery & reflection (psychometric)
+│   └── elohim-library/            # Shared Angular libraries
+│       └── projects/
+│           └── elohim-service/    # Import pipeline, content models
+│
+├── sophia/                        # Assessment engine (git submodule)
+│   └── packages/
+│       ├── sophia-element/        # <sophia-question> web component
+│       ├── sophia-core/           # Core types (Moment, Recognition)
+│       ├── perseus-score/         # Mastery scoring (graded)
+│       └── psyche-survey/         # Discovery & reflection (psychometric)
 │
 ├── steward/                       # Deployment Shells
 │   ├── device/                    # Tauri desktop app
@@ -189,7 +190,7 @@ Person-centered assessment rendering infrastructure, transforming Khan Academy's
 - **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
 - **Reflection**: Open-ended capture without grading
 
-Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`app/sophia/README.md`](./app/sophia/README.md).
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
 
 ## CI/CD
 

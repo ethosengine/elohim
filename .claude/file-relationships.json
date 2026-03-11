@@ -82,12 +82,12 @@
       "description": "sophia-element UMD bundle must be rebuilt before elohim-app build",
       "sync_rules": [
         {
-          "trigger_pattern": "app/sophia/packages/sophia-element/src/*.ts",
+          "trigger_pattern": "sophia/packages/sophia-element/src/*.ts",
           "notify": [],
           "message": "sophia-element source changed - rebuild UMD bundle before elohim-app build (pnpm --filter @ethosengine/sophia-element build:umd)"
         },
         {
-          "trigger_pattern": "app/sophia/packages/sophia-core/src/*.ts",
+          "trigger_pattern": "sophia/packages/sophia-core/src/*.ts",
           "notify": [],
           "message": "sophia-core changed - rebuild sophia-element UMD bundle before elohim-app build"
         }
