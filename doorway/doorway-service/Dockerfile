@@ -1,6 +1,6 @@
 # Dependency stage — cached layer shared by check and build targets
 # NOTE: Build context should be repo root directory
-# Run: docker build -f doorway/Dockerfile -t doorway .
+# Run: docker build -f doorway/doorway-service/Dockerfile -t doorway .
 FROM rust:1.93-slim-bookworm AS deps
 
 WORKDIR /app
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy manifests and local crates first for dependency caching
-COPY doorway/Cargo.toml doorway/Cargo.lock ./
+COPY doorway/doorway-service/Cargo.toml doorway/doorway-service/Cargo.lock ./
 COPY crates ./crates
 COPY elohim/holochain/holochain-cache-core ./elohim/holochain/holochain-cache-core
 
@@ -33,7 +33,7 @@ RUN cargo build --release
 # Quality check stage — CI quality gate (build with --target check)
 FROM deps AS check
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
-COPY doorway/src ./src
+COPY doorway/doorway-service/src ./src
 RUN cargo fmt --check
 RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
 RUN RUSTFLAGS="" cargo test --lib --bins
@@ -45,7 +45,7 @@ FROM deps AS builder
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
 
 # Copy actual source
-COPY doorway/src ./src
+COPY doorway/doorway-service/src ./src
 
 # Accept git info as build args (build.rs reads these env vars)
 ARG GIT_COMMIT_SHORT=unknown
@@ -77,7 +77,7 @@ RUN useradd -m -u 1000 doorway
 COPY --from=builder /app/target/release/doorway /usr/local/bin/doorway
 
 # Copy default config
-COPY doorway/.env.example /app/.env.example
+COPY doorway/doorway-service/.env.example /app/.env.example
 
 # Set ownership
 RUN chown -R doorway:doorway /app
