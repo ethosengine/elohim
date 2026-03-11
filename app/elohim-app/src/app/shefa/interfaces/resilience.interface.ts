@@ -23,7 +23,7 @@
  * ```
  */
 
-import { InjectionToken } from '@angular/core';
+import { InjectionToken, inject } from '@angular/core';
 
 import type { Observable } from 'rxjs';
 
@@ -34,6 +34,7 @@ import type {
   ContentRiskBucket,
   ElohimResilienceAssessment,
 } from '../models/resilience-profile.model';
+import { ResilienceApiService } from '../services/resilience-api.service';
 
 // =============================================================================
 // INTERFACE
@@ -135,8 +136,5 @@ export interface IResilience {
  */
 export const RESILIENCE = new InjectionToken<IResilience>('Resilience', {
   providedIn: 'root',
-  factory: () => {
-    // Temporary: ResilienceApiService will be created in Task 3
-    throw new Error('ResilienceApiService not yet implemented');
-  },
+  factory: () => inject(ResilienceApiService),
 });
