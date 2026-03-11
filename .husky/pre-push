@@ -8,8 +8,8 @@
 #   doorway/                 → cargo fmt + clippy + tests
 #   doorway/doorway-app/     → eslint + build
 #   app/sophia/              → pnpm lint + typecheck + test
-#   holochain/elohim-storage → cargo fmt + clippy + tests
-#   elohim-node/             → cargo fmt + clippy + tests
+#   elohim/elohim-storage/   → cargo fmt + clippy + tests
+#   steward/node/            → cargo fmt + clippy + tests
 #   app/elohim-library/      → tsc type-check + jest tests
 #   genesis/                 → schema validation + tests
 #   genesis/a2o/             → E2E lint + typecheck
@@ -77,11 +77,11 @@ fi
 if echo "$CHANGED" | grep -q "^app/sophia/"; then
   PROJECTS="$PROJECTS sophia"
 fi
-if echo "$CHANGED" | grep -q "^holochain/elohim-storage/"; then
+if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
   PROJECTS="$PROJECTS elohim-storage"
 fi
-if echo "$CHANGED" | grep -q "^elohim-node/"; then
-  PROJECTS="$PROJECTS elohim-node"
+if echo "$CHANGED" | grep -q "^steward/node/"; then
+  PROJECTS="$PROJECTS steward-node"
 fi
 if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
   PROJECTS="$PROJECTS elohim-library"
@@ -136,7 +136,7 @@ run_gate() {
         RUSTFLAGS="" cargo test --lib --bins 2>&1
         rc=$?
         ;;
-      elohim-node)
+      steward-node)
         cargo fmt --check 2>&1 && \
         RUSTFLAGS="" cargo clippy -- -D warnings 2>&1 && \
         RUSTFLAGS="" cargo test 2>&1
@@ -242,7 +242,8 @@ for PROJECT in $PROJECTS; do
     elohim-library)   PROJECT_DIR="app/elohim-library" ;;
     sophia)           PROJECT_DIR="app/sophia" ;;
     doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
-    elohim-storage)   PROJECT_DIR="holochain/elohim-storage" ;;
+    elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
+    steward-node)     PROJECT_DIR="steward/node" ;;
     genesis)          PROJECT_DIR="genesis/seeder" ;;
     genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
     orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
