@@ -632,6 +632,7 @@ async fn handle_request(
 
         // Comprehensive status (runtime stats, cluster health, storage diagnostics)
         (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
+        (Method::GET, "/status.json") => to_boxed(routes::status_check(Arc::clone(&state)).await),
 
         // Debug stream WebSocket for real-time debugging
         (Method::GET, "/debug/stream") if hyper_tungstenite::is_upgrade_request(&req) => {

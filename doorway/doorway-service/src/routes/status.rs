@@ -116,6 +116,42 @@ pub struct ConductorStats {
     pub total_workers: usize,
 }
 
+/// Federation health stats from peer cache
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FederationHealthStats {
+    pub enabled: bool,
+    pub self_id: Option<String>,
+    pub self_url: Option<String>,
+    pub self_tier: Option<String>,
+    pub self_uptime_7d: Option<f32>,
+    pub peer_count: usize,
+    pub peers: Vec<PeerHealthSummary>,
+}
+
+/// Summary of a single federation peer's health
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerHealthSummary {
+    pub doorway_id: String,
+    pub url: String,
+    pub self_reported_status: Option<String>,
+    pub peer_attestations: Vec<AttestationSummary>,
+    pub peers_agree: String,
+    pub consensus_status: String,
+}
+
+/// Summary of a single attestation from a peer
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttestationSummary {
+    pub attestor_id: String,
+    pub observed_status: String,
+    pub response_time_ms: Option<u32>,
+    pub conductor_healthy: Option<bool>,
+    pub timestamp: i64,
+}
+
 /// Diagnostic recommendations
 #[derive(Debug, Serialize)]
 pub struct Diagnostics {
@@ -152,6 +188,8 @@ pub struct StatusResponse {
     pub cache: CacheStats,
     /// Orchestrator cluster stats
     pub orchestrator: OrchestratorStats,
+    /// Federation health stats
+    pub federation: FederationHealthStats,
     /// Diagnostic information and recommendations
     pub diagnostics: Diagnostics,
 }
@@ -348,6 +386,37 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         "degraded".to_string()
     };
 
+    // Build federation health stats from peer cache
+    let federation = {
+        let peer_cache = state.peer_cache.read().await;
+        let peers: Vec<PeerHealthSummary> = peer_cache
+            .iter()
+            .map(|peer| PeerHealthSummary {
+                doorway_id: peer.id.clone(),
+                url: peer.url.clone(),
+                self_reported_status: None, // TODO: from DHT heartbeats
+                peer_attestations: vec![],  // TODO: from DHT attestations
+                peers_agree: "0/0".to_string(),
+                consensus_status: "unknown".to_string(),
+            })
+            .collect();
+        let peer_count = peers.len();
+
+        FederationHealthStats {
+            enabled: peer_count > 0 || !state.args.federation_peers.is_empty(),
+            self_id: state
+                .args
+                .doorway_id
+                .clone()
+                .or_else(|| Some(state.args.node_id.to_string())),
+            self_url: state.args.doorway_url.clone(),
+            self_tier: None,
+            self_uptime_7d: None,
+            peer_count,
+            peers,
+        }
+    };
+
     let diagnostics = Diagnostics {
         status: diag_status,
         recommendations,
@@ -366,6 +435,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         bootstrap,
         cache,
         orchestrator,
+        federation,
         diagnostics,
     };
 
@@ -572,6 +642,28 @@ mod tests {
                     impact_score: Some(0.75),
                 }],
             },
+            federation: FederationHealthStats {
+                enabled: true,
+                self_id: Some("test-doorway".to_string()),
+                self_url: Some("https://test.elohim.host".to_string()),
+                self_tier: None,
+                self_uptime_7d: None,
+                peer_count: 1,
+                peers: vec![PeerHealthSummary {
+                    doorway_id: "peer-1".to_string(),
+                    url: "https://peer1.elohim.host".to_string(),
+                    self_reported_status: None,
+                    peer_attestations: vec![AttestationSummary {
+                        attestor_id: "node-2".to_string(),
+                        observed_status: "healthy".to_string(),
+                        response_time_ms: Some(42),
+                        conductor_healthy: Some(true),
+                        timestamp: 1710000000,
+                    }],
+                    peers_agree: "1/1".to_string(),
+                    consensus_status: "healthy".to_string(),
+                }],
+            },
             diagnostics: Diagnostics {
                 status: "healthy".to_string(),
                 recommendations: vec![],
@@ -588,5 +680,9 @@ mod tests {
         assert!(json.contains("conductor"));
         assert!(json.contains("storage"));
         assert!(json.contains("diagnostics"));
+        assert!(json.contains("federation"));
+        assert!(json.contains("peerCount"));
+        assert!(json.contains("selfId"));
+        assert!(json.contains("consensusStatus"));
     }
 }
