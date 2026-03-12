@@ -129,6 +129,25 @@ pub struct DoorwayHeartbeatSummary {
     pub heartbeat_count: u32,             // How many heartbeats received (expect ~1440)
 }
 
+/// A peer doorway's observation of another doorway's health.
+/// Published to DHT so all nodes see cross-validated health.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HealthAttestation {
+    /// Doorway ID of the observer (must match author's DoorwayRegistration)
+    pub attestor_doorway_id: String,
+    /// Doorway ID of the subject being observed
+    pub subject_doorway_id: String,
+    /// Observed status: "online", "degraded", "unreachable"
+    pub observed_status: String,
+    /// Response time in milliseconds (None if unreachable)
+    pub response_time_ms: Option<u32>,
+    /// Whether the subject's conductor pool was healthy (from /health response)
+    pub conductor_healthy: Option<bool>,
+    /// When the probe happened (ISO 8601)
+    pub timestamp: String,
+}
+
 // =============================================================================
 // Content Server Types (P2P Content Publishing)
 // =============================================================================
@@ -241,6 +260,7 @@ pub enum EntryTypes {
     DoorwayRegistration(DoorwayRegistration),
     DoorwayHeartbeat(DoorwayHeartbeat),
     DoorwayHeartbeatSummary(DoorwayHeartbeatSummary),
+    HealthAttestation(HealthAttestation),
     ContentServer(ContentServer),
     StringAnchor(StringAnchor),
 }
@@ -260,6 +280,9 @@ pub enum LinkTypes {
 
     // DoorwayHeartbeat links (recent, pruned daily)
     DoorwayToHeartbeat,         // DoorwayRegistration -> DoorwayHeartbeat
+
+    // HealthAttestation links
+    DoorwayToAttestation,       // DoorwayRegistration -> HealthAttestation
 
     // DoorwayHeartbeatSummary links (kept forever)
     DoorwayToSummary,           // DoorwayRegistration -> DoorwayHeartbeatSummary
@@ -295,6 +318,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::DoorwayHeartbeatSummary(summary) => {
                         validate_doorway_summary(&summary)
+                    }
+                    EntryTypes::HealthAttestation(attestation) => {
+                        validate_health_attestation(&attestation)
                     }
                     EntryTypes::ContentServer(server) => {
                         validate_content_server(&server)
@@ -419,6 +445,40 @@ fn validate_doorway_summary(summary: &DoorwayHeartbeatSummary) -> ExternResult<V
     if summary.date.len() != 10 || summary.date.chars().nth(4) != Some('-') {
         return Ok(ValidateCallbackResult::Invalid(
             "date must be in YYYY-MM-DD format".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+const ATTESTATION_STATUSES: &[&str] = &["online", "degraded", "unreachable"];
+
+/// Validate HealthAttestation
+fn validate_health_attestation(attestation: &HealthAttestation) -> ExternResult<ValidateCallbackResult> {
+    if attestation.attestor_doorway_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "attestor_doorway_id cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.subject_doorway_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "subject_doorway_id cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.attestor_doorway_id == attestation.subject_doorway_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot attest about yourself".to_string(),
+        ));
+    }
+
+    if !ATTESTATION_STATUSES.contains(&attestation.observed_status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Invalid observed_status '{}'. Must be one of: {:?}",
+                attestation.observed_status, ATTESTATION_STATUSES
+            ),
         ));
     }
 
