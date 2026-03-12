@@ -18,8 +18,8 @@
       "connectionCount": 7
     },
     {
-      "id": "human-susan-spouse",
-      "displayName": "Susan",
+      "id": "human-jessica-spouse",
+      "displayName": "Jessica",
       "category": "core-family",
       "profileReach": "network",
       "position": {
@@ -29,8 +29,8 @@
       "connectionCount": 4
     },
     {
-      "id": "human-sammy-son",
-      "displayName": "Sammy",
+      "id": "human-james-son",
+      "displayName": "James",
       "category": "core-family",
       "profileReach": "network",
       "position": {
@@ -308,21 +308,21 @@
     {
       "id": "rel-0000",
       "source": "human-matthew-manager",
-      "target": "human-susan-spouse",
+      "target": "human-jessica-spouse",
       "type": "spouse",
       "intimacyLevel": "intimate"
     },
     {
       "id": "rel-0001",
       "source": "human-matthew-manager",
-      "target": "human-sammy-son",
+      "target": "human-james-son",
       "type": "parent",
       "intimacyLevel": "intimate"
     },
     {
       "id": "rel-0002",
-      "source": "human-susan-spouse",
-      "target": "human-sammy-son",
+      "source": "human-jessica-spouse",
+      "target": "human-james-son",
       "type": "parent",
       "intimacyLevel": "intimate"
     },
@@ -336,7 +336,7 @@
     {
       "id": "rel-0004",
       "source": "human-gertrude-grandma",
-      "target": "human-sammy-son",
+      "target": "human-james-son",
       "type": "grandparent",
       "intimacyLevel": "trusted"
     },
@@ -363,14 +363,14 @@
     },
     {
       "id": "rel-0008",
-      "source": "human-susan-spouse",
+      "source": "human-jessica-spouse",
       "target": "human-timothy-tutor",
       "type": "learning_partner",
       "intimacyLevel": "connection"
     },
     {
       "id": "rel-0009",
-      "source": "human-sammy-son",
+      "source": "human-james-son",
       "target": "human-timothy-tutor",
       "type": "mentee",
       "intimacyLevel": "connection"
@@ -455,7 +455,7 @@
     {
       "id": "rel-0021",
       "source": "human-georgina-grocer",
-      "target": "human-susan-spouse",
+      "target": "human-jessica-spouse",
       "type": "community_member",
       "intimacyLevel": "recognition"
     },

@@ -82,7 +82,7 @@ const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
   // Care economy: Adam (gardener-steward) primary, Susan (family), Matthew (founder), Frank (ecology)
   'value-scanner': [
     { presenceId: 'adam-firstman', ratio: 0.35 },
-    { presenceId: 'susan-spouse', ratio: 0.25 },
+    { presenceId: 'jessica-spouse', ratio: 0.25 },
     { presenceId: 'matthew-dowell', ratio: 0.20 },
     { presenceId: 'frank-farmer', ratio: 0.20 },
   ],
@@ -111,7 +111,7 @@ const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
   // Digital relationships: Eve (courage, family-systems), Susan (community-building), Matthew
   'social-medium': [
     { presenceId: 'eve-firstwoman', ratio: 0.45 },
-    { presenceId: 'susan-spouse', ratio: 0.30 },
+    { presenceId: 'jessica-spouse', ratio: 0.30 },
     { presenceId: 'matthew-dowell', ratio: 0.25 },
   ],
 

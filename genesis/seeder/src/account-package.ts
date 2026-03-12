@@ -123,7 +123,7 @@ interface ConductorGroup {
 const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
   'value-scanner': [
     { presenceId: 'adam-firstman', ratio: 0.35 },
-    { presenceId: 'susan-spouse', ratio: 0.25 },
+    { presenceId: 'jessica-spouse', ratio: 0.25 },
     { presenceId: 'matthew-dowell', ratio: 0.20 },
     { presenceId: 'frank-farmer', ratio: 0.20 },
   ],
@@ -144,7 +144,7 @@ const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
   ],
   'social-medium': [
     { presenceId: 'eve-firstwoman', ratio: 0.45 },
-    { presenceId: 'susan-spouse', ratio: 0.30 },
+    { presenceId: 'jessica-spouse', ratio: 0.30 },
     { presenceId: 'matthew-dowell', ratio: 0.25 },
   ],
   scripture: [
@@ -213,7 +213,7 @@ const PRESENCE_TO_HUMAN: Record<string, string> = {
   'matthew-dowell': 'human-matthew-manager',
   'adam-firstman': 'human-adam-firstman',
   'eve-firstwoman': 'human-eve-firstwoman',
-  'susan-spouse': 'human-susan-spouse',
+  'jessica-spouse': 'human-jessica-spouse',
   'dan-developer': 'human-dan-developer',
   'nancy-neighbor': 'human-nancy-neighbor',
   'pete-pastor': 'human-pete-pastor',
@@ -294,8 +294,8 @@ const CONDUCTOR_GROUPS: ConductorGroup[] = [
     description: 'Core family + workplace — the founders and builders',
     humanIds: [
       'human-matthew-manager',
-      'human-susan-spouse',
-      'human-sammy-son',
+      'human-jessica-spouse',
+      'human-james-son',
       'human-gertrude-grandma',
       'human-dan-developer',
     ],

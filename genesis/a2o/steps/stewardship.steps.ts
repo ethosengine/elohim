@@ -23,7 +23,7 @@ import type { AllocationView } from '../src/framework/api/doorway-client.js';
 const DISPLAY_NAME_TO_PRESENCE: Record<string, string> = {
   Adam: 'adam-firstman',
   Eve: 'eve-firstwoman',
-  Susan: 'susan-spouse',
+  Jessica: 'jessica-spouse',
   Matthew: 'matthew-dowell',
   Pete: 'pete-pastor',
   'Pastor Pete': 'pete-pastor',

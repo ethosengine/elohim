@@ -34,8 +34,8 @@
       "collectiveCount": 3
     },
     {
-      "humanId": "human-susan-spouse",
-      "displayName": "Susan",
+      "humanId": "human-jessica-spouse",
+      "displayName": "Jessica",
       "category": "core-family",
       "conductorGroup": 0,
       "contentCount": 3453,
@@ -44,8 +44,8 @@
       "collectiveCount": 3
     },
     {
-      "humanId": "human-sammy-son",
-      "displayName": "Sammy",
+      "humanId": "human-james-son",
+      "displayName": "James",
       "category": "core-family",
       "conductorGroup": 0,
       "contentCount": 3453,

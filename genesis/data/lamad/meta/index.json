@@ -54501,8 +54501,8 @@
       "category": "core-family"
     },
     {
-      "id": "human-susan-spouse",
-      "title": "Susan",
+      "id": "human-jessica-spouse",
+      "title": "Jessica",
       "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
       "contentType": "human",
       "tags": [
@@ -54519,8 +54519,8 @@
       "category": "core-family"
     },
     {
-      "id": "human-sammy-son",
-      "title": "Sammy",
+      "id": "human-james-son",
+      "title": "James",
       "description": "Learning about the world. Interested in games, building things, and asking questions.",
       "contentType": "human",
       "tags": [

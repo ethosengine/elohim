@@ -1,13 +1,13 @@
 {
-  "id": "human-susan-spouse",
-  "did": "did:web:elohim.host:human:susan-spouse",
+  "id": "human-jessica-spouse",
+  "did": "did:web:elohim.host:human:jessica-spouse",
   "contentType": "human",
   "activityPubType": "Person",
-  "title": "Susan",
+  "title": "Jessica",
   "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
   "content": "# Susan\n\nPartner in life and learning. Focused on family flourishing, community connection, and meaningful work.\n\n**Profile Reach:** network\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"neighborhood\",\n  \"displayName\": \"Tech Valley\",\n  \"reach\": \"community\"\n}\n\n**Communities:** community-local-church, community-homeschool-coop\n\n**Public Affinities:** education, family-systems, community-building, health-wellness\n\n",
   "contentFormat": "markdown",
-  "sourcePath": "humans/susan-spouse/profile.json",
+  "sourcePath": "humans/jessica-spouse/profile.json",
   "tags": [
     "community-building",
     "core-family",
@@ -30,20 +30,20 @@
     "communityCount": 2
   },
   "openGraphMetadata": {
-    "ogTitle": "Susan",
+    "ogTitle": "Jessica",
     "ogDescription": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
     "ogType": "profile",
-    "ogUrl": "https://elohim-protocol.org/humans/human-susan-spouse",
+    "ogUrl": "https://elohim-protocol.org/humans/human-jessica-spouse",
     "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-susan-spouse.jpg",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-jessica-spouse.jpg",
     "ogImageAlt": "Susan's profile"
   },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "Person",
-    "@id": "https://elohim-protocol.org/humans/human-susan-spouse",
-    "identifier": "did:web:elohim.host:human:susan-spouse",
-    "name": "Susan",
+    "@id": "https://elohim-protocol.org/humans/human-jessica-spouse",
+    "identifier": "did:web:elohim.host:human:jessica-spouse",
+    "name": "Jessica",
     "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
     "publisher": {
       "@type": "Organization",

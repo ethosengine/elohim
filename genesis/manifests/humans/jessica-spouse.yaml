@@ -1,4 +1,4 @@
-# Susan — Household Partner
+# Jessica — Household Partner
 # Stewards: family learning content, household governance
 # Trust topology: bootstraps to Matthew (spouse) + Timothy (tutor)
 # Resource profile: medium — household node with moderate resources
@@ -7,14 +7,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: elohim-susan-alpha-config
+  name: elohim-jessica-alpha-config
   namespace: elohim-alpha
   labels:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha
-    elohim-human: susan-spouse
-    app.kubernetes.io/name: susan
-    app.kubernetes.io/instance: susan-alpha
+    elohim-human: jessica-spouse
+    app.kubernetes.io/name: jessica
+    app.kubernetes.io/instance: jessica-alpha
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -45,36 +45,36 @@ data:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: elohim-susan-alpha
+  name: elohim-jessica-alpha
   namespace: elohim-alpha
   labels:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha
-    elohim-human: susan-spouse
-    app.kubernetes.io/name: susan
-    app.kubernetes.io/instance: susan-alpha
+    elohim-human: jessica-spouse
+    app.kubernetes.io/name: jessica
+    app.kubernetes.io/instance: jessica-alpha
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
 spec:
-  serviceName: elohim-susan-alpha-headless
+  serviceName: elohim-jessica-alpha-headless
   replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: elohim-susan
+      app: elohim-jessica
       environment: alpha
   template:
     metadata:
       labels:
-        app: elohim-susan
+        app: elohim-jessica
         environment: alpha
-        elohim-human: susan-spouse
-        app.kubernetes.io/name: susan
-        app.kubernetes.io/instance: susan-alpha
+        elohim-human: jessica-spouse
+        app.kubernetes.io/name: jessica
+        app.kubernetes.io/instance: jessica-alpha
         app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
         app.kubernetes.io/component: data
         app.kubernetes.io/part-of: elohim
@@ -122,7 +122,7 @@ spec:
             - name: HAPP_VERSION
               valueFrom:
                 configMapKeyRef:
-                  name: elohim-susan-alpha-config
+                  name: elohim-jessica-alpha-config
                   key: happ-version
           volumeMounts:
             - name: happ-volume
@@ -213,7 +213,7 @@ spec:
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
             - name: HUMAN_ID
-              value: "human-susan-spouse"
+              value: "human-jessica-spouse"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB
@@ -290,7 +290,7 @@ spec:
           emptyDir: {}
         - name: conductor-config
           configMap:
-            name: elohim-susan-alpha-config
+            name: elohim-jessica-alpha-config
   volumeClaimTemplates:
     - metadata:
         name: holochain-data
@@ -311,14 +311,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-susan-alpha-headless
+  name: elohim-jessica-alpha-headless
   namespace: elohim-alpha
   labels:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha
-    elohim-human: susan-spouse
-    app.kubernetes.io/name: susan
-    app.kubernetes.io/instance: susan-alpha
+    elohim-human: jessica-spouse
+    app.kubernetes.io/name: jessica
+    app.kubernetes.io/instance: jessica-alpha
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -326,7 +326,7 @@ metadata:
 spec:
   clusterIP: None
   selector:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha
   ports:
     - name: admin-ws
@@ -345,14 +345,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-susan-alpha
+  name: elohim-jessica-alpha
   namespace: elohim-alpha
   labels:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha
-    elohim-human: susan-spouse
-    app.kubernetes.io/name: susan
-    app.kubernetes.io/instance: susan-alpha
+    elohim-human: jessica-spouse
+    app.kubernetes.io/name: jessica
+    app.kubernetes.io/instance: jessica-alpha
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -377,5 +377,5 @@ spec:
       targetPort: 9876
       protocol: TCP
   selector:
-    app: elohim-susan
+    app: elohim-jessica
     environment: alpha

@@ -4,7 +4,7 @@ Annotate genesis content with stewardedBy based on tag-to-human mapping.
 
 Each human stewards content that matches their story:
 - Matthew: governance, protocol core, family learning
-- Susan: family curriculum, relationship content
+- Jessica: family curriculum, relationship content
 - Pastor Pete: faith community, pastoral care
 - Timothy: tutorials, mentorship, learning paths
 - Frank: agriculture, supply chain, local economy
@@ -54,10 +54,10 @@ VALID_HUMAN_IDS = load_valid_human_ids()
 # A content node can match multiple rules — stewards accumulate.
 
 STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
-    # Assessments — Timothy (tutor) is primary, Susan (homeschool) curates
+    # Assessments — Timothy (tutor) is primary, Jessica (homeschool) curates
     ({"assessment"}, [
         {"humanId": "human-timothy-tutor", "affinity": 0.8, "role": "author"},
-        {"humanId": "human-susan-spouse", "affinity": 0.5, "role": "curator"},
+        {"humanId": "human-jessica-spouse", "affinity": 0.5, "role": "curator"},
     ]),
 
     # Faith/pastoral content — Pastor Pete primary
@@ -77,9 +77,9 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
         {"humanId": "human-pete-pastor", "affinity": 0.4, "role": "endorser"},
     ]),
 
-    # Family-layer governance — Susan primary
+    # Family-layer governance — Jessica primary
     ({"governance_layer:family"}, [
-        {"humanId": "human-susan-spouse", "affinity": 0.8, "role": "author"},
+        {"humanId": "human-jessica-spouse", "affinity": 0.8, "role": "author"},
         {"humanId": "human-matthew-manager", "affinity": 0.6, "role": "curator"},
     ]),
 

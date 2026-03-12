@@ -245,7 +245,7 @@ spec:
             - name: DISABLE_MDNS
               value: "true"
             - name: P2P_BOOTSTRAP_NODES
-              value: "/dns4/elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-pete-alpha-0.elohim-pete-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+              value: "/dns4/elohim-jessica-alpha-0.elohim-jessica-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-pete-alpha-0.elohim-pete-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"

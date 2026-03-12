@@ -1,13 +1,13 @@
 {
-  "id": "human-sammy-son",
-  "did": "did:web:elohim.host:human:sammy-son",
+  "id": "human-james-son",
+  "did": "did:web:elohim.host:human:james-son",
   "contentType": "human",
   "activityPubType": "Person",
-  "title": "Sammy",
+  "title": "James",
   "description": "Learning about the world. Interested in games, building things, and asking questions.",
-  "content": "# Sammy\n\nLearning about the world. Interested in games, building things, and asking questions.\n\n**Profile Reach:** network\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Communities:** community-homeschool-coop\n\n**Public Affinities:** games, building, science, animals\n\n**Age Category:** minor\n\n**Guardian Ids:** human-matthew-manager, human-susan-spouse\n\n",
+  "content": "# Sammy\n\nLearning about the world. Interested in games, building things, and asking questions.\n\n**Profile Reach:** network\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Communities:** community-homeschool-coop\n\n**Public Affinities:** games, building, science, animals\n\n**Age Category:** minor\n\n**Guardian Ids:** human-matthew-manager, human-jessica-spouse\n\n",
   "contentFormat": "markdown",
-  "sourcePath": "humans/sammy-son/profile.json",
+  "sourcePath": "humans/james-son/profile.json",
   "tags": [
     "core-family",
     "animals",
@@ -31,20 +31,20 @@
     "hasGuardian": true
   },
   "openGraphMetadata": {
-    "ogTitle": "Sammy",
+    "ogTitle": "James",
     "ogDescription": "Learning about the world. Interested in games, building things, and asking questions.",
     "ogType": "profile",
-    "ogUrl": "https://elohim-protocol.org/humans/human-sammy-son",
+    "ogUrl": "https://elohim-protocol.org/humans/human-james-son",
     "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-sammy-son.jpg",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-james-son.jpg",
     "ogImageAlt": "Sammy's profile"
   },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "Person",
-    "@id": "https://elohim-protocol.org/humans/human-sammy-son",
-    "identifier": "did:web:elohim.host:human:sammy-son",
-    "name": "Sammy",
+    "@id": "https://elohim-protocol.org/humans/human-james-son",
+    "identifier": "did:web:elohim.host:human:james-son",
+    "name": "James",
     "description": "Learning about the world. Interested in games, building things, and asking questions.",
     "publisher": {
       "@type": "Organization",

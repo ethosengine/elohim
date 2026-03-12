@@ -36,8 +36,8 @@
       "affinities": ["knowledge-seeking", "courage", "family-systems", "truth-seeking", "new-beginnings"]
     },
     {
-      "id": "human-susan-spouse",
-      "displayName": "Susan",
+      "id": "human-jessica-spouse",
+      "displayName": "Jessica",
       "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
       "category": "core-family",
       "profileReach": "network",
@@ -46,13 +46,13 @@
       "affinities": ["education", "family-systems", "community-building", "health-wellness"]
     },
     {
-      "id": "human-sammy-son",
-      "displayName": "Sammy",
+      "id": "human-james-son",
+      "displayName": "James",
       "bio": "Learning about the world. Interested in games, building things, and asking questions.",
       "category": "core-family",
       "profileReach": "network",
       "ageCategory": "minor",
-      "guardianIds": ["human-matthew-manager", "human-susan-spouse"],
+      "guardianIds": ["human-matthew-manager", "human-jessica-spouse"],
       "communities": ["community-homeschool-coop"],
       "affinities": ["games", "building", "science", "animals"]
     },
@@ -334,16 +334,16 @@
   ],
   "relationships": [
     {"source": "human-adam-firstman", "target": "human-eve-firstwoman", "type": "spouse", "intimacy": "intimate"},
-    {"source": "human-matthew-manager", "target": "human-susan-spouse", "type": "spouse", "intimacy": "intimate"},
-    {"source": "human-matthew-manager", "target": "human-sammy-son", "type": "parent", "intimacy": "intimate"},
-    {"source": "human-susan-spouse", "target": "human-sammy-son", "type": "parent", "intimacy": "intimate"},
+    {"source": "human-matthew-manager", "target": "human-jessica-spouse", "type": "spouse", "intimacy": "intimate"},
+    {"source": "human-matthew-manager", "target": "human-james-son", "type": "parent", "intimacy": "intimate"},
+    {"source": "human-jessica-spouse", "target": "human-james-son", "type": "parent", "intimacy": "intimate"},
     {"source": "human-gertrude-grandma", "target": "human-matthew-manager", "type": "grandparent", "intimacy": "trusted"},
-    {"source": "human-gertrude-grandma", "target": "human-sammy-son", "type": "grandparent", "intimacy": "trusted"},
+    {"source": "human-gertrude-grandma", "target": "human-james-son", "type": "grandparent", "intimacy": "trusted"},
     {"source": "human-matthew-manager", "target": "human-dan-developer", "type": "coworker", "intimacy": "connection", "context": "org-ethosengine"},
     {"source": "human-matthew-manager", "target": "human-nancy-neighbor", "type": "neighbor", "intimacy": "connection"},
     {"source": "human-matthew-manager", "target": "human-pete-pastor", "type": "congregation_member", "intimacy": "trusted"},
-    {"source": "human-susan-spouse", "target": "human-timothy-tutor", "type": "learning_partner", "intimacy": "connection"},
-    {"source": "human-sammy-son", "target": "human-timothy-tutor", "type": "mentee", "intimacy": "connection"},
+    {"source": "human-jessica-spouse", "target": "human-timothy-tutor", "type": "learning_partner", "intimacy": "connection"},
+    {"source": "human-james-son", "target": "human-timothy-tutor", "type": "mentee", "intimacy": "connection"},
     {"source": "human-frank-farmer", "target": "human-georgina-grocer", "type": "business_partner", "intimacy": "trusted"},
     {"source": "human-bub-builder", "target": "human-manny-manufacturer", "type": "business_partner", "intimacy": "trusted"},
     {"source": "human-bub-builder", "target": "human-frank-farmer", "type": "business_partner", "intimacy": "connection"},
@@ -355,7 +355,7 @@
     {"source": "human-pam-polarized", "target": "human-nancy-neighbor", "type": "neighbor", "intimacy": "connection"},
     {"source": "human-meriadoc-moneybags", "target": "human-matthew-manager", "type": "network_connection", "intimacy": "connection"},
     {"source": "human-meriadoc-moneybags", "target": "human-pete-pastor", "type": "congregation_member", "intimacy": "connection"},
-    {"source": "human-georgina-grocer", "target": "human-susan-spouse", "type": "community_member", "intimacy": "recognition"},
+    {"source": "human-georgina-grocer", "target": "human-jessica-spouse", "type": "community_member", "intimacy": "recognition"},
     {"source": "human-tommy-teacher", "target": "human-janice-janitor", "type": "coworker", "intimacy": "connection", "context": "org-valley-school-district"}
   ],
   "categories": {

@@ -1,13 +1,13 @@
 {
-  "id": "human-sammy-son",
-  "displayName": "Sammy",
+  "id": "human-james-son",
+  "displayName": "James",
   "isPseudonymous": false,
   "createdAt": "2025-12-01T20:29:49.320609Z",
   "updatedAt": "2025-12-01T20:29:49.320609Z",
   "profileReach": "network",
   "acceptingConnections": true,
   "bio": "Learning about the world. Interested in games, building things, and asking questions.",
-  "avatarUrl": "assets/avatars/human-sammy-son.jpg",
+  "avatarUrl": "assets/avatars/human-james-son.jpg",
   "communityIds": [
     "community-homeschool-coop"
   ],
@@ -39,7 +39,7 @@
     "ageCategory": "minor",
     "guardianIds": [
       "human-matthew-manager",
-      "human-susan-spouse"
+      "human-jessica-spouse"
     ],
     "hasGuardian": true,
     "accessibilityNeeds": null,

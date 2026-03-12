@@ -1,13 +1,13 @@
 {
-  "id": "human-susan-spouse",
-  "displayName": "Susan",
+  "id": "human-jessica-spouse",
+  "displayName": "Jessica",
   "isPseudonymous": false,
   "createdAt": "2025-12-01T20:29:49.320609Z",
   "updatedAt": "2025-12-01T20:29:49.320609Z",
   "profileReach": "network",
   "acceptingConnections": true,
   "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
-  "avatarUrl": "assets/avatars/human-susan-spouse.jpg",
+  "avatarUrl": "assets/avatars/human-jessica-spouse.jpg",
   "primaryLocation": {
     "layer": "neighborhood",
     "displayName": "Tech Valley",

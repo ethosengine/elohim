@@ -1,15 +1,15 @@
 {
-  "id": "susan-spouse",
-  "displayName": "Susan",
+  "id": "jessica-spouse",
+  "displayName": "Jessica",
   "presenceState": "claimed",
   "externalIdentifiers": [],
   "establishingContentIds": ["value-scanner-epic"],
-  "claimedAgentId": "agent-susan-spouse",
+  "claimedAgentId": "agent-jessica-spouse",
   "note": "Partner in life and learning. Stewards family education content - parent, child, and caregiver perspectives in the care economy.",
   "metadata": {
     "bootstrapSteward": false,
     "role": "steward-family-education",
     "affinityDomains": ["value-scanner"],
-    "humanId": "human-susan-spouse"
+    "humanId": "human-jessica-spouse"
   }
 }

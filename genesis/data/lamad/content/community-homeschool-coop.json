@@ -5,15 +5,15 @@
   "activityPubType": "Group",
   "title": "Homeschool Coop",
   "description": "Community with 3 members",
-  "content": "# Homeschool Coop\n\n**Members:** 3\n\n## Member List\n\n- human-susan-spouse\n- human-sammy-son\n- human-timothy-tutor",
+  "content": "# Homeschool Coop\n\n**Members:** 3\n\n## Member List\n\n- human-jessica-spouse\n- human-james-son\n- human-timothy-tutor",
   "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
   ],
   "relatedNodeIds": [
-    "human-susan-spouse",
-    "human-sammy-son",
+    "human-jessica-spouse",
+    "human-james-son",
     "human-timothy-tutor"
   ],
   "metadata": {
