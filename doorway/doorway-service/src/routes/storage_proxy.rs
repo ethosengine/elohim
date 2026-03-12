@@ -134,33 +134,11 @@ mod tests {
     /// Verify method-not-allowed branch without needing a live server.
     /// We construct a request with an unsupported method (OPTIONS) and confirm
     /// the function returns 405 before ever attempting a network call.
-    #[tokio::test]
-    async fn method_not_allowed_returns_405() {
-        use http_body_util::Empty;
-        use hyper::Request;
-
-        // Build a minimal OPTIONS request — forward_to_storage rejects it immediately.
-        let req = Request::builder()
-            .method("OPTIONS")
-            .uri("http://ignored/api/v1/test")
-            .body(Empty::<Bytes>::new())
-            .unwrap();
-
-        // Wrap in Incoming-compatible body via hyper channel
-        let (mut sender, recv_body) = hyper::body::Incoming::channel();
-        // Close the channel immediately (empty body)
-        sender.abort();
-        drop(sender);
-
-        // Use a real hyper Incoming by building through the hyper plumbing.
-        // Simpler: just call the private branch directly by crafting the request
-        // with a body that satisfies Request<Incoming>. Since we can't construct
-        // Incoming directly in tests, we test the observable: that method dispatch
-        // produces METHOD_NOT_ALLOWED for an unsupported verb.
-        //
-        // We verify this by inspecting the match arm logic via a unit-level
-        // smoke test that builds the response manually — mirroring the exact
-        // code path in forward_to_storage.
+    #[test]
+    fn method_not_allowed_returns_405() {
+        // We can't construct hyper::body::Incoming directly in tests, so we verify
+        // the observable: that method dispatch produces METHOD_NOT_ALLOWED for an
+        // unsupported verb by mirroring the exact match arm logic from forward_to_storage.
         let method = Method::from_bytes(b"OPTIONS").unwrap();
         let response: Response<Full<Bytes>> = match method {
             Method::GET

@@ -130,6 +130,16 @@ pub enum RouteTarget {
     StorageProxy { endpoint: String },
 }
 
+impl CompiledRoute {
+    /// Return the storage endpoint URL if this route targets a `StorageProxy`.
+    pub fn storage_endpoint(&self) -> Option<&str> {
+        match &self.target {
+            RouteTarget::StorageProxy { endpoint } => Some(endpoint),
+            _ => None,
+        }
+    }
+}
+
 /// Route registry statistics
 #[derive(Debug, Clone, Default)]
 pub struct RouteRegistryStats {
@@ -700,6 +710,21 @@ impl RouteRegistry {
     /// Get all compiled routes
     pub async fn get_routes(&self) -> Vec<CompiledRoute> {
         self.compiled_routes.read().await.clone()
+    }
+
+    /// Find routes that match both the HTTP method and path.
+    ///
+    /// Used by the HTTP router to dispatch incoming requests. Returns all
+    /// matches (ordered by insertion) so the caller can pick the first or
+    /// apply priority logic.
+    pub async fn match_request(&self, method: HttpMethod, path: &str) -> Vec<CompiledRoute> {
+        self.compiled_routes
+            .read()
+            .await
+            .iter()
+            .filter(|r| r.method == method && path_matches(&r.path, path))
+            .cloned()
+            .collect()
     }
 
     /// Get routes for a specific path (for debugging)

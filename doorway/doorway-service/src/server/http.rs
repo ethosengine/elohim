@@ -1133,15 +1133,7 @@ async fn handle_request(
             ));
         }
 
-        // Account API routes (proxied to elohim-storage)
-        // POST /account/import - Import account package
-        // GET /account/export/{human_id} - Export account package
-        (_, p) if p.starts_with("/account/") => {
-            debug!(path = %p, "Forwarding account request to elohim-storage");
-            return Ok(to_boxed(
-                routes::handle_account_request(req, state.args.storage_url.clone(), p).await,
-            ));
-        }
+        // Account API routes — handled by dynamic registry fallback below
 
         // HTML5 App serving routes (proxied to elohim-storage)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
@@ -1222,88 +1214,34 @@ async fn handle_request(
             ));
         }
 
-        // Presence lifecycle
-        (_, p) if p.starts_with("/api/v1/presence") => {
-            return Ok(to_boxed(
-                routes::handle_presence_request(req, Arc::clone(&state), p).await,
-            ));
-        }
+        // ====================================================================
+        // Dynamic Route Registry — all remaining /api/v1/* and /account/* routes
+        // ====================================================================
+        (_, p) if p.starts_with("/api/v1/") || p.starts_with("/account/") => {
+            let http_method = match req.method() {
+                &Method::GET => doorway_client::HttpMethod::Get,
+                &Method::POST => doorway_client::HttpMethod::Post,
+                &Method::PUT => doorway_client::HttpMethod::Put,
+                &Method::DELETE => doorway_client::HttpMethod::Delete,
+                &Method::PATCH => doorway_client::HttpMethod::Patch,
+                &Method::HEAD => doorway_client::HttpMethod::Head,
+                _ => doorway_client::HttpMethod::Get,
+            };
 
-        // Stewardship policy
-        (_, p) if p.starts_with("/api/v1/stewardship") => {
-            return Ok(to_boxed(
-                routes::handle_stewardship_request(req, Arc::clone(&state), p).await,
-            ));
-        }
+            let matches = state.route_registry.match_request(http_method, p).await;
 
-        // Economic events
-        (_, p) if p.starts_with("/api/v1/economic-events") => {
-            return Ok(to_boxed(
-                routes::handle_economic_events_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Stewarded resources
-        (_, p) if p.starts_with("/api/v1/resources") => {
-            return Ok(to_boxed(
-                routes::handle_stewarded_resources_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Requests and offers
-        (_, p) if p.starts_with("/api/v1/exchange") => {
-            return Ok(to_boxed(
-                routes::handle_exchange_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Custodian metrics and data protection
-        (_, p) if p.starts_with("/api/v1/custodians") => {
-            return Ok(to_boxed(
-                routes::handle_custodians_api_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Compute dashboard
-        (_, p) if p.starts_with("/api/v1/compute") => {
-            return Ok(to_boxed(
-                routes::handle_compute_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Flow planning
-        (_, p) if p.starts_with("/api/v1/flow-planning") => {
-            return Ok(to_boxed(
-                routes::handle_flow_planning_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Governance API
-        (_, p) if p.starts_with("/api/v1/governance") => {
-            return Ok(to_boxed(
-                routes::handle_governance_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Attestations API
-        (_, p) if p.starts_with("/api/v1/attestations") => {
-            return Ok(to_boxed(
-                routes::handle_attestations_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Steward API (NOT stewardship — that's a different route)
-        (_, p) if p.starts_with("/api/v1/steward/") || p == "/api/v1/steward" => {
-            return Ok(to_boxed(
-                routes::handle_steward_api_request(req, Arc::clone(&state), p).await,
-            ));
-        }
-
-        // Contributors API
-        (_, p) if p.starts_with("/api/v1/contributors") => {
-            return Ok(to_boxed(
-                routes::handle_contributors_request(req, Arc::clone(&state), p).await,
-            ));
+            if let Some(route) = matches.first() {
+                if let Some(endpoint) = route.storage_endpoint() {
+                    debug!(path = %p, endpoint = %endpoint, "Registry-routed to storage proxy");
+                    return Ok(to_boxed(routes::forward_to_storage(req, endpoint, p).await));
+                }
+                // Future: handle ZomeCall, AgentProxy, BlobProxy, StreamProxy targets
+                debug!(path = %p, "Registry matched but target type not yet handled");
+                to_boxed(not_found_response(p))
+            } else {
+                debug!(path = %p, "No registry match");
+                to_boxed(not_found_response(p))
+            }
         }
 
         // Not found
