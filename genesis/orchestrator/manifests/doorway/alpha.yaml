@@ -86,7 +86,7 @@ spec:
             - "--listen"
             - "0.0.0.0:8080"
             - "--conductor-url"
-            - "ws://elohim-edgenode-alpha:4445"
+            - "ws://elohim-matthew-alpha:4445"
           ports:
             - name: gateway-ws
               containerPort: 8080
@@ -97,11 +97,13 @@ spec:
             - name: PROJECTION_WRITER
               value: "true"
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-2.elohim-edgenode-alpha-headless:8445,ws://elohim-edgenode-alpha-3.elohim-edgenode-alpha-headless:8445"
+              value: "ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local:8445,ws://elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local:8445,ws://elohim-pete-alpha-0.elohim-pete-alpha-headless.elohim-alpha.svc.cluster.local:8445,ws://elohim-timothy-alpha-0.elohim-timothy-alpha-headless.elohim-alpha.svc.cluster.local:8445,ws://elohim-frank-alpha-0.elohim-frank-alpha-headless.elohim-alpha.svc.cluster.local:8445"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-edgenode-alpha:4444"
+              value: "ws://elohim-matthew-alpha:4444"
             - name: STORAGE_URL
-              value: "http://elohim-edgenode-alpha:8090"
+              value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
+            - name: STORAGE_URLS
+              value: "http://elohim-susan-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-pete-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-timothy-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-frank-alpha.elohim-alpha.svc.cluster.local:8090"
             # Elohim Agent SDK sidecar (runs in same pod)
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"

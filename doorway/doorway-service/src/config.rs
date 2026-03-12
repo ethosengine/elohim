@@ -130,6 +130,11 @@ pub struct Args {
     #[arg(long, env = "STORAGE_URL")]
     pub storage_url: Option<String>,
 
+    /// Additional storage peer URLs (comma-separated)
+    /// Each URL registers as a peer in the route registry via /manifest
+    #[arg(long, env = "STORAGE_URLS", value_delimiter = ',')]
+    pub storage_urls: Vec<String>,
+
     /// URL of elohim-agent-sdk sidecar for AI agent invocation
     /// (e.g., "http://localhost:8095")
     /// Doorway proxies /api/v1/elohim/invoke requests here

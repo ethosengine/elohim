@@ -368,11 +368,22 @@ async fn main() -> anyhow::Result<()> {
         info!("P2P status polling enabled (every 30s from elohim-storage)");
     }
 
-    // Self-register the steward's elohim-storage as the first peer in the route registry.
-    // Fetches GET {STORAGE_URL}/manifest and compiles the returned routes.
-    // Non-fatal: if storage is not yet up, dynamic routes are simply unavailable until
+    // Register all steward storage peers in the route registry.
+    // Fetches GET {url}/manifest for each and compiles the returned routes.
+    // Non-fatal: if a storage peer is not yet up, its routes are simply unavailable until
     // the operator restarts doorway or peers register manually.
+    let mut peer_urls: Vec<String> = Vec::new();
     if let Some(ref storage_url) = state.args.storage_url {
+        peer_urls.push(storage_url.clone());
+    }
+    for url in &state.args.storage_urls {
+        let trimmed = url.trim().to_string();
+        if !trimmed.is_empty() && !peer_urls.contains(&trimmed) {
+            peer_urls.push(trimmed);
+        }
+    }
+
+    for storage_url in &peer_urls {
         match state
             .route_registry
             .register_steward_peer(storage_url)
@@ -382,16 +393,20 @@ async fn main() -> anyhow::Result<()> {
                 tracing::info!(
                     routes = count,
                     storage_url = %storage_url,
-                    "Steward storage self-registered as first peer"
+                    "Steward peer registered"
                 );
             }
             Err(e) => {
                 tracing::warn!(
                     error = %e,
-                    "Failed to self-register steward storage — dynamic routes unavailable"
+                    storage_url = %storage_url,
+                    "Failed to register steward peer — its routes unavailable"
                 );
             }
         }
+    }
+    if !peer_urls.is_empty() {
+        tracing::info!(peer_count = peer_urls.len(), "All steward peers registered");
     }
 
     let state = Arc::new(state);
