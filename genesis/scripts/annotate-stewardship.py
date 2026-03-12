@@ -37,7 +37,7 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
     # Assessments — Timothy (tutor) is primary, Susan (homeschool) curates
     ({"assessment"}, [
         {"humanId": "human-timothy-tutor", "affinity": 0.8, "role": "author"},
-        {"humanId": "human-susan-partner", "affinity": 0.5, "role": "curator"},
+        {"humanId": "human-susan-spouse", "affinity": 0.5, "role": "curator"},
     ]),
 
     # Faith/pastoral content — Pastor Pete primary
@@ -59,7 +59,7 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
 
     # Family-layer governance — Susan primary
     ({"governance_layer:family"}, [
-        {"humanId": "human-susan-partner", "affinity": 0.8, "role": "author"},
+        {"humanId": "human-susan-spouse", "affinity": 0.8, "role": "author"},
         {"humanId": "human-matthew-manager", "affinity": 0.6, "role": "curator"},
     ]),
 
