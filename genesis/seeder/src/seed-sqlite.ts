@@ -38,6 +38,7 @@ const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === '
 const SKIP_BLOB_UPLOAD = process.env.SKIP_BLOB_UPLOAD === 'true' || args.includes('--skip-blob-upload');
 const USE_ACCOUNT_PACKAGES = args.includes('--use-account-packages') || process.env.USE_ACCOUNT_PACKAGES === 'true';
 const ACCOUNT_PACKAGES_DIR = process.env.ACCOUNT_PACKAGES_DIR || path.join(GENESIS_DIR, 'data', 'account-packages');
+const CONDUCTOR_FOR = args.find(a => a.startsWith('--conductor-for='))?.split('=')[1];
 
 // Content formats that require blob upload
 const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
@@ -418,6 +419,40 @@ function formatConceptTitle(conceptId: string): string {
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+// ============================================================================
+// Stewardship Filtering
+// ============================================================================
+
+interface StewardAnnotation {
+  humanId: string;
+  affinity: number;
+  role: string;
+}
+
+/**
+ * Filter content nodes to those stewarded by a specific human.
+ * Returns content where the given humanId is the highest-affinity steward.
+ * If no stewardedBy field exists, defaults to the operator (backwards compat).
+ */
+function filterBySteward(
+  concepts: ConceptJson[],
+  humanId: string,
+  operatorId: string = 'human-matthew-manager',
+): ConceptJson[] {
+  return concepts.filter(concept => {
+    const stewards = (concept as Record<string, unknown>).stewardedBy as
+      | StewardAnnotation[]
+      | undefined;
+
+    if (!stewards || stewards.length === 0) {
+      return humanId === operatorId;
+    }
+
+    const primary = stewards.reduce((max, s) => (s.affinity > max.affinity ? s : max), stewards[0]);
+    return primary.humanId === humanId;
+  });
 }
 
 // ============================================================================
@@ -830,6 +865,9 @@ async function main() {
   console.log(`   Content only: ${CONTENT_ONLY}`);
   console.log(`   Paths only: ${PATHS_ONLY}`);
   console.log(`   Skip blob upload: ${SKIP_BLOB_UPLOAD}`);
+  if (CONDUCTOR_FOR) {
+    console.log(`   Conductor for: ${CONDUCTOR_FOR}`);
+  }
 
   // Check storage is available
   console.log(`\nChecking storage availability...`);
@@ -955,6 +993,12 @@ async function main() {
     console.log(`\nLoading content files...`);
     let content = loadContentFiles();
     console.log(`   Loaded ${formatCount(content.length)} content items`);
+
+    if (CONDUCTOR_FOR) {
+      const beforeCount = content.length;
+      content = filterBySteward(content, CONDUCTOR_FOR);
+      console.log(`   [stewardship] Filtered to ${content.length}/${beforeCount} content nodes for ${CONDUCTOR_FOR}`);
+    }
 
     if (LIMIT > 0 && content.length > LIMIT) {
       console.log(`   Limiting to ${LIMIT} items`);
