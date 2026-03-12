@@ -1219,13 +1219,13 @@ async fn handle_request(
         // Dynamic Route Registry — all remaining /api/v1/* and /account/* routes
         // ====================================================================
         (_, p) if p.starts_with("/api/v1/") || p.starts_with("/account/") => {
-            let http_method = match req.method() {
-                &Method::GET => doorway_client::HttpMethod::Get,
-                &Method::POST => doorway_client::HttpMethod::Post,
-                &Method::PUT => doorway_client::HttpMethod::Put,
-                &Method::DELETE => doorway_client::HttpMethod::Delete,
-                &Method::PATCH => doorway_client::HttpMethod::Patch,
-                &Method::HEAD => doorway_client::HttpMethod::Head,
+            let http_method = match *req.method() {
+                Method::GET => doorway_client::HttpMethod::Get,
+                Method::POST => doorway_client::HttpMethod::Post,
+                Method::PUT => doorway_client::HttpMethod::Put,
+                Method::DELETE => doorway_client::HttpMethod::Delete,
+                Method::PATCH => doorway_client::HttpMethod::Patch,
+                Method::HEAD => doorway_client::HttpMethod::Head,
                 _ => doorway_client::HttpMethod::Get,
             };
 
