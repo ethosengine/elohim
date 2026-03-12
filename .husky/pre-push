@@ -165,6 +165,7 @@ run_gate() {
         rc=$?
         ;;
       genesis)
+        python3 genesis/scripts/validate-human-ids.py 2>&1 && \
         pnpm install --frozen-lockfile --ignore-scripts 2>&1 && pnpm run validate 2>&1 && pnpm exec vitest run 2>&1
         rc=$?
         ;;

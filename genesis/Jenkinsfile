@@ -265,6 +265,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+
+                        echo "Validating humanId references against humans.json..."
+                        python3 genesis/scripts/validate-human-ids.py
+
+                        echo "✅ HumanId validation passed"
+                    '''
                     dir('genesis/seeder') {
                         sh '''#!/bin/bash
                             set -euo pipefail
