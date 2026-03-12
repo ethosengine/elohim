@@ -694,10 +694,10 @@ impl RouteRegistry {
         let mut last = self.last_compiled.write().await;
         *last = Some(Instant::now());
 
-        info!(
+        debug!(
             routes = count,
             storage_url = %storage_url,
-            "Steward storage self-registered as first peer"
+            "Steward peer routes compiled"
         );
 
         Ok(count)

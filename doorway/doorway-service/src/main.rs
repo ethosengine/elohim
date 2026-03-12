@@ -383,6 +383,8 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    let mut registered = 0usize;
+    let mut failed = 0usize;
     for storage_url in &peer_urls {
         match state
             .route_registry
@@ -395,6 +397,7 @@ async fn main() -> anyhow::Result<()> {
                     storage_url = %storage_url,
                     "Steward peer registered"
                 );
+                registered += 1;
             }
             Err(e) => {
                 tracing::warn!(
@@ -402,11 +405,12 @@ async fn main() -> anyhow::Result<()> {
                     storage_url = %storage_url,
                     "Failed to register steward peer — its routes unavailable"
                 );
+                failed += 1;
             }
         }
     }
     if !peer_urls.is_empty() {
-        tracing::info!(peer_count = peer_urls.len(), "All steward peers registered");
+        tracing::info!(registered, failed, "Steward peer registration complete");
     }
 
     let state = Arc::new(state);
