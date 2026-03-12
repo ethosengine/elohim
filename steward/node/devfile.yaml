@@ -101,15 +101,15 @@ commands:
     actions:
       - type: exec
         component: dev
-        command: cd /projects/elohim/elohim-node && cargo build
-        workdir: /projects/elohim/elohim-node
+        command: cd /projects/elohim/steward/node && cargo build
+        workdir: /projects/elohim/steward/node
 
   - name: build-release
     actions:
       - type: exec
         component: dev
-        command: cd /projects/elohim/elohim-node && cargo build --release
-        workdir: /projects/elohim/elohim-node
+        command: cd /projects/elohim/steward/node && cargo build --release
+        workdir: /projects/elohim/steward/node
 
   # Run
   - name: run-node-1
@@ -117,29 +117,29 @@ commands:
       - type: exec
         component: dev
         command: |
-          cd /projects/elohim/elohim-node
+          cd /projects/elohim/steward/node
           ELOHIM_NODE_ID=node-1 \
           ELOHIM_CLUSTER_NAME=dev-cluster \
           cargo run
-        workdir: /projects/elohim/elohim-node
+        workdir: /projects/elohim/steward/node
 
   - name: run-node-2
     actions:
       - type: exec
         component: node-2
         command: |
-          cd /projects/elohim/elohim-node
+          cd /projects/elohim/steward/node
           cargo run
-        workdir: /projects/elohim/elohim-node
+        workdir: /projects/elohim/steward/node
 
   - name: run-node-3
     actions:
       - type: exec
         component: node-3
         command: |
-          cd /projects/elohim/elohim-node
+          cd /projects/elohim/steward/node
           cargo run
-        workdir: /projects/elohim/elohim-node
+        workdir: /projects/elohim/steward/node
 
   # Cluster simulation
   - name: start-cluster
@@ -159,7 +159,7 @@ commands:
       - type: exec
         component: dev
         command: cargo test
-        workdir: /projects/elohim/elohim-node
+        workdir: /projects/elohim/steward/node
 
   # Dashboard
   - name: open-dashboard
