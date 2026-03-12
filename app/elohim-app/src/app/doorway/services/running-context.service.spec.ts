@@ -102,6 +102,7 @@ describe('RunningContextService', () => {
       const context = await service.detect();
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith({
+        roleName: 'node_registry',
         zomeName: 'node_registry_coordinator',
         fnName: 'get_my_nodes',
         payload: null,
