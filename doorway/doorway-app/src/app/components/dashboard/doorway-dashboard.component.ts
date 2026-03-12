@@ -162,9 +162,13 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly formatBytesHelper = formatBytes;
   readonly Math = Math; // Expose Math for template
 
+  // Route registry from service signal
+  readonly routeRegistry = this.adminService.routeRegistry;
+  readonly stewardRegistered = this.adminService.stewardRegistered;
+
   async ngOnInit(): Promise<void> {
     await this.adminService.loadCapabilities();
-    await this.loadData();
+    await Promise.all([this.loadData(), this.adminService.loadRouteRegistry()]);
     this.startRefresh();
     // Only connect WebSocket if orchestrator is available (WS endpoint requires it)
     if (this.orchestratorAvailable()) {

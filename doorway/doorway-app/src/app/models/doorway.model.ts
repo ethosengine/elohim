@@ -214,6 +214,29 @@ export interface CustodianNetwork {
 }
 
 // ============================================================================
+// Route Registry Models
+// ============================================================================
+
+/**
+ * Route source info from registry
+ */
+export interface RouteSourceInfo {
+  sourceType: string;
+  routeCount: number;
+  endpoint: string | null;
+}
+
+/**
+ * Route registry response from GET /admin/routes
+ */
+export interface RouteRegistryResponse {
+  totalRoutes: number;
+  stewardRegistered: boolean;
+  stewardUrl: string | null;
+  routeSources: RouteSourceInfo[];
+}
+
+// ============================================================================
 // WebSocket Models
 // ============================================================================
 

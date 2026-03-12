@@ -264,6 +264,38 @@
             </div>
           }
 
+          <!-- Route Registry Card -->
+          <div class="card">
+            <h3>Route Registry</h3>
+            <div class="custodian-stats">
+              <div class="custodian-stat">
+                <span class="value">{{ routeRegistry()?.totalRoutes ?? 0 }}</span>
+                <span class="label">Total Routes</span>
+              </div>
+              <div class="custodian-stat">
+                <span class="value" [class.text-green-600]="stewardRegistered()" [class.text-gray-400]="!stewardRegistered()">
+                  {{ stewardRegistered() ? 'Yes' : 'No' }}
+                </span>
+                <span class="label">Storage Registered</span>
+              </div>
+            </div>
+            @if (routeRegistry()?.stewardUrl) {
+              <div class="info-row" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--dw-text-muted, #6b7280);">
+                <span>{{ routeRegistry()?.stewardUrl }}</span>
+              </div>
+            }
+            @if ((routeRegistry()?.routeSources?.length ?? 0) > 0) {
+              <div style="margin-top: 0.75rem;">
+                @for (source of routeRegistry()?.routeSources; track source.sourceType) {
+                  <div class="tier-row">
+                    <span class="tier-name">{{ source.sourceType }}</span>
+                    <span class="tier-count">{{ source.routeCount }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
           <!-- Human Scale Card -->
           @if (orchestratorAvailable()) {
           <div class="card human-scale">

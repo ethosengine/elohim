@@ -33,6 +33,8 @@ import {
   AccountResponse,
   // Capabilities
   CapabilitiesResponse,
+  // Route registry
+  RouteRegistryResponse,
 } from '../models/doorway.model';
 
 /**
@@ -80,6 +82,11 @@ export class DoorwayAdminService {
   readonly capabilities = this._capabilities.asReadonly();
   readonly orchestratorAvailable = computed(() => this._capabilities()?.orchestrator ?? false);
 
+  // Route registry
+  private readonly _routeRegistry = signal<RouteRegistryResponse | null>(null);
+  readonly routeRegistry = this._routeRegistry.asReadonly();
+  readonly stewardRegistered = computed(() => this._routeRegistry()?.stewardRegistered ?? false);
+
   // Request timeout
   private readonly timeout = 30000;
 
@@ -108,6 +115,29 @@ export class DoorwayAdminService {
   async loadCapabilities(): Promise<void> {
     const caps = await firstValueFrom(this.fetchCapabilities());
     this._capabilities.set(caps);
+  }
+
+  /**
+   * Fetch route registry info (registered peers, route sources)
+   */
+  getRouteRegistry(): Observable<RouteRegistryResponse> {
+    return this.http.get<RouteRegistryResponse>(`${this.baseUrl}/admin/routes`).pipe(
+      timeout(this.timeout),
+      catchError(this.handleError<RouteRegistryResponse>('getRouteRegistry', {
+        totalRoutes: 0,
+        stewardRegistered: false,
+        stewardUrl: null,
+        routeSources: [],
+      }))
+    );
+  }
+
+  /**
+   * Fetch route registry and store in signal
+   */
+  async loadRouteRegistry(): Promise<void> {
+    const registry = await firstValueFrom(this.getRouteRegistry());
+    this._routeRegistry.set(registry);
   }
 
   /**
