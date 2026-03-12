@@ -136,6 +136,8 @@ pub struct DoorwayHeartbeatSummary {
 pub struct HealthAttestation {
     /// Doorway ID of the observer (must match author's DoorwayRegistration)
     pub attestor_doorway_id: String,
+    /// Agent pubkey of the attestor (must match entry author)
+    pub operator_agent: String,
     /// Doorway ID of the subject being observed
     pub subject_doorway_id: String,
     /// Observed status: "online", "degraded", "unreachable"
@@ -144,9 +146,11 @@ pub struct HealthAttestation {
     pub response_time_ms: Option<u32>,
     /// Whether the subject's conductor pool was healthy (from /health response)
     pub conductor_healthy: Option<bool>,
-    /// When the probe happened (ISO 8601)
-    pub timestamp: String,
+    /// When the probe happened
+    pub timestamp: i64,
 }
+
+const ATTESTATION_STATUSES: &[&str] = &["online", "degraded", "unreachable"];
 
 // =============================================================================
 // Content Server Types (P2P Content Publishing)
@@ -282,7 +286,7 @@ pub enum LinkTypes {
     DoorwayToHeartbeat,         // DoorwayRegistration -> DoorwayHeartbeat
 
     // HealthAttestation links
-    DoorwayToAttestation,       // DoorwayRegistration -> HealthAttestation
+    DoorwayToAttestation,       // DoorwayRegistration (subject) -> HealthAttestation (peer observations about this doorway)
 
     // DoorwayHeartbeatSummary links (kept forever)
     DoorwayToSummary,           // DoorwayRegistration -> DoorwayHeartbeatSummary
@@ -320,7 +324,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         validate_doorway_summary(&summary)
                     }
                     EntryTypes::HealthAttestation(attestation) => {
-                        validate_health_attestation(&attestation)
+                        validate_health_attestation(&attestation, &action)
                     }
                     EntryTypes::ContentServer(server) => {
                         validate_content_server(&server)
@@ -451,10 +455,11 @@ fn validate_doorway_summary(summary: &DoorwayHeartbeatSummary) -> ExternResult<V
     Ok(ValidateCallbackResult::Valid)
 }
 
-const ATTESTATION_STATUSES: &[&str] = &["online", "degraded", "unreachable"];
-
 /// Validate HealthAttestation
-fn validate_health_attestation(attestation: &HealthAttestation) -> ExternResult<ValidateCallbackResult> {
+fn validate_health_attestation(
+    attestation: &HealthAttestation,
+    action: &Create,
+) -> ExternResult<ValidateCallbackResult> {
     if attestation.attestor_doorway_id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "attestor_doorway_id cannot be empty".to_string(),
@@ -470,6 +475,12 @@ fn validate_health_attestation(attestation: &HealthAttestation) -> ExternResult<
     if attestation.attestor_doorway_id == attestation.subject_doorway_id {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot attest about yourself".to_string(),
+        ));
+    }
+
+    if attestation.operator_agent != action.author.to_string() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "operator_agent must match the entry author".to_string(),
         ));
     }
 
