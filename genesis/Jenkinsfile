@@ -48,7 +48,7 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
 def resolveInternalStorageUrl(String doorwayHost) {
     // elohim-storage runs on the edgenode service (port 8090), not doorway
     if (doorwayHost.contains('alpha.elohim.host')) {
-        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8090'
+        return 'elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
     } else if (doorwayHost.contains('staging.elohim.host')) {
         return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8090'
     } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {
@@ -56,6 +56,20 @@ def resolveInternalStorageUrl(String doorwayHost) {
     }
     // Fallback: swap doorway→edgenode and port
     return doorwayHost.replace('https://', '').replace('http://', '').replace('doorway', 'edgenode').replaceAll(':\\d+', ':8090')
+}
+
+def getHumanStorageUrls(String environment) {
+    def namespace = "elohim-${environment}"
+    def humans = [
+        [humanId: 'human-matthew-manager',     service: 'elohim-matthew-alpha'],
+        [humanId: 'human-susan-spouse',         service: 'elohim-susan-alpha'],
+        [humanId: 'human-pastor-pete-pastor',   service: 'elohim-pete-alpha'],
+        [humanId: 'human-timothy-tutor',        service: 'elohim-timothy-alpha'],
+        [humanId: 'human-frank-farmer',         service: 'elohim-frank-alpha'],
+    ]
+    return humans.collect { h ->
+        h + [storageUrl: "${h.service}.${namespace}.svc.cluster.local:8090"]
+    }
 }
 
 pipeline {
@@ -417,31 +431,63 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def internalStorage = env.INTERNAL_STORAGE_URL
-                        def seedIds = params.SEED_IDS
+                        def humans = getHumanStorageUrls('alpha')
 
                         dir('genesis/seeder') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                            for (human in humans) {
+                                def humanId = human.humanId
+                                def storageUrl = human.storageUrl
+                                def service = human.service
 
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "🌱 SEEDING DATABASE (SQLite)"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "Storage: ${internalStorage}"
-                                echo "IDs: ${seedIds ?: '(all content)'}"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo ""
+                                sh """#!/bin/bash
+                                    set -euo pipefail
 
-                                # SQLite seeding - direct to elohim-storage, bypasses DHT
-                                # ~5 seconds vs 50+ minutes with DHT seeding
-                                STORAGE_URL="http://${internalStorage}" \
-                                    npx tsx src/seed-sqlite.ts
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "🌱 SEEDING ${humanId}"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Storage: ${storageUrl}"
+                                    echo ""
 
-                                echo ""
+                                    # Wait for this conductor's storage to be ready
+                                    for i in \$(seq 1 30); do
+                                        if curl -sf "http://${storageUrl}/health" > /dev/null 2>&1; then
+                                            echo "✅ ${service} storage is ready"
+                                            break
+                                        fi
+                                        if [ \$i -eq 30 ]; then
+                                            echo "❌ ${service} storage not ready after 30 attempts"
+                                            exit 1
+                                        fi
+                                        echo "   Waiting for ${service} storage... (\$i/30)"
+                                        sleep 2
+                                    done
+
+                                    STORAGE_URL="http://${storageUrl}" \\
+                                        npx tsx src/seed-sqlite.ts --conductor-for=${humanId}
+
+                                    echo ""
+                                    echo "✅ ${humanId} seeded successfully"
+                                    echo ""
+                                """
+                            }
+
+                            sh '''#!/bin/bash
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "✅ DATABASE SEEDED SUCCESSFULLY"
+                                echo "📊 SEEDING SUMMARY"
                                 echo "═══════════════════════════════════════════════════════════"
-                            """
+                            '''
+                            for (human in humans) {
+                                sh """#!/bin/bash
+                                    STATS=\$(curl -sf "http://${human.storageUrl}/db/stats" 2>/dev/null || echo '{}')
+                                    COUNT=\$(echo "\$STATS" | jq -r '.content_count // 0')
+                                    echo "   ${human.humanId}: \$COUNT content nodes"
+                                """
+                            }
+                            sh '''#!/bin/bash
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "✅ ALL CONDUCTORS SEEDED"
+                                echo "═══════════════════════════════════════════════════════════"
+                            '''
                         }
                     }
                 }
@@ -453,64 +499,36 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def internalStorage = env.INTERNAL_STORAGE_URL
+                        def humans = getHumanStorageUrls('alpha')
+                        def matthewUrl = humans[0].storageUrl
 
-                        sh """#!/bin/bash
-                            set -euo pipefail
-
+                        sh '''#!/bin/bash
                             echo "═══════════════════════════════════════════════════════════"
                             echo "🔍 VERIFYING SEEDING"
                             echo "═══════════════════════════════════════════════════════════"
+                        '''
 
-                            # Query SQLite database stats
-                            STATS=\$(curl -sf "http://${internalStorage}/db/stats")
+                        for (human in humans) {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                STATS=\$(curl -sf "http://${human.storageUrl}/db/stats")
+                                CONTENT=\$(echo "\$STATS" | jq -r '.content_count // 0')
+                                PATHS=\$(echo "\$STATS" | jq -r '.path_count // 0')
+                                echo "   ${human.humanId}: \$CONTENT content, \$PATHS paths"
+                                if [ "\$CONTENT" -eq 0 ]; then
+                                    echo "❌ ${human.humanId} has no content!"
+                                    exit 1
+                                fi
+                            """
+                        }
 
-                            CONTENT_COUNT=\$(echo "\$STATS" | jq -r '.content_count')
-                            PATH_COUNT=\$(echo "\$STATS" | jq -r '.path_count')
-                            STEP_COUNT=\$(echo "\$STATS" | jq -r '.step_count')
-                            TAG_COUNT=\$(echo "\$STATS" | jq -r '.unique_tags')
-
+                        // Verify sophia assessment content on Matthew's conductor (founder/primary)
+                        sh """#!/bin/bash
+                            set -euo pipefail
                             echo ""
-                            echo "📊 Database Statistics:"
-                            echo "   Content: \$CONTENT_COUNT items"
-                            echo "   Paths:   \$PATH_COUNT items"
-                            echo "   Steps:   \$STEP_COUNT items"
-                            echo "   Tags:    \$TAG_COUNT unique"
-                            echo ""
-
-                            # Verify minimum expected counts
-                            MIN_CONTENT=3400
-                            MIN_PATHS=5
-
-                            if [ "\$CONTENT_COUNT" -lt "\$MIN_CONTENT" ]; then
-                                echo "❌ Content count \$CONTENT_COUNT is below minimum \$MIN_CONTENT"
-                                exit 1
-                            fi
-
-                            if [ "\$PATH_COUNT" -lt "\$MIN_PATHS" ]; then
-                                echo "❌ Path count \$PATH_COUNT is below minimum \$MIN_PATHS"
-                                exit 1
-                            fi
-
-                            echo "✅ Content: \$CONTENT_COUNT items (min: \$MIN_CONTENT)"
-                            echo "✅ Paths: \$PATH_COUNT items (min: \$MIN_PATHS)"
-
-                            # Verify a sample content item exists
-                            SAMPLE_ID="manifesto"
-                            SAMPLE=\$(curl -sf "http://${internalStorage}/db/content/\$SAMPLE_ID" || echo '{}')
-                            SAMPLE_TITLE=\$(echo "\$SAMPLE" | jq -r '.title // empty')
-
-                            if [ -n "\$SAMPLE_TITLE" ]; then
-                                echo "✅ Sample content '\$SAMPLE_ID' verified: \$SAMPLE_TITLE"
-                            else
-                                echo "⚠️ Sample content '\$SAMPLE_ID' not found (may be expected)"
-                            fi
-
-                            # Verify sophia assessment content survived seeding
-                            echo ""
-                            echo "🔬 Verifying assessment content format & widgets..."
+                            echo "🔬 Verifying assessment content on Matthew's conductor..."
                             for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
-                                ASSESSMENT=\$(curl -sf "http://${internalStorage}/db/content/\$ASSESSMENT_ID" || echo '{}')
+                                ASSESSMENT=\$(curl -sf "http://${matthewUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
                                 FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
 
                                 if [ -z "\$FMT" ]; then
