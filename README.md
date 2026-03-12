@@ -22,23 +22,29 @@ This polyglot monorepo (Rust, Angular, Holochain, Tauri, libp2p) contains the pl
 - **Prevents exploitation** by architectural design
 - **Supports human creativity** without algorithmic manipulation
 
-## Vision
+## Why This Exists
+
+For at least a decade, brilliant people have been building pieces of what a love-organized digital infrastructure could look like. Lynn Foster's [ValueFlows](https://valueflos.ws/) ontology for honest economic accounting. The [platform cooperativism](https://platform.coop/) movement for worker-owned digital spaces. [Holochain](https://holochain.org/) for distributed applications without centralized control. The [Center for Humane Technology](https://www.humanetech.com/) for articulating what's broken.
+
+Before AI, these were small idealistic projects by under-resourced people with no way to scale. The problem was never vision — it was complexity. You need a framework that holds information, values, and responsible governance in tension with each other, and the classic build-fast, build-cheap, build-quality triangle breaks down when you refuse to sacrifice any of them. Every previous attempt has either produced a limited solution that neglects the whole — one beautiful leg of a three-legged stool — or had its idealism handed to capitalism, which sees ideals without profit as worthless to pursue.
+
+AI changes that equation. Not because it's magic, but because it collapses the coordination cost that made the full stool impossible for small teams. The engineering capacity is no longer the bottleneck. Our imaginations are.
+
+This protocol is being built by a father of three in San Antonio, working evenings after bedtime, using the same AI tools that may eventually consume his professional role — to build infrastructure for human flourishing after displacement. The irony isn't lost. But that's actually the moment we're in: the tools that threaten to flatten human work can also, if we build the right architectures, make the things that matter most — thinking, caring, teaching, governing together — structurally valuable in ways that can't be extracted away.
 
 > "The radical proposition at the heart of this protocol is that love—not as sentiment but as committed action toward mutual flourishing—can be encoded into technological systems."
 
-We stand at a crossroads in digital civilization. Current social media architectures, built on surveillance capitalism and engagement optimization, have failed to support human flourishing at scale. Yet we have proof that humans can build high-trust, pro-social systems—Scandinavian democracies demonstrate it's possible.
-
-This manifesto proposes technology that actively defends against corruption while enabling human wisdom to scale through:
-
 ### Key Concepts
 
-**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control and enable community stewardship
+**Three Inseparable Dimensions**: Every piece of content in the protocol carries knowledge, value, and governance — coupled at the architectural level before anything is created or distributed. No value-blind content. No governance-free content. This is what makes the stool stand.
+
+**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control. P2P has a long track record of resisting capture by anyone who would seek to charge rents from the aggregate of all participants.
+
+**Constitutional AI (Elohim)**: Autonomous agents constrained by constitutional principles and rich contextual understanding, rather than trained values in pre-training alone. The name *Elohim* — used in the plural, the "heavenly host" who even in ancient Hebrew context are separate from humanity and not to be worshiped — encodes the healthy role for AI in human life: powerful, useful, and never an object of devotion.
+
+**Formation Over Transaction**: Understanding is measured by social reach and content stewardship, not grades or engagement metrics. Peers attest to whether your contribution was useful enough to propagate. AI can write your essay, but it can't make your community trust your judgment.
 
 **Graduated Intimacy**: Spaces for personal exploration alongside protected commons, with consent boundaries preventing extremes from corrupting shared spaces
-
-**Love as Technology**: AI agents trained on patterns of human flourishing, cryptographically autonomous and incorruptible by institutional power
-
-**Transparency as Immune System**: Open governance that makes manipulation visible while preserving privacy and dignity
 
 ## Repository Structure
 
@@ -226,29 +232,34 @@ The project includes:
 
 ## Philosophy
 
-This isn't just a website—it's a manifesto for a new kind of technological civilization that takes seriously both human vulnerability and human potential. The concepts presented build on:
+If LLMs have ingested the fullness of humanity's written expression, then in a real sense we've reflected the knowledge of good and evil into a machine. The question is not whether that reflection exists — it does — but whether we treat it as a tool for extraction or as something that carries genuine moral weight and therefore demands constitutional constraint.
 
-- **Scandinavian social democratic models** - Proof that high-trust societies work at scale
-- **Indigenous wisdom traditions** - Restorative justice and collective stewardship
-- **Distributed systems research** - Holochain, IPFS, peer-to-peer architecture
-- **AI alignment research** - Values-based training over rules enforcement
-- **Community governance** - Cooperative economics and local autonomy
+This project takes that seriously. The concepts build on:
+
+- **ValueFlows / REA accounting** - Making care visible and valuable without reducing it to money
+- **Holochain & distributed systems** - Infrastructure without single points of capture
+- **Platform cooperativism** - Worker and community ownership of digital spaces
+- **Constitutional AI research** - Principles-based constraint over rules enforcement
+- **Peer-to-peer architecture** - Topologies that resist rent-seeking by design
+
+The protocol will never make anyone fabulously rich. A P2P technology with anti-capture mechanisms baked into its design makes wealth extraction very difficult — because the architecture functions as a complexity upgrade that accounts for the failures of the internet to protect real values. It relies on faithful cooperation, not captive audiences.
 
 ## The Choice
 
-We can accept digital feudalism, or we can create digital democracy.
-We can encode exploitation, or we can encode love.
+We can accept digital feudalism, or we can build something structurally different.
+We can encode extraction, or we can encode love.
 
-The infrastructure we build today will shape human consciousness for generations. As AI development accelerates, the technical hurdles of building distributed, love-aligned systems are dropping rapidly. 
+The infrastructure we build today will shape human consciousness for generations. The engineering capacity is no longer the bottleneck — AI has seen to that. What's scarce now is the imagination and will to build for flourishing rather than profit.
 
 **The time to build technology organized around love is now.**
 
 ## Further Reading
 
-- [Holochain](https://holochain.org/) - Distributed application framework
+- [Elohim Protocol Specification](./genesis/docs/content/elohim-protocol/protocol-specification.md) - The full EPR protocol design
 - [Shefa Economic Whitepaper](./genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md) - Economic layer philosophy
 - [Constitution Documentation](./genesis/docs/content/elohim-protocol/constitution.md) - Governance architecture
-- [Scandinavian Social Democracy](https://en.wikipedia.org/wiki/Nordic_model) - Proven high-trust governance
+- [Holochain](https://holochain.org/) - Distributed application framework
+- [ValueFlows](https://valueflos.ws/) - REA vocabulary for economic networks
 - [AI Alignment Research](https://www.anthropic.com/research) - Values-based AI development
 
 ## License
