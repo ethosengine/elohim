@@ -40,6 +40,23 @@ const USE_ACCOUNT_PACKAGES = args.includes('--use-account-packages') || process.
 const ACCOUNT_PACKAGES_DIR = process.env.ACCOUNT_PACKAGES_DIR || path.join(GENESIS_DIR, 'data', 'account-packages');
 const CONDUCTOR_FOR = args.find(a => a.startsWith('--conductor-for='))?.split('=')[1];
 
+// ============================================================================
+// Canonical Human Registry (single source of truth: humans.json)
+// ============================================================================
+
+const HUMANS_JSON_PATH = path.join(GENESIS_DIR, 'docs', 'humans', 'humans.json');
+
+function loadValidHumanIds(): Set<string> {
+  if (!fs.existsSync(HUMANS_JSON_PATH)) {
+    console.warn(`Warning: humans.json not found at ${HUMANS_JSON_PATH} — skipping humanId validation`);
+    return new Set();
+  }
+  const data = JSON.parse(fs.readFileSync(HUMANS_JSON_PATH, 'utf-8'));
+  return new Set((data.humans as Array<{ id: string }>).map(h => h.id));
+}
+
+const VALID_HUMAN_IDS = loadValidHumanIds();
+
 // Content formats that require blob upload
 const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
 
@@ -867,6 +884,14 @@ async function main() {
   console.log(`   Skip blob upload: ${SKIP_BLOB_UPLOAD}`);
   if (CONDUCTOR_FOR) {
     console.log(`   Conductor for: ${CONDUCTOR_FOR}`);
+    if (VALID_HUMAN_IDS.size > 0 && !VALID_HUMAN_IDS.has(CONDUCTOR_FOR)) {
+      console.error(`\nError: --conductor-for="${CONDUCTOR_FOR}" is not a valid humanId`);
+      console.error(`Valid humanIds (from ${HUMANS_JSON_PATH}):`);
+      for (const id of [...VALID_HUMAN_IDS].sort()) {
+        console.error(`   ${id}`);
+      }
+      process.exit(1);
+    }
   }
 
   // Check storage is available
@@ -993,6 +1018,30 @@ async function main() {
     console.log(`\nLoading content files...`);
     let content = loadContentFiles();
     console.log(`   Loaded ${formatCount(content.length)} content items`);
+
+    // Validate stewardedBy humanIds against canonical registry
+    if (VALID_HUMAN_IDS.size > 0) {
+      const invalidIds = new Map<string, number>();
+      for (const concept of content) {
+        const stewards = (concept as Record<string, unknown>).stewardedBy as StewardAnnotation[] | undefined;
+        if (stewards) {
+          for (const s of stewards) {
+            if (!VALID_HUMAN_IDS.has(s.humanId)) {
+              invalidIds.set(s.humanId, (invalidIds.get(s.humanId) || 0) + 1);
+            }
+          }
+        }
+      }
+      if (invalidIds.size > 0) {
+        console.error(`\n   ❌ ERROR: Content references unknown humanIds not in humans.json:`);
+        for (const [id, count] of [...invalidIds.entries()].sort((a, b) => b[1] - a[1])) {
+          console.error(`      ${id}: ${count} content nodes`);
+        }
+        console.error(`   Re-run genesis/scripts/annotate-stewardship.py to fix.`);
+        process.exit(1);
+      }
+      console.log(`   [stewardship] All stewardedBy humanIds validated against humans.json ✓`);
+    }
 
     if (CONDUCTOR_FOR) {
       const beforeCount = content.length;

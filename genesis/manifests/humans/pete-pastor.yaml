@@ -213,7 +213,7 @@ spec:
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
             - name: HUMAN_ID
-              value: "human-pastor-pete-pastor"
+              value: "human-pete-pastor"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

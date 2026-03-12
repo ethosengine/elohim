@@ -63,7 +63,7 @@ def getHumanStorageUrls(String environment) {
     def humans = [
         [humanId: 'human-matthew-manager',     service: 'elohim-matthew-alpha'],
         [humanId: 'human-susan-spouse',         service: 'elohim-susan-alpha'],
-        [humanId: 'human-pastor-pete-pastor',   service: 'elohim-pete-alpha'],
+        [humanId: 'human-pete-pastor',           service: 'elohim-pete-alpha'],
         [humanId: 'human-timothy-tutor',        service: 'elohim-timothy-alpha'],
         [humanId: 'human-frank-farmer',         service: 'elohim-frank-alpha'],
     ]

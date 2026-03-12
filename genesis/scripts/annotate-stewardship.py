@@ -28,6 +28,26 @@ class Steward(TypedDict):
     role: str
 
 
+# ─── Canonical Human Registry ──────────────────────────────────────────────
+# Single source of truth: genesis/docs/humans/humans.json
+# All humanIds in stewardship rules MUST exist in this registry.
+
+HUMANS_JSON = Path(__file__).parent.parent / "docs" / "humans" / "humans.json"
+
+
+def load_valid_human_ids() -> set[str]:
+    """Load canonical humanIds from humans.json."""
+    if not HUMANS_JSON.exists():
+        print(f"WARNING: {HUMANS_JSON} not found — skipping humanId validation")
+        return set()
+    with open(HUMANS_JSON) as f:
+        data = json.load(f)
+    return {h["id"] for h in data["humans"]}
+
+
+VALID_HUMAN_IDS = load_valid_human_ids()
+
+
 # ─── Stewardship Rules ─────────────────────────────────────────────────────
 # Each rule: (tag_pattern, stewards)
 # First matching rule wins. More specific rules first.
@@ -42,19 +62,19 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
 
     # Faith/pastoral content — Pastor Pete primary
     ({"faith", "pastoral", "spiritual"}, [
-        {"humanId": "human-pastor-pete-pastor", "affinity": 0.9, "role": "author"},
+        {"humanId": "human-pete-pastor", "affinity": 0.9, "role": "author"},
     ]),
 
     # Bible/scripture content — Pastor Pete stewards, Matthew endorses
     ({"fct"}, [
-        {"humanId": "human-pastor-pete-pastor", "affinity": 0.7, "role": "steward"},
+        {"humanId": "human-pete-pastor", "affinity": 0.7, "role": "steward"},
         {"humanId": "human-matthew-manager", "affinity": 0.3, "role": "endorser"},
     ]),
 
     # Governance — Matthew primary, Pete endorses community governance
     ({"governance"}, [
         {"humanId": "human-matthew-manager", "affinity": 0.8, "role": "author"},
-        {"humanId": "human-pastor-pete-pastor", "affinity": 0.4, "role": "endorser"},
+        {"humanId": "human-pete-pastor", "affinity": 0.4, "role": "endorser"},
     ]),
 
     # Family-layer governance — Susan primary
@@ -72,7 +92,7 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
     # Community/neighborhood content — Nancy (neighbor) + Pete
     ({"governance_layer:neighborhood"}, [
         {"humanId": "human-nancy-neighbor", "affinity": 0.6, "role": "steward"},
-        {"humanId": "human-pastor-pete-pastor", "affinity": 0.4, "role": "endorser"},
+        {"humanId": "human-pete-pastor", "affinity": 0.4, "role": "endorser"},
     ]),
 
     # Learning paths, education — Timothy primary
@@ -138,8 +158,37 @@ def annotate_file(filepath: Path, dry_run: bool = False) -> tuple[str, list[Stew
     return data.get("id", filepath.stem), stewards
 
 
+def validate_rules_against_registry():
+    """Fail fast if any humanId in stewardship rules is not in humans.json."""
+    if not VALID_HUMAN_IDS:
+        return
+
+    invalid: set[str] = set()
+    for _, stewards in STEWARDSHIP_RULES:
+        for s in stewards:
+            if s["humanId"] not in VALID_HUMAN_IDS:
+                invalid.add(s["humanId"])
+    for s in DEFAULT_STEWARD:
+        if s["humanId"] not in VALID_HUMAN_IDS:
+            invalid.add(s["humanId"])
+
+    if invalid:
+        print(f"ERROR: Stewardship rules reference unknown humanIds:")
+        for hid in sorted(invalid):
+            print(f"  {hid}")
+        print(f"\nValid humanIds (from {HUMANS_JSON}):")
+        for hid in sorted(VALID_HUMAN_IDS):
+            print(f"  {hid}")
+        print(f"\nUpdate the rules to use IDs from humans.json.")
+        sys.exit(1)
+
+    print(f"Validated {len(STEWARDSHIP_RULES)} stewardship rules against {len(VALID_HUMAN_IDS)} humans ✓")
+
+
 def main():
     dry_run = "--dry-run" in sys.argv
+
+    validate_rules_against_registry()
 
     if not CONTENT_DIR.exists():
         print(f"Content directory not found: {CONTENT_DIR}")
