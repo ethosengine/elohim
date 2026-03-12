@@ -5,11 +5,12 @@
 
 use askama::Template;
 use http_body_util::Full;
-use hyper::body::Bytes;
-use hyper::{Response, StatusCode};
+use hyper::body::{Bytes, Incoming};
+use hyper::{Request, Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
+use crate::auth::{extract_token_from_header, JwtValidator, PermissionLevel};
 use crate::orchestrator::NodeHealthStatus;
 use crate::server::AppState;
 
@@ -532,7 +533,12 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 // =============================================================================
 
 /// Handle status page request — returns server-rendered HTML via Askama
-pub async fn status_page(state: Arc<AppState>) -> Response<Full<Bytes>> {
+///
+/// When a valid operator JWT (Admin-level) is present in the Authorization header
+/// or `doorway_token` cookie, the page includes expanded diagnostics such as
+/// the route registry summary and attestation log.
+pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let is_operator = check_operator_auth(&req, &state);
     let data = build_status_data(&state).await;
 
     // Determine overall status label
@@ -648,8 +654,12 @@ pub async fn status_page(state: Arc<AppState>) -> Response<Full<Bytes>> {
         federation_enabled: data.federation.enabled,
         peers,
         shefa: None,
-        is_operator: false,
-        attestation_log: vec![],
+        is_operator,
+        attestation_log: if is_operator {
+            build_operator_attestation_log(&state).await
+        } else {
+            vec![]
+        },
     };
 
     match template.render() {
@@ -670,6 +680,94 @@ pub async fn status_page(state: Arc<AppState>) -> Response<Full<Bytes>> {
             ))))
             .unwrap(),
     }
+}
+
+// =============================================================================
+// Operator Auth Helpers
+// =============================================================================
+
+/// Check whether the request carries a valid Admin-level JWT.
+///
+/// Looks in the `Authorization: Bearer <token>` header first, then falls back
+/// to a `doorway_token` cookie.  Returns `true` only when the token is valid
+/// and the permission level is at least `Admin`.
+fn check_operator_auth(req: &Request<Incoming>, state: &AppState) -> bool {
+    // Try Authorization header first
+    let auth_header = req
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+
+    let token = extract_token_from_header(auth_header)
+        .map(|t| t.to_string())
+        // Fallback: try doorway_token cookie
+        .or_else(|| {
+            req.headers()
+                .get("cookie")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|cookies| {
+                    cookies.split(';').find_map(|c| {
+                        let c = c.trim();
+                        c.strip_prefix("doorway_token=").map(|t| t.to_string())
+                    })
+                })
+        });
+
+    let Some(token) = token else {
+        return false;
+    };
+
+    let jwt = if state.args.dev_mode {
+        JwtValidator::new_dev()
+    } else {
+        match state.args.jwt_secret.as_ref() {
+            Some(secret) => {
+                match JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds) {
+                    Ok(v) => v,
+                    Err(_) => return false,
+                }
+            }
+            None => return false,
+        }
+    };
+
+    let result = jwt.verify_token(&token);
+    if result.valid {
+        result
+            .claims
+            .map(|c| c.permission_level >= PermissionLevel::Admin)
+            .unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+/// Build the attestation log entries shown in the operator panel.
+///
+/// Currently surfaces a route registry summary. As the federation attestation
+/// protocol matures, this will include recent probe results.
+async fn build_operator_attestation_log(state: &Arc<AppState>) -> Vec<String> {
+    let mut log = Vec::new();
+
+    // Route registry summary
+    let stats = state.route_registry.stats().await;
+    log.push(format!(
+        "Route registry: {} total routes ({} DNA sources, {} external agents, {} blob proxies, {} stream proxies)",
+        stats.total_routes,
+        stats.dna_route_sources,
+        stats.external_agents,
+        stats.blob_proxies,
+        stats.stream_proxies,
+    ));
+
+    // Steward storage registration
+    if state.args.storage_url.is_some() {
+        log.push("Steward storage: registered".to_string());
+    } else {
+        log.push("Steward storage: not configured".to_string());
+    }
+
+    log
 }
 
 // =============================================================================
