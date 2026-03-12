@@ -56,6 +56,25 @@ pub struct RecordSummaryInput {
     pub heartbeat_count: u32,
 }
 
+/// Input for recording a health attestation (peer observation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordHealthAttestationInput {
+    pub attestor_doorway_id: String,
+    pub subject_doorway_id: String,
+    pub observed_status: String,
+    pub response_time_ms: Option<u32>,
+    pub conductor_healthy: Option<bool>,
+}
+
+/// Output from health attestation queries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthAttestationOutput {
+    pub action_hash: String,
+    pub entry_hash: String,
+    pub attestation: HealthAttestation,
+    pub author: String,
+}
+
 // =============================================================================
 // ContentServer Input/Output Types
 // =============================================================================
@@ -159,6 +178,13 @@ pub enum InfrastructureSignal {
         server: ContentServer,
         author: AgentPubKey,
     },
+    /// HealthAttestation was recorded (peer observed another doorway)
+    HealthAttestationCommitted {
+        action_hash: String,
+        entry_hash: String,
+        attestation: HealthAttestation,
+        author: String,
+    },
 }
 
 // =============================================================================
@@ -212,6 +238,13 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 entry_hash,
                 server,
                 author,
+            })?;
+        } else if let Some(attestation) = record.entry().to_app_option::<HealthAttestation>().ok().flatten() {
+            emit_signal(InfrastructureSignal::HealthAttestationCommitted {
+                action_hash: action_hash.to_string(),
+                entry_hash: entry_hash.to_string(),
+                attestation,
+                author: author.to_string(),
             })?;
         }
     }
@@ -530,6 +563,103 @@ pub fn get_doorway_summaries(doorway_id: String) -> ExternResult<Vec<DoorwayHear
     }
 
     Ok(summaries)
+}
+
+// =============================================================================
+// Health Attestation Functions (Peer Observation)
+// =============================================================================
+
+/// Record a health attestation (peer observation of another doorway).
+///
+/// Only a registered doorway operator can attest about another doorway.
+/// The attestation is linked from the SUBJECT doorway for discovery.
+#[hdk_extern]
+pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternResult<ActionHash> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = now.as_micros();
+
+    // Verify attestor is a registered doorway operator
+    let attestor_doorway = get_doorway_by_id(input.attestor_doorway_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            format!("Attestor doorway '{}' not found", input.attestor_doorway_id)
+        )))?;
+
+    if attestor_doorway.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the doorway operator can record attestations".to_string()
+        )));
+    }
+
+    // Verify subject doorway exists
+    let subject_doorway = get_doorway_by_id(input.subject_doorway_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            format!("Subject doorway '{}' not found", input.subject_doorway_id)
+        )))?;
+
+    let attestation = HealthAttestation {
+        attestor_doorway_id: input.attestor_doorway_id,
+        operator_agent: agent_info.agent_initial_pubkey.to_string(),
+        subject_doorway_id: input.subject_doorway_id,
+        observed_status: input.observed_status,
+        response_time_ms: input.response_time_ms,
+        conductor_healthy: input.conductor_healthy,
+        timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::HealthAttestation(attestation))?;
+
+    // Link from SUBJECT doorway to attestation (for discovery: "who observed this doorway?")
+    create_link(
+        subject_doorway.action_hash,
+        action_hash.clone(),
+        LinkTypes::DoorwayToAttestation,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get all health attestations for a doorway (observations by peers).
+#[hdk_extern]
+pub fn get_doorway_attestations(doorway_id: String) -> ExternResult<Vec<HealthAttestationOutput>> {
+    let doorway = get_doorway_by_id(doorway_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            format!("Doorway '{}' not found", doorway_id)
+        )))?;
+
+    let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToAttestation)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut attestations = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(attestation) = record
+                    .entry()
+                    .to_app_option::<HealthAttestation>()
+                    .ok()
+                    .flatten()
+                {
+                    let entry_hash = record
+                        .action()
+                        .entry_hash()
+                        .map(|h| h.to_string())
+                        .unwrap_or_default();
+                    let author = record.action().author().to_string();
+
+                    attestations.push(HealthAttestationOutput {
+                        action_hash: action_hash.to_string(),
+                        entry_hash,
+                        attestation,
+                        author,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(attestations)
 }
 
 // =============================================================================
