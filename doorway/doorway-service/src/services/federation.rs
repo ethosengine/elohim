@@ -107,6 +107,16 @@ pub struct RecordHeartbeatInput {
     pub content_served: u64,
 }
 
+/// Input for recording a health attestation (matches infrastructure zome RecordHealthAttestationInput)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordHealthAttestationInput {
+    pub attestor_doorway_id: String,
+    pub subject_doorway_id: String,
+    pub observed_status: String,
+    pub response_time_ms: Option<u32>,
+    pub conductor_healthy: Option<bool>,
+}
+
 /// Input for finding content publishers (matches infrastructure zome FindPublishersInput)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FindPublishersInput {
@@ -268,6 +278,12 @@ pub fn spawn_heartbeat_task(
         );
 
         let mut content_served_total: u64 = 0;
+        let mut probe_counter: u32 = 0;
+        let probe_interval: u32 = 5; // Every 5th heartbeat (~5 minutes)
+        let http_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
 
         loop {
             tokio::time::sleep(interval).await;
@@ -326,6 +342,81 @@ pub fn spawn_heartbeat_task(
                         error = %e,
                         "Failed to record heartbeat (will retry next interval)"
                     );
+                }
+            }
+
+            // Peer health probing — every Nth heartbeat
+            probe_counter += 1;
+            if probe_counter >= probe_interval {
+                probe_counter = 0;
+
+                let cached_peers = get_cached_peers(&state.peer_cache).await;
+                for peer in &cached_peers {
+                    let probe_start = std::time::Instant::now();
+                    let health_url = format!("{}/health", peer.url.trim_end_matches('/'));
+
+                    let (observed_status, response_time_ms, conductor_healthy) =
+                        match http_client.get(&health_url).send().await {
+                            Ok(resp) => {
+                                let elapsed =
+                                    probe_start.elapsed().as_millis().min(u32::MAX as u128) as u32;
+                                if resp.status().is_success() {
+                                    let conductor_ok =
+                                        resp.json::<serde_json::Value>().await.ok().and_then(|v| {
+                                            v.get("conductor")?.get("connected")?.as_bool()
+                                        });
+                                    let status = if conductor_ok == Some(true) {
+                                        "online"
+                                    } else {
+                                        "degraded"
+                                    };
+                                    (status.to_string(), Some(elapsed), conductor_ok)
+                                } else {
+                                    ("degraded".to_string(), Some(elapsed), None)
+                                }
+                            }
+                            Err(_) => ("unreachable".to_string(), None, None),
+                        };
+
+                    let attestation_input = RecordHealthAttestationInput {
+                        attestor_doorway_id: config.doorway_id.clone(),
+                        subject_doorway_id: peer.id.clone(),
+                        observed_status: observed_status.clone(),
+                        response_time_ms,
+                        conductor_healthy,
+                    };
+
+                    match rmp_serde::to_vec(&attestation_input) {
+                        Ok(payload) => {
+                            match zome_caller
+                                .call_zome(
+                                    &config.infrastructure_role,
+                                    &config.zome_name,
+                                    "record_health_attestation",
+                                    payload,
+                                )
+                                .await
+                            {
+                                Ok(_) => {
+                                    debug!(
+                                        peer = %peer.id,
+                                        status = %observed_status,
+                                        "Health attestation recorded"
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        peer = %peer.id,
+                                        error = %e,
+                                        "Failed to record health attestation"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to serialize attestation input");
+                        }
+                    }
                 }
             }
         }
