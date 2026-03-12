@@ -67,7 +67,7 @@ pub use identity::{handle_did_document, handle_did_endpoint, handle_identity_api
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_check_blob, handle_seed_blob, BlobUploadResponse};
-pub use status::status_check;
+pub use status::{status_check, status_page};
 pub use storage_proxy::forward_to_storage;
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;

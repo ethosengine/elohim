@@ -631,7 +631,7 @@ async fn handle_request(
         (Method::GET, "/version") => to_boxed(routes::version_info()),
 
         // Comprehensive status (runtime stats, cluster health, storage diagnostics)
-        (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
+        (Method::GET, "/status") => to_boxed(routes::status_page(Arc::clone(&state)).await),
         (Method::GET, "/status.json") => to_boxed(routes::status_check(Arc::clone(&state)).await),
 
         // Debug stream WebSocket for real-time debugging

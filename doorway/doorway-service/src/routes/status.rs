@@ -3,6 +3,7 @@
 //! Provides runtime status information including active connections,
 //! cluster health, and orchestration metrics.
 
+use askama::Template;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::{Response, StatusCode};
@@ -194,8 +195,68 @@ pub struct StatusResponse {
     pub diagnostics: Diagnostics,
 }
 
-/// Handle status request
-pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+// =============================================================================
+// Askama HTML Template Types
+// =============================================================================
+
+/// A single component row in the status page
+pub struct ComponentView {
+    pub name: String,
+    pub dot_color: String,
+    pub detail: String,
+}
+
+/// A single federation peer card
+pub struct PeerView {
+    pub doorway_id: String,
+    pub dot_color: String,
+    pub peers_agree: String,
+    pub consensus_status: String,
+    pub self_reported_status: Option<String>,
+    pub response_time_ms: Option<u32>,
+}
+
+/// Shefa compute contribution (placeholder for future)
+#[allow(dead_code)]
+pub struct ShefaView {
+    pub cpu_hours: String,
+    pub storage: String,
+    pub bandwidth: String,
+    pub tokens_earned: String,
+    pub steward_tier: String,
+    pub trust_score: String,
+}
+
+/// Askama template for the /status HTML page
+#[derive(Template)]
+#[template(path = "status.html")]
+pub struct StatusPageTemplate {
+    pub doorway_id: String,
+    pub status_label: String,
+    pub self_tier: Option<String>,
+    pub uptime_7d: Option<String>,
+    pub version: String,
+    pub node_id: String,
+    pub uptime_segments: Vec<String>,
+    pub peer_count: usize,
+    pub cache_hit_rate: String,
+    pub available_hosts: usize,
+    pub region: String,
+    pub components: Vec<ComponentView>,
+    pub federation_enabled: bool,
+    pub peers: Vec<PeerView>,
+    pub shefa: Option<ShefaView>,
+    pub is_operator: bool,
+    pub attestation_log: Vec<String>,
+}
+
+// =============================================================================
+// Shared Data Gathering
+// =============================================================================
+
+/// Build the StatusResponse from the current AppState.
+/// Shared by both the JSON endpoint and the HTML page handler.
+async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
     let available_hosts = state.router.available_count().await;
     let mut recommendations = Vec::new();
 
@@ -422,7 +483,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         recommendations,
     };
 
-    let status = StatusResponse {
+    StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
         node_id: state.args.node_id.to_string(),
@@ -437,7 +498,16 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         orchestrator,
         federation,
         diagnostics,
-    };
+    }
+}
+
+// =============================================================================
+// JSON Handler
+// =============================================================================
+
+/// Handle status request — returns JSON
+pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let status = build_status_data(&state).await;
 
     match serde_json::to_string_pretty(&status) {
         Ok(body) => Response::builder()
@@ -453,6 +523,151 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         Err(_) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(Full::new(Bytes::from("Failed to serialize status")))
+            .unwrap(),
+    }
+}
+
+// =============================================================================
+// HTML Page Handler
+// =============================================================================
+
+/// Handle status page request — returns server-rendered HTML via Askama
+pub async fn status_page(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let data = build_status_data(&state).await;
+
+    // Determine overall status label
+    let status_label = if data.diagnostics.status.starts_with("healthy") {
+        "Operational".to_string()
+    } else if data.diagnostics.status.contains("degraded") {
+        "Degraded".to_string()
+    } else {
+        "Offline".to_string()
+    };
+
+    // Build component list
+    let mut components = Vec::new();
+
+    // Gateway (always present)
+    components.push(ComponentView {
+        name: "Gateway".to_string(),
+        dot_color: "green".to_string(),
+        detail: format!("{} hosts available", data.available_hosts),
+    });
+
+    // Conductor Pool
+    components.push(ComponentView {
+        name: "Conductor Pool".to_string(),
+        dot_color: if data.conductor.connected {
+            "green".to_string()
+        } else {
+            "red".to_string()
+        },
+        detail: format!(
+            "{}/{} workers",
+            data.conductor.connected_workers, data.conductor.total_workers
+        ),
+    });
+
+    // Projection Cache
+    components.push(ComponentView {
+        name: "Projection Cache".to_string(),
+        dot_color: "green".to_string(),
+        detail: format!(
+            "{} entries, {:.0}% hit rate",
+            data.cache.entries, data.cache.hit_rate
+        ),
+    });
+
+    // Storage
+    components.push(ComponentView {
+        name: "Storage".to_string(),
+        dot_color: if data.storage.reachable {
+            "green".to_string()
+        } else if data.storage.configured {
+            "red".to_string()
+        } else {
+            "gray".to_string()
+        },
+        detail: if data.storage.reachable {
+            "Connected".to_string()
+        } else if let Some(ref err) = data.storage.error {
+            err.clone()
+        } else {
+            "Not configured".to_string()
+        },
+    });
+
+    // Build peer view list
+    let peers: Vec<PeerView> = data
+        .federation
+        .peers
+        .iter()
+        .map(|p| {
+            let dot_color = match p.consensus_status.as_str() {
+                "healthy" => "green",
+                "degraded" => "yellow",
+                "unhealthy" | "offline" => "red",
+                _ => "gray",
+            };
+            // Find the first attestation with a response time
+            let response_time_ms = p.peer_attestations.iter().find_map(|a| a.response_time_ms);
+
+            PeerView {
+                doorway_id: p.doorway_id.clone(),
+                dot_color: dot_color.to_string(),
+                peers_agree: p.peers_agree.clone(),
+                consensus_status: p.consensus_status.clone(),
+                self_reported_status: p.self_reported_status.clone(),
+                response_time_ms,
+            }
+        })
+        .collect();
+
+    // 168 hourly segments, all "nodata" for now (placeholder)
+    let uptime_segments: Vec<String> = vec!["nodata".to_string(); 168];
+
+    let doorway_id = data
+        .federation
+        .self_id
+        .clone()
+        .unwrap_or_else(|| data.node_id.clone());
+
+    let template = StatusPageTemplate {
+        doorway_id,
+        status_label,
+        self_tier: data.federation.self_tier.clone(),
+        uptime_7d: data.federation.self_uptime_7d.map(|u| format!("{:.1}", u)),
+        version: data.version.to_string(),
+        node_id: data.node_id.clone(),
+        uptime_segments,
+        peer_count: data.federation.peer_count,
+        cache_hit_rate: format!("{:.0}", data.cache.hit_rate),
+        available_hosts: data.available_hosts,
+        region: data.orchestrator.region.clone(),
+        components,
+        federation_enabled: data.federation.enabled,
+        peers,
+        shefa: None,
+        is_operator: false,
+        attestation_log: vec![],
+    };
+
+    match template.render() {
+        Ok(html) => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "text/html; charset=utf-8")
+            .body(Full::new(Bytes::from(html)))
+            .unwrap_or_else(|_| {
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Full::new(Bytes::from("Failed to build response")))
+                    .unwrap()
+            }),
+        Err(e) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Full::new(Bytes::from(format!(
+                "Template render error: {e}"
+            ))))
             .unwrap(),
     }
 }

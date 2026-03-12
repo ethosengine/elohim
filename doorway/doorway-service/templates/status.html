@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ doorway_id }} - Doorway Status</title>
+  <style>
+    :root {
+      --bg: #0a0a0b; --surface: #141416; --border: #23232a;
+      --text: #e4e4e7; --text-muted: #71717a;
+      --green: #22c55e; --yellow: #eab308; --red: #ef4444; --blue: #3b82f6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; line-height: 1.6; }
+    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1rem; }
+
+    /* Header */
+    .header { margin-bottom: 2rem; }
+    .header h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .header .meta { color: var(--text-muted); font-size: 0.8rem; }
+    .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; vertical-align: middle; }
+    .badge-operational { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-degraded { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .badge-offline { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    /* Uptime bar */
+    .uptime-section { margin-bottom: 2rem; }
+    .uptime-section h2 { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .uptime-bar { display: flex; gap: 1px; height: 32px; border-radius: 4px; overflow: hidden; }
+    .uptime-seg { flex: 1; min-width: 1px; }
+    .seg-up { background: var(--green); }
+    .seg-degraded { background: var(--yellow); }
+    .seg-down { background: var(--red); }
+    .seg-nodata { background: var(--border); }
+    .uptime-legend { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-muted); }
+    .uptime-legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+    .legend-up::before { background: var(--green); }
+    .legend-degraded::before { background: var(--yellow); }
+    .legend-down::before { background: var(--red); }
+    .legend-nodata::before { background: var(--border); }
+
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; }
+    .stat-card .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.1rem; font-weight: 600; margin-top: 0.15rem; }
+
+    /* Sections */
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+
+    /* Component list */
+    .component { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .component:last-child { border-bottom: none; }
+    .component .name { font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
+    .component .detail { font-size: 0.75rem; color: var(--text-muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot-green { background: var(--green); }
+    .dot-yellow { background: var(--yellow); }
+    .dot-red { background: var(--red); }
+    .dot-gray { background: var(--text-muted); }
+
+    /* Peer cards */
+    .peer-grid { display: grid; gap: 0.75rem; }
+    .peer-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; }
+    .peer-card .peer-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .peer-card .peer-id { font-size: 0.85rem; font-weight: 600; }
+    .peer-card .peer-details { font-size: 0.75rem; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+    /* Shefa section */
+    .shefa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; }
+
+    /* Operator section */
+    .operator-section { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-top: 1rem; background: var(--surface); }
+    .operator-section h3 { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .log-entry { font-size: 0.75rem; color: var(--text-muted); padding: 0.25rem 0; border-bottom: 1px solid var(--border); font-family: monospace; }
+    .log-entry:last-child { border-bottom: none; }
+
+    /* Footer */
+    .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+    .footer a { color: var(--blue); text-decoration: none; }
+
+    .empty { font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>
+        {{ doorway_id }}
+        {% if status_label == "Operational" %}
+        <span class="badge badge-operational">Operational</span>
+        {% else if status_label == "Degraded" %}
+        <span class="badge badge-degraded">Degraded</span>
+        {% else %}
+        <span class="badge badge-offline">Offline</span>
+        {% endif %}
+      </h1>
+      <div class="meta">
+        {% if let Some(tier) = self_tier %}Tier: {{ tier }} &middot; {% endif %}
+        {% if let Some(uptime) = uptime_7d %}Uptime (7d): {{ uptime }}% &middot; {% endif %}
+        Version {{ version }} &middot; {{ node_id }}
+      </div>
+    </div>
+
+    <!-- Uptime Bar -->
+    <div class="uptime-section">
+      <h2>7-Day Uptime</h2>
+      <div class="uptime-bar">
+        {% for seg in uptime_segments %}
+        <div class="uptime-seg seg-{{ seg }}"></div>
+        {% endfor %}
+      </div>
+      <div class="uptime-legend">
+        <span class="legend-up">Up</span>
+        <span class="legend-degraded">Degraded</span>
+        <span class="legend-down">Down</span>
+        <span class="legend-nodata">No data</span>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Peers</div>
+        <div class="value">{{ peer_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Cache Hit Rate</div>
+        <div class="value">{{ cache_hit_rate }}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Hosts</div>
+        <div class="value">{{ available_hosts }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Region</div>
+        <div class="value">{{ region }}</div>
+      </div>
+    </div>
+
+    <!-- Components -->
+    <div class="section">
+      <h2>Components</h2>
+      {% for comp in components %}
+      <div class="component">
+        <div class="name">
+          <span class="dot dot-{{ comp.dot_color }}"></span>
+          {{ comp.name }}
+        </div>
+        <div class="detail">{{ comp.detail }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Federation Peers -->
+    {% if federation_enabled %}
+    <div class="section">
+      <h2>Federation Peers</h2>
+      {% if peers.is_empty() %}
+      <div class="empty">No peers connected yet.</div>
+      {% else %}
+      <div class="peer-grid">
+        {% for peer in peers %}
+        <div class="peer-card">
+          <div class="peer-header">
+            <span class="dot dot-{{ peer.dot_color }}"></span>
+            <span class="peer-id">{{ peer.doorway_id }}</span>
+          </div>
+          <div class="peer-details">
+            <span>Peers Agree: {{ peer.peers_agree }}</span>
+            <span>Consensus: {{ peer.consensus_status }}</span>
+            {% if let Some(status) = peer.self_reported_status %}
+            <span>Self-Reported: {{ status }}</span>
+            {% endif %}
+            {% if let Some(ms) = peer.response_time_ms %}
+            <span>Response: {{ ms }}ms</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Shefa (Compute Contribution) -->
+    {% if let Some(shefa) = shefa %}
+    <div class="section">
+      <h2>Compute Contribution (Shefa)</h2>
+      <div class="shefa-grid">
+        <div class="stat-card">
+          <div class="label">CPU Hours</div>
+          <div class="value">{{ shefa.cpu_hours }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Storage</div>
+          <div class="value">{{ shefa.storage }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Bandwidth</div>
+          <div class="value">{{ shefa.bandwidth }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Tokens Earned</div>
+          <div class="value">{{ shefa.tokens_earned }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Steward Tier</div>
+          <div class="value">{{ shefa.steward_tier }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Trust Score</div>
+          <div class="value">{{ shefa.trust_score }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Operator Section (auth-gated) -->
+    {% if is_operator %}
+    <div class="operator-section">
+      <h3>Operator Details</h3>
+      {% if attestation_log.is_empty() %}
+      <div class="empty">No attestation log entries.</div>
+      {% else %}
+      {% for entry in attestation_log %}
+      <div class="log-entry">{{ entry }}</div>
+      {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Doorway v{{ version }}</span>
+      <a href="/status.json">JSON</a>
+    </div>
+  </div>
+</body>
+</html>
