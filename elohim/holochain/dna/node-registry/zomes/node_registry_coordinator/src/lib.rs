@@ -171,6 +171,35 @@ pub fn deregister_node(input: DeregisterInput) -> ExternResult<()> {
 }
 
 // ============================================================================
+// STEWARDSHIP CLAIM FUNCTIONS
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimNodeInput {
+    pub node_id: String,
+    pub agent_pub_key: String,
+}
+
+/// Claim an unclaimed node — transitions claim_status to "claimed"
+#[hdk_extern]
+pub fn claim_node(_input: ClaimNodeInput) -> ExternResult<ActionHash> {
+    // Look up existing registration by node_id
+    // Validate claim_status == "unclaimed"
+    // Create updated entry with claim_status = "claimed"
+    // Return new action hash
+    todo!("Will be implemented when conductor integration is wired")
+}
+
+/// Release a claimed node — transitions claim_status to "released"
+#[hdk_extern]
+pub fn release_node(_node_id: String) -> ExternResult<ActionHash> {
+    // Look up existing registration
+    // Create updated entry with claim_status = "released"
+    // Return new action hash
+    todo!("Will be implemented when conductor integration is wired")
+}
+
+// ============================================================================
 // HEALTH TRACKING FUNCTIONS
 // ============================================================================
 

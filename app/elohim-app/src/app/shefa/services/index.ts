@@ -41,3 +41,6 @@ export { FlowPlanningApiService } from './flow-planning-api.service';
 
 // Resilience API (P2P data protection profile)
 export { ResilienceApiService } from './resilience-api.service';
+
+// Node topology API (stewarded node CRUD + availability aggregation)
+export { NodeTopologyApiService } from './node-topology-api.service';

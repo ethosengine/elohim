@@ -88,6 +88,10 @@ pub struct NodeRegistration {
     pub registered_at: String,        // When node first registered
     pub updated_at: String,           // Last update to registration
 
+    // === STEWARDSHIP CLAIM ===
+    pub claim_status: String,         // "unclaimed", "claimed", "released"
+    pub context_epr_id: Option<String>, // EPR reference to natural language context
+
     // === PROOF (PREVENTS SPOOFING) ===
     pub signature: String,            // Self-signed with agent key (hex-encoded)
 }

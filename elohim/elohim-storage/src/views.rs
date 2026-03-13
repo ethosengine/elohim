@@ -88,9 +88,10 @@ use crate::db::models::{
     AccessGrant, AgreementRow, App, Challenge, Chapter, ChapterWithSteps, Content,
     ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human,
-    HumanRelationship, LocalSession, Path, PathAttestation, PathWithDetails, PathWithSteps,
-    Precedent, PremiumGate, Proposal, ReaCommitment, Relationship, RelationshipWithContent, Step,
-    StewardCredential, StewardshipAllocation, StewardshipAllocationWithPresence,
+    HumanRelationship, LocalSession, NodeStewardship, Path, PathAttestation, PathWithDetails,
+    PathWithSteps, Precedent, PremiumGate, Proposal, ReaCommitment, Relationship,
+    RelationshipWithContent, Step, StewardCredential, StewardedNode, StewardshipAllocation,
+    StewardshipAllocationWithPresence,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -3864,6 +3865,159 @@ impl From<CreateAgreementInputView> for crate::db::agreements::CreateAgreementIn
             name: v.name,
             note: v.note,
             metadata_json: serialize_json_opt(&v.metadata),
+        }
+    }
+}
+
+// ============================================================================
+// Stewarded Node Views
+// ============================================================================
+
+/// API output for a stewarded node, with stewards joined in.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardedNodeView {
+    pub id: String,
+    pub display_name: String,
+    pub claim_status: String,
+    pub cpu_cores: i32,
+    pub memory_gb: i32,
+    pub storage_tb: f64,
+    pub bandwidth_mbps: i32,
+    pub steward_tier: String,
+    pub custodian_opt_in: bool,
+    pub region: Option<String>,
+    pub context_epr_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub stewards: Vec<NodeStewardshipView>,
+}
+
+impl From<StewardedNode> for StewardedNodeView {
+    fn from(n: StewardedNode) -> Self {
+        Self {
+            id: n.id,
+            display_name: n.display_name,
+            claim_status: n.claim_status,
+            cpu_cores: n.cpu_cores,
+            memory_gb: n.memory_gb,
+            storage_tb: n.storage_tb,
+            bandwidth_mbps: n.bandwidth_mbps,
+            steward_tier: n.steward_tier,
+            custodian_opt_in: n.custodian_opt_in == 1,
+            region: n.region,
+            context_epr_id: n.context_epr_id,
+            created_at: n.created_at,
+            updated_at: n.updated_at,
+            stewards: vec![],
+        }
+    }
+}
+
+/// API output for a single node–human stewardship record.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeStewardshipView {
+    pub human_id: String,
+    pub display_name: String,
+    pub affinity_score: f64,
+    pub relationship: String,
+    pub context_epr_id: Option<String>,
+    pub granted_at: String,
+}
+
+impl NodeStewardshipView {
+    /// Build from DB model + joined display name from humans table.
+    pub fn from_with_name(s: NodeStewardship, display_name: String) -> Self {
+        Self {
+            human_id: s.human_id,
+            display_name,
+            affinity_score: s.affinity_score,
+            relationship: s.relationship,
+            context_epr_id: s.context_epr_id,
+            granted_at: s.granted_at,
+        }
+    }
+}
+
+fn default_claim_status() -> String {
+    "unclaimed".to_string()
+}
+
+fn default_steward_tier() -> String {
+    "caretaker".to_string()
+}
+
+fn default_relationship() -> String {
+    "primary".to_string()
+}
+
+/// API input for registering a new stewarded node.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateStewardedNodeInputView {
+    pub id: String,
+    pub display_name: String,
+    #[serde(default = "default_claim_status")]
+    pub claim_status: String,
+    pub cpu_cores: i32,
+    pub memory_gb: i32,
+    pub storage_tb: f64,
+    pub bandwidth_mbps: i32,
+    #[serde(default = "default_steward_tier")]
+    pub steward_tier: String,
+    #[serde(default = "default_true")]
+    pub custodian_opt_in: bool,
+    pub region: Option<String>,
+    pub context_epr_id: Option<String>,
+}
+
+impl From<CreateStewardedNodeInputView> for crate::db::stewarded_nodes::CreateStewardedNodeInput {
+    fn from(v: CreateStewardedNodeInputView) -> Self {
+        Self {
+            id: v.id,
+            display_name: v.display_name,
+            claim_status: v.claim_status,
+            cpu_cores: v.cpu_cores,
+            memory_gb: v.memory_gb,
+            storage_tb: v.storage_tb,
+            bandwidth_mbps: v.bandwidth_mbps,
+            steward_tier: v.steward_tier,
+            custodian_opt_in: if v.custodian_opt_in { 1 } else { 0 },
+            region: v.region,
+            context_epr_id: v.context_epr_id,
+            dht_anchor_hash: None,
+            app_id: String::new(), // set by handler from AppContext
+        }
+    }
+}
+
+/// API input for adding a stewardship relationship to a node.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateNodeStewardshipInputView {
+    pub node_id: String,
+    pub human_id: String,
+    pub affinity_score: f64,
+    #[serde(default = "default_relationship")]
+    pub relationship: String,
+    pub context_epr_id: Option<String>,
+}
+
+impl From<CreateNodeStewardshipInputView>
+    for crate::db::stewarded_nodes::CreateNodeStewardshipInput
+{
+    fn from(v: CreateNodeStewardshipInputView) -> Self {
+        Self {
+            node_id: v.node_id,
+            human_id: v.human_id,
+            affinity_score: v.affinity_score,
+            relationship: v.relationship,
+            context_epr_id: v.context_epr_id,
         }
     }
 }

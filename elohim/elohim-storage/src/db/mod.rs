@@ -63,6 +63,9 @@ pub mod steward_operations;
 // Custodian node metrics
 pub mod custodian_metrics;
 
+// Stewarded node topology (node registry + node-human stewardship)
+pub mod stewarded_nodes;
+
 // Policy cache for stewardship enforcement
 pub mod policy_cache;
 

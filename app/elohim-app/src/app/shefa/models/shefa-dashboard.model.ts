@@ -557,8 +557,8 @@ export interface ConstitutionalAlert {
  * - Overall cluster health
  */
 export interface NodeTopologyState {
-  // All nodes the user owns/manages
-  nodes: OwnedNode[];
+  // All nodes the user stewards
+  nodes: StewardedNode[];
 
   // Summary stats
   totalNodes: number;
@@ -584,47 +584,74 @@ export interface NodeTopologyState {
 }
 
 /**
- * OwnedNode - A single node in user's cluster
+ * StewardedNode — a physical node in the user's cluster.
+ * Wire type matches StewardedNodeView from storage-client-ts.
+ * Raw capacity fields — no affinity labels. Intelligence infers role from specs.
  */
-export interface OwnedNode {
-  // Identity
-  nodeId: string;
-  displayName: string; // User-friendly name, e.g., "Living Room Holoport"
-  nodeType: 'holoport' | 'holoport-plus' | 'holoport-nano' | 'self-hosted' | 'cloud';
+export interface StewardedNode {
+  id: string;
+  displayName: string;
+  claimStatus: 'unclaimed' | 'claimed' | 'released';
+  cpuCores: number;
+  memoryGb: number;
+  storageTb: number;
+  bandwidthMbps: number;
+  stewardTier: string;
+  custodianOptIn: boolean;
+  region?: string;
+  contextEprId?: string;
+  createdAt: string;
+  updatedAt: string;
+  stewards: NodeStewardshipSummary[];
+}
 
-  // Status
-  status: NodeClusterStatus;
-  lastHeartbeat: string; // ISO 8601
-  consecutiveUptime: string; // Human-readable, e.g., "14 days"
+/**
+ * NodeStewardshipSummary — a human's relationship to a node.
+ */
+export interface NodeStewardshipSummary {
+  humanId: string;
+  displayName: string;
+  affinityScore: number;
+  relationship: 'primary' | 'household' | 'community';
+  contextEprId?: string;
+  grantedAt: string;
+}
 
-  // Location
-  location?: {
-    label: string; // "Home Office", "Basement Rack"
-    region: string; // Geographic region
-    country: string;
+/**
+ * Aggregated availability across all stewarded nodes.
+ * Three numbers per resource: total capacity, committed, available to share.
+ */
+export interface NodeAvailability {
+  cpu: ResourceAvailability;
+  memory: ResourceAvailability;
+  storage: ResourceAvailability;
+  bandwidth: ResourceAvailability;
+}
+
+export interface ResourceAvailability {
+  total: number;
+  committed: number;
+  available: number;
+  unit: string;
+}
+
+/**
+ * Calculate aggregate availability from stewarded nodes.
+ */
+export function calculateNodeAvailability(nodes: StewardedNode[]): NodeAvailability {
+  const claimedNodes = nodes.filter(n => n.claimStatus === 'claimed');
+
+  const totalCpu = claimedNodes.reduce((sum, n) => sum + n.cpuCores, 0);
+  const totalMemory = claimedNodes.reduce((sum, n) => sum + n.memoryGb, 0);
+  const totalStorage = claimedNodes.reduce((sum, n) => sum + n.storageTb, 0);
+  const totalBandwidth = claimedNodes.reduce((sum, n) => sum + n.bandwidthMbps, 0);
+
+  return {
+    cpu: { total: totalCpu, committed: 0, available: totalCpu, unit: 'cores' },
+    memory: { total: totalMemory, committed: 0, available: totalMemory, unit: 'GB' },
+    storage: { total: totalStorage, committed: 0, available: totalStorage, unit: 'TB' },
+    bandwidth: { total: totalBandwidth, committed: 0, available: totalBandwidth, unit: 'Mbps' },
   };
-
-  // What this node is doing
-  roles: NodeRole[];
-
-  // Resource summary
-  resources: {
-    cpuPercent: number; // Current usage
-    memoryPercent: number;
-    storageUsedGB: number;
-    storageTotalGB: number;
-    bandwidthMbps: number;
-  };
-
-  // Custodian activity on this node
-  custodianActivity: {
-    contentItemsCustodied: number; // Content I'm storing for others
-    contentItemsBeingCustodied: number; // My content others store on this node's behalf
-    totalCustodiedGB: number;
-  };
-
-  // Is this the primary family node?
-  isPrimary: boolean;
 }
 
 /**
@@ -901,20 +928,6 @@ export interface NodeRecommendation {
 // =============================================================================
 
 /**
- * Get display info for node type.
- */
-export function getNodeTypeDisplay(type: OwnedNode['nodeType']): { label: string; icon: string } {
-  const displays: Record<OwnedNode['nodeType'], { label: string; icon: string }> = {
-    holoport: { label: 'HoloPort', icon: 'dns' },
-    'holoport-plus': { label: 'HoloPort+', icon: 'hub' },
-    'holoport-nano': { label: 'HoloPort Nano', icon: 'memory' },
-    'self-hosted': { label: 'Self-Hosted', icon: 'home' },
-    cloud: { label: 'Cloud', icon: 'cloud' },
-  };
-  return displays[type] ?? { label: type, icon: 'computer' };
-}
-
-/**
  * Get display info for node status.
  */
 export function getNodeStatusDisplay(status: NodeClusterStatus): {
@@ -952,29 +965,20 @@ export function getGapSeverityDisplay(severity: ComputeGap['severity'] | 'low' |
 }
 
 /**
- * Calculate health score from node statuses.
+ * Calculate health score from stewarded node claim statuses.
+ * Claimed nodes contribute full weight; unclaimed/released contribute none.
  */
-export function calculateHealthScore(nodes: OwnedNode[]): number {
+export function calculateHealthScore(nodes: StewardedNode[]): number {
   if (nodes.length === 0) return 0;
 
-  const statusScores: Record<NodeClusterStatus, number> = {
-    online: 100,
-    provisioning: 80,
-    maintenance: 70,
-    degraded: 50,
-    offline: 0,
-    unknown: 25,
+  const claimScores: Record<StewardedNode['claimStatus'], number> = {
+    claimed: 100,
+    unclaimed: 25,
+    released: 0,
   };
 
-  const totalScore = nodes.reduce((sum, node) => {
-    const baseScore = statusScores[node.status];
-    // Primary node has more weight
-    const weight = node.isPrimary ? 2 : 1;
-    return sum + baseScore * weight;
-  }, 0);
-
-  const totalWeight = nodes.reduce((sum, node) => sum + (node.isPrimary ? 2 : 1), 0);
-  return Math.round(totalScore / totalWeight);
+  const totalScore = nodes.reduce((sum, node) => sum + claimScores[node.claimStatus], 0);
+  return Math.round(totalScore / nodes.length);
 }
 
 /**

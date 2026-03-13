@@ -564,9 +564,42 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    stewarded_nodes (id) {
+        id -> Text,
+        display_name -> Text,
+        claim_status -> Text,
+        cpu_cores -> Integer,
+        memory_gb -> Integer,
+        storage_tb -> Double,
+        bandwidth_mbps -> Integer,
+        steward_tier -> Text,
+        custodian_opt_in -> Integer,
+        region -> Nullable<Text>,
+        context_epr_id -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        app_id -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    node_stewardship (node_id, human_id) {
+        node_id -> Text,
+        human_id -> Text,
+        affinity_score -> Double,
+        relationship -> Text,
+        context_epr_id -> Nullable<Text>,
+        granted_at -> Text,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
+diesel::joinable!(node_stewardship -> stewarded_nodes (node_id));
+diesel::joinable!(node_stewardship -> humans (human_id));
 diesel::joinable!(path_attestations -> paths (path_id));
 diesel::joinable!(path_tags -> paths (path_id));
 diesel::joinable!(steps -> chapters (chapter_id));
@@ -594,6 +627,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     human_relationships,
     humans,
     local_sessions,
+    node_stewardship,
     path_attestations,
     path_tags,
     paths,
@@ -604,6 +638,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     relationships,
     schema_version,
     steward_credentials,
+    stewarded_nodes,
     stewardship_allocations,
     steps,
 );
