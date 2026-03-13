@@ -190,7 +190,7 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
-                            pnpm test -- --ci --coverage
+                            pnpm exec jest --ci --coverage
                         '''
                     }
                 }
