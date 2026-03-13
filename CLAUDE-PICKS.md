@@ -70,12 +70,14 @@ The qahal pillar has a complete model layer with constitutional challenges, SLA-
 
 ---
 
-## 7. Steward Economy Services (14-37% Coverage)
+## 7. Steward Economy Services
 
-Three steward economy services (`stewardship-allocation.service.ts` at 14.8%, `steward.service.ts` at 23.4%, `contributor.service.ts` at 37.7%) have elaborate type signatures and method stubs but almost no implementation. REA economics, stewardship tracking, request/offer matching. M5-M6.
+Recognition pipeline service built in Rust (`elohim-storage/src/services/recognition_pipeline_service.rs`) with 5 composable stages: normalize (event type weights) → resolve (steward allocations + affinity) → weight (proportional with affinity coefficient) → limit (constitutional checks, v0 passthrough) → settle (economic events + recognition accumulation). Exposed via `POST /api/v1/recognition/distribute`. Angular thin client in elohim pillar.
 
-**Impact**: High for M5-M6, not relevant to M1-M3.
-**Effort**: Very large. Complex models (REA economics).
+**Remaining**: v0 affinity defaults to 1.0 — wire stored_affinity from node_stewardship and derived_affinity from human profiles. Constitutional limit enforcement (stage 4). Future distribution models documented in `genesis/research/economic/future-distribution-models.md`.
+
+**Impact**: High for M5-M6.
+**Effort**: Medium remaining. REA coordination layer wired; deeper economics is research.
 
 ---
 

@@ -6386,6 +6386,15 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/recognition — Recognition distribution pipeline
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/recognition/distribute")
+                .handler("distribute_recognition")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/resources — REA resource management
         // =====================================================================
         .route(

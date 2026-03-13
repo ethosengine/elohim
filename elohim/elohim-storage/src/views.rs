@@ -4023,6 +4023,93 @@ impl From<CreateNodeStewardshipInputView>
 }
 
 // ============================================================================
+// Recognition Pipeline Views
+// ============================================================================
+
+/// API input for triggering recognition distribution
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecognitionTriggerInputView {
+    pub content_id: String,
+    pub event_type: String,
+    pub raw_amount: f64,
+    #[serde(default)]
+    pub triggered_by: Option<String>,
+}
+
+impl From<RecognitionTriggerInputView> for crate::services::recognition_pipeline_service::RecognitionTrigger {
+    fn from(v: RecognitionTriggerInputView) -> Self {
+        Self {
+            content_id: v.content_id,
+            event_type: v.event_type,
+            raw_amount: v.raw_amount,
+            triggered_by: v.triggered_by,
+        }
+    }
+}
+
+/// Per-steward trace in the distribution result
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StageTraceView {
+    pub steward_presence_id: String,
+    pub allocation_ratio: f32,
+    pub stored_affinity: f64,
+    pub derived_affinity: f64,
+    pub effective_ratio: f64,
+    pub pre_limit_share: f64,
+    pub final_share: f64,
+    pub limit_reasons: Vec<JsonVal>,
+    pub economic_event_id: String,
+}
+
+impl From<crate::services::recognition_pipeline_service::StageTrace> for StageTraceView {
+    fn from(t: crate::services::recognition_pipeline_service::StageTrace) -> Self {
+        Self {
+            steward_presence_id: t.steward_presence_id,
+            allocation_ratio: t.allocation_ratio,
+            stored_affinity: t.stored_affinity,
+            derived_affinity: t.derived_affinity,
+            effective_ratio: t.effective_ratio,
+            pre_limit_share: t.pre_limit_share,
+            final_share: t.final_share,
+            limit_reasons: t.limit_reasons.iter().map(|r| JsonVal(serde_json::to_value(r).unwrap_or_default())).collect(),
+            economic_event_id: t.economic_event_id.unwrap_or_default(),
+        }
+    }
+}
+
+/// Full pipeline result
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecognitionDistributionResultView {
+    pub content_id: String,
+    pub trigger_event_type: String,
+    pub raw_amount: f64,
+    pub weighted_amount: f64,
+    pub distributions: Vec<StageTraceView>,
+    pub economic_event_ids: Vec<String>,
+    pub limits_applied: Vec<JsonVal>,
+}
+
+impl From<crate::services::recognition_pipeline_service::RecognitionDistributionResult> for RecognitionDistributionResultView {
+    fn from(r: crate::services::recognition_pipeline_service::RecognitionDistributionResult) -> Self {
+        Self {
+            content_id: r.content_id,
+            trigger_event_type: r.trigger_event_type,
+            raw_amount: r.raw_amount,
+            weighted_amount: r.weighted_amount,
+            distributions: r.distributions.into_iter().map(StageTraceView::from).collect(),
+            economic_event_ids: r.economic_event_ids,
+            limits_applied: r.limits_applied.iter().map(|l| JsonVal(serde_json::to_value(l).unwrap_or_default())).collect(),
+        }
+    }
+}
+
+// ============================================================================
 // Schema Version Tests
 // ============================================================================
 
@@ -4162,5 +4249,14 @@ mod schema_version_tests {
     #[test]
     fn supported_versions_includes_default() {
         assert!(super::SUPPORTED_SCHEMA_VERSIONS.contains(&super::default_schema_version()));
+    }
+
+    #[test]
+    fn recognition_trigger_input_deserializes_camel_case() {
+        let json = r#"{"contentId":"c-1","eventType":"mastery_completion","rawAmount":10.0}"#;
+        let view: super::RecognitionTriggerInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.content_id, "c-1");
+        assert_eq!(view.event_type, "mastery_completion");
+        assert!((view.raw_amount - 10.0).abs() < 1e-6);
     }
 }
