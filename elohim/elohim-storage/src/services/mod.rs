@@ -47,12 +47,12 @@ pub use resource_service::ResourceService;
 pub use response::*;
 pub use stewardship_service::StewardshipService;
 
-use crate::db::ContentDb;
+use crate::db::{context::AppContext, DbPool};
 use std::sync::Arc;
 
 /// Service container for dependency injection
 ///
-/// Holds all services with shared database connection.
+/// Holds all services with shared database connection pool.
 /// Pass this to HttpServer for handler access.
 pub struct Services {
     pub content: Arc<ContentService>,
@@ -63,28 +63,30 @@ pub struct Services {
 }
 
 impl Services {
-    /// Create all services with shared database
-    pub fn new(content_db: Arc<ContentDb>) -> Self {
+    /// Create all services with shared database pool
+    pub fn new(pool: DbPool) -> Self {
         let events = Arc::new(EventBus::new());
+        let ctx = AppContext::default_lamad();
 
         Self {
-            content: Arc::new(ContentService::new(content_db.clone(), events.clone())),
-            path: Arc::new(PathService::new(content_db.clone(), events.clone())),
-            relationship: Arc::new(RelationshipService::new(content_db.clone(), events.clone())),
-            knowledge: Arc::new(KnowledgeService::new(content_db.clone(), events.clone())),
+            content: Arc::new(ContentService::new(pool.clone(), ctx.clone(), events.clone())),
+            path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
+            relationship: Arc::new(RelationshipService::new(pool.clone(), ctx.clone(), events.clone())),
+            knowledge: Arc::new(KnowledgeService::new(pool.clone(), ctx.clone(), events.clone())),
             events,
         }
     }
 
     /// Create services without event bus (for testing)
-    pub fn new_without_events(content_db: Arc<ContentDb>) -> Self {
+    pub fn new_without_events(pool: DbPool) -> Self {
         let events = Arc::new(EventBus::new());
+        let ctx = AppContext::default_lamad();
 
         Self {
-            content: Arc::new(ContentService::new(content_db.clone(), events.clone())),
-            path: Arc::new(PathService::new(content_db.clone(), events.clone())),
-            relationship: Arc::new(RelationshipService::new(content_db.clone(), events.clone())),
-            knowledge: Arc::new(KnowledgeService::new(content_db.clone(), events.clone())),
+            content: Arc::new(ContentService::new(pool.clone(), ctx.clone(), events.clone())),
+            path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
+            relationship: Arc::new(RelationshipService::new(pool.clone(), ctx.clone(), events.clone())),
+            knowledge: Arc::new(KnowledgeService::new(pool.clone(), ctx.clone(), events.clone())),
             events,
         }
     }

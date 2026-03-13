@@ -5,21 +5,37 @@
 
 use std::sync::Arc;
 
-use crate::db::{paths, ContentDb};
+use diesel::prelude::*;
+
+use crate::db::models::{Chapter, NewChapter, NewStep, Path, PathWithSteps, Step};
+use crate::db::{context::AppContext, paths_diesel, DbPool};
 use crate::error::StorageError;
 
 use super::events::{EventBus, StorageEvent};
 
 /// Path service for business logic
 pub struct PathService {
-    content_db: Arc<ContentDb>,
+    pool: DbPool,
+    ctx: AppContext,
     events: Arc<EventBus>,
 }
 
 impl PathService {
     /// Create a new path service
-    pub fn new(content_db: Arc<ContentDb>, events: Arc<EventBus>) -> Self {
-        Self { content_db, events }
+    pub fn new(pool: DbPool, ctx: AppContext, events: Arc<EventBus>) -> Self {
+        Self { pool, ctx, events }
+    }
+
+    /// Get a connection from the pool
+    fn conn(
+        &self,
+    ) -> Result<
+        diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
+        StorageError,
+    > {
+        self.pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))
     }
 
     // =========================================================================
@@ -27,20 +43,21 @@ impl PathService {
     // =========================================================================
 
     /// Get path by ID
-    pub fn get(&self, id: &str) -> Result<Option<paths::PathRow>, StorageError> {
-        self.content_db.with_conn(|conn| paths::get_path(conn, id))
+    pub fn get(&self, id: &str) -> Result<Option<Path>, StorageError> {
+        let mut conn = self.conn()?;
+        paths_diesel::get_path(&mut conn, &self.ctx, id)
     }
 
     /// Get path with all chapters and steps
-    pub fn get_with_steps(&self, id: &str) -> Result<Option<paths::PathWithSteps>, StorageError> {
-        self.content_db
-            .with_conn(|conn| paths::get_path_with_steps(conn, id))
+    pub fn get_with_steps(&self, id: &str) -> Result<Option<PathWithSteps>, StorageError> {
+        let mut conn = self.conn()?;
+        paths_diesel::get_path_with_steps(&mut conn, &self.ctx, id)
     }
 
     /// List paths with pagination
-    pub fn list(&self, limit: u32, offset: u32) -> Result<Vec<paths::PathRow>, StorageError> {
-        self.content_db
-            .with_conn(|conn| paths::list_paths(conn, limit, offset))
+    pub fn list(&self, limit: u32, offset: u32) -> Result<Vec<Path>, StorageError> {
+        let mut conn = self.conn()?;
+        paths_diesel::list_paths(&mut conn, &self.ctx, limit as i64, offset as i64)
     }
 
     /// Search paths by tag
@@ -48,12 +65,24 @@ impl PathService {
         &self,
         tag: &str,
         limit: u32,
-    ) -> Result<Vec<paths::PathRow>, StorageError> {
+    ) -> Result<Vec<Path>, StorageError> {
         // Use list and filter by tag (could be optimized with a dedicated query)
         let all_paths = self.list(1000, 0)?;
+        // Paths don't have tags directly in the Diesel model; we'd need to join path_tags.
+        // For now, fetch tags per path and filter.
+        let mut conn = self.conn()?;
         let filtered: Vec<_> = all_paths
             .into_iter()
-            .filter(|p| p.tags.iter().any(|t| t == tag))
+            .filter(|p| {
+                use crate::db::diesel_schema::path_tags;
+                let tags: Vec<String> = path_tags::table
+                    .filter(path_tags::app_id.eq(&self.ctx.app_id))
+                    .filter(path_tags::path_id.eq(&p.id))
+                    .select(path_tags::tag)
+                    .load(&mut *conn)
+                    .unwrap_or_default();
+                tags.iter().any(|t| t == tag)
+            })
             .take(limit as usize)
             .collect();
         Ok(filtered)
@@ -64,14 +93,16 @@ impl PathService {
     // =========================================================================
 
     /// Create a path with chapters and steps
-    pub fn create(&self, input: paths::CreatePathInput) -> Result<paths::PathRow, StorageError> {
+    pub fn create(
+        &self,
+        input: paths_diesel::CreatePathInput,
+    ) -> Result<Path, StorageError> {
         // Validate input
         self.validate_path(&input)?;
 
         // Create path
-        let result = self
-            .content_db
-            .with_conn_mut(|conn| paths::create_path(conn, input.clone()))?;
+        let mut conn = self.conn()?;
+        let result = paths_diesel::create_path(&mut conn, &self.ctx, input)?;
 
         // Emit event
         self.events.emit(StorageEvent::PathCreated {
@@ -85,8 +116,8 @@ impl PathService {
     /// Bulk create paths (for seeding)
     pub fn bulk_create(
         &self,
-        items: Vec<paths::CreatePathInput>,
-    ) -> Result<paths::BulkPathResult, StorageError> {
+        items: Vec<paths_diesel::CreatePathInput>,
+    ) -> Result<paths_diesel::BulkPathResult, StorageError> {
         // Validate all items first
         for (i, item) in items.iter().enumerate() {
             if let Err(e) = self.validate_path(item) {
@@ -97,9 +128,8 @@ impl PathService {
         let ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
 
         // Perform bulk create
-        let result = self
-            .content_db
-            .with_conn_mut(|conn| paths::bulk_create_paths(conn, items))?;
+        let mut conn = self.conn()?;
+        let result = paths_diesel::bulk_create_paths(&mut conn, &self.ctx, items)?;
 
         // Emit event if any items were inserted
         if result.inserted > 0 {
@@ -120,9 +150,8 @@ impl PathService {
             return Ok(false);
         }
 
-        let deleted = self
-            .content_db
-            .with_conn_mut(|conn| paths::delete_path(conn, id))?;
+        let mut conn = self.conn()?;
+        let deleted = paths_diesel::delete_path(&mut conn, &self.ctx, id)?;
 
         if deleted {
             self.events
@@ -137,26 +166,67 @@ impl PathService {
     // =========================================================================
 
     /// Get steps for a path
-    pub fn get_steps(&self, path_id: &str) -> Result<Vec<paths::StepRow>, StorageError> {
-        self.content_db
-            .with_conn(|conn| paths::get_steps_for_path(conn, path_id))
+    pub fn get_steps(&self, path_id: &str) -> Result<Vec<Step>, StorageError> {
+        use crate::db::diesel_schema::steps;
+        let mut conn = self.conn()?;
+        steps::table
+            .filter(steps::app_id.eq(&self.ctx.app_id))
+            .filter(steps::path_id.eq(path_id))
+            .order(steps::order_index.asc())
+            .load(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Steps query failed: {}", e)))
     }
 
     /// Create a step
     pub fn create_step(
         &self,
-        input: paths::CreateStepInput,
-    ) -> Result<paths::StepRow, StorageError> {
-        self.validate_step(&input)?;
+        input: paths_diesel::CreateStepInput,
+        path_id: &str,
+    ) -> Result<Step, StorageError> {
+        self.validate_step(&input, path_id)?;
 
-        self.content_db
-            .with_conn_mut(|conn| paths::create_step(conn, input))
+        use crate::db::diesel_schema::steps;
+        let mut conn = self.conn()?;
+
+        let new_step = NewStep {
+            id: &input.id,
+            app_id: &self.ctx.app_id,
+            path_id,
+            chapter_id: input.chapter_id.as_deref(),
+            title: &input.title,
+            description: input.description.as_deref(),
+            step_type: &input.step_type,
+            resource_id: input.resource_id.as_deref(),
+            resource_type: input.resource_type.as_deref(),
+            order_index: input.order_index,
+            estimated_duration: input.estimated_duration.as_deref(),
+            metadata_json: input.metadata_json.as_deref(),
+        };
+
+        diesel::insert_into(steps::table)
+            .values(&new_step)
+            .execute(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Step insert failed: {}", e)))?;
+
+        steps::table
+            .filter(steps::app_id.eq(&self.ctx.app_id))
+            .filter(steps::id.eq(&input.id))
+            .first(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Step fetch failed: {}", e)))
     }
 
     /// Delete a step
     pub fn delete_step(&self, step_id: &str) -> Result<bool, StorageError> {
-        self.content_db
-            .with_conn_mut(|conn| paths::delete_step(conn, step_id))
+        use crate::db::diesel_schema::steps;
+        let mut conn = self.conn()?;
+        let deleted = diesel::delete(
+            steps::table
+                .filter(steps::app_id.eq(&self.ctx.app_id))
+                .filter(steps::id.eq(step_id)),
+        )
+        .execute(&mut *conn)
+        .map_err(|e| StorageError::Internal(format!("Step delete failed: {}", e)))?;
+        Ok(deleted > 0)
     }
 
     // =========================================================================
@@ -164,27 +234,62 @@ impl PathService {
     // =========================================================================
 
     /// Get chapters for a path
-    pub fn get_chapters(&self, path_id: &str) -> Result<Vec<paths::ChapterRow>, StorageError> {
-        self.content_db
-            .with_conn(|conn| paths::get_chapters(conn, path_id))
+    pub fn get_chapters(&self, path_id: &str) -> Result<Vec<Chapter>, StorageError> {
+        use crate::db::diesel_schema::chapters;
+        let mut conn = self.conn()?;
+        chapters::table
+            .filter(chapters::app_id.eq(&self.ctx.app_id))
+            .filter(chapters::path_id.eq(path_id))
+            .order(chapters::order_index.asc())
+            .load(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Chapters query failed: {}", e)))
     }
 
     /// Create a chapter
     pub fn create_chapter(
         &self,
-        input: paths::CreateChapterInput,
+        input: paths_diesel::CreateChapterInput,
         path_id: &str,
-    ) -> Result<paths::ChapterRow, StorageError> {
+    ) -> Result<Chapter, StorageError> {
         self.validate_chapter(&input)?;
 
-        self.content_db
-            .with_conn_mut(|conn| paths::create_chapter(conn, path_id, input))
+        use crate::db::diesel_schema::chapters;
+        let mut conn = self.conn()?;
+
+        let new_chapter = NewChapter {
+            id: &input.id,
+            app_id: &self.ctx.app_id,
+            path_id,
+            title: &input.title,
+            description: input.description.as_deref(),
+            order_index: input.order_index,
+            estimated_duration: input.estimated_duration.as_deref(),
+        };
+
+        diesel::insert_into(chapters::table)
+            .values(&new_chapter)
+            .execute(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Chapter insert failed: {}", e)))?;
+
+        chapters::table
+            .filter(chapters::app_id.eq(&self.ctx.app_id))
+            .filter(chapters::id.eq(&input.id))
+            .first(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Chapter fetch failed: {}", e)))
     }
 
     /// Delete a chapter (cascades to steps)
     pub fn delete_chapter(&self, chapter_id: &str) -> Result<bool, StorageError> {
-        self.content_db
-            .with_conn_mut(|conn| paths::delete_chapter(conn, chapter_id))
+        use crate::db::diesel_schema::chapters;
+        let mut conn = self.conn()?;
+        let deleted = diesel::delete(
+            chapters::table
+                .filter(chapters::app_id.eq(&self.ctx.app_id))
+                .filter(chapters::id.eq(chapter_id)),
+        )
+        .execute(&mut *conn)
+        .map_err(|e| StorageError::Internal(format!("Chapter delete failed: {}", e)))?;
+        Ok(deleted > 0)
     }
 
     // =========================================================================
@@ -192,7 +297,7 @@ impl PathService {
     // =========================================================================
 
     /// Validate path input
-    fn validate_path(&self, input: &paths::CreatePathInput) -> Result<(), StorageError> {
+    fn validate_path(&self, input: &paths_diesel::CreatePathInput) -> Result<(), StorageError> {
         if input.id.is_empty() {
             return Err(StorageError::InvalidInput("id is required".into()));
         }
@@ -279,7 +384,7 @@ impl PathService {
     }
 
     /// Validate chapter input
-    fn validate_chapter(&self, input: &paths::CreateChapterInput) -> Result<(), StorageError> {
+    fn validate_chapter(&self, input: &paths_diesel::CreateChapterInput) -> Result<(), StorageError> {
         if input.id.is_empty() {
             return Err(StorageError::InvalidInput("chapter id is required".into()));
         }
@@ -292,7 +397,7 @@ impl PathService {
 
         // Validate steps
         for (i, step) in input.steps.iter().enumerate() {
-            if let Err(e) = self.validate_step(step) {
+            if let Err(e) = self.validate_step_input(step) {
                 return Err(StorageError::InvalidInput(format!("steps[{}]: {}", i, e)));
             }
         }
@@ -300,13 +405,17 @@ impl PathService {
         Ok(())
     }
 
-    /// Validate step input
-    fn validate_step(&self, input: &paths::CreateStepInput) -> Result<(), StorageError> {
+    /// Validate step input (for standalone step creation)
+    fn validate_step(
+        &self,
+        input: &paths_diesel::CreateStepInput,
+        path_id: &str,
+    ) -> Result<(), StorageError> {
         if input.id.is_empty() {
             return Err(StorageError::InvalidInput("step id is required".into()));
         }
 
-        if input.path_id.is_empty() {
+        if path_id.is_empty() {
             return Err(StorageError::InvalidInput(
                 "step path_id is required".into(),
             ));
@@ -316,7 +425,27 @@ impl PathService {
             return Err(StorageError::InvalidInput("step title is required".into()));
         }
 
-        // Validate step_type
+        self.validate_step_type(&input.step_type)
+    }
+
+    /// Validate step input (for embedded step in chapter)
+    fn validate_step_input(
+        &self,
+        input: &paths_diesel::CreateStepInput,
+    ) -> Result<(), StorageError> {
+        if input.id.is_empty() {
+            return Err(StorageError::InvalidInput("step id is required".into()));
+        }
+
+        if input.title.is_empty() {
+            return Err(StorageError::InvalidInput("step title is required".into()));
+        }
+
+        self.validate_step_type(&input.step_type)
+    }
+
+    /// Validate step_type value
+    fn validate_step_type(&self, step_type: &str) -> Result<(), StorageError> {
         let valid_types = [
             "learn",
             "practice",
@@ -329,13 +458,12 @@ impl PathService {
             "reading",
             "checkpoint",
         ];
-        if !valid_types.contains(&input.step_type.as_str()) {
+        if !valid_types.contains(&step_type) {
             return Err(StorageError::InvalidInput(format!(
                 "step_type '{}' is not valid. Valid types: {:?}",
-                input.step_type, valid_types
+                step_type, valid_types
             )));
         }
-
         Ok(())
     }
 
@@ -345,24 +473,22 @@ impl PathService {
 
     /// Get path statistics
     pub fn get_stats(&self) -> Result<PathStats, StorageError> {
-        self.content_db.with_conn(|conn| {
-            let total: i64 = conn
-                .query_row("SELECT COUNT(*) FROM paths", [], |row| row.get(0))
-                .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut conn = self.conn()?;
+        let total = paths_diesel::path_count(&mut conn, &self.ctx)? as u64;
+        let total_steps = paths_diesel::total_step_count(&mut conn, &self.ctx)? as u64;
 
-            let total_steps: i64 = conn
-                .query_row("SELECT COUNT(*) FROM steps", [], |row| row.get(0))
-                .map_err(|e| StorageError::Internal(e.to_string()))?;
+        // Chapter count via Diesel
+        use crate::db::diesel_schema::chapters;
+        let total_chapters: i64 = chapters::table
+            .filter(chapters::app_id.eq(&self.ctx.app_id))
+            .count()
+            .get_result(&mut *conn)
+            .map_err(|e| StorageError::Internal(format!("Chapter count failed: {}", e)))?;
 
-            let total_chapters: i64 = conn
-                .query_row("SELECT COUNT(*) FROM chapters", [], |row| row.get(0))
-                .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-            Ok(PathStats {
-                total_paths: total as u64,
-                total_steps: total_steps as u64,
-                total_chapters: total_chapters as u64,
-            })
+        Ok(PathStats {
+            total_paths: total,
+            total_steps,
+            total_chapters: total_chapters as u64,
         })
     }
 }

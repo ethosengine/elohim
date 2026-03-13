@@ -595,6 +595,55 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    knowledge_maps (id) {
+        id -> Text,
+        app_id -> Text,
+        map_type -> Text,
+        owner_id -> Text,
+        title -> Text,
+        description -> Nullable<Text>,
+        subject_type -> Text,
+        subject_id -> Text,
+        subject_name -> Text,
+        visibility -> Text,
+        shared_with_json -> Nullable<Text>,
+        nodes_json -> Text,
+        path_ids_json -> Nullable<Text>,
+        overall_affinity -> Float,
+        content_graph_id -> Nullable<Text>,
+        mastery_levels_json -> Nullable<Text>,
+        goals_json -> Nullable<Text>,
+        metadata_json -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    path_extensions (id) {
+        id -> Text,
+        app_id -> Text,
+        base_path_id -> Text,
+        base_path_version -> Text,
+        extended_by -> Text,
+        title -> Text,
+        description -> Nullable<Text>,
+        insertions_json -> Nullable<Text>,
+        annotations_json -> Nullable<Text>,
+        reorderings_json -> Nullable<Text>,
+        exclusions_json -> Nullable<Text>,
+        visibility -> Text,
+        shared_with_json -> Nullable<Text>,
+        forked_from -> Nullable<Text>,
+        forks_json -> Nullable<Text>,
+        upstream_proposal_json -> Nullable<Text>,
+        stats_json -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -603,6 +652,7 @@ diesel::joinable!(node_stewardship -> humans (human_id));
 diesel::joinable!(path_attestations -> paths (path_id));
 diesel::joinable!(path_tags -> paths (path_id));
 diesel::joinable!(steps -> chapters (chapter_id));
+diesel::joinable!(path_extensions -> paths (base_path_id));
 diesel::joinable!(steps -> paths (path_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -626,9 +676,11 @@ diesel::allow_tables_to_appear_in_same_query!(
     governance_states,
     human_relationships,
     humans,
+    knowledge_maps,
     local_sessions,
     node_stewardship,
     path_attestations,
+    path_extensions,
     path_tags,
     paths,
     precedents,

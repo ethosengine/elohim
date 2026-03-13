@@ -16,9 +16,10 @@ use super::diesel_schema::{
     access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
     content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
-    governance_states, human_relationships, humans, local_sessions, node_stewardship,
-    path_attestations, path_tags, paths, precedents, premium_gates, proposals, rea_commitments,
-    relationships, steps, steward_credentials, stewardship_allocations, stewarded_nodes,
+    governance_states, human_relationships, humans, knowledge_maps, local_sessions,
+    node_stewardship, path_attestations, path_extensions, path_tags, paths, precedents,
+    premium_gates, proposals, rea_commitments, relationships, steps, steward_credentials,
+    stewardship_allocations, stewarded_nodes,
 };
 
 // ============================================================================
@@ -1800,4 +1801,112 @@ pub struct NewNodeStewardship {
     pub affinity_score: f64,
     pub relationship: String,
     pub context_epr_id: Option<String>,
+}
+
+// ============================================================================
+// Knowledge Map Models
+// ============================================================================
+
+/// Knowledge map from the database
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = knowledge_maps)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct KnowledgeMap {
+    pub id: String,
+    pub app_id: String,
+    pub map_type: String,
+    pub owner_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub subject_type: String,
+    pub subject_id: String,
+    pub subject_name: String,
+    pub visibility: String,
+    pub shared_with_json: Option<String>,
+    pub nodes_json: String,
+    pub path_ids_json: Option<String>,
+    pub overall_affinity: f32,
+    pub content_graph_id: Option<String>,
+    pub mastery_levels_json: Option<String>,
+    pub goals_json: Option<String>,
+    pub metadata_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable knowledge map
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = knowledge_maps)]
+pub struct NewKnowledgeMap<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub map_type: &'a str,
+    pub owner_id: &'a str,
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub subject_type: &'a str,
+    pub subject_id: &'a str,
+    pub subject_name: &'a str,
+    pub visibility: &'a str,
+    pub shared_with_json: Option<&'a str>,
+    pub nodes_json: &'a str,
+    pub path_ids_json: Option<&'a str>,
+    pub overall_affinity: f32,
+    pub content_graph_id: Option<&'a str>,
+    pub mastery_levels_json: Option<&'a str>,
+    pub goals_json: Option<&'a str>,
+    pub metadata_json: Option<&'a str>,
+}
+
+// ============================================================================
+// Path Extension Models
+// ============================================================================
+
+/// Path extension from the database
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = path_extensions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PathExtension {
+    pub id: String,
+    pub app_id: String,
+    pub base_path_id: String,
+    pub base_path_version: String,
+    pub extended_by: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub insertions_json: Option<String>,
+    pub annotations_json: Option<String>,
+    pub reorderings_json: Option<String>,
+    pub exclusions_json: Option<String>,
+    pub visibility: String,
+    pub shared_with_json: Option<String>,
+    pub forked_from: Option<String>,
+    pub forks_json: Option<String>,
+    pub upstream_proposal_json: Option<String>,
+    pub stats_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable path extension
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = path_extensions)]
+pub struct NewPathExtension<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub base_path_id: &'a str,
+    pub base_path_version: &'a str,
+    pub extended_by: &'a str,
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub insertions_json: Option<&'a str>,
+    pub annotations_json: Option<&'a str>,
+    pub reorderings_json: Option<&'a str>,
+    pub exclusions_json: Option<&'a str>,
+    pub visibility: &'a str,
+    pub shared_with_json: Option<&'a str>,
+    pub forked_from: Option<&'a str>,
+    pub forks_json: Option<&'a str>,
+    pub upstream_proposal_json: Option<&'a str>,
+    pub stats_json: Option<&'a str>,
 }

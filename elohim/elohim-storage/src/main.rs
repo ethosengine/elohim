@@ -47,7 +47,7 @@
 use clap::Parser;
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
 use elohim_storage::{
-    BlobStore, Config, ContentDb, HttpServer, ImportHandler, ImportHandlerConfig,
+    BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig,
 };
 use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use std::net::SocketAddr;
@@ -371,32 +371,6 @@ async fn async_main(
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
 
-    // Initialize SQLite content database if enabled
-    let content_db: Option<Arc<ContentDb>> = if args.enable_content_db {
-        info!("SQLite content database enabled");
-        match ContentDb::open(&config.storage_dir) {
-            Ok(db) => {
-                let db = Arc::new(db);
-                if let Ok(stats) = db.stats() {
-                    info!("  Content: {} items", stats.content_count);
-                    info!("  Paths: {} items", stats.path_count);
-                    info!("  Steps: {} items", stats.step_count);
-                    info!("  Tags: {} unique", stats.unique_tags);
-                }
-                Some(db)
-            }
-            Err(e) => {
-                error!("Failed to open content database: {}", e);
-                None
-            }
-        }
-    } else {
-        info!(
-            "SQLite content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)"
-        );
-        None
-    };
-
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
     let mut http_server =
@@ -497,43 +471,56 @@ async fn async_main(
         }
     }
 
-    // Attach ContentDb and Services to HttpServer if enabled
-    if let Some(ref db) = content_db {
-        http_server = http_server.with_content_db(Arc::clone(db));
+    // Initialize Diesel connection pool for all database operations
+    if args.enable_content_db {
+        match init_pool_from_dir(&config.storage_dir) {
+            Ok(pool) => {
+                // Create services with the pool
+                let services = Arc::new(Services::new(pool.clone()));
+                http_server = http_server.with_services(services);
+                http_server = http_server.with_db_pool(pool);
 
-        // Initialize service layer
-        let services = Arc::new(Services::new(Arc::clone(db)));
-        http_server = http_server.with_services(services);
-
-        info!("Database API:");
-        info!("  GET  /db/stats           - Database statistics");
-        info!("  GET  /db/content         - List content");
-        info!("  GET  /db/content/{{id}}    - Get content by ID");
-        info!("  POST /db/content         - Create content");
-        info!("  POST /db/content/bulk    - Bulk create content");
-        info!("  GET  /db/paths           - List paths");
-        info!("  GET  /db/paths/{{id}}      - Get path with steps");
-        info!("  POST /db/paths           - Create path");
-        info!("  POST /db/paths/bulk      - Bulk create paths");
-    }
-
-    // Initialize Diesel connection pool for session management
-    // (Separate from ContentDb — Diesel uses its own pool for session CRUD)
-    match init_pool_from_dir(&config.storage_dir) {
-        Ok(pool) => {
-            http_server = http_server.with_db_pool(pool);
-            info!("Session API:");
-            info!("  GET    /session       - Get active session");
-            info!("  POST   /session       - Create session");
-            info!("  DELETE /session       - Delete session");
-            info!("  GET    /session/all   - List all sessions");
+                info!("Database API:");
+                info!("  GET  /db/stats           - Database statistics");
+                info!("  GET  /db/content         - List content");
+                info!("  GET  /db/content/{{id}}    - Get content by ID");
+                info!("  POST /db/content         - Create content");
+                info!("  POST /db/content/bulk    - Bulk create content");
+                info!("  GET  /db/paths           - List paths");
+                info!("  GET  /db/paths/{{id}}      - Get path with steps");
+                info!("  POST /db/paths           - Create path");
+                info!("  POST /db/paths/bulk      - Bulk create paths");
+                info!("Session API:");
+                info!("  GET    /session       - Get active session");
+                info!("  POST   /session       - Create session");
+                info!("  DELETE /session       - Delete session");
+                info!("  GET    /session/all   - List all sessions");
+            }
+            Err(e) => {
+                error!("Failed to initialize database pool: {} (database API disabled)", e);
+            }
         }
-        Err(e) => {
-            warn!(
-                "Failed to initialize session pool: {} (session API disabled)",
-                e
-            );
+    } else {
+        // Even without content DB, initialize pool for session management
+        match init_pool_from_dir(&config.storage_dir) {
+            Ok(pool) => {
+                http_server = http_server.with_db_pool(pool);
+                info!("Session API:");
+                info!("  GET    /session       - Get active session");
+                info!("  POST   /session       - Create session");
+                info!("  DELETE /session       - Delete session");
+                info!("  GET    /session/all   - List all sessions");
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to initialize session pool: {} (session API disabled)",
+                    e
+                );
+            }
         }
+        info!(
+            "Content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)"
+        );
     }
 
     // Wire P2P services into HTTP server

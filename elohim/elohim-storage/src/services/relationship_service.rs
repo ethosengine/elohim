@@ -5,21 +5,34 @@
 
 use std::sync::Arc;
 
-use crate::db::{content, relationships, ContentDb};
+use crate::db::{content_diesel, context::AppContext, relationships_diesel, DbPool};
 use crate::error::StorageError;
 
 use super::events::{EventBus, StorageEvent};
 
 /// Relationship service for content graph operations
 pub struct RelationshipService {
-    content_db: Arc<ContentDb>,
+    pool: DbPool,
+    ctx: AppContext,
     events: Arc<EventBus>,
 }
 
 impl RelationshipService {
     /// Create a new relationship service
-    pub fn new(content_db: Arc<ContentDb>, events: Arc<EventBus>) -> Self {
-        Self { content_db, events }
+    pub fn new(pool: DbPool, ctx: AppContext, events: Arc<EventBus>) -> Self {
+        Self { pool, ctx, events }
+    }
+
+    /// Get a connection from the pool
+    fn conn(
+        &self,
+    ) -> Result<
+        diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
+        StorageError,
+    > {
+        self.pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))
     }
 
     // =========================================================================
@@ -27,18 +40,21 @@ impl RelationshipService {
     // =========================================================================
 
     /// Get relationship by ID
-    pub fn get(&self, id: &str) -> Result<Option<relationships::RelationshipRow>, StorageError> {
-        self.content_db
-            .with_conn(|conn| relationships::get_relationship(conn, id))
+    pub fn get(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::db::models::Relationship>, StorageError> {
+        let mut conn = self.conn()?;
+        relationships_diesel::get_relationship(&mut conn, &self.ctx, id)
     }
 
     /// List relationships with filtering
     pub fn list(
         &self,
-        query: &relationships::RelationshipQuery,
-    ) -> Result<Vec<relationships::RelationshipRow>, StorageError> {
-        self.content_db
-            .with_conn(|conn| relationships::list_relationships(conn, query))
+        query: &relationships_diesel::RelationshipQuery,
+    ) -> Result<Vec<crate::db::models::Relationship>, StorageError> {
+        let mut conn = self.conn()?;
+        relationships_diesel::list_relationships(&mut conn, &self.ctx, query)
     }
 
     /// Get relationships for a content item
@@ -46,8 +62,8 @@ impl RelationshipService {
         &self,
         content_id: &str,
         direction: Option<&str>,
-    ) -> Result<Vec<relationships::RelationshipRow>, StorageError> {
-        self.list(&relationships::RelationshipQuery {
+    ) -> Result<Vec<crate::db::models::Relationship>, StorageError> {
+        self.list(&relationships_diesel::RelationshipQuery {
             content_id: Some(content_id.to_string()),
             direction: direction.map(|s| s.to_string()),
             ..Default::default()
@@ -55,13 +71,38 @@ impl RelationshipService {
     }
 
     /// Get content graph starting from a root node
+    ///
+    /// Note: The Diesel module doesn't have a graph traversal function.
+    /// This returns a flat list of relationships for the content node,
+    /// structured as a simple graph with depth=1.
     pub fn get_graph(
         &self,
         content_id: &str,
         relationship_types: Option<&[String]>,
-    ) -> Result<relationships::ContentGraph, StorageError> {
-        self.content_db.with_conn(|conn| {
-            relationships::get_content_graph(conn, content_id, relationship_types)
+    ) -> Result<ContentGraph, StorageError> {
+        let mut conn = self.conn()?;
+        let rels = relationships_diesel::get_outgoing_relationships(
+            &mut conn,
+            &self.ctx,
+            content_id,
+            relationship_types,
+        )?;
+
+        let related: Vec<ContentGraphNode> = rels
+            .iter()
+            .map(|r| ContentGraphNode {
+                content_id: r.target_id.clone(),
+                relationship_type: r.relationship_type.clone(),
+                confidence: r.confidence as f64,
+                children: vec![],
+            })
+            .collect();
+
+        let total_nodes = related.len();
+        Ok(ContentGraph {
+            root_id: content_id.to_string(),
+            related,
+            total_nodes,
         })
     }
 
@@ -71,9 +112,9 @@ impl RelationshipService {
         content_id: &str,
         max_depth: u32,
         relationship_types: Option<&[String]>,
-    ) -> Result<relationships::ContentGraph, StorageError> {
+    ) -> Result<ContentGraph, StorageError> {
         if max_depth == 0 {
-            return Ok(relationships::ContentGraph {
+            return Ok(ContentGraph {
                 root_id: content_id.to_string(),
                 related: vec![],
                 total_nodes: 0,
@@ -92,8 +133,8 @@ impl RelationshipService {
     /// Create a relationship with validation
     pub fn create(
         &self,
-        input: relationships::CreateRelationshipInput,
-    ) -> Result<relationships::RelationshipRow, StorageError> {
+        input: relationships_diesel::CreateRelationshipInput,
+    ) -> Result<crate::db::models::Relationship, StorageError> {
         // Validate input
         self.validate_relationship(&input)?;
 
@@ -118,9 +159,9 @@ impl RelationshipService {
         }
 
         // Create relationship
-        let result = self
-            .content_db
-            .with_conn_mut(|conn| relationships::create_relationship(conn, input.clone()))?;
+        let mut conn = self.conn()?;
+        let result =
+            relationships_diesel::create_relationship(&mut conn, &self.ctx, input)?;
 
         // Emit event
         self.events.emit(StorageEvent::RelationshipCreated {
@@ -136,8 +177,8 @@ impl RelationshipService {
     /// Bulk create relationships (for seeding/import)
     pub fn bulk_create(
         &self,
-        inputs: Vec<relationships::CreateRelationshipInput>,
-    ) -> Result<relationships::BulkRelationshipResult, StorageError> {
+        inputs: Vec<relationships_diesel::CreateRelationshipInput>,
+    ) -> Result<relationships_diesel::BulkRelationshipResult, StorageError> {
         // Validate all inputs (skip content existence check for bulk operations)
         for (i, input) in inputs.iter().enumerate() {
             if let Err(e) = self.validate_relationship(input) {
@@ -146,14 +187,14 @@ impl RelationshipService {
         }
 
         // Perform bulk create
-        let result = self
-            .content_db
-            .with_conn_mut(|conn| relationships::bulk_create_relationships(conn, inputs))?;
+        let mut conn = self.conn()?;
+        let result =
+            relationships_diesel::bulk_create_relationships(&mut conn, &self.ctx, inputs)?;
 
         // Emit event
         if result.created > 0 {
             self.events.emit(StorageEvent::RelationshipBulkCreated {
-                count: result.created,
+                count: result.created as usize,
             });
         }
 
@@ -162,9 +203,8 @@ impl RelationshipService {
 
     /// Delete a relationship by ID
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let deleted = self
-            .content_db
-            .with_conn_mut(|conn| relationships::delete_relationship(conn, id))?;
+        let mut conn = self.conn()?;
+        let deleted = relationships_diesel::delete_relationship(&mut conn, &self.ctx, id)?;
 
         if deleted {
             self.events
@@ -176,8 +216,8 @@ impl RelationshipService {
 
     /// Delete all relationships for a content item
     pub fn delete_for_content(&self, content_id: &str) -> Result<usize, StorageError> {
-        self.content_db
-            .with_conn_mut(|conn| relationships::delete_relationships_for_content(conn, content_id))
+        let mut conn = self.conn()?;
+        relationships_diesel::delete_relationships_for_content(&mut conn, &self.ctx, content_id)
     }
 
     // =========================================================================
@@ -187,7 +227,7 @@ impl RelationshipService {
     /// Validate relationship input
     fn validate_relationship(
         &self,
-        input: &relationships::CreateRelationshipInput,
+        input: &relationships_diesel::CreateRelationshipInput,
     ) -> Result<(), StorageError> {
         if input.source_id.is_empty() {
             return Err(StorageError::InvalidInput("source_id is required".into()));
@@ -259,10 +299,8 @@ impl RelationshipService {
 
     /// Validate that content exists
     fn validate_content_exists(&self, id: &str, field_name: &str) -> Result<(), StorageError> {
-        let exists = self
-            .content_db
-            .with_conn(|conn| content::get_content(conn, id))?
-            .is_some();
+        let mut conn = self.conn()?;
+        let exists = content_diesel::get_content(&mut conn, &self.ctx, id)?.is_some();
 
         if !exists {
             return Err(StorageError::InvalidInput(format!(
@@ -317,28 +355,32 @@ impl RelationshipService {
 
     /// Get relationship statistics
     pub fn get_stats(&self) -> Result<RelationshipStats, StorageError> {
-        self.content_db.with_conn(|conn| {
-            let total: i64 = conn
-                .query_row("SELECT COUNT(*) FROM relationships", [], |row| row.get(0))
-                .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut conn = self.conn()?;
+        let total = relationships_diesel::relationship_count(&mut conn, &self.ctx)? as u64;
+        let by_type_vec = relationships_diesel::relationship_stats_by_type(&mut conn, &self.ctx)?;
 
-            let by_type: Vec<(String, i64)> = {
-                let mut stmt = conn
-                    .prepare("SELECT relationship_type, COUNT(*) FROM relationships GROUP BY relationship_type")
-                    .map_err(|e| StorageError::Internal(e.to_string()))?;
-                let rows = stmt
-                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-                    .map_err(|e| StorageError::Internal(e.to_string()))?;
-                rows.collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| StorageError::Internal(e.to_string()))?
-            };
-
-            Ok(RelationshipStats {
-                total_count: total as u64,
-                by_type: by_type.into_iter().collect(),
-            })
+        Ok(RelationshipStats {
+            total_count: total,
+            by_type: by_type_vec.into_iter().collect(),
         })
     }
+}
+
+/// Content graph node for tree traversal
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ContentGraphNode {
+    pub content_id: String,
+    pub relationship_type: String,
+    pub confidence: f64,
+    pub children: Vec<ContentGraphNode>,
+}
+
+/// Content graph output
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ContentGraph {
+    pub root_id: String,
+    pub related: Vec<ContentGraphNode>,
+    pub total_nodes: usize,
 }
 
 /// Relationship statistics

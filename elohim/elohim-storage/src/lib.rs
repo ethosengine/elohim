@@ -111,7 +111,7 @@ pub use sync::{
 };
 
 // SQLite re-exports
-pub use db::{ContentDb, ContentRow, DbStats, PathRow, StepRow};
+pub use db::DbStats;
 
 // Policy cache re-exports
 pub use db::policy_cache::{

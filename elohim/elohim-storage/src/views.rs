@@ -95,10 +95,6 @@ use crate::db::models::{
 };
 use crate::db::steward_operations::RevenueSummary;
 
-// Legacy rusqlite types (used by services until migration complete)
-use crate::db::content::ContentRow;
-use crate::db::paths::{ChapterRow, PathRow, PathWithSteps as LegacyPathWithSteps, StepRow};
-use crate::db::relationships::RelationshipRow;
 
 // ============================================================================
 // App View
@@ -177,27 +173,10 @@ impl From<Content> for ContentView {
     }
 }
 
-// Legacy ContentRow → ContentView (rusqlite)
-impl From<ContentRow> for ContentView {
-    fn from(c: ContentRow) -> Self {
-        Self {
-            id: c.id,
-            app_id: String::new(), // Legacy doesn't have app_id
-            title: c.title,
-            description: c.description,
-            content_type: c.content_type,
-            content_format: c.content_format,
-            blob_hash: c.blob_hash,
-            blob_cid: c.blob_cid,
-            content_size_bytes: c.content_size_bytes.map(|v| v as i32),
-            metadata: parse_json_opt(&c.metadata_json),
-            reach: c.reach,
-            validation_status: c.validation_status,
-            created_by: c.created_by,
-            created_at: c.created_at,
-            updated_at: c.updated_at,
-            content_body: c.content_body,
-        }
+/// Convert ContentWithTags → ContentView (strips tags, for backward compat)
+impl From<ContentWithTags> for ContentView {
+    fn from(c: ContentWithTags) -> Self {
+        c.content.into()
     }
 }
 
@@ -265,27 +244,6 @@ impl From<Path> for PathView {
     }
 }
 
-// Legacy PathRow → PathView (rusqlite, missing app_id)
-impl From<PathRow> for PathView {
-    fn from(p: PathRow) -> Self {
-        Self {
-            id: p.id,
-            app_id: String::new(), // Legacy doesn't have app_id
-            title: p.title,
-            description: p.description,
-            path_type: p.path_type,
-            difficulty: p.difficulty,
-            estimated_duration: p.estimated_duration,
-            thumbnail_url: p.thumbnail_url,
-            thumbnail_alt: p.thumbnail_alt,
-            metadata: parse_json_opt(&p.metadata_json),
-            visibility: p.visibility,
-            created_by: p.created_by,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-        }
-    }
-}
 
 // ============================================================================
 // Chapter Views
@@ -318,20 +276,6 @@ impl From<Chapter> for ChapterView {
     }
 }
 
-// Legacy ChapterRow → ChapterView (rusqlite)
-impl From<ChapterRow> for ChapterView {
-    fn from(c: ChapterRow) -> Self {
-        Self {
-            id: c.id,
-            app_id: String::new(), // Legacy doesn't have app_id
-            path_id: c.path_id,
-            title: c.title,
-            description: c.description,
-            order_index: c.order_index,
-            estimated_duration: c.estimated_duration,
-        }
-    }
-}
 
 // ============================================================================
 // Step Views
@@ -375,25 +319,6 @@ impl From<Step> for StepView {
     }
 }
 
-// Legacy StepRow → StepView (rusqlite)
-impl From<StepRow> for StepView {
-    fn from(s: StepRow) -> Self {
-        Self {
-            id: s.id,
-            app_id: String::new(), // Legacy doesn't have app_id
-            path_id: s.path_id,
-            chapter_id: s.chapter_id,
-            title: s.title,
-            description: s.description,
-            step_type: s.step_type,
-            resource_id: s.resource_id,
-            resource_type: s.resource_type,
-            order_index: s.order_index,
-            estimated_duration: s.estimated_duration,
-            metadata: parse_json_opt(&s.metadata_json),
-        }
-    }
-}
 
 // ============================================================================
 // Path Attestation Views
@@ -466,34 +391,19 @@ impl From<PathWithDetails> for PathWithDetailsView {
     }
 }
 
-// Legacy PathWithSteps → PathWithDetailsView (rusqlite)
-// Note: Legacy type doesn't have tags or attestations
-impl From<LegacyPathWithSteps> for PathWithDetailsView {
-    fn from(p: LegacyPathWithSteps) -> Self {
+// Diesel PathWithSteps → PathWithDetailsView (flat steps, no chapters)
+impl From<PathWithSteps> for PathWithDetailsView {
+    fn from(p: PathWithSteps) -> Self {
         Self {
             path: p.path.into(),
-            tags: vec![], // Legacy doesn't have tags at this level
-            chapters: p
-                .chapters
-                .into_iter()
-                .map(|c| ChapterWithStepsView {
-                    chapter: ChapterView {
-                        id: c.id,
-                        app_id: String::new(),
-                        path_id: c.path_id,
-                        title: c.title,
-                        description: c.description,
-                        order_index: c.order_index,
-                        estimated_duration: c.estimated_duration,
-                    },
-                    steps: c.steps.into_iter().map(|s| s.into()).collect(),
-                })
-                .collect(),
-            ungrouped_steps: p.ungrouped_steps.into_iter().map(|s| s.into()).collect(),
-            attestations: vec![], // Legacy doesn't have attestations
+            tags: vec![],
+            chapters: vec![],
+            ungrouped_steps: p.steps.into_iter().map(|s| s.into()).collect(),
+            attestations: vec![],
         }
     }
 }
+
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -562,29 +472,6 @@ impl From<Relationship> for RelationshipView {
     }
 }
 
-// Legacy RelationshipRow → RelationshipView (rusqlite)
-// Note: Legacy type has fewer fields
-impl From<RelationshipRow> for RelationshipView {
-    fn from(r: RelationshipRow) -> Self {
-        Self {
-            id: r.id,
-            app_id: String::new(), // Legacy doesn't have app_id
-            source_id: r.source_id,
-            target_id: r.target_id,
-            relationship_type: r.relationship_type,
-            confidence: r.confidence as f32, // Legacy uses f64
-            inference_source: r.inference_source,
-            is_bidirectional: false, // Legacy doesn't have this field
-            inverse_relationship_id: None,
-            provenance_chain: None,
-            governance_layer: None,
-            reach: "public".to_string(), // Default reach
-            metadata: parse_json_opt(&r.metadata_json),
-            created_at: r.created_at.clone(),
-            updated_at: r.created_at, // Legacy doesn't have updated_at
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1225,7 +1112,7 @@ fn serialize_json_opt(value: &Option<JsonVal>) -> Option<String> {
 // Content Input Views
 // ============================================================================
 
-use crate::db::content::CreateContentInput;
+use crate::db::content_diesel::CreateContentInput;
 
 /// Input for creating content - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -1269,10 +1156,9 @@ impl From<CreateContentInputView> for CreateContentInput {
             description: v.description,
             content_type: v.content_type.unwrap_or_else(|| "concept".to_string()),
             content_format: v.content_format.unwrap_or_else(|| "markdown".to_string()),
-            content_body: v.content_body,
             blob_hash: v.blob_hash,
             blob_cid: v.blob_cid,
-            content_size_bytes: v.content_size_bytes,
+            content_size_bytes: v.content_size_bytes.map(|s| s as i32),
             metadata_json: serialize_json_opt(&v.metadata),
             reach: v.reach.unwrap_or_else(|| "public".to_string()),
             created_by: v.created_by,
@@ -1285,7 +1171,7 @@ impl From<CreateContentInputView> for CreateContentInput {
 // Path Input Views
 // ============================================================================
 
-use crate::db::paths::{CreateChapterInput, CreatePathInput, CreateStepInput};
+use crate::db::paths_diesel::{CreateChapterInput, CreatePathInput, CreateStepInput};
 
 /// Input for creating a step - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -1320,7 +1206,6 @@ impl From<CreateStepInputView> for CreateStepInput {
     fn from(v: CreateStepInputView) -> Self {
         Self {
             id: v.id,
-            path_id: v.path_id,
             chapter_id: v.chapter_id,
             title: v.title,
             description: v.description,
@@ -1416,6 +1301,7 @@ impl From<CreatePathInputView> for CreatePathInput {
             created_by: v.created_by,
             tags: v.tags,
             chapters: v.chapters.into_iter().map(|c| c.into()).collect(),
+            attestations: vec![],
         }
     }
 }
@@ -1424,7 +1310,7 @@ impl From<CreatePathInputView> for CreatePathInput {
 // Relationship Input Views
 // ============================================================================
 
-use crate::db::relationships::CreateRelationshipInput;
+use crate::db::relationships_diesel::CreateRelationshipInput;
 
 /// Input for creating a relationship - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -1454,8 +1340,12 @@ impl From<CreateRelationshipInputView> for CreateRelationshipInput {
             source_id: v.source_id,
             target_id: v.target_id,
             relationship_type: v.relationship_type,
-            confidence: v.confidence.unwrap_or(1.0),
+            confidence: v.confidence.unwrap_or(1.0) as f32,
             inference_source: v.inference_source.unwrap_or_else(|| "explicit".to_string()),
+            is_bidirectional: false,
+            provenance_chain_json: None,
+            governance_layer: None,
+            reach: "commons".to_string(),
             metadata_json: serialize_json_opt(&v.metadata),
         }
     }
