@@ -54,6 +54,18 @@ export interface StewardedDevice {
   memoryGb?: number;
   storageTb?: number;
   bandwidthMbps?: number;
+
+  // Runtime node details (populated from heartbeat/metrics)
+  nodeType?: string;
+  isPrimaryNode?: boolean;
+  location?: { label: string; region: string; country: string };
+  resources?: {
+    cpuPercent: number;
+    memoryPercent: number;
+    storageUsedGB: number;
+    storageTotalGB: number;
+    bandwidthMbps: number;
+  };
 }
 
 export interface DeviceStewardshipState {

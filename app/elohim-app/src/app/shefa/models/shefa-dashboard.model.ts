@@ -947,6 +947,18 @@ export function getNodeStatusDisplay(status: NodeClusterStatus): {
 }
 
 /**
+ * Get display info for a node type string (e.g. 'holoport', 'cloud', 'desktop').
+ */
+export function getNodeTypeDisplay(nodeType: string): { label: string; icon: string } {
+  const displays: Record<string, { label: string; icon: string }> = {
+    holoport: { label: 'HoloPort', icon: 'dns' },
+    cloud: { label: 'Cloud Node', icon: 'cloud' },
+    desktop: { label: 'Desktop Node', icon: 'computer' },
+  };
+  return displays[nodeType] ?? { label: nodeType, icon: 'dns' };
+}
+
+/**
  * Get display info for gap severity.
  */
 export function getGapSeverityDisplay(severity: ComputeGap['severity'] | 'low' | 'critical'): {
