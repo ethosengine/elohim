@@ -70,18 +70,22 @@ use crate::views::{
     CreateEconomicEventInputView,
     CreateHumanRelationshipInputView,
     CreateMasteryInputView,
+    CreateNodeStewardshipInputView,
     CreatePathInputView,
     CreateRelationshipInputView,
+    CreateStewardedNodeInputView,
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
     InitiateClaimInputView,
     LocalSessionView,
+    NodeStewardshipView,
     PackageManifestView,
     PathView,
     PathWithDetailsView,
     RelationshipSeedView,
     RelationshipView,
+    StewardedNodeView,
     StewardshipAllocationView,
     StewardshipSeedView,
     UpdateAllocationInputView,
@@ -1775,6 +1779,24 @@ impl HttpServer {
             }
             return self
                 .handle_allocation_by_id(req, method, alloc_path, &app_ctx)
+                .await;
+        }
+
+        // Stewarded node routes (Diesel)
+        if resource_path == "nodes" {
+            return self.handle_nodes_list(req, method, &app_ctx).await;
+        }
+
+        if let Some(node_path) = resource_path.strip_prefix("nodes/") {
+            // /db/nodes/{id}/stewardship
+            if let Some(node_id) = node_path.strip_suffix("/stewardship") {
+                return self
+                    .handle_node_stewardship(req, method, node_id, &app_ctx)
+                    .await;
+            }
+            // /db/nodes/{id}
+            return self
+                .handle_node_by_id(req, method, node_path, &app_ctx)
                 .await;
         }
 
@@ -4732,6 +4754,183 @@ impl HttpServer {
             failed,
             errors,
         }))
+    }
+
+    // =========================================================================
+    // Stewarded Node Handlers
+    // =========================================================================
+
+    /// GET /db/nodes — list nodes (optional ?claimStatus= filter)
+    /// POST /db/nodes — register a new node
+    async fn handle_nodes_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+                let claim_status = params.get("claimStatus").map(|s| s.as_str());
+
+                match crate::db::stewarded_nodes::list_stewarded_nodes(
+                    &mut conn,
+                    claim_status,
+                ) {
+                    Ok(nodes) => {
+                        let views: Vec<StewardedNodeView> =
+                            nodes.into_iter().map(|n| n.into()).collect();
+                        Ok(response::ok(&views))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?
+                    .to_bytes();
+                let input_view: CreateStewardedNodeInputView =
+                    serde_json::from_slice(&body).map_err(|e| {
+                        StorageError::InvalidInput(format!("Invalid JSON: {}", e))
+                    })?;
+                // Inject app_id from context
+                let mut input: crate::db::stewarded_nodes::CreateStewardedNodeInput =
+                    input_view.into();
+                input.app_id = app_ctx.app_id.clone();
+
+                match crate::db::stewarded_nodes::create_stewarded_node(&mut conn, input) {
+                    Ok(node) => {
+                        let view: StewardedNodeView = node.into();
+                        Ok(response::created(&view))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/nodes/{id} — get node with stewards joined
+    async fn handle_node_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        _app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::GET => {
+                match crate::db::stewarded_nodes::get_stewarded_node_by_id(&mut conn, id) {
+                    Ok(Some(node)) => {
+                        let mut view: StewardedNodeView = node.into();
+                        // Join stewards with human display names
+                        match crate::db::stewarded_nodes::list_stewards_for_node(&mut conn, id) {
+                            Ok(stewards) => {
+                                view.stewards = stewards
+                                    .into_iter()
+                                    .map(|s| {
+                                        let name = crate::db::humans::get_human_by_id(
+                                            &mut conn,
+                                            &s.human_id,
+                                        )
+                                        .ok()
+                                        .flatten()
+                                        .map(|h| h.display_name)
+                                        .unwrap_or_else(|| s.human_id.clone());
+                                        NodeStewardshipView::from_with_name(s, name)
+                                    })
+                                    .collect();
+                            }
+                            Err(e) => {
+                                warn!(error = %e, node_id = id, "Failed to load stewards for node");
+                            }
+                        }
+                        Ok(response::ok(&view))
+                    }
+                    Ok(None) => Ok(response::not_found("Node not found")),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// POST /db/nodes/{id}/stewardship — add a stewardship relationship to a node
+    async fn handle_node_stewardship(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        node_id: &str,
+        _app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::POST => {
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?
+                    .to_bytes();
+                let mut input_view: CreateNodeStewardshipInputView =
+                    serde_json::from_slice(&body).map_err(|e| {
+                        StorageError::InvalidInput(format!("Invalid JSON: {}", e))
+                    })?;
+                // Override node_id from URL path segment (authoritative)
+                input_view.node_id = node_id.to_string();
+                let input: crate::db::stewarded_nodes::CreateNodeStewardshipInput =
+                    input_view.into();
+
+                match crate::db::stewarded_nodes::create_node_stewardship(&mut conn, input) {
+                    Ok(stewardship) => {
+                        let name = crate::db::humans::get_human_by_id(
+                            &mut conn,
+                            &stewardship.human_id,
+                        )
+                        .ok()
+                        .flatten()
+                        .map(|h| h.display_name)
+                        .unwrap_or_else(|| stewardship.human_id.clone());
+                        let view = NodeStewardshipView::from_with_name(stewardship, name);
+                        Ok(response::created(&view))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
     }
 
     // =========================================================================

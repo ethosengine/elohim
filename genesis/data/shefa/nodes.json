@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "id": "node-storage-01",
+      "displayName": "Storage Node",
+      "cpuCores": 2,
+      "memoryGb": 4,
+      "storageTb": 4.0,
+      "bandwidthMbps": 1000,
+      "stewardTier": "guardian",
+      "region": "home-lab",
+      "context": "NAS in the garage. 4TB spinning disk, runs Harbor container registry and family photo archive. Runs hot in summer — monitor thermals."
+    },
+    {
+      "id": "node-operations-01",
+      "displayName": "Operations Node",
+      "cpuCores": 4,
+      "memoryGb": 8,
+      "storageTb": 0.25,
+      "bandwidthMbps": 1000,
+      "stewardTier": "guardian",
+      "region": "home-lab",
+      "context": "Edge node running Jenkins agents and CI/CD pipelines. Handles batch workloads. Modest storage — build artifacts should be pushed to storage node."
+    }
+  ],
+  "stewardship": [
+    {
+      "nodeId": "node-storage-01",
+      "humanId": "human-matthew-manager",
+      "affinityScore": 1.0,
+      "relationship": "primary",
+      "context": "Set up and maintains the hardware. Knows the RAID configuration and network topology."
+    },
+    {
+      "nodeId": "node-storage-01",
+      "humanId": "human-jessica-spouse",
+      "affinityScore": 0.6,
+      "relationship": "household",
+      "context": "Uses for photo backups. Knows how to restart if the NAS light goes red."
+    },
+    {
+      "nodeId": "node-operations-01",
+      "humanId": "human-matthew-manager",
+      "affinityScore": 1.0,
+      "relationship": "primary",
+      "context": "Primary operator. Manages Jenkins configuration and pipeline definitions."
+    },
+    {
+      "nodeId": "node-operations-01",
+      "humanId": "human-jessica-spouse",
+      "affinityScore": 0.4,
+      "relationship": "household"
+    }
+  ]
+}

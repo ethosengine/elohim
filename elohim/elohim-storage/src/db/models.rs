@@ -16,9 +16,9 @@ use super::diesel_schema::{
     access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
     content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
-    governance_states, human_relationships, humans, local_sessions, path_attestations, path_tags,
-    paths, precedents, premium_gates, proposals, rea_commitments, relationships, steps,
-    steward_credentials, stewardship_allocations,
+    governance_states, human_relationships, humans, local_sessions, node_stewardship,
+    path_attestations, path_tags, paths, precedents, premium_gates, proposals, rea_commitments,
+    relationships, steps, steward_credentials, stewardship_allocations, stewarded_nodes,
 };
 
 // ============================================================================
@@ -1733,4 +1733,71 @@ pub struct NewAgreement<'a> {
     pub note: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
+}
+
+// ============================================================================
+// Stewarded Node Models
+// ============================================================================
+
+/// A physical node registered on the DHT and projected to storage.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = stewarded_nodes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct StewardedNode {
+    pub id: String,
+    pub display_name: String,
+    pub claim_status: String,
+    pub cpu_cores: i32,
+    pub memory_gb: i32,
+    pub storage_tb: f64,
+    pub bandwidth_mbps: i32,
+    pub steward_tier: String,
+    pub custodian_opt_in: i32,
+    pub region: Option<String>,
+    pub context_epr_id: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub app_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = stewarded_nodes)]
+pub struct NewStewardedNode {
+    pub id: String,
+    pub display_name: String,
+    pub claim_status: String,
+    pub cpu_cores: i32,
+    pub memory_gb: i32,
+    pub storage_tb: f64,
+    pub bandwidth_mbps: i32,
+    pub steward_tier: String,
+    pub custodian_opt_in: i32,
+    pub region: Option<String>,
+    pub context_epr_id: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub app_id: String,
+}
+
+/// Stewardship relationship between a node and a human.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = node_stewardship)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct NodeStewardship {
+    pub node_id: String,
+    pub human_id: String,
+    pub affinity_score: f64,
+    pub relationship: String,
+    pub context_epr_id: Option<String>,
+    pub granted_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = node_stewardship)]
+pub struct NewNodeStewardship {
+    pub node_id: String,
+    pub human_id: String,
+    pub affinity_score: f64,
+    pub relationship: String,
+    pub context_epr_id: Option<String>,
 }

@@ -10,7 +10,7 @@
  * - offline / unknown -> offline
  */
 
-import type { OwnedNode, NodeClusterStatus, NodeRole } from './shefa-dashboard.model';
+import type { StewardedNode, NodeClusterStatus, NodeRole } from './shefa-dashboard.model';
 
 // @coverage: 31.6% (2026-02-24)
 
@@ -45,12 +45,15 @@ export interface StewardedDevice {
   appVersion?: string;
   doorwayUrl?: string; // Which doorway this device connected through
 
-  // Node steward metadata (from existing OwnedNode)
-  nodeType?: OwnedNode['nodeType'];
-  location?: OwnedNode['location'];
+  // Node steward metadata (from StewardedNode)
+  stewardTier?: StewardedNode['stewardTier'];
+  region?: StewardedNode['region'];
   roles?: NodeRole[];
-  resources?: OwnedNode['resources'];
-  isPrimaryNode?: boolean;
+  claimStatus?: StewardedNode['claimStatus'];
+  cpuCores?: number;
+  memoryGb?: number;
+  storageTb?: number;
+  bandwidthMbps?: number;
 }
 
 export interface DeviceStewardshipState {

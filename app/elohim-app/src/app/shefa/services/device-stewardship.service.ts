@@ -30,7 +30,7 @@ import {
 
 import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../interfaces';
 
-import type { OwnedNode } from '../models/shefa-dashboard.model';
+import type { StewardedNode } from '../models/shefa-dashboard.model';
 
 const CATEGORY_APP_STEWARD: DeviceCategory = 'app-steward';
 const CATEGORY_NODE_STEWARD: DeviceCategory = 'node-steward';
@@ -176,7 +176,7 @@ export class DeviceStewardshipService {
 
     try {
       const topology = await firstValueFrom(this.shefaComputeService.getNodeTopology(operatorId));
-      return (topology.nodes ?? []).map(node => this.mapOwnedNodeToDevice(node));
+      return (topology.nodes ?? []).map(node => this.mapStewardedNodeToDevice(node));
     } catch {
       // Zome may not be available — not an error for device view
       return [];
@@ -184,21 +184,24 @@ export class DeviceStewardshipService {
   }
 
   /**
-   * Map an OwnedNode from topology to a StewardedDevice.
+   * Map a StewardedNode from topology to a StewardedDevice.
    */
-  private mapOwnedNodeToDevice(node: OwnedNode): StewardedDevice {
+  private mapStewardedNodeToDevice(node: StewardedNode): StewardedDevice {
     return {
-      deviceId: node.nodeId,
+      deviceId: node.id,
       displayName: node.displayName,
       category: CATEGORY_NODE_STEWARD,
-      status: mapNodeClusterStatusToDeviceStatus(node.status),
-      lastSeen: node.lastHeartbeat,
+      // StewardedNode has no live status — use claimStatus as a proxy
+      status: node.claimStatus === 'claimed' ? 'connected' : 'offline',
+      lastSeen: node.updatedAt,
       isCurrentDevice: false,
-      nodeType: node.nodeType,
-      location: node.location,
-      roles: node.roles,
-      resources: node.resources,
-      isPrimaryNode: node.isPrimary,
+      stewardTier: node.stewardTier,
+      region: node.region,
+      claimStatus: node.claimStatus,
+      cpuCores: node.cpuCores,
+      memoryGb: node.memoryGb,
+      storageTb: node.storageTb,
+      bandwidthMbps: node.bandwidthMbps,
     };
   }
 
