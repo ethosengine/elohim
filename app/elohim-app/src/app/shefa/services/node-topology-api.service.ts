@@ -22,7 +22,7 @@ export class NodeTopologyApiService {
 
   /** List all stewarded nodes, optionally filtered by claim status. */
   listNodes(claimStatus?: StewardedNode['claimStatus']): Observable<StewardedNode[]> {
-    const params = claimStatus ? { claimStatus } : {};
+    const params: Record<string, string> = claimStatus ? { claimStatus } : {};
     return this.http.get<StewardedNode[]>('/db/nodes', { params });
   }
 
