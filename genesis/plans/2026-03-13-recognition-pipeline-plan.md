@@ -1179,7 +1179,7 @@ Update section 3 to reflect what was built:
 
 Recognition pipeline service built in Rust (`elohim-storage/src/services/recognition_pipeline_service.rs`) with 5 composable stages: normalize (event type weights) → resolve (steward allocations + affinity) → weight (proportional with affinity coefficient) → limit (constitutional checks, v0 passthrough) → settle (economic events + recognition accumulation). Exposed via `POST /api/v1/recognition/distribute`. Angular thin client in elohim pillar.
 
-**Remaining**: v0 affinity defaults to 1.0 — wire stored_affinity from node_stewardship and derived_affinity from human profiles. Constitutional limit enforcement (stage 4). Future distribution models documented in `genesis/research/economic/future-distribution-models.md`.
+**Remaining**: v0 affinity defaults to 1.0 — wire stored_affinity from node_stewardship and derived_affinity from human profiles. Constitutional limit enforcement (stage 4). Future distribution models documented in `elohim/elohim-storage/research/future-distribution-models.md`.
 
 **Impact**: High for M5-M6.
 **Effort**: Medium remaining. REA coordination layer wired; deeper economics is research.

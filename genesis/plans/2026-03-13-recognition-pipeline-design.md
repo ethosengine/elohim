@@ -254,7 +254,7 @@ Following elohim-storage boundary conventions:
 - Swimlane-specific distribution (all recognition is generic v0)
 - Constitutional limit enforcement (stage 4 is passthrough, structure only)
 
-These are documented in `genesis/research/economic/` for future work.
+These are documented in `elohim/elohim-storage/research/` for future work.
 
 ---
 

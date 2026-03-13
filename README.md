@@ -111,6 +111,7 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │   ├── orchestrator/              # CI/CD central controller
 │   ├── a2o/                       # Alpha-to-omega E2E validation
 │   ├── docs/                      # Source content (markdown, Gherkin)
+│   ├── research/                  # Research index (links to module research/)
 │   ├── seeder/                    # Content seeding tools
 │   └── manifests/                 # K8s deployment manifests
 │

@@ -1439,7 +1439,6 @@ dependencies = [
  "rmp",
  "rmp-serde",
  "rmpv",
- "rusqlite",
  "serde",
  "serde_ipld_dagcbor",
  "serde_ipld_dagjson",
@@ -5275,7 +5274,6 @@ dependencies = [
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
- "serde_json",
  "smallvec",
 ]
 
