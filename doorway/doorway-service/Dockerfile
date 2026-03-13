@@ -34,6 +34,7 @@ RUN cargo build --release
 FROM deps AS check
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
 COPY doorway/doorway-service/src ./src
+COPY doorway/doorway-service/templates ./templates
 RUN cargo fmt --check
 RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
 RUN RUSTFLAGS="" cargo test --lib --bins
@@ -44,8 +45,9 @@ FROM deps AS builder
 # Remove placeholder source and binaries to force rebuild
 RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
 
-# Copy actual source
+# Copy actual source and templates (Askama resolves templates at compile time)
 COPY doorway/doorway-service/src ./src
+COPY doorway/doorway-service/templates ./templates
 
 # Accept git info as build args (build.rs reads these env vars)
 ARG GIT_COMMIT_SHORT=unknown
