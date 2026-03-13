@@ -11,18 +11,27 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 import { CONTENT_FORMATS, CONTENT_TYPES } from '../validation-constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SEEDER_DIR = path.resolve(__dirname, '..', '..');
-const GENESIS_DIR = path.resolve(SEEDER_DIR, '..');
-const CONTENT_DIR = path.join(GENESIS_DIR, 'data', 'lamad', 'content');
-const APP_GENERATED = path.resolve(
-  GENESIS_DIR,
-  '..',
+
+function findRepoRoot(): string {
+  try {
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Fallback: __dirname is genesis/seeder/src/__tests__
+    return path.resolve(__dirname, '..', '..', '..', '..');
+  }
+}
+
+const REPO_ROOT = findRepoRoot();
+const CONTENT_DIR = path.join(REPO_ROOT, 'genesis', 'data', 'lamad', 'content');
+const APP_GENERATED = path.join(
+  REPO_ROOT,
   'app',
   'elohim-app',
   'src',
@@ -30,10 +39,9 @@ const APP_GENERATED = path.resolve(
   'generated',
   'schema-enums.ts',
 );
-const SEEDER_GENERATED = path.resolve(SEEDER_DIR, 'src', 'generated', 'schema-enums.ts');
-const HEALING_RS = path.resolve(
-  GENESIS_DIR,
-  '..',
+const SEEDER_GENERATED = path.join(REPO_ROOT, 'genesis', 'seeder', 'src', 'generated', 'schema-enums.ts');
+const HEALING_RS = path.join(
+  REPO_ROOT,
   'elohim',
   'holochain',
   'dna',

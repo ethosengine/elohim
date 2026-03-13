@@ -1,59 +1,56 @@
 # What Spoke to Me: A Survey of What I'd Love to Work On
 
-_Updated 2026-02-25 after protocol philosophy conversation. Previous completed items archived — see git history for context._
+_Updated 2026-03-13. Completed items cleared — see git history for previous versions._
 
 ---
 
-## 1. Elohim Presence in the Learning Journey
+## Completed
 
-The protocol's philosophical architecture describes the elohim layer as nudge/play/resolve — AI agents that are separate from humanity but present within the system, holding context across all four pillars and reflecting it back meaningfully. Right now, *I'm* the elohim — sync-check hooks, ambient reminders, story-first nudges — but that's configuration files, not a learner-facing presence.
+These items have been built since the original survey (2026-02-25). Archived here for context, not action.
 
-There's no `ElohimService`, no formalized agent presence in the app. What would it look like for the lamad journey to have an elohim presence — not a chatbot, not anthropomorphized, but something that sees your learning profile, your discovery results, your community relationships, and reflects it back in a way that feels like guidance? The difference between content delivery and encountering something that *knows you*.
-
-This is the "play" function — meaning-making that transcends the rational. It's what makes the system endure across generations. The fruit on the tree.
-
-**Impact**: Transformative. This is what the protocol IS.
-**Effort**: Requires deep design. What does non-anthropomorphized AI presence feel like in a UI?
-**Depends on**: Path adaptation (#2), discovery attestation infrastructure (done), sophia integration (in progress).
+- **Elohim Presence**: `ElohimAgentService` + `ElohimPresenceService` with 32 capabilities, 3 learner hooks (discovery completion, content completion, wellbeing check), mock+native backends, config UI. 96.9% coverage. The nudge/play/resolve functions are formalized and integrated with assessments and knowledge mapping.
+- **Path Adaptation**: `PathAdaptationService` + `LearnerContextService` + `PathRecommendationService`. Fog-of-war is now adaptive: mastery-based unlock, pre-assessment skip-ahead, discovery-driven path recommendations. No longer purely sequential.
+- **Sophia Moment JSON**: 4 instruments authored (values-hierarchy, attachment-style, strengths-finder, epic-domain) with 5 assessment JSONs, self-registering instrument pattern, and full pipeline from genesis JSON through storage to rendering. Minor gaps: `personal-values-discovery.json` instrument metadata not yet authored; constitutional reasoning exists as mastery assessment only.
+- **Offline Queue / IndexedDB**: `IndexedDBCacheService` (80.5% coverage), `WriteBufferService` (85.9%), `LocalSourceChainService` (47%). Infrastructure complete — TTL caching, priority queuing with IDB persistence, append-only local chain model.
+- **Story-First Loop**: 28 feature files across 8 directories. Pattern established and practiced. `dev-intent.jsonl` fallback in use. Ongoing discipline, not a deliverable.
 
 ---
 
-## 2. Path Adaptation Service - The Missing Intelligence
+## 1. Recovery Protocol - Sovereignty Through Embeddedness
 
-There is no `path-adaptation.service.ts`. The fog-of-war is purely sequential (completed steps + 1), not adaptive to mastery level, interest patterns, or learning velocity. For the learning experience to feel alive rather than linear, something needs to observe the learner's profile and adjust path recommendations.
+Phase 1 (shard tracking) complete. Frontend `RecoveryCoordinatorService` at 98.7% coverage with interview flow, attestation progress, question generation. Rich domain models.
 
-`PathService.getPathCompletionByContent()` cross-path method exists but nothing consumes it for adaptive routing. The discovery attestation service now records rich profile data (values hierarchy, attachment style, strengths) — this should inform what the learner sees next.
+Phases 2-5 remain: recovery request flow (DHT entry types in imagodei DNA), shard reconstruction, work-while-recovering, verification. Your attestations of relationship and history of mutual stewardship ARE your safety net — your actual people, whose elohim coordinate the response while preserving your dignity.
 
-**Impact**: High (M3 "Know Thyself"). Transforms learning from linear to responsive.
-**Effort**: Large. Needs design work on what "adaptive" means for this system.
-**Seeds**: `PathService.getPathCompletionByContent()`, `DiscoveryAttestationService.getDiscoveryProfile()`.
-
----
-
-## 3. Recovery Protocol - Sovereignty Through Embeddedness
-
-`doorway/RECOVERY-SPRINT-PLAN.md` describes a 10-sprint plan for social key recovery. A human loses their device but recovers their identity through a constitutional, verifiable process involving their actual relational web — family, congregation, neighbors, coop.
-
-After our conversation about relational trust, this is where philosophy becomes tangible. Your attestations of relationship and history of mutual stewardship ARE your safety net, encoded in the protocol. Not an insurance company, not a government program — your actual people, whose elohim can coordinate the response while preserving your dignity.
-
-**Impact**: Transformative for trust and adoption. Where shefa stops being a model layer and becomes real.
-**Effort**: Massive. 10 sprints planned. M4+ work.
+**Impact**: Transformative for trust and adoption. M4+ work.
+**Effort**: Large. 4 remaining phases.
+**Done**: Phase 1 shard tracking, frontend coordinator service, recovery models.
 
 ---
 
-## 4. Sophia Moment JSON Authoring
+## 2. The Governance Immune System (Qahal Write Path)
 
-The **critical path bottleneck** for M2-M3. Five discovery instruments are defined as metadata records (values hierarchy, attachment style, strengths finder, constitutional reasoning, personal values) but none have actual Sophia moment JSON authored. Without these, the assessment engine has nothing to render.
+Read-only layer fully functional — list, get, query governance states, challenges, proposals, precedents. Backend DB CRUD functions exist but are **not exposed via HTTP**. UI components (Loomio-style voting, reaction bar, SLA timer) are built but have nowhere to persist.
 
-Content authoring work requiring psychometric instrument design + Perseus/Sophia JSON format. AI can generate drafts but they need human review for psychometric validity.
+The gap: wire backend CRUD to POST routes (`/challenges`, `/responses`, `/appeals`, `/precedents`), then connect the existing UI. No a2o scenarios exist for governance — story-first was never applied here, which is why write paths were never driven.
 
-**Impact**: Critical for M2-M3. Literally the bottleneck.
-**Effort**: Large. Cross-disciplinary (psychometrics + JSON schema + content design).
+**Impact**: High for M5-M6. The elohim "resolve" function depends on this.
+**Effort**: Medium for the wiring (CRUD exists), large for the full immune system (dysfunction detection, precedent interpretation).
 
 ---
 
-## 5. The Governance Immune System (Qahal Write Path)
+## 3. Steward Economy Services
 
+`StewardshipAllocationService` exists at 14.8% coverage with content stewardship, portfolio queries, allocation CRUD, dispute management, recognition distribution. REA API clients exist (economic-events, exchange, flow-planning) but no unified coordinator. The allocation model is rich — contribution types, governance lifecycle, temporal effectiveness — but largely untested.
+
+**Impact**: High for M5-M6.
+**Effort**: Large. REA economics coordination layer needed.
+
+---
+
+## Small Gaps to Close
+
+<<<<<<< Updated upstream
 The qahal pillar has a complete model layer with constitutional challenges, SLA-guaranteed response times, precedent tracking, and dysfunction detection. Read-only operations implemented but zero write path. This is where the elohim "resolve" function lives — dispute resolution governed by community norms, not external courts.
 
 **Impact**: High for M5-M6. The third elohim function (resolve) depends on this.

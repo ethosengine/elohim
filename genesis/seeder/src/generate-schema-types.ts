@@ -9,20 +9,42 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const RUST_SOURCE = path.resolve(
-  __dirname,
-  '../../../elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs'
+// Resolve repo root reliably — __dirname-based relative paths can break
+// when tsx resolves import.meta.url differently based on CWD vs source location
+function findRepoRoot(): string {
+  try {
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Fallback: walk up from __dirname looking for genesis/ directory
+    let dir = __dirname;
+    for (let i = 0; i < 10; i++) {
+      if (fs.existsSync(path.join(dir, 'genesis')) && fs.existsSync(path.join(dir, 'elohim'))) {
+        return dir;
+      }
+      dir = path.dirname(dir);
+    }
+    // Last resort: assume __dirname is genesis/seeder/src
+    return path.resolve(__dirname, '..', '..', '..');
+  }
+}
+
+const REPO_ROOT = findRepoRoot();
+
+const RUST_SOURCE = path.join(
+  REPO_ROOT,
+  'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs'
 );
 
 const OUTPUT_FILE = path.resolve(__dirname, 'generated/schema-enums.ts');
-const APP_OUTPUT_FILE = path.resolve(
-  __dirname,
-  '../../../app/elohim-app/src/app/generated/schema-enums.ts'
+const APP_OUTPUT_FILE = path.join(
+  REPO_ROOT,
+  'app/elohim-app/src/app/generated/schema-enums.ts'
 );
 
 interface ParsedConstant {
@@ -117,6 +139,8 @@ function main() {
   // Check if Rust source exists
   if (!fs.existsSync(RUST_SOURCE)) {
     console.error(`ERROR: Rust source not found at ${RUST_SOURCE}`);
+    console.error(`  __dirname: ${__dirname}`);
+    console.error(`  REPO_ROOT: ${REPO_ROOT}`);
     process.exit(1);
   }
 
