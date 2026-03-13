@@ -1,4 +1,6 @@
 # Build stage
+# NOTE: Build context should be repo root directory
+# Run: docker build -f elohim/elohim-storage/Dockerfile -t elohim-storage .
 # Note: sysinfo 0.37.2 (via lair_keystore 0.6.3) requires Rust 1.88+
 FROM rust:1.88-slim-bookworm AS builder
 
@@ -14,8 +16,12 @@ RUN apt-get update && apt-get install -y \
     libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests first for dependency caching
-COPY Cargo.toml Cargo.lock ./
+# Copy manifests and local crates first for dependency caching
+COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
+COPY crates ./crates
+
+# Fix the path to local crates (now relative to /app)
+RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
 
 # Create dummy src to build dependencies
 RUN mkdir -p src && \
@@ -30,7 +36,7 @@ RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim*
 
 # Copy actual source
-COPY src ./src
+COPY elohim/elohim-storage/src ./src
 
 # Touch source files to ensure rebuild and build the release binary
 RUN touch src/main.rs src/lib.rs && cargo build --release

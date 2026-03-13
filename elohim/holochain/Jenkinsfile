@@ -612,12 +612,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd elohim/elohim-storage
-
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     -t elohim-storage:${IMAGE_TAG} \\
-                                    -f Dockerfile .
+                                    -f elohim/elohim-storage/Dockerfile .
 
                                 nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} elohim-storage:${GIT_COMMIT_HASH}
                             """
