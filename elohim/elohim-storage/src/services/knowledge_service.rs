@@ -78,8 +78,7 @@ impl KnowledgeService {
 
         // Create knowledge map
         let mut conn = self.conn()?;
-        let result =
-            knowledge_maps_diesel::create_knowledge_map(&mut conn, &self.ctx, input)?;
+        let result = knowledge_maps_diesel::create_knowledge_map(&mut conn, &self.ctx, input)?;
 
         // Emit event
         self.events.emit(StorageEvent::KnowledgeMapCreated {
@@ -110,8 +109,7 @@ impl KnowledgeService {
 
         // Update
         let mut conn = self.conn()?;
-        let result =
-            knowledge_maps_diesel::update_knowledge_map(&mut conn, &self.ctx, id, input)?;
+        let result = knowledge_maps_diesel::update_knowledge_map(&mut conn, &self.ctx, id, input)?;
 
         // Emit event
         self.events
@@ -123,8 +121,7 @@ impl KnowledgeService {
     /// Delete a knowledge map
     pub fn delete_knowledge_map(&self, id: &str) -> Result<bool, StorageError> {
         let mut conn = self.conn()?;
-        let deleted =
-            knowledge_maps_diesel::delete_knowledge_map(&mut conn, &self.ctx, id)?;
+        let deleted = knowledge_maps_diesel::delete_knowledge_map(&mut conn, &self.ctx, id)?;
 
         if deleted {
             self.events
@@ -235,8 +232,7 @@ impl KnowledgeService {
 
         // Create path extension
         let mut conn = self.conn()?;
-        let result =
-            path_extensions_diesel::create_path_extension(&mut conn, &self.ctx, input)?;
+        let result = path_extensions_diesel::create_path_extension(&mut conn, &self.ctx, input)?;
 
         // Emit event
         self.events.emit(StorageEvent::PathExtensionCreated {
@@ -280,8 +276,7 @@ impl KnowledgeService {
     /// Delete a path extension
     pub fn delete_path_extension(&self, id: &str) -> Result<bool, StorageError> {
         let mut conn = self.conn()?;
-        let deleted =
-            path_extensions_diesel::delete_path_extension(&mut conn, &self.ctx, id)?;
+        let deleted = path_extensions_diesel::delete_path_extension(&mut conn, &self.ctx, id)?;
 
         if deleted {
             self.events
@@ -338,8 +333,7 @@ impl KnowledgeService {
     /// Get knowledge statistics
     pub fn get_stats(&self) -> Result<KnowledgeStats, StorageError> {
         let mut conn = self.conn()?;
-        let total_maps =
-            knowledge_maps_diesel::knowledge_map_count(&mut conn, &self.ctx)? as u64;
+        let total_maps = knowledge_maps_diesel::knowledge_map_count(&mut conn, &self.ctx)? as u64;
         let total_extensions =
             path_extensions_diesel::path_extension_count(&mut conn, &self.ctx)? as u64;
 

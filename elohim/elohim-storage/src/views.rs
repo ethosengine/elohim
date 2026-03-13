@@ -95,7 +95,6 @@ use crate::db::models::{
 };
 use crate::db::steward_operations::RevenueSummary;
 
-
 // ============================================================================
 // App View
 // ============================================================================
@@ -244,7 +243,6 @@ impl From<Path> for PathView {
     }
 }
 
-
 // ============================================================================
 // Chapter Views
 // ============================================================================
@@ -275,7 +273,6 @@ impl From<Chapter> for ChapterView {
         }
     }
 }
-
 
 // ============================================================================
 // Step Views
@@ -318,7 +315,6 @@ impl From<Step> for StepView {
         }
     }
 }
-
 
 // ============================================================================
 // Path Attestation Views
@@ -404,7 +400,6 @@ impl From<PathWithSteps> for PathWithDetailsView {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -471,7 +466,6 @@ impl From<Relationship> for RelationshipView {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -3928,7 +3922,9 @@ pub struct RecognitionTriggerInputView {
     pub triggered_by: Option<String>,
 }
 
-impl From<RecognitionTriggerInputView> for crate::services::recognition_pipeline_service::RecognitionTrigger {
+impl From<RecognitionTriggerInputView>
+    for crate::services::recognition_pipeline_service::RecognitionTrigger
+{
     fn from(v: RecognitionTriggerInputView) -> Self {
         Self {
             content_id: v.content_id,
@@ -3965,7 +3961,11 @@ impl From<crate::services::recognition_pipeline_service::StageTrace> for StageTr
             effective_ratio: t.effective_ratio,
             pre_limit_share: t.pre_limit_share,
             final_share: t.final_share,
-            limit_reasons: t.limit_reasons.iter().map(|r| JsonVal(serde_json::to_value(r).unwrap_or_default())).collect(),
+            limit_reasons: t
+                .limit_reasons
+                .iter()
+                .map(|r| JsonVal(serde_json::to_value(r).unwrap_or_default()))
+                .collect(),
             economic_event_id: t.economic_event_id.unwrap_or_default(),
         }
     }
@@ -3985,16 +3985,28 @@ pub struct RecognitionDistributionResultView {
     pub limits_applied: Vec<JsonVal>,
 }
 
-impl From<crate::services::recognition_pipeline_service::RecognitionDistributionResult> for RecognitionDistributionResultView {
-    fn from(r: crate::services::recognition_pipeline_service::RecognitionDistributionResult) -> Self {
+impl From<crate::services::recognition_pipeline_service::RecognitionDistributionResult>
+    for RecognitionDistributionResultView
+{
+    fn from(
+        r: crate::services::recognition_pipeline_service::RecognitionDistributionResult,
+    ) -> Self {
         Self {
             content_id: r.content_id,
             trigger_event_type: r.trigger_event_type,
             raw_amount: r.raw_amount,
             weighted_amount: r.weighted_amount,
-            distributions: r.distributions.into_iter().map(StageTraceView::from).collect(),
+            distributions: r
+                .distributions
+                .into_iter()
+                .map(StageTraceView::from)
+                .collect(),
             economic_event_ids: r.economic_event_ids,
-            limits_applied: r.limits_applied.iter().map(|l| JsonVal(serde_json::to_value(l).unwrap_or_default())).collect(),
+            limits_applied: r
+                .limits_applied
+                .iter()
+                .map(|l| JsonVal(serde_json::to_value(l).unwrap_or_default()))
+                .collect(),
         }
     }
 }

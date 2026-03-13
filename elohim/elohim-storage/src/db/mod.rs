@@ -37,10 +37,10 @@ pub mod device_policies;
 pub mod economic_events;
 pub mod human_relationships;
 pub mod humans;
-pub mod local_sessions;
-pub mod rea_commitments;
 pub mod knowledge_maps_diesel;
+pub mod local_sessions;
 pub mod path_extensions_diesel;
+pub mod rea_commitments;
 pub mod relationships_diesel;
 pub mod stewardship_allocations;
 

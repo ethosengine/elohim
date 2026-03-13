@@ -46,9 +46,7 @@
 
 use clap::Parser;
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
-use elohim_storage::{
-    BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig,
-};
+use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
 use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -497,7 +495,10 @@ async fn async_main(
                 info!("  GET    /session/all   - List all sessions");
             }
             Err(e) => {
-                error!("Failed to initialize database pool: {} (database API disabled)", e);
+                error!(
+                    "Failed to initialize database pool: {} (database API disabled)",
+                    e
+                );
             }
         }
     } else {
@@ -518,9 +519,7 @@ async fn async_main(
                 );
             }
         }
-        info!(
-            "Content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)"
-        );
+        info!("Content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)");
     }
 
     // Wire P2P services into HTTP server

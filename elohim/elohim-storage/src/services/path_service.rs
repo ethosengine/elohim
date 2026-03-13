@@ -61,11 +61,7 @@ impl PathService {
     }
 
     /// Search paths by tag
-    pub fn search_by_tag(
-        &self,
-        tag: &str,
-        limit: u32,
-    ) -> Result<Vec<Path>, StorageError> {
+    pub fn search_by_tag(&self, tag: &str, limit: u32) -> Result<Vec<Path>, StorageError> {
         // Use list and filter by tag (could be optimized with a dedicated query)
         let all_paths = self.list(1000, 0)?;
         // Paths don't have tags directly in the Diesel model; we'd need to join path_tags.
@@ -93,10 +89,7 @@ impl PathService {
     // =========================================================================
 
     /// Create a path with chapters and steps
-    pub fn create(
-        &self,
-        input: paths_diesel::CreatePathInput,
-    ) -> Result<Path, StorageError> {
+    pub fn create(&self, input: paths_diesel::CreatePathInput) -> Result<Path, StorageError> {
         // Validate input
         self.validate_path(&input)?;
 
@@ -384,7 +377,10 @@ impl PathService {
     }
 
     /// Validate chapter input
-    fn validate_chapter(&self, input: &paths_diesel::CreateChapterInput) -> Result<(), StorageError> {
+    fn validate_chapter(
+        &self,
+        input: &paths_diesel::CreateChapterInput,
+    ) -> Result<(), StorageError> {
         if input.id.is_empty() {
             return Err(StorageError::InvalidInput("chapter id is required".into()));
         }

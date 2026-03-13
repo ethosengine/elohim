@@ -40,10 +40,7 @@ impl RelationshipService {
     // =========================================================================
 
     /// Get relationship by ID
-    pub fn get(
-        &self,
-        id: &str,
-    ) -> Result<Option<crate::db::models::Relationship>, StorageError> {
+    pub fn get(&self, id: &str) -> Result<Option<crate::db::models::Relationship>, StorageError> {
         let mut conn = self.conn()?;
         relationships_diesel::get_relationship(&mut conn, &self.ctx, id)
     }
@@ -160,8 +157,7 @@ impl RelationshipService {
 
         // Create relationship
         let mut conn = self.conn()?;
-        let result =
-            relationships_diesel::create_relationship(&mut conn, &self.ctx, input)?;
+        let result = relationships_diesel::create_relationship(&mut conn, &self.ctx, input)?;
 
         // Emit event
         self.events.emit(StorageEvent::RelationshipCreated {
@@ -188,8 +184,7 @@ impl RelationshipService {
 
         // Perform bulk create
         let mut conn = self.conn()?;
-        let result =
-            relationships_diesel::bulk_create_relationships(&mut conn, &self.ctx, inputs)?;
+        let result = relationships_diesel::bulk_create_relationships(&mut conn, &self.ctx, inputs)?;
 
         // Emit event
         if result.created > 0 {

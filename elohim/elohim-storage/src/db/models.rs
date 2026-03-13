@@ -19,7 +19,7 @@ use super::diesel_schema::{
     governance_states, human_relationships, humans, knowledge_maps, local_sessions,
     node_stewardship, path_attestations, path_extensions, path_tags, paths, precedents,
     premium_gates, proposals, rea_commitments, relationships, steps, steward_credentials,
-    stewardship_allocations, stewarded_nodes,
+    stewarded_nodes, stewardship_allocations,
 };
 
 // ============================================================================

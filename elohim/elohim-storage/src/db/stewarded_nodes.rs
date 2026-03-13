@@ -7,7 +7,9 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use super::diesel_schema::{node_stewardship, stewarded_nodes};
-use super::models::{current_timestamp, NewNodeStewardship, NewStewardedNode, NodeStewardship, StewardedNode};
+use super::models::{
+    current_timestamp, NewNodeStewardship, NewStewardedNode, NodeStewardship, StewardedNode,
+};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -107,9 +109,7 @@ pub fn get_stewarded_node_by_id(
         .filter(stewarded_nodes::id.eq(id))
         .first::<StewardedNode>(conn)
         .optional()
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to fetch stewarded node by id: {}", e))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to fetch stewarded node by id: {}", e)))
 }
 
 /// List stewarded nodes, optionally filtered by `claim_status`.
@@ -119,8 +119,7 @@ pub fn list_stewarded_nodes(
     conn: &mut SqliteConnection,
     claim_status: Option<&str>,
 ) -> Result<Vec<StewardedNode>, StorageError> {
-    let mut query = stewarded_nodes::table
-        .into_boxed();
+    let mut query = stewarded_nodes::table.into_boxed();
 
     if let Some(status) = claim_status {
         query = query.filter(stewarded_nodes::claim_status.eq(status));
@@ -156,9 +155,7 @@ pub fn create_node_stewardship(
     diesel::insert_into(node_stewardship::table)
         .values(&new_rel)
         .execute(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to insert node stewardship: {}", e))
-        })?;
+        .map_err(|e| StorageError::Internal(format!("Failed to insert node stewardship: {}", e)))?;
 
     // Set granted_at timestamp
     diesel::update(
@@ -169,7 +166,10 @@ pub fn create_node_stewardship(
     .set(node_stewardship::granted_at.eq(&now))
     .execute(conn)
     .map_err(|e| {
-        StorageError::Internal(format!("Failed to set granted_at on node stewardship: {}", e))
+        StorageError::Internal(format!(
+            "Failed to set granted_at on node stewardship: {}",
+            e
+        ))
     })?;
 
     get_node_stewardship(conn, &input.node_id, &input.human_id)?
@@ -187,9 +187,7 @@ pub fn get_node_stewardship(
         .filter(node_stewardship::human_id.eq(human_id))
         .first::<NodeStewardship>(conn)
         .optional()
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to fetch node stewardship: {}", e))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to fetch node stewardship: {}", e)))
 }
 
 /// List all stewards for a given node, ordered by affinity score descending.
@@ -201,9 +199,7 @@ pub fn list_stewards_for_node(
         .filter(node_stewardship::node_id.eq(node_id))
         .order(node_stewardship::affinity_score.desc())
         .load::<NodeStewardship>(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to list stewards for node: {}", e))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to list stewards for node: {}", e)))
 }
 
 /// List all nodes stewarded by a given human, ordered by affinity score descending.
@@ -215,7 +211,5 @@ pub fn list_nodes_for_human(
         .filter(node_stewardship::human_id.eq(human_id))
         .order(node_stewardship::affinity_score.desc())
         .load::<NodeStewardship>(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to list nodes for human: {}", e))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to list nodes for human: {}", e)))
 }

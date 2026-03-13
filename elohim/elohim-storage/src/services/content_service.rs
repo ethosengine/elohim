@@ -40,10 +40,7 @@ impl ContentService {
     // =========================================================================
 
     /// Get content by ID
-    pub fn get(
-        &self,
-        id: &str,
-    ) -> Result<Option<crate::db::models::Content>, StorageError> {
+    pub fn get(&self, id: &str) -> Result<Option<crate::db::models::Content>, StorageError> {
         let mut conn = self.conn()?;
         content_diesel::get_content(&mut conn, &self.ctx, id)
     }
@@ -160,7 +157,8 @@ impl ContentService {
 
         let mut conn = self.conn()?;
         // Delete relationships where this content is source or target
-        let _ = db::relationships_diesel::delete_relationships_for_content(&mut conn, &self.ctx, id);
+        let _ =
+            db::relationships_diesel::delete_relationships_for_content(&mut conn, &self.ctx, id);
         // Then delete content
         content_diesel::delete_content(&mut conn, &self.ctx, id)?;
 
@@ -175,7 +173,10 @@ impl ContentService {
     // =========================================================================
 
     /// Validate content input
-    fn validate_content(&self, input: &content_diesel::CreateContentInput) -> Result<(), StorageError> {
+    fn validate_content(
+        &self,
+        input: &content_diesel::CreateContentInput,
+    ) -> Result<(), StorageError> {
         if input.id.is_empty() {
             return Err(StorageError::InvalidInput("id is required".into()));
         }

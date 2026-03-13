@@ -79,18 +79,9 @@ pub struct LimitedShare {
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum LimitReason {
     None,
-    FloorApplied {
-        floor: f64,
-        original: f64,
-    },
-    CeilingApplied {
-        ceiling: f64,
-        excess: f64,
-    },
-    ExcessRedistributed {
-        from_steward: String,
-        amount: f64,
-    },
+    FloorApplied { floor: f64, original: f64 },
+    CeilingApplied { ceiling: f64, excess: f64 },
+    ExcessRedistributed { from_steward: String, amount: f64 },
 }
 
 /// Per-steward trace through all pipeline stages.
@@ -142,11 +133,7 @@ fn event_type_weight(event_type: &str) -> f64 {
 ///
 /// Looks up the weight for the given event type (defaulting to 0.01 for unknown
 /// types) and computes weighted_amount = raw_amount * weight.
-pub fn normalize_trigger(
-    content_id: &str,
-    event_type: &str,
-    raw_amount: f64,
-) -> NormalizedTrigger {
+pub fn normalize_trigger(content_id: &str, event_type: &str, raw_amount: f64) -> NormalizedTrigger {
     let weight = event_type_weight(event_type);
     NormalizedTrigger {
         content_id: content_id.to_string(),
@@ -184,8 +171,7 @@ pub fn resolve_stewards(
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<ResolvedSteward>, StorageError> {
-    let allocations =
-        stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
+    let allocations = stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
     Ok(resolve_from_allocations(&allocations))
 }
 
@@ -350,7 +336,8 @@ pub fn distribute(
     trigger: RecognitionTrigger,
 ) -> Result<RecognitionDistributionResult, StorageError> {
     // Stage 1: Normalize
-    let normalized = normalize_trigger(&trigger.content_id, &trigger.event_type, trigger.raw_amount);
+    let normalized =
+        normalize_trigger(&trigger.content_id, &trigger.event_type, trigger.raw_amount);
 
     if normalized.weighted_amount <= 0.0 {
         return Ok(RecognitionDistributionResult {

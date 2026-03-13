@@ -28,10 +28,10 @@ pub mod knowledge_service;
 pub mod path_service;
 pub mod presence_service;
 pub mod rea_commitment_service;
+pub mod recognition_pipeline_service;
 pub mod relationship_service;
 pub mod resource_service;
 pub mod response;
-pub mod recognition_pipeline_service;
 pub mod stewardship_service;
 
 // Re-exports
@@ -69,10 +69,22 @@ impl Services {
         let ctx = AppContext::default_lamad();
 
         Self {
-            content: Arc::new(ContentService::new(pool.clone(), ctx.clone(), events.clone())),
+            content: Arc::new(ContentService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
             path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
-            relationship: Arc::new(RelationshipService::new(pool.clone(), ctx.clone(), events.clone())),
-            knowledge: Arc::new(KnowledgeService::new(pool.clone(), ctx.clone(), events.clone())),
+            relationship: Arc::new(RelationshipService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
+            knowledge: Arc::new(KnowledgeService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
             events,
         }
     }
@@ -83,10 +95,22 @@ impl Services {
         let ctx = AppContext::default_lamad();
 
         Self {
-            content: Arc::new(ContentService::new(pool.clone(), ctx.clone(), events.clone())),
+            content: Arc::new(ContentService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
             path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
-            relationship: Arc::new(RelationshipService::new(pool.clone(), ctx.clone(), events.clone())),
-            knowledge: Arc::new(KnowledgeService::new(pool.clone(), ctx.clone(), events.clone())),
+            relationship: Arc::new(RelationshipService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
+            knowledge: Arc::new(KnowledgeService::new(
+                pool.clone(),
+                ctx.clone(),
+                events.clone(),
+            )),
             events,
         }
     }
