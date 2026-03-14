@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 
 use crate::db::economic_events::{record_event, CreateEconomicEventInput};
 use crate::db::models::StewardshipAllocation;
+use crate::db::steward_affinity;
 use crate::db::stewardship_allocations;
 use crate::db::AppContext;
 use crate::error::StorageError;
@@ -165,14 +166,56 @@ pub fn resolve_from_allocations(allocations: &[StewardshipAllocation]) -> Vec<Re
         .collect()
 }
 
-/// Stage 2 (DB): Query allocations for content, then resolve.
+/// Stage 2 (pure): Build resolved stewards with real affinity data.
+/// Falls back to 0.0 for stewards without affinity records (no affinity = no share).
+pub fn resolve_from_allocations_with_affinity(
+    allocations: &[StewardshipAllocation],
+    affinity_map: &std::collections::HashMap<String, f64>,
+) -> Vec<ResolvedSteward> {
+    allocations
+        .iter()
+        .filter(|a| a.governance_state == "active")
+        .map(|a| {
+            let stored_affinity = affinity_map
+                .get(&a.steward_presence_id)
+                .copied()
+                .unwrap_or(0.0);
+            ResolvedSteward {
+                allocation_id: a.id.clone(),
+                steward_presence_id: a.steward_presence_id.clone(),
+                allocation_ratio: a.allocation_ratio,
+                stored_affinity,
+                derived_affinity: 1.0,
+                contribution_type: a.contribution_type.clone(),
+            }
+        })
+        .collect()
+}
+
+/// Stage 2 (DB): Query allocations for content, then resolve with real affinity.
 pub fn resolve_stewards(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<ResolvedSteward>, StorageError> {
     let allocations = stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
-    Ok(resolve_from_allocations(&allocations))
+
+    // Build affinity map from DB
+    let affinities = steward_affinity::list_affinities(
+        conn,
+        ctx,
+        &steward_affinity::AffinityQuery {
+            content_id: Some(content_id.to_string()),
+            ..Default::default()
+        },
+    )?;
+
+    let affinity_map: std::collections::HashMap<String, f64> = affinities
+        .into_iter()
+        .map(|a| (a.steward_id, a.affinity_score as f64))
+        .collect();
+
+    Ok(resolve_from_allocations_with_affinity(&allocations, &affinity_map))
 }
 
 // =============================================================================
@@ -539,6 +582,35 @@ mod tests {
         let allocations = vec![make_allocation("alloc-1", "steward-1", 0.6, "disputed")];
         let resolved = resolve_from_allocations(&allocations);
         assert!(resolved.is_empty());
+    }
+
+    #[test]
+    fn resolve_with_affinity_uses_provided_scores() {
+        let allocations = vec![
+            make_allocation("alloc-1", "steward-1", 0.6, "active"),
+            make_allocation("alloc-2", "steward-2", 0.4, "active"),
+        ];
+        let affinity_map = vec![
+            ("steward-1".to_string(), 0.85_f64),
+            ("steward-2".to_string(), 0.50_f64),
+        ]
+        .into_iter()
+        .collect::<std::collections::HashMap<_, _>>();
+
+        let resolved = resolve_from_allocations_with_affinity(&allocations, &affinity_map);
+        assert_eq!(resolved.len(), 2);
+        assert!((resolved[0].stored_affinity - 0.85).abs() < f64::EPSILON);
+        assert!((resolved[1].stored_affinity - 0.50).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn resolve_with_affinity_defaults_to_zero_when_missing() {
+        let allocations = vec![make_allocation("alloc-1", "steward-1", 0.6, "active")];
+        let affinity_map = std::collections::HashMap::new();
+
+        let resolved = resolve_from_allocations_with_affinity(&allocations, &affinity_map);
+        assert_eq!(resolved.len(), 1);
+        assert!((resolved[0].stored_affinity - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]
