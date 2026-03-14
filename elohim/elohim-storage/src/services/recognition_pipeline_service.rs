@@ -267,6 +267,135 @@ pub fn apply_weights(stewards: &[ResolvedSteward], weighted_amount: f64) -> Vec<
 
 /// Stage 4: Apply floor/ceiling limits to weighted shares.
 ///
+/// - `floor_ratio`: minimum share as ratio of total (e.g., 0.10 = 10%)
+/// - `ceiling_ratio`: maximum share as ratio of total (e.g., 0.70 = 70%)
+///
+/// Excess from ceiling enforcement is redistributed proportionally
+/// to non-capped stewards. Floor is applied after ceiling redistribution.
+pub fn apply_limits_with_config(
+    shares: &[WeightedShare],
+    total_amount: f64,
+    floor_ratio: Option<f64>,
+    ceiling_ratio: Option<f64>,
+) -> Vec<LimitedShare> {
+    if shares.is_empty() {
+        return Vec::new();
+    }
+
+    // If no limits configured, passthrough
+    if floor_ratio.is_none() && ceiling_ratio.is_none() {
+        return apply_limits(shares);
+    }
+
+    let mut results: Vec<LimitedShare> = shares
+        .iter()
+        .map(|s| LimitedShare {
+            allocation_id: s.allocation_id.clone(),
+            steward_presence_id: s.steward_presence_id.clone(),
+            pre_limit_amount: s.share_amount,
+            final_amount: s.share_amount,
+            limit_reasons: Vec::new(),
+        })
+        .collect();
+
+    // Apply ceiling
+    if let Some(ceiling) = ceiling_ratio {
+        let ceiling_amount = total_amount * ceiling;
+        let mut excess_total = 0.0;
+        let mut capped_indices = Vec::new();
+
+        for (i, result) in results.iter_mut().enumerate() {
+            if result.final_amount > ceiling_amount {
+                let excess = result.final_amount - ceiling_amount;
+                excess_total += excess;
+                result.final_amount = ceiling_amount;
+                result.limit_reasons.push(LimitReason::CeilingApplied {
+                    ceiling: ceiling_amount,
+                    excess,
+                });
+                capped_indices.push(i);
+            }
+        }
+
+        // Redistribute excess proportionally to non-capped stewards
+        if excess_total > 0.0 {
+            let uncapped_total: f64 = results
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !capped_indices.contains(i))
+                .map(|(_, r)| r.final_amount)
+                .sum();
+
+            if uncapped_total > 0.0 {
+                for (i, result) in results.iter_mut().enumerate() {
+                    if !capped_indices.contains(&i) {
+                        let redistribution =
+                            excess_total * (result.final_amount / uncapped_total);
+                        result.final_amount += redistribution;
+                        if redistribution > f64::EPSILON {
+                            result
+                                .limit_reasons
+                                .push(LimitReason::ExcessRedistributed {
+                                    from_steward: "ceiling_excess".to_string(),
+                                    amount: redistribution,
+                                });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Apply floor
+    if let Some(floor) = floor_ratio {
+        let floor_amount = total_amount * floor;
+
+        // Need to iterate by index because we modify other elements
+        let len = results.len();
+        for idx in 0..len {
+            if results[idx].final_amount < floor_amount && results[idx].final_amount > 0.0 {
+                let original_amount = results[idx].final_amount;
+                let boost = floor_amount - original_amount;
+                let steward_id = results[idx].steward_presence_id.clone();
+                results[idx].limit_reasons.push(LimitReason::FloorApplied {
+                    floor: floor_amount,
+                    original: original_amount,
+                });
+                results[idx].final_amount = floor_amount;
+
+                // Deduct boost proportionally from others above floor
+                let above_floor_total: f64 = results
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, r)| {
+                        *i != idx
+                            && r.steward_presence_id != steward_id
+                            && r.final_amount > floor_amount
+                    })
+                    .map(|(_, r)| r.final_amount - floor_amount)
+                    .sum();
+
+                if above_floor_total > 0.0 {
+                    for i in 0..len {
+                        if i != idx
+                            && results[i].steward_presence_id != steward_id
+                            && results[i].final_amount > floor_amount
+                        {
+                            let deduction = boost
+                                * ((results[i].final_amount - floor_amount) / above_floor_total);
+                            results[i].final_amount -= deduction;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    results
+}
+
+/// Stage 4: Apply floor/ceiling limits to weighted shares.
+///
 /// v0 implementation: passthrough — final_amount equals share_amount with no
 /// limit reasons applied. Future versions will enforce min/max constraints and
 /// redistribute excess.
@@ -639,5 +768,69 @@ mod tests {
         assert!(limited[0].limit_reasons.is_empty());
         assert!((limited[1].final_amount - 2.5).abs() < f64::EPSILON);
         assert!(limited[1].limit_reasons.is_empty());
+    }
+
+    #[test]
+    fn limits_apply_ceiling() {
+        let shares = vec![
+            WeightedShare {
+                allocation_id: "a1".to_string(),
+                steward_presence_id: "p1".to_string(),
+                effective_ratio: 0.8,
+                share_amount: 8.0,
+            },
+            WeightedShare {
+                allocation_id: "a2".to_string(),
+                steward_presence_id: "p2".to_string(),
+                effective_ratio: 0.2,
+                share_amount: 2.0,
+            },
+        ];
+
+        let limited = apply_limits_with_config(&shares, 10.0, None, Some(0.70));
+        assert_eq!(limited.len(), 2);
+        // p1 capped at 7.0 (70% of 10.0), excess 1.0 redistributed to p2
+        assert!((limited[0].final_amount - 7.0).abs() < 1e-10);
+        assert!((limited[1].final_amount - 3.0).abs() < 1e-10);
+        assert!(!limited[0].limit_reasons.is_empty());
+    }
+
+    #[test]
+    fn limits_apply_floor() {
+        let shares = vec![
+            WeightedShare {
+                allocation_id: "a1".to_string(),
+                steward_presence_id: "p1".to_string(),
+                effective_ratio: 0.95,
+                share_amount: 9.5,
+            },
+            WeightedShare {
+                allocation_id: "a2".to_string(),
+                steward_presence_id: "p2".to_string(),
+                effective_ratio: 0.05,
+                share_amount: 0.5,
+            },
+        ];
+
+        let limited = apply_limits_with_config(&shares, 10.0, Some(0.10), None);
+        // p2 bumped up to 1.0 (10% of 10.0), deducted from p1
+        assert!((limited[1].final_amount - 1.0).abs() < 1e-10);
+        assert!((limited[0].final_amount - 9.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn limits_passthrough_when_no_config() {
+        let shares = vec![
+            WeightedShare {
+                allocation_id: "a1".to_string(),
+                steward_presence_id: "p1".to_string(),
+                effective_ratio: 0.7,
+                share_amount: 7.0,
+            },
+        ];
+
+        let limited = apply_limits_with_config(&shares, 10.0, None, None);
+        assert!((limited[0].final_amount - 7.0).abs() < f64::EPSILON);
+        assert!(limited[0].limit_reasons.is_empty());
     }
 }
