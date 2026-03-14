@@ -475,6 +475,13 @@ impl HttpServer {
                     Ok(response::service_unavailable("Database not enabled"))
                 }
             }
+            (Method::POST, "/session/intent") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_set_session_intent(req, pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
 
             // EPR Head API: DAG-CBOR encoded three-pillar metadata
             (Method::PUT, p) if p.starts_with("/epr-head/") => {
@@ -4002,6 +4009,44 @@ impl HttpServer {
         let views: Vec<LocalSessionView> =
             sessions.into_iter().map(LocalSessionView::from).collect();
         Ok(response::ok(&views))
+    }
+
+    /// POST /session/intent - Set session intent for drift detection
+    ///
+    /// Declares what the user plans to do this session. Creates a set-point
+    /// for the ElohimGate to detect behavioral drift.
+    async fn handle_set_session_intent(
+        &self,
+        req: Request<Incoming>,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        let bytes = body.to_bytes();
+
+        let input: crate::views::SetSessionIntentInputView = serde_json::from_slice(&bytes)
+            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        match db::local_sessions::get_active_session(&mut conn)? {
+            Some(session) => {
+                db::local_sessions::set_session_intent(&mut conn, &session.id, &input.intent)?;
+                info!(session_id = %session.id, "Session intent set");
+                Ok(response::ok(&serde_json::json!({ "status": "intent_set" })))
+            }
+            None => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "No active session"}"#,
+                )))
+                .unwrap()),
+        }
     }
 
     // =========================================================================
