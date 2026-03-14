@@ -376,6 +376,7 @@ pub fn apply_limits_with_config(
                     .sum();
 
                 if above_floor_total > 0.0 {
+                    #[allow(clippy::needless_range_loop)]
                     for i in 0..len {
                         if i != idx
                             && results[i].steward_presence_id != steward_id
@@ -501,6 +502,13 @@ fn generate_recognition_event_id(content_id: &str, steward_id: &str, timestamp_m
 // Pipeline Orchestrator
 // ---------------------------------------------------------------------------
 
+/// Limit configuration for constitutional constraints
+#[derive(Debug, Clone, Default)]
+pub struct LimitConfig {
+    pub floor_ratio: Option<f64>,
+    pub ceiling_ratio: Option<f64>,
+}
+
 /// Run the full recognition distribution pipeline.
 ///
 /// Chains: normalize → resolve → weight → limit → settle
@@ -509,6 +517,16 @@ pub fn distribute(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     trigger: RecognitionTrigger,
+) -> Result<RecognitionDistributionResult, StorageError> {
+    distribute_with_limits(conn, ctx, trigger, &LimitConfig::default())
+}
+
+/// Run the full recognition distribution pipeline with optional limit config.
+pub fn distribute_with_limits(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    trigger: RecognitionTrigger,
+    limits: &LimitConfig,
 ) -> Result<RecognitionDistributionResult, StorageError> {
     // Stage 1: Normalize
     let normalized =
@@ -544,8 +562,17 @@ pub fn distribute(
     // Stage 3: Weight
     let shares = apply_weights(&stewards, normalized.weighted_amount);
 
-    // Stage 4: Limit
-    let limited = apply_limits(&shares);
+    // Stage 4: Apply limits if configured
+    let limited = if limits.floor_ratio.is_some() || limits.ceiling_ratio.is_some() {
+        apply_limits_with_config(
+            &shares,
+            normalized.weighted_amount,
+            limits.floor_ratio,
+            limits.ceiling_ratio,
+        )
+    } else {
+        apply_limits(&shares)
+    };
 
     // Stage 5: Settle
     let mut traces = settle(conn, ctx, &limited, &trigger, normalized.weighted_amount)?;
