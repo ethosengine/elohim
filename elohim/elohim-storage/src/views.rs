@@ -4086,6 +4086,66 @@ pub struct CurationEventInputView {
 }
 
 // ============================================================================
+// ElohimGate Views
+// ============================================================================
+
+/// Trust context summary for client observability.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TrustContextView {
+    pub composite_trust: f64,
+    pub mastery_depth: f64,
+    pub steward_standing: f64,
+    pub relationship_density: f64,
+    pub governance_health: f64,
+    pub behavioral_trust: f64,
+    pub intent_divergence: f64,
+    pub declared_intent: Option<String>,
+}
+
+/// Gate evaluation result for client.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GateEvaluationView {
+    pub tier: String,
+    pub trust_context: TrustContextView,
+    /// Present when gate pauses the mutation
+    pub pause_prompt: Option<String>,
+    /// Token to confirm a paused mutation
+    pub confirm_token: Option<String>,
+    /// Present when gate settles (constitutional boundary)
+    pub settlement_boundary: Option<String>,
+    pub appeal_path: Option<String>,
+}
+
+/// Imagodei observation output view.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ImagodeiObservationView {
+    pub id: String,
+    pub human_id: String,
+    pub observed_at: String,
+    pub observation_type: String,
+    pub content: String,
+    pub structured_signals: Option<JsonVal>,
+    pub trust_delta: f64,
+    pub visibility_layer: String,
+    pub relevance_decay: f64,
+    pub created_at: String,
+}
+
+/// Session intent input view.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SetSessionIntentInputView {
+    pub intent: String,
+}
+
+// ============================================================================
 // Schema Version Tests
 // ============================================================================
 
