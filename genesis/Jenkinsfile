@@ -48,7 +48,7 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
 def resolveInternalStorageUrl(String doorwayHost) {
     // elohim-storage runs on the edgenode service (port 8090), not doorway
     if (doorwayHost.contains('alpha.elohim.host')) {
-        return 'elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
+        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8090'
     } else if (doorwayHost.contains('staging.elohim.host')) {
         return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8090'
     } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {
@@ -60,15 +60,18 @@ def resolveInternalStorageUrl(String doorwayHost) {
 
 def getHumanStorageUrls(String environment) {
     def namespace = "elohim-${environment}"
+    // All humans seed to the shared edgenode service until per-human
+    // StatefulSets are deployed (see five-peer-content-distribution-plan)
+    def edgenodeService = "elohim-edgenode-${environment}"
     def humans = [
-        [humanId: 'human-matthew-manager',     service: 'elohim-matthew-alpha'],
-        [humanId: 'human-jessica-spouse',         service: 'elohim-jessica-alpha'],
-        [humanId: 'human-pete-pastor',           service: 'elohim-pete-alpha'],
-        [humanId: 'human-timothy-tutor',        service: 'elohim-timothy-alpha'],
-        [humanId: 'human-frank-farmer',         service: 'elohim-frank-alpha'],
+        [humanId: 'human-matthew-manager'],
+        [humanId: 'human-jessica-spouse'],
+        [humanId: 'human-pete-pastor'],
+        [humanId: 'human-timothy-tutor'],
+        [humanId: 'human-frank-farmer'],
     ]
     return humans.collect { h ->
-        h + [storageUrl: "${h.service}.${namespace}.svc.cluster.local:8090"]
+        h + [service: edgenodeService, storageUrl: "${edgenodeService}.${namespace}.svc.cluster.local:8090"]
     }
 }
 
