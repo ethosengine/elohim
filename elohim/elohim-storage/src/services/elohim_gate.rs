@@ -319,10 +319,55 @@ impl TrustContextCache {
     }
 }
 
+/// Cached pending confirmation — stores original mutation context
+/// so it can be validated when the user confirms a paused mutation.
+pub struct PendingConfirmation {
+    pub mutation: MutationType,
+    pub mutation_content: serde_json::Value,
+    pub human_id: String,
+    pub created_at: Instant,
+}
+
+/// Short-lived cache for pending confirmations (Pause flow).
+/// Token -> PendingConfirmation, with TTL expiry.
+pub struct PendingConfirmationCache {
+    entries: RwLock<HashMap<String, PendingConfirmation>>,
+    ttl: Duration,
+}
+
+impl PendingConfirmationCache {
+    pub fn new(ttl_secs: u64) -> Self {
+        Self {
+            entries: RwLock::new(HashMap::new()),
+            ttl: Duration::from_secs(ttl_secs),
+        }
+    }
+
+    /// Store a pending confirmation for a token.
+    pub fn store(&self, token: &str, confirmation: PendingConfirmation) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.insert(token.to_string(), confirmation);
+        }
+    }
+
+    /// Take (remove and return) a pending confirmation if within TTL.
+    /// Returns None if token not found or expired.
+    pub fn take(&self, token: &str) -> Option<PendingConfirmation> {
+        let mut entries = self.entries.write().ok()?;
+        let entry = entries.remove(token)?;
+        if entry.created_at.elapsed() < self.ttl {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+}
+
 /// The gate itself. Sprint 2: routes to InferenceRouter when available.
 pub struct ElohimGate {
     router: Option<Arc<InferenceRouter>>,
     trust_cache: TrustContextCache,
+    pending_confirmations: PendingConfirmationCache,
 }
 
 impl ElohimGate {
@@ -331,6 +376,7 @@ impl ElohimGate {
         Self {
             router: None,
             trust_cache: TrustContextCache::new(300),
+            pending_confirmations: PendingConfirmationCache::new(300),
         }
     }
 
@@ -339,12 +385,18 @@ impl ElohimGate {
         Self {
             router: Some(router),
             trust_cache: TrustContextCache::new(300),
+            pending_confirmations: PendingConfirmationCache::new(300),
         }
     }
 
     /// Access the trust context cache.
     pub fn trust_cache(&self) -> &TrustContextCache {
         &self.trust_cache
+    }
+
+    /// Access the pending confirmations cache.
+    pub fn pending_confirmations(&self) -> &PendingConfirmationCache {
+        &self.pending_confirmations
     }
 
     /// Evaluate a mutation against trust context.
@@ -765,6 +817,45 @@ mod tests {
         cache.set("session-1", ctx);
         cache.invalidate("session-1");
         assert!(cache.get("session-1").is_none());
+    }
+
+    #[test]
+    fn pending_confirmation_store_and_take() {
+        let cache = PendingConfirmationCache::new(300);
+        cache.store(
+            "token-1",
+            PendingConfirmation {
+                mutation: MutationType::CurationEvent,
+                mutation_content: serde_json::json!({"test": true}),
+                human_id: "human-1".to_string(),
+                created_at: Instant::now(),
+            },
+        );
+        let taken = cache.take("token-1");
+        assert!(taken.is_some());
+        assert_eq!(taken.unwrap().human_id, "human-1");
+    }
+
+    #[test]
+    fn pending_confirmation_take_removes_entry() {
+        let cache = PendingConfirmationCache::new(300);
+        cache.store(
+            "token-1",
+            PendingConfirmation {
+                mutation: MutationType::CurationEvent,
+                mutation_content: serde_json::json!({}),
+                human_id: "human-1".to_string(),
+                created_at: Instant::now(),
+            },
+        );
+        let _ = cache.take("token-1");
+        assert!(cache.take("token-1").is_none()); // second take returns None
+    }
+
+    #[test]
+    fn pending_confirmation_invalid_token_returns_none() {
+        let cache = PendingConfirmationCache::new(300);
+        assert!(cache.take("nonexistent").is_none());
     }
 
     #[test]

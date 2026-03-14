@@ -22,6 +22,7 @@ pub mod custodians;
 pub mod economic_events;
 pub mod exchange;
 pub mod flow_planning;
+pub mod gate;
 pub mod governance;
 pub mod identity;
 pub mod mastery;
@@ -112,6 +113,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("steward") && !sub_path.starts_with("stewardship") {
         let resource_path = sub_path.strip_prefix("steward").unwrap_or("");
         steward::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("gate") {
+        let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
+        gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",
@@ -193,6 +197,7 @@ pub async fn evaluate_gate(
         intent_divergence: 0.0,     // placeholder — Task 6 wires anomaly detection
     });
 
+    let mutation_content_for_cache = mutation_content.clone();
     let result = svc
         .gate
         .evaluate(mutation, &trust_ctx, mutation_content)
@@ -260,6 +265,22 @@ pub async fn evaluate_gate(
                     &mut conn, ctx, &new_obs,
                 );
             }
+        }
+    }
+
+    // Store pending confirmation for Pause flow
+    if let GateResult::Pause { confirm_token, .. } = &result {
+        if let Some(hid) = human_id {
+            use crate::services::elohim_gate::PendingConfirmation;
+            svc.gate.pending_confirmations().store(
+                confirm_token,
+                PendingConfirmation {
+                    mutation,
+                    mutation_content: mutation_content_for_cache,
+                    human_id: hid.to_string(),
+                    created_at: std::time::Instant::now(),
+                },
+            );
         }
     }
 
