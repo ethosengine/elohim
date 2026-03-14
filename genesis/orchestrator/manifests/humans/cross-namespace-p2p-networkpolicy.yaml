@@ -1,0 +1,133 @@
+# Cross-Namespace P2P NetworkPolicy
+#
+# Allows libp2p traffic (port 9876) between per-human StatefulSets
+# across elohim-alpha, elohim-staging, and elohim-prod namespaces.
+#
+# Without this, Kubernetes network isolation blocks cross-namespace
+# P2P connections, preventing the WAN-like topology where:
+#   - Matthew + Jessica (alpha) <-> Pete + Timothy (staging) <-> Frank (prod)
+#
+# Apply once per namespace:
+#   kubectl apply -f cross-namespace-p2p-networkpolicy.yaml
+#
+# Note: These policies are additive — they allow P2P traffic without
+# restricting other existing traffic. If the cluster has no default-deny
+# NetworkPolicy, these are technically redundant but serve as documentation
+# and will be required if default-deny is ever applied.
+---
+# Alpha namespace: allow P2P ingress from staging and prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-cross-namespace
+  namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow P2P from staging namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-staging
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+    # Allow P2P from prod namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-prod
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+---
+# Staging namespace: allow P2P ingress from alpha and prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-cross-namespace
+  namespace: elohim-staging
+  labels:
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow P2P from alpha namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-alpha
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+    # Allow P2P from prod namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-prod
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+---
+# Prod namespace: allow P2P ingress from alpha and staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-cross-namespace
+  namespace: elohim-prod
+  labels:
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow P2P from alpha namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-alpha
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+    # Allow P2P from staging namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elohim-staging
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876

@@ -106,7 +106,7 @@ spec:
             - "--listen"
             - "0.0.0.0:8080"
             - "--conductor-url"
-            - "ws://elohim-edgenode-staging:4445"
+            - "ws://elohim-pete-staging:4445"
           ports:
             - name: gateway-ws
               containerPort: 8080
@@ -118,12 +118,15 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "true"
+            # Staging hosts Pete (pastor) + Timothy (tutor)
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-edgenode-staging-0.elohim-edgenode-staging-headless:8445,ws://elohim-edgenode-staging-1.elohim-edgenode-staging-headless:8445"
+              value: "ws://elohim-pete-staging-0.elohim-pete-staging-headless.elohim-staging.svc.cluster.local:8445,ws://elohim-timothy-staging-0.elohim-timothy-staging-headless.elohim-staging.svc.cluster.local:8445"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-edgenode-staging:4444"
+              value: "ws://elohim-pete-staging:4444"
             - name: STORAGE_URL
-              value: "http://elohim-edgenode-staging:8090"
+              value: "http://elohim-pete-staging.elohim-staging.svc.cluster.local:8090"
+            - name: STORAGE_URLS
+              value: "http://elohim-pete-staging.elohim-staging.svc.cluster.local:8090,http://elohim-timothy-staging.elohim-staging.svc.cluster.local:8090"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
             - name: NATS_URL

@@ -107,7 +107,7 @@ spec:
             - "--listen"
             - "0.0.0.0:8080"
             - "--conductor-url"
-            - "ws://elohim-edgenode-prod:4445"
+            - "ws://elohim-frank-prod:4445"
           ports:
             - name: gateway-ws
               containerPort: 8080
@@ -119,12 +119,13 @@ spec:
               value: "warn,doorway=info"
             - name: PROJECTION_WRITER
               value: "true"
+            # Prod hosts Frank (farmer) — independent economy node
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-edgenode-prod-0.elohim-edgenode-prod-headless:8445"
+              value: "ws://elohim-frank-prod-0.elohim-frank-prod-headless.elohim-prod.svc.cluster.local:8445"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-edgenode-prod:4444"
+              value: "ws://elohim-frank-prod:4444"
             - name: STORAGE_URL
-              value: "http://elohim-edgenode-prod:8090"
+              value: "http://elohim-frank-prod.elohim-prod.svc.cluster.local:8090"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
             - name: NATS_URL

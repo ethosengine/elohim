@@ -46,32 +46,38 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
 }
 
 def resolveInternalStorageUrl(String doorwayHost) {
-    // elohim-storage runs on the edgenode service (port 8090), not doorway
+    // Points to Matthew's per-human storage (founder/primary) for preflight checks
     if (doorwayHost.contains('alpha.elohim.host')) {
-        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8090'
+        return 'elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
     } else if (doorwayHost.contains('staging.elohim.host')) {
-        return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8090'
+        return 'elohim-pete-staging.elohim-staging.svc.cluster.local:8090'
     } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {
-        return 'elohim-edgenode-prod.elohim-prod.svc.cluster.local:8090'
+        return 'elohim-frank-prod.elohim-prod.svc.cluster.local:8090'
     }
     // Fallback: swap doorway→edgenode and port
     return doorwayHost.replace('https://', '').replace('http://', '').replace('doorway', 'edgenode').replaceAll(':\\d+', ':8090')
 }
 
-def getHumanStorageUrls(String environment) {
-    def namespace = "elohim-${environment}"
-    // All humans seed to the shared edgenode service until per-human
-    // StatefulSets are deployed (see five-peer-content-distribution-plan)
-    def edgenodeService = "elohim-edgenode-${environment}"
+/**
+ * Per-human storage endpoints across environments.
+ * Each human has a dedicated StatefulSet in their assigned environment:
+ *   alpha:   Matthew (founder) + Jessica (household)
+ *   staging: Pete (pastor) + Timothy (tutor)
+ *   prod:    Frank (farmer)
+ *
+ * Cross-env P2P topology simulates WAN; household members colocate.
+ */
+def getHumanStorageUrls(String ignored) {
+    // Human-to-environment mapping (each human lives in one env)
     def humans = [
-        [humanId: 'human-matthew-manager'],
-        [humanId: 'human-jessica-spouse'],
-        [humanId: 'human-pete-pastor'],
-        [humanId: 'human-timothy-tutor'],
-        [humanId: 'human-frank-farmer'],
+        [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha'],
+        [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha'],
+        [humanId: 'human-pete-pastor',      service: 'elohim-pete-staging',    namespace: 'elohim-staging'],
+        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-staging', namespace: 'elohim-staging'],
+        [humanId: 'human-frank-farmer',     service: 'elohim-frank-prod',      namespace: 'elohim-prod'],
     ]
     return humans.collect { h ->
-        h + [service: edgenodeService, storageUrl: "${edgenodeService}.${namespace}.svc.cluster.local:8090"]
+        h + [storageUrl: "${h.service}.${h.namespace}.svc.cluster.local:8090"]
     }
 }
 
