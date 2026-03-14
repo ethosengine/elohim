@@ -649,6 +649,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
+name = "constitution"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "uuid 1.18.1",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1179,6 +1196,7 @@ dependencies = [
  "chrono",
  "cid",
  "clap",
+ "constitution",
  "dashmap 5.5.3",
  "diesel",
  "dirs",

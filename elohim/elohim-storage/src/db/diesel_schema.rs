@@ -212,6 +212,8 @@ diesel::table! {
         updated_at -> Text,
         last_synced_at -> Nullable<Text>,
         bootstrap_url -> Nullable<Text>,
+        session_intent_json -> Nullable<Text>,
+        intent_set_at -> Nullable<Text>,
     }
 }
 
@@ -657,6 +659,24 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    imagodei_observations (id) {
+        id -> Text,
+        app_id -> Text,
+        human_id -> Text,
+        observed_at -> Text,
+        observation_type -> Text,
+        content -> Text,
+        structured_signals_json -> Nullable<Text>,
+        trust_delta -> Float,
+        visibility_layer -> Text,
+        originating_elohim -> Text,
+        relevance_decay -> Float,
+        superseded_by -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -689,6 +709,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     governance_states,
     human_relationships,
     humans,
+    imagodei_observations,
     knowledge_maps,
     local_sessions,
     node_stewardship,
