@@ -26,6 +26,7 @@ pub mod elohim_gate;
 pub mod events;
 pub mod exchange_service;
 pub mod inference_engine;
+pub mod inference_router;
 pub mod knowledge_service;
 pub mod path_service;
 pub mod presence_service;
