@@ -11,6 +11,7 @@ use hyper::{body::Incoming, Method, Request, Response};
 use crate::db::steward_affinity::{self, AffinityQuery};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
+use crate::services::elohim_gate::{GateResult, MutationType};
 use crate::services::response;
 use crate::services::Services;
 use crate::views::{
@@ -93,43 +94,36 @@ async fn handle_curation_event(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let input: crate::views::CurationEventInputView = parse_body(req).await?;
 
-    // Evaluate curation event through the ElohimGate (Sprint 1: always PassThrough)
-    if let Some(ref svc) = services {
-        use crate::services::elohim_gate::{MutationType, TrustContext};
-        use constitution::ConstitutionalLayer;
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        MutationType::CurationEvent,
+        serde_json::json!({
+            "stewardId": input.steward_id,
+            "contentId": input.content_id,
+            "activityType": input.activity_type,
+        }),
+    )
+    .await;
 
-        // Sprint 1: placeholder TrustContext with neutral signals
-        // Sprint 2: gather real signals from session + steward standing
-        let trust_ctx = TrustContext {
-            human_id: input.steward_id.clone(),
-            session_id: String::new(),
-            mastery_depth: 0.5,
-            steward_standing: 0.5,
-            relationship_density: 0.5,
-            governance_health: 0.5,
-            behavioral_trust: 0.5,
-            intent_divergence: 0.5,
-            composite_trust: 0.5,
-            constitutional_layer: ConstitutionalLayer::Individual,
-            community_id: None,
-            family_id: None,
-            declared_intent: None,
-            computed_at: String::new(),
-        };
-
-        let gate_result = svc
-            .gate
-            .evaluate(
-                MutationType::CurationEvent,
-                &trust_ctx,
-                serde_json::json!({
-                    "stewardId": input.steward_id,
-                    "contentId": input.content_id,
-                    "activityType": input.activity_type,
+    match &gate_result {
+        GateResult::Pause { prompt, confirm_token, .. } => {
+            return Ok(response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
                 }),
-            )
-            .await;
-        tracing::info!(tier = ?gate_result.tier(), "ElohimGate evaluated curation event");
+            ));
+        }
+        GateResult::Settlement { boundary, appeal_path, .. } => {
+            return Ok(response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            })));
+        }
+        _ => {}
     }
 
     let mut conn = get_conn(pool)?;
@@ -143,7 +137,10 @@ async fn handle_curation_event(
     )?;
 
     let view = StewardAffinityView::from(result);
-    Ok(response::created(&view))
+    Ok(response::created(&serde_json::json!({
+        "data": view,
+        "gate": gate_view,
+    })))
 }
 
 async fn handle_get_by_id(
