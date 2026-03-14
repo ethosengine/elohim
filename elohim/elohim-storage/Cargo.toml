@@ -7,6 +7,9 @@ authors = ["Elohim Protocol"]
 license = "AGPL-3.0"
 
 [dependencies]
+# Constitutional layer — principles, boundaries, agent reasoning
+constitution = { path = "../constitution" }
+
 # Doorway route registration
 doorway-client = { path = "../../crates/doorway-client" }
 

@@ -20,6 +20,7 @@
 //! ```
 
 pub mod agreement_service;
+pub mod elohim_gate;
 pub mod content_service;
 pub mod economic_event_service;
 pub mod events;
