@@ -5363,6 +5363,33 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/steward-affinity — Steward affinity lifecycle
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/steward-affinity")
+                .handler("list_steward_affinity")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/steward-affinity")
+                .handler("create_steward_affinity")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/steward-affinity/bulk")
+                .handler("bulk_create_steward_affinity")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/steward-affinity/{id}")
+                .handler("get_steward_affinity")
+                .cache_ttl(60)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/resources — REA resource management
         // =====================================================================
         .route(
