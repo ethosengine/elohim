@@ -117,7 +117,18 @@ async fn handle_curation_event(
             computed_at: String::new(),
         };
 
-        let gate_result = svc.gate.evaluate(MutationType::CurationEvent, &trust_ctx);
+        let gate_result = svc
+            .gate
+            .evaluate(
+                MutationType::CurationEvent,
+                &trust_ctx,
+                serde_json::json!({
+                    "stewardId": input.steward_id,
+                    "contentId": input.content_id,
+                    "activityType": input.activity_type,
+                }),
+            )
+            .await;
         tracing::info!(tier = ?gate_result.tier(), "ElohimGate evaluated curation event");
     }
 

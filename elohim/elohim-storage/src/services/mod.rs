@@ -54,6 +54,9 @@ pub use stewardship_service::StewardshipService;
 
 use crate::db::{context::AppContext, DbPool};
 use elohim_gate::ElohimGate;
+use inference_engine::InferenceEngine;
+use inference_router::InferenceRouter;
+use sidecar_engine::SidecarEngine;
 use std::sync::Arc;
 
 /// Service container for dependency injection
@@ -75,6 +78,17 @@ impl Services {
         let events = Arc::new(EventBus::new());
         let ctx = AppContext::default_lamad();
 
+        // Create inference router with sidecar engine
+        let sidecar_url = std::env::var("ELOHIM_AGENT_URL")
+            .unwrap_or_else(|_| "http://localhost:8095".to_string());
+        let sidecar = Arc::new(SidecarEngine::new(
+            sidecar_url,
+            "gate-evaluator".to_string(),
+        ));
+        let router = Arc::new(InferenceRouter::new(vec![
+            sidecar as Arc<dyn InferenceEngine>,
+        ]));
+
         Self {
             content: Arc::new(ContentService::new(
                 pool.clone(),
@@ -93,7 +107,7 @@ impl Services {
                 events.clone(),
             )),
             events,
-            gate: Arc::new(ElohimGate::new_skeleton()),
+            gate: Arc::new(ElohimGate::new(router)),
         }
     }
 

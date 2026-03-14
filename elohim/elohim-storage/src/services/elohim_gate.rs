@@ -4,8 +4,13 @@
 //! classifies an InferenceTier, and returns a GateResult that determines
 //! how the mutation settles.
 
+use std::sync::Arc;
+
 use constitution::{ConstitutionalLayer, ConstitutionalStack, PromptAssembler, StackContext};
 use serde::Serialize;
+
+use super::inference_engine::{InferenceRequest, InferenceResult, RecommendedAction};
+use super::inference_router::InferenceRouter;
 
 /// Raw trust signals gathered from DB queries.
 #[derive(Debug, Clone)]
@@ -252,23 +257,97 @@ pub struct ObservationDraft {
     pub visibility_layer: String,
 }
 
-/// The gate itself. Sprint 1: classify-only skeleton.
+/// The gate itself. Sprint 2: routes to InferenceRouter when available.
 pub struct ElohimGate {
-    // Sprint 2: inference_router: Option<InferenceRouter>,
+    router: Option<Arc<InferenceRouter>>,
     // Sprint 3: observation_store: ObservationStore,
 }
 
 impl ElohimGate {
     /// Create a skeleton gate with no inference capability.
     pub fn new_skeleton() -> Self {
-        Self {}
+        Self { router: None }
+    }
+
+    /// Create a gate backed by an inference router.
+    pub fn new(router: Arc<InferenceRouter>) -> Self {
+        Self {
+            router: Some(router),
+        }
     }
 
     /// Evaluate a mutation against trust context.
-    /// Sprint 1: always returns PassThrough with correct tier classification.
-    pub fn evaluate(&self, mutation: MutationType, ctx: &TrustContext) -> GateResult {
+    /// Routes to inference when a router is available and tier is not None.
+    /// Falls back to PassThrough on missing router or inference failure.
+    pub async fn evaluate(
+        &self,
+        mutation: MutationType,
+        ctx: &TrustContext,
+        mutation_content: serde_json::Value,
+    ) -> GateResult {
         let tier = InferenceTier::classify(mutation, ctx);
-        GateResult::PassThrough { tier }
+
+        // None tier: always pass through
+        if tier == InferenceTier::None {
+            return GateResult::PassThrough { tier };
+        }
+
+        // No router: fall back to PassThrough
+        let router = match &self.router {
+            Some(r) => r,
+            None => return GateResult::PassThrough { tier },
+        };
+
+        // Build prompt and request
+        let prompt = self.build_constitutional_prompt(ctx, mutation, tier);
+        let request = InferenceRequest {
+            tier,
+            mutation_type: mutation,
+            trust_context: ctx.clone(),
+            mutation_content,
+            constitutional_prompt: prompt,
+        };
+
+        // Route to inference
+        match router.route(request).await {
+            Ok(result) => self.map_inference_result(tier, result),
+            Err(e) => {
+                tracing::warn!(error = %e, "Inference failed, falling back to PassThrough");
+                GateResult::PassThrough { tier }
+            }
+        }
+    }
+
+    /// Map an inference result to the appropriate GateResult variant.
+    fn map_inference_result(&self, tier: InferenceTier, result: InferenceResult) -> GateResult {
+        match result.recommended_action {
+            RecommendedAction::Proceed => GateResult::Enriched {
+                tier,
+                reasoning: result.reasoning,
+                adjusted_reach: None,
+                observations: result.observations,
+                session_intent_note: None,
+            },
+            RecommendedAction::ProceedWithReachAdjustment(reach) => GateResult::Enriched {
+                tier,
+                reasoning: result.reasoning,
+                adjusted_reach: Some(reach),
+                observations: result.observations,
+                session_intent_note: None,
+            },
+            RecommendedAction::PauseForConfirmation(prompt) => GateResult::Pause {
+                tier,
+                reasoning: result.reasoning,
+                prompt,
+                confirm_token: uuid::Uuid::new_v4().to_string(),
+            },
+            RecommendedAction::Settle(boundary) => GateResult::Settlement {
+                tier,
+                reasoning: result.reasoning,
+                boundary,
+                appeal_path: Some("/api/v1/governance/appeal".to_string()),
+            },
+        }
     }
 
     /// Build constitutional prompt for a given trust context and mutation.
@@ -293,7 +372,9 @@ impl ElohimGate {
             mutation,
             tier,
             ctx.composite_trust,
-            ctx.declared_intent.as_deref().unwrap_or("No declared intent."),
+            ctx.declared_intent
+                .as_deref()
+                .unwrap_or("No declared intent."),
         );
 
         match tier {
@@ -429,8 +510,8 @@ mod tests {
         assert!(tier == InferenceTier::Full || tier == InferenceTier::Constitutional);
     }
 
-    #[test]
-    fn gate_evaluate_returns_pass_through() {
+    #[tokio::test]
+    async fn gate_evaluate_returns_pass_through() {
         let gate = ElohimGate::new_skeleton();
         let ctx = TrustContext::compute(TrustSignals {
             mastery_depth: 0.5,
@@ -440,13 +521,82 @@ mod tests {
             behavioral_trust: 0.5,
             intent_divergence: 0.0,
         });
-        let result = gate.evaluate(MutationType::Comment, &ctx);
-        // Sprint 1: always PassThrough (no inference engine yet)
+        let result = gate
+            .evaluate(MutationType::Comment, &ctx, serde_json::json!({}))
+            .await;
+        // No router: always PassThrough
         let GateResult::PassThrough { tier } = result else {
             panic!("Expected PassThrough, got {:?}", result);
         };
         // But tier is correctly classified (composite=0.575 < 0.7 → Full for Comment)
         assert_eq!(tier, InferenceTier::Full);
+    }
+
+    #[tokio::test]
+    async fn gate_with_mock_returns_enriched() {
+        use crate::services::inference_engine::MockEngine;
+        use crate::services::inference_router::InferenceRouter;
+
+        let engine = Arc::new(MockEngine::always_proceed());
+        let router = Arc::new(InferenceRouter::new(vec![
+            engine as Arc<dyn crate::services::inference_engine::InferenceEngine>,
+        ]));
+        let gate = ElohimGate::new(router);
+
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.8,
+            steward_standing: 0.7,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.85,
+            intent_divergence: 0.0,
+        });
+        let result = gate
+            .evaluate(MutationType::Comment, &ctx, serde_json::json!({}))
+            .await;
+        assert!(matches!(result, GateResult::Enriched { .. }));
+    }
+
+    #[tokio::test]
+    async fn gate_without_router_returns_passthrough() {
+        let gate = ElohimGate::new_skeleton();
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 0.5,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        let result = gate
+            .evaluate(MutationType::Comment, &ctx, serde_json::json!({}))
+            .await;
+        assert!(matches!(result, GateResult::PassThrough { .. }));
+    }
+
+    #[tokio::test]
+    async fn gate_none_tier_always_passthrough() {
+        use crate::services::inference_engine::MockEngine;
+        use crate::services::inference_router::InferenceRouter;
+
+        let engine = Arc::new(MockEngine::always_proceed());
+        let router = Arc::new(InferenceRouter::new(vec![
+            engine as Arc<dyn crate::services::inference_engine::InferenceEngine>,
+        ]));
+        let gate = ElohimGate::new(router);
+
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 0.5,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        let result = gate
+            .evaluate(MutationType::MasteryUpdate, &ctx, serde_json::json!({}))
+            .await;
+        assert!(matches!(result, GateResult::PassThrough { .. }));
     }
 
     #[test]
