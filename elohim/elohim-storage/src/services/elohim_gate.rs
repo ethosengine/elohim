@@ -4,7 +4,9 @@
 //! classifies an InferenceTier, and returns a GateResult that determines
 //! how the mutation settles.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use constitution::{ConstitutionalLayer, ConstitutionalStack, PromptAssembler, StackContext};
 use serde::Serialize;
@@ -257,23 +259,92 @@ pub struct ObservationDraft {
     pub visibility_layer: String,
 }
 
+/// Per-session cache entry for computed TrustContext
+struct CacheEntry {
+    context: TrustContext,
+    cached_at: Instant,
+}
+
+/// Session-scoped cache for TrustContext with TTL-based expiry.
+/// Avoids recomputing trust signals on every mutation within a session.
+pub struct TrustContextCache {
+    entries: RwLock<HashMap<String, CacheEntry>>,
+    ttl: Duration,
+}
+
+impl TrustContextCache {
+    pub fn new(ttl_secs: u64) -> Self {
+        Self {
+            entries: RwLock::new(HashMap::new()),
+            ttl: Duration::from_secs(ttl_secs),
+        }
+    }
+
+    /// Get cached TrustContext if within TTL
+    pub fn get(&self, session_id: &str) -> Option<TrustContext> {
+        let entries = self.entries.read().ok()?;
+        let entry = entries.get(session_id)?;
+        if entry.cached_at.elapsed() < self.ttl {
+            Some(entry.context.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Cache a computed TrustContext for a session
+    pub fn set(&self, session_id: &str, context: TrustContext) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.insert(
+                session_id.to_string(),
+                CacheEntry {
+                    context,
+                    cached_at: Instant::now(),
+                },
+            );
+        }
+    }
+
+    /// Invalidate a specific session's cache (e.g., on session intent change)
+    pub fn invalidate(&self, session_id: &str) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.remove(session_id);
+        }
+    }
+
+    /// Invalidate all cached entries (e.g., on system-wide trust recalibration)
+    pub fn invalidate_all(&self) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.clear();
+        }
+    }
+}
+
 /// The gate itself. Sprint 2: routes to InferenceRouter when available.
 pub struct ElohimGate {
     router: Option<Arc<InferenceRouter>>,
-    // Sprint 3: observation_store: ObservationStore,
+    trust_cache: TrustContextCache,
 }
 
 impl ElohimGate {
     /// Create a skeleton gate with no inference capability.
     pub fn new_skeleton() -> Self {
-        Self { router: None }
+        Self {
+            router: None,
+            trust_cache: TrustContextCache::new(300),
+        }
     }
 
     /// Create a gate backed by an inference router.
     pub fn new(router: Arc<InferenceRouter>) -> Self {
         Self {
             router: Some(router),
+            trust_cache: TrustContextCache::new(300),
         }
+    }
+
+    /// Access the trust context cache.
+    pub fn trust_cache(&self) -> &TrustContextCache {
+        &self.trust_cache
     }
 
     /// Evaluate a mutation against trust context.
@@ -655,5 +726,62 @@ mod tests {
             intent_divergence: 0.8,
         });
         assert!(diverged.composite_trust < base.composite_trust);
+    }
+
+    #[test]
+    fn cache_hit_returns_context() {
+        let cache = TrustContextCache::new(300);
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.7,
+            steward_standing: 0.8,
+            relationship_density: 0.6,
+            governance_health: 0.5,
+            behavioral_trust: 0.9,
+            intent_divergence: 0.0,
+        });
+        cache.set("session-1", ctx.clone());
+        let cached = cache.get("session-1");
+        assert!(cached.is_some());
+        assert_eq!(cached.unwrap().composite_trust, ctx.composite_trust);
+    }
+
+    #[test]
+    fn cache_miss_returns_none() {
+        let cache = TrustContextCache::new(300);
+        assert!(cache.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn invalidation_removes_entry() {
+        let cache = TrustContextCache::new(300);
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 0.5,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        cache.set("session-1", ctx);
+        cache.invalidate("session-1");
+        assert!(cache.get("session-1").is_none());
+    }
+
+    #[test]
+    fn invalidate_all_clears_cache() {
+        let cache = TrustContextCache::new(300);
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 0.5,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        cache.set("session-1", ctx.clone());
+        cache.set("session-2", ctx);
+        cache.invalidate_all();
+        assert!(cache.get("session-1").is_none());
+        assert!(cache.get("session-2").is_none());
     }
 }
