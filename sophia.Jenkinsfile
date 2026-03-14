@@ -59,16 +59,8 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: node-type
-                operator: In
-                values:
-                  - operations
-                  - edge
+  nodeSelector:
+    node-type: performance
   tolerations:
     - key: "workload-type"
       operator: "Equal"
@@ -81,12 +73,12 @@ spec:
       tty: true
       resources:
         requests:
-          memory: "1Gi"
-          cpu: "500m"
+          memory: "2Gi"
+          cpu: "1"
           ephemeral-storage: "3Gi"
         limits:
-          memory: "4Gi"
-          cpu: "2"
+          memory: "6Gi"
+          cpu: "4"
           ephemeral-storage: "6Gi"
 '''
         }
