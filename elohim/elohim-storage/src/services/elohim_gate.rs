@@ -4,7 +4,7 @@
 //! classifies an InferenceTier, and returns a GateResult that determines
 //! how the mutation settles.
 
-use constitution::ConstitutionalLayer;
+use constitution::{ConstitutionalLayer, ConstitutionalStack, PromptAssembler, StackContext};
 use serde::Serialize;
 
 /// Raw trust signals gathered from DB queries.
@@ -270,6 +270,39 @@ impl ElohimGate {
         let tier = InferenceTier::classify(mutation, ctx);
         GateResult::PassThrough { tier }
     }
+
+    /// Build constitutional prompt for a given trust context and mutation.
+    pub fn build_constitutional_prompt(
+        &self,
+        ctx: &TrustContext,
+        mutation: MutationType,
+        tier: InferenceTier,
+    ) -> String {
+        let mut stack_ctx = StackContext::agent_only(&ctx.human_id);
+        if let Some(ref family_id) = ctx.family_id {
+            stack_ctx = stack_ctx.with_family(family_id);
+        }
+        if let Some(ref community_id) = ctx.community_id {
+            stack_ctx = stack_ctx.with_community(community_id);
+        }
+
+        let stack = ConstitutionalStack::build_defaults(stack_ctx);
+
+        let query = format!(
+            "Evaluate {:?} mutation (tier: {:?}, composite_trust: {:.2}). {}",
+            mutation,
+            tier,
+            ctx.composite_trust,
+            ctx.declared_intent.as_deref().unwrap_or("No declared intent."),
+        );
+
+        match tier {
+            InferenceTier::Constitutional => {
+                PromptAssembler::build_reasoning_prompt(&stack, &query)
+            }
+            _ => PromptAssembler::build_system_prompt(&stack),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -414,6 +447,43 @@ mod tests {
         };
         // But tier is correctly classified (composite=0.575 < 0.7 → Full for Comment)
         assert_eq!(tier, InferenceTier::Full);
+    }
+
+    #[test]
+    fn prompt_assembly_light_tier() {
+        let gate = ElohimGate::new_skeleton();
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.8,
+            steward_standing: 0.7,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.85,
+            intent_divergence: 0.0,
+        });
+        let prompt =
+            gate.build_constitutional_prompt(&ctx, MutationType::Comment, InferenceTier::Light);
+        assert!(!prompt.is_empty());
+    }
+
+    #[test]
+    fn prompt_assembly_constitutional_tier() {
+        let gate = ElohimGate::new_skeleton();
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 0.5,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        let prompt = gate.build_constitutional_prompt(
+            &ctx,
+            MutationType::ReachChange,
+            InferenceTier::Constitutional,
+        );
+        assert!(!prompt.is_empty());
+        // Constitutional tier uses reasoning prompt which includes the query
+        assert!(prompt.contains("Evaluate"));
     }
 
     #[test]
