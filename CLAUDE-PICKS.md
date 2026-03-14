@@ -41,16 +41,28 @@ The gap: wire backend CRUD to POST routes (`/challenges`, `/responses`, `/appeal
 
 ## 3. Steward Economy Services
 
-Recognition pipeline service built in Rust (`elohim-storage/src/services/recognition_pipeline_service.rs`) with 5 composable stages: normalize (event type weights) → resolve (steward allocations + affinity) → weight (proportional with affinity coefficient) → limit (constitutional floor/ceiling) → settle (economic events + recognition accumulation). Exposed via `POST /api/v1/recognition/distribute`. Angular thin client in elohim pillar.
+The steward economy has two layers now: a solid Rust pipeline backend and a fragmented Angular frontend that doesn't yet compose the pieces into a lived experience.
 
-`StewardshipAllocationService` exists at 14.8% coverage with content stewardship, portfolio queries, allocation CRUD, dispute management, recognition distribution. REA API clients exist (economic-events, exchange, flow-planning) but no unified coordinator. The allocation model is rich — contribution types, governance lifecycle, temporal effectiveness — but largely untested.
+**Backend (complete)**: Recognition pipeline (`recognition_pipeline_service.rs`) with 5 composable stages: normalize → resolve stewards → weight by affinity → constitutional limits → settle economic events. Steward affinity service with mastery gate, curation event deltas, and real affinity wired into weighting. All exposed via REST. This layer works end-to-end.
 
-**Done (2026-03-14)**: Steward affinity lifecycle — `steward_affinity` table with CRUD + API (`/api/v1/steward-affinity`), real affinity wired into Stage 2 (replacing hardcoded 1.0), mastery gate (must reach APPLY level before curation builds affinity), curation event endpoint (`POST /steward-affinity/curation-event` with +0.10 edit, +0.05 review, +0.15 dispute resolution deltas), constitutional limits in Stage 4 (floor/ceiling enforcement with excess redistribution via `distribute_with_limits`), genesis seeder extended with `CATEGORY_AFFINITY_MAP`. Design: `genesis/plans/2026-03-14-steward-affinity-lifecycle-design.md`.
+**Frontend (fragmented)**: Five independent API clients exist but nothing ties them together:
 
-**Remaining**: Angular `StewardshipAllocationService` test coverage (14.8%). REA coordinator unification. Affinity decay (time-based). `derived_affinity` (network/community signals). Multi-swimlane distribution (future research). Angular UI for curation tracking.
+| Service | Pillar | Tests | Status |
+|---------|--------|-------|--------|
+| `RecognitionApiService` | elohim | 2 | Working, not barrel-exported |
+| `StewardshipAllocationService` | lamad | 23 | Tested (2026-03-14), thin API client |
+| `EconomicEventsApiService` | shefa | 8 | Working, newly barrel-exported |
+| `ExchangeApiService` | shefa | 0 | Working, newly barrel-exported |
+| `StewardAffinityApiService` | shefa | 0 | New (2026-03-14), not yet consumed |
 
-**Impact**: High for M5-M6.
-**Effort**: Medium remaining. Core pipeline complete; deeper economics is research.
+**Done (2026-03-14)**: Steward affinity lifecycle in Rust — `steward_affinity` table + API, mastery gate, curation events (+0.10 edit, +0.05 review, +0.15 dispute resolution), constitutional floor/ceiling in Stage 4, genesis seeder with `CATEGORY_AFFINITY_MAP`. Design: `genesis/plans/2026-03-14-steward-affinity-lifecycle-design.md`. Also: `StewardshipAllocationService` test coverage (23 tests, all methods covered), `StewardAffinityApiService` thin client created, barrel exports fixed for `EconomicEventsApiService` + `ExchangeApiService`.
+
+**The big question**: Where does the learner *feel* the steward economy? Right now recognition fires silently — a learner completes an exercise, the pipeline distributes recognition to stewards, economic events are created in the database... and nothing is visible. No steward sees their portfolio grow. No learner sees who stewarded what they just learned. No curator sees their affinity reflected back. The pipeline is a tree falling in a forest. The next move isn't more backend — it's a `StewardEconomyCoordinator` in shefa that composes these five clients into reactive state the UI can render: "You just learned from content stewarded by X, who earned Y recognition. Your curation of Z increased your affinity to W."
+
+**Remaining**: Coordinator service (composes the 5 clients). Portfolio UI (steward dashboard). Curation tracking UI. Affinity decay (time-based). `derived_affinity` (network/community signals). Wire recognition trigger to assessment completion in lamad.
+
+**Impact**: High for M5-M6. The economic experience is what makes stewardship feel real.
+**Effort**: Medium. All plumbing exists; this is composition and UX.
 
 ---
 

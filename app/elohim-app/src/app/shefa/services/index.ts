@@ -44,3 +44,13 @@ export { ResilienceApiService } from './resilience-api.service';
 
 // Node topology API (stewarded node CRUD + availability aggregation)
 export { NodeTopologyApiService } from './node-topology-api.service';
+
+// Economic events API (thin HTTP client for hREA economic events)
+export { EconomicEventsApiService } from './economic-events-api.service';
+
+// Exchange API (thin HTTP client for request/offer coordination)
+export { ExchangeApiService } from './exchange-api.service';
+
+// Steward affinity API (thin HTTP client for affinity queries + curation events)
+export { StewardAffinityApiService } from './steward-affinity-api.service';
+export type { AffinityQuery } from './steward-affinity-api.service';
