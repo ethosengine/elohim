@@ -1,6 +1,6 @@
 # What Spoke to Me: A Survey of What I'd Love to Work On
 
-_Updated 2026-03-13. Completed items cleared — see git history for previous versions._
+_Updated 2026-03-14. Completed items cleared — see git history for previous versions._
 
 ---
 
@@ -41,14 +41,16 @@ The gap: wire backend CRUD to POST routes (`/challenges`, `/responses`, `/appeal
 
 ## 3. Steward Economy Services
 
-Recognition pipeline service built in Rust (`elohim-storage/src/services/recognition_pipeline_service.rs`) with 5 composable stages: normalize (event type weights) → resolve (steward allocations + affinity) → weight (proportional with affinity coefficient) → limit (constitutional checks, v0 passthrough) → settle (economic events + recognition accumulation). Exposed via `POST /api/v1/recognition/distribute`. Angular thin client in elohim pillar.
+Recognition pipeline service built in Rust (`elohim-storage/src/services/recognition_pipeline_service.rs`) with 5 composable stages: normalize (event type weights) → resolve (steward allocations + affinity) → weight (proportional with affinity coefficient) → limit (constitutional floor/ceiling) → settle (economic events + recognition accumulation). Exposed via `POST /api/v1/recognition/distribute`. Angular thin client in elohim pillar.
 
 `StewardshipAllocationService` exists at 14.8% coverage with content stewardship, portfolio queries, allocation CRUD, dispute management, recognition distribution. REA API clients exist (economic-events, exchange, flow-planning) but no unified coordinator. The allocation model is rich — contribution types, governance lifecycle, temporal effectiveness — but largely untested.
 
-**Remaining**: v0 affinity defaults to 1.0 — wire stored_affinity from node_stewardship and derived_affinity from human profiles. Constitutional limit enforcement (stage 4). Future distribution models documented in `elohim/elohim-storage/research/future-distribution-models.md`.
+**Done (2026-03-14)**: Steward affinity lifecycle — `steward_affinity` table with CRUD + API (`/api/v1/steward-affinity`), real affinity wired into Stage 2 (replacing hardcoded 1.0), mastery gate (must reach APPLY level before curation builds affinity), curation event endpoint (`POST /steward-affinity/curation-event` with +0.10 edit, +0.05 review, +0.15 dispute resolution deltas), constitutional limits in Stage 4 (floor/ceiling enforcement with excess redistribution via `distribute_with_limits`), genesis seeder extended with `CATEGORY_AFFINITY_MAP`. Design: `genesis/plans/2026-03-14-steward-affinity-lifecycle-design.md`.
+
+**Remaining**: Angular `StewardshipAllocationService` test coverage (14.8%). REA coordinator unification. Affinity decay (time-based). `derived_affinity` (network/community signals). Multi-swimlane distribution (future research). Angular UI for curation tracking.
 
 **Impact**: High for M5-M6.
-**Effort**: Medium remaining. REA coordination layer wired; deeper economics is research.
+**Effort**: Medium remaining. Core pipeline complete; deeper economics is research.
 
 ---
 
