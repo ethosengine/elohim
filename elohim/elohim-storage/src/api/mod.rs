@@ -170,31 +170,31 @@ pub async fn evaluate_gate(
         );
     };
 
-    // Sprint 3: compute real behavioral_trust from observation history
-    let behavioral_trust = match human_id {
+    // Query observations once for both behavioral trust and anomaly detection
+    let observations = match human_id {
         Some(hid) => match get_conn(pool) {
             Ok(mut conn) => {
-                match crate::db::imagodei_observations::list_observations_for_human(
+                crate::db::imagodei_observations::list_observations_for_human(
                     &mut conn, ctx, hid, "individual",
-                ) {
-                    Ok(observations) => {
-                        crate::services::behavioral_trust::compute(&observations)
-                    }
-                    Err(_) => 0.5,
-                }
+                )
+                .unwrap_or_default()
             }
-            Err(_) => 0.5,
+            Err(_) => Vec::new(),
         },
-        None => 0.5,
+        None => Vec::new(),
     };
+
+    let behavioral_trust = crate::services::behavioral_trust::compute(&observations);
+    let intent_divergence =
+        crate::services::anomaly_detection::compute_anomaly_score(&observations);
 
     let trust_ctx = TrustContext::compute(TrustSignals {
         mastery_depth: 0.5,         // placeholder — future sprint
         steward_standing: 0.5,      // placeholder — future sprint
         relationship_density: 0.5,  // placeholder — future sprint
         governance_health: 0.5,     // placeholder — future sprint
-        behavioral_trust,           // NOW REAL from observation history
-        intent_divergence: 0.0,     // placeholder — Task 6 wires anomaly detection
+        behavioral_trust,           // from observation history
+        intent_divergence,          // from anomaly detection
     });
 
     let mutation_content_for_cache = mutation_content.clone();

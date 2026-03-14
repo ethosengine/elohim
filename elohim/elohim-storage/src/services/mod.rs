@@ -20,6 +20,7 @@
 //! ```
 
 pub mod agreement_service;
+pub mod anomaly_detection;
 pub mod behavioral_trust;
 pub mod content_service;
 pub mod economic_event_service;
