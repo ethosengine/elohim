@@ -38,8 +38,30 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
-      nodeSelector:
-        node-type: operations
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+            - weight: 70
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - edge
+            - weight: 60
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - performance
       containers:
         - name: nats
           image: nats:2.10-alpine

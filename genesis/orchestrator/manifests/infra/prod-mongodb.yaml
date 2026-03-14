@@ -58,8 +58,30 @@ spec:
     spec:
       securityContext:
         fsGroup: 999
-      nodeSelector:
-        node-type: operations
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+            - weight: 70
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - edge
+            - weight: 60
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - performance
       containers:
         - name: mongodb
           image: mongo:7
