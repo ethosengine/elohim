@@ -17,6 +17,119 @@ pub struct TrustSignals {
     pub intent_divergence: f64,
 }
 
+/// What kind of mutation is being attempted.
+/// Extensible — SDK developers register new types here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationType {
+    // Internal bookkeeping — never gated
+    MasteryUpdate,
+    SessionHeartbeat,
+    InternalSync,
+
+    // Curation — light gate for trusted stewards
+    CurationEvent,
+    AllocationUpdate,
+
+    // Human boundary — full gate for untrusted
+    Comment,
+    Reaction,
+    ContentPublish,
+
+    // Recognition pipeline — usually pass-through
+    RecognitionTrigger,
+
+    // Governance — always elevated
+    DisputeFiling,
+    GovernanceVote,
+    ReachChange,
+
+    // Catch-all for SDK extensions
+    Custom(u32),
+}
+
+/// How much ceremony this mutation receives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InferenceTier {
+    None,
+    Light,
+    Full,
+    Constitutional,
+}
+
+impl InferenceTier {
+    /// Escalate one level.
+    pub fn escalate(self) -> Self {
+        match self {
+            Self::None => Self::Light,
+            Self::Light => Self::Full,
+            Self::Full => Self::Constitutional,
+            Self::Constitutional => Self::Constitutional,
+        }
+    }
+
+    /// Classify the inference tier for a mutation given trust context.
+    pub fn classify(mutation: MutationType, ctx: &TrustContext) -> Self {
+        let base = Self::base_tier(mutation, ctx.composite_trust);
+
+        // Intent divergence escalates
+        if ctx.intent_divergence > 0.5 {
+            base.escalate()
+        } else {
+            base
+        }
+    }
+
+    fn base_tier(mutation: MutationType, trust: f64) -> Self {
+        use MutationType::*;
+
+        match mutation {
+            // Never gated
+            MasteryUpdate | SessionHeartbeat | InternalSync => Self::None,
+
+            // Curation
+            CurationEvent | AllocationUpdate => {
+                if trust > 0.6 {
+                    Self::Light
+                } else {
+                    Self::Full
+                }
+            }
+
+            // Human boundary
+            Comment | Reaction | ContentPublish => {
+                if trust > 0.7 {
+                    Self::Light
+                } else {
+                    Self::Full
+                }
+            }
+
+            // Recognition
+            RecognitionTrigger => {
+                if trust > 0.4 {
+                    Self::None
+                } else {
+                    Self::Light
+                }
+            }
+
+            // Governance — always elevated
+            DisputeFiling => Self::Full,
+            GovernanceVote => {
+                if trust > 0.8 {
+                    Self::Full
+                } else {
+                    Self::Constitutional
+                }
+            }
+            ReachChange => Self::Constitutional,
+
+            // Unknown SDK types — conservative
+            Custom(_) => Self::Full,
+        }
+    }
+}
+
 /// Pre-computed trust context for a session.
 #[derive(Debug, Clone)]
 pub struct TrustContext {
@@ -106,6 +219,99 @@ mod tests {
             intent_divergence: 0.0,
         });
         assert!(ctx.composite_trust < 0.3);
+    }
+
+    #[test]
+    fn mastery_update_always_none() {
+        let high_trust = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.9,
+            steward_standing: 0.9,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.9,
+            intent_divergence: 0.0,
+        });
+        assert_eq!(
+            InferenceTier::classify(MutationType::MasteryUpdate, &high_trust),
+            InferenceTier::None
+        );
+    }
+
+    #[test]
+    fn comment_high_trust_is_light() {
+        let high_trust = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.8,
+            steward_standing: 0.7,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.85,
+            intent_divergence: 0.0,
+        });
+        assert_eq!(
+            InferenceTier::classify(MutationType::Comment, &high_trust),
+            InferenceTier::Light
+        );
+    }
+
+    #[test]
+    fn comment_low_trust_is_full() {
+        let low_trust = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.1,
+            steward_standing: 0.0,
+            relationship_density: 0.05,
+            governance_health: 0.5,
+            behavioral_trust: 0.3,
+            intent_divergence: 0.0,
+        });
+        assert_eq!(
+            InferenceTier::classify(MutationType::Comment, &low_trust),
+            InferenceTier::Full
+        );
+    }
+
+    #[test]
+    fn governance_vote_is_at_least_full() {
+        let high_trust = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.9,
+            steward_standing: 0.9,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.9,
+            intent_divergence: 0.0,
+        });
+        let tier = InferenceTier::classify(MutationType::GovernanceVote, &high_trust);
+        assert!(tier == InferenceTier::Full || tier == InferenceTier::Constitutional);
+    }
+
+    #[test]
+    fn reach_change_always_constitutional() {
+        let high_trust = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.9,
+            steward_standing: 0.9,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.9,
+            intent_divergence: 0.0,
+        });
+        assert_eq!(
+            InferenceTier::classify(MutationType::ReachChange, &high_trust),
+            InferenceTier::Constitutional
+        );
+    }
+
+    #[test]
+    fn intent_divergence_escalates_tier() {
+        let diverged = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.8,
+            steward_standing: 0.7,
+            relationship_density: 0.9,
+            governance_health: 1.0,
+            behavioral_trust: 0.85,
+            intent_divergence: 0.8,
+        });
+        // Comment would normally be Light for high trust, but divergence escalates
+        let tier = InferenceTier::classify(MutationType::Comment, &diverged);
+        assert!(tier == InferenceTier::Full || tier == InferenceTier::Constitutional);
     }
 
     #[test]
