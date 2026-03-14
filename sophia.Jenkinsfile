@@ -81,13 +81,13 @@ spec:
       tty: true
       resources:
         requests:
-          memory: "4Gi"
-          cpu: "1"
-          ephemeral-storage: "5Gi"
+          memory: "1Gi"
+          cpu: "500m"
+          ephemeral-storage: "3Gi"
         limits:
-          memory: "8Gi"
-          cpu: "4"
-          ephemeral-storage: "10Gi"
+          memory: "3Gi"
+          cpu: "2"
+          ephemeral-storage: "6Gi"
 '''
         }
     }
