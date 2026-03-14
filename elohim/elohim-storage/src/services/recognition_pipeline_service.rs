@@ -215,7 +215,10 @@ pub fn resolve_stewards(
         .map(|a| (a.steward_id, a.affinity_score as f64))
         .collect();
 
-    Ok(resolve_from_allocations_with_affinity(&allocations, &affinity_map))
+    Ok(resolve_from_allocations_with_affinity(
+        &allocations,
+        &affinity_map,
+    ))
 }
 
 // =============================================================================
