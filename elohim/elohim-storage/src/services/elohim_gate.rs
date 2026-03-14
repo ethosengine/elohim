@@ -195,9 +195,7 @@ impl TrustContext {
 #[derive(Debug, Clone)]
 pub enum GateResult {
     /// No inference needed, or inference not yet available (Sprint 1).
-    PassThrough {
-        tier: InferenceTier,
-    },
+    PassThrough { tier: InferenceTier },
 
     /// Elohim evaluated. Mutation proceeds with adjustments.
     Enriched {

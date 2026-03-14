@@ -4042,9 +4042,7 @@ impl HttpServer {
             None => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(
-                    r#"{"error": "No active session"}"#,
-                )))
+                .body(Full::new(Bytes::from(r#"{"error": "No active session"}"#)))
                 .unwrap()),
         }
     }

@@ -34,9 +34,7 @@ pub async fn handle(
         (&Method::GET, "") => handle_list(req, pool, ctx).await,
         (&Method::POST, "") => handle_create(req, pool, ctx).await,
         (&Method::POST, "bulk") => handle_bulk_create(req, pool, ctx).await,
-        (&Method::POST, "curation-event") => {
-            handle_curation_event(req, pool, ctx, services).await
-        }
+        (&Method::POST, "curation-event") => handle_curation_event(req, pool, ctx, services).await,
         (&Method::GET, id) if !id.contains('/') => handle_get_by_id(id, pool, ctx).await,
 
         _ => Ok(response::not_found(&format!(
