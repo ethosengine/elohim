@@ -287,6 +287,8 @@ mod tests {
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 last_synced_at TEXT,
                 bootstrap_url TEXT,
+                session_intent_json TEXT,
+                intent_set_at TEXT,
                 UNIQUE(human_id, agent_pub_key)
             );
             "#,
