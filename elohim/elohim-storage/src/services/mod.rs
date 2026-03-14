@@ -32,6 +32,7 @@ pub mod recognition_pipeline_service;
 pub mod relationship_service;
 pub mod resource_service;
 pub mod response;
+pub mod steward_affinity_service;
 pub mod stewardship_service;
 
 // Re-exports

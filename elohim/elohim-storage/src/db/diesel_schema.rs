@@ -476,6 +476,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    steward_affinity (id) {
+        id -> Text,
+        app_id -> Text,
+        steward_id -> Text,
+        content_id -> Text,
+        affinity_score -> Float,
+        source -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     steward_credentials (id) {
         id -> Text,
         presence_id -> Text,
@@ -689,6 +702,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     rea_commitments,
     relationships,
     schema_version,
+    steward_affinity,
     steward_credentials,
     stewarded_nodes,
     stewardship_allocations,

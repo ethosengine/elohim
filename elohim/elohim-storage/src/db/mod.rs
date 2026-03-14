@@ -42,6 +42,7 @@ pub mod local_sessions;
 pub mod path_extensions_diesel;
 pub mod rea_commitments;
 pub mod relationships_diesel;
+pub mod steward_affinity;
 pub mod stewardship_allocations;
 
 // Governance tables (v7)

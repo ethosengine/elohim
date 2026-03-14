@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 
 use crate::db::economic_events::{record_event, CreateEconomicEventInput};
 use crate::db::models::StewardshipAllocation;
+use crate::db::steward_affinity;
 use crate::db::stewardship_allocations;
 use crate::db::AppContext;
 use crate::error::StorageError;
@@ -165,14 +166,59 @@ pub fn resolve_from_allocations(allocations: &[StewardshipAllocation]) -> Vec<Re
         .collect()
 }
 
-/// Stage 2 (DB): Query allocations for content, then resolve.
+/// Stage 2 (pure): Build resolved stewards with real affinity data.
+/// Falls back to 0.0 for stewards without affinity records (no affinity = no share).
+pub fn resolve_from_allocations_with_affinity(
+    allocations: &[StewardshipAllocation],
+    affinity_map: &std::collections::HashMap<String, f64>,
+) -> Vec<ResolvedSteward> {
+    allocations
+        .iter()
+        .filter(|a| a.governance_state == "active")
+        .map(|a| {
+            let stored_affinity = affinity_map
+                .get(&a.steward_presence_id)
+                .copied()
+                .unwrap_or(0.0);
+            ResolvedSteward {
+                allocation_id: a.id.clone(),
+                steward_presence_id: a.steward_presence_id.clone(),
+                allocation_ratio: a.allocation_ratio,
+                stored_affinity,
+                derived_affinity: 1.0,
+                contribution_type: a.contribution_type.clone(),
+            }
+        })
+        .collect()
+}
+
+/// Stage 2 (DB): Query allocations for content, then resolve with real affinity.
 pub fn resolve_stewards(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<ResolvedSteward>, StorageError> {
     let allocations = stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)?;
-    Ok(resolve_from_allocations(&allocations))
+
+    // Build affinity map from DB
+    let affinities = steward_affinity::list_affinities(
+        conn,
+        ctx,
+        &steward_affinity::AffinityQuery {
+            content_id: Some(content_id.to_string()),
+            ..Default::default()
+        },
+    )?;
+
+    let affinity_map: std::collections::HashMap<String, f64> = affinities
+        .into_iter()
+        .map(|a| (a.steward_id, a.affinity_score as f64))
+        .collect();
+
+    Ok(resolve_from_allocations_with_affinity(
+        &allocations,
+        &affinity_map,
+    ))
 }
 
 // =============================================================================
@@ -218,6 +264,133 @@ pub fn apply_weights(stewards: &[ResolvedSteward], weighted_amount: f64) -> Vec<
 // =============================================================================
 // Stage 4: Apply Limits (v0: passthrough)
 // =============================================================================
+
+/// Stage 4: Apply floor/ceiling limits to weighted shares.
+///
+/// - `floor_ratio`: minimum share as ratio of total (e.g., 0.10 = 10%)
+/// - `ceiling_ratio`: maximum share as ratio of total (e.g., 0.70 = 70%)
+///
+/// Excess from ceiling enforcement is redistributed proportionally
+/// to non-capped stewards. Floor is applied after ceiling redistribution.
+pub fn apply_limits_with_config(
+    shares: &[WeightedShare],
+    total_amount: f64,
+    floor_ratio: Option<f64>,
+    ceiling_ratio: Option<f64>,
+) -> Vec<LimitedShare> {
+    if shares.is_empty() {
+        return Vec::new();
+    }
+
+    // If no limits configured, passthrough
+    if floor_ratio.is_none() && ceiling_ratio.is_none() {
+        return apply_limits(shares);
+    }
+
+    let mut results: Vec<LimitedShare> = shares
+        .iter()
+        .map(|s| LimitedShare {
+            allocation_id: s.allocation_id.clone(),
+            steward_presence_id: s.steward_presence_id.clone(),
+            pre_limit_amount: s.share_amount,
+            final_amount: s.share_amount,
+            limit_reasons: Vec::new(),
+        })
+        .collect();
+
+    // Apply ceiling
+    if let Some(ceiling) = ceiling_ratio {
+        let ceiling_amount = total_amount * ceiling;
+        let mut excess_total = 0.0;
+        let mut capped_indices = Vec::new();
+
+        for (i, result) in results.iter_mut().enumerate() {
+            if result.final_amount > ceiling_amount {
+                let excess = result.final_amount - ceiling_amount;
+                excess_total += excess;
+                result.final_amount = ceiling_amount;
+                result.limit_reasons.push(LimitReason::CeilingApplied {
+                    ceiling: ceiling_amount,
+                    excess,
+                });
+                capped_indices.push(i);
+            }
+        }
+
+        // Redistribute excess proportionally to non-capped stewards
+        if excess_total > 0.0 {
+            let uncapped_total: f64 = results
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !capped_indices.contains(i))
+                .map(|(_, r)| r.final_amount)
+                .sum();
+
+            if uncapped_total > 0.0 {
+                for (i, result) in results.iter_mut().enumerate() {
+                    if !capped_indices.contains(&i) {
+                        let redistribution = excess_total * (result.final_amount / uncapped_total);
+                        result.final_amount += redistribution;
+                        if redistribution > f64::EPSILON {
+                            result.limit_reasons.push(LimitReason::ExcessRedistributed {
+                                from_steward: "ceiling_excess".to_string(),
+                                amount: redistribution,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Apply floor
+    if let Some(floor) = floor_ratio {
+        let floor_amount = total_amount * floor;
+
+        // Need to iterate by index because we modify other elements
+        let len = results.len();
+        for idx in 0..len {
+            if results[idx].final_amount < floor_amount && results[idx].final_amount > 0.0 {
+                let original_amount = results[idx].final_amount;
+                let boost = floor_amount - original_amount;
+                let steward_id = results[idx].steward_presence_id.clone();
+                results[idx].limit_reasons.push(LimitReason::FloorApplied {
+                    floor: floor_amount,
+                    original: original_amount,
+                });
+                results[idx].final_amount = floor_amount;
+
+                // Deduct boost proportionally from others above floor
+                let above_floor_total: f64 = results
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, r)| {
+                        *i != idx
+                            && r.steward_presence_id != steward_id
+                            && r.final_amount > floor_amount
+                    })
+                    .map(|(_, r)| r.final_amount - floor_amount)
+                    .sum();
+
+                if above_floor_total > 0.0 {
+                    #[allow(clippy::needless_range_loop)]
+                    for i in 0..len {
+                        if i != idx
+                            && results[i].steward_presence_id != steward_id
+                            && results[i].final_amount > floor_amount
+                        {
+                            let deduction = boost
+                                * ((results[i].final_amount - floor_amount) / above_floor_total);
+                            results[i].final_amount -= deduction;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    results
+}
 
 /// Stage 4: Apply floor/ceiling limits to weighted shares.
 ///
@@ -326,6 +499,13 @@ fn generate_recognition_event_id(content_id: &str, steward_id: &str, timestamp_m
 // Pipeline Orchestrator
 // ---------------------------------------------------------------------------
 
+/// Limit configuration for constitutional constraints
+#[derive(Debug, Clone, Default)]
+pub struct LimitConfig {
+    pub floor_ratio: Option<f64>,
+    pub ceiling_ratio: Option<f64>,
+}
+
 /// Run the full recognition distribution pipeline.
 ///
 /// Chains: normalize → resolve → weight → limit → settle
@@ -334,6 +514,16 @@ pub fn distribute(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     trigger: RecognitionTrigger,
+) -> Result<RecognitionDistributionResult, StorageError> {
+    distribute_with_limits(conn, ctx, trigger, &LimitConfig::default())
+}
+
+/// Run the full recognition distribution pipeline with optional limit config.
+pub fn distribute_with_limits(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    trigger: RecognitionTrigger,
+    limits: &LimitConfig,
 ) -> Result<RecognitionDistributionResult, StorageError> {
     // Stage 1: Normalize
     let normalized =
@@ -369,8 +559,17 @@ pub fn distribute(
     // Stage 3: Weight
     let shares = apply_weights(&stewards, normalized.weighted_amount);
 
-    // Stage 4: Limit
-    let limited = apply_limits(&shares);
+    // Stage 4: Apply limits if configured
+    let limited = if limits.floor_ratio.is_some() || limits.ceiling_ratio.is_some() {
+        apply_limits_with_config(
+            &shares,
+            normalized.weighted_amount,
+            limits.floor_ratio,
+            limits.ceiling_ratio,
+        )
+    } else {
+        apply_limits(&shares)
+    };
 
     // Stage 5: Settle
     let mut traces = settle(conn, ctx, &limited, &trigger, normalized.weighted_amount)?;
@@ -542,6 +741,35 @@ mod tests {
     }
 
     #[test]
+    fn resolve_with_affinity_uses_provided_scores() {
+        let allocations = vec![
+            make_allocation("alloc-1", "steward-1", 0.6, "active"),
+            make_allocation("alloc-2", "steward-2", 0.4, "active"),
+        ];
+        let affinity_map = vec![
+            ("steward-1".to_string(), 0.85_f64),
+            ("steward-2".to_string(), 0.50_f64),
+        ]
+        .into_iter()
+        .collect::<std::collections::HashMap<_, _>>();
+
+        let resolved = resolve_from_allocations_with_affinity(&allocations, &affinity_map);
+        assert_eq!(resolved.len(), 2);
+        assert!((resolved[0].stored_affinity - 0.85).abs() < f64::EPSILON);
+        assert!((resolved[1].stored_affinity - 0.50).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn resolve_with_affinity_defaults_to_zero_when_missing() {
+        let allocations = vec![make_allocation("alloc-1", "steward-1", 0.6, "active")];
+        let affinity_map = std::collections::HashMap::new();
+
+        let resolved = resolve_from_allocations_with_affinity(&allocations, &affinity_map);
+        assert_eq!(resolved.len(), 1);
+        assert!((resolved[0].stored_affinity - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn limits_passthrough_preserves_amounts() {
         let shares = vec![
             WeightedShare {
@@ -564,5 +792,67 @@ mod tests {
         assert!(limited[0].limit_reasons.is_empty());
         assert!((limited[1].final_amount - 2.5).abs() < f64::EPSILON);
         assert!(limited[1].limit_reasons.is_empty());
+    }
+
+    #[test]
+    fn limits_apply_ceiling() {
+        let shares = vec![
+            WeightedShare {
+                allocation_id: "a1".to_string(),
+                steward_presence_id: "p1".to_string(),
+                effective_ratio: 0.8,
+                share_amount: 8.0,
+            },
+            WeightedShare {
+                allocation_id: "a2".to_string(),
+                steward_presence_id: "p2".to_string(),
+                effective_ratio: 0.2,
+                share_amount: 2.0,
+            },
+        ];
+
+        let limited = apply_limits_with_config(&shares, 10.0, None, Some(0.70));
+        assert_eq!(limited.len(), 2);
+        // p1 capped at 7.0 (70% of 10.0), excess 1.0 redistributed to p2
+        assert!((limited[0].final_amount - 7.0).abs() < 1e-10);
+        assert!((limited[1].final_amount - 3.0).abs() < 1e-10);
+        assert!(!limited[0].limit_reasons.is_empty());
+    }
+
+    #[test]
+    fn limits_apply_floor() {
+        let shares = vec![
+            WeightedShare {
+                allocation_id: "a1".to_string(),
+                steward_presence_id: "p1".to_string(),
+                effective_ratio: 0.95,
+                share_amount: 9.5,
+            },
+            WeightedShare {
+                allocation_id: "a2".to_string(),
+                steward_presence_id: "p2".to_string(),
+                effective_ratio: 0.05,
+                share_amount: 0.5,
+            },
+        ];
+
+        let limited = apply_limits_with_config(&shares, 10.0, Some(0.10), None);
+        // p2 bumped up to 1.0 (10% of 10.0), deducted from p1
+        assert!((limited[1].final_amount - 1.0).abs() < 1e-10);
+        assert!((limited[0].final_amount - 9.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn limits_passthrough_when_no_config() {
+        let shares = vec![WeightedShare {
+            allocation_id: "a1".to_string(),
+            steward_presence_id: "p1".to_string(),
+            effective_ratio: 0.7,
+            share_amount: 7.0,
+        }];
+
+        let limited = apply_limits_with_config(&shares, 10.0, None, None);
+        assert!((limited[0].final_amount - 7.0).abs() < f64::EPSILON);
+        assert!(limited[0].limit_reasons.is_empty());
     }
 }

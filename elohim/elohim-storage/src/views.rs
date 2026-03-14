@@ -4012,6 +4012,80 @@ impl From<crate::services::recognition_pipeline_service::RecognitionDistribution
 }
 
 // ============================================================================
+// Steward Affinity Views
+// ============================================================================
+
+/// Steward affinity output view
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardAffinityView {
+    pub id: String,
+    pub steward_id: String,
+    pub content_id: String,
+    pub affinity_score: f32,
+    pub source: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<crate::db::models::StewardAffinity> for StewardAffinityView {
+    fn from(a: crate::db::models::StewardAffinity) -> Self {
+        Self {
+            id: a.id,
+            steward_id: a.steward_id,
+            content_id: a.content_id,
+            affinity_score: a.affinity_score,
+            source: a.source,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+        }
+    }
+}
+
+/// Input for creating steward affinity via API
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateStewardAffinityInputView {
+    pub steward_id: String,
+    pub content_id: String,
+    #[serde(default)]
+    pub affinity_score: f32,
+    #[serde(default)]
+    pub source: Option<String>,
+}
+
+impl From<CreateStewardAffinityInputView> for crate::db::steward_affinity::CreateAffinityInput {
+    fn from(v: CreateStewardAffinityInputView) -> Self {
+        Self {
+            steward_id: v.steward_id,
+            content_id: v.content_id,
+            affinity_score: v.affinity_score,
+            source: v.source.unwrap_or_else(|| "genesis_seed".to_string()),
+        }
+    }
+}
+
+/// Bulk create input
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct BulkCreateStewardAffinityInputView {
+    pub affinities: Vec<CreateStewardAffinityInputView>,
+}
+
+/// Input for recording a curation activity
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CurationEventInputView {
+    pub steward_id: String,
+    pub content_id: String,
+    pub activity_type: String,
+}
+
+// ============================================================================
 // Schema Version Tests
 // ============================================================================
 

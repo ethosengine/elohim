@@ -930,6 +930,52 @@ pub mod lamad_event_types {
 }
 
 // ============================================================================
+// Steward Affinity
+// ============================================================================
+
+/// Steward affinity source types
+pub mod affinity_sources {
+    pub const GENESIS_SEED: &str = "genesis_seed";
+    pub const MASTERY_GATE: &str = "mastery_gate";
+    pub const CURATION_EDIT: &str = "curation_edit";
+    pub const CURATION_REVIEW: &str = "curation_review";
+    pub const DISPUTE_RESOLUTION: &str = "dispute_resolution";
+
+    pub fn is_valid(source: &str) -> bool {
+        matches!(
+            source,
+            GENESIS_SEED | MASTERY_GATE | CURATION_EDIT | CURATION_REVIEW | DISPUTE_RESOLUTION
+        )
+    }
+}
+
+/// Steward affinity record — tracks a steward's earned relationship to content
+#[derive(Debug, Clone, Queryable, Serialize)]
+#[diesel(table_name = crate::db::diesel_schema::steward_affinity)]
+pub struct StewardAffinity {
+    pub id: String,
+    pub app_id: String,
+    pub steward_id: String,
+    pub content_id: String,
+    pub affinity_score: f32,
+    pub source: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable steward affinity record
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = crate::db::diesel_schema::steward_affinity)]
+pub struct NewStewardAffinity<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub steward_id: &'a str,
+    pub content_id: &'a str,
+    pub affinity_score: f32,
+    pub source: &'a str,
+}
+
+// ============================================================================
 // Stewardship Allocation Models
 // ============================================================================
 

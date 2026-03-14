@@ -193,6 +193,106 @@ const CATEGORY_STEWARD_MAP: Record<string, StewardRatio[]> = {
 };
 
 // =============================================================================
+// Category-to-Steward Affinity Scores
+//
+// Affinity represents earned stewardship standing through curation.
+// Higher affinity = deeper relationship with the content domain.
+// These are initial seeds — real activity will update them over time.
+// =============================================================================
+
+interface StewardAffinityEntry {
+  stewardId: string;
+  affinityScore: number;
+}
+
+const CATEGORY_AFFINITY_MAP: Record<string, StewardAffinityEntry[]> = {
+  'public-observer': [
+    { stewardId: 'eve-firstwoman', affinityScore: 0.85 },
+    { stewardId: 'nancy-neighbor', affinityScore: 0.60 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'scripture': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'fct': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'fct-media': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'fct-practice': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'fct-narrative': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'fct-activity': [
+    { stewardId: 'pete-pastor', affinityScore: 0.50 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'value-scanner': [
+    { stewardId: 'adam-firstman', affinityScore: 0.75 },
+    { stewardId: 'jessica-spouse', affinityScore: 0.55 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+    { stewardId: 'frank-farmer', affinityScore: 0.45 },
+  ],
+  'governance': [
+    { stewardId: 'nancy-neighbor', affinityScore: 0.70 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+    { stewardId: 'eve-firstwoman', affinityScore: 0.55 },
+  ],
+  'social-medium': [
+    { stewardId: 'eve-firstwoman', affinityScore: 0.80 },
+    { stewardId: 'jessica-spouse', affinityScore: 0.55 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'autonomous-entity': [
+    { stewardId: 'meriadoc-moneybags', affinityScore: 0.65 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+    { stewardId: 'frank-farmer', affinityScore: 0.45 },
+  ],
+  'economic-coordination': [
+    { stewardId: 'meriadoc-moneybags', affinityScore: 0.65 },
+    { stewardId: 'frank-farmer', affinityScore: 0.60 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'community': [
+    { stewardId: 'nancy-neighbor', affinityScore: 0.70 },
+    { stewardId: 'adam-firstman', affinityScore: 0.55 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'local-economy': [
+    { stewardId: 'frank-farmer', affinityScore: 0.70 },
+    { stewardId: 'meriadoc-moneybags', affinityScore: 0.55 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'foundation': [
+    { stewardId: 'dan-developer', affinityScore: 0.75 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'contributor': [
+    { stewardId: 'dan-developer', affinityScore: 0.75 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'general': [
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+    { stewardId: 'dan-developer', affinityScore: 0.50 },
+  ],
+  'landing-page-concept': [
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+  'algorithmic-bias': [
+    { stewardId: 'eve-firstwoman', affinityScore: 0.75 },
+    { stewardId: 'matthew-dowell', affinityScore: 0.70 },
+  ],
+};
+
+// =============================================================================
 // Doorway Client Extensions
 // =============================================================================
 
@@ -270,6 +370,23 @@ class StewardshipClient extends DoorwayClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to bulk create allocations: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  async bulkCreateAffinities(
+    affinities: Array<{ stewardId: string; contentId: string; affinityScore: number; source: string }>
+  ): Promise<{ created: number; errors: string[] }> {
+    const response = await this.fetch('/api/v1/steward-affinity/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ affinities }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to bulk create affinities: ${error}`);
     }
 
     return response.json();
@@ -584,6 +701,51 @@ async function main() {
   for (const [steward, count] of sorted) {
     const name = presences.find((p) => p.id === steward)?.displayName || steward;
     console.log(`     ${name}: ${count} allocations`);
+  }
+
+  // Step 9: Seed steward affinities
+  console.log();
+  console.log('Seeding steward affinities...');
+
+  const affinityInputs: Array<{
+    stewardId: string;
+    contentId: string;
+    affinityScore: number;
+    source: string;
+  }> = [];
+
+  for (const contentId of contentNeedingAllocations) {
+    const category = categoryMap.get(contentId);
+    const affinityEntries =
+      category && CATEGORY_AFFINITY_MAP[category]
+        ? CATEGORY_AFFINITY_MAP[category]
+        : [{ stewardId: 'matthew-dowell', affinityScore: 0.7 }];
+
+    for (const entry of affinityEntries) {
+      affinityInputs.push({
+        stewardId: entry.stewardId,
+        contentId,
+        affinityScore: entry.affinityScore,
+        source: 'genesis_seed',
+      });
+    }
+  }
+
+  console.log(`   Generated ${affinityInputs.length} affinity records`);
+
+  for (let i = 0; i < affinityInputs.length; i += BATCH_SIZE) {
+    const batch = affinityInputs.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(affinityInputs.length / BATCH_SIZE);
+
+    try {
+      const result = await client.bulkCreateAffinities(batch);
+      console.log(
+        `   Affinity batch ${batchNum}/${totalBatches}: ${result.created} created, ${result.errors.length} errors`
+      );
+    } catch (error) {
+      console.error(`   ERROR in affinity batch ${batchNum}: ${error}`);
+    }
   }
 
   console.log('='.repeat(60));

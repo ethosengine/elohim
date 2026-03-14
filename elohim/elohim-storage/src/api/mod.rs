@@ -30,6 +30,7 @@ pub mod rea_commitments;
 pub mod recognition;
 pub mod resources;
 pub mod steward;
+pub mod steward_affinity;
 pub mod stewardship;
 
 use bytes::Bytes;
@@ -105,6 +106,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("recognition") {
         let resource_path = sub_path.strip_prefix("recognition").unwrap_or("");
         recognition::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("steward-affinity") {
+        let resource_path = sub_path.strip_prefix("steward-affinity").unwrap_or("");
+        steward_affinity::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("steward") && !sub_path.starts_with("stewardship") {
         let resource_path = sub_path.strip_prefix("steward").unwrap_or("");
         steward::handle(req, method, resource_path, &pool, &app_ctx).await
