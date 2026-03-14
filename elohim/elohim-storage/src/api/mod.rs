@@ -197,6 +197,72 @@ pub async fn evaluate_gate(
         .gate
         .evaluate(mutation, &trust_ctx, mutation_content)
         .await;
+
+    // Store observations from gate evaluation (closes the feedback loop)
+    if let GateResult::Enriched { observations, .. } = &result {
+        if let Some(hid) = human_id {
+            if let Ok(mut conn) = get_conn(pool) {
+                for draft in observations {
+                    let obs_id = uuid::Uuid::new_v4().to_string();
+                    let now = crate::db::models::current_timestamp();
+                    let signals_json = draft
+                        .structured_signals
+                        .as_ref()
+                        .map(|v| serde_json::to_string(v).unwrap_or_default());
+                    let new_obs = crate::db::models::NewImagodeiObservation {
+                        id: &obs_id,
+                        app_id: &ctx.app_id,
+                        human_id: hid,
+                        observed_at: &now,
+                        observation_type: &draft.observation_type,
+                        content: &draft.content,
+                        structured_signals_json: signals_json.as_deref(),
+                        trust_delta: draft.trust_delta as f32,
+                        visibility_layer: &draft.visibility_layer,
+                        originating_elohim: "sidecar",
+                        relevance_decay: 1.0,
+                        superseded_by: None,
+                    };
+                    if let Err(e) = crate::db::imagodei_observations::create_observation(
+                        &mut conn, ctx, &new_obs,
+                    ) {
+                        tracing::warn!("Failed to store gate observation: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    // Store implicit GrowthSignal on Light-tier PassThrough
+    if let GateResult::PassThrough {
+        tier: InferenceTier::Light,
+    } = &result
+    {
+        if let Some(hid) = human_id {
+            if let Ok(mut conn) = get_conn(pool) {
+                let obs_id = uuid::Uuid::new_v4().to_string();
+                let now = crate::db::models::current_timestamp();
+                let new_obs = crate::db::models::NewImagodeiObservation {
+                    id: &obs_id,
+                    app_id: &ctx.app_id,
+                    human_id: hid,
+                    observed_at: &now,
+                    observation_type: "growth_signal",
+                    content: "Light-tier mutation proceeded without issues",
+                    structured_signals_json: None,
+                    trust_delta: 0.01,
+                    visibility_layer: "individual",
+                    originating_elohim: "gate",
+                    relevance_decay: 0.5,
+                    superseded_by: None,
+                };
+                let _ = crate::db::imagodei_observations::create_observation(
+                    &mut conn, ctx, &new_obs,
+                );
+            }
+        }
+    }
+
     let view = build_gate_view(&result, &trust_ctx);
     (result, Some(view))
 }
