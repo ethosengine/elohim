@@ -329,16 +329,13 @@ pub fn apply_limits_with_config(
             if uncapped_total > 0.0 {
                 for (i, result) in results.iter_mut().enumerate() {
                     if !capped_indices.contains(&i) {
-                        let redistribution =
-                            excess_total * (result.final_amount / uncapped_total);
+                        let redistribution = excess_total * (result.final_amount / uncapped_total);
                         result.final_amount += redistribution;
                         if redistribution > f64::EPSILON {
-                            result
-                                .limit_reasons
-                                .push(LimitReason::ExcessRedistributed {
-                                    from_steward: "ceiling_excess".to_string(),
-                                    amount: redistribution,
-                                });
+                            result.limit_reasons.push(LimitReason::ExcessRedistributed {
+                                from_steward: "ceiling_excess".to_string(),
+                                amount: redistribution,
+                            });
                         }
                     }
                 }
@@ -847,14 +844,12 @@ mod tests {
 
     #[test]
     fn limits_passthrough_when_no_config() {
-        let shares = vec![
-            WeightedShare {
-                allocation_id: "a1".to_string(),
-                steward_presence_id: "p1".to_string(),
-                effective_ratio: 0.7,
-                share_amount: 7.0,
-            },
-        ];
+        let shares = vec![WeightedShare {
+            allocation_id: "a1".to_string(),
+            steward_presence_id: "p1".to_string(),
+            effective_ratio: 0.7,
+            share_amount: 7.0,
+        }];
 
         let limited = apply_limits_with_config(&shares, 10.0, None, None);
         assert!((limited[0].final_amount - 7.0).abs() < f64::EPSILON);
