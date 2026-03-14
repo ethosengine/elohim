@@ -4075,6 +4075,16 @@ pub struct BulkCreateStewardAffinityInputView {
     pub affinities: Vec<CreateStewardAffinityInputView>,
 }
 
+/// Input for recording a curation activity
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CurationEventInputView {
+    pub steward_id: String,
+    pub content_id: String,
+    pub activity_type: String,
+}
+
 // ============================================================================
 // Schema Version Tests
 // ============================================================================

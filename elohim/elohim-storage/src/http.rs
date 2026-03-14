@@ -5384,6 +5384,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            Route::post("/api/v1/steward-affinity/curation-event")
+                .handler("steward_affinity_curation_event")
+                .auth_required()
+                .build(),
+        )
+        .route(
             Route::get("/api/v1/steward-affinity/{id}")
                 .handler("get_steward_affinity")
                 .cache_ttl(60)
