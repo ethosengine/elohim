@@ -520,11 +520,14 @@ async fn handle_create_allocation(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::AllocationUpdate,
         serde_json::json!({
             "contentId": input_view.content_id,
             "stewardPresenceId": input_view.steward_presence_id,
         }),
+        Some(&input_view.steward_presence_id),
     )
     .await;
 
@@ -586,8 +589,11 @@ async fn handle_update_allocation(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::AllocationUpdate,
         serde_json::json!({ "allocationId": id }),
+        None,
     )
     .await;
 
@@ -643,8 +649,11 @@ async fn handle_delete_allocation(
 ) -> Response<Full<Bytes>> {
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::AllocationUpdate,
         serde_json::json!({ "allocationId": id }),
+        None,
     )
     .await;
 
@@ -742,12 +751,15 @@ async fn handle_file_dispute(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::DisputeFiling,
         serde_json::json!({
             "allocationId": id,
             "disputedBy": body.disputed_by,
             "reason": body.reason,
         }),
+        Some(&body.disputed_by),
     )
     .await;
 
@@ -808,12 +820,15 @@ async fn handle_resolve_dispute(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::GovernanceVote,
         serde_json::json!({
             "allocationId": id,
             "ratifierId": body.ratifier_id,
             "newState": body.new_state,
         }),
+        Some(&body.ratifier_id),
     )
     .await;
 

@@ -96,12 +96,15 @@ async fn handle_curation_event(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::CurationEvent,
         serde_json::json!({
             "stewardId": input.steward_id,
             "contentId": input.content_id,
             "activityType": input.activity_type,
         }),
+        Some(&input.steward_id),
     )
     .await;
 

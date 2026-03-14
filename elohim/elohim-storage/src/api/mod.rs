@@ -151,8 +151,11 @@ use crate::views::{GateEvaluationView, TrustContextView};
 /// If services unavailable, returns PassThrough with no view.
 pub async fn evaluate_gate(
     services: &Option<Arc<Services>>,
+    pool: &DbPool,
+    ctx: &AppContext,
     mutation: MutationType,
     mutation_content: serde_json::Value,
+    human_id: Option<&str>,
 ) -> (GateResult, Option<GateEvaluationView>) {
     let Some(svc) = services else {
         return (
@@ -163,14 +166,31 @@ pub async fn evaluate_gate(
         );
     };
 
-    // Sprint 2: placeholder TrustContext — Sprint 3 gathers real signals from DB
+    // Sprint 3: compute real behavioral_trust from observation history
+    let behavioral_trust = match human_id {
+        Some(hid) => match get_conn(pool) {
+            Ok(mut conn) => {
+                match crate::db::imagodei_observations::list_observations_for_human(
+                    &mut conn, ctx, hid, "individual",
+                ) {
+                    Ok(observations) => {
+                        crate::services::behavioral_trust::compute(&observations)
+                    }
+                    Err(_) => 0.5,
+                }
+            }
+            Err(_) => 0.5,
+        },
+        None => 0.5,
+    };
+
     let trust_ctx = TrustContext::compute(TrustSignals {
-        mastery_depth: 0.5,
-        steward_standing: 0.5,
-        relationship_density: 0.5,
-        governance_health: 0.5,
-        behavioral_trust: 0.5,
-        intent_divergence: 0.0,
+        mastery_depth: 0.5,         // placeholder — future sprint
+        steward_standing: 0.5,      // placeholder — future sprint
+        relationship_density: 0.5,  // placeholder — future sprint
+        governance_health: 0.5,     // placeholder — future sprint
+        behavioral_trust,           // NOW REAL from observation history
+        intent_divergence: 0.0,     // placeholder — Task 6 wires anomaly detection
     });
 
     let result = svc

@@ -60,12 +60,15 @@ async fn handle_distribute(
 
     let (gate_result, gate_view) = super::evaluate_gate(
         &services,
+        pool,
+        ctx,
         MutationType::ReachChange,
         serde_json::json!({
             "contentId": input.content_id,
             "eventType": input.event_type,
             "rawAmount": input.raw_amount,
         }),
+        None,
     )
     .await;
 
