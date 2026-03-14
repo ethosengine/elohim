@@ -79,7 +79,7 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   serviceName: elohim-edgenode-staging-headless
-  replicas: 2
+  replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
@@ -101,8 +101,23 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
-      nodeSelector:
-        node-type: operations
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+            - weight: 70
+              preference:
+                matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - performance
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
@@ -149,11 +164,11 @@ spec:
               value: "true"
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "250m"
             limits:
-              memory: "4Gi"
-              cpu: "2000m"
+              memory: "1536Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: holochain-data
               mountPath: /data
@@ -203,11 +218,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: "16Mi"
-              cpu: "10m"
+              memory: "8Mi"
+              cpu: "5m"
             limits:
-              memory: "64Mi"
-              cpu: "100m"
+              memory: "32Mi"
+              cpu: "50m"
           readinessProbe:
             tcpSocket:
               port: 8444
@@ -244,7 +259,7 @@ spec:
             - name: DISABLE_MDNS
               value: "true"
             - name: P2P_BOOTSTRAP_NODES
-              value: "/dns4/elohim-edgenode-staging-0.elohim-edgenode-staging-headless.elohim-staging.svc.cluster.local/tcp/9876,/dns4/elohim-edgenode-staging-1.elohim-edgenode-staging-headless.elohim-staging.svc.cluster.local/tcp/9876"
+              value: "/dns4/elohim-edgenode-staging-0.elohim-edgenode-staging-headless.elohim-staging.svc.cluster.local/tcp/9876"
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"
@@ -257,11 +272,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "64Mi"
+              cpu: "50m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "250m"
           volumeMounts:
             - name: storage-data
               mountPath: /data
@@ -299,11 +314,11 @@ spec:
               mountPath: /opt/holochain
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "50m"
+              memory: "32Mi"
+              cpu: "25m"
             limits:
-              memory: "256Mi"
-              cpu: "200m"
+              memory: "128Mi"
+              cpu: "100m"
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
