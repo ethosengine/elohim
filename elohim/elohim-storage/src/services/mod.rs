@@ -23,9 +23,9 @@ pub mod agreement_service;
 pub mod content_service;
 pub mod economic_event_service;
 pub mod elohim_gate;
-pub mod inference_engine;
 pub mod events;
 pub mod exchange_service;
+pub mod inference_engine;
 pub mod knowledge_service;
 pub mod path_service;
 pub mod presence_service;
@@ -34,6 +34,7 @@ pub mod recognition_pipeline_service;
 pub mod relationship_service;
 pub mod resource_service;
 pub mod response;
+pub mod sidecar_engine;
 pub mod steward_affinity_service;
 pub mod stewardship_service;
 
