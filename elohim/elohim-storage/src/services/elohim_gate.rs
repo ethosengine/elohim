@@ -5,6 +5,7 @@
 //! how the mutation settles.
 
 use constitution::ConstitutionalLayer;
+use serde::Serialize;
 
 /// Raw trust signals gathered from DB queries.
 #[derive(Debug, Clone)]
@@ -190,6 +191,89 @@ impl TrustContext {
     }
 }
 
+/// Result of gate evaluation.
+#[derive(Debug, Clone)]
+pub enum GateResult {
+    /// No inference needed, or inference not yet available (Sprint 1).
+    PassThrough {
+        tier: InferenceTier,
+    },
+
+    /// Elohim evaluated. Mutation proceeds with adjustments.
+    Enriched {
+        tier: InferenceTier,
+        reasoning: ElohimReasoning,
+        adjusted_reach: Option<String>,
+        observations: Vec<ObservationDraft>,
+        session_intent_note: Option<String>,
+    },
+
+    /// Friction moment. Human must confirm to proceed.
+    Pause {
+        tier: InferenceTier,
+        reasoning: ElohimReasoning,
+        prompt: String,
+        confirm_token: String,
+    },
+
+    /// Constitutional settlement. Appeal path exists.
+    Settlement {
+        tier: InferenceTier,
+        reasoning: ElohimReasoning,
+        boundary: String,
+        appeal_path: Option<String>,
+    },
+}
+
+impl GateResult {
+    pub fn tier(&self) -> InferenceTier {
+        match self {
+            Self::PassThrough { tier } => *tier,
+            Self::Enriched { tier, .. } => *tier,
+            Self::Pause { tier, .. } => *tier,
+            Self::Settlement { tier, .. } => *tier,
+        }
+    }
+}
+
+/// Placeholder for Sprint 2 — will carry LLM reasoning.
+#[derive(Debug, Clone, Serialize)]
+pub struct ElohimReasoning {
+    pub primary_principle: String,
+    pub interpretation: String,
+    pub confidence: f64,
+}
+
+/// Draft observation to be stored in imagodei_observations.
+#[derive(Debug, Clone)]
+pub struct ObservationDraft {
+    pub observation_type: String,
+    pub content: String,
+    pub structured_signals: Option<serde_json::Value>,
+    pub trust_delta: f64,
+    pub visibility_layer: String,
+}
+
+/// The gate itself. Sprint 1: classify-only skeleton.
+pub struct ElohimGate {
+    // Sprint 2: inference_router: Option<InferenceRouter>,
+    // Sprint 3: observation_store: ObservationStore,
+}
+
+impl ElohimGate {
+    /// Create a skeleton gate with no inference capability.
+    pub fn new_skeleton() -> Self {
+        Self {}
+    }
+
+    /// Evaluate a mutation against trust context.
+    /// Sprint 1: always returns PassThrough with correct tier classification.
+    pub fn evaluate(&self, mutation: MutationType, ctx: &TrustContext) -> GateResult {
+        let tier = InferenceTier::classify(mutation, ctx);
+        GateResult::PassThrough { tier }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,6 +396,26 @@ mod tests {
         // Comment would normally be Light for high trust, but divergence escalates
         let tier = InferenceTier::classify(MutationType::Comment, &diverged);
         assert!(tier == InferenceTier::Full || tier == InferenceTier::Constitutional);
+    }
+
+    #[test]
+    fn gate_evaluate_returns_pass_through() {
+        let gate = ElohimGate::new_skeleton();
+        let ctx = TrustContext::compute(TrustSignals {
+            mastery_depth: 0.5,
+            steward_standing: 0.5,
+            relationship_density: 0.5,
+            governance_health: 1.0,
+            behavioral_trust: 0.5,
+            intent_divergence: 0.0,
+        });
+        let result = gate.evaluate(MutationType::Comment, &ctx);
+        // Sprint 1: always PassThrough (no inference engine yet)
+        let GateResult::PassThrough { tier } = result else {
+            panic!("Expected PassThrough, got {:?}", result);
+        };
+        // But tier is correctly classified (composite=0.575 < 0.7 → Full for Comment)
+        assert_eq!(tier, InferenceTier::Full);
     }
 
     #[test]

@@ -50,6 +50,7 @@ pub use response::*;
 pub use stewardship_service::StewardshipService;
 
 use crate::db::{context::AppContext, DbPool};
+use elohim_gate::ElohimGate;
 use std::sync::Arc;
 
 /// Service container for dependency injection
@@ -62,6 +63,7 @@ pub struct Services {
     pub relationship: Arc<RelationshipService>,
     pub knowledge: Arc<KnowledgeService>,
     pub events: Arc<EventBus>,
+    pub gate: Arc<ElohimGate>,
 }
 
 impl Services {
@@ -88,6 +90,7 @@ impl Services {
                 events.clone(),
             )),
             events,
+            gate: Arc::new(ElohimGate::new_skeleton()),
         }
     }
 
@@ -114,6 +117,7 @@ impl Services {
                 events.clone(),
             )),
             events,
+            gate: Arc::new(ElohimGate::new_skeleton()),
         }
     }
 }
