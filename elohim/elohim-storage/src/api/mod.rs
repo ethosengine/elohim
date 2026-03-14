@@ -141,7 +141,9 @@ pub fn get_conn(pool: &DbPool) -> Result<crate::db::PooledConn, StorageError> {
 // ElohimGate evaluation helper
 // =============================================================================
 
-use crate::services::elohim_gate::{GateResult, InferenceTier, MutationType, TrustContext, TrustSignals};
+use crate::services::elohim_gate::{
+    GateResult, InferenceTier, MutationType, TrustContext, TrustSignals,
+};
 use crate::views::{GateEvaluationView, TrustContextView};
 
 /// Evaluate a mutation through the ElohimGate.
@@ -153,7 +155,12 @@ pub async fn evaluate_gate(
     mutation_content: serde_json::Value,
 ) -> (GateResult, Option<GateEvaluationView>) {
     let Some(svc) = services else {
-        return (GateResult::PassThrough { tier: InferenceTier::None }, None);
+        return (
+            GateResult::PassThrough {
+                tier: InferenceTier::None,
+            },
+            None,
+        );
     };
 
     // Sprint 2: placeholder TrustContext — Sprint 3 gathers real signals from DB
@@ -166,7 +173,10 @@ pub async fn evaluate_gate(
         intent_divergence: 0.0,
     });
 
-    let result = svc.gate.evaluate(mutation, &trust_ctx, mutation_content).await;
+    let result = svc
+        .gate
+        .evaluate(mutation, &trust_ctx, mutation_content)
+        .await;
     let view = build_gate_view(&result, &trust_ctx);
     (result, Some(view))
 }
@@ -200,7 +210,12 @@ fn build_gate_view(result: &GateResult, ctx: &TrustContext) -> GateEvaluationVie
             settlement_boundary: None,
             appeal_path: None,
         },
-        GateResult::Pause { tier, prompt, confirm_token, .. } => GateEvaluationView {
+        GateResult::Pause {
+            tier,
+            prompt,
+            confirm_token,
+            ..
+        } => GateEvaluationView {
             tier: format!("{:?}", tier),
             trust_context: trust_view,
             pause_prompt: Some(prompt.clone()),
@@ -208,7 +223,12 @@ fn build_gate_view(result: &GateResult, ctx: &TrustContext) -> GateEvaluationVie
             settlement_boundary: None,
             appeal_path: None,
         },
-        GateResult::Settlement { tier, boundary, appeal_path, .. } => GateEvaluationView {
+        GateResult::Settlement {
+            tier,
+            boundary,
+            appeal_path,
+            ..
+        } => GateEvaluationView {
             tier: format!("{:?}", tier),
             trust_context: trust_view,
             pause_prompt: None,

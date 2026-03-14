@@ -70,7 +70,11 @@ async fn handle_distribute(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return Ok(response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -80,7 +84,11 @@ async fn handle_distribute(
                 }),
             ));
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return Ok(response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,

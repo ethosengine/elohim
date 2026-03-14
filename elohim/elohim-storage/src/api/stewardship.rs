@@ -209,7 +209,9 @@ pub async fn handle(
         // -----------------------------------------------------------------
         (&Method::GET, "allocations") => handle_list_allocations(req, pool, ctx).await,
 
-        (&Method::POST, "allocations") => handle_create_allocation(req, pool, ctx, services.clone()).await,
+        (&Method::POST, "allocations") => {
+            handle_create_allocation(req, pool, ctx, services.clone()).await
+        }
 
         (&Method::GET, p) if p.starts_with("allocations/content/") => {
             let content_id = p.trim_start_matches("allocations/content/");
@@ -527,7 +529,11 @@ async fn handle_create_allocation(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -537,7 +543,11 @@ async fn handle_create_allocation(
                 }),
             );
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,
@@ -582,7 +592,11 @@ async fn handle_update_allocation(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -592,7 +606,11 @@ async fn handle_update_allocation(
                 }),
             );
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,
@@ -631,7 +649,11 @@ async fn handle_delete_allocation(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -641,7 +663,11 @@ async fn handle_delete_allocation(
                 }),
             );
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,
@@ -726,7 +752,11 @@ async fn handle_file_dispute(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -736,7 +766,11 @@ async fn handle_file_dispute(
                 }),
             );
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,
@@ -784,7 +818,11 @@ async fn handle_resolve_dispute(
     .await;
 
     match &gate_result {
-        GateResult::Pause { prompt, confirm_token, .. } => {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
             return response::json_response(
                 hyper::StatusCode::CONFLICT,
                 &serde_json::json!({
@@ -794,7 +832,11 @@ async fn handle_resolve_dispute(
                 }),
             );
         }
-        GateResult::Settlement { boundary, appeal_path, .. } => {
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
             return response::forbidden(&serde_json::json!({
                 "gate": gate_view,
                 "boundary": boundary,
