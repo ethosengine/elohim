@@ -17,6 +17,7 @@ export * from './models';
 // Components
 export { FaceCardComponent } from './components/face-card/face-card.component';
 export { CommunityDirectoryComponent } from './components/community-directory/community-directory.component';
+export { CollectiveDetailComponent } from './components/collective-detail/collective-detail.component';
 
 // Services
 export * from './services';

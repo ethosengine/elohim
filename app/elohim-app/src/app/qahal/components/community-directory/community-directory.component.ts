@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { forkJoin } from 'rxjs';
 
@@ -247,6 +248,7 @@ interface ListResponse<T> {
 })
 export class CommunityDirectoryComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   readonly tabs: { label: string; value: DirectoryView }[] = [
     { label: 'All', value: 'all' },
@@ -307,6 +309,10 @@ export class CommunityDirectoryComponent implements OnInit {
   onHumanSelected(humanId: string): void {
     // Future: navigate to human profile
     console.log('Selected human:', humanId);
+  }
+
+  navigateToCollective(id: string): void {
+    this.router.navigate(['/community', 'collective', id]);
   }
 
   private loadDirectory(): void {

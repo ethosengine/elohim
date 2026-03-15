@@ -44,6 +44,14 @@ export const COMMUNITY_ROUTES: Routes = [
           title: 'Community Directory',
         },
       },
+      {
+        path: 'collective/:id',
+        loadComponent: () =>
+          import('./components/collective-detail/collective-detail.component').then(
+            m => m.CollectiveDetailComponent
+          ),
+        data: { title: 'Collective' },
+      },
     ],
   },
 ];
