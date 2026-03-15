@@ -945,6 +945,45 @@ impl From<ContentStewardship> for ContentStewardshipView {
 }
 
 // ============================================================================
+// Comment Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CommentView {
+    pub id: String,
+    pub content_id: String,
+    pub human_id: String,
+    pub body: String,
+    pub reach: String,
+    pub governance_state: String,
+    pub created_at: String,
+}
+
+impl From<crate::db::models::Comment> for CommentView {
+    fn from(c: crate::db::models::Comment) -> Self {
+        Self {
+            id: c.id,
+            content_id: c.content_id,
+            human_id: c.human_id,
+            body: c.body,
+            reach: c.reach,
+            governance_state: c.governance_state,
+            created_at: c.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateCommentInputView {
+    pub content_id: String,
+    pub body: String,
+}
+
+// ============================================================================
 // Device Policy Views (Stewardship v5)
 // ============================================================================
 
