@@ -602,14 +602,16 @@ describe('StorageApiService', () => {
       service.createStewardshipAllocation(input).subscribe();
 
       const req = httpMock.expectOne(
-        request => request.method === 'POST' && request.url.includes('/db/allocations')
+        request =>
+          request.method === 'POST' &&
+          request.url.includes('/api/v1/stewardship/allocations')
       );
 
       expect(req.request.body.allocationRatio).toBe(1);
       expect(req.request.body.allocationMethod).toBe('manual');
       expect(req.request.body.contributionType).toBe('inherited');
 
-      req.flush({ id: 'alloc-new', content_id: 'content-1' });
+      req.flush({ data: { id: 'alloc-new', content_id: 'content-1' } });
       tick();
     }));
   });
@@ -625,14 +627,16 @@ describe('StorageApiService', () => {
       service.updateStewardshipAllocation('alloc-1', update).subscribe();
 
       const req = httpMock.expectOne(
-        request => request.method === 'PUT' && request.url.includes('/db/allocations/alloc-1')
+        request =>
+          request.method === 'PUT' &&
+          request.url.includes('/api/v1/stewardship/allocations/alloc-1')
       );
 
       expect(req.request.body.allocationRatio).toBe(0.75);
       expect(req.request.body.governanceState).toBe('active');
       expect(req.request.body.note).toBe('Updated');
 
-      req.flush({ id: 'alloc-1', allocation_ratio: 0.75 });
+      req.flush({ data: { id: 'alloc-1', allocation_ratio: 0.75 } });
       tick();
     }));
   });
@@ -642,7 +646,9 @@ describe('StorageApiService', () => {
       service.deleteStewardshipAllocation('alloc-1').subscribe();
 
       const req = httpMock.expectOne(
-        request => request.method === 'DELETE' && request.url.includes('/db/allocations/alloc-1')
+        request =>
+          request.method === 'DELETE' &&
+          request.url.includes('/api/v1/stewardship/allocations/alloc-1')
       );
 
       req.flush(null);
