@@ -275,6 +275,53 @@ describe('GateArtifactCardComponent', () => {
     expect(badge?.textContent).toContain('Network');
   });
 
+  // --- gateApiCall input ---
+
+  it('should call submitWithApi when gateApiCall is provided', () => {
+    const apiCall = vi.fn().mockReturnValue(of({}));
+    const submitWithApiSpy = vi.spyOn(component.interaction, 'submitWithApi');
+    component.gateApiCall = apiCall;
+    component.mutationType = 'comment';
+    component.contextMetadata = { contentId: 'c-1' };
+
+    component.localText.set('api text');
+    component.onSubmit();
+
+    expect(submitWithApiSpy).toHaveBeenCalledWith(
+      'api text',
+      'comment',
+      { contentId: 'c-1' },
+      apiCall,
+    );
+  });
+
+  it('should call regular submit when no gateApiCall is provided', () => {
+    const submitSpy = vi.spyOn(component.interaction, 'submit');
+    component.gateApiCall = undefined;
+    component.mutationType = 'comment';
+    component.contextMetadata = { contentId: 'c-2' };
+
+    component.localText.set('manual text');
+    component.onSubmit();
+
+    expect(submitSpy).toHaveBeenCalledWith(
+      'manual text',
+      'comment',
+      { contentId: 'c-2' },
+    );
+  });
+
+  it('should not submit when text is empty', () => {
+    const submitSpy = vi.spyOn(component.interaction, 'submit');
+    const submitWithApiSpy = vi.spyOn(component.interaction, 'submitWithApi');
+
+    component.localText.set('   ');
+    component.onSubmit();
+
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(submitWithApiSpy).not.toHaveBeenCalled();
+  });
+
   // --- Wrapper class ---
 
   it('should have gate-comment wrapper class', () => {

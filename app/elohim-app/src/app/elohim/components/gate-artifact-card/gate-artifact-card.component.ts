@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Observable } from 'rxjs';
 
 import {
   GateInteractionService,
@@ -337,6 +338,7 @@ export class GateArtifactCardComponent {
   @Input() placeholder = 'Write something...';
   @Input() mutationType = '';
   @Input() contextMetadata: MutationContext = {};
+  @Input() gateApiCall?: (text: string, context: MutationContext) => Observable<unknown>;
 
   @Output() posted = new EventEmitter<{ reachTier: ReachTier }>();
   @Output() settled = new EventEmitter<{
@@ -376,11 +378,13 @@ export class GateArtifactCardComponent {
   }
 
   onSubmit(): void {
-    this.interaction.submit(
-      this.localText(),
-      this.mutationType,
-      this.contextMetadata,
-    );
+    const text = this.localText().trim();
+    if (!text) return;
+    if (this.gateApiCall) {
+      this.interaction.submitWithApi(text, this.mutationType, this.contextMetadata, this.gateApiCall);
+    } else {
+      this.interaction.submit(text, this.mutationType, this.contextMetadata);
+    }
   }
 
   onAffirm(): void {
@@ -390,6 +394,10 @@ export class GateArtifactCardComponent {
   protected onResubmit(): void {
     const text = this.localText().trim();
     if (!text) return;
-    this.interaction.submit(text, this.mutationType, this.contextMetadata);
+    if (this.gateApiCall) {
+      this.interaction.submitWithApi(text, this.mutationType, this.contextMetadata, this.gateApiCall);
+    } else {
+      this.interaction.submit(text, this.mutationType, this.contextMetadata);
+    }
   }
 }
