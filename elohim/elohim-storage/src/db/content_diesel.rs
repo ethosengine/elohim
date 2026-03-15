@@ -45,6 +45,23 @@ pub struct CreateContentInput {
     pub tags: Vec<String>,
 }
 
+/// Input for partially updating a content item (PATCH semantics).
+/// All fields are `Option` — `None` means "no change".
+#[derive(Debug, Default)]
+pub struct UpdateContentInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub content_body: Option<String>,
+    pub content_format: Option<String>,
+    /// Already-serialized JSON string. If provided, replaces metadata_json in the row.
+    /// The caller (ContentService) is responsible for shallow-merging before calling this.
+    pub metadata_json: Option<String>,
+    /// If provided, replaces all existing tags (delete all + insert new).
+    pub tags: Option<Vec<String>>,
+    pub reach: Option<String>,
+}
+
 fn default_content_type() -> String {
     "concept".to_string()
 }
@@ -351,6 +368,92 @@ pub fn bulk_create_content(
     })
 }
 
+/// Update a content item with partial (PATCH) semantics — scoped by app.
+///
+/// Only fields present in `input` are applied. Tags, if provided, replace all existing tags.
+/// Returns the updated `ContentWithTags`.
+pub fn update_content(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: UpdateContentInput,
+) -> Result<ContentWithTags, StorageError> {
+    use super::models::current_timestamp;
+
+    let id = &input.id;
+
+    // Verify the row exists in this app scope
+    let existing = get_content_with_tags(conn, ctx, id)?
+        .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
+
+    // Apply scalar field updates — use provided value or fall back to existing
+    let new_title = input.title.as_deref().unwrap_or(&existing.content.title);
+    let new_description = input
+        .description
+        .as_deref()
+        .or(existing.content.description.as_deref());
+    let new_content_body = input
+        .content_body
+        .as_deref()
+        .or(existing.content.content_body.as_deref());
+    let new_content_format = input
+        .content_format
+        .as_deref()
+        .unwrap_or(&existing.content.content_format);
+    let new_reach = input.reach.as_deref().unwrap_or(&existing.content.reach);
+    let new_metadata_json = input
+        .metadata_json
+        .as_deref()
+        .or(existing.content.metadata_json.as_deref());
+
+    let now = current_timestamp();
+
+    conn.transaction(|conn| {
+        diesel::update(
+            content::table
+                .filter(content::app_id.eq(&ctx.app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set((
+            content::title.eq(new_title),
+            content::description.eq(new_description),
+            content::content_body.eq(new_content_body),
+            content::content_format.eq(new_content_format),
+            content::metadata_json.eq(new_metadata_json),
+            content::reach.eq(new_reach),
+            content::updated_at.eq(&now),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+
+        // Replace tags if provided
+        if let Some(ref new_tags) = input.tags {
+            diesel::delete(
+                content_tags::table
+                    .filter(content_tags::app_id.eq(&ctx.app_id))
+                    .filter(content_tags::content_id.eq(id)),
+            )
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Tag delete failed: {}", e)))?;
+
+            for tag in new_tags {
+                let new_tag = NewContentTag {
+                    app_id: &ctx.app_id,
+                    content_id: id,
+                    tag,
+                };
+                diesel::insert_or_ignore_into(content_tags::table)
+                    .values(&new_tag)
+                    .execute(conn)
+                    .map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
+            }
+        }
+
+        // Return updated record
+        get_content_with_tags(conn, ctx, id)?
+            .ok_or_else(|| StorageError::Internal("Failed to fetch updated content".into()))
+    })
+}
+
 /// Delete content by ID - scoped by app
 pub fn delete_content(
     conn: &mut SqliteConnection,
@@ -589,5 +692,20 @@ mod tests {
         let result2 = bulk_create_content(&mut conn, &lamad_ctx, items2).unwrap();
         assert_eq!(result2.inserted, 0, "Should insert 0 items (duplicate)");
         assert_eq!(result2.skipped, 1, "Should skip 1 item");
+    }
+
+    #[test]
+    fn test_update_content_input_struct_exists() {
+        let input = UpdateContentInput {
+            id: "test-id".to_string(),
+            title: None,
+            description: None,
+            content_body: None,
+            content_format: None,
+            metadata_json: None,
+            tags: None,
+            reach: None,
+        };
+        assert_eq!(input.id, "test-id");
     }
 }
