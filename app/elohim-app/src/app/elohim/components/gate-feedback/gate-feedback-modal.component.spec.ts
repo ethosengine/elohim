@@ -243,6 +243,18 @@ describe('GateFeedbackModalComponent', () => {
     });
   });
 
+  // --- API wiring ---
+
+  it('should have an apiCall function that delegates to StorageApiService', () => {
+    expect(component.apiCall).toBeDefined();
+    expect(typeof component.apiCall).toBe('function');
+  });
+
+  it('should pass gateApiCall to the artifact card', () => {
+    const card = component.artifactCard();
+    expect(card.gateApiCall).toBe(component.apiCall);
+  });
+
   // --- Auto-close on posted ---
 
   it('should emit closed ~800ms after posted', fakeAsync(() => {

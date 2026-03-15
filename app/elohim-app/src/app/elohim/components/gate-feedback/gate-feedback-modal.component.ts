@@ -11,8 +11,11 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { Observable } from 'rxjs';
+
 import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
-import type { ReachTier } from '../../services/gate-interaction.service';
+import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
+import { StorageApiService } from '../../services/storage-api.service';
 
 export type FeedbackType = 'flag' | 'challenge' | 'feedback';
 
@@ -62,6 +65,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
           [placeholder]="placeholder()"
           [mutationType]="feedbackType()"
           [contextMetadata]="contextMetadata()"
+          [gateApiCall]="apiCall"
           (posted)="onPosted($event)"
           (settled)="settled.emit($event)"
         />
@@ -125,6 +129,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
 })
 export class GateFeedbackModalComponent {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly storageApi = inject(StorageApiService);
 
   readonly feedbackType = input<FeedbackType>('feedback');
   readonly contentId = input('');
@@ -149,6 +154,10 @@ export class GateFeedbackModalComponent {
     contentId: this.contentId(),
     category: this.feedbackType(),
   }));
+
+  readonly apiCall = (text: string, context: MutationContext): Observable<unknown> => {
+    return this.storageApi.createComment(context['contentId'] as string, text);
+  };
 
   onPosted(event: { reachTier: ReachTier }): void {
     this.posted.emit(event);
