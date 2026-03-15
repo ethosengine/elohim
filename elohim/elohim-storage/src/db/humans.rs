@@ -26,6 +26,7 @@ pub struct CreateHumanInput {
     pub affinities: String,
     pub profile_reach: String,
     pub location: Option<String>,
+    pub profile_photo_url: Option<String>,
     pub app_id: String,
 }
 
@@ -38,6 +39,7 @@ pub struct UpdateHumanInput {
     pub affinities: Option<String>,
     pub profile_reach: Option<String>,
     pub location: Option<String>,
+    pub profile_photo_url: Option<String>,
 }
 
 // ============================================================================
@@ -65,6 +67,7 @@ pub fn create_human(
         affinities: input.affinities,
         profile_reach: input.profile_reach,
         location: input.location,
+        profile_photo_url: input.profile_photo_url,
         app_id: input.app_id,
     };
 
@@ -121,6 +124,7 @@ pub fn update_human(
     let affinities = input.affinities.unwrap_or(existing.affinities);
     let profile_reach = input.profile_reach.unwrap_or(existing.profile_reach);
     let location = input.location.or(existing.location);
+    let profile_photo_url = input.profile_photo_url.or(existing.profile_photo_url);
 
     let rows_affected = diesel::update(humans::table.filter(humans::id.eq(id)))
         .set((
@@ -129,6 +133,7 @@ pub fn update_human(
             humans::affinities.eq(affinities),
             humans::profile_reach.eq(profile_reach),
             humans::location.eq(location),
+            humans::profile_photo_url.eq(profile_photo_url),
             humans::updated_at.eq(&now),
         ))
         .execute(conn)
