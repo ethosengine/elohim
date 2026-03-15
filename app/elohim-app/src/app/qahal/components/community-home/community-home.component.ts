@@ -26,11 +26,12 @@ import { RouterModule } from '@angular/router';
         <p class="subtitle">Community & Governance</p>
       </div>
 
-      <div class="coming-soon">
-        <h2>Coming Soon</h2>
+      <div class="directory-link-section">
+        <a routerLink="directory" class="nav-link directory-link" data-testid="directory-link">
+          Community Directory
+        </a>
         <p>
-          The community coordination layer of the Elohim Protocol, implementing consent-based
-          relationships and collective governance.
+          Browse community members, households, and groups.
         </p>
       </div>
 
@@ -96,23 +97,22 @@ import { RouterModule } from '@angular/router';
         margin-top: 0.5rem;
       }
 
-      .coming-soon {
+      .directory-link-section {
         background: var(--surface-elevated, #f5f5f5);
         border-radius: 12px;
         padding: 2rem;
         margin-bottom: 3rem;
       }
 
-      .coming-soon h2 {
-        color: var(--primary, #6366f1);
-        margin-top: 0;
-      }
-
-      .coming-soon p {
+      .directory-link-section p {
         color: var(--text-secondary, #666);
         max-width: 500px;
-        margin: 0 auto;
+        margin: 0.75rem auto 0;
         line-height: 1.6;
+      }
+
+      .directory-link {
+        font-size: 1.125rem;
       }
 
       .features {
@@ -193,7 +193,7 @@ import { RouterModule } from '@angular/router';
           color: var(--text-primary, #f5f5f5);
         }
 
-        .coming-soon {
+        .directory-link-section {
           background: var(--surface-elevated, #2a2a2a);
         }
 

@@ -34,6 +34,16 @@ export const COMMUNITY_ROUTES: Routes = [
           },
         },
       },
+      {
+        path: 'directory',
+        loadComponent: async () =>
+          import('./components/community-directory/community-directory.component').then(
+            m => m.CommunityDirectoryComponent
+          ),
+        data: {
+          title: 'Community Directory',
+        },
+      },
     ],
   },
 ];
