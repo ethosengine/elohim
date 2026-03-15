@@ -1161,6 +1161,33 @@ impl From<CreateContentInputView> for CreateContentInput {
     }
 }
 
+/// Input for partially updating a content item — PATCH /db/content/{id}
+///
+/// All fields are optional — only provided fields are applied.
+/// `metadata` is shallow-merged into the existing metadata object (key-by-key overwrite).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateContentInputView {
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Pass `null` explicitly to clear the description field.
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub content_body: Option<String>,
+    #[serde(default)]
+    pub content_format: Option<String>,
+    /// Shallow-merged into existing metadata: only keys present in this object are updated.
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+    /// If provided, replaces all existing tags.
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub reach: Option<String>,
+}
+
 // ============================================================================
 // Path Input Views
 // ============================================================================
@@ -4379,5 +4406,23 @@ mod schema_version_tests {
         assert_eq!(view.content_id, "c-1");
         assert_eq!(view.event_type, "mastery_completion");
         assert!((view.raw_amount - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_update_content_input_view_deserializes_partial() {
+        let json = r#"{"metadata": {"status": "done"}}"#;
+        let view: super::UpdateContentInputView = serde_json::from_str(json).unwrap();
+        assert!(view.title.is_none());
+        assert!(view.tags.is_none());
+        let meta = view.metadata.unwrap();
+        assert_eq!(meta.0["status"], "done");
+    }
+
+    #[test]
+    fn test_update_content_input_view_empty_patch_deserializes() {
+        let json = r#"{}"#;
+        let view: super::UpdateContentInputView = serde_json::from_str(json).unwrap();
+        assert!(view.title.is_none());
+        assert!(view.metadata.is_none());
     }
 }
