@@ -351,6 +351,7 @@ diesel::table! {
         affinities -> Text,
         profile_reach -> Text,
         location -> Nullable<Text>,
+        profile_photo_url -> Nullable<Text>,
         app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
