@@ -154,6 +154,24 @@ describe('GateFeedbackModalComponent', () => {
     );
   });
 
+  it('should render "Report Issue" title for report type', () => {
+    fixture.componentRef.setInput('feedbackType', 'report');
+    fixture.detectChanges();
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid="feedback-modal-title"]',
+    );
+    expect(title.textContent.trim()).toBe('Report Issue');
+  });
+
+  it('should set placeholder to "What happened?" for report type', () => {
+    fixture.componentRef.setInput('feedbackType', 'report');
+    fixture.detectChanges();
+    const textarea = fixture.nativeElement.querySelector(
+      '[data-testid="artifact-textarea"]',
+    );
+    expect(textarea.getAttribute('placeholder')).toBe('What happened?');
+  });
+
   // --- Close / dismiss events ---
 
   it('should emit closed when close button clicked', () => {

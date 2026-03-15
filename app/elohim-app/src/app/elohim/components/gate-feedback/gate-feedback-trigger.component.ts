@@ -19,6 +19,7 @@ const MENU_ITEMS: MenuItem[] = [
   { type: 'flag', label: 'Flag' },
   { type: 'challenge', label: 'Challenge' },
   { type: 'feedback', label: 'Feedback' },
+  { type: 'report', label: 'Report Issue' },
 ];
 
 @Component({
