@@ -57,6 +57,8 @@ export { AffinityTrackingService } from './affinity-tracking.service';
 
 // Gate evaluation (mutation interceptor responses)
 export { GateService } from './gate.service';
+export { GateInteractionService } from './gate-interaction.service';
+export type { GateArtifactState, ReachTier, MutationContext } from './gate-interaction.service';
 
 // Lens registry (cross-pillar resource exploration)
 export { LensRegistryService } from './lens-registry.service';
