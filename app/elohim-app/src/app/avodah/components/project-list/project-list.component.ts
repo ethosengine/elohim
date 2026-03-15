@@ -48,17 +48,23 @@ import { AvodahApiService } from '../../services/avodah-api.service';
                 class="action-btn"
                 (click)="navigate(project, 'board')"
                 data-testid="btn-board"
-              >▦ Board</button>
+              >
+                ▦ Board
+              </button>
               <button
                 class="action-btn"
                 (click)="navigate(project, 'backlog')"
                 data-testid="btn-backlog"
-              >≡ Backlog</button>
+              >
+                ≡ Backlog
+              </button>
               <button
                 class="action-btn"
                 (click)="navigate(project, 'tasks')"
                 data-testid="btn-tasks"
-              >↺ Tasks</button>
+              >
+                ↺ Tasks
+              </button>
             </div>
           </div>
         }
@@ -183,7 +189,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
         font-size: 0.78rem;
         color: var(--lamad-text-muted, #64748b);
         cursor: pointer;
-        transition: background 0.12s ease, color 0.12s ease;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease;
       }
       .action-btn:last-child {
         border-right: none;
@@ -196,12 +204,16 @@ import { AvodahApiService } from '../../services/avodah-api.service';
   ],
 })
 export class ProjectListComponent implements OnInit {
-  private router = inject(Router);
-  private api = inject(AvodahApiService);
+  private readonly router = inject(Router);
+  private readonly api = inject(AvodahApiService);
 
   projects: ContentNode[] = [];
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
     this.projects = await this.api.getProjects();
   }
 

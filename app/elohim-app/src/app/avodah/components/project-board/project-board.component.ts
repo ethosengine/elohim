@@ -1,10 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { ActivatedRoute } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
-import { BoardColumn, DEFAULT_BOARD_COLUMNS, parseWorkProjectMeta } from '../../models/work-project.model';
+import {
+  BoardColumn,
+  DEFAULT_BOARD_COLUMNS,
+  parseWorkProjectMeta,
+} from '../../models/work-project.model';
 import { parseWorkStoryMeta } from '../../models/work-story.model';
 import { AvodahApiService } from '../../services/avodah-api.service';
 import { StoryCardComponent } from '../story-card/story-card.component';
@@ -19,10 +22,12 @@ import { StoryCardComponent } from '../story-card/story-card.component';
         <div class="project-name">{{ project?.title ?? 'Project' }}</div>
         <ul>
           <li class="active">▦ Board</li>
-          <li><a [routerLink]="['../backlog']">≡ Backlog</a></li>
-          <li><a [routerLink]="['../tasks']">↺ Tasks</a></li>
+          <li><a [routerLink]="['../backlog']" data-testid="nav-backlog">≡ Backlog</a></li>
+          <li><a [routerLink]="['../tasks']" data-testid="nav-tasks">↺ Tasks</a></li>
         </ul>
-        <a routerLink="/avodah/projects" class="new-project">+ New Project</a>
+        <a routerLink="/avodah/projects" class="new-project" data-testid="nav-projects">
+          + New Project
+        </a>
       </nav>
       <main class="board-main">
         <div class="columns">
@@ -151,14 +156,18 @@ import { StoryCardComponent } from '../story-card/story-card.component';
   ],
 })
 export class ProjectBoardComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private api = inject(AvodahApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly api = inject(AvodahApiService);
 
   project: ContentNode | null = null;
   stories: ContentNode[] = [];
   columns: BoardColumn[] = DEFAULT_BOARD_COLUMNS;
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
     const projectId = this.route.snapshot.params['id'] as string;
     const projects = await this.api.getProjects();
     this.project = projects.find(p => p.id === projectId) ?? null;

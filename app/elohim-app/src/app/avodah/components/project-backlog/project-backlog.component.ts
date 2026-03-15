@@ -1,6 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { ActivatedRoute } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -20,12 +19,19 @@ import { AvodahApiService } from '../../services/avodah-api.service';
           <li class="active">≡ Backlog</li>
           <li><a [routerLink]="['../tasks']" data-testid="nav-tasks">↺ Tasks</a></li>
         </ul>
-        <a routerLink="/avodah/projects" class="new-project" data-testid="nav-projects">+ New Project</a>
+        <a routerLink="/avodah/projects" class="new-project" data-testid="nav-projects">
+          + New Project
+        </a>
       </nav>
       <main class="backlog-main">
         <div class="filter-bar">
           <label for="filter-status" class="sr-only">Filter by status</label>
-          <select id="filter-status" (change)="filterStatus($event)" data-testid="filter-status" aria-label="Filter by status">
+          <select
+            id="filter-status"
+            (change)="filterStatus($event)"
+            data-testid="filter-status"
+            aria-label="Filter by status"
+          >
             <option value="">All Statuses</option>
             <option value="backlog">Backlog</option>
             <option value="todo">To Do</option>
@@ -34,7 +40,12 @@ import { AvodahApiService } from '../../services/avodah-api.service';
             <option value="done">Done</option>
           </select>
           <label for="filter-priority" class="sr-only">Filter by priority</label>
-          <select id="filter-priority" (change)="filterPriority($event)" data-testid="filter-priority" aria-label="Filter by priority">
+          <select
+            id="filter-priority"
+            (change)="filterPriority($event)"
+            data-testid="filter-priority"
+            aria-label="Filter by priority"
+          >
             <option value="">All Priorities</option>
             <option value="urgent">Urgent</option>
             <option value="high">High</option>
@@ -287,8 +298,8 @@ import { AvodahApiService } from '../../services/avodah-api.service';
   ],
 })
 export class ProjectBacklogComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private api = inject(AvodahApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly api = inject(AvodahApiService);
 
   projectId = '';
   stories: ContentNode[] = [];
@@ -296,7 +307,11 @@ export class ProjectBacklogComponent implements OnInit {
   readonly activeStatusFilter = signal<string>('');
   readonly activePriorityFilter = signal<string>('');
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
     this.projectId = this.route.snapshot.params['id'] as string;
     this.stories = await this.api.getStoriesForProject(this.projectId);
   }
@@ -309,7 +324,8 @@ export class ProjectBacklogComponent implements OnInit {
     return this.stories.filter(s => {
       const meta = this.storyMeta(s);
       const statusOk = !this.activeStatusFilter() || meta.status === this.activeStatusFilter();
-      const priorityOk = !this.activePriorityFilter() || meta.priority === this.activePriorityFilter();
+      const priorityOk =
+        !this.activePriorityFilter() || meta.priority === this.activePriorityFilter();
       return statusOk && priorityOk;
     });
   }

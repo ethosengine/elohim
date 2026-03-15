@@ -1,6 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { ActivatedRoute } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -20,7 +19,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
           <li><a [routerLink]="['../backlog']" data-testid="nav-backlog">≡ Backlog</a></li>
           <li class="active">↺ Tasks</li>
         </ul>
-        <a routerLink="/avodah/projects" class="new-project" data-testid="nav-projects">+ New Project</a>
+        <a routerLink="/avodah/projects" class="new-project" data-testid="nav-projects">
+          + New Project
+        </a>
       </nav>
       <main class="tasks-main">
         @if (recurringStories.length === 0) {
@@ -44,16 +45,22 @@ import { AvodahApiService } from '../../services/avodah-api.service';
                       class="check-btn"
                       [attr.aria-label]="'Mark complete: ' + story.title"
                       data-testid="task-check"
-                    >○</button>
+                    >
+                      ○
+                    </button>
                     <span class="task-title">{{ story.title }}</span>
                     <span class="task-next">
                       {{ nextOccurrence(story) }}
                     </span>
                     @if (hasExchange(story)) {
-                      <span class="badge badge--exchange" data-testid="badge-exchange">⚖ exchange</span>
+                      <span class="badge badge--exchange" data-testid="badge-exchange">
+                        ⚖ exchange
+                      </span>
                     }
                     @if (hasAttestation(story)) {
-                      <span class="badge badge--attestation" data-testid="badge-attestation">🎓 attested</span>
+                      <span class="badge badge--attestation" data-testid="badge-attestation">
+                        🎓 attested
+                      </span>
                     }
                   </li>
                 }
@@ -231,15 +238,19 @@ import { AvodahApiService } from '../../services/avodah-api.service';
   ],
 })
 export class TaskListComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private api = inject(AvodahApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly api = inject(AvodahApiService);
 
   readonly groups = ['daily', 'weekly', 'monthly', 'custom'] as const;
 
   projectId = '';
   recurringStories: ContentNode[] = [];
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
     this.projectId = this.route.snapshot.params['id'] as string;
     const all = await this.api.getStoriesForProject(this.projectId);
     this.recurringStories = all.filter(s => {
