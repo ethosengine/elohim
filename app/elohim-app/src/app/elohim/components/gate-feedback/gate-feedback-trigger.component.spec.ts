@@ -195,4 +195,32 @@ describe('GateFeedbackTriggerComponent', () => {
       reachTier: 'community',
     });
   });
+
+  // --- Integration: trigger → modal → card flow ---
+
+  it('should pass correct feedbackType through to modal card', () => {
+    // Open menu → click Flag
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="feedback-trigger-btn"]',
+    );
+    btn.click();
+    fixture.detectChanges();
+    const flagItem: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="feedback-menu-item-flag"]',
+    );
+    flagItem.click();
+    fixture.detectChanges();
+
+    // Modal should show "Flag Content" title
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid="feedback-modal-title"]',
+    );
+    expect(title.textContent.trim()).toBe('Flag Content');
+
+    // Textarea should have flag placeholder
+    const textarea = fixture.nativeElement.querySelector(
+      '[data-testid="artifact-textarea"]',
+    );
+    expect(textarea.placeholder).toBe('Describe the issue...');
+  });
 });
