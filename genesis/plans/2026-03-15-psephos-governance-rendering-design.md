@@ -21,6 +21,26 @@ Psephos is the third pillar of the Sophia rendering ecosystem:
 
 Each names the *object*, not the institution. Perseus is the exercise, not the classroom. Psyche is the measure, not the test. Psephos is the ballot, not the election.
 
+### Content Supply Chain
+
+The protocol supplies the content for each pillar through the EPR pipeline:
+
+| Pillar | Protocol supplies... | Sophia renders... |
+|--------|---------------------|-------------------|
+| Perseus | The exercise content (via EPR content node) | The interactive widget |
+| Psyche | The psychometric instrument (item parameters, calibration) | The assessment experience |
+| Psephos | The ballot (proposal + options + mechanism + hygiene config) | The voting interface |
+
+**The ballot is a governed content artifact.** It flows through EPR content addressing with governance validation — the same three-pillar coupling (lamad + shefa + qahal) that governs all content. This means:
+
+- Ballot options are EPR-addressed, not assembled ad hoc by the client
+- The governance dimension on the EPR Head validates that this ballot was properly constituted
+- Election hygiene rules come from the protocol, not from client-side configuration
+- You can't tamper with ballot content because it carries integrity verification
+- The `PsephosBallotProps` are resolved from an EPR reference, not constructed from loose API calls
+
+Psephos is a pure renderer — it receives the ballot artifact and renders it faithfully, the same way Perseus receives an exercise and renders it faithfully. The protocol owns the content; Sophia owns the experience.
+
 ---
 
 ## Why a Separate Rendering Package?
@@ -53,13 +73,33 @@ The boundary is clear: when the elohim selects a formal voting mechanism (levels
 
 ## Architecture
 
+### Integration with sophia-core
+
+Psephos extends sophia-core's type system rather than standing alone. The parallel:
+
+| | Perseus | Psyche | Psephos |
+|--|---------|--------|---------|
+| **Protocol supplies** | Moment with `content: PerseusRenderer` | Moment with `subscaleContributions` | **PsephosBallot** with options + mechanism + hygiene |
+| **Renders** | Exercise widgets | Discovery/reflection UX | Voting widgets |
+| **Callback** | Recognition with `mastery` | Recognition with `resonance/reflection` | Recognition with `governance: GovernanceResult` |
+| **Aggregation** | perseus-score (client-side) | psyche-survey (client-side) | Server-side TallyStrategy (Sprint 3) |
+
+**sophia-core additions:**
+- `'governance'` added to `AssessmentPurpose`
+- `governance?: GovernanceResult` added to `Recognition`
+- `hasGovernanceResult()` type guard
+- `GovernanceScoringStrategy` registered via `registerScoringStrategy()`
+
+**Key difference from Perseus/Psyche:** The input is NOT a `Moment`. A ballot is structurally different from an exercise — it has options, mechanism config, and election hygiene rules instead of widget definitions. `PsephosBallot` is the governance equivalent of `Moment`, but its own type.
+
 ### Package Structure
 
 ```
 sophia/packages/psephos/
 ├── src/
-│   ├── index.ts                    # Public API
-│   ├── types.ts                    # PsephosBallotProps, BallotRecognition, ElectionHygiene
+│   ├── index.ts                    # Public API + auto-registers GovernanceScoringStrategy
+│   ├── types.ts                    # PsephosBallot, PsephosOption, ElectionHygiene, GovernanceResult
+│   ├── governance-strategy.ts      # ScoringStrategy implementation for ballot validation
 │   ├── psephos-renderer.tsx        # Main renderer (React, like Perseus)
 │   ├── widgets/
 │   │   ├── ranked-choice.tsx       # Drag-to-rank or click-to-assign
