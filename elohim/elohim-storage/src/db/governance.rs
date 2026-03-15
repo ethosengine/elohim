@@ -5,10 +5,14 @@
 
 use diesel::prelude::*;
 
-use super::diesel_schema::{challenges, discussions, governance_states, precedents, proposals, votes};
+use super::diesel_schema::{
+    challenges, discussions, governance_signals, governance_states, precedents, proposal_options,
+    proposals, ranked_votes, votes,
+};
 use super::models::{
-    Challenge, Discussion, GovernanceState, NewChallenge, NewDiscussion, NewGovernanceState,
-    NewPrecedent, NewProposal, NewVote, Precedent, Proposal, Vote,
+    Challenge, Discussion, GovernanceSignal, GovernanceState, NewChallenge, NewDiscussion,
+    NewGovernanceSignal, NewGovernanceState, NewPrecedent, NewProposal, NewProposalOption, NewRankedVote,
+    NewVote, Precedent, Proposal, ProposalOption, RankedVote, Vote,
 };
 use crate::error::StorageError;
 
@@ -295,4 +299,145 @@ pub fn cast_vote(
         .filter(votes::id.eq(new.id))
         .first(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// =========================================================================
+// Proposal Options
+// =========================================================================
+
+pub fn query_proposal_options(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+) -> Result<Vec<ProposalOption>, StorageError> {
+    proposal_options::table
+        .filter(proposal_options::proposal_id.eq(proposal_id))
+        .order(proposal_options::position.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn create_proposal_option(
+    conn: &mut SqliteConnection,
+    new: &NewProposalOption,
+) -> Result<ProposalOption, StorageError> {
+    diesel::insert_into(proposal_options::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    proposal_options::table
+        .filter(proposal_options::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn create_proposal_options(
+    conn: &mut SqliteConnection,
+    options: &[NewProposalOption],
+) -> Result<Vec<ProposalOption>, StorageError> {
+    for opt in options {
+        diesel::insert_into(proposal_options::table)
+            .values(opt)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    }
+    let pid = options.first().map(|o| o.proposal_id).unwrap_or("");
+    proposal_options::table
+        .filter(proposal_options::proposal_id.eq(pid))
+        .order(proposal_options::position.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// =========================================================================
+// Ranked Votes (multi-mechanism)
+// =========================================================================
+
+pub fn query_ranked_votes(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+) -> Result<Vec<RankedVote>, StorageError> {
+    ranked_votes::table
+        .filter(ranked_votes::proposal_id.eq(proposal_id))
+        .order(ranked_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn get_ranked_votes_for_human(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+    human_id: &str,
+) -> Result<Vec<RankedVote>, StorageError> {
+    ranked_votes::table
+        .filter(ranked_votes::proposal_id.eq(proposal_id))
+        .filter(ranked_votes::human_id.eq(human_id))
+        .order(ranked_votes::rank.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn cast_ranked_votes(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+    human_id: &str,
+    votes: &[NewRankedVote],
+) -> Result<Vec<RankedVote>, StorageError> {
+    diesel::delete(
+        ranked_votes::table
+            .filter(ranked_votes::proposal_id.eq(proposal_id))
+            .filter(ranked_votes::human_id.eq(human_id)),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+    for vote in votes {
+        diesel::insert_into(ranked_votes::table)
+            .values(vote)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    }
+    get_ranked_votes_for_human(conn, proposal_id, human_id)
+}
+
+// =========================================================================
+// Governance Signals
+// =========================================================================
+
+pub fn record_signal(
+    conn: &mut SqliteConnection,
+    new: &NewGovernanceSignal,
+) -> Result<GovernanceSignal, StorageError> {
+    diesel::insert_into(governance_signals::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    governance_signals::table
+        .filter(governance_signals::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn query_signals(
+    conn: &mut SqliteConnection,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<Vec<GovernanceSignal>, StorageError> {
+    governance_signals::table
+        .filter(governance_signals::entity_type.eq(entity_type))
+        .filter(governance_signals::entity_id.eq(entity_id))
+        .order(governance_signals::created_at.desc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+pub fn count_signals(
+    conn: &mut SqliteConnection,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<i64, StorageError> {
+    governance_signals::table
+        .filter(governance_signals::entity_type.eq(entity_type))
+        .filter(governance_signals::entity_id.eq(entity_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))
 }
