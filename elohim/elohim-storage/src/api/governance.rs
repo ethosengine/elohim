@@ -162,6 +162,12 @@ pub async fn handle(
                 proposal_type: &input.proposal_type,
                 title: &input.title,
                 body: &input.body,
+                voting_mechanism: &input.voting_mechanism,
+                score_min: input.score_min,
+                score_max: input.score_max,
+                dots_per_voter: input.dots_per_voter,
+                quorum_percentage: input.quorum_percentage,
+                passage_threshold: input.passage_threshold,
             };
 
             let mut conn = get_conn(pool)?;

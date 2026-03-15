@@ -454,8 +454,8 @@ diesel::table! {
         score_min -> Nullable<Integer>,
         score_max -> Nullable<Integer>,
         dots_per_voter -> Nullable<Integer>,
-        quorum_percentage -> Nullable<Float>,
-        passage_threshold -> Nullable<Float>,
+        quorum_percentage -> Nullable<Double>,
+        passage_threshold -> Nullable<Double>,
     }
 }
 

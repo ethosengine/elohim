@@ -3295,8 +3295,8 @@ pub struct ProposalView {
     pub score_min: Option<i32>,
     pub score_max: Option<i32>,
     pub dots_per_voter: Option<i32>,
-    pub quorum_percentage: Option<f32>,
-    pub passage_threshold: Option<f32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 impl From<Proposal> for ProposalView {
@@ -3404,6 +3404,10 @@ impl VoteView {
     }
 }
 
+fn default_voting_mechanism() -> String {
+    "consent".to_string()
+}
+
 /// Create a proposal — API request
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -3417,6 +3421,13 @@ pub struct CreateProposalInputView {
     pub body: String,
     #[serde(default)]
     pub voting_anonymous: bool,
+    #[serde(default = "default_voting_mechanism")]
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// Cast or update a vote — API request

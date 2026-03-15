@@ -1480,8 +1480,8 @@ pub struct Proposal {
     pub score_min: Option<i32>,
     pub score_max: Option<i32>,
     pub dots_per_voter: Option<i32>,
-    pub quorum_percentage: Option<f32>,
-    pub passage_threshold: Option<f32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// New proposal for INSERT
@@ -1494,6 +1494,12 @@ pub struct NewProposal<'a> {
     pub proposal_type: &'a str,
     pub title: &'a str,
     pub body: &'a str,
+    pub voting_mechanism: &'a str,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// Governance precedent
