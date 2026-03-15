@@ -10,3 +10,4 @@ export { GovernanceService } from '@app/elohim/services/governance.service';
 export { CollectiveService } from './collective.service';
 export { MechanismSelectionService } from './mechanism-selection.service';
 export type { MechanismSelection } from './mechanism-selection.service';
+export { GovernanceRecognitionService } from './governance-recognition.service';

@@ -10,6 +10,7 @@ import {
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 import type {
   RecordSignalInputView,
   GovernanceSignalView,
@@ -384,6 +385,7 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
 
   private readonly signalService = inject(GovernanceSignalService);
   private readonly governanceApi = inject(GovernanceApiService);
+  private readonly governanceRecognition = inject(GovernanceRecognitionService);
 
   private static readonly CURRENT_USER_ID = 'current-user';
 
@@ -510,6 +512,21 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
     this.governanceApi.recordSignal(signal).catch(() => {
       // API failure is non-blocking; local signal is already recorded
     });
+
+    // Generate REA economic event for governance participation
+    // Block positions (index 0 on proposal scale) use 'block' participation type
+    const isBlock = this.context() === 'proposal' && positionData.index === 0;
+    this.governanceRecognition
+      .recordParticipation({
+        entityType: this.entityType(),
+        entityId: this.resolvedEntityId,
+        humanId: GraduatedFeedbackComponent.CURRENT_USER_ID,
+        mechanismLevel: 2,
+        participationType: isBlock ? 'block' : 'graduated-feedback',
+      })
+      .catch(() => {
+        // Recognition failure is non-blocking
+      });
   }
 
   /**

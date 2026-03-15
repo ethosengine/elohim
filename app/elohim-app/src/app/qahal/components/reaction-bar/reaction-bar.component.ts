@@ -8,6 +8,7 @@ import {
   ReactionCounts,
 } from '@app/elohim/services/governance-signal.service';
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 import {
   EmotionalReactionType,
   EmotionalReactionConstraints,
@@ -289,6 +290,7 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
 
   private readonly signalService = inject(GovernanceSignalService);
   private readonly governanceApi = inject(GovernanceApiService);
+  private readonly governanceRecognition = inject(GovernanceRecognitionService);
 
   private static readonly CURRENT_USER_ID = 'current-user';
 
@@ -367,6 +369,19 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
     this.governanceApi.recordSignal(signal).catch(() => {
       // API failure is non-blocking; local signal is already recorded
     });
+
+    // Generate REA economic event for governance participation
+    this.governanceRecognition
+      .recordParticipation({
+        entityType: this.entityType(),
+        entityId: this.resolvedEntityId,
+        humanId: ReactionBarComponent.CURRENT_USER_ID,
+        mechanismLevel: 1,
+        participationType: 'reaction',
+      })
+      .catch(() => {
+        // Recognition failure is non-blocking
+      });
   }
 
   /**
