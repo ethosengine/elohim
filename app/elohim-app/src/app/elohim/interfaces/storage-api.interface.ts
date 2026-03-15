@@ -31,6 +31,7 @@ import type {
   ContentMasteryView,
   ContentStewardshipView,
   ContentWithTagsView,
+  CreateContentInputView,
   PathView,
   PathWithDetailsView,
   RelationshipView,
@@ -82,6 +83,23 @@ export interface RelationshipFilters {
 }
 
 /**
+ * Partial update input for PATCH /db/content/{id}.
+ * All fields are optional — only provided fields are applied server-side.
+ * `metadata` is shallow-merged with the existing metadata object.
+ */
+export interface UpdateContentPatch {
+  title?: string;
+  description?: string | null;
+  contentBody?: string;
+  contentFormat?: string;
+  /** Shallow-merged server-side — only the keys you provide are overwritten. */
+  metadata?: Record<string, unknown>;
+  /** If provided, replaces all existing tags. */
+  tags?: string[];
+  reach?: string;
+}
+
+/**
  * Abstract storage API — read-oriented contract for elohim-storage.
  *
  * Exposes the common read surface shared by StorageApiService and
@@ -94,6 +112,12 @@ export interface IStorageApi {
 
   /** List content items with optional filters. */
   getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]>;
+
+  /** Create a new content node. Returns the created item with tags. */
+  createContent(input: CreateContentInputView): Observable<ContentWithTagsView>;
+
+  /** Partially update a content node (PATCH). Returns the updated item with tags. */
+  updateContent(id: string, patch: UpdateContentPatch): Observable<ContentWithTagsView>;
 
   /** Get a single learning path by ID, with full details. */
   getPath(id: string): Observable<PathWithDetailsView | null>;

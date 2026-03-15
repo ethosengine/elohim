@@ -23,6 +23,7 @@ export type {
   ContentFilters,
   PathFilters,
   RelationshipFilters,
+  UpdateContentPatch,
 } from './storage-api.interface';
 export { STORAGE_WRITER } from './storage-writer.interface';
 export type {
