@@ -89,7 +89,7 @@ use crate::db::models::{
     ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human,
     HumanRelationship, LocalSession, NodeStewardship, Path, PathAttestation, PathWithDetails,
-    PathWithSteps, Precedent, PremiumGate, Proposal, ReaCommitment, Relationship,
+    PathWithSteps, Precedent, PremiumGate, Proposal, ReaCommitment, Relationship, Vote,
     RelationshipWithContent, Step, StewardCredential, StewardedNode, StewardshipAllocation,
     StewardshipAllocationWithPresence,
 };
@@ -3288,6 +3288,7 @@ pub struct ProposalView {
     pub status: String,
     pub votes_for: i32,
     pub votes_against: i32,
+    pub voting_anonymous: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -3304,6 +3305,7 @@ impl From<Proposal> for ProposalView {
             status: p.status,
             votes_for: p.votes_for,
             votes_against: p.votes_against,
+            voting_anonymous: p.voting_anonymous == 1,
             created_at: p.created_at,
             updated_at: p.updated_at,
         }
@@ -3360,6 +3362,83 @@ impl From<Discussion> for DiscussionView {
             updated_at: d.updated_at,
         }
     }
+}
+
+/// Vote on a governance proposal — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct VoteView {
+    pub id: String,
+    pub proposal_id: String,
+    pub human_id: Option<String>,
+    pub position: String,
+    pub reason: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl VoteView {
+    pub fn from_vote(v: Vote, hide_identity: bool) -> Self {
+        Self {
+            id: v.id,
+            proposal_id: v.proposal_id,
+            human_id: if hide_identity { None } else { Some(v.human_id) },
+            position: v.position,
+            reason: v.reason,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Create a proposal — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateProposalInputView {
+    pub id: String,
+    pub content_id: String,
+    pub proposer_presence_id: String,
+    pub proposal_type: String,
+    pub title: String,
+    pub body: String,
+    #[serde(default)]
+    pub voting_anonymous: bool,
+}
+
+/// Cast or update a vote — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CastVoteInputView {
+    pub human_id: String,
+    pub position: String,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+/// Start a discussion — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateDiscussionInputView {
+    pub id: String,
+    pub content_id: String,
+    pub author_presence_id: String,
+    pub body: String,
+    #[serde(default)]
+    pub parent_id: Option<String>,
+}
+
+/// Post a message (reply) in a discussion — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PostMessageInputView {
+    pub id: String,
+    pub author_presence_id: String,
+    pub body: String,
 }
 
 // ============================================================================

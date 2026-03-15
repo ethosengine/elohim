@@ -5232,6 +5232,32 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .cache_ttl(60)
                 .build(),
         )
+        .route(
+            Route::post("/api/v1/governance/proposals")
+                .handler("create_proposal")
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/proposals/{id}/votes")
+                .handler("cast_vote")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/proposals/{id}/votes")
+                .handler("list_votes")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/discussions")
+                .handler("create_discussion")
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/discussions/{id}/messages")
+                .handler("post_message")
+                .build(),
+        )
         // =====================================================================
         // /api/v1/economic-events — REA economic events
         // =====================================================================
