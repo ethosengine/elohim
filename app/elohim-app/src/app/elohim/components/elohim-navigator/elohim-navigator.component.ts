@@ -33,7 +33,7 @@ import { BannerService } from '../../services/banner.service';
 /**
  * Context app identifiers for the Elohim Protocol
  */
-export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway';
+export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway' | 'avodah';
 
 /**
  * Context app configuration
@@ -126,6 +126,14 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '✨',
       route: '/shefa',
       tagline: 'Economics of Flourishing',
+      available: true,
+    },
+    {
+      id: 'avodah',
+      name: 'Avodah',
+      icon: '🔨',
+      route: '/avodah',
+      tagline: 'Work & Stewardship',
       available: true,
     },
   ];

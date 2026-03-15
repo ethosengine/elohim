@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/require-await -- Phase 1: mock stubs returning Promise<T> without async work */
 import { Injectable } from '@angular/core';
 
-import { ContentNode } from '../../lamad/models/content-node.model';
+import { ContentMetadata, ContentNode } from '../../lamad/models/content-node.model';
 import { DEFAULT_BOARD_COLUMNS } from '../models/work-project.model';
 
 const CONTENT_FORMAT = 'text' as const;
@@ -48,7 +48,7 @@ const MOCK_STORIES: ContentNode[] = [
         resetToStatus: 'todo',
         nextOccurrence: '2026-03-22T00:00:00Z',
       },
-    },
+    } as unknown as ContentMetadata,
     createdAt: MOCK_CREATED_AT,
     updatedAt: MOCK_CREATED_AT,
   },
@@ -67,7 +67,7 @@ const MOCK_STORIES: ContentNode[] = [
       visibility: 'private',
       priority: 'high',
       storyPoints: 3,
-    },
+    } as unknown as ContentMetadata,
     createdAt: MOCK_CREATED_AT,
     updatedAt: MOCK_CREATED_AT,
   },
@@ -90,7 +90,7 @@ const MOCK_STORIES: ContentNode[] = [
         resetToStatus: 'todo',
         nextOccurrence: '2026-03-22T00:00:00Z',
       },
-    },
+    } as unknown as ContentMetadata,
     createdAt: MOCK_CREATED_AT,
     updatedAt: MOCK_CREATED_AT,
   },
