@@ -72,6 +72,7 @@ import {
   type ContentFilters,
   type PathFilters,
   type RelationshipFilters,
+  type UpdateContentPatch,
   type CreatePresenceInput,
   type CreateMasteryInput,
   type CreateEventInput,
@@ -85,6 +86,7 @@ import type {
   EconomicEventView,
   ContentMasteryView,
   ContentWithTagsView,
+  CreateContentInputView,
   PathView,
   PathWithDetailsView,
   StewardshipAllocationView,
@@ -173,6 +175,24 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
       timeout(this.defaultTimeoutMs),
       catchError(error => this.handleError('getContents', error))
     );
+  }
+
+  /** Create a new content node. Returns the created item with tags. */
+  createContent(input: CreateContentInputView): Observable<ContentWithTagsView> {
+    return this.http.post<ContentWithTagsView>(`${this.baseUrl}/db/content`, input).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError(error => this.handleError('createContent', error))
+    );
+  }
+
+  /** Partially update a content node (PATCH). Returns the updated item with tags. */
+  updateContent(id: string, patch: UpdateContentPatch): Observable<ContentWithTagsView> {
+    return this.http
+      .patch<ContentWithTagsView>(`${this.baseUrl}/db/content/${encodeURIComponent(id)}`, patch)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => this.handleError('updateContent', error))
+      );
   }
 
   /** Get a single learning path by ID, with full details. */

@@ -1,117 +1,88 @@
-/* eslint-disable @typescript-eslint/require-await -- Phase 1: mock stubs returning Promise<T> without async work */
-import { Injectable } from '@angular/core';
+/* eslint-disable @typescript-eslint/require-await -- Observable→Promise bridging */
+import { Injectable, inject } from '@angular/core';
 
+import { firstValueFrom } from 'rxjs';
+
+import { StorageApiService } from '../../elohim/services/storage-api.service';
 import { ContentMetadata, ContentNode } from '../../lamad/models/content-node.model';
-import { DEFAULT_BOARD_COLUMNS } from '../models/work-project.model';
 
-const CONTENT_FORMAT = 'text' as const;
-const WORK_STORY_TYPE = 'work-story' as const;
-const MOCK_CREATED_AT = '2026-01-01T00:00:00Z';
-const MOCK_PROJECT_ID = 'proj-household-2026';
+import type { WorkStoryStatus } from '../models/work-story.model';
 
-const MOCK_PROJECTS: ContentNode[] = [
-  {
-    id: MOCK_PROJECT_ID,
-    contentType: 'work-project',
-    title: 'Household 2026',
-    description: 'Running tasks and projects for the household.',
-    content: '',
-    contentFormat: CONTENT_FORMAT,
-    tags: ['household'],
-    relatedNodeIds: [],
-    metadata: {
-      columns: DEFAULT_BOARD_COLUMNS,
-      visibility: 'private',
-    },
-    createdAt: MOCK_CREATED_AT,
-    updatedAt: MOCK_CREATED_AT,
-  },
-];
+import type { ContentWithTagsView } from '@elohim/storage-client/generated';
 
-const MOCK_STORIES: ContentNode[] = [
-  {
-    id: 'story-trash-weekly',
-    contentType: WORK_STORY_TYPE,
-    title: 'Take out the trash',
-    description: 'Weekly recurring chore.',
-    content: '',
-    contentFormat: CONTENT_FORMAT,
-    tags: ['chore', 'recurring'],
+// TODO: [HOLOCHAIN-ZOME] writes currently go direct to storage (same as seed workflow).
+// Route through conductor once the work-story zome is implemented.
+
+/**
+ * Map a storage ContentWithTagsView to the app's ContentNode domain type.
+ * The wire format is already camelCase with parsed JSON — no transformation needed,
+ * just field projection.
+ */
+function toContentNode(view: ContentWithTagsView): ContentNode {
+  return {
+    id: view.id,
+    contentType: view.contentType,
+    title: view.title,
+    description: view.description ?? '',
+    content: view.contentBody ?? '',
+    contentFormat: view.contentFormat,
+    tags: view.tags,
     relatedNodeIds: [],
-    metadata: {
-      projectId: MOCK_PROJECT_ID,
-      status: 'todo',
-      visibility: 'private',
-      priority: 'medium',
-      cadence: {
-        interval: 'weekly',
-        resetToStatus: 'todo',
-        nextOccurrence: '2026-03-22T00:00:00Z',
-      },
-    } as unknown as ContentMetadata,
-    createdAt: MOCK_CREATED_AT,
-    updatedAt: MOCK_CREATED_AT,
-  },
-  {
-    id: 'story-faucet-fix',
-    contentType: WORK_STORY_TYPE,
-    title: 'Fix the kitchen faucet',
-    description: 'The kitchen faucet is dripping and needs repair.',
-    content: '',
-    contentFormat: CONTENT_FORMAT,
-    tags: ['maintenance'],
-    relatedNodeIds: [],
-    metadata: {
-      projectId: MOCK_PROJECT_ID,
-      status: 'backlog',
-      visibility: 'private',
-      priority: 'high',
-      storyPoints: 3,
-    } as unknown as ContentMetadata,
-    createdAt: MOCK_CREATED_AT,
-    updatedAt: MOCK_CREATED_AT,
-  },
-  {
-    id: 'story-cook-meals',
-    contentType: WORK_STORY_TYPE,
-    title: 'Cook meals for the week',
-    description: 'Batch cook and prepare meals for the coming week.',
-    content: '',
-    contentFormat: CONTENT_FORMAT,
-    tags: ['food', 'recurring'],
-    relatedNodeIds: [],
-    metadata: {
-      projectId: MOCK_PROJECT_ID,
-      status: 'in-progress',
-      visibility: 'community',
-      priority: 'medium',
-      cadence: {
-        interval: 'weekly',
-        resetToStatus: 'todo',
-        nextOccurrence: '2026-03-22T00:00:00Z',
-      },
-    } as unknown as ContentMetadata,
-    createdAt: MOCK_CREATED_AT,
-    updatedAt: MOCK_CREATED_AT,
-  },
-];
+    metadata: (view.metadata ?? {}) as ContentMetadata,
+    reach: view.reach,
+    createdAt: view.createdAt,
+    updatedAt: view.updatedAt,
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class AvodahApiService {
+  private readonly storageApi = inject(StorageApiService);
+
   async getProjects(): Promise<ContentNode[]> {
-    return [...MOCK_PROJECTS];
+    const views = await firstValueFrom(
+      this.storageApi.getContents({ contentType: 'work-project' }),
+    );
+    return views.map(toContentNode);
   }
 
   async getStoriesForProject(projectId: string): Promise<ContentNode[]> {
-    return MOCK_STORIES.filter(
-      s => (s.metadata as Record<string, unknown>)['projectId'] === projectId
+    const views = await firstValueFrom(
+      this.storageApi.getContents({ contentType: 'work-story' }),
     );
+    return views
+      .map(toContentNode)
+      .filter(
+        n => (n.metadata as Record<string, unknown>)['projectId'] === projectId,
+      );
   }
 
-  async updateStoryStatus(storyId: string, status: string): Promise<void> {
-    const story = MOCK_STORIES.find(s => s.id === storyId);
-    if (story) {
-      (story.metadata as Record<string, unknown>)['status'] = status;
+  /**
+   * Update a story's status.
+   *
+   * @param isTerminal - set true when moving to a done-state column (`isTerminal: true`
+   *   in the project's BoardColumn config). This triggers an economic event in shefa.
+   */
+  async updateStoryStatus(
+    storyId: string,
+    status: WorkStoryStatus,
+    isTerminal = false,
+  ): Promise<void> {
+    await firstValueFrom(
+      this.storageApi.updateContent(storyId, { metadata: { status } }),
+    );
+
+    if (isTerminal) {
+      // REA transition: done → economic event settles the work record
+      await firstValueFrom(
+        this.storageApi.createEconomicEvent({
+          action: 'work',
+          provider: storyId,
+          receiver: storyId,
+          contentId: storyId,
+          lamadEventType: 'work-complete',
+        }),
+      );
     }
   }
 }

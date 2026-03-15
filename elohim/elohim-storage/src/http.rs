@@ -65,6 +65,7 @@ use crate::views::{
     ContributorPresenceView,
     CreateAllocationInputView,
     CreateCollectiveInputView,
+    ContentWithTagsView,
     // InputView types for API boundary (camelCase with parsed JSON)
     CreateContentInputView,
     CreateContributorPresenceInputView,
@@ -91,6 +92,7 @@ use crate::views::{
     StewardshipAllocationView,
     StewardshipSeedView,
     UpdateAllocationInputView,
+    UpdateContentInputView,
     SUPPORTED_SCHEMA_VERSIONS,
 };
 use bytes::Bytes;
@@ -555,7 +557,7 @@ impl HttpServer {
                 headers.insert(
                     "Access-Control-Allow-Methods",
                     hyper::header::HeaderValue::from_static(
-                        "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                        "GET, PUT, POST, PATCH, DELETE, HEAD, OPTIONS",
                     ),
                 );
                 headers.insert(
@@ -868,7 +870,7 @@ impl HttpServer {
             .header("Access-Control-Allow-Origin", "*")
             .header(
                 "Access-Control-Allow-Methods",
-                "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                "GET, PUT, POST, PATCH, DELETE, HEAD, OPTIONS",
             )
             .header(
                 "Access-Control-Allow-Headers",
@@ -1934,7 +1936,7 @@ impl HttpServer {
     /// GET/DELETE /db/content/{id} - Get or delete content by ID
     async fn handle_db_content_by_id(
         &self,
-        _req: Request<Incoming>,
+        req: Request<Incoming>,
         method: Method,
         content_id: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -1952,6 +1954,27 @@ impl HttpServer {
                 Ok(response::from_option(
                     result,
                     &format!("Content not found: {}", content_id),
+                ))
+            }
+            Method::PATCH => {
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                let body_bytes = body.to_bytes();
+
+                let view: UpdateContentInputView =
+                    serde_json::from_slice(&body_bytes).map_err(|e| {
+                        StorageError::Parse(format!("Invalid JSON: {}", e))
+                    })?;
+
+                Ok(response::from_result(
+                    services
+                        .content
+                        .update(content_id, view)
+                        .map(ContentWithTagsView::from),
                 ))
             }
             Method::DELETE => {
