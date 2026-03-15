@@ -27,6 +27,7 @@ pub mod economic_event_service;
 pub mod elohim_gate;
 pub mod events;
 pub mod exchange_service;
+pub mod governance_health;
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
