@@ -38,11 +38,17 @@ import {
               [entityId]="entityId()" />
           }
           @case (1) {
-            <app-reaction-bar [contentId]="entityId()" />
+            <app-reaction-bar
+              [entityType]="entityType()"
+              [entityId]="entityId()" />
           }
           @case (2) {
-            <app-graduated-feedback [contentId]="entityId()" />
-            <app-reaction-bar [contentId]="entityId()" />
+            <app-graduated-feedback
+              [entityType]="entityType()"
+              [entityId]="entityId()" />
+            <app-reaction-bar
+              [entityType]="entityType()"
+              [entityId]="entityId()" />
           }
         }
       }
