@@ -62,3 +62,11 @@ export type { GateArtifactState, ReachTier, MutationContext } from './gate-inter
 
 // Lens registry (cross-pillar resource exploration)
 export { LensRegistryService } from './lens-registry.service';
+
+// Diagnostic collection (issue reporting)
+export { DiagnosticCollectorService } from './diagnostic-collector.service';
+export type { DiagnosticBundle } from './diagnostic-collector.service';
+
+// Issue report service (content-node API)
+export { IssueReportService } from './issue-report.service';
+export type { IssueReportInput, ResolutionStatus } from './issue-report.service';

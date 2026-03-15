@@ -57,7 +57,7 @@ describe('GateFeedbackTriggerComponent', () => {
 
   // --- Menu items ---
 
-  it('should show three menu items', () => {
+  it('should show four menu items', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="feedback-trigger-btn"]',
     );
@@ -67,10 +67,10 @@ describe('GateFeedbackTriggerComponent', () => {
     const items = fixture.nativeElement.querySelectorAll(
       '[data-testid^="feedback-menu-item-"]',
     );
-    expect(items.length).toBe(3);
+    expect(items.length).toBe(4);
   });
 
-  it('should show Flag, Challenge, Feedback labels', () => {
+  it('should show Flag, Challenge, Feedback, Report Issue labels', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="feedback-trigger-btn"]',
     );
@@ -86,6 +86,7 @@ describe('GateFeedbackTriggerComponent', () => {
     expect(labels).toContain('Flag');
     expect(labels).toContain('Challenge');
     expect(labels).toContain('Feedback');
+    expect(labels).toContain('Report Issue');
   });
 
   // --- Modal interaction ---

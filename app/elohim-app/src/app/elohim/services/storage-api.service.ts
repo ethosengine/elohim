@@ -65,6 +65,7 @@ import {
   BulkAllocationResult,
 } from '@app/lamad/models/stewardship-allocation.model';
 
+import { LoggerService } from './logger.service';
 import { environment } from '../../../environments/environment';
 import {
   type IStorageApi,
@@ -132,6 +133,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
 
   private readonly http = inject(HttpClient);
   private readonly gateService = inject(GateService);
+  private readonly logger = inject(LoggerService);
 
   constructor() {
     // Use storageUrl from environment or fall back to doorway URL
@@ -998,6 +1000,14 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
 
   private handleError(operation: string, error: unknown): Observable<never> {
     const message = error instanceof Error ? error.message : String(error);
+    const status = (error as Record<string, unknown>)['status'];
+    const url = (error as Record<string, unknown>)['url'];
+
+    this.logger.error(`${operation} failed`, error instanceof Error ? error : undefined, {
+      operation,
+      status: status as number,
+      url: url as string,
+    });
 
     return throwError(() => new Error(`${operation} failed: ${message}`));
   }
