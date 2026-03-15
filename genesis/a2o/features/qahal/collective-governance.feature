@@ -89,3 +89,41 @@ Feature: Collective governance
     Then only reasoned dissent is available via the context menu
     And no low-friction reactions are shown
     But the learner can still flag, challenge, or provide open feedback
+
+  Scenario: Learner sees context menu only on constitutional content
+    Given content "protocol-foundations" has governance state "constitutional"
+    When a learner views the content
+    Then the feedback gateway renders at level 0
+    And only the context menu is visible with flag, challenge, and open feedback options
+    And no emotional reactions or graduated feedback are shown
+
+  Scenario: Learner reacts to learning content with emotional response
+    Given content "intro-to-ecology" has governance state "active"
+    And no active proposals exist for the content
+    When a learner views the content
+    Then the feedback gateway renders at level 1
+    And emotional reactions are available
+    When the learner selects the "inspired" reaction
+    Then a governance signal is recorded with type "reaction" and value "inspired"
+
+  Scenario: Learner provides graduated feedback on discussion content
+    Given content "climate-adaptation-strategies" has governance state "active"
+    And the content type is "discussion"
+    When a learner views the content
+    Then the feedback gateway renders at level 2
+    And a graduated feedback scale is shown
+    When the learner rates accuracy as "mostly-inaccurate"
+    Then reasoning text is required before submission
+    And the signal is recorded with type "graduated" and value "accuracy:mostly-inaccurate"
+
+  Scenario: Formal governance ballot renders via Psephos for ranked-choice proposal
+    Given content "history-curriculum-options" has an active proposal
+    And the proposal uses "ranked-choice" voting mechanism
+    When a learner views the content
+    Then the feedback gateway routes to the Psephos ballot renderer
+    And the ballot displays options with election hygiene applied
+
+  Scenario: Governance participation generates stewardship recognition
+    Given a learner has submitted a vote on a proposal
+    Then an REA economic event is generated with type "governance-participation"
+    And the learner's steward affinity increases proportional to mechanism level
