@@ -35,7 +35,7 @@ import { Injectable, inject } from '@angular/core';
 
 // @coverage: 67.9% (2026-02-24)
 
-import { catchError, map, timeout } from 'rxjs/operators';
+import { catchError, map, tap, timeout } from 'rxjs/operators';
 
 import { Observable, of, throwError } from 'rxjs';
 
@@ -48,6 +48,9 @@ import {
   withEstablishingContentIdsArray,
 } from '@app/elohim/adapters/storage-types.adapter';
 import { EventQuery } from '@app/elohim/models/economic-event.model';
+import { extractGateFromResponse } from '@app/elohim/models/gated-response.model';
+import { handleGateError } from '@app/elohim/services/gate-error.handler';
+import { GateService } from '@app/elohim/services/gate.service';
 import {
   HumanRelationshipQuery,
   CreateHumanRelationshipInput,
@@ -126,6 +129,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   private readonly defaultTimeoutMs = 30000;
 
   private readonly http = inject(HttpClient);
+  private readonly gateService = inject(GateService);
 
   constructor() {
     // Use storageUrl from environment or fall back to doorway URL
@@ -759,8 +763,18 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
       metadata: input.metadata ?? null,
     };
 
-    return this.http.post<StewardshipAllocationView>(`${this.baseUrl}/db/allocations`, body).pipe(
+    return this.http.post<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations`, body).pipe(
       timeout(this.defaultTimeoutMs),
+      tap(response => {
+        const gate = extractGateFromResponse(response);
+        if (gate) this.gateService.handleGateResponse(gate);
+      }),
+      map(
+        response =>
+          (response as { data: StewardshipAllocationView }).data ??
+          (response as StewardshipAllocationView)
+      ),
+      catchError(error => handleGateError(error, this.gateService)),
       catchError(error => this.handleError('createStewardshipAllocation', error))
     );
   }
@@ -787,9 +801,19 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     if (input.note) body['note'] = input.note;
 
     return this.http
-      .put<StewardshipAllocationView>(`${this.baseUrl}/db/allocations/${allocationId}`, body)
+      .put<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations/${allocationId}`, body)
       .pipe(
         timeout(this.defaultTimeoutMs),
+        tap(response => {
+          const gate = extractGateFromResponse(response);
+          if (gate) this.gateService.handleGateResponse(gate);
+        }),
+        map(
+          response =>
+            (response as { data: StewardshipAllocationView }).data ??
+            (response as StewardshipAllocationView)
+        ),
+        catchError(error => handleGateError(error, this.gateService)),
         catchError(error => this.handleError('updateStewardshipAllocation', error))
       );
   }
@@ -798,10 +822,18 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * Delete a stewardship allocation.
    */
   deleteStewardshipAllocation(allocationId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/db/allocations/${allocationId}`).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError(error => this.handleError('deleteStewardshipAllocation', error))
-    );
+    return this.http
+      .delete<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations/${allocationId}`)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        tap(response => {
+          const gate = extractGateFromResponse(response);
+          if (gate) this.gateService.handleGateResponse(gate);
+        }),
+        map(() => undefined as void),
+        catchError(error => handleGateError(error, this.gateService)),
+        catchError(error => this.handleError('deleteStewardshipAllocation', error))
+      );
   }
 
   /**
@@ -819,12 +851,19 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     };
 
     return this.http
-      .post<StewardshipAllocationView>(
-        `${this.baseUrl}/db/allocations/${allocationId}/dispute`,
-        body
-      )
+      .post<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations/${allocationId}/dispute`, body)
       .pipe(
         timeout(this.defaultTimeoutMs),
+        tap(response => {
+          const gate = extractGateFromResponse(response);
+          if (gate) this.gateService.handleGateResponse(gate);
+        }),
+        map(
+          response =>
+            (response as { data: StewardshipAllocationView }).data ??
+            (response as StewardshipAllocationView)
+        ),
+        catchError(error => handleGateError(error, this.gateService)),
         catchError(error => this.handleError('fileAllocationDispute', error))
       );
   }
@@ -843,12 +882,19 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     };
 
     return this.http
-      .post<StewardshipAllocationView>(
-        `${this.baseUrl}/db/allocations/${allocationId}/resolve`,
-        body
-      )
+      .post<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations/${allocationId}/resolve`, body)
       .pipe(
         timeout(this.defaultTimeoutMs),
+        tap(response => {
+          const gate = extractGateFromResponse(response);
+          if (gate) this.gateService.handleGateResponse(gate);
+        }),
+        map(
+          response =>
+            (response as { data: StewardshipAllocationView }).data ??
+            (response as StewardshipAllocationView)
+        ),
+        catchError(error => handleGateError(error, this.gateService)),
         catchError(error => this.handleError('resolveAllocationDispute', error))
       );
   }
@@ -869,10 +915,21 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
       metadata: input.metadata ?? null,
     }));
 
-    return this.http.post<BulkAllocationResult>(`${this.baseUrl}/db/allocations/bulk`, body).pipe(
-      timeout(this.defaultTimeoutMs * 2), // Double timeout for bulk operations
-      catchError(error => this.handleError('bulkCreateAllocations', error))
-    );
+    return this.http
+      .post<unknown>(`${this.baseUrl}/api/v1/stewardship/allocations/bulk`, body)
+      .pipe(
+        timeout(this.defaultTimeoutMs * 2), // Double timeout for bulk operations
+        tap(response => {
+          const gate = extractGateFromResponse(response);
+          if (gate) this.gateService.handleGateResponse(gate);
+        }),
+        map(
+          response =>
+            (response as { data: BulkAllocationResult }).data ?? (response as BulkAllocationResult)
+        ),
+        catchError(error => handleGateError(error, this.gateService)),
+        catchError(error => this.handleError('bulkCreateAllocations', error))
+      );
   }
 
   // ==========================================================================

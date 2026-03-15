@@ -1,6 +1,14 @@
-import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { inject, Injectable } from '@angular/core';
+
+import { catchError, map, tap } from 'rxjs/operators';
+
 import { Observable } from 'rxjs';
+
+import { extractGateFromResponse } from '../models/gated-response.model';
+
+import { handleGateError } from './gate-error.handler';
+import { GateService } from './gate.service';
 
 export interface RecognitionTrigger {
   contentId: string;
@@ -34,11 +42,20 @@ export interface RecognitionDistributionResult {
 @Injectable({ providedIn: 'root' })
 export class RecognitionApiService {
   private readonly http = inject(HttpClient);
+  private readonly gateService = inject(GateService);
 
   distribute(trigger: RecognitionTrigger): Observable<RecognitionDistributionResult> {
-    return this.http.post<RecognitionDistributionResult>(
-      '/api/v1/recognition/distribute',
-      trigger,
+    return this.http.post<unknown>('/api/v1/recognition/distribute', trigger).pipe(
+      tap(response => {
+        const gate = extractGateFromResponse(response);
+        if (gate) this.gateService.handleGateResponse(gate);
+      }),
+      map(
+        response =>
+          (response as { data: RecognitionDistributionResult }).data ??
+          (response as RecognitionDistributionResult)
+      ),
+      catchError(error => handleGateError(error, this.gateService))
     );
   }
 }
