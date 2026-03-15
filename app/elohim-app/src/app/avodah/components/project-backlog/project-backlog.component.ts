@@ -13,7 +13,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
   template: `
     <div class="board-shell">
       <nav class="board-sidebar">
-        <div class="project-name">{{ projectId }}</div>
+        <div class="project-name">{{ project?.title ?? 'Project' }}</div>
         <ul>
           <li><a [routerLink]="['../board']" data-testid="nav-board">▦ Board</a></li>
           <li class="active">≡ Backlog</li>
@@ -302,6 +302,7 @@ export class ProjectBacklogComponent implements OnInit {
   private readonly api = inject(AvodahApiService);
 
   projectId = '';
+  project: ContentNode | null = null;
   stories: ContentNode[] = [];
 
   readonly activeStatusFilter = signal<string>('');
@@ -313,6 +314,8 @@ export class ProjectBacklogComponent implements OnInit {
 
   private async load(): Promise<void> {
     this.projectId = this.route.snapshot.params['id'] as string;
+    const projects = await this.api.getProjects();
+    this.project = projects.find(p => p.id === this.projectId) ?? null;
     this.stories = await this.api.getStoriesForProject(this.projectId);
   }
 

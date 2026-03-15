@@ -1,3 +1,4 @@
+import { TitleCasePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 
@@ -9,11 +10,11 @@ import { AvodahApiService } from '../../services/avodah-api.service';
 @Component({
   selector: 'app-task-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TitleCasePipe],
   template: `
     <div class="board-shell">
       <nav class="board-sidebar">
-        <div class="project-name">{{ projectId }}</div>
+        <div class="project-name">{{ project?.title ?? 'Project' }}</div>
         <ul>
           <li><a [routerLink]="['../board']" data-testid="nav-board">▦ Board</a></li>
           <li><a [routerLink]="['../backlog']" data-testid="nav-backlog">≡ Backlog</a></li>
@@ -244,6 +245,7 @@ export class TaskListComponent implements OnInit {
   readonly groups = ['daily', 'weekly', 'monthly', 'custom'] as const;
 
   projectId = '';
+  project: ContentNode | null = null;
   recurringStories: ContentNode[] = [];
 
   ngOnInit(): void {
@@ -252,6 +254,8 @@ export class TaskListComponent implements OnInit {
 
   private async load(): Promise<void> {
     this.projectId = this.route.snapshot.params['id'] as string;
+    const projects = await this.api.getProjects();
+    this.project = projects.find(p => p.id === this.projectId) ?? null;
     const all = await this.api.getStoriesForProject(this.projectId);
     this.recurringStories = all.filter(s => {
       const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
