@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   input,
@@ -32,19 +33,18 @@ const PLACEHOLDER_MAP: Record<string, string> = {
     <div
       class="modal-backdrop"
       role="dialog"
-      aria-label="Feedback modal"
+      aria-modal="true"
+      aria-labelledby="feedback-modal-heading"
       data-testid="feedback-modal-backdrop"
       (click)="closed.emit()"
     >
       <div
         class="modal-panel"
-        role="document"
-        aria-label="Feedback form"
         data-testid="feedback-modal-panel"
         (click)="$event.stopPropagation()"
       >
         <div class="modal-header">
-          <h3 data-testid="feedback-modal-title">{{ title() }}</h3>
+          <h3 id="feedback-modal-heading" data-testid="feedback-modal-title">{{ title() }}</h3>
           <button
             class="btn-close"
             aria-label="Close modal"
@@ -73,7 +73,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1000;
+        z-index: 1000; /* modal overlay — above all pillar content */
       }
 
       .modal-panel {
@@ -107,6 +107,15 @@ const PLACEHOLDER_MAP: Record<string, string> = {
         line-height: 1;
         padding: 0.25rem;
       }
+
+      .btn-close:hover {
+        color: var(--text-primary, #202124);
+      }
+
+      .btn-close:focus-visible {
+        outline: 2px solid var(--primary, #4285f4);
+        border-radius: 4px;
+      }
     `,
   ],
 })
@@ -120,6 +129,11 @@ export class GateFeedbackModalComponent {
     appealPath: string | null;
   }>();
   @Output() readonly closed = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    this.closed.emit();
+  }
 
   readonly artifactCard = viewChild.required(GateArtifactCardComponent);
 
