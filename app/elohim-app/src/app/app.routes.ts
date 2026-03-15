@@ -28,6 +28,10 @@ export const routes: Routes = [
     path: 'doorway',
     loadChildren: async () => import('./doorway/doorway.routes').then(m => m.DOORWAY_ROUTES),
   },
+  {
+    path: 'avodah',
+    loadChildren: async () => import('./avodah/avodah.routes').then(m => m.AVODAH_ROUTES),
+  },
   // OAuth callback route for doorway authentication
   {
     path: 'auth/callback',

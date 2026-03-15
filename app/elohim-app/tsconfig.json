@@ -14,6 +14,8 @@
       "@app/lamad/*": ["src/app/lamad/*"],
       "@app/qahal": ["src/app/qahal/index.ts"],
       "@app/qahal/*": ["src/app/qahal/*"],
+      "@app/avodah": ["src/app/avodah/index.ts"],
+      "@app/avodah/*": ["src/app/avodah/*"],
       "@app/shefa": ["src/app/shefa/index.ts"],
       "@app/shefa/*": ["src/app/shefa/*"],
       "@app/doorway": ["src/app/doorway/index.ts"],
