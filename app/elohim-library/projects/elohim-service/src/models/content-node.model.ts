@@ -24,7 +24,9 @@ export type ContentType =
   | 'path' // Learning path (graph integration)
   | 'assessment' // Assessment instrument
   | 'reference' // External reference (books, articles, etc.)
-  | 'example'; // Code or usage example
+  | 'example' // Code or usage example
+  | 'work-story' // Work management story/task (EPR ContentNode)
+  | 'work-project'; // Work management project container
 
 /**
  * Content format for rendering

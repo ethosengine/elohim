@@ -53,6 +53,10 @@ export const routes: Routes = [
         m => m.EprResolveRedirectComponent
       ),
   },
+  {
+    path: 'avodah',
+    loadChildren: async () => import('./avodah/avodah.routes').then(m => m.AVODAH_ROUTES),
+  },
   // 404 catch-all - must be last
   {
     path: '**',

@@ -452,7 +452,9 @@ type AppContentTypeExtension =
   | 'instrument' // Psychometric instrument definition (subscales, scoring, display)
   | 'tool' // External tools and utilities
   | 'path' // Learning path - curated journey through content nodes
-  | 'placeholder'; // Missing/errored content - shown when content can't be loaded
+  | 'placeholder' // Missing/errored content - shown when content can't be loaded
+  | 'work-story' // Work management story/task (EPR ContentNode)
+  | 'work-project'; // Work management project container
 
 export type ContentType = WireContentType | AppContentTypeExtension;
 
@@ -465,6 +467,8 @@ export const ALL_CONTENT_TYPES = [
   'tool',
   'path',
   'placeholder',
+  'work-story',
+  'work-project',
 ] as const;
 
 /**
