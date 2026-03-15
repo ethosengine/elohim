@@ -22,6 +22,7 @@ export {
   ContextMenuOnlyComponent,
   type ContextMenuAction,
 } from './components/context-menu-only/context-menu-only.component';
+export { FeedbackMechanismGatewayComponent } from './components/feedback-mechanism-gateway/feedback-mechanism-gateway.component';
 
 // Services
 export * from './services';
