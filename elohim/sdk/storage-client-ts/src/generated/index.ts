@@ -80,6 +80,7 @@ export * from './PackageManifestView';
 export * from './RelationshipSeedView';
 export * from './StewardshipSeedView';
 export * from './UpdateAllocationInputView';
+export * from './UpdateContentInputView';
 export * from './AccessGrantView';
 export * from './AllocationBlockView';
 export * from './AllocationSnapshotView';
