@@ -13,14 +13,18 @@ use serde::Deserialize;
 
 use crate::db::diesel_schema::proposals;
 use crate::db::governance;
-use crate::db::models::{NewDiscussion, NewProposal, NewVote};
+use crate::db::models::{
+    NewDiscussion, NewGovernanceSignal, NewProposal, NewProposalOption, NewRankedVote, NewVote,
+};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
+use crate::tally;
 use crate::views::{
-    CastVoteInputView, ChallengeView, CreateDiscussionInputView, CreateProposalInputView,
-    DiscussionView, GovernanceStateView, PostMessageInputView, PrecedentView, ProposalView,
-    VoteView,
+    CastRankedVoteInputView, CastVoteInputView, ChallengeView, CreateDiscussionInputView,
+    CreateProposalInputView, CreateProposalOptionInputView, DiscussionView, GovernanceSignalView,
+    GovernanceStateView, PostMessageInputView, PrecedentView, ProposalOptionView, ProposalView,
+    RankedVoteView, RecordSignalInputView, VoteView,
 };
 
 use super::get_conn;
@@ -47,6 +51,13 @@ struct ContentQuery {
 struct ProposalQuery {
     pub content_id: Option<String>,
     pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct SignalQuery {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +234,211 @@ pub async fn handle(
             Ok(response::created(&VoteView::from_vote(vote, hide)))
         }
 
+        // POST /api/v1/governance/proposals/{id}/options — Create proposal options
+        (&Method::POST, p) if p.starts_with("/proposals/") && p.ends_with("/options") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/options"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let inputs: Vec<CreateProposalOptionInputView> =
+                serde_json::from_slice(&body.to_bytes())
+                    .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let now = crate::db::models::current_timestamp();
+            let new_options: Vec<NewProposalOption> = inputs
+                .iter()
+                .map(|input| NewProposalOption {
+                    id: &input.id,
+                    proposal_id: id,
+                    label: &input.label,
+                    description: &input.description,
+                    position: input.position,
+                    source: input.source.as_deref(),
+                    source_justification: input.source_justification.as_deref(),
+                    created_at: &now,
+                })
+                .collect();
+
+            let mut conn = get_conn(pool)?;
+            let results = governance::create_proposal_options(&mut conn, &new_options)?;
+            let views: Vec<ProposalOptionView> =
+                results.into_iter().map(ProposalOptionView::from).collect();
+            Ok(response::created(&views))
+        }
+
+        // GET /api/v1/governance/proposals/{id}/options — List proposal options
+        (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/options") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/options"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let results = governance::query_proposal_options(&mut conn, id)?;
+            let views: Vec<ProposalOptionView> =
+                results.into_iter().map(ProposalOptionView::from).collect();
+            Ok(response::ok(&views))
+        }
+
+        // POST /api/v1/governance/proposals/{id}/ranked-votes — Cast ranked/scored/dot/approval votes
+        (&Method::POST, p) if p.starts_with("/proposals/") && p.ends_with("/ranked-votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/ranked-votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CastRankedVoteInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let mut conn = get_conn(pool)?;
+
+            // Fetch proposal for mechanism and config
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+
+            // Fetch options for validation
+            let options = governance::query_proposal_options(&mut conn, id)?;
+
+            // Build VotingConfig from proposal fields
+            let config = tally::VotingConfig {
+                score_min: proposal.score_min,
+                score_max: proposal.score_max,
+                dots_per_voter: proposal.dots_per_voter,
+                quorum_percentage: proposal.quorum_percentage,
+                passage_threshold: proposal.passage_threshold,
+            };
+
+            // Build temporary RankedVote structs for validation
+            let now = crate::db::models::current_timestamp();
+            let temp_votes: Vec<crate::db::models::RankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| crate::db::models::RankedVote {
+                    id: format!("rv-{}-{}-{}", id, input.human_id, i),
+                    proposal_id: id.to_string(),
+                    human_id: input.human_id.clone(),
+                    option_id: b.option_id.clone(),
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.clone(),
+                    proxy_elohim_id: input.proxy_elohim_id.clone(),
+                    proxy_justification: input.proxy_justification.clone(),
+                    created_at: now.clone(),
+                    updated_at: now.clone(),
+                })
+                .collect();
+
+            // Validate ballot against mechanism
+            let strategy = tally::get_strategy(&proposal.voting_mechanism).ok_or_else(|| {
+                StorageError::InvalidInput(format!(
+                    "Unknown voting mechanism: {}",
+                    proposal.voting_mechanism
+                ))
+            })?;
+            strategy.validate_ballot(&temp_votes, &options, &config).map_err(|e| {
+                StorageError::InvalidInput(format!("Ballot validation failed: {}", e))
+            })?;
+
+            // Build NewRankedVote entries
+            let vote_ids: Vec<String> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("rv-{}-{}-{}", id, input.human_id, i))
+                .collect();
+
+            let new_votes: Vec<NewRankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| NewRankedVote {
+                    id: &vote_ids[i],
+                    proposal_id: id,
+                    human_id: &input.human_id,
+                    option_id: &b.option_id,
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.as_deref(),
+                    proxy_elohim_id: input.proxy_elohim_id.as_deref(),
+                    proxy_justification: input.proxy_justification.as_deref(),
+                    created_at: &now,
+                    updated_at: &now,
+                })
+                .collect();
+
+            let results = governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
+            let hide = proposal.voting_anonymous == 1;
+            let views: Vec<RankedVoteView> = results
+                .into_iter()
+                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .collect();
+            Ok(response::created(&views))
+        }
+
+        // GET /api/v1/governance/proposals/{id}/ranked-votes — List ranked votes
+        (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/ranked-votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/ranked-votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+            let hide = proposal.voting_anonymous == 1;
+            let votes = governance::query_ranked_votes(&mut conn, id)?;
+            let views: Vec<RankedVoteView> = votes
+                .into_iter()
+                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .collect();
+            Ok(response::ok(&views))
+        }
+
+        // GET /api/v1/governance/proposals/{id}/tally — Compute tally
+        (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/tally") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/tally"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+            let options = governance::query_proposal_options(&mut conn, id)?;
+            let votes = governance::query_ranked_votes(&mut conn, id)?;
+
+            let config = tally::VotingConfig {
+                score_min: proposal.score_min,
+                score_max: proposal.score_max,
+                dots_per_voter: proposal.dots_per_voter,
+                quorum_percentage: proposal.quorum_percentage,
+                passage_threshold: proposal.passage_threshold,
+            };
+
+            let strategy = tally::get_strategy(&proposal.voting_mechanism).ok_or_else(|| {
+                StorageError::InvalidInput(format!(
+                    "Unknown voting mechanism: {}",
+                    proposal.voting_mechanism
+                ))
+            })?;
+            let result = strategy.tally(&votes, &options, &config);
+            Ok(response::ok(&result))
+        }
+
         // GET /api/v1/governance/proposals/{id}/votes — List votes
         (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/votes") => {
             let id = p
@@ -371,6 +587,54 @@ pub async fn handle(
             let mut conn = get_conn(pool)?;
             let result = governance::create_discussion(&mut conn, &new)?;
             Ok(response::created(&DiscussionView::from(result)))
+        }
+
+        // POST /api/v1/governance/signals — Record a governance signal
+        (&Method::POST, "/signals") => {
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: RecordSignalInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let now = crate::db::models::current_timestamp();
+            let signal_id = format!(
+                "sig-{}-{}-{}",
+                input.entity_type, input.entity_id, now
+            );
+            let new_signal = NewGovernanceSignal {
+                id: &signal_id,
+                entity_type: &input.entity_type,
+                entity_id: &input.entity_id,
+                human_id: &input.human_id,
+                signal_type: &input.signal_type,
+                signal_value: &input.signal_value,
+                mechanism_level: input.mechanism_level,
+                proxy_elohim_id: input.proxy_elohim_id.as_deref(),
+                created_at: &now,
+            };
+
+            let mut conn = get_conn(pool)?;
+            let result = governance::record_signal(&mut conn, &new_signal)?;
+            Ok(response::created(&GovernanceSignalView::from(result)))
+        }
+
+        // GET /api/v1/governance/signals?entityType=X&entityId=Y — List governance signals
+        (&Method::GET, "/signals") => {
+            let params: SignalQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
+            }
+            let mut conn = get_conn(pool)?;
+            let results = governance::query_signals(&mut conn, entity_type, entity_id)?;
+            let views: Vec<GovernanceSignalView> =
+                results.into_iter().map(GovernanceSignalView::from).collect();
+            Ok(response::ok(&views))
         }
 
         _ => Ok(response::not_found(&format!(
