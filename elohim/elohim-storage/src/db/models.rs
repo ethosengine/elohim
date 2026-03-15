@@ -19,7 +19,7 @@ use super::diesel_schema::{
     governance_states, human_relationships, humans, imagodei_observations, knowledge_maps,
     local_sessions, node_stewardship, path_attestations, path_extensions, path_tags, paths,
     precedents, premium_gates, proposals, rea_commitments, relationships, steps,
-    steward_credentials, stewarded_nodes, stewardship_allocations,
+    steward_credentials, stewarded_nodes, stewardship_allocations, votes,
 };
 
 // ============================================================================
@@ -1473,6 +1473,7 @@ pub struct Proposal {
     pub status: String,
     pub votes_for: i32,
     pub votes_against: i32,
+    pub voting_anonymous: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -1536,6 +1537,35 @@ pub struct NewDiscussion<'a> {
     pub author_presence_id: &'a str,
     pub body: &'a str,
     pub parent_id: Option<&'a str>,
+}
+
+/// Governance vote on a proposal
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = votes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Vote {
+    pub id: String,
+    pub proposal_id: String,
+    pub human_id: String,
+    pub position: String,
+    pub reason: Option<String>,
+    pub anonymous: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New vote for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = votes)]
+pub struct NewVote<'a> {
+    pub id: &'a str,
+    pub proposal_id: &'a str,
+    pub human_id: &'a str,
+    pub position: &'a str,
+    pub reason: Option<&'a str>,
+    pub anonymous: i32,
+    pub created_at: &'a str,
+    pub updated_at: &'a str,
 }
 
 // ============================================================================
