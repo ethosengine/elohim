@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 
-import { type ContentNode } from '@app/lamad';
+import { ContentNode } from '@app/lamad/models/content-node.model';
 
 import { parseWorkStoryMeta, type WorkStoryMeta } from '../../models/work-story.model';
 
@@ -229,11 +229,11 @@ export class StoryCardComponent {
   readonly cardClick = output<ContentNode>();
 
   readonly meta = computed<WorkStoryMeta>(() =>
-    parseWorkStoryMeta((this.story() as unknown as { metadata: Record<string, unknown> }).metadata)
+    parseWorkStoryMeta(this.story().metadata as unknown as Record<string, unknown>)
   );
 
   readonly shortId = computed<string>(() => {
-    const id = (this.story() as unknown as { id: string }).id;
+    const id = this.story().id;
     const lastDash = id.lastIndexOf('-');
     return lastDash >= 0 ? id.slice(lastDash + 1) : id;
   });

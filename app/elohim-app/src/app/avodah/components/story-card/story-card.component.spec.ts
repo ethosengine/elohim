@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { ContentNode } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentMetadata } from '@app/lamad/models/content-node.model';
 import { StoryCardComponent } from './story-card.component';
 
 const MOCK_STORY: ContentNode = {
@@ -19,7 +19,7 @@ const MOCK_STORY: ContentNode = {
     priority: 'high',
     storyPoints: 3,
     attestationGates: ['path-plumbing-basics'],
-  } as unknown as import('../../lamad/models/content-node.model').ContentMetadata,
+  } as unknown as ContentMetadata,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
