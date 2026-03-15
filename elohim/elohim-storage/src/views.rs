@@ -3291,6 +3291,12 @@ pub struct ProposalView {
     pub voting_anonymous: bool,
     pub created_at: String,
     pub updated_at: String,
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f32>,
+    pub passage_threshold: Option<f32>,
 }
 
 impl From<Proposal> for ProposalView {
@@ -3308,6 +3314,12 @@ impl From<Proposal> for ProposalView {
             voting_anonymous: p.voting_anonymous == 1,
             created_at: p.created_at,
             updated_at: p.updated_at,
+            voting_mechanism: p.voting_mechanism,
+            score_min: p.score_min,
+            score_max: p.score_max,
+            dots_per_voter: p.dots_per_voter,
+            quorum_percentage: p.quorum_percentage,
+            passage_threshold: p.passage_threshold,
         }
     }
 }

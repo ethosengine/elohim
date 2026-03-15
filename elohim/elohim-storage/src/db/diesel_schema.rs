@@ -424,6 +424,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    proposal_options (id) {
+        id -> Text,
+        proposal_id -> Text,
+        label -> Text,
+        description -> Text,
+        position -> Integer,
+        source -> Nullable<Text>,
+        source_justification -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     proposals (id) {
         id -> Text,
         content_id -> Text,
@@ -437,6 +450,12 @@ diesel::table! {
         voting_anonymous -> Integer,
         created_at -> Text,
         updated_at -> Text,
+        voting_mechanism -> Text,
+        score_min -> Nullable<Integer>,
+        score_max -> Nullable<Integer>,
+        dots_per_voter -> Nullable<Integer>,
+        quorum_percentage -> Nullable<Float>,
+        passage_threshold -> Nullable<Float>,
     }
 }
 
@@ -734,6 +753,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     paths,
     precedents,
     premium_gates,
+    proposal_options,
     proposals,
     rea_commitments,
     relationships,

@@ -1476,6 +1476,12 @@ pub struct Proposal {
     pub voting_anonymous: i32,
     pub created_at: String,
     pub updated_at: String,
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f32>,
+    pub passage_threshold: Option<f32>,
 }
 
 /// New proposal for INSERT
