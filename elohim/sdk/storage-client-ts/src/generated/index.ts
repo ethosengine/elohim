@@ -50,6 +50,7 @@ export * from './CreateStepInputView';
 export * from './EconomicEvent';
 export * from './EconomicEventView';
 export * from './HumanRelationship';
+export * from './HumanView';
 export * from './HumanRelationshipView';
 export * from './InitiateClaimInputView';
 export * from './JsonValue';
