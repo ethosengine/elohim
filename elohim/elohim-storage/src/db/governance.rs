@@ -5,10 +5,10 @@
 
 use diesel::prelude::*;
 
-use super::diesel_schema::{challenges, discussions, governance_states, precedents, proposals};
+use super::diesel_schema::{challenges, discussions, governance_states, precedents, proposals, votes};
 use super::models::{
     Challenge, Discussion, GovernanceState, NewChallenge, NewDiscussion, NewGovernanceState,
-    NewPrecedent, NewProposal, Precedent, Proposal,
+    NewPrecedent, NewProposal, NewVote, Precedent, Proposal, Vote,
 };
 use crate::error::StorageError;
 
@@ -238,6 +238,61 @@ pub fn create_discussion(
 
     discussions::table
         .filter(discussions::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// ============================================================================
+// Votes
+// ============================================================================
+
+/// Get all votes for a proposal
+pub fn query_votes(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+) -> Result<Vec<Vote>, StorageError> {
+    votes::table
+        .filter(votes::proposal_id.eq(proposal_id))
+        .order(votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Get a specific human's vote on a proposal
+pub fn get_vote(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+    human_id: &str,
+) -> Result<Option<Vote>, StorageError> {
+    votes::table
+        .filter(votes::proposal_id.eq(proposal_id))
+        .filter(votes::human_id.eq(human_id))
+        .first::<Vote>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Cast or update a vote (upsert via delete+insert for SQLite)
+pub fn cast_vote(
+    conn: &mut SqliteConnection,
+    new: &NewVote,
+) -> Result<Vote, StorageError> {
+    // Delete existing vote if any (UNIQUE constraint enforcement)
+    diesel::delete(
+        votes::table
+            .filter(votes::proposal_id.eq(new.proposal_id))
+            .filter(votes::human_id.eq(new.human_id)),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+
+    diesel::insert_into(votes::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+    votes::table
+        .filter(votes::id.eq(new.id))
         .first(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }

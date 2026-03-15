@@ -1,12 +1,17 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { forkJoin } from 'rxjs';
 
-import type { CollectiveView, CollectiveParticipationView, HumanView } from '@elohim/storage-client/generated';
-
 import { FaceCardComponent } from '../face-card/face-card.component';
+
+import type {
+  CollectiveView,
+  CollectiveParticipationView,
+  HumanView,
+} from '@elohim/storage-client/generated';
 
 /**
  * Type aliases for clarity within directory context.
@@ -247,6 +252,7 @@ interface ListResponse<T> {
 })
 export class CommunityDirectoryComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   readonly tabs: { label: string; value: DirectoryView }[] = [
     { label: 'All', value: 'all' },
@@ -309,6 +315,10 @@ export class CommunityDirectoryComponent implements OnInit {
     console.log('Selected human:', humanId);
   }
 
+  navigateToCollective(id: string): void {
+    this.router.navigate(['/community', 'collective', id]);
+  }
+
   private loadDirectory(): void {
     this.loading.set(true);
 
@@ -325,7 +335,10 @@ export class CommunityDirectoryComponent implements OnInit {
 
         // Load participants for each collective
         if (allCollectives.length > 0) {
-          const participantRequests: Record<string, ReturnType<typeof this.http.get<ListResponse<ParticipantEntry>>>> = {};
+          const participantRequests: Record<
+            string,
+            ReturnType<typeof this.http.get<ListResponse<ParticipantEntry>>>
+          > = {};
           for (const c of allCollectives) {
             participantRequests[c.id] = this.http.get<ListResponse<ParticipantEntry>>(
               `/api/v1/collectives/${c.id}/participants`
@@ -336,7 +349,7 @@ export class CommunityDirectoryComponent implements OnInit {
             next: responses => {
               const map = new Map<string, ParticipantEntry[]>();
               for (const [id, response] of Object.entries(responses)) {
-                map.set(id, (response as ListResponse<ParticipantEntry>).items);
+                map.set(id, response.items);
               }
               this.participantsByCollective.set(map);
               this.loading.set(false);

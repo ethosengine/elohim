@@ -17,12 +17,14 @@ import {
   GovernanceStateRecord,
 } from './data-loader.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { GovernanceApiService } from './governance-api.service';
 import { vi, Mock } from 'vitest';
 
 describe('GovernanceService', () => {
   let service: GovernanceService;
   let dataLoaderMock: any;
   let sessionMock: any;
+  let governanceApiMock: any;
 
   const mockSession = {
     sessionId: 'test-session-123',
@@ -133,6 +135,25 @@ describe('GovernanceService', () => {
       getSession: vi.fn(),
     };
 
+    // Mock GovernanceApiService
+    governanceApiMock = {
+      createProposal: vi.fn(),
+      castVote: vi.fn(),
+      getVotes: vi.fn(),
+      createDiscussion: vi.fn(),
+      postMessage: vi.fn(),
+      getGovernanceState: vi.fn(),
+      queryGovernanceStates: vi.fn(),
+      getChallengeById: vi.fn(),
+      queryChallenges: vi.fn(),
+      getProposalById: vi.fn(),
+      queryProposals: vi.fn(),
+      getPrecedentById: vi.fn(),
+      queryPrecedents: vi.fn(),
+      getDiscussionById: vi.fn(),
+      queryDiscussions: vi.fn(),
+    };
+
     // Default mock return values
     dataLoaderMock.getGovernanceIndex.mockReturnValue(
       of({
@@ -161,6 +182,7 @@ describe('GovernanceService', () => {
         GovernanceService,
         { provide: DataLoaderService, useValue: dataLoaderMock },
         { provide: SessionHumanService, useValue: sessionMock },
+        { provide: GovernanceApiService, useValue: governanceApiMock },
       ],
     });
 
@@ -555,8 +577,23 @@ describe('GovernanceService', () => {
   });
 
   describe('submitProposal', () => {
-    it('should create new proposal', () =>
+    it('should create new proposal via API', () =>
       new Promise<void>(done => {
+        governanceApiMock.createProposal.mockResolvedValue({
+          id: 'proposal-new',
+          title: 'New Proposal',
+          proposalType: 'sense-check',
+          body: 'Test proposal\n\n**Rationale:** To test',
+          proposerPresenceId: 'test-session-123',
+          contentId: '',
+          status: 'voting',
+          votesFor: 0,
+          votesAgainst: 0,
+          votingAnonymous: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
         const submission: ProposalSubmission = {
           title: 'New Proposal',
           proposalType: 'sense-check',
@@ -567,18 +604,33 @@ describe('GovernanceService', () => {
         service.submitProposal(submission).subscribe(proposal => {
           expect(proposal).toBeDefined();
           expect(proposal.title).toBe('New Proposal');
-          expect(proposal.status).toBe('discussion');
+          expect(governanceApiMock.createProposal).toHaveBeenCalled();
           done();
         });
       }));
 
-    it('should set proposer', () =>
+    it('should set proposer from session', () =>
       new Promise<void>(done => {
+        governanceApiMock.createProposal.mockResolvedValue({
+          id: 'proposal-new',
+          title: 'New Proposal',
+          proposalType: 'sense-check',
+          body: 'desc\n\n**Rationale:** reason',
+          proposerPresenceId: 'test-session-123',
+          contentId: '',
+          status: 'voting',
+          votesFor: 0,
+          votesAgainst: 0,
+          votingAnonymous: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
         const submission: ProposalSubmission = {
           title: 'New Proposal',
           proposalType: 'sense-check',
-          description: 'Test proposal',
-          rationale: 'To test',
+          description: 'desc',
+          rationale: 'reason',
         };
 
         service.submitProposal(submission).subscribe(proposal => {
@@ -589,8 +641,18 @@ describe('GovernanceService', () => {
   });
 
   describe('voteOnProposal', () => {
-    it('should record vote', () =>
+    it('should record vote via API', () =>
       new Promise<void>(done => {
+        governanceApiMock.castVote.mockResolvedValue({
+          id: 'vote-1',
+          proposalId: 'proposal-1',
+          humanId: 'test-session-123',
+          position: 'agree',
+          reason: 'Good proposal',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
         const vote: Vote = {
           proposalId: 'proposal-1',
           position: 'agree',
@@ -599,48 +661,54 @@ describe('GovernanceService', () => {
 
         service.voteOnProposal(vote).subscribe(result => {
           expect(result).toBe(true);
+          expect(governanceApiMock.castVote).toHaveBeenCalledWith('proposal-1', expect.objectContaining({
+            humanId: 'test-session-123',
+            position: 'agree',
+          }));
           done();
         });
       }));
 
-    it('should handle storage failure gracefully', async () => {
-      // JSDOM localStorage cannot be easily mocked to throw via spy/assignment.
-      // This test verifies the try/catch path in voteOnProposal. Since we cannot
-      // reliably trigger a QuotaExceededError in JSDOM, we verify the happy path
-      // and note the exception path is covered by the source code's try/catch.
+    it('should handle API failure gracefully', async () => {
+      governanceApiMock.castVote.mockRejectedValue(new Error('API error'));
+
       const vote: Vote = {
         proposalId: 'test-proposal-fail',
         position: 'agree',
       };
 
-      // Verify the service returns a boolean (true for success in JSDOM)
       const result = await firstValueFrom(service.voteOnProposal(vote));
-      expect(typeof result).toBe('boolean');
+      expect(result).toBe(false);
     });
   });
 
   describe('getMyVote', () => {
-    beforeEach(() => {
-      // Clear localStorage before each test to prevent pollution
-      localStorage.clear();
-    });
-
     it('should return null if no vote cast', () =>
       new Promise<void>(done => {
+        governanceApiMock.getVotes.mockResolvedValue([]);
+
         service.getMyVote('proposal-1').subscribe(vote => {
           expect(vote).toBeNull();
           done();
         });
       }));
 
-    it('should return stored vote', async () => {
-      const voteData = { proposalId: 'proposal-1', position: 'agree' };
-      // Store vote using actual key format the service uses
-      const key = 'lamad-governance-vote-test-session-123-proposal-1';
-      localStorage.setItem(key, JSON.stringify(voteData));
+    it('should return my vote from API', async () => {
+      governanceApiMock.getVotes.mockResolvedValue([
+        {
+          id: 'vote-1',
+          proposalId: 'proposal-1',
+          humanId: 'test-session-123',
+          position: 'agree',
+          reason: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
 
       const vote = await firstValueFrom(service.getMyVote('proposal-1'));
       expect(vote?.proposalId).toBe('proposal-1');
+      expect(vote?.position).toBe('agree');
     });
   });
 
@@ -780,8 +848,18 @@ describe('GovernanceService', () => {
   });
 
   describe('postMessage', () => {
-    it('should post message to discussion', () =>
+    it('should post message via API', () =>
       new Promise<void>(done => {
+        governanceApiMock.postMessage.mockResolvedValue({
+          id: 'msg-new',
+          contentId: 'discussion-1',
+          authorPresenceId: 'test-session-123',
+          body: 'Great discussion',
+          parentId: 'discussion-1',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
         const message: DiscussionMessage = {
           discussionId: 'discussion-1',
           content: 'Great discussion',
@@ -789,49 +867,21 @@ describe('GovernanceService', () => {
 
         service.postMessage(message).subscribe(result => {
           expect(result).toBe(true);
+          expect(governanceApiMock.postMessage).toHaveBeenCalled();
           done();
         });
       }));
 
-    it('should handle storage failure gracefully', async () => {
-      // JSDOM localStorage cannot be easily mocked to throw via spy/assignment.
-      // This test verifies the try/catch path in postMessage. Since we cannot
-      // reliably trigger a QuotaExceededError in JSDOM, we verify the happy path
-      // and note the exception path is covered by the source code's try/catch.
+    it('should handle API failure gracefully', async () => {
+      governanceApiMock.postMessage.mockRejectedValue(new Error('API error'));
+
       const message: DiscussionMessage = {
-        discussionId: 'discussion-fail-gracefully',
+        discussionId: 'discussion-fail',
         content: 'Great discussion',
       };
 
-      // Verify the service returns a boolean (true for success in JSDOM)
       const result = await firstValueFrom(service.postMessage(message));
-      expect(typeof result).toBe('boolean');
-    });
-  });
-
-  describe('getLocalMessages', () => {
-    it('should return empty array if no messages', () => {
-      const messages = service.getLocalMessages('discussion-1');
-      expect(Array.isArray(messages)).toBe(true);
-    });
-
-    it('should return stored messages', () => {
-      const mockMessages = [
-        {
-          id: 'msg-1',
-          authorId: 'user-1',
-          authorName: 'User',
-          content: 'Hello',
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      // Store using actual key format the service uses
-      const key = 'lamad-governance-discussion-messages-discussion-1';
-      localStorage.setItem(key, JSON.stringify(mockMessages));
-
-      const messages = service.getLocalMessages('discussion-1');
-      expect(messages.length).toBe(1);
-      expect(messages[0].content).toBe('Hello');
+      expect(result).toBe(false);
     });
   });
 

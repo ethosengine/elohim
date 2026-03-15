@@ -6,16 +6,21 @@
 //! CRUD functions.
 
 use bytes::Bytes;
-use http_body_util::Full;
+use diesel::prelude::*;
+use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, Method, Request, Response};
 use serde::Deserialize;
 
+use crate::db::diesel_schema::proposals;
 use crate::db::governance;
+use crate::db::models::{NewDiscussion, NewProposal, NewVote};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
 use crate::views::{
-    ChallengeView, DiscussionView, GovernanceStateView, PrecedentView, ProposalView,
+    CastVoteInputView, ChallengeView, CreateDiscussionInputView, CreateProposalInputView,
+    DiscussionView, GovernanceStateView, PostMessageInputView, PrecedentView, ProposalView,
+    VoteView,
 };
 
 use super::get_conn;
@@ -141,6 +146,96 @@ pub async fn handle(
             Ok(response::ok(&views))
         }
 
+        // POST /api/v1/governance/proposals — Create a proposal
+        (&Method::POST, "/proposals") => {
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CreateProposalInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let new = NewProposal {
+                id: &input.id,
+                content_id: &input.content_id,
+                proposer_presence_id: &input.proposer_presence_id,
+                proposal_type: &input.proposal_type,
+                title: &input.title,
+                body: &input.body,
+            };
+
+            let mut conn = get_conn(pool)?;
+            let _result = governance::create_proposal(&mut conn, &new)?;
+
+            // Set voting_anonymous after insert if requested
+            if input.voting_anonymous {
+                diesel::update(proposals::table.filter(proposals::id.eq(&input.id)))
+                    .set(proposals::voting_anonymous.eq(1))
+                    .execute(&mut conn)
+                    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+            }
+
+            let final_result = governance::get_proposal(&mut conn, &input.id)?
+                .ok_or_else(|| StorageError::Internal("Created proposal not found".to_string()))?;
+            Ok(response::created(&ProposalView::from(final_result)))
+        }
+
+        // POST /api/v1/governance/proposals/{id}/votes — Cast or update a vote
+        (&Method::POST, p) if p.starts_with("/proposals/") && p.ends_with("/votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CastVoteInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let mut conn = get_conn(pool)?;
+
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+
+            let vote_id = format!("vote-{}-{}", id, input.human_id);
+            let now = crate::db::models::current_timestamp();
+            let new_vote = NewVote {
+                id: &vote_id,
+                proposal_id: id,
+                human_id: &input.human_id,
+                position: &input.position,
+                reason: input.reason.as_deref(),
+                anonymous: proposal.voting_anonymous,
+                created_at: &now,
+                updated_at: &now,
+            };
+
+            let vote = governance::cast_vote(&mut conn, &new_vote)?;
+            let hide = proposal.voting_anonymous == 1;
+            Ok(response::created(&VoteView::from_vote(vote, hide)))
+        }
+
+        // GET /api/v1/governance/proposals/{id}/votes — List votes
+        (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+            let hide = proposal.voting_anonymous == 1;
+            let votes = governance::query_votes(&mut conn, id)?;
+            let views: Vec<VoteView> = votes
+                .into_iter()
+                .map(|v| VoteView::from_vote(v, hide))
+                .collect();
+            Ok(response::ok(&views))
+        }
+
         // GET /api/v1/governance/proposals/{id}
         (&Method::GET, p) if p.starts_with("/proposals/") => {
             let sub = p.strip_prefix("/proposals").unwrap_or("");
@@ -219,6 +314,57 @@ pub async fn handle(
             let views: Vec<DiscussionView> =
                 results.into_iter().map(DiscussionView::from).collect();
             Ok(response::ok(&views))
+        }
+
+        // POST /api/v1/governance/discussions — Create a discussion
+        (&Method::POST, "/discussions") => {
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CreateDiscussionInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let new = NewDiscussion {
+                id: &input.id,
+                content_id: &input.content_id,
+                author_presence_id: &input.author_presence_id,
+                body: &input.body,
+                parent_id: input.parent_id.as_deref(),
+            };
+
+            let mut conn = get_conn(pool)?;
+            let result = governance::create_discussion(&mut conn, &new)?;
+            Ok(response::created(&DiscussionView::from(result)))
+        }
+
+        // POST /api/v1/governance/discussions/{id}/messages — Reply to discussion
+        (&Method::POST, p) if p.starts_with("/discussions/") && p.ends_with("/messages") => {
+            let discussion_id = p
+                .strip_prefix("/discussions/")
+                .and_then(|s| s.strip_suffix("/messages"))
+                .ok_or_else(|| {
+                    StorageError::InvalidInput("Discussion ID required".to_string())
+                })?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: PostMessageInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let new = NewDiscussion {
+                id: &input.id,
+                content_id: discussion_id,
+                author_presence_id: &input.author_presence_id,
+                body: &input.body,
+                parent_id: Some(discussion_id),
+            };
+
+            let mut conn = get_conn(pool)?;
+            let result = governance::create_discussion(&mut conn, &new)?;
+            Ok(response::created(&DiscussionView::from(result)))
         }
 
         _ => Ok(response::not_found(&format!(

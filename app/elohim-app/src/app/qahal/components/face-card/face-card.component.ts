@@ -1,12 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  EventEmitter,
-  Input,
-  OnChanges,
-  Output,
-  SimpleChanges,
-} from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 
 /**
  * FaceCardComponent - Identity card with initials-based avatar
@@ -27,11 +20,7 @@ import {
     >
       <div class="avatar" [style.background-color]="avatarColor">
         @if (profilePhotoUrl) {
-          <img
-            [src]="profilePhotoUrl"
-            [alt]="displayName"
-            class="avatar-img"
-          />
+          <img [src]="profilePhotoUrl" [alt]="displayName" class="avatar-img" />
         } @else {
           <span class="initials">{{ initials }}</span>
         }
@@ -41,9 +30,7 @@ import {
         <span class="subtitle">{{ subtitle }}</span>
       }
       @if (roleTag) {
-        <span class="role-tag" [class.leader]="roleTag === 'leader'">{{
-          roleTag
-        }}</span>
+        <span class="role-tag" [class.leader]="roleTag === 'leader'">{{ roleTag }}</span>
       }
     </button>
   `,
@@ -197,7 +184,7 @@ export class FaceCardComponent implements OnChanges {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return (parts[0][0] + parts.at(-1)[0]).toUpperCase();
     }
     return parts[0][0].toUpperCase();
   }
@@ -209,8 +196,7 @@ export class FaceCardComponent implements OnChanges {
       hash = (hash << 5) - hash + name.charCodeAt(i);
       hash |= 0; // Convert to 32-bit integer
     }
-    const index =
-      Math.abs(hash) % FaceCardComponent.COLORS.length;
+    const index = Math.abs(hash) % FaceCardComponent.COLORS.length;
     return FaceCardComponent.COLORS[index];
   }
 }

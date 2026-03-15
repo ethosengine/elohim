@@ -8,17 +8,22 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 import { catchError } from 'rxjs/operators';
+
 import { firstValueFrom, of } from 'rxjs';
 
+import type { IGovernance } from '../interfaces/governance.interface';
 import type {
   GovernanceStateView,
   ChallengeView,
   ProposalView,
   PrecedentView,
   DiscussionView,
+  VoteView,
+  CreateProposalInputView,
+  CastVoteInputView,
+  CreateDiscussionInputView,
+  PostMessageInputView,
 } from '@elohim/storage-client/generated';
-
-import type { IGovernance } from '../interfaces/governance.interface';
 
 @Injectable({ providedIn: 'root' })
 export class GovernanceApiService implements IGovernance {
@@ -121,6 +126,40 @@ export class GovernanceApiService implements IGovernance {
           params: { contentId: encodeURIComponent(contentId) },
         })
         .pipe(catchError(() => of([])))
+    );
+  }
+
+  async createProposal(input: CreateProposalInputView): Promise<ProposalView> {
+    return firstValueFrom(this.http.post<ProposalView>('/api/v1/governance/proposals', input));
+  }
+
+  async castVote(proposalId: string, input: CastVoteInputView): Promise<VoteView> {
+    return firstValueFrom(
+      this.http.post<VoteView>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/votes`,
+        input
+      )
+    );
+  }
+
+  async getVotes(proposalId: string): Promise<VoteView[]> {
+    return firstValueFrom(
+      this.http
+        .get<VoteView[]>(`/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/votes`)
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async createDiscussion(input: CreateDiscussionInputView): Promise<DiscussionView> {
+    return firstValueFrom(this.http.post<DiscussionView>('/api/v1/governance/discussions', input));
+  }
+
+  async postMessage(discussionId: string, input: PostMessageInputView): Promise<DiscussionView> {
+    return firstValueFrom(
+      this.http.post<DiscussionView>(
+        `/api/v1/governance/discussions/${encodeURIComponent(discussionId)}/messages`,
+        input
+      )
     );
   }
 }

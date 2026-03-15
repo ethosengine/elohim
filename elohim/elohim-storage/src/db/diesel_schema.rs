@@ -434,6 +434,7 @@ diesel::table! {
         status -> Text,
         votes_for -> Integer,
         votes_against -> Integer,
+        voting_anonymous -> Integer,
         created_at -> Text,
         updated_at -> Text,
     }
@@ -457,6 +458,19 @@ diesel::table! {
         author_presence_id -> Text,
         body -> Text,
         parent_id -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    votes (id) {
+        id -> Text,
+        proposal_id -> Text,
+        human_id -> Text,
+        position -> Text,
+        reason -> Nullable<Text>,
+        anonymous -> Integer,
         created_at -> Text,
         updated_at -> Text,
     }
@@ -729,4 +743,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     stewarded_nodes,
     stewardship_allocations,
     steps,
+    votes,
 );
