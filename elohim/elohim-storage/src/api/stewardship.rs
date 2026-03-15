@@ -5,6 +5,8 @@
 //! Delegates to `StewardshipService` for business logic, which calls
 //! `db::stewardship_allocations` and `db::policy_cache` for Diesel queries.
 
+use std::sync::Arc;
+
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
@@ -14,7 +16,9 @@ use serde_json::Value;
 use crate::db::stewardship_allocations::AllocationQuery;
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
+use crate::services::elohim_gate::{GateResult, MutationType};
 use crate::services::response;
+use crate::services::Services;
 use crate::services::StewardshipService;
 use crate::views::{
     ContentStewardshipView, CreateAllocationInputView, DevicePolicyView, StewardshipAllocationView,
@@ -155,6 +159,7 @@ pub async fn handle(
     resource_path: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // resource_path arrives without the "stewardship" prefix:
     //   ""                          → /api/v1/stewardship
@@ -204,7 +209,9 @@ pub async fn handle(
         // -----------------------------------------------------------------
         (&Method::GET, "allocations") => handle_list_allocations(req, pool, ctx).await,
 
-        (&Method::POST, "allocations") => handle_create_allocation(req, pool, ctx).await,
+        (&Method::POST, "allocations") => {
+            handle_create_allocation(req, pool, ctx, services.clone()).await
+        }
 
         (&Method::GET, p) if p.starts_with("allocations/content/") => {
             let content_id = p.trim_start_matches("allocations/content/");
@@ -220,14 +227,14 @@ pub async fn handle(
             let inner = p
                 .trim_start_matches("allocations/")
                 .trim_end_matches("/dispute");
-            handle_file_dispute(req, inner, pool, ctx).await
+            handle_file_dispute(req, inner, pool, ctx, services.clone()).await
         }
 
         (&Method::POST, p) if p.starts_with("allocations/") && p.ends_with("/resolve") => {
             let inner = p
                 .trim_start_matches("allocations/")
                 .trim_end_matches("/resolve");
-            handle_resolve_dispute(req, inner, pool, ctx).await
+            handle_resolve_dispute(req, inner, pool, ctx, services.clone()).await
         }
 
         (&Method::GET, p) if p.starts_with("allocations/") => {
@@ -237,12 +244,12 @@ pub async fn handle(
 
         (&Method::PUT, p) if p.starts_with("allocations/") => {
             let id = p.trim_start_matches("allocations/");
-            handle_update_allocation(req, id, pool, ctx).await
+            handle_update_allocation(req, id, pool, ctx, services.clone()).await
         }
 
         (&Method::DELETE, p) if p.starts_with("allocations/") => {
             let id = p.trim_start_matches("allocations/");
-            handle_delete_allocation(id, pool, ctx).await
+            handle_delete_allocation(id, pool, ctx, services.clone()).await
         }
 
         // -----------------------------------------------------------------
@@ -504,11 +511,54 @@ async fn handle_create_allocation(
     req: Request<Incoming>,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
     let input_view: CreateAllocationInputView = match parse_body(req).await {
         Ok(v) => v,
         Err(_) => return response::bad_request("Invalid JSON body for create allocation"),
     };
+
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        pool,
+        ctx,
+        MutationType::AllocationUpdate,
+        serde_json::json!({
+            "contentId": input_view.content_id,
+            "stewardPresenceId": input_view.steward_presence_id,
+        }),
+        Some(&input_view.steward_presence_id),
+    )
+    .await;
+
+    match &gate_result {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
+            return response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
+                }),
+            );
+        }
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
+            return response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            }));
+        }
+        _ => {}
+    }
 
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
@@ -517,7 +567,10 @@ async fn handle_create_allocation(
 
     let input = input_view.into();
     match StewardshipService::create_allocation(&mut conn, ctx, input) {
-        Ok(a) => response::created(&StewardshipAllocationView::from(a)),
+        Ok(a) => response::created(&serde_json::json!({
+            "data": StewardshipAllocationView::from(a),
+            "gate": gate_view,
+        })),
         Err(e) => response::error_response(e),
     }
 }
@@ -527,11 +580,51 @@ async fn handle_update_allocation(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
     let input_view: UpdateAllocationInputView = match parse_body(req).await {
         Ok(v) => v,
         Err(_) => return response::bad_request("Invalid JSON body for update allocation"),
     };
+
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        pool,
+        ctx,
+        MutationType::AllocationUpdate,
+        serde_json::json!({ "allocationId": id }),
+        None,
+    )
+    .await;
+
+    match &gate_result {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
+            return response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
+                }),
+            );
+        }
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
+            return response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            }));
+        }
+        _ => {}
+    }
 
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
@@ -540,7 +633,10 @@ async fn handle_update_allocation(
 
     let input = input_view.into();
     match StewardshipService::update_allocation(&mut conn, ctx, id, input) {
-        Ok(a) => response::ok(&StewardshipAllocationView::from(a)),
+        Ok(a) => response::ok(&serde_json::json!({
+            "data": StewardshipAllocationView::from(a),
+            "gate": gate_view,
+        })),
         Err(e) => response::error_response(e),
     }
 }
@@ -549,7 +645,47 @@ async fn handle_delete_allocation(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        pool,
+        ctx,
+        MutationType::AllocationUpdate,
+        serde_json::json!({ "allocationId": id }),
+        None,
+    )
+    .await;
+
+    match &gate_result {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
+            return response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
+                }),
+            );
+        }
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
+            return response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            }));
+        }
+        _ => {}
+    }
+
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
@@ -606,11 +742,55 @@ async fn handle_file_dispute(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
     let body: FileDisputeRequest = match parse_body(req).await {
         Ok(b) => b,
         Err(_) => return response::bad_request("Invalid JSON body for file dispute"),
     };
+
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        pool,
+        ctx,
+        MutationType::DisputeFiling,
+        serde_json::json!({
+            "allocationId": id,
+            "disputedBy": body.disputed_by,
+            "reason": body.reason,
+        }),
+        Some(&body.disputed_by),
+    )
+    .await;
+
+    match &gate_result {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
+            return response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
+                }),
+            );
+        }
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
+            return response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            }));
+        }
+        _ => {}
+    }
 
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
@@ -618,7 +798,10 @@ async fn handle_file_dispute(
     };
 
     match StewardshipService::file_dispute(&mut conn, ctx, id, &body.disputed_by, &body.reason) {
-        Ok(a) => response::ok(&StewardshipAllocationView::from(a)),
+        Ok(a) => response::ok(&serde_json::json!({
+            "data": StewardshipAllocationView::from(a),
+            "gate": gate_view,
+        })),
         Err(e) => response::error_response(e),
     }
 }
@@ -628,11 +811,55 @@ async fn handle_resolve_dispute(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
     let body: ResolveDisputeRequest = match parse_body(req).await {
         Ok(b) => b,
         Err(_) => return response::bad_request("Invalid JSON body for resolve dispute"),
     };
+
+    let (gate_result, gate_view) = super::evaluate_gate(
+        &services,
+        pool,
+        ctx,
+        MutationType::GovernanceVote,
+        serde_json::json!({
+            "allocationId": id,
+            "ratifierId": body.ratifier_id,
+            "newState": body.new_state,
+        }),
+        Some(&body.ratifier_id),
+    )
+    .await;
+
+    match &gate_result {
+        GateResult::Pause {
+            prompt,
+            confirm_token,
+            ..
+        } => {
+            return response::json_response(
+                hyper::StatusCode::CONFLICT,
+                &serde_json::json!({
+                    "gate": gate_view,
+                    "pausePrompt": prompt,
+                    "confirmToken": confirm_token,
+                }),
+            );
+        }
+        GateResult::Settlement {
+            boundary,
+            appeal_path,
+            ..
+        } => {
+            return response::forbidden(&serde_json::json!({
+                "gate": gate_view,
+                "boundary": boundary,
+                "appealPath": appeal_path,
+            }));
+        }
+        _ => {}
+    }
 
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
@@ -646,7 +873,10 @@ async fn handle_resolve_dispute(
         &body.ratifier_id,
         &body.new_state,
     ) {
-        Ok(a) => response::ok(&StewardshipAllocationView::from(a)),
+        Ok(a) => response::ok(&serde_json::json!({
+            "data": StewardshipAllocationView::from(a),
+            "gate": gate_view,
+        })),
         Err(e) => response::error_response(e),
     }
 }

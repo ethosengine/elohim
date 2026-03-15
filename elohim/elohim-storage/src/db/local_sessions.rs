@@ -231,6 +231,23 @@ pub fn update_profile(
         .ok_or_else(|| StorageError::NotFound(format!("Session {} not found", id)))
 }
 
+/// Set session intent (declares what the user plans to do this session)
+pub fn set_session_intent(
+    conn: &mut SqliteConnection,
+    session_id: &str,
+    intent_json: &str,
+) -> Result<(), StorageError> {
+    diesel::update(local_sessions::table.filter(local_sessions::id.eq(session_id)))
+        .set((
+            local_sessions::session_intent_json.eq(Some(intent_json)),
+            local_sessions::intent_set_at.eq(Some(current_timestamp())),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    Ok(())
+}
+
 /// Delete a session by ID
 pub fn delete_session(conn: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
     let deleted = diesel::delete(local_sessions::table.filter(local_sessions::id.eq(id)))
@@ -287,6 +304,8 @@ mod tests {
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 last_synced_at TEXT,
                 bootstrap_url TEXT,
+                session_intent_json TEXT,
+                intent_set_at TEXT,
                 UNIQUE(human_id, agent_pub_key)
             );
             "#,

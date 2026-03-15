@@ -20,10 +20,15 @@
 //! ```
 
 pub mod agreement_service;
+pub mod anomaly_detection;
+pub mod behavioral_trust;
 pub mod content_service;
 pub mod economic_event_service;
+pub mod elohim_gate;
 pub mod events;
 pub mod exchange_service;
+pub mod inference_engine;
+pub mod inference_router;
 pub mod knowledge_service;
 pub mod path_service;
 pub mod presence_service;
@@ -32,6 +37,7 @@ pub mod recognition_pipeline_service;
 pub mod relationship_service;
 pub mod resource_service;
 pub mod response;
+pub mod sidecar_engine;
 pub mod steward_affinity_service;
 pub mod stewardship_service;
 
@@ -49,6 +55,10 @@ pub use response::*;
 pub use stewardship_service::StewardshipService;
 
 use crate::db::{context::AppContext, DbPool};
+use elohim_gate::ElohimGate;
+use inference_engine::InferenceEngine;
+use inference_router::InferenceRouter;
+use sidecar_engine::SidecarEngine;
 use std::sync::Arc;
 
 /// Service container for dependency injection
@@ -61,6 +71,7 @@ pub struct Services {
     pub relationship: Arc<RelationshipService>,
     pub knowledge: Arc<KnowledgeService>,
     pub events: Arc<EventBus>,
+    pub gate: Arc<ElohimGate>,
 }
 
 impl Services {
@@ -68,6 +79,17 @@ impl Services {
     pub fn new(pool: DbPool) -> Self {
         let events = Arc::new(EventBus::new());
         let ctx = AppContext::default_lamad();
+
+        // Create inference router with sidecar engine
+        let sidecar_url = std::env::var("ELOHIM_AGENT_URL")
+            .unwrap_or_else(|_| "http://localhost:8095".to_string());
+        let sidecar = Arc::new(SidecarEngine::new(
+            sidecar_url,
+            "gate-evaluator".to_string(),
+        ));
+        let router = Arc::new(InferenceRouter::new(vec![
+            sidecar as Arc<dyn InferenceEngine>,
+        ]));
 
         Self {
             content: Arc::new(ContentService::new(
@@ -87,6 +109,7 @@ impl Services {
                 events.clone(),
             )),
             events,
+            gate: Arc::new(ElohimGate::new(router)),
         }
     }
 
@@ -113,6 +136,7 @@ impl Services {
                 events.clone(),
             )),
             events,
+            gate: Arc::new(ElohimGate::new_skeleton()),
         }
     }
 }

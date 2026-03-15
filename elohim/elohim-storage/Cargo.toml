@@ -7,6 +7,9 @@ authors = ["Elohim Protocol"]
 license = "AGPL-3.0"
 
 [dependencies]
+# Constitutional layer — principles, boundaries, agent reasoning
+constitution = { path = "../constitution" }
+
 # Doorway route registration
 doorway-client = { path = "../../crates/doorway-client" }
 
@@ -40,6 +43,9 @@ getrandom = { version = "0.3", features = ["std"] }
 
 # Async traits
 async-trait = "0.1"
+
+# HTTP client for inference providers
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # Content-addressed storage
 sha2 = "0.10"

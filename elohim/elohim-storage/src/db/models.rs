@@ -16,10 +16,10 @@ use super::diesel_schema::{
     access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
     content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
-    governance_states, human_relationships, humans, knowledge_maps, local_sessions,
-    node_stewardship, path_attestations, path_extensions, path_tags, paths, precedents,
-    premium_gates, proposals, rea_commitments, relationships, steps, steward_credentials,
-    stewarded_nodes, stewardship_allocations,
+    governance_states, human_relationships, humans, imagodei_observations, knowledge_maps,
+    local_sessions, node_stewardship, path_attestations, path_extensions, path_tags, paths,
+    precedents, premium_gates, proposals, rea_commitments, relationships, steps,
+    steward_credentials, stewarded_nodes, stewardship_allocations,
 };
 
 // ============================================================================
@@ -1198,6 +1198,8 @@ pub struct LocalSession {
     pub updated_at: String,
     pub last_synced_at: Option<String>,
     pub bootstrap_url: Option<String>,
+    pub session_intent_json: Option<String>,
+    pub intent_set_at: Option<String>,
 }
 
 /// New local session for INSERT
@@ -1955,4 +1957,46 @@ pub struct NewPathExtension<'a> {
     pub forks_json: Option<&'a str>,
     pub upstream_proposal_json: Option<&'a str>,
     pub stats_json: Option<&'a str>,
+}
+
+// ============================================================================
+// ImagodeiObservation
+// ============================================================================
+
+/// Elohim observation about human behavior — constitutional memory layer.
+/// Access-controlled by constitutional layer. Feeds behavioral_trust in TrustContext.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize)]
+#[diesel(table_name = imagodei_observations)]
+pub struct ImagodeiObservation {
+    pub id: String,
+    pub app_id: String,
+    pub human_id: String,
+    pub observed_at: String,
+    pub observation_type: String,
+    pub content: String,
+    pub structured_signals_json: Option<String>,
+    pub trust_delta: f32,
+    pub visibility_layer: String,
+    pub originating_elohim: String,
+    pub relevance_decay: f32,
+    pub superseded_by: Option<String>,
+    pub created_at: String,
+}
+
+/// New observation for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = imagodei_observations)]
+pub struct NewImagodeiObservation<'a> {
+    pub id: &'a str,
+    pub app_id: &'a str,
+    pub human_id: &'a str,
+    pub observed_at: &'a str,
+    pub observation_type: &'a str,
+    pub content: &'a str,
+    pub structured_signals_json: Option<&'a str>,
+    pub trust_delta: f32,
+    pub visibility_layer: &'a str,
+    pub originating_elohim: &'a str,
+    pub relevance_decay: f32,
+    pub superseded_by: Option<&'a str>,
 }

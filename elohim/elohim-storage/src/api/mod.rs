@@ -22,6 +22,7 @@ pub mod custodians;
 pub mod economic_events;
 pub mod exchange;
 pub mod flow_planning;
+pub mod gate;
 pub mod governance;
 pub mod identity;
 pub mod mastery;
@@ -66,7 +67,7 @@ pub async fn handle_api_request(
         presence::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("stewardship") {
         let resource_path = sub_path.strip_prefix("stewardship").unwrap_or("");
-        stewardship::handle(req, method, resource_path, &pool, &app_ctx).await
+        stewardship::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("economic-events") {
         let resource_path = sub_path.strip_prefix("economic-events").unwrap_or("");
         economic_events::handle(req, method, resource_path, &pool, &app_ctx).await
@@ -105,13 +106,16 @@ pub async fn handle_api_request(
         contributors::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("recognition") {
         let resource_path = sub_path.strip_prefix("recognition").unwrap_or("");
-        recognition::handle(req, method, resource_path, &pool, &app_ctx).await
+        recognition::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("steward-affinity") {
         let resource_path = sub_path.strip_prefix("steward-affinity").unwrap_or("");
-        steward_affinity::handle(req, method, resource_path, &pool, &app_ctx).await
+        steward_affinity::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("steward") && !sub_path.starts_with("stewardship") {
         let resource_path = sub_path.strip_prefix("steward").unwrap_or("");
         steward::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("gate") {
+        let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
+        gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",
@@ -135,6 +139,211 @@ fn extract_app_context(req: &Request<Incoming>) -> AppContext {
 pub fn get_conn(pool: &DbPool) -> Result<crate::db::PooledConn, StorageError> {
     pool.get()
         .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))
+}
+
+// =============================================================================
+// ElohimGate evaluation helper
+// =============================================================================
+
+use crate::services::elohim_gate::{
+    GateResult, InferenceTier, MutationType, TrustContext, TrustSignals,
+};
+use crate::views::{GateEvaluationView, TrustContextView};
+
+/// Evaluate a mutation through the ElohimGate.
+/// Returns (GateResult, Option<GateEvaluationView>) for inclusion in response.
+/// If services unavailable, returns PassThrough with no view.
+pub async fn evaluate_gate(
+    services: &Option<Arc<Services>>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    mutation: MutationType,
+    mutation_content: serde_json::Value,
+    human_id: Option<&str>,
+) -> (GateResult, Option<GateEvaluationView>) {
+    let Some(svc) = services else {
+        return (
+            GateResult::PassThrough {
+                tier: InferenceTier::None,
+            },
+            None,
+        );
+    };
+
+    // Query observations once for both behavioral trust and anomaly detection
+    let observations = match human_id {
+        Some(hid) => match get_conn(pool) {
+            Ok(mut conn) => crate::db::imagodei_observations::list_observations_for_human(
+                &mut conn,
+                ctx,
+                hid,
+                "individual",
+            )
+            .unwrap_or_default(),
+            Err(_) => Vec::new(),
+        },
+        None => Vec::new(),
+    };
+
+    let behavioral_trust = crate::services::behavioral_trust::compute(&observations);
+    let intent_divergence =
+        crate::services::anomaly_detection::compute_anomaly_score(&observations);
+
+    let trust_ctx = TrustContext::compute(TrustSignals {
+        mastery_depth: 0.5,        // placeholder — future sprint
+        steward_standing: 0.5,     // placeholder — future sprint
+        relationship_density: 0.5, // placeholder — future sprint
+        governance_health: 0.5,    // placeholder — future sprint
+        behavioral_trust,          // from observation history
+        intent_divergence,         // from anomaly detection
+    });
+
+    let mutation_content_for_cache = mutation_content.clone();
+    let result = svc
+        .gate
+        .evaluate(mutation, &trust_ctx, mutation_content)
+        .await;
+
+    // Store observations from gate evaluation (closes the feedback loop)
+    if let GateResult::Enriched { observations, .. } = &result {
+        if let Some(hid) = human_id {
+            if let Ok(mut conn) = get_conn(pool) {
+                for draft in observations {
+                    let obs_id = uuid::Uuid::new_v4().to_string();
+                    let now = crate::db::models::current_timestamp();
+                    let signals_json = draft
+                        .structured_signals
+                        .as_ref()
+                        .map(|v| serde_json::to_string(v).unwrap_or_default());
+                    let new_obs = crate::db::models::NewImagodeiObservation {
+                        id: &obs_id,
+                        app_id: &ctx.app_id,
+                        human_id: hid,
+                        observed_at: &now,
+                        observation_type: &draft.observation_type,
+                        content: &draft.content,
+                        structured_signals_json: signals_json.as_deref(),
+                        trust_delta: draft.trust_delta as f32,
+                        visibility_layer: &draft.visibility_layer,
+                        originating_elohim: "sidecar",
+                        relevance_decay: 1.0,
+                        superseded_by: None,
+                    };
+                    if let Err(e) = crate::db::imagodei_observations::create_observation(
+                        &mut conn, ctx, &new_obs,
+                    ) {
+                        tracing::warn!("Failed to store gate observation: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    // Store implicit GrowthSignal on Light-tier PassThrough
+    if let GateResult::PassThrough {
+        tier: InferenceTier::Light,
+    } = &result
+    {
+        if let Some(hid) = human_id {
+            if let Ok(mut conn) = get_conn(pool) {
+                let obs_id = uuid::Uuid::new_v4().to_string();
+                let now = crate::db::models::current_timestamp();
+                let new_obs = crate::db::models::NewImagodeiObservation {
+                    id: &obs_id,
+                    app_id: &ctx.app_id,
+                    human_id: hid,
+                    observed_at: &now,
+                    observation_type: "growth_signal",
+                    content: "Light-tier mutation proceeded without issues",
+                    structured_signals_json: None,
+                    trust_delta: 0.01,
+                    visibility_layer: "individual",
+                    originating_elohim: "gate",
+                    relevance_decay: 0.5,
+                    superseded_by: None,
+                };
+                let _ =
+                    crate::db::imagodei_observations::create_observation(&mut conn, ctx, &new_obs);
+            }
+        }
+    }
+
+    // Store pending confirmation for Pause flow
+    if let GateResult::Pause { confirm_token, .. } = &result {
+        if let Some(hid) = human_id {
+            use crate::services::elohim_gate::PendingConfirmation;
+            svc.gate.pending_confirmations().store(
+                confirm_token,
+                PendingConfirmation {
+                    mutation,
+                    mutation_content: mutation_content_for_cache,
+                    human_id: hid.to_string(),
+                    created_at: std::time::Instant::now(),
+                },
+            );
+        }
+    }
+
+    let view = build_gate_view(&result, &trust_ctx);
+    (result, Some(view))
+}
+
+/// Build a GateEvaluationView from a GateResult + TrustContext
+fn build_gate_view(result: &GateResult, ctx: &TrustContext) -> GateEvaluationView {
+    let trust_view = TrustContextView {
+        composite_trust: ctx.composite_trust,
+        mastery_depth: ctx.mastery_depth,
+        steward_standing: ctx.steward_standing,
+        relationship_density: ctx.relationship_density,
+        governance_health: ctx.governance_health,
+        behavioral_trust: ctx.behavioral_trust,
+        intent_divergence: ctx.intent_divergence,
+        declared_intent: ctx.declared_intent.clone(),
+    };
+    match result {
+        GateResult::PassThrough { tier } => GateEvaluationView {
+            tier: format!("{:?}", tier),
+            trust_context: trust_view,
+            pause_prompt: None,
+            confirm_token: None,
+            settlement_boundary: None,
+            appeal_path: None,
+        },
+        GateResult::Enriched { tier, .. } => GateEvaluationView {
+            tier: format!("{:?}", tier),
+            trust_context: trust_view,
+            pause_prompt: None,
+            confirm_token: None,
+            settlement_boundary: None,
+            appeal_path: None,
+        },
+        GateResult::Pause {
+            tier,
+            prompt,
+            confirm_token,
+            ..
+        } => GateEvaluationView {
+            tier: format!("{:?}", tier),
+            trust_context: trust_view,
+            pause_prompt: Some(prompt.clone()),
+            confirm_token: Some(confirm_token.clone()),
+            settlement_boundary: None,
+            appeal_path: None,
+        },
+        GateResult::Settlement {
+            tier,
+            boundary,
+            appeal_path,
+            ..
+        } => GateEvaluationView {
+            tier: format!("{:?}", tier),
+            trust_context: trust_view,
+            pause_prompt: None,
+            confirm_token: None,
+            settlement_boundary: Some(boundary.clone()),
+            appeal_path: appeal_path.clone(),
+        },
+    }
 }
 
 /// Helper to parse JSON request body

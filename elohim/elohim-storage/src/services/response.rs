@@ -88,6 +88,11 @@ pub fn conflict(message: &str) -> Response<Full<Bytes>> {
     )
 }
 
+/// Build a 403 Forbidden response with structured body
+pub fn forbidden<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
+    json_response(StatusCode::FORBIDDEN, body)
+}
+
 /// Build a 500 Internal Server Error response with message
 pub fn internal_error(message: &str) -> Response<Full<Bytes>> {
     json_response(
