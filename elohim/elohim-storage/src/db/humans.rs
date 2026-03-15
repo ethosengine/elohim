@@ -104,6 +104,18 @@ pub fn get_human_by_agent_key(
         .map_err(|e| StorageError::Internal(format!("Failed to fetch human by agent key: {}", e)))
 }
 
+/// List all humans for a given app, ordered by display name.
+pub fn list_humans(
+    conn: &mut SqliteConnection,
+    app_id: &str,
+) -> Result<Vec<Human>, diesel::result::Error> {
+    use crate::db::diesel_schema::humans::dsl;
+    dsl::humans
+        .filter(dsl::app_id.eq(app_id))
+        .order(dsl::display_name.asc())
+        .load::<Human>(conn)
+}
+
 /// Update mutable profile fields for an existing human.
 ///
 /// Only fields present in `input` (i.e., `Some(...)`) are written.
