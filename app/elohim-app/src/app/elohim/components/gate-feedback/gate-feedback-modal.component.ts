@@ -6,6 +6,7 @@ import {
   HostListener,
   Output,
   computed,
+  effect,
   inject,
   input,
   viewChild,
@@ -16,19 +17,26 @@ import { Observable } from 'rxjs';
 import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
 import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
 import { StorageApiService } from '../../services/storage-api.service';
+import {
+  DiagnosticCollectorService,
+  type DiagnosticBundle,
+} from '../../services/diagnostic-collector.service';
+import { IssueReportService } from '../../services/issue-report.service';
 
-export type FeedbackType = 'flag' | 'challenge' | 'feedback';
+export type FeedbackType = 'flag' | 'challenge' | 'feedback' | 'report';
 
 const TITLE_MAP: Record<string, string> = {
   flag: 'Flag Content',
   challenge: 'Challenge Content',
   feedback: 'Share Feedback',
+  report: 'Report Issue',
 };
 
 const PLACEHOLDER_MAP: Record<string, string> = {
   flag: 'Describe the issue...',
   challenge: 'State your case...',
   feedback: 'Share your thoughts...',
+  report: 'What happened?',
 };
 
 @Component({
@@ -130,6 +138,9 @@ const PLACEHOLDER_MAP: Record<string, string> = {
 export class GateFeedbackModalComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly storageApi = inject(StorageApiService);
+  private readonly diagnosticCollector = inject(DiagnosticCollectorService);
+  private readonly issueReportService = inject(IssueReportService);
+  private diagnosticBundle: DiagnosticBundle | null = null;
 
   readonly feedbackType = input<FeedbackType>('feedback');
   readonly contentId = input('');
@@ -155,7 +166,24 @@ export class GateFeedbackModalComponent {
     category: this.feedbackType(),
   }));
 
+  constructor() {
+    effect(() => {
+      if (this.feedbackType() === 'report') {
+        this.diagnosticCollector.collect().then((bundle) => {
+          this.diagnosticBundle = bundle;
+        });
+      }
+    });
+  }
+
   readonly apiCall = (text: string, context: MutationContext): Observable<unknown> => {
+    if (context['category'] === 'report' && this.diagnosticBundle) {
+      return this.issueReportService.createReport({
+        description: text,
+        diagnostics: this.diagnosticBundle,
+        contextUrl: this.diagnosticBundle.context.url,
+      });
+    }
     return this.storageApi.createComment(context['contentId'] as string, text);
   };
 
