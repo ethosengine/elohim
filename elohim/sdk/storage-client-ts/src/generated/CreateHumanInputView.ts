@@ -7,4 +7,4 @@ export type CreateHumanInputView = {
 /**
  * Caller-supplied stable ID (e.g. UUID derived from agent key)
  */
-id: string, agentPubKey: string | null, displayName: string, bio: string | null, affinities: Array<string>, profileReach: string, location: string | null, };
+id: string, agentPubKey: string | null, displayName: string, bio: string | null, affinities: Array<string>, profileReach: string, location: string | null, profilePhotoUrl: string | null, };

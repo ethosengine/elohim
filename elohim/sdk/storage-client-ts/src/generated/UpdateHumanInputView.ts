@@ -3,4 +3,4 @@
 /**
  * Input for updating a human's mutable profile fields — camelCase API boundary type.
  */
-export type UpdateHumanInputView = { displayName: string | null, bio: string | null, affinities: Array<string> | null, profileReach: string | null, location: string | null, };
+export type UpdateHumanInputView = { displayName: string | null, bio: string | null, affinities: Array<string> | null, profileReach: string | null, location: string | null, profilePhotoUrl: string | null, };

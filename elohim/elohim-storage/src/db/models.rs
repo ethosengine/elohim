@@ -723,6 +723,7 @@ pub struct Human {
     pub affinities: String,
     pub profile_reach: String,
     pub location: Option<String>,
+    pub profile_photo_url: Option<String>,
     pub app_id: String,
     pub created_at: String,
     pub updated_at: String,
@@ -739,6 +740,7 @@ pub struct NewHuman {
     pub affinities: String,
     pub profile_reach: String,
     pub location: Option<String>,
+    pub profile_photo_url: Option<String>,
     pub app_id: String,
 }
 

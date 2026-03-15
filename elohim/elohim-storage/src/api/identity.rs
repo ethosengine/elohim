@@ -68,6 +68,7 @@ async fn register_human(
         affinities: affinities_json,
         profile_reach: body.profile_reach,
         location: body.location,
+        profile_photo_url: body.profile_photo_url,
         app_id: "imagodei".to_string(),
     };
 
@@ -143,6 +144,7 @@ async fn update_me(
         affinities: affinities_json,
         profile_reach: body.profile_reach,
         location: body.location,
+        profile_photo_url: body.profile_photo_url,
     };
 
     let updated = humans::update_human(&mut conn, &human_id, input)?;

@@ -40,7 +40,7 @@ use crate::db::policy_cache::{
 use crate::db::{self, AppContext, DbPool, PooledConn};
 use crate::db::{
     collectives, content_mastery, contributor_presences, economic_events, human_relationships,
-    stewardship_allocations,
+    humans, stewardship_allocations,
 };
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
@@ -78,6 +78,7 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
+    HumanView,
     InitiateClaimInputView,
     LocalSessionView,
     NodeStewardshipView,
@@ -1627,6 +1628,11 @@ impl HttpServer {
             return self
                 .handle_human_relationship_by_id(req, method, rel_path, &app_ctx)
                 .await;
+        }
+
+        // Human directory route (Diesel)
+        if resource_path == "humans" && method == Method::GET {
+            return self.handle_list_humans(req, &app_ctx).await;
         }
 
         // Collective routes (Diesel)
@@ -4411,6 +4417,34 @@ impl HttpServer {
     }
 
     // =========================================================================
+    // Human Directory Handler (Qahal - Community Directory)
+    // =========================================================================
+
+    /// GET /db/humans - List all humans for the app
+    async fn handle_list_humans(
+        &self,
+        _req: Request<Incoming>,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match humans::list_humans(&mut conn, &ctx.app_id) {
+            Ok(items) => {
+                let views: Vec<HumanView> =
+                    items.into_iter().map(HumanView::from).collect();
+                let body = serde_json::json!({
+                    "items": views,
+                    "count": views.len(),
+                });
+                Ok(response::ok(&body))
+            }
+            Err(e) => Ok(response::error_response(StorageError::Internal(
+                format!("Failed to list humans: {}", e),
+            ))),
+        }
+    }
+
+    // =========================================================================
     // Collective Handlers (Qahal - Governance Contexts)
     // =========================================================================
 
@@ -6083,6 +6117,13 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/db/human-relationships/{id}/custody")
                 .handler("update_relationship_custody")
                 .auth_required()
+                .build(),
+        )
+        // Human directory (qahal)
+        .route(
+            Route::get("/db/humans")
+                .handler("list_humans")
+                .cache_ttl(300)
                 .build(),
         )
         // Collectives (qahal)
