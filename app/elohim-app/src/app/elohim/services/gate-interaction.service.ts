@@ -1,7 +1,9 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { Observable } from 'rxjs';
 
 import type { GateEvaluationView } from '@elohim/storage-client';
 
+import { extractGateFromResponse } from '../models/gated-response.model';
 import { GateService } from './gate.service';
 
 export type GateArtifactState =
@@ -58,6 +60,38 @@ export class GateInteractionService {
     }
     return 'constitutional';
   });
+
+  submitWithApi(
+    text: string,
+    mutationType: string,
+    context: MutationContext,
+    apiCall: (text: string, context: MutationContext) => Observable<unknown>,
+  ): void {
+    if (this._state() === 'evaluating') return;
+    this._draftText.set(text);
+    this._mutationType = mutationType;
+    this._context = context;
+    this._state.set('evaluating');
+
+    apiCall(text, context).subscribe({
+      next: (response) => {
+        const gate = extractGateFromResponse(response);
+        if (gate) {
+          this.handleGateEvaluation(gate);
+        } else {
+          this._state.set('posted');
+        }
+      },
+      error: (err) => {
+        const gate = err?.error?.gate;
+        if ((err?.status === 409 || err?.status === 403) && gate) {
+          this.handleGateEvaluation(gate);
+        } else {
+          this._state.set('draft');
+        }
+      },
+    });
+  }
 
   submit(text: string, mutationType: string, context: MutationContext): void {
     if (this._state() === 'evaluating') {

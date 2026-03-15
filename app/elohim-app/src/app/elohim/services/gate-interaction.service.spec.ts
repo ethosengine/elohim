@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import type { GateEvaluationView, TrustContextView } from '@elohim/storage-client';
@@ -216,5 +216,87 @@ describe('GateInteractionService', () => {
 
     service.resubmit();
     expect(service.state()).toBe('evaluating');
+  });
+
+  // --- submitWithApi ---
+
+  it('submitWithApi transitions to evaluating then affirm on success with gate', () => {
+    const gate = makeEvaluation();
+    const apiCall = vi.fn().mockReturnValue(of({ data: 'ok', gate }));
+
+    service.submitWithApi('hello', 'create', { contentId: 'c1' }, apiCall);
+
+    expect(service.state()).toBe('affirm');
+    expect(service.gateResult()).toEqual(gate);
+    expect(service.draftText()).toBe('hello');
+  });
+
+  it('submitWithApi calls the apiCall function with text and context', () => {
+    const apiCall = vi.fn().mockReturnValue(of({}));
+    const ctx = { contentId: 'c1' };
+
+    service.submitWithApi('hello', 'create', ctx, apiCall);
+
+    expect(apiCall).toHaveBeenCalledWith('hello', ctx);
+  });
+
+  it('submitWithApi transitions to posted on success without gate', () => {
+    const apiCall = vi.fn().mockReturnValue(of({ data: 'ok' }));
+
+    service.submitWithApi('hello', 'create', {}, apiCall);
+
+    expect(service.state()).toBe('posted');
+  });
+
+  it('submitWithApi transitions to dialogue on 409 error with gate', () => {
+    const gate = makeEvaluation({
+      pausePrompt: 'Are you sure?',
+      confirmToken: 'tok-123',
+    });
+    const apiCall = vi
+      .fn()
+      .mockReturnValue(throwError(() => ({ status: 409, error: { gate } })));
+
+    service.submitWithApi('hello', 'create', {}, apiCall);
+
+    expect(service.state()).toBe('dialogue');
+    expect(service.gateResult()).toEqual(gate);
+  });
+
+  it('submitWithApi transitions to settled on 403 error with gate', () => {
+    const gate = makeEvaluation({
+      settlementBoundary: 'constitutional-limit',
+      appealPath: '/appeal/1',
+    });
+    const apiCall = vi
+      .fn()
+      .mockReturnValue(throwError(() => ({ status: 403, error: { gate } })));
+
+    service.submitWithApi('hello', 'create', {}, apiCall);
+
+    expect(service.state()).toBe('settled');
+    expect(service.gateResult()).toEqual(gate);
+  });
+
+  it('submitWithApi reverts to draft on network error', () => {
+    const apiCall = vi
+      .fn()
+      .mockReturnValue(throwError(() => ({ status: 0, error: null })));
+
+    service.submitWithApi('hello', 'create', {}, apiCall);
+
+    expect(service.state()).toBe('draft');
+  });
+
+  it('submitWithApi guards against double-submit', () => {
+    const apiCall = vi.fn().mockReturnValue(of({}));
+
+    service.submit('first', 'create', {});
+    expect(service.state()).toBe('evaluating');
+
+    service.submitWithApi('second', 'create', {}, apiCall);
+
+    expect(apiCall).not.toHaveBeenCalled();
+    expect(service.draftText()).toBe('first');
   });
 });
