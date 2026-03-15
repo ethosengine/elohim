@@ -11,6 +11,9 @@ pub mod dot;
 pub mod ranked_choice;
 pub mod score;
 
+#[cfg(test)]
+mod tests;
+
 use crate::db::models::{ProposalOption, RankedVote};
 use serde::Serialize;
 use ts_rs::TS;
