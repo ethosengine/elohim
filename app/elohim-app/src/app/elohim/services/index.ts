@@ -55,5 +55,8 @@ export { HumanConsentService } from './human-consent.service';
 export { GovernanceService } from './governance.service';
 export { AffinityTrackingService } from './affinity-tracking.service';
 
+// Gate evaluation (mutation interceptor responses)
+export { GateService } from './gate.service';
+
 // Lens registry (cross-pillar resource exploration)
 export { LensRegistryService } from './lens-registry.service';
