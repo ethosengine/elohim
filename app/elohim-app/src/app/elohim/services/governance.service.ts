@@ -6,14 +6,6 @@ import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 
 import { Observable, of, combineLatest, from } from 'rxjs';
 
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import type {
-  CreateProposalInputView,
-  CastVoteInputView,
-  PostMessageInputView,
-} from '@elohim/storage-client/generated';
-
-// Services
 import {
   DataLoaderService,
   GovernanceIndex,
@@ -23,7 +15,16 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+
+import type {
+  CreateProposalInputView,
+  CastVoteInputView,
+  PostMessageInputView,
+} from '@elohim/storage-client/generated';
+
+// Services
 
 /**
  * Challenge submission from a user.
@@ -316,20 +317,22 @@ export class GovernanceService {
     };
 
     return from(this.governanceApi.createProposal(input)).pipe(
-      map((view): ProposalRecord => ({
-        id: view.id,
-        title: view.title,
-        proposalType: view.proposalType as ProposalRecord['proposalType'],
-        description: view.body,
-        proposer: {
-          agentId: view.proposerPresenceId,
-          displayName: view.proposerPresenceId,
-        },
-        status: view.status as ProposalRecord['status'],
-        phase: view.status as ProposalRecord['phase'],
-        createdAt: view.createdAt,
-      })),
-      tap(() => this.clearCache()),
+      map(
+        (view): ProposalRecord => ({
+          id: view.id,
+          title: view.title,
+          proposalType: view.proposalType as ProposalRecord['proposalType'],
+          description: view.body,
+          proposer: {
+            agentId: view.proposerPresenceId,
+            displayName: view.proposerPresenceId,
+          },
+          status: view.status as ProposalRecord['status'],
+          phase: view.status as ProposalRecord['phase'],
+          createdAt: view.createdAt,
+        })
+      ),
+      tap(() => this.clearCache())
     );
   }
 
@@ -345,7 +348,7 @@ export class GovernanceService {
 
     return from(this.governanceApi.castVote(vote.proposalId, input)).pipe(
       map(() => true),
-      catchError(() => of(false)),
+      catchError(() => of(false))
     );
   }
 
@@ -366,7 +369,7 @@ export class GovernanceService {
           reasoning: mine.reason ?? undefined,
         };
       }),
-      catchError(() => of(null)),
+      catchError(() => of(null))
     );
   }
 
@@ -443,7 +446,7 @@ export class GovernanceService {
     return from(this.governanceApi.postMessage(message.discussionId, input)).pipe(
       map(() => true),
       tap(() => this.clearCache()),
-      catchError(() => of(false)),
+      catchError(() => of(false))
     );
   }
 
@@ -492,5 +495,4 @@ export class GovernanceService {
     this.proposalsCache$ = null;
     this.precedentsCache$ = null;
   }
-
 }

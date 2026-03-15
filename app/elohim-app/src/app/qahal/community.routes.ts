@@ -46,7 +46,7 @@ export const COMMUNITY_ROUTES: Routes = [
       },
       {
         path: 'collective/:id',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/collective-detail/collective-detail.component').then(
             m => m.CollectiveDetailComponent
           ),

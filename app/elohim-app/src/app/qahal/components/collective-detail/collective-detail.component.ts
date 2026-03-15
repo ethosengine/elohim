@@ -5,6 +5,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { forkJoin } from 'rxjs';
 
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
+import { FaceCardComponent } from '../face-card/face-card.component';
+
 import type {
   CollectiveView,
   CollectiveParticipationView,
@@ -12,10 +16,6 @@ import type {
   ProposalView,
   DiscussionView,
 } from '@elohim/storage-client/generated';
-
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-
-import { FaceCardComponent } from '../face-card/face-card.component';
 
 interface ListResponse<T> {
   items: T[];
@@ -37,7 +37,13 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
   template: `
     <div class="detail">
       <div class="header">
-        <button class="back-btn" type="button" data-testid="back-to-directory" aria-label="Back to directory" (click)="navigateBack()">
+        <button
+          class="back-btn"
+          type="button"
+          data-testid="back-to-directory"
+          aria-label="Back to directory"
+          (click)="navigateBack()"
+        >
           &larr; Directory
         </button>
         @if (collective()) {
@@ -112,11 +118,16 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
               <div class="list-item">
                 <div class="list-item-header">
                   <span class="list-item-title">
-                    {{ discussion.body.length > 80 ? discussion.body.slice(0, 80) + '...' : discussion.body }}
+                    {{
+                      discussion.body.length > 80
+                        ? discussion.body.slice(0, 80) + '...'
+                        : discussion.body
+                    }}
                   </span>
                 </div>
                 <span class="list-item-meta">
-                  {{ discussion.authorPresenceId }} &middot; {{ discussion.createdAt | date: 'mediumDate' }}
+                  {{ discussion.authorPresenceId }} &middot;
+                  {{ discussion.createdAt | date: 'mediumDate' }}
                 </span>
               </div>
             } @empty {
