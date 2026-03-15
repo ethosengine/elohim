@@ -2245,6 +2245,7 @@ pub struct HumanView {
     pub affinities: Vec<String>,
     pub profile_reach: String,
     pub location: Option<String>,
+    pub profile_photo_url: Option<String>,
     pub app_id: String,
     pub created_at: String,
     pub updated_at: String,
@@ -2261,6 +2262,7 @@ impl From<Human> for HumanView {
             affinities,
             profile_reach: h.profile_reach,
             location: h.location,
+            profile_photo_url: h.profile_photo_url,
             app_id: h.app_id,
             created_at: h.created_at,
             updated_at: h.updated_at,
@@ -2286,6 +2288,8 @@ pub struct CreateHumanInputView {
     pub profile_reach: String,
     #[serde(default)]
     pub location: Option<String>,
+    #[serde(default)]
+    pub profile_photo_url: Option<String>,
 }
 
 fn default_profile_reach() -> String {
@@ -2307,6 +2311,8 @@ pub struct UpdateHumanInputView {
     pub profile_reach: Option<String>,
     #[serde(default)]
     pub location: Option<String>,
+    #[serde(default)]
+    pub profile_photo_url: Option<String>,
 }
 
 // ============================================================================
