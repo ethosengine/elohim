@@ -1,10 +1,12 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   EventEmitter,
   HostListener,
   Output,
   computed,
+  inject,
   input,
   viewChild,
 } from '@angular/core';
@@ -60,7 +62,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
           [placeholder]="placeholder()"
           [mutationType]="feedbackType()"
           [contextMetadata]="contextMetadata()"
-          (posted)="posted.emit($event)"
+          (posted)="onPosted($event)"
           (settled)="settled.emit($event)"
         />
       </div>
@@ -122,6 +124,8 @@ const PLACEHOLDER_MAP: Record<string, string> = {
   ],
 })
 export class GateFeedbackModalComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly feedbackType = input<FeedbackType>('feedback');
   readonly contentId = input('');
 
@@ -145,4 +149,10 @@ export class GateFeedbackModalComponent {
     contentId: this.contentId(),
     category: this.feedbackType(),
   }));
+
+  onPosted(event: { reachTier: ReachTier }): void {
+    this.posted.emit(event);
+    const timer = setTimeout(() => this.closed.emit(), 800);
+    this.destroyRef.onDestroy(() => clearTimeout(timer));
+  }
 }

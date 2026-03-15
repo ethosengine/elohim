@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -242,4 +242,30 @@ describe('GateFeedbackModalComponent', () => {
       appealPath: '/appeal/1',
     });
   });
+
+  // --- Auto-close on posted ---
+
+  it('should emit closed ~800ms after posted', fakeAsync(() => {
+    const closedSpy = vi.fn();
+    component.closed.subscribe(closedSpy);
+
+    component.onPosted({ reachTier: 'community' });
+    fixture.detectChanges();
+
+    expect(closedSpy).not.toHaveBeenCalled();
+
+    tick(800);
+    expect(closedSpy).toHaveBeenCalled();
+  }));
+
+  it('should NOT auto-close on settled', fakeAsync(() => {
+    const closedSpy = vi.fn();
+    component.closed.subscribe(closedSpy);
+
+    component.settled.emit({ boundary: 'harm', appealPath: null });
+    fixture.detectChanges();
+
+    tick(2000);
+    expect(closedSpy).not.toHaveBeenCalled();
+  }));
 });
