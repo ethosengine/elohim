@@ -12,6 +12,8 @@ import {
 import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
 import type { ReachTier } from '../../services/gate-interaction.service';
 
+export type FeedbackType = 'flag' | 'challenge' | 'feedback';
+
 const TITLE_MAP: Record<string, string> = {
   flag: 'Flag Content',
   challenge: 'Challenge Content',
@@ -120,7 +122,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
   ],
 })
 export class GateFeedbackModalComponent {
-  readonly feedbackType = input<'flag' | 'challenge' | 'feedback'>('feedback');
+  readonly feedbackType = input<FeedbackType>('feedback');
   readonly contentId = input('');
 
   @Output() readonly posted = new EventEmitter<{ reachTier: ReachTier }>();
