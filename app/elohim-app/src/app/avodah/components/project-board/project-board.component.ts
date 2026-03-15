@@ -1,8 +1,178 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
+
+import { ContentNode } from '@app/lamad/models/content-node.model';
+
+import { BoardColumn, DEFAULT_BOARD_COLUMNS, parseWorkProjectMeta } from '../../models/work-project.model';
+import { parseWorkStoryMeta } from '../../models/work-story.model';
+import { AvodahApiService } from '../../services/avodah-api.service';
+import { StoryCardComponent } from '../story-card/story-card.component';
 
 @Component({
   selector: 'app-project-board',
   standalone: true,
-  template: `<div class="project-board-stub"><p>Board — coming soon</p></div>`,
+  imports: [RouterLink, StoryCardComponent],
+  template: `
+    <div class="board-shell">
+      <nav class="board-sidebar">
+        <div class="project-name">{{ project?.title ?? 'Project' }}</div>
+        <ul>
+          <li class="active">▦ Board</li>
+          <li><a [routerLink]="['../backlog']">≡ Backlog</a></li>
+          <li><a [routerLink]="['../tasks']">↺ Tasks</a></li>
+        </ul>
+        <a routerLink="/avodah/projects" class="new-project">+ New Project</a>
+      </nav>
+      <main class="board-main">
+        <div class="columns">
+          @for (col of columns; track col.id) {
+            <div class="column">
+              <div class="col-header">
+                <span>{{ col.name }}</span>
+                <span class="col-count">{{ storiesInColumn(col.id).length }}</span>
+              </div>
+              <div class="col-stories">
+                @for (story of storiesInColumn(col.id); track story.id) {
+                  <app-story-card [story]="story" />
+                }
+              </div>
+              <div class="add-story">+ Add story</div>
+            </div>
+          }
+        </div>
+      </main>
+    </div>
+  `,
+  styles: [
+    `
+      .board-shell {
+        display: flex;
+        height: calc(100vh - 60px);
+        overflow: hidden;
+      }
+      .board-sidebar {
+        width: 200px;
+        flex-shrink: 0;
+        background: rgba(20, 20, 36, 0.95);
+        border-right: 1px solid rgba(99, 102, 241, 0.12);
+        display: flex;
+        flex-direction: column;
+        padding: 1rem 0;
+      }
+      .project-name {
+        padding: 0 1rem 1rem;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.12);
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0 0;
+        flex: 1;
+      }
+      li {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+        border-radius: 0 6px 6px 0;
+        margin-right: 0.5rem;
+      }
+      li.active {
+        background: var(--lamad-accent-primary, #6366f1);
+        color: white;
+      }
+      li a {
+        color: var(--lamad-text-secondary, #e2e8f0);
+        text-decoration: none;
+        display: block;
+      }
+      li:not(.active):hover {
+        background: rgba(99, 102, 241, 0.1);
+      }
+      .new-project {
+        padding: 0.75rem 1rem;
+        font-size: 0.8rem;
+        color: var(--lamad-accent-primary, #6366f1);
+        text-decoration: none;
+      }
+      .board-main {
+        flex: 1;
+        overflow-x: auto;
+        padding: 1rem;
+      }
+      .columns {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+      }
+      .column {
+        width: 280px;
+        flex-shrink: 0;
+        background: rgba(15, 15, 26, 0.6);
+        border-radius: 10px;
+        padding: 0.75rem;
+      }
+      .col-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .col-count {
+        background: rgba(99, 102, 241, 0.2);
+        border-radius: 999px;
+        padding: 1px 7px;
+        font-size: 0.75rem;
+        color: var(--lamad-text-muted, #64748b);
+      }
+      .col-stories {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .add-story {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--lamad-text-muted, #64748b);
+        cursor: pointer;
+        border-radius: 6px;
+        text-align: center;
+        border: 1px dashed rgba(99, 102, 241, 0.15);
+        margin-top: 0.5rem;
+      }
+      .add-story:hover {
+        border-color: var(--lamad-accent-primary, #6366f1);
+        color: var(--lamad-accent-primary, #6366f1);
+      }
+    `,
+  ],
 })
-export class ProjectBoardComponent {}
+export class ProjectBoardComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private api = inject(AvodahApiService);
+
+  project: ContentNode | null = null;
+  stories: ContentNode[] = [];
+  columns: BoardColumn[] = DEFAULT_BOARD_COLUMNS;
+
+  async ngOnInit(): Promise<void> {
+    const projectId = this.route.snapshot.params['id'] as string;
+    const projects = await this.api.getProjects();
+    this.project = projects.find(p => p.id === projectId) ?? null;
+    if (this.project) {
+      const meta = parseWorkProjectMeta(this.project.metadata as Record<string, unknown>);
+      this.columns = meta.columns;
+    }
+    this.stories = await this.api.getStoriesForProject(projectId);
+  }
+
+  storiesInColumn(columnId: string): ContentNode[] {
+    return this.stories.filter(s => {
+      const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
+      return meta.status === columnId;
+    });
+  }
+}
