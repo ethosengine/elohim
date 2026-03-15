@@ -18,6 +18,10 @@ export * from './models';
 export { FaceCardComponent } from './components/face-card/face-card.component';
 export { CommunityDirectoryComponent } from './components/community-directory/community-directory.component';
 export { CollectiveDetailComponent } from './components/collective-detail/collective-detail.component';
+export {
+  ContextMenuOnlyComponent,
+  type ContextMenuAction,
+} from './components/context-menu-only/context-menu-only.component';
 
 // Services
 export * from './services';
