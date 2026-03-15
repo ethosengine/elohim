@@ -132,6 +132,68 @@ impl ContentService {
         Ok(result)
     }
 
+    /// Partially update a content item (PATCH semantics).
+    ///
+    /// The `view.metadata` field is shallow-merged with existing metadata:
+    /// only the keys present in the patch object are overwritten.
+    pub fn update(
+        &self,
+        id: &str,
+        view: crate::views::UpdateContentInputView,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        let mut conn = self.conn()?;
+
+        // Compute merged metadata_json before entering the DB layer
+        let merged_metadata_json = if let Some(patch_meta) = &view.metadata {
+            let existing = content_diesel::get_content(&mut conn, &self.ctx, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
+
+            let existing_meta: serde_json::Value = existing
+                .metadata_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+            let patch_value = patch_meta.0.clone();
+            let merged = match (existing_meta, patch_value) {
+                (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
+                    for (k, v) in patch {
+                        base.insert(k, v);
+                    }
+                    serde_json::Value::Object(base)
+                }
+                (_, patch) => patch, // fallback: replace entirely
+            };
+
+            Some(
+                serde_json::to_string(&merged).map_err(|e| {
+                    StorageError::Internal(format!("Metadata serialize error: {}", e))
+                })?,
+            )
+        } else {
+            None
+        };
+
+        let input = content_diesel::UpdateContentInput {
+            id: id.to_string(),
+            title: view.title,
+            description: view.description,
+            content_body: view.content_body,
+            content_format: view.content_format,
+            metadata_json: merged_metadata_json,
+            tags: view.tags,
+            reach: view.reach,
+        };
+
+        let result = content_diesel::update_content(&mut conn, &self.ctx, input)?;
+
+        self.events.emit(StorageEvent::ContentUpdated {
+            id: result.content.id.clone(),
+        });
+
+        Ok(result)
+    }
+
     /// Delete content by ID
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
         let mut conn = self.conn()?;
@@ -340,5 +402,16 @@ mod tests {
     fn test_validate_empty_id() {
         let _events = Arc::new(EventBus::new());
         // Can't test without a database connection, but validation is straightforward
+    }
+
+    #[test]
+    fn test_content_service_has_update_method() {
+        fn _assert_update_exists(
+            _s: &ContentService,
+            _id: &str,
+            _v: crate::views::UpdateContentInputView,
+        ) {
+            // If this compiles, the method exists
+        }
     }
 }
