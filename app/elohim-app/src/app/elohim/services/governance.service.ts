@@ -2,9 +2,16 @@ import { Injectable, inject } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { map, shareReplay } from 'rxjs/operators';
+import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 
-import { Observable, of, combineLatest } from 'rxjs';
+import { Observable, of, combineLatest, from } from 'rxjs';
+
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import type {
+  CreateProposalInputView,
+  CastVoteInputView,
+  PostMessageInputView,
+} from '@elohim/storage-client/generated';
 
 // Services
 import {
@@ -80,8 +87,8 @@ export interface DiscussionMessage {
  * Responsibilities:
  * - Load governance state for any entity
  * - Display challenges, proposals, precedents, discussions
- * - Submit challenges and proposals (MVP: localStorage simulation)
- * - Vote on proposals (MVP: localStorage simulation)
+ * - Submit challenges and proposals (proposals via API, challenges MVP: Sprint 3)
+ * - Vote on proposals (via API)
  * - Check SLA deadlines and status
  *
  * Constitutional principles:
@@ -95,8 +102,6 @@ const ACTIVE_CHALLENGE_STATUSES = new Set(['acknowledged', 'under-review']);
 
 @Injectable({ providedIn: 'root' })
 export class GovernanceService {
-  private readonly STORAGE_PREFIX = 'lamad-governance-';
-
   // Cached governance data
   private challengesCache$: Observable<ChallengeRecord[]> | null = null;
   private proposalsCache$: Observable<ProposalRecord[]> | null = null;
@@ -104,6 +109,7 @@ export class GovernanceService {
 
   private readonly dataLoader = inject(DataLoaderService);
   private readonly sessionUser = inject(SessionHumanService);
+  private readonly governanceApi = inject(GovernanceApiService);
 
   // =========================================================================
   // Governance Index & Overview
@@ -228,7 +234,7 @@ export class GovernanceService {
   }
 
   /**
-   * Submit a new challenge (MVP: saves to localStorage).
+   * Submit a new challenge (MVP: still localStorage, wired in Sprint 3).
    */
   submitChallenge(submission: ChallengeSubmission): Observable<ChallengeRecord> {
     const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
@@ -250,9 +256,6 @@ export class GovernanceService {
       filedAt: new Date().toISOString(),
       slaDeadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     };
-
-    // Save to localStorage
-    this.saveLocalChallenge(challenge);
 
     // Clear cache to pick up new challenge
     this.challengesCache$ = null;
@@ -297,67 +300,74 @@ export class GovernanceService {
   }
 
   /**
-   * Submit a new proposal (MVP: saves to localStorage).
+   * Submit a new proposal via governance API.
    */
   submitProposal(submission: ProposalSubmission): Observable<ProposalRecord> {
-    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
-    const session = this.sessionUser.getSession();
-    const userName = session?.displayName ?? 'Anonymous';
+    const presenceId = this.sessionUser.getSessionId() ?? 'anonymous';
 
-    const proposal: ProposalRecord = {
-      id: `proposal-local-${Date.now()}`,
-      title: submission.title,
+    const input: CreateProposalInputView = {
+      id: `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      contentId: submission.relatedEntityId ?? '',
+      proposerPresenceId: presenceId,
       proposalType: submission.proposalType,
-      description: submission.description,
-      proposer: {
-        agentId,
-        displayName: userName,
-      },
-      status: 'discussion',
-      phase: 'discussion',
-      createdAt: new Date().toISOString(),
+      title: submission.title,
+      body: `${submission.description}\n\n**Rationale:** ${submission.rationale}`,
+      votingAnonymous: false,
     };
 
-    // Save to localStorage
-    this.saveLocalProposal(proposal);
-
-    // Clear cache
-    this.proposalsCache$ = null;
-
-    return of(proposal);
+    return from(this.governanceApi.createProposal(input)).pipe(
+      map((view): ProposalRecord => ({
+        id: view.id,
+        title: view.title,
+        proposalType: view.proposalType as ProposalRecord['proposalType'],
+        description: view.body,
+        proposer: {
+          agentId: view.proposerPresenceId,
+          displayName: view.proposerPresenceId,
+        },
+        status: view.status as ProposalRecord['status'],
+        phase: view.status as ProposalRecord['phase'],
+        createdAt: view.createdAt,
+      })),
+      tap(() => this.clearCache()),
+    );
   }
 
   /**
-   * Vote on a proposal (MVP: saves to localStorage).
+   * Vote on a proposal via governance API.
    */
   voteOnProposal(vote: Vote): Observable<boolean> {
-    // In MVP, we just record the vote locally
-    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
-    const key = `${this.STORAGE_PREFIX}vote-${agentId}-${vote.proposalId}`;
+    const input: CastVoteInputView = {
+      humanId: this.sessionUser.getSessionId() ?? 'anonymous',
+      position: vote.position,
+      reason: vote.reasoning ?? null,
+    };
 
-    try {
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          ...vote,
-          votedAt: new Date().toISOString(),
-          agentId,
-        })
-      );
-      return of(true);
-    } catch {
-      return of(false);
-    }
+    return from(this.governanceApi.castVote(vote.proposalId, input)).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
   }
 
   /**
    * Get my vote on a proposal.
    */
   getMyVote(proposalId: string): Observable<Vote | null> {
-    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
-    const key = `${this.STORAGE_PREFIX}vote-${agentId}-${proposalId}`;
-    const data = localStorage.getItem(key);
-    return of(data ? JSON.parse(data) : null);
+    const humanId = this.sessionUser.getSessionId();
+    if (!humanId) return of(null);
+
+    return from(this.governanceApi.getVotes(proposalId)).pipe(
+      map(votes => {
+        const mine = votes.find(v => v.humanId === humanId);
+        if (!mine) return null;
+        return {
+          proposalId,
+          position: mine.position as Vote['position'],
+          reasoning: mine.reason ?? undefined,
+        };
+      }),
+      catchError(() => of(null)),
+    );
   }
 
   // =========================================================================
@@ -421,51 +431,20 @@ export class GovernanceService {
   }
 
   /**
-   * Post a message to a discussion (MVP: saves to localStorage).
+   * Post a message to a discussion via governance API.
    */
   postMessage(message: DiscussionMessage): Observable<boolean> {
-    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
-    const session = this.sessionUser.getSession();
-    const userName = session?.displayName ?? 'Anonymous';
-
-    const newMessage = {
-      id: `msg-local-${Date.now()}`,
-      authorId: agentId,
-      authorName: userName,
-      content: message.content,
-      createdAt: new Date().toISOString(),
-      replyToId: message.replyToId,
+    const input: PostMessageInputView = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      authorPresenceId: this.sessionUser.getSessionId() ?? 'anonymous',
+      body: message.content,
     };
 
-    // Save to localStorage
-    const key = `${this.STORAGE_PREFIX}discussion-messages-${message.discussionId}`;
-    const existing = localStorage.getItem(key);
-    const messages: Record<string, unknown>[] = existing
-      ? (JSON.parse(existing) as Record<string, unknown>[])
-      : [];
-    messages.push(newMessage);
-
-    try {
-      localStorage.setItem(key, JSON.stringify(messages));
-      return of(true);
-    } catch {
-      return of(false);
-    }
-  }
-
-  /**
-   * Get local messages for a discussion (MVP supplement to server data).
-   */
-  getLocalMessages(discussionId: string): {
-    id: string;
-    authorId: string;
-    authorName: string;
-    content: string;
-    createdAt: string;
-  }[] {
-    const key = `${this.STORAGE_PREFIX}discussion-messages-${discussionId}`;
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    return from(this.governanceApi.postMessage(message.discussionId, input)).pipe(
+      map(() => true),
+      tap(() => this.clearCache()),
+      catchError(() => of(false)),
+    );
   }
 
   // =========================================================================
@@ -514,35 +493,4 @@ export class GovernanceService {
     this.precedentsCache$ = null;
   }
 
-  // =========================================================================
-  // Local Storage (MVP)
-  // =========================================================================
-
-  private saveLocalChallenge(challenge: ChallengeRecord): void {
-    const key = `${this.STORAGE_PREFIX}local-challenges`;
-    const existing = localStorage.getItem(key);
-    const challenges: ChallengeRecord[] = existing
-      ? (JSON.parse(existing) as ChallengeRecord[])
-      : [];
-    challenges.push(challenge);
-
-    try {
-      localStorage.setItem(key, JSON.stringify(challenges));
-    } catch {
-      // localStorage write failure is non-critical
-    }
-  }
-
-  private saveLocalProposal(proposal: ProposalRecord): void {
-    const key = `${this.STORAGE_PREFIX}local-proposals`;
-    const existing = localStorage.getItem(key);
-    const proposals: ProposalRecord[] = existing ? (JSON.parse(existing) as ProposalRecord[]) : [];
-    proposals.push(proposal);
-
-    try {
-      localStorage.setItem(key, JSON.stringify(proposals));
-    } catch {
-      // localStorage write failure is non-critical
-    }
-  }
 }
