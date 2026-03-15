@@ -8,3 +8,5 @@ export { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.
 export { HumanConsentService } from '@app/elohim/services/human-consent.service';
 export { GovernanceService } from '@app/elohim/services/governance.service';
 export { CollectiveService } from './collective.service';
+export { MechanismSelectionService } from './mechanism-selection.service';
+export type { MechanismSelection } from './mechanism-selection.service';
