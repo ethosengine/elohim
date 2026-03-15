@@ -25,10 +25,9 @@ pub fn compute_anomaly_score(observations: &[ImagodeiObservation]) -> f64 {
     let now = chrono::Utc::now().naive_utc();
 
     // Partition into recent (24h) and baseline (rest)
-    let (recent, baseline): (Vec<&ImagodeiObservation>, Vec<&ImagodeiObservation>) =
-        observations.iter().partition(|obs| {
-            parse_age_hours(&obs.observed_at, &now) < 24.0
-        });
+    let (recent, baseline): (Vec<&ImagodeiObservation>, Vec<&ImagodeiObservation>) = observations
+        .iter()
+        .partition(|obs| parse_age_hours(&obs.observed_at, &now) < 24.0);
 
     if recent.is_empty() || baseline.is_empty() {
         return 0.0;
@@ -39,13 +38,13 @@ pub fn compute_anomaly_score(observations: &[ImagodeiObservation]) -> f64 {
     let recent_rate = recent.len() as f64 / 24.0; // obs per hour in last 24h
     let baseline_days = baseline
         .iter()
-        .filter_map(|obs| Some(parse_age_hours(&obs.observed_at, &now) / 24.0))
+        .map(|obs| parse_age_hours(&obs.observed_at, &now) / 24.0)
         .fold(0.0_f64, f64::max)
         .max(1.0); // at least 1 day
     let baseline_rate = baseline.len() as f64 / (baseline_days * 24.0); // obs per hour in baseline
 
     let rate_divergence = if baseline_rate > 0.0 {
-        ((recent_rate / baseline_rate) - 1.0).max(0.0).min(1.0)
+        ((recent_rate / baseline_rate) - 1.0).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -81,10 +80,9 @@ mod tests {
     use super::*;
 
     fn make_observation(trust_delta: f32, hours_ago: i64) -> ImagodeiObservation {
-        let observed_at = (chrono::Utc::now().naive_utc()
-            - chrono::TimeDelta::hours(hours_ago))
-        .format("%Y-%m-%d %H:%M:%S")
-        .to_string();
+        let observed_at = (chrono::Utc::now().naive_utc() - chrono::TimeDelta::hours(hours_ago))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
         ImagodeiObservation {
             id: uuid::Uuid::new_v4().to_string(),
             app_id: "lamad".to_string(),

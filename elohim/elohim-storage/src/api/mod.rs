@@ -173,12 +173,13 @@ pub async fn evaluate_gate(
     // Query observations once for both behavioral trust and anomaly detection
     let observations = match human_id {
         Some(hid) => match get_conn(pool) {
-            Ok(mut conn) => {
-                crate::db::imagodei_observations::list_observations_for_human(
-                    &mut conn, ctx, hid, "individual",
-                )
-                .unwrap_or_default()
-            }
+            Ok(mut conn) => crate::db::imagodei_observations::list_observations_for_human(
+                &mut conn,
+                ctx,
+                hid,
+                "individual",
+            )
+            .unwrap_or_default(),
             Err(_) => Vec::new(),
         },
         None => Vec::new(),
@@ -189,12 +190,12 @@ pub async fn evaluate_gate(
         crate::services::anomaly_detection::compute_anomaly_score(&observations);
 
     let trust_ctx = TrustContext::compute(TrustSignals {
-        mastery_depth: 0.5,         // placeholder — future sprint
-        steward_standing: 0.5,      // placeholder — future sprint
-        relationship_density: 0.5,  // placeholder — future sprint
-        governance_health: 0.5,     // placeholder — future sprint
-        behavioral_trust,           // from observation history
-        intent_divergence,          // from anomaly detection
+        mastery_depth: 0.5,        // placeholder — future sprint
+        steward_standing: 0.5,     // placeholder — future sprint
+        relationship_density: 0.5, // placeholder — future sprint
+        governance_health: 0.5,    // placeholder — future sprint
+        behavioral_trust,          // from observation history
+        intent_divergence,         // from anomaly detection
     });
 
     let mutation_content_for_cache = mutation_content.clone();
@@ -261,9 +262,8 @@ pub async fn evaluate_gate(
                     relevance_decay: 0.5,
                     superseded_by: None,
                 };
-                let _ = crate::db::imagodei_observations::create_observation(
-                    &mut conn, ctx, &new_obs,
-                );
+                let _ =
+                    crate::db::imagodei_observations::create_observation(&mut conn, ctx, &new_obs);
             }
         }
     }

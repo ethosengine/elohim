@@ -58,9 +58,7 @@ async fn handle_confirm(
         .gate
         .pending_confirmations()
         .take(&body.confirm_token)
-        .ok_or_else(|| {
-            StorageError::NotFound("Invalid or expired confirmation token".into())
-        })?;
+        .ok_or_else(|| StorageError::NotFound("Invalid or expired confirmation token".into()))?;
 
     // Store PauseOverride observation — the human chose to proceed despite the elohim's pause
     let obs_id = uuid::Uuid::new_v4().to_string();

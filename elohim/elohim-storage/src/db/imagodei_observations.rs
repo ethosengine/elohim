@@ -184,7 +184,13 @@ mod tests {
     fn test_create_and_retrieve_observation() {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
-        let obs = make_observation("obs-1", "human-1", "growth_signal", "individual", "2026-03-14T10:00:00Z");
+        let obs = make_observation(
+            "obs-1",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T10:00:00Z",
+        );
 
         let created = create_observation(&mut conn, &ctx, &obs).expect("Failed to create");
         assert_eq!(created.id, "obs-1");
@@ -205,9 +211,27 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
 
-        let obs1 = make_observation("obs-1", "human-1", "growth_signal", "individual", "2026-03-14T10:00:00Z");
-        let obs2 = make_observation("obs-2", "human-1", "pause_override", "individual", "2026-03-14T11:00:00Z");
-        let obs3 = make_observation("obs-3", "human-2", "growth_signal", "individual", "2026-03-14T12:00:00Z");
+        let obs1 = make_observation(
+            "obs-1",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T10:00:00Z",
+        );
+        let obs2 = make_observation(
+            "obs-2",
+            "human-1",
+            "pause_override",
+            "individual",
+            "2026-03-14T11:00:00Z",
+        );
+        let obs3 = make_observation(
+            "obs-3",
+            "human-2",
+            "growth_signal",
+            "individual",
+            "2026-03-14T12:00:00Z",
+        );
 
         create_observation(&mut conn, &ctx, &obs1).unwrap();
         create_observation(&mut conn, &ctx, &obs2).unwrap();
@@ -226,8 +250,20 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
 
-        let obs_individual = make_observation("obs-ind", "human-1", "growth_signal", "individual", "2026-03-14T10:00:00Z");
-        let obs_community = make_observation("obs-com", "human-1", "growth_signal", "community", "2026-03-14T11:00:00Z");
+        let obs_individual = make_observation(
+            "obs-ind",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T10:00:00Z",
+        );
+        let obs_community = make_observation(
+            "obs-com",
+            "human-1",
+            "growth_signal",
+            "community",
+            "2026-03-14T11:00:00Z",
+        );
 
         create_observation(&mut conn, &ctx, &obs_individual).unwrap();
         create_observation(&mut conn, &ctx, &obs_community).unwrap();
@@ -249,9 +285,27 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
 
-        let obs1 = make_observation("obs-1", "human-1", "growth_signal", "individual", "2026-03-14T10:00:00Z");
-        let obs2 = make_observation("obs-2", "human-1", "pause_override", "individual", "2026-03-14T11:00:00Z");
-        let obs3 = make_observation("obs-3", "human-1", "growth_signal", "individual", "2026-03-14T12:00:00Z");
+        let obs1 = make_observation(
+            "obs-1",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T10:00:00Z",
+        );
+        let obs2 = make_observation(
+            "obs-2",
+            "human-1",
+            "pause_override",
+            "individual",
+            "2026-03-14T11:00:00Z",
+        );
+        let obs3 = make_observation(
+            "obs-3",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T12:00:00Z",
+        );
 
         create_observation(&mut conn, &ctx, &obs1).unwrap();
         create_observation(&mut conn, &ctx, &obs2).unwrap();
@@ -272,14 +326,32 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
 
-        assert_eq!(count_observations_for_human(&mut conn, &ctx, "human-1").unwrap(), 0);
+        assert_eq!(
+            count_observations_for_human(&mut conn, &ctx, "human-1").unwrap(),
+            0
+        );
 
-        let obs1 = make_observation("obs-1", "human-1", "growth_signal", "individual", "2026-03-14T10:00:00Z");
-        let obs2 = make_observation("obs-2", "human-1", "pause_override", "individual", "2026-03-14T11:00:00Z");
+        let obs1 = make_observation(
+            "obs-1",
+            "human-1",
+            "growth_signal",
+            "individual",
+            "2026-03-14T10:00:00Z",
+        );
+        let obs2 = make_observation(
+            "obs-2",
+            "human-1",
+            "pause_override",
+            "individual",
+            "2026-03-14T11:00:00Z",
+        );
 
         create_observation(&mut conn, &ctx, &obs1).unwrap();
         create_observation(&mut conn, &ctx, &obs2).unwrap();
 
-        assert_eq!(count_observations_for_human(&mut conn, &ctx, "human-1").unwrap(), 2);
+        assert_eq!(
+            count_observations_for_human(&mut conn, &ctx, "human-1").unwrap(),
+            2
+        );
     }
 }
