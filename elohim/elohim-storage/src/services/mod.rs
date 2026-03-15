@@ -30,6 +30,7 @@ pub mod exchange_service;
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
+pub mod mastery_depth;
 pub mod path_service;
 pub mod presence_service;
 pub mod rea_commitment_service;
