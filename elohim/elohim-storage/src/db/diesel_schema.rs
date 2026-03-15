@@ -397,6 +397,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    governance_signals (id) {
+        id -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        human_id -> Text,
+        signal_type -> Text,
+        signal_value -> Text,
+        mechanism_level -> Integer,
+        proxy_elohim_id -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     governance_states (id) {
         id -> Text,
         entity_type -> Text,
@@ -433,6 +447,24 @@ diesel::table! {
         source -> Nullable<Text>,
         source_justification -> Nullable<Text>,
         created_at -> Text,
+    }
+}
+
+diesel::table! {
+    ranked_votes (id) {
+        id -> Text,
+        proposal_id -> Text,
+        human_id -> Text,
+        option_id -> Text,
+        rank -> Nullable<Integer>,
+        score -> Nullable<Integer>,
+        dots -> Nullable<Integer>,
+        approved -> Nullable<Integer>,
+        reasoning -> Nullable<Text>,
+        proxy_elohim_id -> Nullable<Text>,
+        proxy_justification -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
@@ -740,6 +772,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     device_policies,
     discussions,
     economic_events,
+    governance_signals,
     governance_states,
     human_relationships,
     humans,
@@ -755,6 +788,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     premium_gates,
     proposal_options,
     proposals,
+    ranked_votes,
     rea_commitments,
     relationships,
     schema_version,
