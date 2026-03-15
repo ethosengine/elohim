@@ -16,6 +16,7 @@
 
 pub mod agreements;
 pub mod attestations;
+pub mod comments;
 pub mod compute;
 pub mod contributors;
 pub mod custodians;
@@ -101,6 +102,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("attestations") {
         let resource_path = sub_path.strip_prefix("attestations").unwrap_or("");
         attestations::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("comments") {
+        let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
+        comments::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("contributors") {
         let resource_path = sub_path.strip_prefix("contributors").unwrap_or("");
         contributors::handle(req, method, resource_path, &pool, &app_ctx).await
