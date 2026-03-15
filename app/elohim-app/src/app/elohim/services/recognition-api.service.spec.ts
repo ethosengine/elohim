@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+
+import { GateService } from './gate.service';
 import { RecognitionApiService } from './recognition-api.service';
 
 describe('RecognitionApiService', () => {
@@ -9,7 +11,12 @@ describe('RecognitionApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), RecognitionApiService],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        RecognitionApiService,
+        { provide: GateService, useValue: { handleGateResponse: vi.fn() } },
+      ],
     });
     service = TestBed.inject(RecognitionApiService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -41,6 +48,6 @@ describe('RecognitionApiService', () => {
     const req = httpMock.expectOne('/api/v1/recognition/distribute');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(trigger);
-    req.flush(mockResult);
+    req.flush({ data: mockResult, gate: { status: 'clear' } });
   });
 });
