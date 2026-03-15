@@ -43,6 +43,7 @@ import {
   FeedbackContext,
   GraduatedFeedbackComponent,
 } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
+import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
 import { SeoService } from '../../../services/seo.service';
@@ -70,6 +71,7 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
     MiniGraphComponent,
     ReactionBarComponent,
     GraduatedFeedbackComponent,
+    FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
   ],
   templateUrl: './content-viewer.component.html',

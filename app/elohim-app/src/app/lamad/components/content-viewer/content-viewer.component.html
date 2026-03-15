@@ -297,6 +297,13 @@
           </div>
         </div>
 
+        <!-- Feedback Mechanism Gateway (governance at the point of content) -->
+        <qahal-feedback-mechanism-gateway
+          *ngIf="node"
+          [entityType]="'content'"
+          [entityId]="node.id"
+        ></qahal-feedback-mechanism-gateway>
+
         <!-- Appears in Paths (Wikipedia-style back-links) -->
         <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
           <h2>📚 Appears in Learning Paths</h2>
