@@ -14,7 +14,7 @@ use ts_rs::TS;
 
 use super::diesel_schema::{
     access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
-    content, content_attestations, content_mastery, content_tags, contributor_dashboards,
+    comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     governance_states, human_relationships, humans, imagodei_observations, knowledge_maps,
     local_sessions, node_stewardship, path_attestations, path_extensions, path_tags, paths,
@@ -2031,4 +2031,39 @@ pub struct NewImagodeiObservation<'a> {
     pub originating_elohim: &'a str,
     pub relevance_decay: f32,
     pub superseded_by: Option<&'a str>,
+}
+
+// ============================================================================
+// Comment Models
+// ============================================================================
+
+/// Comment from the comments table (Queryable)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = comments)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Comment {
+    pub id: String,
+    pub app_id: String,
+    pub content_id: String,
+    pub human_id: String,
+    pub body: String,
+    pub reach: String,
+    pub governance_state: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New comment for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = comments)]
+pub struct NewComment {
+    pub id: String,
+    pub app_id: String,
+    pub content_id: String,
+    pub human_id: String,
+    pub body: String,
+    pub reach: String,
+    pub governance_state: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
