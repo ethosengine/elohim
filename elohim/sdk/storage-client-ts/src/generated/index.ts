@@ -111,3 +111,15 @@ export * from './SheafaDashboardStateView';
 export * from './StewardCredentialView';
 export * from './StewardRevenueSummaryView';
 export * from './VoteView';
+
+// Multi-mechanism voting types
+export * from './BallotEntry';
+export * from './CastRankedVoteInputView';
+export * from './CreateProposalOptionInputView';
+export * from './GovernanceSignalView';
+export * from './OptionResult';
+export * from './ProposalOptionView';
+export * from './RankedVoteView';
+export * from './RecordSignalInputView';
+export * from './TallyResult';
+export * from './TallyRound';

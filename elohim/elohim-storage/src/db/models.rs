@@ -20,6 +20,7 @@ use super::diesel_schema::{
     local_sessions, node_stewardship, path_attestations, path_extensions, path_tags, paths,
     precedents, premium_gates, proposals, rea_commitments, relationships, steps,
     steward_credentials, stewarded_nodes, stewardship_allocations, votes,
+    proposal_options, ranked_votes, governance_signals,
 };
 
 // ============================================================================
@@ -1476,6 +1477,12 @@ pub struct Proposal {
     pub voting_anonymous: i32,
     pub created_at: String,
     pub updated_at: String,
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// New proposal for INSERT
@@ -1488,6 +1495,12 @@ pub struct NewProposal<'a> {
     pub proposal_type: &'a str,
     pub title: &'a str,
     pub body: &'a str,
+    pub voting_mechanism: &'a str,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// Governance precedent
@@ -1566,6 +1579,114 @@ pub struct NewVote<'a> {
     pub anonymous: i32,
     pub created_at: &'a str,
     pub updated_at: &'a str,
+}
+
+// ============================================================================
+// Proposal Option Models (multi-mechanism voting)
+// ============================================================================
+
+/// Option within a multi-mechanism proposal
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = proposal_options)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ProposalOption {
+    pub id: String,
+    pub proposal_id: String,
+    pub label: String,
+    pub description: String,
+    pub position: i32,
+    pub source: Option<String>,
+    pub source_justification: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = proposal_options)]
+pub struct NewProposalOption<'a> {
+    pub id: &'a str,
+    pub proposal_id: &'a str,
+    pub label: &'a str,
+    pub description: &'a str,
+    pub position: i32,
+    pub source: Option<&'a str>,
+    pub source_justification: Option<&'a str>,
+    pub created_at: &'a str,
+}
+
+// ============================================================================
+// Ranked Vote Models (multi-mechanism voting)
+// ============================================================================
+
+/// Vote in a multi-mechanism proposal (ranked-choice, score, dot, approval)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = ranked_votes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct RankedVote {
+    pub id: String,
+    pub proposal_id: String,
+    pub human_id: String,
+    pub option_id: String,
+    pub rank: Option<i32>,
+    pub score: Option<i32>,
+    pub dots: Option<i32>,
+    pub approved: Option<i32>,
+    pub reasoning: Option<String>,
+    pub proxy_elohim_id: Option<String>,
+    pub proxy_justification: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = ranked_votes)]
+pub struct NewRankedVote<'a> {
+    pub id: &'a str,
+    pub proposal_id: &'a str,
+    pub human_id: &'a str,
+    pub option_id: &'a str,
+    pub rank: Option<i32>,
+    pub score: Option<i32>,
+    pub dots: Option<i32>,
+    pub approved: Option<i32>,
+    pub reasoning: Option<&'a str>,
+    pub proxy_elohim_id: Option<&'a str>,
+    pub proxy_justification: Option<&'a str>,
+    pub created_at: &'a str,
+    pub updated_at: &'a str,
+}
+
+// ============================================================================
+// Governance Signal Models
+// ============================================================================
+
+/// Normalized governance signal from any feedback mechanism
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = governance_signals)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct GovernanceSignal {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub signal_type: String,
+    pub signal_value: String,
+    pub mechanism_level: i32,
+    pub proxy_elohim_id: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = governance_signals)]
+pub struct NewGovernanceSignal<'a> {
+    pub id: &'a str,
+    pub entity_type: &'a str,
+    pub entity_id: &'a str,
+    pub human_id: &'a str,
+    pub signal_type: &'a str,
+    pub signal_value: &'a str,
+    pub mechanism_level: i32,
+    pub proxy_elohim_id: Option<&'a str>,
+    pub created_at: &'a str,
 }
 
 // ============================================================================

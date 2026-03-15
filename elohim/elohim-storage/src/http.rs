@@ -5258,6 +5258,45 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .handler("post_message")
                 .build(),
         )
+        .route(
+            Route::post("/api/v1/governance/proposals/{id}/options")
+                .handler("create_proposal_options")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/proposals/{id}/options")
+                .handler("list_proposal_options")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/proposals/{id}/ranked-votes")
+                .handler("cast_ranked_votes")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/proposals/{id}/ranked-votes")
+                .handler("list_ranked_votes")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/proposals/{id}/tally")
+                .handler("compute_tally")
+                .cache_ttl(10)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/signals")
+                .handler("record_signal")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/signals")
+                .handler("list_signals")
+                .cache_ttl(30)
+                .build(),
+        )
         // =====================================================================
         // /api/v1/economic-events — REA economic events
         // =====================================================================

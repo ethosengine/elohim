@@ -3,4 +3,4 @@
 /**
  * Create a proposal — API request
  */
-export type CreateProposalInputView = { id: string, contentId: string, proposerPresenceId: string, proposalType: string, title: string, body: string, votingAnonymous: boolean, };
+export type CreateProposalInputView = { id: string, contentId: string, proposerPresenceId: string, proposalType: string, title: string, body: string, votingAnonymous: boolean, votingMechanism: string, scoreMin: number | null, scoreMax: number | null, dotsPerVoter: number | null, quorumPercentage: number | null, passageThreshold: number | null, };

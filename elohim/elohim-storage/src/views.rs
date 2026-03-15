@@ -87,11 +87,11 @@ use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
     AccessGrant, AgreementRow, App, Challenge, Chapter, ChapterWithSteps, Content,
     ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
-    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceState, Human,
-    HumanRelationship, LocalSession, NodeStewardship, Path, PathAttestation, PathWithDetails,
-    PathWithSteps, Precedent, PremiumGate, Proposal, ReaCommitment, Relationship, Vote,
-    RelationshipWithContent, Step, StewardCredential, StewardedNode, StewardshipAllocation,
-    StewardshipAllocationWithPresence,
+    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
+    GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
+    PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
+    ProposalOption, RankedVote, ReaCommitment, Relationship, Vote, RelationshipWithContent, Step,
+    StewardCredential, StewardedNode, StewardshipAllocation, StewardshipAllocationWithPresence,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -3330,6 +3330,12 @@ pub struct ProposalView {
     pub voting_anonymous: bool,
     pub created_at: String,
     pub updated_at: String,
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 impl From<Proposal> for ProposalView {
@@ -3347,6 +3353,12 @@ impl From<Proposal> for ProposalView {
             voting_anonymous: p.voting_anonymous == 1,
             created_at: p.created_at,
             updated_at: p.updated_at,
+            voting_mechanism: p.voting_mechanism,
+            score_min: p.score_min,
+            score_max: p.score_max,
+            dots_per_voter: p.dots_per_voter,
+            quorum_percentage: p.quorum_percentage,
+            passage_threshold: p.passage_threshold,
         }
     }
 }
@@ -3431,6 +3443,10 @@ impl VoteView {
     }
 }
 
+fn default_voting_mechanism() -> String {
+    "consent".to_string()
+}
+
 /// Create a proposal — API request
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -3444,6 +3460,13 @@ pub struct CreateProposalInputView {
     pub body: String,
     #[serde(default)]
     pub voting_anonymous: bool,
+    #[serde(default = "default_voting_mechanism")]
+    pub voting_mechanism: String,
+    pub score_min: Option<i32>,
+    pub score_max: Option<i32>,
+    pub dots_per_voter: Option<i32>,
+    pub quorum_percentage: Option<f64>,
+    pub passage_threshold: Option<f64>,
 }
 
 /// Cast or update a vote — API request
@@ -3455,6 +3478,171 @@ pub struct CastVoteInputView {
     pub position: String,
     #[serde(default)]
     pub reason: Option<String>,
+}
+
+// ============================================================================
+// Proposal Option Views (multi-mechanism voting)
+// ============================================================================
+
+/// Proposal option — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ProposalOptionView {
+    pub id: String,
+    pub proposal_id: String,
+    pub label: String,
+    pub description: String,
+    pub position: i32,
+    pub source: Option<String>,
+    pub source_justification: Option<String>,
+    pub created_at: String,
+}
+
+impl From<ProposalOption> for ProposalOptionView {
+    fn from(o: ProposalOption) -> Self {
+        Self {
+            id: o.id,
+            proposal_id: o.proposal_id,
+            label: o.label,
+            description: o.description,
+            position: o.position,
+            source: o.source,
+            source_justification: o.source_justification,
+            created_at: o.created_at,
+        }
+    }
+}
+
+/// Create proposal options — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateProposalOptionInputView {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub position: i32,
+    pub source: Option<String>,
+    pub source_justification: Option<String>,
+}
+
+// ============================================================================
+// Ranked Vote Views (multi-mechanism voting)
+// ============================================================================
+
+/// Ranked/scored/dot vote — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RankedVoteView {
+    pub id: String,
+    pub proposal_id: String,
+    pub human_id: Option<String>,
+    pub option_id: String,
+    pub rank: Option<i32>,
+    pub score: Option<i32>,
+    pub dots: Option<i32>,
+    pub approved: Option<bool>,
+    pub reasoning: Option<String>,
+    pub proxy_elohim_id: Option<String>,
+    pub created_at: String,
+}
+
+impl RankedVoteView {
+    pub fn from_ranked_vote(v: RankedVote, hide_identity: bool) -> Self {
+        Self {
+            id: v.id,
+            proposal_id: v.proposal_id,
+            human_id: if hide_identity { None } else { Some(v.human_id) },
+            option_id: v.option_id,
+            rank: v.rank,
+            score: v.score,
+            dots: v.dots,
+            approved: v.approved.map(|a| a == 1),
+            reasoning: v.reasoning,
+            proxy_elohim_id: v.proxy_elohim_id,
+            created_at: v.created_at,
+        }
+    }
+}
+
+/// Single entry in a ranked/scored/dot ballot
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct BallotEntry {
+    pub option_id: String,
+    pub rank: Option<i32>,
+    pub score: Option<i32>,
+    pub dots: Option<i32>,
+    pub approved: Option<bool>,
+}
+
+/// Cast a ranked/scored/dot/approval vote — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CastRankedVoteInputView {
+    pub human_id: String,
+    pub ballots: Vec<BallotEntry>,
+    #[serde(default)]
+    pub reasoning: Option<String>,
+    #[serde(default)]
+    pub proxy_elohim_id: Option<String>,
+    #[serde(default)]
+    pub proxy_justification: Option<String>,
+}
+
+// ============================================================================
+// Governance Signal Views
+// ============================================================================
+
+/// Governance signal — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceSignalView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub signal_type: String,
+    pub signal_value: String,
+    pub mechanism_level: i32,
+    pub proxy_elohim_id: Option<String>,
+    pub created_at: String,
+}
+
+impl From<GovernanceSignal> for GovernanceSignalView {
+    fn from(s: GovernanceSignal) -> Self {
+        Self {
+            id: s.id,
+            entity_type: s.entity_type,
+            entity_id: s.entity_id,
+            human_id: s.human_id,
+            signal_type: s.signal_type,
+            signal_value: s.signal_value,
+            mechanism_level: s.mechanism_level,
+            proxy_elohim_id: s.proxy_elohim_id,
+            created_at: s.created_at,
+        }
+    }
+}
+
+/// Record a governance signal — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecordSignalInputView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub signal_type: String,
+    pub signal_value: String,
+    pub mechanism_level: i32,
+    #[serde(default)]
+    pub proxy_elohim_id: Option<String>,
 }
 
 /// Start a discussion — API request

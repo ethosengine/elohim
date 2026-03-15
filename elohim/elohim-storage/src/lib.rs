@@ -65,6 +65,9 @@ pub mod progress_hub;
 pub mod progress_ws;
 pub mod services;
 
+// Tally strategies for multi-mechanism voting
+pub mod tally;
+
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
