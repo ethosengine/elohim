@@ -11,6 +11,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    comments (id) {
+        id -> Text,
+        app_id -> Text,
+        content_id -> Text,
+        human_id -> Text,
+        body -> Text,
+        reach -> Text,
+        governance_state -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     collectives (id) {
         id -> Text,
         app_id -> Text,
@@ -709,6 +723,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     apps,
     challenges,
     chapters,
+    comments,
     collective_participations,
     collectives,
     content,

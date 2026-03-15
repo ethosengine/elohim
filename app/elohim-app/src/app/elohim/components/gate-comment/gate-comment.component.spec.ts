@@ -51,4 +51,17 @@ describe('GateCommentComponent', () => {
     const wrapper = fixture.nativeElement.querySelector('.gate-comment');
     expect(wrapper).toBeTruthy();
   });
+
+  it('should have apiCall defined as a function', () => {
+    expect(component.apiCall).toBeDefined();
+    expect(typeof component.apiCall).toBe('function');
+  });
+
+  it('should delegate apiCall to StorageApiService.createComment', () => {
+    const httpMock = TestBed.inject(HttpClient) as unknown as { post: ReturnType<typeof vi.fn> };
+    const result = component.apiCall('hello world', { contentId: 'content-123' });
+
+    expect(result).toBeDefined();
+    expect(httpMock.post).toHaveBeenCalled();
+  });
 });
