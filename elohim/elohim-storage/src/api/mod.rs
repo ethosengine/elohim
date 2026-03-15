@@ -189,13 +189,56 @@ pub async fn evaluate_gate(
     let intent_divergence =
         crate::services::anomaly_detection::compute_anomaly_score(&observations);
 
+    // Query mastery records for mastery depth
+    let mastery_depth = match human_id {
+        Some(hid) => match get_conn(pool) {
+            Ok(mut conn) => {
+                let records =
+                    crate::db::content_mastery::get_mastery_for_human(&mut conn, ctx, hid)
+                        .unwrap_or_default();
+                crate::services::mastery_depth::compute(&records)
+            }
+            Err(_) => 0.5,
+        },
+        None => 0.5,
+    };
+
+    // Query allocations once for both steward standing and governance health
+    let allocations = match human_id {
+        Some(hid) => match get_conn(pool) {
+            Ok(mut conn) => {
+                crate::db::stewardship_allocations::get_allocations_for_steward(&mut conn, ctx, hid)
+                    .unwrap_or_default()
+            }
+            Err(_) => Vec::new(),
+        },
+        None => Vec::new(),
+    };
+    let steward_standing = crate::services::steward_standing::compute(&allocations);
+    let governance_health = crate::services::governance_health::compute(&allocations);
+
+    // Query relationships for relationship density
+    let relationship_density = match human_id {
+        Some(hid) => match get_conn(pool) {
+            Ok(mut conn) => {
+                let relationships = crate::db::human_relationships::get_relationships_for_human(
+                    &mut conn, ctx, hid,
+                )
+                .unwrap_or_default();
+                crate::services::relationship_density::compute(&relationships)
+            }
+            Err(_) => 0.5,
+        },
+        None => 0.5,
+    };
+
     let trust_ctx = TrustContext::compute(TrustSignals {
-        mastery_depth: 0.5,        // placeholder — future sprint
-        steward_standing: 0.5,     // placeholder — future sprint
-        relationship_density: 0.5, // placeholder — future sprint
-        governance_health: 0.5,    // placeholder — future sprint
-        behavioral_trust,          // from observation history
-        intent_divergence,         // from anomaly detection
+        mastery_depth,        // from mastery records
+        steward_standing,     // from stewardship allocations
+        relationship_density, // from human relationships
+        governance_health,    // from allocation governance states
+        behavioral_trust,     // from observation history
+        intent_divergence,    // from anomaly detection
     });
 
     let mutation_content_for_cache = mutation_content.clone();
