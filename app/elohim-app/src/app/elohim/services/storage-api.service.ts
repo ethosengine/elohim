@@ -865,7 +865,6 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     input: FileDisputeInput
   ): Observable<StewardshipAllocationView> {
     const body = {
-      disputeId: input.disputeId,
       disputedBy: input.disputedBy,
       reason: input.reason,
     };

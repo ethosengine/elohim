@@ -210,7 +210,6 @@ export interface UpdateAllocationInput {
  * FileDisputeInput - Input for filing a dispute on an allocation.
  */
 export interface FileDisputeInput {
-  disputeId: string;
   disputedBy: string;
   reason: string;
 }

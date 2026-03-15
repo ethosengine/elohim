@@ -54,19 +54,6 @@ export interface StewardPortfolio {
   activeDisputeCount: number;
 }
 
-/**
- * Recognition distribution for a content piece.
- */
-export interface RecognitionDistribution {
-  contentId: string;
-  totalAmount: number;
-  distributions: {
-    stewardPresenceId: string;
-    amount: number;
-    ratio: number;
-  }[];
-}
-
 @Injectable({
   providedIn: 'root',
 })
@@ -244,16 +231,14 @@ export class StewardshipAllocationService {
    *
    * Used when a steward believes their allocation ratio is incorrect
    * or they're being subject to a "hostile takeover".
+   * Dispute ID is generated server-side.
    */
   fileDispute(
     allocationId: string,
     disputedBy: string,
     reason: string
   ): Observable<StewardshipAllocationView> {
-    const disputeId = `dispute-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`;
-
     return this.storageApi.fileAllocationDispute(allocationId, {
-      disputeId,
       disputedBy,
       reason,
     });
@@ -285,38 +270,6 @@ export class StewardshipAllocationService {
   }
 
   // ============================================================================
-  // Recognition Distribution
-  // ============================================================================
-
-  /**
-   * Calculate how recognition should be distributed for a content piece.
-   *
-   * Recognition flows to stewards proportional to their allocation ratios.
-   */
-  calculateRecognitionDistribution(
-    contentId: string,
-    totalAmount: number
-  ): Observable<RecognitionDistribution> {
-    return this.getContentStewardship(contentId).pipe(
-      map(stewardship => {
-        const distributions = stewardship.allocations
-          .filter(a => a.governanceState === 'active')
-          .map(a => ({
-            stewardPresenceId: a.stewardPresenceId,
-            amount: totalAmount * a.allocationRatio,
-            ratio: a.allocationRatio,
-          }));
-
-        return {
-          contentId,
-          totalAmount,
-          distributions,
-        };
-      })
-    );
-  }
-
-  // ============================================================================
   // Bootstrap Helpers
   // ============================================================================
 
@@ -341,26 +294,6 @@ export class StewardshipAllocationService {
     }));
 
     return this.bulkCreateAllocations(inputs);
-  }
-
-  /**
-   * Normalize allocation ratios for a content piece to sum to 1.0.
-   *
-   * Call this after adding/removing allocations to ensure ratios are valid.
-   */
-  normalizeRatios(allocations: StewardshipAllocationView[]): StewardshipAllocationView[] {
-    const activeAllocations = allocations.filter(a => a.governanceState === 'active');
-    const totalRatio = activeAllocations.reduce((sum, a) => sum + a.allocationRatio, 0);
-
-    if (totalRatio === 0 || totalRatio === 1) {
-      return allocations;
-    }
-
-    return allocations.map(a => ({
-      ...a,
-      allocationRatio:
-        a.governanceState === 'active' ? a.allocationRatio / totalRatio : a.allocationRatio,
-    }));
   }
 
   // ============================================================================

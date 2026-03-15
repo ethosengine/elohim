@@ -1,88 +1,126 @@
-/* eslint-disable @typescript-eslint/require-await -- Observable→Promise bridging */
-import { Injectable, inject } from '@angular/core';
+/* eslint-disable @typescript-eslint/require-await -- Phase 1: mock stubs returning Promise<T> without async work */
+import { Injectable } from '@angular/core';
 
-import { firstValueFrom } from 'rxjs';
-
-import { StorageApiService } from '../../elohim/services/storage-api.service';
 import { ContentMetadata, ContentNode } from '../../lamad/models/content-node.model';
+import { DEFAULT_BOARD_COLUMNS } from '../models/work-project.model';
 
-import type { WorkStoryStatus } from '../models/work-story.model';
+const CONTENT_FORMAT = 'text' as const;
+const WORK_STORY_TYPE = 'work-story' as const;
+const MOCK_CREATED_AT = '2026-01-01T00:00:00Z';
+const MOCK_PROJECT_ID = 'proj-household-collective';
 
-import type { ContentWithTagsView } from '@elohim/storage-client/generated';
+// Household member IDs
+const MATTHEW = 'matthew';
+const JESSICA = 'jessica';
+const JAMES = 'james';
 
-// TODO: [HOLOCHAIN-ZOME] writes currently go direct to storage (same as seed workflow).
-// Route through conductor once the work-story zome is implemented.
-
-/**
- * Map a storage ContentWithTagsView to the app's ContentNode domain type.
- * The wire format is already camelCase with parsed JSON — no transformation needed,
- * just field projection.
- */
-function toContentNode(view: ContentWithTagsView): ContentNode {
-  return {
-    id: view.id,
-    contentType: view.contentType,
-    title: view.title,
-    description: view.description ?? '',
-    content: view.contentBody ?? '',
-    contentFormat: view.contentFormat,
-    tags: view.tags,
+const MOCK_PROJECTS: ContentNode[] = [
+  {
+    id: MOCK_PROJECT_ID,
+    contentType: 'work-project',
+    title: 'Matthew, Jessica & James',
+    description: 'Shared household tasks and projects for the family collective.',
+    content: '',
+    contentFormat: CONTENT_FORMAT,
+    tags: ['household', 'family'],
     relatedNodeIds: [],
-    metadata: (view.metadata ?? {}) as ContentMetadata,
-    reach: view.reach,
-    createdAt: view.createdAt,
-    updatedAt: view.updatedAt,
-  };
-}
+    metadata: {
+      columns: DEFAULT_BOARD_COLUMNS,
+      visibility: 'private',
+      memberIds: [MATTHEW, JESSICA, JAMES],
+    },
+    createdAt: MOCK_CREATED_AT,
+    updatedAt: MOCK_CREATED_AT,
+  },
+];
+
+const MOCK_STORIES: ContentNode[] = [
+  {
+    id: 'story-groceries-weekly',
+    contentType: WORK_STORY_TYPE,
+    title: 'Weekly grocery run',
+    description: 'Pick up groceries for the week — check the shared list first.',
+    content: '',
+    contentFormat: CONTENT_FORMAT,
+    tags: ['food', 'recurring'],
+    relatedNodeIds: [],
+    metadata: {
+      projectId: MOCK_PROJECT_ID,
+      status: 'todo',
+      visibility: 'private',
+      priority: 'high',
+      assigneeId: JESSICA,
+      cadence: {
+        interval: 'weekly',
+        resetToStatus: 'todo',
+        nextOccurrence: '2026-03-22T00:00:00Z',
+      },
+    } as unknown as ContentMetadata,
+    createdAt: MOCK_CREATED_AT,
+    updatedAt: MOCK_CREATED_AT,
+  },
+  {
+    id: 'story-back-fence-repair',
+    contentType: WORK_STORY_TYPE,
+    title: 'Repair the back fence',
+    description: 'Two panels came loose after the last storm. Needs new hardware.',
+    content: '',
+    contentFormat: CONTENT_FORMAT,
+    tags: ['maintenance', 'yard'],
+    relatedNodeIds: [],
+    metadata: {
+      projectId: MOCK_PROJECT_ID,
+      status: 'backlog',
+      visibility: 'private',
+      priority: 'high',
+      assigneeId: MATTHEW,
+      storyPoints: 5,
+    } as unknown as ContentMetadata,
+    createdAt: MOCK_CREATED_AT,
+    updatedAt: MOCK_CREATED_AT,
+  },
+  {
+    id: 'story-james-reading',
+    contentType: WORK_STORY_TYPE,
+    title: 'Reading practice with James',
+    description: '20 minutes of reading practice each evening before bed.',
+    content: '',
+    contentFormat: CONTENT_FORMAT,
+    tags: ['education', 'recurring'],
+    relatedNodeIds: [],
+    metadata: {
+      projectId: MOCK_PROJECT_ID,
+      status: 'in-progress',
+      visibility: 'private',
+      priority: 'medium',
+      assigneeId: MATTHEW,
+      cadence: {
+        interval: 'daily',
+        resetToStatus: 'todo',
+        nextOccurrence: '2026-03-16T21:00:00Z',
+      },
+    } as unknown as ContentMetadata,
+    createdAt: MOCK_CREATED_AT,
+    updatedAt: MOCK_CREATED_AT,
+  },
+];
 
 @Injectable({ providedIn: 'root' })
 export class AvodahApiService {
-  private readonly storageApi = inject(StorageApiService);
-
   async getProjects(): Promise<ContentNode[]> {
-    const views = await firstValueFrom(
-      this.storageApi.getContents({ contentType: 'work-project' }),
-    );
-    return views.map(toContentNode);
+    return [...MOCK_PROJECTS];
   }
 
   async getStoriesForProject(projectId: string): Promise<ContentNode[]> {
-    const views = await firstValueFrom(
-      this.storageApi.getContents({ contentType: 'work-story' }),
+    return MOCK_STORIES.filter(
+      s => (s.metadata as Record<string, unknown>)['projectId'] === projectId
     );
-    return views
-      .map(toContentNode)
-      .filter(
-        n => (n.metadata as Record<string, unknown>)['projectId'] === projectId,
-      );
   }
 
-  /**
-   * Update a story's status.
-   *
-   * @param isTerminal - set true when moving to a done-state column (`isTerminal: true`
-   *   in the project's BoardColumn config). This triggers an economic event in shefa.
-   */
-  async updateStoryStatus(
-    storyId: string,
-    status: WorkStoryStatus,
-    isTerminal = false,
-  ): Promise<void> {
-    await firstValueFrom(
-      this.storageApi.updateContent(storyId, { metadata: { status } }),
-    );
-
-    if (isTerminal) {
-      // REA transition: done → economic event settles the work record
-      await firstValueFrom(
-        this.storageApi.createEconomicEvent({
-          action: 'work',
-          provider: storyId,
-          receiver: storyId,
-          contentId: storyId,
-          lamadEventType: 'work-complete',
-        }),
-      );
+  async updateStoryStatus(storyId: string, status: string): Promise<void> {
+    const story = MOCK_STORIES.find(s => s.id === storyId);
+    if (story) {
+      (story.metadata as Record<string, unknown>)['status'] = status;
     }
   }
 }

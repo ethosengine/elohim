@@ -1,6 +1,6 @@
 # What Spoke to Me: A Survey of What I'd Love to Work On
 
-_Updated 2026-03-14. Completed items cleared — see git history for previous versions._
+_Updated 2026-03-15. Completed items cleared — see git history for previous versions._
 
 ---
 
@@ -30,12 +30,14 @@ Phases 2-5 remain: recovery request flow (DHT entry types in imagodei DNA), shar
 
 ## 2. The Governance Immune System (Qahal Write Path)
 
-Read-only layer fully functional — list, get, query governance states, challenges, proposals, precedents. Backend DB CRUD functions exist but are **not exposed via HTTP**. UI components (Loomio-style voting, reaction bar, SLA timer) are built but have nowhere to persist.
+Read-only layer fully functional. **Sprint 2 complete (2026-03-15)**: proposals, votes, and discussions now persist via real HTTP POST routes to elohim-storage. Votes table added (SQLite, UNIQUE per proposal+human). GovernanceService wired to API — localStorage MVP replaced. CollectiveDetailComponent built with members/proposals/discussions tabs. 5 a2o governance scenarios added (first qahal coverage). 99 governance tests passing.
 
-The gap: wire backend CRUD to POST routes (`/challenges`, `/responses`, `/appeals`, `/precedents`), then connect the existing UI. No a2o scenarios exist for governance — story-first was never applied here, which is why write paths were never driven.
+**Done**: Votes table + migration, Rust CRUD handlers (create proposal, cast/get votes, create discussion, post message), generated TypeScript types (VoteView, CastVoteInputView, etc.), GovernanceApiService POST methods, GovernanceService API integration, CollectiveDetailComponent, community routes, a2o scenarios.
 
-**Impact**: High for M5-M6. The elohim "resolve" function depends on this.
-**Effort**: Medium for the wiring (CRUD exists), large for the full immune system (dysfunction detection, precedent interpretation).
+**Remaining (Sprint 3 — the immune system)**: Challenges write path (still localStorage), responses, appeals, precedent interpretation, dysfunction detection, elohim resolve function, SLA enforcement.
+
+**Impact**: High for M5-M6. The elohim "resolve" function depends on Sprint 3.
+**Effort**: Medium for challenges wiring, large for the full immune system.
 
 ---
 
@@ -63,6 +65,33 @@ The steward economy has two layers now: a solid Rust pipeline backend and a frag
 
 **Impact**: High for M5-M6. The economic experience is what makes stewardship feel real.
 **Effort**: Medium. All plumbing exists; this is composition and UX.
+
+---
+
+## 4. ElohimGate — Adaptive Friction Through Trust Signals
+
+The gate is an async mutation interceptor in elohim-storage. Every write passes through it. Four tiers of inference (None/Light/Deep/Constitutional), four outcomes (PassThrough, Enriched, Pause with confirm flow, Settlement with constitutional boundary).
+
+**Backend (Sprints 1-4, complete)**: The gate has all six trust senses wired to real data:
+
+| Signal | Source | Module |
+|--------|--------|--------|
+| mastery_depth | Content mastery records (Bloom's taxonomy × freshness) | `mastery_depth.rs` |
+| steward_standing | Stewardship allocations (active ratio + recognition - disputes) | `steward_standing.rs` |
+| relationship_density | Human relationships (log-scaled, weighted by verification/consent) | `relationship_density.rs` |
+| governance_health | Allocation governance states (active/disputed/pending ratio) | `governance_health.rs` |
+| behavioral_trust | Observation history (trust deltas with time decay) | `behavioral_trust.rs` |
+| intent_divergence | Anomaly detection (mutation rate + trust trend divergence) | `anomaly_detection.rs` |
+
+Feedback loop closed: gate evaluates → observations stored → behavioral trust updated → gate re-evaluates with new context. PendingConfirmationCache for pause/confirm flow. InferenceRouter with priority-based engine selection and fallback. 344 tests.
+
+**Not yet built**:
+- **Angular gate client** (Sprint 5): Service to handle `GateEvaluationView` responses, pause confirm UX, trust context display. Types already generated (`GateEvaluationView.ts`, `TrustContextView.ts`).
+- **SSE streaming** (Sprint 6): Real-time gate evaluation push to Angular. No existing SSE patterns in codebase — needs full wire-up.
+- **Inference sidecar integration** (Sprint 7): Connect elohim-agent-sdk at :8095 for Deep/Constitutional tier inference. `SidecarEngine` HTTP client exists but sidecar isn't deployed yet.
+
+**Impact**: This is the elohim's primary sensory system — how it perceives the health of a mutation before it lands. Everything downstream (nudge, play, resolve) depends on the gate seeing clearly.
+**Effort**: Backend complete. Sprint 5 (Angular client) is medium. Sprint 6-7 are larger.
 
 ---
 
