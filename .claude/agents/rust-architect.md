@@ -105,16 +105,20 @@ Abstracts doorway vs Tauri runtime via `IConnectionStrategy`. Angular doesn't kn
 
 ## Adding New Entities (Full Vertical)
 
-**Before writing any code, classify the entity.** Invoke the `p2p-design-gate` skill or apply its decision tree:
+**Before writing any code, classify the entity.** Invoke the `p2p-design-gate` skill or apply its decision tree.
+
+**DNA Capacity Warning**: Lamad DNA is at **83/~100 entry types**. Do NOT add new entry types without confirming headroom. Most entities already have DHT entry types — the typical gap is the missing `dht_anchor_hash` in storage, not a missing entry type. Use Links (Category A2 in the skill) for relationships and attributes of existing entries.
 
 ```
 Does the community need to witness/verify this data?
-  YES → NOTARIZED (Path A below)
-  NO  → Does this data belong to a single agent privately?
-          YES → AGENT-SCOPED (Path B below)
-          NO  → Is it reconstructable from other sources?
-                  YES → OPERATIONAL (Path C below)
-                  NO  → It's probably Notarized. Go back.
+  YES → Does a DHT entry type ALREADY EXIST?
+          YES → NOTARIZED (Path A — wire up dht_anchor_hash)
+          NO  → Relationship of existing entry? → DERIVED (Path A2 — use Link)
+                Truly new? Check DNA capacity → NOTARIZED (Path A — create type)
+  NO  → Agent-scoped? → Does its effect need peer verification?
+          YES → AGENT-SCOPED + ATTESTATION (Path B2)
+          NO  → AGENT-SCOPED (Path B)
+  NO  → Reconstructable? → OPERATIONAL (Path C)
 ```
 
 ### Path A: Notarized Entity (DHT is truth, storage is projection)
