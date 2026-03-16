@@ -64,6 +64,7 @@ pub mod node_registry_api;
 pub mod progress_hub;
 pub mod progress_ws;
 pub mod services;
+pub mod sse;
 
 // Tally strategies for multi-mechanism voting
 pub mod tally;
