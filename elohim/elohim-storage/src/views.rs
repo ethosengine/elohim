@@ -92,15 +92,9 @@ use crate::db::models::{
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
     GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
     PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
-<<<<<<< HEAD
-    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Statement,
-    StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
+    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Schedule,
+    Statement, StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
     StewardshipAllocationWithPresence, Vote,
-=======
-    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Schedule, Step,
-    StewardCredential, StewardedNode, StewardshipAllocation, StewardshipAllocationWithPresence,
-    Vote,
->>>>>>> feature/kairos-schedules
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -878,6 +872,7 @@ pub struct StewardshipAllocationView {
     pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<StewardshipAllocation> for StewardshipAllocationView {
@@ -908,6 +903,7 @@ impl From<StewardshipAllocation> for StewardshipAllocationView {
             metadata: parse_json_opt(&a.metadata_json),
             created_at: a.created_at,
             updated_at: a.updated_at,
+            dht_anchor_hash: a.dht_anchor_hash,
         }
     }
 }
@@ -3891,6 +3887,7 @@ pub struct StewardCredentialView {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<StewardCredential> for StewardCredentialView {
@@ -3904,6 +3901,7 @@ impl From<StewardCredential> for StewardCredentialView {
             status: s.status,
             created_at: s.created_at,
             updated_at: s.updated_at,
+            dht_anchor_hash: s.dht_anchor_hash,
         }
     }
 }
@@ -3920,6 +3918,7 @@ pub struct PremiumGateView {
     pub gate_title: String,
     pub gate_description: Option<String>,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<PremiumGate> for PremiumGateView {
@@ -3933,6 +3932,7 @@ impl From<PremiumGate> for PremiumGateView {
             gate_title: g.gate_title,
             gate_description: g.gate_description,
             created_at: g.created_at,
+            dht_anchor_hash: g.dht_anchor_hash,
         }
     }
 }
@@ -3948,6 +3948,7 @@ pub struct AccessGrantView {
     pub granted_at: String,
     pub expires_at: Option<String>,
     pub status: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<AccessGrant> for AccessGrantView {
@@ -3960,6 +3961,7 @@ impl From<AccessGrant> for AccessGrantView {
             granted_at: a.granted_at,
             expires_at: a.expires_at,
             status: a.status,
+            dht_anchor_hash: a.dht_anchor_hash,
         }
     }
 }
@@ -4236,6 +4238,7 @@ pub struct StewardedNodeView {
     pub context_epr_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
     pub stewards: Vec<NodeStewardshipView>,
 }
 
@@ -4255,6 +4258,7 @@ impl From<StewardedNode> for StewardedNodeView {
             context_epr_id: n.context_epr_id,
             created_at: n.created_at,
             updated_at: n.updated_at,
+            dht_anchor_hash: n.dht_anchor_hash,
             stewards: vec![],
         }
     }
@@ -4607,7 +4611,6 @@ pub struct SetSessionIntentInputView {
 }
 
 // ============================================================================
-<<<<<<< HEAD
 // Sensemaking Statement Views
 // ============================================================================
 
@@ -4631,33 +4634,10 @@ pub struct StatementView {
 
 impl From<Statement> for StatementView {
     fn from(s: Statement) -> Self {
-=======
-// Schedule Views (Kairos temporal dimension)
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ScheduleView {
-    pub id: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub scheduled_at: Option<String>,
-    pub expires_at: Option<String>,
-    pub rrule: Option<String>,
-    pub next_occurrence_at: Option<String>,
-    pub occurrence_count: i32,
-    pub created_at: String,
-}
-
-impl From<Schedule> for ScheduleView {
-    fn from(s: Schedule) -> Self {
->>>>>>> feature/kairos-schedules
         Self {
             id: s.id,
             entity_type: s.entity_type,
             entity_id: s.entity_id,
-<<<<<<< HEAD
             human_id: s.human_id,
             text: s.text,
             agree_count: s.agree_count,
@@ -4665,19 +4645,11 @@ impl From<Schedule> for ScheduleView {
             pass_count: s.pass_count,
             group_id: s.group_id,
             is_bridging: s.is_bridging != 0,
-=======
-            scheduled_at: s.scheduled_at,
-            expires_at: s.expires_at,
-            rrule: s.rrule,
-            next_occurrence_at: s.next_occurrence_at,
-            occurrence_count: s.occurrence_count,
->>>>>>> feature/kairos-schedules
             created_at: s.created_at,
         }
     }
 }
 
-<<<<<<< HEAD
 /// Statement vote — API response
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -4744,7 +4716,43 @@ pub struct OpinionClusterView {
     pub member_count: usize,
     pub characteristic_statements: Vec<StatementView>,
     pub internal_agreement: f64,
-=======
+}
+
+// ============================================================================
+// Schedule Views (Kairos temporal dimension)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ScheduleView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+    pub next_occurrence_at: Option<String>,
+    pub occurrence_count: i32,
+    pub created_at: String,
+}
+
+impl From<Schedule> for ScheduleView {
+    fn from(s: Schedule) -> Self {
+        Self {
+            id: s.id,
+            entity_type: s.entity_type,
+            entity_id: s.entity_id,
+            scheduled_at: s.scheduled_at,
+            expires_at: s.expires_at,
+            rrule: s.rrule,
+            next_occurrence_at: s.next_occurrence_at,
+            occurrence_count: s.occurrence_count,
+            created_at: s.created_at,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -4763,7 +4771,6 @@ pub struct UpdateScheduleInputView {
     pub scheduled_at: Option<String>,
     pub expires_at: Option<String>,
     pub rrule: Option<String>,
->>>>>>> feature/kairos-schedules
 }
 
 // ============================================================================
