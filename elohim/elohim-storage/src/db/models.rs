@@ -19,8 +19,8 @@ use super::diesel_schema::{
     economic_events, governance_signals, governance_states, human_relationships, humans,
     imagodei_observations, knowledge_maps, local_sessions, node_stewardship, path_attestations,
     path_extensions, path_tags, paths, precedents, premium_gates, proposal_options, proposals,
-    ranked_votes, rea_commitments, relationships, steps, steward_credentials, stewarded_nodes,
-    stewardship_allocations, votes,
+    ranked_votes, rea_commitments, relationships, statement_votes, statements, steps,
+    steward_credentials, stewarded_nodes, stewardship_allocations, votes,
 };
 
 // ============================================================================
@@ -2241,4 +2241,61 @@ pub struct NewComment {
     pub governance_state: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+// ============================================================================
+// Sensemaking Statement Models
+// ============================================================================
+
+/// Statement row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = statements)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Statement {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub text: String,
+    pub agree_count: i32,
+    pub disagree_count: i32,
+    pub pass_count: i32,
+    pub group_id: Option<String>,
+    pub is_bridging: i32,
+    pub created_at: String,
+}
+
+/// New statement for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = statements)]
+pub struct NewStatement<'a> {
+    pub id: &'a str,
+    pub entity_type: &'a str,
+    pub entity_id: &'a str,
+    pub human_id: &'a str,
+    pub text: &'a str,
+    pub created_at: &'a str,
+}
+
+/// Statement vote row from SELECT query
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = statement_votes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct StatementVote {
+    pub id: String,
+    pub statement_id: String,
+    pub human_id: String,
+    pub vote: String,
+    pub created_at: String,
+}
+
+/// New statement vote for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = statement_votes)]
+pub struct NewStatementVote<'a> {
+    pub id: &'a str,
+    pub statement_id: &'a str,
+    pub human_id: &'a str,
+    pub vote: &'a str,
+    pub created_at: &'a str,
 }
