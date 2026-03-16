@@ -19,7 +19,7 @@ use super::diesel_schema::{
     economic_events, governance_signals, governance_states, human_relationships, humans,
     imagodei_observations, knowledge_maps, local_sessions, node_stewardship, path_attestations,
     path_extensions, path_tags, paths, precedents, premium_gates, proposal_options, proposals,
-    ranked_votes, rea_commitments, relationships, statement_votes, statements, steps,
+    ranked_votes, rea_commitments, relationships, schedules, statement_votes, statements, steps,
     steward_credentials, stewarded_nodes, stewardship_allocations, votes,
 };
 
@@ -2302,4 +2302,45 @@ pub struct NewStatementVote<'a> {
     pub human_id: &'a str,
     pub vote: &'a str,
     pub created_at: &'a str,
+}
+
+// ============================================================================
+// Schedule Models (Kairos temporal dimension)
+// ============================================================================
+
+/// Schedule from the schedules table (Queryable)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = schedules)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Schedule {
+    pub id: String,
+    pub app_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+    pub last_occurred_at: Option<String>,
+    pub next_occurrence_at: Option<String>,
+    pub occurrence_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New schedule for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schedules)]
+pub struct NewSchedule {
+    pub id: String,
+    pub app_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+    pub last_occurred_at: Option<String>,
+    pub next_occurrence_at: Option<String>,
+    pub occurrence_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
 }

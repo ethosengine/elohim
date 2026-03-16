@@ -288,6 +288,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    schedules (id) {
+        id -> Text,
+        app_id -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        scheduled_at -> Nullable<Text>,
+        expires_at -> Nullable<Text>,
+        rrule -> Nullable<Text>,
+        last_occurred_at -> Nullable<Text>,
+        next_occurrence_at -> Nullable<Text>,
+        occurrence_count -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     schema_version (rowid) {
         rowid -> Integer,
         version -> Integer,
@@ -870,6 +887,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     rea_commitments,
     relationships,
     schema_version,
+    schedules,
     statement_votes,
     statements,
     steward_affinity,

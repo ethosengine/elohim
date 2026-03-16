@@ -137,3 +137,8 @@ export * from './SensemakingResultView';
 export * from './StatementView';
 export * from './StatementVoteView';
 export * from './VoteOnStatementInputView';
+
+// Schedule types
+export * from './ScheduleView';
+export * from './CreateScheduleInputView';
+export * from './UpdateScheduleInputView';
