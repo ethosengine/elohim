@@ -69,6 +69,9 @@ pub mod sse;
 // Tally strategies for multi-mechanism voting
 pub mod tally;
 
+// Sensemaking: opinion clustering for governance deliberation
+pub mod sensemaking;
+
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
