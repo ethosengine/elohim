@@ -70,6 +70,56 @@ When you spot an existing Angular service doing foundational work, note it — d
 ### The Judgment Call
 You have agency here. Not everything is black and white. A service like `QuizSessionService` might legitimately keep session UX state (current question index, animation timing, local answer buffer) in Angular while delegating scoring, mastery calculation, and response persistence to Rust. The split can live *within* a service — just be intentional about which side of the line each method serves.
 
+## Data Identity — Where Entity IDs Come From
+
+Entity IDs in this system are **not opaque strings**. They carry meaning about where truth lives. Angular must respect the identity scheme the backend provides — never invent new entity identity.
+
+### ID Types You'll Encounter
+
+| ID Format | What It Means | Source of Truth | Example |
+|---|---|---|---|
+| `bafkrei...` (CID) | Content-addressed — identity IS a hash of the content | Immutable content blob | `blobCid` on ContentView |
+| ActionHash/EntryHash | Holochain DHT entry — notarized, verified by peers | DHT (projected to storage) | `dhtAnchorHash` on views |
+| Slug string | Human-readable alias — resolves via EPR to the above | EPR resolution layer | `fair-exchange` in routes |
+| UUID | Agent-local identity — typically for sessions or operational data | Local storage only | `humanId` from IdentityService |
+
+### Rules for Angular Services
+
+1. **Never generate entity IDs** for notarized or content-addressed entities. IDs come from the Rust layer (DHT entry creation or CID computation). Angular receives them, never creates them.
+
+2. **Don't add new ID fields to existing models.** If you need to reference an entity, use the ID type the backend already provides. If the backend doesn't expose the right reference, that's a Rust change, not an Angular one.
+
+3. **Use the ID type the route expects.** When calling `/db/content/{id}`, the `id` is a slug. When calling `/blob/{hash}`, the hash can be a CID or `sha256-{hex}`. Don't convert between formats in Angular — the backend normalizes.
+
+4. **EPR references for navigation, not raw URLs.** Use `epr:{slug}` for content links. The EPR resolver handles context-aware routing (in-path vs cross-path vs standalone). See `EprResolverService`.
+
+5. **`dhtAnchorHash` is provenance.** When a view includes `dhtAnchorHash`, that's the cryptographic link back to the DHT entry. If you're building a trust/verification UI, this is what you display — not the slug.
+
+### Anti-Patterns
+
+```typescript
+// BAD — generating entity identity in Angular
+const scheduleId = crypto.randomUUID();
+await this.api.createSchedule({ id: scheduleId, ... });
+
+// GOOD — let the backend assign identity
+const schedule = await this.api.createSchedule({ contentId, type: 'spaced-repetition' });
+// schedule.id comes from the backend (DHT entry hash or derived key)
+```
+
+```typescript
+// BAD — inventing a new reference format
+interface MyModel {
+  contentRef: string;  // What is this? CID? Slug? UUID?
+}
+
+// GOOD — use the type the backend provides
+interface MyModel {
+  contentId: string;       // Slug (resolves via EPR)
+  contentBlobCid?: string; // CID (content-addressed, verifiable)
+}
+```
+
 ## Service Patterns
 
 **Injectable Services with DI**:

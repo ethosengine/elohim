@@ -105,7 +105,69 @@ Abstracts doorway vs Tauri runtime via `IConnectionStrategy`. Angular doesn't kn
 
 ## Adding New Entities (Full Vertical)
 
-### Step 1: Rust Model (db/models.rs)
+**Before writing any code, classify the entity.** Invoke the `p2p-design-gate` skill or apply its decision tree:
+
+```
+Does the community need to witness/verify this data?
+  YES → NOTARIZED (Path A below)
+  NO  → Does this data belong to a single agent privately?
+          YES → AGENT-SCOPED (Path B below)
+          NO  → Is it reconstructable from other sources?
+                  YES → OPERATIONAL (Path C below)
+                  NO  → It's probably Notarized. Go back.
+```
+
+### Path A: Notarized Entity (DHT is truth, storage is projection)
+
+**Step 1: Integrity zome entry type**
+
+```rust
+// holochain/dna/elohim/zomes/{zome}_integrity/src/lib.rs
+#[hdk_entry_helper]
+pub struct MyEntity {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+}
+
+#[hdk_entry_types]
+pub enum EntryTypes {
+    // ...existing types...
+    MyEntity(MyEntity),
+}
+
+#[hdk_link_types]
+pub enum LinkTypes {
+    // ...existing types...
+    IdToMyEntity,        // Hash(id) → MyEntity
+    AuthorToMyEntity,    // AgentPubKey → MyEntity
+}
+```
+
+**Step 2: Coordinator zome function**
+
+```rust
+// holochain/dna/elohim/zomes/{zome}/src/lib.rs
+#[hdk_extern]
+pub fn create_my_entity(input: CreateMyEntityInput) -> ExternResult<MyEntityOutput> {
+    let entity = MyEntity::from(input);
+    let action_hash = create_entry(&EntryTypes::MyEntity(entity.clone()))?;
+    create_link(hash_entry(&entity.id)?, action_hash.clone(), LinkTypes::IdToMyEntity, ())?;
+    Ok(MyEntityOutput { action_hash, entity })
+}
+```
+
+**Step 3: Post-commit signal → storage projection**
+
+```rust
+// Signal emitted by post_commit hook
+Signal::MyEntityCreated { action_hash, entity }
+
+// elohim-storage handler upserts into SQLite projection
+INSERT INTO my_entities (..., dht_anchor_hash) VALUES (..., ?action_hash)
+```
+
+**Step 4: Storage projection model (db/models.rs)**
 
 ```rust
 #[derive(Queryable, Selectable, Serialize)]
@@ -114,13 +176,30 @@ pub struct MyEntity {
     pub id: String,
     pub app_id: String,
     pub name: String,
-    pub metadata_json: Option<String>,  // Storage format
-    pub is_active: i32,                  // SQLite limitation
+    pub metadata_json: Option<String>,
+    pub is_active: i32,
+    pub dht_anchor_hash: String,         // NOT NULL — links back to DHT
     pub created_at: String,
 }
 ```
 
-### Step 2: Rust View (views.rs)
+**Step 5: Migration (with source-of-truth comment)**
+
+```sql
+-- Source of truth: Holochain DHT (this table is a read-optimized projection)
+CREATE TABLE my_entities (
+    id TEXT NOT NULL,
+    app_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    metadata_json TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    dht_anchor_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (app_id, id)
+);
+```
+
+**Step 6: View (views.rs) — exposes projection with DHT provenance**
 
 ```rust
 #[derive(Debug, Clone, Serialize, TS)]
@@ -130,8 +209,9 @@ pub struct MyEntityView {
     pub id: String,
     pub app_id: String,
     pub name: String,
-    pub metadata: Option<Value>,         // PARSED in Rust
-    pub is_active: bool,                  // COERCED in Rust
+    pub metadata: Option<Value>,
+    pub is_active: bool,
+    pub dht_anchor_hash: String,         // Client can verify provenance
     pub created_at: String,
 }
 
@@ -143,64 +223,95 @@ impl From<MyEntity> for MyEntityView {
             name: e.name,
             metadata: parse_json_opt(&e.metadata_json),
             is_active: e.is_active == 1,
+            dht_anchor_hash: e.dht_anchor_hash,
             created_at: e.created_at,
         }
     }
 }
 ```
 
-### Step 3: Rust InputView (views.rs)
-
-```rust
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateMyEntityInputView {
-    pub name: String,
-    pub metadata: Option<Value>,
-    pub is_active: Option<bool>,
-}
-
-impl From<CreateMyEntityInputView> for CreateMyEntityInput {
-    fn from(v: CreateMyEntityInputView) -> Self {
-        Self {
-            name: v.name,
-            metadata_json: serialize_json_opt(&v.metadata),
-            is_active: if v.is_active.unwrap_or(true) { 1 } else { 0 },
-        }
-    }
-}
-```
-
-### Step 4: Rust HTTP Route
+**Step 7: HTTP route (LAST — serves the projection)**
 
 ```rust
 async fn create_my_entity(
     State(services): State<Arc<Services>>,
     Json(input_view): Json<CreateMyEntityInputView>,
 ) -> Result<Json<MyEntityView>, AppError> {
+    // Route calls coordinator zome, which writes to DHT,
+    // which triggers post-commit signal, which projects to storage
     let input: CreateMyEntityInput = input_view.into();
     let entity = services.my_entity.create(input)?;
     Ok(Json(entity.into()))
 }
 ```
 
-### Step 5: Regenerate TypeScript Types
+**Step 8: Regenerate TypeScript types + thin Angular wrapper**
 
 ```bash
-cd holochain/elohim-storage && cargo test export_bindings
-cd ../sdk/storage-client-ts && pnpm build
+cd elohim/elohim-storage && cargo test export_bindings
+cd ../../sdk/storage-client-ts && pnpm build
 ```
 
-### Step 6: TypeScript API Service (thin wrapper)
+### Path B: Agent-Scoped Entity (private source-chain, local projection)
 
-```typescript
-createMyEntity(input: CreateMyEntityInputView): Observable<MyEntityView> {
-  return this.http.post<MyEntityView>(`${this.baseUrl}/db/my-entities`, input);
+For entities like preferences, schedules, bookmarks, drafts.
+
+**Step 1: Private source-chain entry + link to content**
+
+```rust
+// Coordinator zome — private entry, not gossipped
+#[hdk_extern]
+pub fn set_my_preference(input: SetPreferenceInput) -> ExternResult<ActionHash> {
+    let entry = Preference::from(input);
+    let action_hash = create_entry(&EntryTypes::Preference(entry))?;
+    // Link from agent to content — agent-scoped identity
+    create_link(agent_info()?.agent_latest_pubkey, input.content_hash, LinkTypes::AgentToPreference, ())?;
+    Ok(action_hash)
 }
 ```
 
-**Key rule**: snake_case never leaves the Rust boundary. TypeScript receives camelCase with parsed JSON and proper booleans. No `JSON.parse()`, no case conversion in TypeScript.
+**Step 2: Local storage projection (for fast query only)**
+
+```sql
+-- Source of truth: private source chain (this table is a local convenience index)
+CREATE TABLE preferences (
+    agent_pubkey TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    preference_type TEXT NOT NULL,
+    value_json TEXT,
+    dht_anchor_hash TEXT NOT NULL,
+    PRIMARY KEY (agent_pubkey, content_id, preference_type)
+);
+```
+
+**Step 3: HTTP route (agent-scoped — only the owning agent reads this)**
+
+```rust
+// GET /api/v1/me/preferences — scoped to authenticated agent
+async fn get_my_preferences(...) -> Result<Json<Vec<PreferenceView>>, AppError> { ... }
+```
+
+### Path C: Operational Entity (SQLite-only)
+
+For caches, temp state, rate limits. Use the standard model → view → route flow:
+
+```rust
+// db/models.rs — no dht_anchor_hash needed
+pub struct CacheEntry {
+    pub key: String,
+    pub value_json: String,
+    pub expires_at: String,
+    // Comment required:
+    // Operational: reconstructable from DHT content on cache miss
+}
+```
+
+### Key Rules (all paths)
+
+- snake_case never leaves the Rust boundary — TypeScript receives camelCase with parsed JSON and proper booleans
+- No `JSON.parse()`, no case conversion in TypeScript
+- `From<T>` impls for view ↔ model conversion
+- The HTTP route is designed LAST, not first
 
 ## Anti-Patterns
 
