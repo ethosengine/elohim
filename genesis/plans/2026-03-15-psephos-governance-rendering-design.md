@@ -284,29 +284,68 @@ The elohim can override defaults based on context. For example, a constitutional
 
 ## Type Definitions
 
-### Input: What Psephos Receives
+### sophia-core Extensions
+
+These types are added to `sophia-core/src/types.ts`:
 
 ```typescript
-/** Props passed to <psephos-ballot> */
-interface PsephosBallotProps {
+/** Extended AssessmentPurpose */
+type AssessmentPurpose = 'mastery' | 'discovery' | 'reflection' | 'invitation' | 'governance';
+
+/** Added to Recognition interface */
+interface Recognition {
+  // ...existing fields (momentId, purpose, mastery?, resonance?, reflection?, userInput, timestamp?)...
+  governance?: GovernanceResult;
+}
+
+/** The governance result — parallel to MasteryResult, ResonanceResult, ReflectionResult */
+interface GovernanceResult {
+  mechanism: string;
+  ballots: BallotEntry[];
+  reasoning?: string;
+  timestamp: string;
+  proposalId: string;
+}
+
+/** Type guard — parallel to hasMasteryResult, hasResonanceResult */
+function hasGovernanceResult(rec: Recognition): rec is Recognition & { governance: GovernanceResult }
+```
+
+### Input: PsephosBallot (What the Protocol Supplies)
+
+The protocol supplies the ballot content, just as it supplies Moments for Perseus and instruments for Psyche. The Angular wrapper transforms `ProposalView` + `ProposalOptionView[]` → `PsephosBallot`.
+
+```typescript
+/** The governance equivalent of a Moment — what the protocol supplies to Psephos */
+interface PsephosBallot {
+  /** Unique ballot identifier (typically proposalId) */
+  id: string;
+
+  /** Always 'governance' — aligns with AssessmentPurpose */
+  purpose: 'governance';
+
+  /** The proposal being voted on */
+  proposal: {
+    id: string;
+    title: string;
+    description: string;
+    proposalType: string;
+  };
+
+  /** The options to vote on — supplied by the protocol */
+  options: PsephosOption[];
+
   /** Which voting mechanism to render */
   mechanism: 'ranked-choice' | 'approval' | 'score-vote' | 'dot-vote' | 'consent';
 
-  /** The options to vote on */
-  options: PsephosOption[];
-
-  /** Mechanism-specific configuration */
+  /** Mechanism-specific config (from ProposalView) */
   config: PsephosConfig;
 
-  /** Election hygiene settings */
+  /** Election hygiene — the protocol's ballot integrity rules */
   hygiene: ElectionHygiene;
 
-  /** Proposal context (for display) */
-  context: {
-    proposalId: string;
-    title: string;
-    description: string;
-  };
+  /** Optional: existing ballot for review/amendment */
+  previousBallot?: BallotEntry[];
 }
 
 /** A single voting option */
@@ -324,41 +363,116 @@ interface PsephosConfig {
   scoreMin?: number;        // score-vote: minimum score
   scoreMax?: number;        // score-vote: maximum score
   dotsPerVoter?: number;    // dot-vote: budget per voter
+  quorumPercentage?: number;
+  passageThreshold?: number;
 }
+```
+
+### Protocol-to-Ballot Mapping
+
+How the Angular wrapper transforms storage-client types to PsephosBallot:
+
+```
+ProposalView (storage-client)     PsephosBallot (psephos)
+─────────────────────────         ─────────────────────────
+proposal.id                  →    ballot.id / ballot.proposal.id
+proposal.title               →    ballot.proposal.title
+proposal.body                →    ballot.proposal.description
+proposal.proposalType        →    ballot.proposal.proposalType
+proposal.votingMechanism     →    ballot.mechanism
+proposal.scoreMin/Max        →    ballot.config.scoreMin/Max
+proposal.dotsPerVoter        →    ballot.config.dotsPerVoter
+proposal.quorumPercentage    →    ballot.config.quorumPercentage
+proposal.passageThreshold    →    ballot.config.passageThreshold
+
+ProposalOptionView[]         →    ballot.options[]
+option.id                    →    option.id
+option.label                 →    option.label
+option.description           →    option.description
+option.position              →    option.position
+option.source                →    option.source
+option.sourceJustification   →    option.sourceJustification
+
+GovernanceState + elohim     →    ballot.hygiene (defaults per mechanism,
+                                    overridable by constitutional rules)
 ```
 
 ### Output: What Psephos Produces
 
+Psephos emits standard `Recognition` objects (from sophia-core) with the `governance` field populated:
+
 ```typescript
-/** Emitted when voter submits their ballot */
-interface BallotRecognition {
-  /** Which mechanism was used */
-  mechanism: string;
-
-  /** The voter's choices */
-  ballots: BallotEntry[];
-
-  /** Optional reasoning text */
-  reasoning?: string;
-
-  /** When the ballot was cast */
-  timestamp: string;
-
-  /** Proposal context for downstream processing */
-  proposalId: string;
-}
-
-/** A single entry in the ballot (one per option) */
-interface BallotEntry {
-  optionId: string;
-  rank?: number;            // ranked-choice: preference order
-  score?: number;           // score-vote: assigned score
-  dots?: number;            // dot-vote: dots allocated
-  approved?: boolean;       // approval/consent: yes/no
+// Recognition emitted by <psephos-ballot> via onRecognition callback
+{
+  momentId: ballot.id,           // The ballot ID
+  purpose: 'governance',
+  governance: {                  // GovernanceResult
+    mechanism: 'ranked-choice',
+    ballots: [
+      { optionId: 'opt-1', rank: 1 },
+      { optionId: 'opt-2', rank: 2 },
+      { optionId: 'opt-3' }     // Unranked
+    ],
+    reasoning: 'Option 1 best addresses...',
+    timestamp: '2026-03-15T10:30:00Z',
+    proposalId: 'prop-123',
+  },
+  userInput: { /* raw widget state */ },
+  timestamp: Date.now(),
 }
 ```
 
-These types align exactly with `@elohim/storage-client`'s generated `BallotEntry` and `CastRankedVoteInputView`. The Angular wrapper converts `BallotRecognition` → `CastRankedVoteInputView` and calls the governance API.
+### BallotEntry (shared with storage-client)
+
+```typescript
+/** A single entry in the ballot (one per option) — matches storage-client's BallotEntry */
+interface BallotEntry {
+  optionId: string;
+  rank?: number | null;     // ranked-choice: preference order
+  score?: number | null;    // score-vote: assigned score
+  dots?: number | null;     // dot-vote: dots allocated
+  approved?: boolean | null; // approval/consent: yes/no
+}
+```
+
+The Angular wrapper converts `Recognition.governance` → `CastRankedVoteInputView` and calls the governance API. Psephos never knows about storage-client types.
+
+### GovernanceScoringStrategy
+
+Registered via sophia-core's `registerScoringStrategy()`, parallel to perseus-score and psyche-survey:
+
+```typescript
+const GovernanceScoringStrategy: ScoringStrategy = {
+  id: 'governance',
+  name: 'Governance Ballot',
+
+  getEmptyWidgetIds(ballot: PsephosBallot, userInput: UserInputMap): string[] {
+    // Returns option IDs that haven't been voted on yet
+    // Mechanism-specific validation:
+    //   ranked-choice: at least 1 option ranked
+    //   approval: at least 1 option approved
+    //   score-vote: all options must be scored
+    //   dot-vote: valid (0 dots is intentional non-allocation)
+    //   consent: must choose consent or block
+  },
+
+  recognize(ballot: PsephosBallot, userInput: UserInputMap): Recognition {
+    return {
+      momentId: ballot.id,
+      purpose: 'governance',
+      governance: {
+        mechanism: ballot.mechanism,
+        ballots: buildBallotEntries(userInput, ballot),
+        reasoning: userInput.reasoning as string | undefined,
+        timestamp: new Date().toISOString(),
+        proposalId: ballot.proposal.id,
+      },
+      userInput,
+      timestamp: Date.now(),
+    };
+  },
+};
+```
 
 ---
 
@@ -411,11 +525,24 @@ Every Psephos widget must be:
 
 ## Relationship to Existing Models
 
-The qahal pillar already has comprehensive governance models in:
+### sophia-core (dependency)
+
+Psephos extends sophia-core's type system:
+- Adds `'governance'` to `AssessmentPurpose`
+- Adds `GovernanceResult` to `Recognition`
+- Registers `GovernanceScoringStrategy` via `registerScoringStrategy()`
+
+### qahal Angular models (NO dependency)
+
+The qahal pillar has comprehensive governance models in:
 - `governance-deliberation.model.ts` — VotingMechanism enum, ProposalType, GraduatedFeedbackScale
 - `governance-feedback.model.ts` — GovernanceState, ChallengeGrounds, SLA tracking
 
-Psephos does NOT depend on these Angular models. It receives `PsephosBallotProps` (plain TypeScript interfaces) and emits `BallotRecognition`. The Angular wrapper in `psephos-plugin` bridges between the qahal models and Psephos's props.
+Psephos does NOT depend on these Angular models. It receives `PsephosBallot` (plain TypeScript interfaces defined in psephos/types.ts) and emits `Recognition` with `GovernanceResult`. The Angular wrapper transforms between qahal models / storage-client types and Psephos's own types.
+
+### storage-client (NO dependency)
+
+`BallotEntry` is defined in both psephos and storage-client with matching shapes. The Angular wrapper handles the translation. Psephos never imports from `@elohim/storage-client`.
 
 ---
 

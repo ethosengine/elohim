@@ -49,6 +49,14 @@ export const AVODAH_ROUTES: Routes = [
         data: { title: 'Avodah — Backlog' },
       },
       {
+        path: 'projects/:id/stories/:storyId',
+        loadComponent: async () =>
+          import('./components/story-detail/story-detail.component').then(
+            m => m.StoryDetailComponent
+          ),
+        data: { title: 'Avodah — Story' },
+      },
+      {
         path: 'projects/:id/tasks',
         loadComponent: async () =>
           import('./components/task-list/task-list.component').then(m => m.TaskListComponent),

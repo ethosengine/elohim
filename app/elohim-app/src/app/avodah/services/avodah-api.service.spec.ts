@@ -120,4 +120,22 @@ describe('AvodahApiService', () => {
       expect.objectContaining({ action: 'work', contentId: 'story-1' }),
     );
   });
+
+  it('updateStoryField patches via storageApi', async () => {
+    await service.updateStoryField('story-1', { title: 'New title' });
+    expect(storageSpy.updateContent).toHaveBeenCalledWith('story-1', { title: 'New title' });
+  });
+
+  it('createStory creates a work-story via storageApi', async () => {
+    storageSpy.createContent.mockReturnValue(of(MOCK_STORY_VIEW));
+    const result = await service.createStory('proj-1', 'New task', 'todo');
+    expect(storageSpy.createContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'New task',
+        contentType: 'work-story',
+        metadata: expect.objectContaining({ projectId: 'proj-1', status: 'todo' }),
+      }),
+    );
+    expect(result.id).toBe('story-1');
+  });
 });
