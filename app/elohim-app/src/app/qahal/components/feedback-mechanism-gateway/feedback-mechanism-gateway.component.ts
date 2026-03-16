@@ -19,6 +19,7 @@ import { GovernanceApiService } from '@app/elohim/services/governance-api.servic
 import { ContextMenuOnlyComponent } from '../context-menu-only/context-menu-only.component';
 import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
 import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feedback.component';
+import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
 import {
   MechanismSelectionService,
   type MechanismSelection,
@@ -27,7 +28,12 @@ import {
 @Component({
   selector: 'qahal-feedback-mechanism-gateway',
   standalone: true,
-  imports: [ContextMenuOnlyComponent, ReactionBarComponent, GraduatedFeedbackComponent],
+  imports: [
+    ContextMenuOnlyComponent,
+    ReactionBarComponent,
+    GraduatedFeedbackComponent,
+    PsephosBallotWrapperComponent,
+  ],
   template: `
     @if (selection(); as sel) {
       @if (sel.renderTarget === 'angular') {
@@ -53,13 +59,11 @@ import {
         }
       }
 
-      @if (sel.renderTarget === 'psephos') {
-        <!-- PsephosBallotWrapper (Task 6) — not yet created -->
-        <div class="psephos-placeholder"
-          data-proposal-id="{{ sel.activeProposal?.id }}"
-          data-mechanism="{{ sel.mechanism }}">
-          Formal governance ballot loading...
-        </div>
+      @if (sel.renderTarget === 'psephos' && sel.activeProposal) {
+        <qahal-psephos-ballot-wrapper
+          [proposal]="sel.activeProposal"
+          [mechanism]="sel.mechanism"
+          (ballotSubmitted)="onBallotSubmitted($event)" />
       }
     } @else {
       <div class="gateway-loading">Loading governance...</div>
@@ -79,16 +83,6 @@ import {
       color: var(--text-secondary, #999);
     }
 
-    .psephos-placeholder {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      font-size: 0.875rem;
-      color: var(--text-secondary, #666);
-      border: 1px dashed var(--border, #e5e5e5);
-      border-radius: 8px;
-    }
   `,
 })
 export class FeedbackMechanismGatewayComponent {
