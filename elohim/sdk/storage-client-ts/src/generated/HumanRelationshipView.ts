@@ -5,4 +5,8 @@ export type HumanRelationshipView = { id: string, appId: string, partyAId: strin
 /**
  * Parsed context object (was context_json string in storage)
  */
-context: JsonValue | null, createdAt: string, updatedAt: string, expiresAt: string | null, };
+context: JsonValue | null, createdAt: string, updatedAt: string, expiresAt: string | null, 
+/**
+ * DHT provenance: ActionHash of the HumanRelationship entry in imagodei DNA. None for pre-coherence rows.
+ */
+dhtAnchorHash: string | null, };

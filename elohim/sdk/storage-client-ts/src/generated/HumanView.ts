@@ -7,4 +7,8 @@ export type HumanView = { id: string, agentPubKey: string | null, displayName: s
 /**
  * Parsed affinities array (stored as JSON text in DB)
  */
-affinities: Array<string>, profileReach: string, location: string | null, profilePhotoUrl: string | null, appId: string, createdAt: string, updatedAt: string, };
+affinities: Array<string>, profileReach: string, location: string | null, profilePhotoUrl: string | null, appId: string, createdAt: string, updatedAt: string, 
+/**
+ * DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
+ */
+dhtAnchorHash: string | null, };

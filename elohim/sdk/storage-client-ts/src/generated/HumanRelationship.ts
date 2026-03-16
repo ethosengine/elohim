@@ -3,4 +3,8 @@
 /**
  * Human relationship row from SELECT query
  */
-export type HumanRelationship = { id: string, app_id: string, party_a_id: string, party_b_id: string, relationship_type: string, intimacy_level: string, is_bidirectional: number, consent_given_by_a: number, consent_given_by_b: number, custody_enabled_by_a: number, custody_enabled_by_b: number, auto_custody_enabled: number, emergency_access_enabled: number, initiated_by: string, verified_at: string | null, governance_layer: string | null, reach: string, context_json: string | null, created_at: string, updated_at: string, expires_at: string | null, };
+export type HumanRelationship = { id: string, app_id: string, party_a_id: string, party_b_id: string, relationship_type: string, intimacy_level: string, is_bidirectional: number, consent_given_by_a: number, consent_given_by_b: number, custody_enabled_by_a: number, custody_enabled_by_b: number, auto_custody_enabled: number, emergency_access_enabled: number, initiated_by: string, verified_at: string | null, governance_layer: string | null, reach: string, context_json: string | null, created_at: string, updated_at: string, expires_at: string | null, 
+/**
+ * Source of truth: DHT (HumanRelationship entry in imagodei DNA). NULL for pre-coherence rows.
+ */
+dht_anchor_hash: string | null, };

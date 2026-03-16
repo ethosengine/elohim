@@ -3,4 +3,8 @@
 /**
  * Path attestation row
  */
-export type PathAttestation = { app_id: string, path_id: string, attestation_type: string, attestation_name: string, };
+export type PathAttestation = { app_id: string, path_id: string, attestation_type: string, attestation_name: string, 
+/**
+ * Source of truth: DHT (Attestation entry in imagodei DNA). NULL for pre-coherence rows.
+ */
+dht_anchor_hash: string | null, };

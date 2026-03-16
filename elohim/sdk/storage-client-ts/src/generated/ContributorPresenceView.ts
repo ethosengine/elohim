@@ -21,4 +21,8 @@ claimEvidence: JsonValue | null, claimedAgentId: string | null, claimRecognition
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, createdAt: string, updatedAt: string, };
+metadata: JsonValue | null, createdAt: string, updatedAt: string, 
+/**
+ * DHT provenance: ActionHash of the ContributorPresence entry in imagodei DNA. None for pre-coherence rows.
+ */
+dhtAnchorHash: string | null, };
