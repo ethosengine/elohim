@@ -15,6 +15,7 @@ import type {
   AppealView,
   CastRankedVoteInputView,
   ChallengeView,
+  CreateStatementInputView,
   FileAppealInputView,
   FileChallengeInputView,
   GovernanceSignalView,
@@ -22,7 +23,11 @@ import type {
   RankedVoteView,
   RecordSignalInputView,
   RespondToChallengeInputView,
+  SensemakingResultView,
+  StatementView,
+  StatementVoteView,
   TallyResult,
+  VoteOnStatementInputView,
 } from '@elohim/storage-client/generated';
 
 import { GovernanceApiService } from './governance-api.service';
@@ -437,6 +442,168 @@ describe('GovernanceApiService', () => {
 
       const result = await promise;
       expect(result).toEqual([]);
+    });
+  });
+
+  // --- Sprint 7: Sensemaking ---
+
+  const mockStatement: StatementView = {
+    id: 'stmt-1',
+    entityType: 'content',
+    entityId: 'entity-1',
+    humanId: 'human-1',
+    text: 'We should focus on quality',
+    agreeCount: 5,
+    disagreeCount: 2,
+    passCount: 1,
+    groupId: null,
+    isBridging: false,
+    createdAt: '2026-03-16T00:00:00Z',
+  };
+
+  const mockStatementVote: StatementVoteView = {
+    id: 'sv-1',
+    statementId: 'stmt-1',
+    humanId: 'human-2',
+    vote: 'agree',
+    createdAt: '2026-03-16T00:00:00Z',
+  };
+
+  describe('submitStatement', () => {
+    it('should POST to /api/v1/governance/sensemaking/statements', async () => {
+      const input: CreateStatementInputView = {
+        entityType: 'content',
+        entityId: 'entity-1',
+        humanId: 'human-1',
+        text: 'We should focus on quality',
+      };
+
+      const promise = service.submitStatement(input);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/sensemaking/statements' && r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(input);
+      req.flush(mockStatement);
+
+      const result = await promise;
+      expect(result.id).toBe('stmt-1');
+      expect(result.text).toBe('We should focus on quality');
+      expect(result.entityType).toBe('content');
+    });
+  });
+
+  describe('voteOnStatement', () => {
+    it('should POST to /api/v1/governance/sensemaking/statements/{id}/vote', async () => {
+      const input: VoteOnStatementInputView = {
+        humanId: 'human-2',
+        vote: 'agree',
+      };
+
+      const promise = service.voteOnStatement('stmt-1', input);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/sensemaking/statements/stmt-1/vote' &&
+          r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(input);
+      req.flush(mockStatementVote);
+
+      const result = await promise;
+      expect(result.id).toBe('sv-1');
+      expect(result.statementId).toBe('stmt-1');
+      expect(result.vote).toBe('agree');
+    });
+  });
+
+  describe('getStatements', () => {
+    it('should GET /api/v1/governance/sensemaking/statements with query params', async () => {
+      const promise = service.getStatements('content', 'entity-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/sensemaking/statements' &&
+          r.method === 'GET' &&
+          r.params.get('entityType') === 'content' &&
+          r.params.get('entityId') === 'entity-1',
+      );
+      req.flush([mockStatement]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('stmt-1');
+      expect(result[0].entityType).toBe('content');
+    });
+
+    it('should return empty array on error', async () => {
+      const promise = service.getStatements('content', 'entity-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/sensemaking/statements',
+      );
+      req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+
+      const result = await promise;
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getClusters', () => {
+    it('should GET /api/v1/governance/sensemaking/clusters with query params', async () => {
+      const mockResult: SensemakingResultView = {
+        entityType: 'content',
+        entityId: 'entity-1',
+        clusters: [
+          {
+            id: 'cluster-1',
+            memberCount: 3,
+            characteristicStatements: [mockStatement],
+            internalAgreement: 0.85,
+          },
+        ],
+        bridgingStatements: [{ ...mockStatement, isBridging: true }],
+        totalParticipants: 5,
+        totalStatements: 10,
+      };
+
+      const promise = service.getClusters('content', 'entity-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/sensemaking/clusters' &&
+          r.method === 'GET' &&
+          r.params.get('entityType') === 'content' &&
+          r.params.get('entityId') === 'entity-1',
+      );
+      req.flush(mockResult);
+
+      const result = await promise;
+      expect(result.clusters).toHaveLength(1);
+      expect(result.clusters[0].id).toBe('cluster-1');
+      expect(result.clusters[0].internalAgreement).toBe(0.85);
+      expect(result.bridgingStatements).toHaveLength(1);
+      expect(result.bridgingStatements[0].isBridging).toBe(true);
+      expect(result.totalParticipants).toBe(5);
+      expect(result.totalStatements).toBe(10);
+    });
+
+    it('should return empty result on error', async () => {
+      const promise = service.getClusters('content', 'entity-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/sensemaking/clusters',
+      );
+      req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+
+      const result = await promise;
+      expect(result.entityType).toBe('content');
+      expect(result.entityId).toBe('entity-missing');
+      expect(result.clusters).toEqual([]);
+      expect(result.bridgingStatements).toEqual([]);
+      expect(result.totalParticipants).toBe(0);
+      expect(result.totalStatements).toBe(0);
     });
   });
 });
