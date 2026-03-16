@@ -3,4 +3,8 @@
 /**
  * Content row from SELECT query
  */
-export type Content = { id: string, app_id: string, title: string, description: string | null, content_type: string, content_format: string, blob_hash: string | null, blob_cid: string | null, content_size_bytes: number | null, metadata_json: string | null, reach: string, validation_status: string, created_by: string | null, created_at: string, updated_at: string, content_body: string | null, };
+export type Content = { id: string, app_id: string, title: string, description: string | null, content_type: string, content_format: string, blob_hash: string | null, blob_cid: string | null, content_size_bytes: number | null, metadata_json: string | null, reach: string, validation_status: string, created_by: string | null, created_at: string, updated_at: string, content_body: string | null, 
+/**
+ * Source of truth: DHT (Content entry in lamad DNA). Classification: A (Notarized).
+ */
+dht_anchor_hash: string | null, };

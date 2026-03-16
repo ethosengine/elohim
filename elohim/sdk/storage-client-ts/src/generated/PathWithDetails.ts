@@ -6,4 +6,8 @@ import type { Step } from "./Step";
 /**
  * Path with all nested data (chapters, steps, tags, attestations)
  */
-export type PathWithDetails = { tags: Array<string>, chapters: Array<ChapterWithSteps>, ungrouped_steps: Array<Step>, attestations: Array<PathAttestation>, id: string, app_id: string, title: string, description: string | null, path_type: string, difficulty: string | null, estimated_duration: string | null, thumbnail_url: string | null, thumbnail_alt: string | null, metadata_json: string | null, visibility: string, created_by: string | null, created_at: string, updated_at: string, };
+export type PathWithDetails = { tags: Array<string>, chapters: Array<ChapterWithSteps>, ungrouped_steps: Array<Step>, attestations: Array<PathAttestation>, id: string, app_id: string, title: string, description: string | null, path_type: string, difficulty: string | null, estimated_duration: string | null, thumbnail_url: string | null, thumbnail_alt: string | null, metadata_json: string | null, visibility: string, created_by: string | null, created_at: string, updated_at: string, 
+/**
+ * Source of truth: DHT (LearningPath entry in lamad DNA). Classification: A (Notarized).
+ */
+dht_anchor_hash: string | null, };

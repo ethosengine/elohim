@@ -3,4 +3,8 @@
 /**
  * Step row from SELECT query
  */
-export type Step = { id: string, app_id: string, path_id: string, chapter_id: string | null, title: string, description: string | null, step_type: string, resource_id: string | null, resource_type: string | null, order_index: number, estimated_duration: string | null, metadata_json: string | null, };
+export type Step = { id: string, app_id: string, path_id: string, chapter_id: string | null, title: string, description: string | null, step_type: string, resource_id: string | null, resource_type: string | null, order_index: number, estimated_duration: string | null, metadata_json: string | null, 
+/**
+ * Source of truth: DHT (derived from LearningPath via chapter chain Link). Classification: A2 (Derived).
+ */
+dht_anchor_hash: string | null, };

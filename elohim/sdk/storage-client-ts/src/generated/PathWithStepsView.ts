@@ -6,4 +6,4 @@ export type PathWithStepsView = { steps: Array<StepView>, id: string, appId: str
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, visibility: string, createdBy: string | null, createdAt: string, updatedAt: string, };
+metadata: JsonValue | null, visibility: string, createdBy: string | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };

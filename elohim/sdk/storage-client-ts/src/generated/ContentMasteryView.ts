@@ -9,4 +9,4 @@ assessmentEvidence: JsonValue | null,
 /**
  * Parsed privileges (was privileges_json string in storage)
  */
-privileges: JsonValue | null, createdAt: string, updatedAt: string, };
+privileges: JsonValue | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };

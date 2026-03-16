@@ -3,4 +3,8 @@
 /**
  * Chapter row from SELECT query
  */
-export type Chapter = { id: string, app_id: string, path_id: string, title: string, description: string | null, order_index: number, estimated_duration: string | null, };
+export type Chapter = { id: string, app_id: string, path_id: string, title: string, description: string | null, order_index: number, estimated_duration: string | null, 
+/**
+ * Source of truth: DHT (derived from LearningPath via Link). Classification: A2 (Derived).
+ */
+dht_anchor_hash: string | null, };

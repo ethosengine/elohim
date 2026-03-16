@@ -4,4 +4,8 @@ import type { Step } from "./Step";
 /**
  * Chapter with its steps
  */
-export type ChapterWithSteps = { steps: Array<Step>, id: string, app_id: string, path_id: string, title: string, description: string | null, order_index: number, estimated_duration: string | null, };
+export type ChapterWithSteps = { steps: Array<Step>, id: string, app_id: string, path_id: string, title: string, description: string | null, order_index: number, estimated_duration: string | null, 
+/**
+ * Source of truth: DHT (derived from LearningPath via Link). Classification: A2 (Derived).
+ */
+dht_anchor_hash: string | null, };

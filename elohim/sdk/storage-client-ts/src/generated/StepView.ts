@@ -5,4 +5,4 @@ export type StepView = { id: string, appId: string, pathId: string, chapterId: s
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, };
+metadata: JsonValue | null, dhtAnchorHash: string | null, };

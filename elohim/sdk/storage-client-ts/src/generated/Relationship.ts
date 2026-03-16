@@ -3,4 +3,8 @@
 /**
  * Content relationship row from SELECT query
  */
-export type Relationship = { id: string, app_id: string, source_id: string, target_id: string, relationship_type: string, confidence: number, inference_source: string, is_bidirectional: number, inverse_relationship_id: string | null, provenance_chain_json: string | null, governance_layer: string | null, reach: string, metadata_json: string | null, created_at: string, updated_at: string, };
+export type Relationship = { id: string, app_id: string, source_id: string, target_id: string, relationship_type: string, confidence: number, inference_source: string, is_bidirectional: number, inverse_relationship_id: string | null, provenance_chain_json: string | null, governance_layer: string | null, reach: string, metadata_json: string | null, created_at: string, updated_at: string, 
+/**
+ * Source of truth: DHT (Relationship entry in lamad DNA). Classification: A (Notarized).
+ */
+dht_anchor_hash: string | null, };

@@ -8,4 +8,4 @@ export type PathWithDetailsView = { tags: Array<string>, chapters: Array<Chapter
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, visibility: string, createdBy: string | null, createdAt: string, updatedAt: string, };
+metadata: JsonValue | null, visibility: string, createdBy: string | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };

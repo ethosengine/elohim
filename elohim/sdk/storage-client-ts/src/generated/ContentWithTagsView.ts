@@ -5,4 +5,4 @@ export type ContentWithTagsView = { tags: Array<string>, id: string, appId: stri
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, reach: string, validationStatus: string, createdBy: string | null, createdAt: string, updatedAt: string, contentBody: string | null, };
+metadata: JsonValue | null, reach: string, validationStatus: string, createdBy: string | null, createdAt: string, updatedAt: string, contentBody: string | null, dhtAnchorHash: string | null, };

@@ -9,4 +9,4 @@ provenanceChain: JsonValue | null, governanceLayer: string | null, reach: string
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, createdAt: string, updatedAt: string, };
+metadata: JsonValue | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };
