@@ -76,6 +76,7 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │   │       ├── elohim/            # Core infrastructure services
 │   │       ├── imagodei/          # Human identity & stewardship
 │   │       ├── lamad/             # Learning infrastructure
+│   │       ├── avodah/            # Work management & stewardship
 │   │       ├── qahal/             # Community governance
 │   │       ├── shefa/             # Resource flows & economics
 │   │       └── doorway/           # Gateway integration
@@ -88,7 +89,9 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │       ├── sophia-element/        # <sophia-question> web component
 │       ├── sophia-core/           # Core types (Moment, Recognition)
 │       ├── perseus-score/         # Mastery scoring (graded)
-│       └── psyche-survey/         # Discovery & reflection (psychometric)
+│       ├── psyche-survey/         # Discovery & reflection (psychometric)
+│       ├── psephos/               # Governance ballot rendering (formal voting)
+│       └── psephos-element/       # <psephos-ballot> web component
 │
 ├── steward/                       # Deployment Shells
 │   ├── device/                    # Tauri desktop app
@@ -164,6 +167,19 @@ The protocol runs on [Holochain](https://holochain.org/), a framework for distri
 
 See [`app/elohim-app/src/app/lamad/README.md`](./app/elohim-app/src/app/lamad/README.md) for detailed documentation.
 
+## Avodah Work Management
+
+**Avodah** (עֲבוֹדָה - Hebrew: "work, service, worship") is the work management pillar — the protocol's answer to Taiga.io. It treats work as service, not commodity, built on EPR ContentNodes with three-pillar coupling:
+
+- **Stories**: Work items stored as `work-story` ContentNodes with status, priority, visibility, cadence, and attestation gates
+- **Projects**: Container `work-project` ContentNodes with configurable kanban columns and member lists
+- **Kanban Board**: Drag-and-drop columns with inline story creation (type a title, press Enter)
+- **Backlog**: Filterable story table with status/priority filters and inline creation
+- **Task List**: Recurring cadence items (daily/weekly/monthly) grouped by interval
+- **Story Detail**: Full-page view with inline editing for all metadata fields and content attachments via `ATTACHED_TO` relationships
+
+Stories start private and can be promoted to community visibility or published to the shefa exchange. Attestation gates (lamad learning paths) can be required before someone bids on or accepts work — enabling open collaboration qualified by proven mastery rather than credentials.
+
 ## Key Infrastructure Components
 
 ### Doorway (Gateway)
@@ -190,14 +206,21 @@ Two deployment form factors in `steward/`:
 - **device/** (Tauri): Desktop app for running your own Holochain node as a steward of co-creation
 - **node/** (libp2p): Always-on headless P2P runtime for family infrastructure — device-to-node sync, cluster replication, backup and recovery
 
-### Sophia (Assessment Engine)
+### Sophia (Assessment & Governance Rendering)
 
-Person-centered assessment rendering infrastructure, transforming Khan Academy's Perseus with three assessment modes:
-- **Mastery**: Graded exercises (correct/incorrect)
-- **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
-- **Reflection**: Open-ended capture without grading
+Person-centered rendering infrastructure with three pillars, transforming Khan Academy's Perseus:
 
-Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
+- **Perseus**: Mastery exercises — graded correct/incorrect
+- **Psyche**: Discovery & reflection — resonance mapping (psychometric), open-ended capture
+- **Psephos**: Governance ballots — formal voting with election hygiene
+
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what the learner or voter demonstrated, not just "answer").
+
+**Psephos** (ψῆφος - Greek: "voting pebble") renders five voting mechanisms with election hygiene: approval, ranked-choice, score-vote, dot-vote, and consent (block requires reasoning). Includes seeded randomization, confirmation interstitials, equal visual weight, and result hiding. Distributes as `<psephos-ballot>` web component via `psephos-element` UMD bundle, wrapped for Angular by `psephos-plugin`.
+
+Casual governance (emoji reactions, simple polls) stays as Angular components; formal governance (proposals, constitutional challenges) renders through Psephos.
+
+See [`sophia/README.md`](./sophia/README.md).
 
 ## CI/CD
 
