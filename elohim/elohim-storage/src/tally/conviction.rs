@@ -25,12 +25,8 @@ impl ConvictionTally {
         let created = created_at
             .trim_end_matches('Z')
             .parse::<NaiveDateTime>()
-            .or_else(|_| {
-                NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S%.fZ")
-            })
-            .or_else(|_| {
-                NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S")
-            })
+            .or_else(|_| NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S%.fZ"))
+            .or_else(|_| NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S"))
             .unwrap_or(now);
 
         let days_held = (now - created).num_seconds() as f64 / 86400.0;
@@ -101,7 +97,7 @@ impl TallyStrategy for ConvictionTally {
             result.rank = Some(i as i32 + 1);
         }
 
-        let recommendation = if quorum_met && option_results.first().map_or(false, |r| r.votes > 0.0)
+        let recommendation = if quorum_met && option_results.first().is_some_and(|r| r.votes > 0.0)
         {
             "pass".to_string()
         } else {

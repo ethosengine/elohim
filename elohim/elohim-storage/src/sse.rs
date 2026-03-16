@@ -39,7 +39,8 @@ use crate::services::events::{EventBus, StorageEvent};
 static EVENT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// The SSE body type — a stream of `Frame<Bytes>` that never errors
-pub type SseBody = StreamBody<Pin<Box<dyn futures_util::Stream<Item = Result<Frame<Bytes>, Infallible>> + Send>>>;
+pub type SseBody =
+    StreamBody<Pin<Box<dyn futures_util::Stream<Item = Result<Frame<Bytes>, Infallible>> + Send>>>;
 
 /// Map a StorageEvent to its SSE event type string
 fn event_type(event: &StorageEvent) -> &'static str {
@@ -67,62 +68,57 @@ fn event_type(event: &StorageEvent) -> &'static str {
 /// Serialize a StorageEvent to its JSON data payload
 fn event_data(event: &StorageEvent) -> String {
     match event {
-        StorageEvent::ContentCreated { id, title, content_type } => {
+        StorageEvent::ContentCreated {
+            id,
+            title,
+            content_type,
+        } => {
             serde_json::json!({ "id": id, "title": title, "contentType": content_type }).to_string()
         }
-        StorageEvent::ContentUpdated { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
-        StorageEvent::ContentDeleted { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
+        StorageEvent::ContentUpdated { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::ContentDeleted { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::ContentBulkCreated { count, ids } => {
             serde_json::json!({ "count": count, "ids": ids }).to_string()
         }
         StorageEvent::PathCreated { id, title } => {
             serde_json::json!({ "id": id, "title": title }).to_string()
         }
-        StorageEvent::PathUpdated { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
-        StorageEvent::PathDeleted { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
+        StorageEvent::PathUpdated { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::PathDeleted { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::PathBulkCreated { count, ids } => {
             serde_json::json!({ "count": count, "ids": ids }).to_string()
         }
-        StorageEvent::RelationshipCreated { id, source_id, target_id, relationship_type } => {
-            serde_json::json!({
-                "id": id,
-                "sourceId": source_id,
-                "targetId": target_id,
-                "relationshipType": relationship_type,
-            }).to_string()
-        }
-        StorageEvent::RelationshipDeleted { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
+        StorageEvent::RelationshipCreated {
+            id,
+            source_id,
+            target_id,
+            relationship_type,
+        } => serde_json::json!({
+            "id": id,
+            "sourceId": source_id,
+            "targetId": target_id,
+            "relationshipType": relationship_type,
+        })
+        .to_string(),
+        StorageEvent::RelationshipDeleted { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::RelationshipBulkCreated { count } => {
             serde_json::json!({ "count": count }).to_string()
         }
-        StorageEvent::KnowledgeMapCreated { id, map_type, owner_id } => {
-            serde_json::json!({ "id": id, "mapType": map_type, "ownerId": owner_id }).to_string()
-        }
-        StorageEvent::KnowledgeMapUpdated { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
-        StorageEvent::KnowledgeMapDeleted { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
-        StorageEvent::PathExtensionCreated { id, base_path_id, extended_by } => {
-            serde_json::json!({ "id": id, "basePathId": base_path_id, "extendedBy": extended_by }).to_string()
-        }
-        StorageEvent::PathExtensionUpdated { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
-        StorageEvent::PathExtensionDeleted { id } => {
-            serde_json::json!({ "id": id }).to_string()
-        }
+        StorageEvent::KnowledgeMapCreated {
+            id,
+            map_type,
+            owner_id,
+        } => serde_json::json!({ "id": id, "mapType": map_type, "ownerId": owner_id }).to_string(),
+        StorageEvent::KnowledgeMapUpdated { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::KnowledgeMapDeleted { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::PathExtensionCreated {
+            id,
+            base_path_id,
+            extended_by,
+        } => serde_json::json!({ "id": id, "basePathId": base_path_id, "extendedBy": extended_by })
+            .to_string(),
+        StorageEvent::PathExtensionUpdated { id } => serde_json::json!({ "id": id }).to_string(),
+        StorageEvent::PathExtensionDeleted { id } => serde_json::json!({ "id": id }).to_string(),
     }
 }
 
@@ -162,9 +158,9 @@ pub fn create_sse_stream(event_bus: &Arc<EventBus>) -> hyper::Response<SseBody> 
     );
 
     // Merge event stream with heartbeat interval
-    let heartbeat = tokio_stream::wrappers::IntervalStream::new(
-        tokio::time::interval(std::time::Duration::from_secs(30)),
-    );
+    let heartbeat = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(30),
+    ));
 
     // Event frames from broadcast — map all results to SSE frames
     let events = broadcast_stream.map(|result| {
@@ -184,9 +180,7 @@ pub fn create_sse_stream(event_bus: &Arc<EventBus>) -> hyper::Response<SseBody> 
     });
 
     // Heartbeat frames
-    let heartbeats = heartbeat.map(|_| {
-        Ok(Frame::data(Bytes::from(format_heartbeat())))
-    });
+    let heartbeats = heartbeat.map(|_| Ok(Frame::data(Bytes::from(format_heartbeat()))));
 
     // Merge both streams — events + heartbeats
     let merged = events.merge(heartbeats);
@@ -244,9 +238,26 @@ mod tests {
 
     #[test]
     fn test_event_type_mapping() {
-        assert_eq!(event_type(&StorageEvent::ContentCreated { id: "".into(), title: "".into(), content_type: None }), "content.created");
-        assert_eq!(event_type(&StorageEvent::PathDeleted { id: "".into() }), "path.deleted");
-        assert_eq!(event_type(&StorageEvent::KnowledgeMapCreated { id: "".into(), map_type: "".into(), owner_id: "".into() }), "knowledge-map.created");
+        assert_eq!(
+            event_type(&StorageEvent::ContentCreated {
+                id: "".into(),
+                title: "".into(),
+                content_type: None
+            }),
+            "content.created"
+        );
+        assert_eq!(
+            event_type(&StorageEvent::PathDeleted { id: "".into() }),
+            "path.deleted"
+        );
+        assert_eq!(
+            event_type(&StorageEvent::KnowledgeMapCreated {
+                id: "".into(),
+                map_type: "".into(),
+                owner_id: "".into()
+            }),
+            "knowledge-map.created"
+        );
     }
 
     #[test]
@@ -256,8 +267,22 @@ mod tests {
         let f1 = format_sse_event(&e1);
         let f2 = format_sse_event(&e2);
         // Extract IDs
-        let id1: u64 = f1.lines().find(|l| l.starts_with("id: ")).unwrap().strip_prefix("id: ").unwrap().parse().unwrap();
-        let id2: u64 = f2.lines().find(|l| l.starts_with("id: ")).unwrap().strip_prefix("id: ").unwrap().parse().unwrap();
+        let id1: u64 = f1
+            .lines()
+            .find(|l| l.starts_with("id: "))
+            .unwrap()
+            .strip_prefix("id: ")
+            .unwrap()
+            .parse()
+            .unwrap();
+        let id2: u64 = f2
+            .lines()
+            .find(|l| l.starts_with("id: "))
+            .unwrap()
+            .strip_prefix("id: ")
+            .unwrap()
+            .parse()
+            .unwrap();
         assert!(id2 > id1);
     }
 }

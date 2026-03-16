@@ -4,7 +4,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::db::models::{ProposalOption, RankedVote};
 
-use super::{check_quorum, BallotError, OptionResult, TallyResult, TallyRound, TallyStrategy, VotingConfig};
+use super::{
+    check_quorum, BallotError, OptionResult, TallyResult, TallyRound, TallyStrategy, VotingConfig,
+};
 
 pub struct RankedChoiceTally;
 
@@ -16,8 +18,10 @@ impl TallyStrategy for RankedChoiceTally {
         config: &VotingConfig,
     ) -> TallyResult {
         let option_ids: HashSet<&str> = options.iter().map(|o| o.id.as_str()).collect();
-        let option_labels: HashMap<&str, &str> =
-            options.iter().map(|o| (o.id.as_str(), o.label.as_str())).collect();
+        let option_labels: HashMap<&str, &str> = options
+            .iter()
+            .map(|o| (o.id.as_str(), o.label.as_str()))
+            .collect();
 
         // Group votes by voter, sorted by rank
         let mut ballots: HashMap<&str, Vec<&RankedVote>> = HashMap::new();
@@ -80,7 +84,10 @@ impl TallyStrategy for RankedChoiceTally {
                     };
                     OptionResult {
                         option_id: opt_id.clone(),
-                        label: option_labels.get(opt_id.as_str()).unwrap_or(&"").to_string(),
+                        label: option_labels
+                            .get(opt_id.as_str())
+                            .unwrap_or(&"")
+                            .to_string(),
                         votes: count as f64,
                         percentage: pct,
                         rank: None,
@@ -88,7 +95,11 @@ impl TallyStrategy for RankedChoiceTally {
                     }
                 })
                 .collect();
-            standings.sort_by(|a, b| b.votes.partial_cmp(&a.votes).unwrap_or(std::cmp::Ordering::Equal));
+            standings.sort_by(|a, b| {
+                b.votes
+                    .partial_cmp(&a.votes)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             if winner.is_some() || counts.len() <= 2 {
                 // Store final counts
@@ -148,7 +159,11 @@ impl TallyStrategy for RankedChoiceTally {
             .collect();
 
         // Assign ranks by vote count (highest first)
-        option_results.sort_by(|a, b| b.votes.partial_cmp(&a.votes).unwrap_or(std::cmp::Ordering::Equal));
+        option_results.sort_by(|a, b| {
+            b.votes
+                .partial_cmp(&a.votes)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (i, result) in option_results.iter_mut().enumerate() {
             result.rank = Some(i as i32 + 1);
         }

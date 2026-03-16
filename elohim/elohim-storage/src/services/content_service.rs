@@ -144,35 +144,34 @@ impl ContentService {
         let mut conn = self.conn()?;
 
         // Compute merged metadata_json before entering the DB layer
-        let merged_metadata_json = if let Some(patch_meta) = &view.metadata {
-            let existing = content_diesel::get_content(&mut conn, &self.ctx, id)?
-                .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
+        let merged_metadata_json =
+            if let Some(patch_meta) = &view.metadata {
+                let existing = content_diesel::get_content(&mut conn, &self.ctx, id)?
+                    .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
 
-            let existing_meta: serde_json::Value = existing
-                .metadata_json
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok())
-                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+                let existing_meta: serde_json::Value = existing
+                    .metadata_json
+                    .as_deref()
+                    .and_then(|s| serde_json::from_str(s).ok())
+                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
-            let patch_value = patch_meta.0.clone();
-            let merged = match (existing_meta, patch_value) {
-                (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
-                    for (k, v) in patch {
-                        base.insert(k, v);
+                let patch_value = patch_meta.0.clone();
+                let merged = match (existing_meta, patch_value) {
+                    (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
+                        for (k, v) in patch {
+                            base.insert(k, v);
+                        }
+                        serde_json::Value::Object(base)
                     }
-                    serde_json::Value::Object(base)
-                }
-                (_, patch) => patch, // fallback: replace entirely
-            };
+                    (_, patch) => patch, // fallback: replace entirely
+                };
 
-            Some(
-                serde_json::to_string(&merged).map_err(|e| {
+                Some(serde_json::to_string(&merged).map_err(|e| {
                     StorageError::Internal(format!("Metadata serialize error: {}", e))
-                })?,
-            )
-        } else {
-            None
-        };
+                })?)
+            } else {
+                None
+            };
 
         let input = content_diesel::UpdateContentInput {
             id: id.to_string(),

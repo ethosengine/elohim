@@ -235,8 +235,8 @@ pub async fn handle(
 
             // Get the challenge to derive appellant_id (challenger is the default appellant)
             let mut conn = get_conn(pool)?;
-            let challenge = governance::get_challenge(&mut conn, challenge_id)?
-                .ok_or_else(|| {
+            let challenge =
+                governance::get_challenge(&mut conn, challenge_id)?.ok_or_else(|| {
                     StorageError::NotFound(format!("Challenge {} not found", challenge_id))
                 })?;
 
@@ -275,8 +275,7 @@ pub async fn handle(
 
         // GET /api/v1/governance/challenges?entityType=X&entityId=Y
         (&Method::GET, "/challenges") => {
-            let params: ChallengeQuery =
-                serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let params: ChallengeQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
             let entity_type = params.entity_type.as_deref().unwrap_or("");
             let entity_id = params.entity_id.as_deref().unwrap_or("");
             if entity_type.is_empty() || entity_id.is_empty() {
@@ -499,9 +498,11 @@ pub async fn handle(
                     proposal.voting_mechanism
                 ))
             })?;
-            strategy.validate_ballot(&temp_votes, &options, &config).map_err(|e| {
-                StorageError::InvalidInput(format!("Ballot validation failed: {}", e))
-            })?;
+            strategy
+                .validate_ballot(&temp_votes, &options, &config)
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!("Ballot validation failed: {}", e))
+                })?;
 
             // Build NewRankedVote entries
             let vote_ids: Vec<String> = input
@@ -532,7 +533,8 @@ pub async fn handle(
                 })
                 .collect();
 
-            let results = governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
+            let results =
+                governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
             let hide = proposal.voting_anonymous == 1;
             let views: Vec<RankedVoteView> = results
                 .into_iter()
@@ -717,9 +719,7 @@ pub async fn handle(
             let discussion_id = p
                 .strip_prefix("/discussions/")
                 .and_then(|s| s.strip_suffix("/messages"))
-                .ok_or_else(|| {
-                    StorageError::InvalidInput("Discussion ID required".to_string())
-                })?;
+                .ok_or_else(|| StorageError::InvalidInput("Discussion ID required".to_string()))?;
 
             let body = req
                 .collect()
@@ -751,10 +751,7 @@ pub async fn handle(
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
             let now = crate::db::models::current_timestamp();
-            let signal_id = format!(
-                "sig-{}-{}-{}",
-                input.entity_type, input.entity_id, now
-            );
+            let signal_id = format!("sig-{}-{}-{}", input.entity_type, input.entity_id, now);
             let new_signal = NewGovernanceSignal {
                 id: &signal_id,
                 entity_type: &input.entity_type,
@@ -783,8 +780,7 @@ pub async fn handle(
                 ));
             }
             let mut conn = get_conn(pool)?;
-            let aggregate =
-                governance::aggregate_signals(&mut conn, entity_type, entity_id)?;
+            let aggregate = governance::aggregate_signals(&mut conn, entity_type, entity_id)?;
             Ok(response::ok(&aggregate))
         }
 
@@ -800,8 +796,10 @@ pub async fn handle(
             }
             let mut conn = get_conn(pool)?;
             let results = governance::query_signals(&mut conn, entity_type, entity_id)?;
-            let views: Vec<GovernanceSignalView> =
-                results.into_iter().map(GovernanceSignalView::from).collect();
+            let views: Vec<GovernanceSignalView> = results
+                .into_iter()
+                .map(GovernanceSignalView::from)
+                .collect();
             Ok(response::ok(&views))
         }
 
@@ -848,8 +846,7 @@ pub async fn handle(
             }
             let mut conn = get_conn(pool)?;
             let results = governance::query_statements(&mut conn, entity_type, entity_id)?;
-            let views: Vec<StatementView> =
-                results.into_iter().map(StatementView::from).collect();
+            let views: Vec<StatementView> = results.into_iter().map(StatementView::from).collect();
             Ok(response::ok(&views))
         }
 
@@ -902,8 +899,7 @@ pub async fn handle(
                 ));
             }
             let mut conn = get_conn(pool)?;
-            let results =
-                governance::get_all_votes_for_entity(&mut conn, entity_type, entity_id)?;
+            let results = governance::get_all_votes_for_entity(&mut conn, entity_type, entity_id)?;
             let views: Vec<StatementVoteView> =
                 results.into_iter().map(StatementVoteView::from).collect();
             Ok(response::ok(&views))
@@ -924,7 +920,10 @@ pub async fn handle(
             let stmts = governance::query_statements(&mut conn, entity_type, entity_id)?;
             let votes = governance::get_all_votes_for_entity(&mut conn, entity_type, entity_id)?;
             let result = crate::sensemaking::clustering::cluster_opinions(
-                entity_type, entity_id, &stmts, &votes,
+                entity_type,
+                entity_id,
+                &stmts,
+                &votes,
             );
             Ok(response::ok(&result))
         }

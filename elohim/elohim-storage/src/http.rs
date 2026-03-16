@@ -62,10 +62,10 @@ use crate::views::{
     ContentMasteryView,
     ContentStewardshipView,
     ContentView,
+    ContentWithTagsView,
     ContributorPresenceView,
     CreateAllocationInputView,
     CreateCollectiveInputView,
-    ContentWithTagsView,
     // InputView types for API boundary (camelCase with parsed JSON)
     CreateContentInputView,
     CreateContributorPresenceInputView,
@@ -75,6 +75,7 @@ use crate::views::{
     CreateNodeStewardshipInputView,
     CreatePathInputView,
     CreateRelationshipInputView,
+    CreateScheduleInputView,
     CreateStewardedNodeInputView,
     EconomicEventView,
     EprHeadInputView,
@@ -88,6 +89,7 @@ use crate::views::{
     PathWithDetailsView,
     RelationshipSeedView,
     RelationshipView,
+    ScheduleView,
     StewardedNodeView,
     StewardshipAllocationView,
     StewardshipSeedView,
@@ -585,7 +587,10 @@ impl HttpServer {
                 error!(error = %e, "Request error");
                 Ok(Self::with_cors_headers(Response::builder())
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Either::Left(Full::new(Bytes::from(format!("Error: {}", e)))))
+                    .body(Either::Left(Full::new(Bytes::from(format!(
+                        "Error: {}",
+                        e
+                    )))))
                     .unwrap())
             }
         }
@@ -1561,6 +1566,15 @@ impl HttpServer {
             return self.handle_db_content_bulk(req, method).await;
         }
 
+        // Entity-nested schedule routes: /db/content/{cid}/schedule
+        if let Some(rest) = resource_path.strip_prefix("content/") {
+            if let Some(cid) = rest.strip_suffix("/schedule") {
+                return self
+                    .handle_content_schedule(req, method, cid, &app_ctx)
+                    .await;
+            }
+        }
+
         if let Some(content_id) = resource_path.strip_prefix("content/") {
             return self.handle_db_content_by_id(req, method, content_id).await;
         }
@@ -1946,6 +1960,58 @@ impl HttpServer {
         }
     }
 
+    /// GET/POST /db/content/{cid}/schedule - Entity-nested schedule convenience
+    async fn handle_content_schedule(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::GET => {
+                match db::schedules::get_schedule(&mut conn, app_ctx, "content", content_id) {
+                    Ok(schedule) => Ok(response::ok(&ScheduleView::from(schedule))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                use http_body_util::BodyExt;
+                let body_bytes = req
+                    .into_body()
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+                    .to_bytes();
+                let input_view: CreateScheduleInputView = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                // Override entity_type/entity_id from URL path
+                let input = db::schedules::CreateScheduleInput {
+                    entity_type: "content".to_string(),
+                    entity_id: content_id.to_string(),
+                    scheduled_at: input_view.scheduled_at,
+                    expires_at: input_view.expires_at,
+                    rrule: input_view.rrule,
+                };
+
+                match db::schedules::create_schedule(&mut conn, app_ctx, input) {
+                    Ok(schedule) => Ok(response::created(&ScheduleView::from(schedule))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
     /// GET/DELETE /db/content/{id} - Get or delete content by ID
     async fn handle_db_content_by_id(
         &self,
@@ -1973,15 +2039,11 @@ impl HttpServer {
                 let body = req
                     .collect()
                     .await
-                    .map_err(|e| {
-                        StorageError::Internal(format!("Failed to read body: {}", e))
-                    })?;
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
-                let view: UpdateContentInputView =
-                    serde_json::from_slice(&body_bytes).map_err(|e| {
-                        StorageError::Parse(format!("Invalid JSON: {}", e))
-                    })?;
+                let view: UpdateContentInputView = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
                 Ok(response::from_result(
                     services
@@ -4466,17 +4528,17 @@ impl HttpServer {
 
         match humans::list_humans(&mut conn, &ctx.app_id) {
             Ok(items) => {
-                let views: Vec<HumanView> =
-                    items.into_iter().map(HumanView::from).collect();
+                let views: Vec<HumanView> = items.into_iter().map(HumanView::from).collect();
                 let body = serde_json::json!({
                     "items": views,
                     "count": views.len(),
                 });
                 Ok(response::ok(&body))
             }
-            Err(e) => Ok(response::error_response(StorageError::Internal(
-                format!("Failed to list humans: {}", e),
-            ))),
+            Err(e) => Ok(response::error_response(StorageError::Internal(format!(
+                "Failed to list humans: {}",
+                e
+            )))),
         }
     }
 
@@ -5599,6 +5661,39 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/schedules — Kairos temporal schedules
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/schedules")
+                .handler("list_schedules")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/schedules")
+                .handler("create_schedule")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/schedules/{id}")
+                .handler("get_schedule")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::patch("/api/v1/schedules/{id}")
+                .handler("update_schedule")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/schedules/{id}/advance")
+                .handler("advance_schedule")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/steward-affinity — Steward affinity lifecycle
         // =====================================================================
         .route(
@@ -6108,6 +6203,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::delete("/db/content/{id}")
                 .handler("delete_content")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/content/{id}/schedule")
+                .handler("get_content_schedule")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/db/content/{id}/schedule")
+                .handler("create_content_schedule")
                 .auth_required()
                 .build(),
         )

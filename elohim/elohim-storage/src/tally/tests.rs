@@ -317,10 +317,7 @@ fn dot_validates_budget() {
         make_option("b", "Option B", 2),
     ];
     // Voter uses 7 dots total but budget is 5
-    let votes = vec![
-        make_dot_vote("h1", "a", 3),
-        make_dot_vote("h1", "b", 4),
-    ];
+    let votes = vec![make_dot_vote("h1", "a", 3), make_dot_vote("h1", "b", 4)];
     let config = VotingConfig {
         score_min: None,
         score_max: None,

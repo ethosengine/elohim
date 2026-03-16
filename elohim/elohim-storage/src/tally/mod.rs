@@ -122,5 +122,5 @@ pub fn get_strategy(mechanism: &str) -> Option<Box<dyn TallyStrategy>> {
 pub fn check_quorum(total_voters: usize, config: &VotingConfig) -> bool {
     config
         .quorum_percentage
-        .map_or(true, |q| q <= 0.0 || total_voters > 0)
+        .is_none_or(|q| q <= 0.0 || total_voters > 0)
 }

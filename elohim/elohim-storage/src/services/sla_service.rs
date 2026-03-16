@@ -34,11 +34,9 @@ pub fn compute_sla_status(challenge: &Challenge) -> SlaStatus {
         return SlaStatus::Resolved;
     }
     let now = chrono::Utc::now().naive_utc();
-    let deadline = chrono::NaiveDateTime::parse_from_str(
-        &challenge.response_deadline,
-        "%Y-%m-%dT%H:%M:%SZ",
-    )
-    .unwrap_or(now);
+    let deadline =
+        chrono::NaiveDateTime::parse_from_str(&challenge.response_deadline, "%Y-%m-%dT%H:%M:%SZ")
+            .unwrap_or(now);
     let warning = deadline - chrono::Duration::days(1);
     if now > deadline {
         SlaStatus::Overdue

@@ -56,8 +56,11 @@ pub fn cluster_opinions(
 
     if human_ids.len() < 2 {
         // Single participant — one cluster with all statements as characteristic
-        let characteristic: Vec<StatementView> =
-            statements.iter().cloned().map(StatementView::from).collect();
+        let characteristic: Vec<StatementView> = statements
+            .iter()
+            .cloned()
+            .map(StatementView::from)
+            .collect();
         return SensemakingResultView {
             entity_type: entity_type.to_string(),
             entity_id: entity_id.to_string(),
@@ -84,7 +87,10 @@ pub fn cluster_opinions(
 
     let mut matrix: Vec<Vec<f64>> = vec![vec![0.0; n_stmts]; n_humans];
     for v in votes {
-        if let (Some(&hi), Some(&si)) = (human_index.get(v.human_id.as_str()), stmt_index.get(v.statement_id.as_str())) {
+        if let (Some(&hi), Some(&si)) = (
+            human_index.get(v.human_id.as_str()),
+            stmt_index.get(v.statement_id.as_str()),
+        ) {
             matrix[hi][si] = match v.vote.as_str() {
                 "agree" => 1.0,
                 "disagree" => -1.0,
@@ -109,10 +115,8 @@ pub fn cluster_opinions(
     }
 
     // Build statement lookup
-    let stmt_map: HashMap<&str, &Statement> = statements
-        .iter()
-        .map(|s| (s.id.as_str(), s))
-        .collect();
+    let stmt_map: HashMap<&str, &Statement> =
+        statements.iter().map(|s| (s.id.as_str(), s)).collect();
 
     // For each cluster, find characteristic statements
     let mut clusters: Vec<OpinionClusterView> = Vec::new();
@@ -126,10 +130,7 @@ pub fn cluster_opinions(
         // Compute characteristic statements (>70% agreement within cluster)
         let mut characteristic: Vec<StatementView> = Vec::new();
         for (si, stmt_id) in stmt_ids.iter().enumerate() {
-            let agree_count = members
-                .iter()
-                .filter(|&&hi| matrix[hi][si] > 0.5)
-                .count();
+            let agree_count = members.iter().filter(|&&hi| matrix[hi][si] > 0.5).count();
             let ratio = agree_count as f64 / member_count as f64;
             if ratio >= CHARACTERISTIC_THRESHOLD {
                 if let Some(&stmt) = stmt_map.get(stmt_id.as_str()) {
@@ -150,7 +151,11 @@ pub fn cluster_opinions(
                     count += 1;
                 }
             }
-            if count > 0 { sum / count as f64 } else { 1.0 }
+            if count > 0 {
+                sum / count as f64
+            } else {
+                1.0
+            }
         };
 
         clusters.push(OpinionClusterView {
@@ -167,10 +172,7 @@ pub fn cluster_opinions(
         for (si, stmt_id) in stmt_ids.iter().enumerate() {
             let bridges_all = cluster_ids_sorted.iter().all(|&cid| {
                 let members = &cluster_members[&cid];
-                let agree_count = members
-                    .iter()
-                    .filter(|&&hi| matrix[hi][si] > 0.5)
-                    .count();
+                let agree_count = members.iter().filter(|&&hi| matrix[hi][si] > 0.5).count();
                 let ratio = agree_count as f64 / members.len() as f64;
                 ratio >= BRIDGING_THRESHOLD
             });
@@ -222,11 +224,7 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
 
 /// Agglomerative clustering using average linkage.
 /// Returns a vector of cluster IDs, one per human.
-fn agglomerative_cluster(
-    sim_matrix: &[Vec<f64>],
-    n: usize,
-    threshold: f64,
-) -> Vec<usize> {
+fn agglomerative_cluster(sim_matrix: &[Vec<f64>], n: usize, threshold: f64) -> Vec<usize> {
     // Each human starts in their own cluster
     let mut assignments: Vec<usize> = (0..n).collect();
     let mut next_cluster_id = n;
@@ -297,7 +295,11 @@ fn average_linkage_similarity(
             sum += sim_matrix[a][b];
         }
     }
-    if count > 0 { sum / count as f64 } else { 0.0 }
+    if count > 0 {
+        sum / count as f64
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
@@ -377,7 +379,11 @@ mod tests {
 
         let result = cluster_opinions("proposal", "p1", &stmts, &votes);
         assert_eq!(result.total_participants, 3);
-        assert_eq!(result.clusters.len(), 1, "Unanimous should produce 1 cluster");
+        assert_eq!(
+            result.clusters.len(),
+            1,
+            "Unanimous should produce 1 cluster"
+        );
         assert_eq!(result.clusters[0].member_count, 3);
         // With only one cluster, bridging is not computed (requires >=2 clusters)
         assert!(result.bridging_statements.is_empty());
@@ -460,9 +466,6 @@ mod tests {
             !result.bridging_statements.is_empty(),
             "s3 should be a bridging statement"
         );
-        assert!(result
-            .bridging_statements
-            .iter()
-            .any(|s| s.id == "s3"));
+        assert!(result.bridging_statements.iter().any(|s| s.id == "s3"));
     }
 }

@@ -3565,7 +3565,11 @@ impl VoteView {
         Self {
             id: v.id,
             proposal_id: v.proposal_id,
-            human_id: if hide_identity { None } else { Some(v.human_id) },
+            human_id: if hide_identity {
+                None
+            } else {
+                Some(v.human_id)
+            },
             position: v.position,
             reason: v.reason,
             created_at: v.created_at,
@@ -3685,7 +3689,11 @@ impl RankedVoteView {
         Self {
             id: v.id,
             proposal_id: v.proposal_id,
-            human_id: if hide_identity { None } else { Some(v.human_id) },
+            human_id: if hide_identity {
+                None
+            } else {
+                Some(v.human_id)
+            },
             option_id: v.option_id,
             rank: v.rank,
             score: v.score,

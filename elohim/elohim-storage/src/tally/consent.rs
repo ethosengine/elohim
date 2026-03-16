@@ -60,13 +60,11 @@ impl TallyStrategy for ConsentTally {
 
         // Sort: unblocked first, then by consent count descending
         option_results.sort_by(|a, b| {
-            a.eliminated
-                .cmp(&b.eliminated)
-                .then_with(|| {
-                    b.votes
-                        .partial_cmp(&a.votes)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
+            a.eliminated.cmp(&b.eliminated).then_with(|| {
+                b.votes
+                    .partial_cmp(&a.votes)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
         });
 
         // Assign ranks

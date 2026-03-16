@@ -144,10 +144,7 @@ pub fn respond_to_challenge(
 // ============================================================================
 
 /// Get appeal by ID
-pub fn get_appeal(
-    conn: &mut SqliteConnection,
-    id: &str,
-) -> Result<Option<Appeal>, StorageError> {
+pub fn get_appeal(conn: &mut SqliteConnection, id: &str) -> Result<Option<Appeal>, StorageError> {
     appeals::table
         .filter(appeals::id.eq(id))
         .first(conn)
@@ -168,10 +165,7 @@ pub fn query_appeals_for_challenge(
 }
 
 /// Insert a new appeal
-pub fn create_appeal(
-    conn: &mut SqliteConnection,
-    new: &NewAppeal,
-) -> Result<Appeal, StorageError> {
+pub fn create_appeal(conn: &mut SqliteConnection, new: &NewAppeal) -> Result<Appeal, StorageError> {
     diesel::insert_into(appeals::table)
         .values(new)
         .execute(conn)
@@ -354,10 +348,7 @@ pub fn get_vote(
 }
 
 /// Cast or update a vote (upsert via delete+insert for SQLite)
-pub fn cast_vote(
-    conn: &mut SqliteConnection,
-    new: &NewVote,
-) -> Result<Vote, StorageError> {
+pub fn cast_vote(conn: &mut SqliteConnection, new: &NewVote) -> Result<Vote, StorageError> {
     // Delete existing vote if any (UNIQUE constraint enforcement)
     diesel::delete(
         votes::table

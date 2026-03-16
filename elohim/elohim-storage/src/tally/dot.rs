@@ -68,7 +68,7 @@ impl TallyStrategy for DotTally {
             result.rank = Some(i as i32 + 1);
         }
 
-        let recommendation = if quorum_met && option_results.first().map_or(false, |r| r.votes > 0.0)
+        let recommendation = if quorum_met && option_results.first().is_some_and(|r| r.votes > 0.0)
         {
             "pass".to_string()
         } else {

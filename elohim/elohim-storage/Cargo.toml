@@ -105,6 +105,9 @@ reed-solomon-erasure = "6"
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
+# RFC 5545 RRULE parsing for recurrence schedules (Kairos temporal dimension)
+rrule = "0.14"
+
 # ZIP extraction for HTML5 apps
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
