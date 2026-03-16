@@ -1,166 +1,198 @@
-# Sprint 6: Signal Accumulation — Graduated Feedback, Reactions & REA Flow
+# Sprint 6: Signal Accumulation — Aggregation, Thresholds & Sensemaking Prep (v2)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build the low-friction governance signals (emotional reactions, graduated feedback scales) that accumulate over time and feed into sensemaking. Wire the REA pipeline so governance participation generates economic events and builds steward affinity.
+**Goal:** Build the signal aggregation and threshold detection that feeds Sprint 7's Polis sensemaking. Most of the signal collection infrastructure (reactions, graduated feedback, REA events) was already built in Sprint 4. This sprint adds the server-side aggregation, client-side visualization, and threshold service that detects when an entity is "ready for sensemaking."
 
-**Architecture:** Signals flow: User interaction → governance_signals table → REA economic event → recognition pipeline → steward affinity. Accumulated signals become the input for Sprint 7's Polis sensemaking layer.
+**Already built (Sprint 4):**
+- ReactionBarComponent wired to governance signals API (mechanism_level 1)
+- GraduatedFeedbackComponent wired to governance signals API (mechanism_level 2)
+- GovernanceRecognitionService for REA economic events on participation
+- FeedbackMechanismGateway renders reactions at level 1, graduated feedback at level 2
+- governance_signals table + CRUD + GET/POST routes (Sprint 3)
 
-**Tech Stack:** Angular 19, TypeScript, elohim-storage Rust backend
+**What remains:**
+- Backend signal aggregation query (avoid transferring raw signals to client)
+- FeedbackAggregateComponent (distribution visualization)
+- SignalAccumulationService (threshold detection for sensemaking readiness)
+- Tests and A2O scenarios
 
-**Depends on:** Sprint 4 (gateway component), Sprint 3 (signals backend)
+**Tech Stack:** Rust (Diesel, SQLite), Angular 19, TypeScript
+
+**Depends on:** Sprint 4 (signal collection), Sprint 3 (signals backend)
 
 ---
 
-### Task 1: EmotionalReactionComponent — rich reactions
+### Task 1: Backend — signal aggregation query and view
 
 **Files:**
-- Create: `app/elohim-app/src/app/qahal/components/emotional-reaction/emotional-reaction.component.ts`
+- Modify: `elohim/elohim-storage/src/db/governance.rs`
+- Modify: `elohim/elohim-storage/src/api/governance.rs`
+- Modify: `elohim/elohim-storage/src/views.rs`
+- Modify: `elohim/elohim-storage/src/http.rs`
 
-Reaction types from governance-deliberation.model.ts: moved, grateful, inspired, hopeful, challenged, concerned, uncomfortable. Each maps to a `governance_signal` with `signal_type: "reaction"` and `signal_value: "{reaction_type}"`.
+Add a new view type:
 
-UI: Small icon bar, expandable. Click to react. Second click to remove. Show aggregate counts.
+```rust
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SignalAggregateView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub total_signals: i64,
+    pub by_type: HashMap<String, i64>,       // {"reaction": 25, "graduated": 12, "vote": 5}
+    pub by_value: HashMap<String, i64>,      // {"accurate": 8, "inspired": 15, ...}
+    pub unique_participants: i64,
+    pub consensus_strength: f64,             // 0.0-1.0, higher = more agreement
+}
+```
 
-**Commit:** `feat(qahal): add emotional reaction component`
+Add CRUD function `aggregate_signals(conn, entity_type, entity_id) -> SignalAggregateView` that:
+1. Counts total signals
+2. Groups by signal_type
+3. Groups by signal_value
+4. Counts distinct human_ids
+5. Computes consensus_strength: if all signals agree on one value → 1.0, evenly distributed → 0.0. Use normalized entropy: `1.0 - (entropy / max_entropy)`.
+
+Add HTTP route: `GET /signals/aggregate?entityType=X&entityId=Y`
+
+Run `cargo test export_bindings` to generate `SignalAggregateView.ts`.
+
+**Commit:** `feat(storage): add signal aggregation query with consensus strength`
 
 ---
 
-### Task 2: GraduatedFeedbackSelectorComponent — context-aware scales
+### Task 2: GovernanceApiService — aggregation method
 
 **Files:**
-- Create: `app/elohim-app/src/app/qahal/components/graduated-feedback-selector/graduated-feedback-selector.component.ts`
+- Modify: `app/elohim-app/src/app/elohim/services/governance-api.service.ts`
 
-Renders the appropriate scale from governance-deliberation.model.ts based on FeedbackContext:
-- Accuracy: {inaccurate, mostly-inaccurate, uncertain, mostly-accurate, accurate}
-- Usefulness: {not-useful, slightly, moderately, very, essential}
-- Proposal position: {strongly-disagree, disagree, abstain, agree, strongly-agree}
-- Label agreement: {disagree, uncertain, agree}
+Add:
+```typescript
+getSignalAggregate(entityType: string, entityId: string): Promise<SignalAggregateView>
+```
 
-Negative feedback (bottom 2 options) requires reasoning text.
+Import `SignalAggregateView` from `@elohim/storage-client/generated`.
 
-Submits as `governance_signal` with `signal_type: "graduated"`, `signal_value: "{scale}:{value}"`, `mechanism_level: 2`.
-
-**Commit:** `feat(qahal): add graduated feedback selector component`
+**Commit:** `feat(qahal): add signal aggregation API method`
 
 ---
 
-### Task 3: FeedbackAggregateComponent — display signal distribution
+### Task 3: FeedbackAggregateComponent — distribution visualization
 
 **Files:**
 - Create: `app/elohim-app/src/app/qahal/components/feedback-aggregate/feedback-aggregate.component.ts`
 
-Shows aggregate distribution of graduated feedback for an entity:
-- Horizontal bar chart per scale option
-- Total respondents count
-- Consensus strength indicator (standard deviation of responses)
-- "N people found this accurate" summary
+Standalone, inline template, signal-based.
+Input: `entityType`, `entityId` (both required).
 
-Loads via GovernanceApiService.getSignals() and aggregates client-side.
+On init, load aggregate via `GovernanceApiService.getSignalAggregate()`.
+
+Template shows:
+- Total signal count and unique participants
+- **By type breakdown:** "25 reactions, 12 feedback, 5 votes" as a horizontal stacked bar
+- **By value distribution:** For each signal value, a horizontal bar showing count + percentage
+  - Color-coded: positive values (green), neutral (gray), negative (amber)
+- **Consensus strength meter:** 0-100% arc or bar with label "Low agreement" / "Moderate consensus" / "Strong consensus"
+- **Sensemaking readiness:** If totalSignals > threshold (e.g. 20) and consensus_strength < 0.7, show "Diverse perspectives — ready for sensemaking"
+
+Keep styling simple — CSS bars, no charting library needed.
+
+Add to qahal barrel exports.
 
 **Commit:** `feat(qahal): add feedback aggregate visualization component`
 
 ---
 
-### Task 4: Signal-to-REA pipeline integration
-
-**Files:**
-- Modify: voting components and reaction/feedback components
-- Modify or use: `app/elohim-app/src/app/elohim/services/recognition.service.ts` (or create if missing)
-
-After each governance signal submission (vote, reaction, feedback), fire an REA economic event:
-- Resource: the signal itself
-- Event type: "governance-participation"
-- Agent: the human who submitted
-- Trigger: POST to `/api/v1/recognition/distribute`
-
-Map mechanism levels to recognition weight:
-- Level 0-1 (reactions): low weight
-- Level 2-3 (feedback, approval): medium weight
-- Level 4-6 (ranked-choice, score, consent): high weight
-- Level 7 (deliberation): highest weight
-
-This makes governance participation a first-class stewardship activity.
-
-**Commit:** `feat(qahal): wire governance signals to REA recognition pipeline`
-
----
-
-### Task 5: Signal accumulation threshold detection
+### Task 4: SignalAccumulationService — threshold detection
 
 **Files:**
 - Create: `app/elohim-app/src/app/qahal/services/signal-accumulation.service.ts`
 
-This service monitors signal counts for entities and detects when thresholds are crossed:
-- N signals received → "ready for sensemaking" flag
-- Divergent signals detected → "controversy detected" flag
-- High consensus → "settled" indicator
+```typescript
+export interface AccumulationStatus {
+  totalSignals: number;
+  uniqueParticipants: number;
+  consensusStrength: number;
+  readyForSensemaking: boolean;    // enough signals + enough diversity
+  controversyDetected: boolean;    // low consensus with many signals
+  settled: boolean;                // high consensus, stable over time
+}
 
-These flags prepare the ground for Sprint 7's Polis sensemaking. For now, they surface as indicators on the governance summary.
+@Injectable({ providedIn: 'root' })
+export class SignalAccumulationService {
+  private readonly governanceApi = inject(GovernanceApiService);
 
-Uses `GovernanceApiService.getSignals()` and `count_signals()` backend function.
+  async getAccumulationStatus(entityType: string, entityId: string): Promise<AccumulationStatus>
+}
+```
+
+Thresholds (configurable via constants):
+- `SENSEMAKING_MIN_SIGNALS = 20` — minimum signals before sensemaking is meaningful
+- `SENSEMAKING_MAX_CONSENSUS = 0.7` — if consensus is too high, sensemaking isn't needed
+- `CONTROVERSY_MIN_SIGNALS = 10` — minimum signals to detect controversy
+- `CONTROVERSY_MAX_CONSENSUS = 0.3` — low consensus = controversy
+- `SETTLED_MIN_SIGNALS = 30` — minimum signals for settled
+- `SETTLED_MIN_CONSENSUS = 0.85` — high consensus = settled
+
+These thresholds prepare the ground for Sprint 7. The sensemaking layer activates when `readyForSensemaking` is true.
+
+Add to qahal barrel exports.
 
 **Commit:** `feat(qahal): add signal accumulation threshold service`
 
 ---
 
-### Task 6: Integrate reactions and feedback into gateway
+### Task 5: Integrate aggregate into gateway
 
 **Files:**
-- Modify: `FeedbackMechanismGatewayComponent` (Sprint 4 Task 3)
+- Modify: `app/elohim-app/src/app/qahal/components/feedback-mechanism-gateway/feedback-mechanism-gateway.component.ts`
 
-Replace stubs at levels 1 and 2:
-- Level 1: render `EmotionalReactionComponent`
-- Level 2: render `GraduatedFeedbackSelectorComponent` + `EmotionalReactionComponent`
+Add `FeedbackAggregateComponent` below the level 1-2 feedback components. It shows "what others thought" — the aggregate distribution of signals for this entity.
 
-Add `FeedbackAggregateComponent` below the feedback selector (shows what others thought).
+Also load `AccumulationStatus` and show a subtle indicator when sensemaking is ready:
+- If `readyForSensemaking`: show "Diverse perspectives on this content — sensemaking available" link
+- If `controversyDetected`: show "Active discussion" badge
+- If `settled`: show "Community consensus" badge
 
-**Commit:** `feat(qahal): integrate reactions and graduated feedback into gateway`
+**Commit:** `feat(qahal): integrate signal aggregate and accumulation status into gateway`
 
 ---
 
-### Task 7: Backend — signal aggregation query
+### Task 6: Tests
 
 **Files:**
-- Modify: `elohim/elohim-storage/src/db/governance.rs`
-- Modify: `elohim/elohim-storage/src/api/governance.rs`
+- Create: `app/elohim-app/src/app/qahal/services/signal-accumulation.service.spec.ts`
 
-Add `GET /signals/aggregate?entityType=X&entityId=Y` route that returns grouped signal counts:
-```json
-{
-  "totalSignals": 42,
-  "byType": { "reaction": 25, "graduated": 12, "vote": 5 },
-  "byValue": { "accurate": 8, "mostly-accurate": 3, "inspired": 15, ... },
-  "consensusStrength": 0.72
-}
-```
+Test SignalAccumulationService threshold logic:
+- Below min signals → not ready, not controversial, not settled
+- 25 signals, consensus 0.5 → readyForSensemaking true
+- 15 signals, consensus 0.2 → controversyDetected true
+- 35 signals, consensus 0.9 → settled true
+- Edge cases: exactly at thresholds
 
-This avoids transferring all raw signals to the client for aggregation.
+Also test consensus_strength computation in the Rust service if time permits.
 
-**Commit:** `feat(storage): add signal aggregation query route`
+Run: `pnpm exec vitest run --config vite.config.ts "signal-accumulation"`
+
+**Commit:** `test(qahal): add signal accumulation threshold tests`
 
 ---
 
-### Task 8: Tests
+### Task 7: A2O scenarios
 
-- EmotionalReactionComponent: renders reactions, click toggles, shows counts
-- GraduatedFeedbackSelectorComponent: renders correct scale per context, validates reasoning
-- FeedbackAggregateComponent: renders bar chart from signal data
-- SignalAccumulationService: threshold detection logic
-- Signal-to-REA integration: verify economic event created after signal
+**Files:**
+- Modify: `genesis/a2o/features/qahal/collective-governance.feature`
 
-**Commit:** `test(qahal): add signal accumulation and feedback tests`
+Scenarios:
+- "Signal aggregate shows community feedback distribution" — byType and byValue breakdown displayed
+- "Consensus strength indicator reflects agreement level" — high consensus = strong indicator
+- "Signal accumulation triggers sensemaking readiness" — 20+ signals with diverse opinions
+- "Controversy detected on divisive content" — low consensus badge appears
+- "Content reaches settled status through consensus" — high consensus, stable
 
----
-
-### Task 9: A2O scenarios
-
-- "Learner reacts to content with emotional response" — reaction recorded as signal
-- "Learner rates content accuracy with graduated feedback" — feedback with reasoning
-- "Feedback aggregate shows community consensus" — distribution visualization
-- "Governance participation earns recognition" — REA event → affinity delta
-- "Signal accumulation triggers sensemaking readiness" — threshold crossed
-
-**Commit:** `feat(a2o): add signal accumulation and feedback scenarios`
+**Commit:** `feat(a2o): add signal accumulation and aggregate scenarios`
 
 ---
 
@@ -168,12 +200,10 @@ This avoids transferring all raw signals to the client for aggregation.
 
 | Task | What | Layer |
 |------|------|-------|
-| 1 | EmotionalReactionComponent | Component |
-| 2 | GraduatedFeedbackSelectorComponent | Component |
-| 3 | FeedbackAggregateComponent | Component |
-| 4 | Signal-to-REA pipeline | Integration |
-| 5 | Signal accumulation threshold service | Service |
-| 6 | Integrate into gateway | Integration |
-| 7 | Backend signal aggregation | Rust |
-| 8 | Tests | Testing |
-| 9 | A2O scenarios | Scenarios |
+| 1 | Backend signal aggregation + consensus strength | Rust |
+| 2 | GovernanceApiService aggregation method | Angular service |
+| 3 | FeedbackAggregateComponent | Angular component |
+| 4 | SignalAccumulationService | Angular service |
+| 5 | Integrate into gateway | Integration |
+| 6 | Tests | Testing |
+| 7 | A2O scenarios | Scenarios |
