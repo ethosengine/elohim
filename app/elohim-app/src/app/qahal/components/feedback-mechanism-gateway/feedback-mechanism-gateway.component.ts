@@ -11,6 +11,7 @@
  */
 
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
 import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/storage-client';
 
@@ -53,6 +54,7 @@ import {
             class="challenge-close"
             type="button"
             aria-label="Close challenge form"
+            data-testid="close-challenge-form"
             (click)="closeChallengeForm()">
             &times;
           </button>
@@ -105,9 +107,13 @@ import {
       <!-- Accumulation status badges -->
       @if (accumulationStatus(); as status) {
         @if (status.readyForSensemaking) {
-          <div class="accumulation-badge sensemaking">
+          <button
+            type="button"
+            class="accumulation-badge sensemaking sensemaking-link"
+            data-testid="sensemaking-link"
+            (click)="navigateToSensemaking()">
             Diverse perspectives on this content — sensemaking available
-          </div>
+          </button>
         }
         @if (status.controversyDetected) {
           <div class="accumulation-badge controversy">Active discussion</div>
@@ -194,6 +200,18 @@ import {
       color: var(--sensemaking-fg, #1a56db);
     }
 
+    .sensemaking-link {
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: opacity 0.15s ease;
+    }
+
+    .sensemaking-link:hover {
+      opacity: 0.85;
+      text-decoration: underline;
+    }
+
     .accumulation-badge.controversy {
       background: var(--controversy-bg, #fef3c7);
       color: var(--controversy-fg, #92400e);
@@ -241,6 +259,7 @@ export class FeedbackMechanismGatewayComponent {
   /** Optional content type hint for mechanism selection (e.g. 'discussion', 'reflection'). */
   contentType = input<string>('learning-content');
 
+  private readonly router = inject(Router);
   private readonly governanceApi = inject(GovernanceApiService);
   private readonly mechanismSelection = inject(MechanismSelectionService);
   private readonly signalAccumulation = inject(SignalAccumulationService);
@@ -298,6 +317,16 @@ export class FeedbackMechanismGatewayComponent {
   /** Close the inline challenge form. */
   closeChallengeForm(): void {
     this.showChallengeForm.set(false);
+  }
+
+  /** Navigate to the sensemaking page with entity context as query params. */
+  navigateToSensemaking(): void {
+    this.router.navigate(['/community/governance/sensemaking'], {
+      queryParams: {
+        entityType: this.entityType(),
+        entityId: this.entityId(),
+      },
+    });
   }
 
   /** Handle successful challenge filing — close form and reload governance state. */
