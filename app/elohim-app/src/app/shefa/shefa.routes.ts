@@ -91,7 +91,7 @@ export const SHEFA_ROUTES: Routes = [
         path: 'journal/:id',
         loadComponent: async () =>
           import('./components/journal-page/journal-page.component').then(
-            m => m.JournalPageComponent,
+            m => m.JournalPageComponent
           ),
         data: { title: 'Shefa - Journal' },
       },
