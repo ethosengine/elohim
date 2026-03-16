@@ -1,6 +1,6 @@
 import { TitleCasePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink, ActivatedRoute } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -41,7 +41,14 @@ import { AvodahApiService } from '../../services/avodah-api.service';
               </h2>
               <ul class="task-rows" role="list">
                 @for (story of storiesInGroup(group); track story.id) {
-                  <li class="task-row" data-testid="task-row">
+                  <li
+                    class="task-row clickable-row"
+                    data-testid="task-row"
+                    tabindex="0"
+                    role="button"
+                    [attr.aria-label]="'Open story: ' + story.title"
+                    (click)="openStory(story)"
+                  >
                     <button
                       class="check-btn"
                       [attr.aria-label]="'Mark complete: ' + story.title"
@@ -187,6 +194,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
         border: 1px solid rgba(99, 102, 241, 0.08);
         font-size: 0.85rem;
       }
+      .clickable-row {
+        cursor: pointer;
+      }
       .task-row:hover {
         background: rgba(99, 102, 241, 0.06);
         border-color: rgba(99, 102, 241, 0.18);
@@ -240,6 +250,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
 })
 export class TaskListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly api = inject(AvodahApiService);
 
   readonly groups = ['daily', 'weekly', 'monthly', 'custom'] as const;
@@ -261,6 +272,10 @@ export class TaskListComponent implements OnInit {
       const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
       return meta.cadence !== undefined;
     });
+  }
+
+  openStory(story: ContentNode): void {
+    void this.router.navigate(['/avodah/projects', this.projectId, 'stories', story.id]);
   }
 
   storiesInGroup(interval: CadenceInterval): ContentNode[] {

@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink, ActivatedRoute } from '@angular/router';
+import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 
@@ -52,7 +52,20 @@ import { AvodahApiService } from '../../services/avodah-api.service';
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <button class="btn-new" data-testid="btn-new-story">+ New Story</button>
+          @if (addingStory) {
+            <input
+              class="inline-title-input"
+              placeholder="Story title…"
+              data-testid="new-story-input"
+              (keydown.enter)="submitNewStory($event)"
+              (keydown.escape)="addingStory = false"
+              (blur)="addingStory = false"
+            />
+          } @else {
+            <button class="btn-new" data-testid="btn-new-story" (click)="addingStory = true">
+              + New Story
+            </button>
+          }
         </div>
         <table class="backlog-table">
           <thead>
@@ -67,7 +80,14 @@ import { AvodahApiService } from '../../services/avodah-api.service';
           </thead>
           <tbody>
             @for (story of filteredStories(); track story.id) {
-              <tr data-testid="backlog-row">
+              <tr
+                data-testid="backlog-row"
+                class="clickable-row"
+                (click)="openStory(story)"
+                (keydown.enter)="openStory(story)"
+                tabindex="0"
+                role="button"
+              >
                 <td class="title-cell">{{ story.title }}</td>
                 <td>
                   <span class="status-badge status-{{ storyMeta(story).status }}">
@@ -294,13 +314,31 @@ import { AvodahApiService } from '../../services/avodah-api.service';
         background: rgba(245, 158, 11, 0.15);
         color: #fbbf24;
       }
+      .inline-title-input {
+        background: rgba(15, 15, 26, 0.8);
+        border: 1px solid var(--lamad-accent-primary, #6366f1);
+        border-radius: 6px;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+        color: var(--lamad-text-secondary, #e2e8f0);
+        outline: none;
+        min-width: 200px;
+      }
+      .clickable-row {
+        cursor: pointer;
+      }
+      .clickable-row:hover td {
+        background: rgba(99, 102, 241, 0.06);
+      }
     `,
   ],
 })
 export class ProjectBacklogComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly api = inject(AvodahApiService);
 
+  addingStory = false;
   projectId = '';
   project: ContentNode | null = null;
   stories: ContentNode[] = [];
@@ -339,5 +377,18 @@ export class ProjectBacklogComponent implements OnInit {
 
   filterPriority(event: Event): void {
     this.activePriorityFilter.set((event.target as HTMLSelectElement).value);
+  }
+
+  async submitNewStory(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const title = input.value.trim();
+    if (!title) return;
+    const newStory = await this.api.createStory(this.projectId, title, 'backlog');
+    this.stories = [...this.stories, newStory];
+    this.addingStory = false;
+  }
+
+  openStory(story: ContentNode): void {
+    void this.router.navigate(['/avodah/projects', this.projectId, 'stories', story.id]);
   }
 }
