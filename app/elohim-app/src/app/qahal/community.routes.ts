@@ -5,6 +5,11 @@ import { Routes } from '@angular/router';
  *
  * Routes:
  * - /community - Community home (landing page)
+ * - /community/directory - Community directory
+ * - /community/collective/:id - Collective detail
+ * - /community/governance/challenges - Challenge list
+ * - /community/governance/challenges/new - File a new challenge
+ * - /community/governance/challenges/:id - Challenge detail
  *
  * Future routes:
  * - /community/human - Community-specific profile settings
@@ -51,6 +56,30 @@ export const COMMUNITY_ROUTES: Routes = [
             m => m.CollectiveDetailComponent
           ),
         data: { title: 'Collective' },
+      },
+      {
+        path: 'governance/challenges',
+        loadComponent: async () =>
+          import('./components/challenge-list/challenge-list.component').then(
+            m => m.ChallengeListComponent
+          ),
+        data: { title: 'Governance Challenges' },
+      },
+      {
+        path: 'governance/challenges/new',
+        loadComponent: async () =>
+          import('./components/challenge-route/challenge-route.component').then(
+            m => m.ChallengeRouteComponent
+          ),
+        data: { title: 'File a Challenge' },
+      },
+      {
+        path: 'governance/challenges/:id',
+        loadComponent: async () =>
+          import('./components/challenge-detail/challenge-detail.component').then(
+            m => m.ChallengeDetailComponent
+          ),
+        data: { title: 'Challenge Detail' },
       },
     ],
   },

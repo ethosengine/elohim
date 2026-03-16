@@ -6,13 +6,14 @@
 use diesel::prelude::*;
 
 use super::diesel_schema::{
-    challenges, discussions, governance_signals, governance_states, precedents, proposal_options,
-    proposals, ranked_votes, votes,
+    appeals, challenges, discussions, governance_signals, governance_states, precedents,
+    proposal_options, proposals, ranked_votes, votes,
 };
 use super::models::{
-    Challenge, Discussion, GovernanceSignal, GovernanceState, NewChallenge, NewDiscussion,
-    NewGovernanceSignal, NewGovernanceState, NewPrecedent, NewProposal, NewProposalOption, NewRankedVote,
-    NewVote, Precedent, Proposal, ProposalOption, RankedVote, Vote,
+    Appeal, Challenge, Discussion, GovernanceSignal, GovernanceState, NewAppeal, NewChallenge,
+    NewDiscussion, NewGovernanceSignal, NewGovernanceState, NewPrecedent, NewProposal,
+    NewProposalOption, NewRankedVote, NewVote, Precedent, Proposal, ProposalOption, RankedVote,
+    Vote,
 };
 use crate::error::StorageError;
 
@@ -78,13 +79,15 @@ pub fn get_challenge(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
-/// Query challenges by content ID
+/// Query challenges by entity type and entity ID
 pub fn query_challenges(
     conn: &mut SqliteConnection,
-    content_id: &str,
+    entity_type: &str,
+    entity_id: &str,
 ) -> Result<Vec<Challenge>, StorageError> {
     challenges::table
-        .filter(challenges::content_id.eq(content_id))
+        .filter(challenges::entity_type.eq(entity_type))
+        .filter(challenges::entity_id.eq(entity_id))
         .order(challenges::created_at.desc())
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
@@ -102,6 +105,80 @@ pub fn create_challenge(
 
     challenges::table
         .filter(challenges::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Respond to a challenge — update state, outcome, reasoning, actions, responded_at, sets_precedent
+pub fn respond_to_challenge(
+    conn: &mut SqliteConnection,
+    id: &str,
+    outcome: &str,
+    reasoning: &str,
+    actions: Option<&str>,
+    response_by: &str,
+    sets_precedent: bool,
+) -> Result<Challenge, StorageError> {
+    let now = crate::db::models::current_timestamp();
+    diesel::update(challenges::table.filter(challenges::id.eq(id)))
+        .set((
+            challenges::state.eq("responded"),
+            challenges::response_outcome.eq(Some(outcome)),
+            challenges::response_reasoning.eq(Some(reasoning)),
+            challenges::response_actions.eq(actions),
+            challenges::response_by.eq(Some(response_by)),
+            challenges::sets_precedent.eq(if sets_precedent { 1 } else { 0 }),
+            challenges::responded_at.eq(Some(&now)),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+
+    challenges::table
+        .filter(challenges::id.eq(id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// ============================================================================
+// Appeals
+// ============================================================================
+
+/// Get appeal by ID
+pub fn get_appeal(
+    conn: &mut SqliteConnection,
+    id: &str,
+) -> Result<Option<Appeal>, StorageError> {
+    appeals::table
+        .filter(appeals::id.eq(id))
+        .first(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Query appeals for a challenge
+pub fn query_appeals_for_challenge(
+    conn: &mut SqliteConnection,
+    challenge_id: &str,
+) -> Result<Vec<Appeal>, StorageError> {
+    appeals::table
+        .filter(appeals::challenge_id.eq(challenge_id))
+        .order(appeals::created_at.desc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Insert a new appeal
+pub fn create_appeal(
+    conn: &mut SqliteConnection,
+    new: &NewAppeal,
+) -> Result<Appeal, StorageError> {
+    diesel::insert_into(appeals::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+    appeals::table
+        .filter(appeals::id.eq(new.id))
         .first(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }

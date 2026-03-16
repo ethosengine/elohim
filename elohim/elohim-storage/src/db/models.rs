@@ -13,14 +13,14 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::diesel_schema::{
-    access_grants, agreements, apps, challenges, chapters, collective_participations, collectives,
-    comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
-    contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
-    governance_states, human_relationships, humans, imagodei_observations, knowledge_maps,
-    local_sessions, node_stewardship, path_attestations, path_extensions, path_tags, paths,
-    precedents, premium_gates, proposals, rea_commitments, relationships, steps,
-    steward_credentials, stewarded_nodes, stewardship_allocations, votes,
-    proposal_options, ranked_votes, governance_signals,
+    access_grants, agreements, appeals, apps, challenges, chapters, collective_participations,
+    collectives, comments, content, content_attestations, content_mastery, content_tags,
+    contributor_dashboards, contributor_presences, custodian_metrics, device_policies, discussions,
+    economic_events, governance_signals, governance_states, human_relationships, humans,
+    imagodei_observations, knowledge_maps, local_sessions, node_stewardship, path_attestations,
+    path_extensions, path_tags, paths, precedents, premium_gates, proposal_options, proposals,
+    ranked_votes, rea_commitments, relationships, steps, steward_credentials, stewarded_nodes,
+    stewardship_allocations, votes,
 };
 
 // ============================================================================
@@ -1433,19 +1433,32 @@ pub struct NewGovernanceState<'a> {
     pub voting_state: &'a str,
 }
 
-/// Challenge on content
+/// Challenge — governance immune system challenge with full lifecycle
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = challenges)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Challenge {
     pub id: String,
-    pub content_id: String,
-    pub challenger_presence_id: String,
-    pub reason: String,
-    pub status: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub challenger_id: String,
+    pub standing_basis: String,
+    pub grounds_primary: String,
+    pub grounds_secondary: Option<String>,
     pub evidence: String,
+    pub requested_outcome: Option<String>,
+    pub state: String,
+    pub response_outcome: Option<String>,
+    pub response_reasoning: Option<String>,
+    pub response_actions: Option<String>,
+    pub response_by: Option<String>,
+    pub sets_precedent: i32,
+    pub filed_at: String,
+    pub acknowledged_at: Option<String>,
+    pub response_deadline: String,
+    pub responded_at: Option<String>,
+    pub resolved_at: Option<String>,
     pub created_at: String,
-    pub updated_at: String,
 }
 
 /// New challenge for INSERT
@@ -1453,11 +1466,52 @@ pub struct Challenge {
 #[diesel(table_name = challenges)]
 pub struct NewChallenge<'a> {
     pub id: &'a str,
-    pub content_id: &'a str,
-    pub challenger_presence_id: &'a str,
-    pub reason: &'a str,
-    pub status: &'a str,
+    pub entity_type: &'a str,
+    pub entity_id: &'a str,
+    pub challenger_id: &'a str,
+    pub standing_basis: &'a str,
+    pub grounds_primary: &'a str,
+    pub grounds_secondary: Option<&'a str>,
     pub evidence: &'a str,
+    pub requested_outcome: Option<&'a str>,
+    pub state: &'a str,
+    pub filed_at: &'a str,
+    pub response_deadline: &'a str,
+    pub created_at: &'a str,
+}
+
+/// Appeal — escalation of a challenge decision
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = appeals)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Appeal {
+    pub id: String,
+    pub challenge_id: String,
+    pub appellant_id: String,
+    pub grounds: String,
+    pub additional_evidence: Option<String>,
+    pub state: String,
+    pub escalation_level: Option<String>,
+    pub decision: Option<String>,
+    pub decision_reasoning: Option<String>,
+    pub decided_by: Option<String>,
+    pub filed_at: String,
+    pub decided_at: Option<String>,
+    pub created_at: String,
+}
+
+/// New appeal for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = appeals)]
+pub struct NewAppeal<'a> {
+    pub id: &'a str,
+    pub challenge_id: &'a str,
+    pub appellant_id: &'a str,
+    pub grounds: &'a str,
+    pub additional_evidence: Option<&'a str>,
+    pub state: &'a str,
+    pub filed_at: &'a str,
+    pub created_at: &'a str,
 }
 
 /// Governance proposal

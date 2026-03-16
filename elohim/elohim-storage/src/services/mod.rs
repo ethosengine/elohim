@@ -41,6 +41,7 @@ pub mod relationship_service;
 pub mod resource_service;
 pub mod response;
 pub mod sidecar_engine;
+pub mod sla_service;
 pub mod steward_affinity_service;
 pub mod steward_standing;
 pub mod stewardship_service;

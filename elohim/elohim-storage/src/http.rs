@@ -5233,6 +5233,27 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            Route::post("/api/v1/governance/challenges")
+                .handler("file_challenge")
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/challenges/{id}/respond")
+                .handler("respond_to_challenge")
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/challenges/{id}/appeal")
+                .handler("file_appeal")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/appeals/{challengeId}")
+                .handler("list_appeals")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
             Route::get("/api/v1/governance/proposals")
                 .handler("list_proposals")
                 .cache_ttl(300)

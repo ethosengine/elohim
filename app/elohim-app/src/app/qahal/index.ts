@@ -24,6 +24,12 @@ export {
 } from './components/context-menu-only/context-menu-only.component';
 export { FeedbackMechanismGatewayComponent } from './components/feedback-mechanism-gateway/feedback-mechanism-gateway.component';
 export { PsephosBallotWrapperComponent } from './components/psephos-ballot-wrapper/psephos-ballot-wrapper.component';
+export { FileChallengeComponent } from './components/file-challenge/file-challenge.component';
+export { ChallengeListComponent } from './components/challenge-list/challenge-list.component';
+export { ChallengeDetailComponent } from './components/challenge-detail/challenge-detail.component';
+export { ChallengeRouteComponent } from './components/challenge-route/challenge-route.component';
+export { RespondToChallengeComponent } from './components/respond-to-challenge/respond-to-challenge.component';
+export { FileAppealComponent } from './components/file-appeal/file-appeal.component';
 
 // Services
 export * from './services';

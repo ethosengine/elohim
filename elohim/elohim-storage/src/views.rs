@@ -85,13 +85,14 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 
 use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
-    AccessGrant, AgreementRow, App, Challenge, Chapter, ChapterWithSteps, Content,
+    AccessGrant, AgreementRow, App, Appeal, Challenge, Chapter, ChapterWithSteps, Content,
     ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
     GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
     PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
-    ProposalOption, RankedVote, ReaCommitment, Relationship, Vote, RelationshipWithContent, Step,
+    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Step,
     StewardCredential, StewardedNode, StewardshipAllocation, StewardshipAllocationWithPresence,
+    Vote,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -3317,28 +3318,127 @@ impl From<GovernanceState> for GovernanceStateView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ChallengeView {
     pub id: String,
-    pub content_id: String,
-    pub challenger_presence_id: String,
-    pub reason: String,
-    pub status: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub challenger_id: String,
+    pub standing_basis: String,
+    pub grounds_primary: String,
+    pub grounds_secondary: Option<String>,
     pub evidence: JsonVal,
+    pub requested_outcome: Option<String>,
+    pub state: String,
+    pub response_outcome: Option<String>,
+    pub response_reasoning: Option<String>,
+    pub response_actions: Option<String>,
+    pub response_by: Option<String>,
+    pub sets_precedent: bool,
+    pub filed_at: String,
+    pub acknowledged_at: Option<String>,
+    pub response_deadline: String,
+    pub responded_at: Option<String>,
+    pub resolved_at: Option<String>,
     pub created_at: String,
-    pub updated_at: String,
+    pub sla_status: String,
 }
 
 impl From<Challenge> for ChallengeView {
     fn from(c: Challenge) -> Self {
         Self {
             id: c.id,
-            content_id: c.content_id,
-            challenger_presence_id: c.challenger_presence_id,
-            reason: c.reason,
-            status: c.status,
+            entity_type: c.entity_type,
+            entity_id: c.entity_id,
+            challenger_id: c.challenger_id,
+            standing_basis: c.standing_basis,
+            grounds_primary: c.grounds_primary,
+            grounds_secondary: c.grounds_secondary,
             evidence: parse_json(&c.evidence),
+            requested_outcome: c.requested_outcome,
+            state: c.state,
+            response_outcome: c.response_outcome,
+            response_reasoning: c.response_reasoning,
+            response_actions: c.response_actions,
+            response_by: c.response_by,
+            sets_precedent: c.sets_precedent != 0,
+            filed_at: c.filed_at,
+            acknowledged_at: c.acknowledged_at,
+            response_deadline: c.response_deadline,
+            responded_at: c.responded_at,
+            resolved_at: c.resolved_at,
             created_at: c.created_at,
-            updated_at: c.updated_at,
+            sla_status: String::new(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AppealView {
+    pub id: String,
+    pub challenge_id: String,
+    pub appellant_id: String,
+    pub grounds: String,
+    pub additional_evidence: Option<String>,
+    pub state: String,
+    pub escalation_level: Option<String>,
+    pub decision: Option<String>,
+    pub decision_reasoning: Option<String>,
+    pub decided_by: Option<String>,
+    pub filed_at: String,
+    pub decided_at: Option<String>,
+    pub created_at: String,
+}
+
+impl From<Appeal> for AppealView {
+    fn from(a: Appeal) -> Self {
+        Self {
+            id: a.id,
+            challenge_id: a.challenge_id,
+            appellant_id: a.appellant_id,
+            grounds: a.grounds,
+            additional_evidence: a.additional_evidence,
+            state: a.state,
+            escalation_level: a.escalation_level,
+            decision: a.decision,
+            decision_reasoning: a.decision_reasoning,
+            decided_by: a.decided_by,
+            filed_at: a.filed_at,
+            decided_at: a.decided_at,
+            created_at: a.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FileChallengeInputView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub challenger_id: String,
+    pub standing_basis: String,
+    pub grounds_primary: String,
+    pub grounds_secondary: Option<String>,
+    pub evidence: String,
+    pub requested_outcome: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RespondToChallengeInputView {
+    pub outcome: String,
+    pub reasoning: String,
+    pub actions: Option<String>,
+    pub sets_precedent: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FileAppealInputView {
+    pub grounds: String,
+    pub additional_evidence: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
