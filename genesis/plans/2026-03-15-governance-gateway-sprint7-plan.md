@@ -1,4 +1,4 @@
-# Sprint 7: Polis Sensemaking — Opinion Clustering & Bridging Statements
+# Sprint 7: Polis Sensemaking — Opinion Clustering & Bridging Statements (v2)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -6,65 +6,136 @@
 
 **Architecture:** Polis is the sensing organ; elohim is the deliberative mind. This sprint implements the sensing: signal → statement → cluster → bridge → bracket. The elohim synthesizing brackets is a seam for Sprint 9's inference integration.
 
-**Tech Stack:** Angular 19, TypeScript, elohim-storage Rust backend, lightweight clustering (no ML dependency — rule-based for now, replaced with proper dimensionality reduction later)
+**What already exists:**
+- `OpinionClusterComponent` (727 lines) — Canvas-based 2D scatter visualization with PCA, cluster identification, consensus/divisive statement highlighting. Uses `GovernanceSignalService.OpinionCluster` types. Currently renders from in-memory data (no real backend).
+- `governance-deliberation.model.ts` — Rich models: `SensemakingContext`, `OpinionCluster`, `ConsensusStatement`, `DivisiveStatement`, `Statement`, `StatementVote`, `ClusterVisualizationData`
+- `SignalAccumulationService` (Sprint 6) — Detects `readyForSensemaking` threshold
+- `FeedbackMechanismGateway` (Sprint 4) — Shows "sensemaking available" badge when threshold crossed
 
-**Depends on:** Sprint 6 (signals accumulated, aggregation queries)
+**What's missing:**
+- Backend: statements + statement_votes tables, clustering algorithm, sensemaking routes
+- Frontend: Statement contribution UI (Polis-style one-at-a-time voting), bridging statement highlighting, bracket synthesis seam
+- Wiring: Connect OpinionClusterComponent to real backend data
+
+**Tech Stack:** Rust (Diesel, SQLite), Angular 19, TypeScript
+
+**Depends on:** Sprint 6 (signal accumulation thresholds)
 
 ---
 
-### Task 1: Backend — statements table and CRUD
+### Task 1: Migration — statements and statement_votes tables
 
 **Files:**
-- Create migration: `elohim/elohim-storage/migrations/YYYY-MM-DD_add_statements/`
-- Modify: `elohim/elohim-storage/src/db/models.rs`
-- Modify: `elohim/elohim-storage/src/db/governance.rs`
-- Modify: `elohim/elohim-storage/src/views.rs`
+- Create: `elohim/elohim-storage/migrations/2026-03-16-000002_add_statements/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-03-16-000002_add_statements/down.sql`
+- Modify: `elohim/elohim-storage/src/db/diesel_schema.rs`
 
-New table `statements`:
-- id, entity_type, entity_id, human_id, text, agree_count, disagree_count, pass_count, group_id, is_bridging, created_at
+```sql
+CREATE TABLE IF NOT EXISTS statements (
+    id TEXT PRIMARY KEY NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    human_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    agree_count INTEGER NOT NULL DEFAULT 0,
+    disagree_count INTEGER NOT NULL DEFAULT 0,
+    pass_count INTEGER NOT NULL DEFAULT 0,
+    group_id TEXT,
+    is_bridging INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 
-New table `statement_votes`:
-- id, statement_id, human_id, vote (agree/disagree/pass), created_at
-- UNIQUE(statement_id, human_id)
+CREATE TABLE IF NOT EXISTS statement_votes (
+    id TEXT PRIMARY KEY NOT NULL,
+    statement_id TEXT NOT NULL,
+    human_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(statement_id, human_id)
+);
 
-CRUD: create_statement, vote_on_statement, query_statements, get_statement_votes
+CREATE INDEX IF NOT EXISTS idx_statements_entity ON statements(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_statement_votes_statement ON statement_votes(statement_id);
+```
 
-View types: StatementView, StatementVoteView, CreateStatementInputView, VoteOnStatementInputView
+Manually update diesel_schema.rs. Add both tables to allow_tables_to_appear_in_same_query!.
 
-HTTP routes:
-- `POST /sensemaking/statements` — create statement
-- `GET /sensemaking/statements?entityType=X&entityId=Y` — list statements
-- `POST /sensemaking/statements/{id}/vote` — vote on statement
-- `GET /sensemaking/clusters?entityType=X&entityId=Y` — get opinion clusters (Task 2)
-
-**Commit:** `feat(storage): add statements and statement_votes tables with CRUD`
+**Commit:** `feat(storage): add statements and statement_votes tables`
 
 ---
 
-### Task 2: Backend — opinion clustering algorithm
+### Task 2: Diesel models, views, CRUD, and routes
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/db/models.rs`
+- Modify: `elohim/elohim-storage/src/views.rs`
+- Modify: `elohim/elohim-storage/src/db/governance.rs`
+- Modify: `elohim/elohim-storage/src/api/governance.rs`
+- Modify: `elohim/elohim-storage/src/http.rs`
+
+**Models:** Statement, NewStatement, StatementVote, NewStatementVote (Queryable + Insertable)
+
+**Views (with ts-rs export):**
+- `StatementView` — id, entityType, entityId, humanId, text, agreeCount, disagreeCount, passCount, groupId, isBridging, createdAt
+- `StatementVoteView` — id, statementId, humanId, vote, createdAt
+- `CreateStatementInputView` — entityType, entityId, humanId, text
+- `VoteOnStatementInputView` — humanId, vote (agree/disagree/pass)
+
+**CRUD:**
+- `create_statement(conn, new)` — insert + return
+- `query_statements(conn, entity_type, entity_id)` — list ordered by created_at
+- `vote_on_statement(conn, new)` — upsert (delete existing + insert), then update statement's agree/disagree/pass counts
+- `get_statement_votes(conn, statement_id)` — list votes for a statement
+- `get_all_votes_for_entity(conn, entity_type, entity_id)` — all votes for all statements of an entity (needed for clustering)
+
+**Routes:**
+- `POST /sensemaking/statements` — create statement
+- `GET /sensemaking/statements?entityType=X&entityId=Y` — list statements
+- `POST /sensemaking/statements/{id}/vote` — vote on statement (updates counts)
+- `GET /sensemaking/votes?entityType=X&entityId=Y` — all votes for entity (for clustering)
+
+Register in http.rs.
+
+Run `cargo test export_bindings` and add new types to storage-client-ts index.
+
+**Commit:** `feat(storage): add sensemaking CRUD and routes for statements`
+
+---
+
+### Task 3: Opinion clustering algorithm
 
 **Files:**
 - Create: `elohim/elohim-storage/src/sensemaking/mod.rs`
 - Create: `elohim/elohim-storage/src/sensemaking/clustering.rs`
-- Modify: `elohim/elohim-storage/src/lib.rs`
+- Modify: `elohim/elohim-storage/src/lib.rs` (add `pub mod sensemaking;`)
 
-Implement a rule-based clustering algorithm (MVP, not ML):
-1. Build a vote matrix: rows = humans, columns = statements, values = agree(1)/disagree(-1)/pass(0)
-2. Compute pairwise similarity between humans (cosine similarity on vote vectors)
-3. Simple agglomerative clustering (merge most-similar pairs until threshold)
-4. For each cluster: find characteristic statements (high within-cluster agreement)
-5. Find bridging statements (high agreement across ALL clusters)
+Implement rule-based clustering (MVP):
 
-Output type:
+1. **Build vote matrix:** rows = human_ids, columns = statement_ids, values = agree(1)/disagree(-1)/pass(0)/unvoted(0)
+2. **Cosine similarity:** Compute pairwise similarity between human vote vectors
+3. **Agglomerative clustering:** Start with each human as own cluster. Merge most-similar pair. Repeat until similarity < threshold (0.3).
+4. **Characteristic statements:** For each cluster, find statements where >70% of cluster members agree (or >70% disagree). These characterize the cluster's position.
+5. **Bridging statements:** Statements where >60% of EVERY cluster agrees. These are common ground.
+
+**Output types (with ts-rs export):**
+
 ```rust
-pub struct SensemakingResult {
-    pub clusters: Vec<OpinionCluster>,
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SensemakingResultView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub clusters: Vec<OpinionClusterView>,
     pub bridging_statements: Vec<StatementView>,
     pub total_participants: usize,
     pub total_statements: usize,
 }
 
-pub struct OpinionCluster {
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OpinionClusterView {
     pub id: String,
     pub member_count: usize,
     pub characteristic_statements: Vec<StatementView>,
@@ -72,123 +143,168 @@ pub struct OpinionCluster {
 }
 ```
 
+**HTTP route:** `GET /sensemaking/clusters?entityType=X&entityId=Y` — loads all statements + votes, runs clustering, returns SensemakingResultView.
+
+**Tests:** Add `#[cfg(test)] mod tests;` with:
+- 2 clearly separated groups → 2 clusters
+- Unanimous agreement → 1 cluster, bridging statement found
+- No votes → empty result
+- Single voter → 1 cluster
+
 **Commit:** `feat(storage): add opinion clustering algorithm for sensemaking`
 
 ---
 
-### Task 3: SensemakingService — Angular service
+### Task 4: GovernanceApiService — sensemaking methods
 
 **Files:**
-- Create: `app/elohim-app/src/app/qahal/services/sensemaking.service.ts`
+- Modify: `app/elohim-app/src/app/elohim/services/governance-api.service.ts`
 
-Methods:
-- `submitStatement(entityType: string, entityId: string, text: string): Observable<StatementView>`
-- `voteOnStatement(statementId: string, vote: 'agree'|'disagree'|'pass'): Observable<StatementVoteView>`
-- `getStatements(entityType: string, entityId: string): Observable<StatementView[]>`
-- `getClusters(entityType: string, entityId: string): Observable<SensemakingResult>`
+Add methods:
+- `submitStatement(input: CreateStatementInputView): Promise<StatementView>`
+- `voteOnStatement(statementId: string, input: VoteOnStatementInputView): Promise<StatementVoteView>`
+- `getStatements(entityType: string, entityId: string): Promise<StatementView[]>`
+- `getClusters(entityType: string, entityId: string): Promise<SensemakingResultView>`
 
-**Commit:** `feat(qahal): add sensemaking service`
+Import new types from `@elohim/storage-client/generated`.
+
+**Commit:** `feat(qahal): add sensemaking API methods`
 
 ---
 
-### Task 4: ContributeStatementComponent
+### Task 5: ContributeStatementComponent — Polis-style voting
 
 **Files:**
 - Create: `app/elohim-app/src/app/qahal/components/contribute-statement/contribute-statement.component.ts`
 
-Simple form: text input + submit button. Shows existing statements below with agree/disagree/pass vote buttons per statement. Polis-style: one statement at a time, vote, see next.
+Standalone, inline template. Inputs: `entityType`, `entityId`.
 
-**Commit:** `feat(qahal): add contribute statement component`
+**Polis-style one-at-a-time flow:**
+1. Load statements via API
+2. Show one unvoted statement at a time (card with text)
+3. Three buttons: Agree / Disagree / Pass
+4. On vote → submit via API → show next unvoted statement
+5. When all voted → show "Add your own statement" text input
+6. After contributing → show "Thanks! Your statement will be shown to others"
+7. Show progress: "Voted on 12 of 15 statements"
+
+This is the core Polis interaction pattern — simple, addictive, low-friction.
+
+Add to qahal barrel exports.
+
+**Commit:** `feat(qahal): add contribute-statement component with Polis-style voting`
 
 ---
 
-### Task 5: OpinionClusterVisualizationComponent
+### Task 6: Wire OpinionClusterComponent to real data
 
 **Files:**
-- Create: `app/elohim-app/src/app/qahal/components/opinion-cluster-visualization/opinion-cluster-visualization.component.ts`
+- Modify: `app/elohim-app/src/app/qahal/components/opinion-cluster/opinion-cluster.component.ts`
 
-Renders clusters as cards/groups:
-- Each cluster shows member count and characteristic statements
-- Bridging statements highlighted across clusters
-- No 2D projection for MVP — just grouped lists with visual grouping
-- Later: replace with proper t-SNE/UMAP visualization
+The existing 727-line component renders from in-memory Statement/StatementVote arrays passed as inputs. It already has PCA, clustering, canvas rendering.
 
-**Commit:** `feat(qahal): add opinion cluster visualization component`
+Wire it to real backend data:
+1. Add `entityType` and `entityId` inputs
+2. Load statements and votes via GovernanceApiService on init
+3. Pass loaded data to existing rendering logic
+4. Alternatively, load pre-computed SensemakingResultView from the clusters endpoint and map to component's internal types
 
----
+Keep the existing canvas rendering — just change the data source from mock to API.
 
-### Task 6: BridgingStatementComponent
-
-**Files:**
-- Create: `app/elohim-app/src/app/qahal/components/bridging-statement/bridging-statement.component.ts`
-
-Highlights statements with cross-cluster agreement. Shows:
-- Statement text
-- Agreement percentage per cluster
-- Overall agreement score
-- "Common ground" badge
-
-These bridging statements are the raw material for elohim bracket synthesis (Sprint 9).
-
-**Commit:** `feat(qahal): add bridging statement component`
+**Commit:** `feat(qahal): wire opinion cluster component to sensemaking backend`
 
 ---
 
-### Task 7: ElohimBracketSynthesisSeam
+### Task 7: BracketSynthesisService — Layer B seam
 
 **Files:**
 - Create: `app/elohim-app/src/app/qahal/services/bracket-synthesis.service.ts`
 
-This is the seam for Sprint 9. For now, it's a stub that takes bridging statements and packages them into a ProposalView with ranked-choice options. The options are the bridging statements themselves.
-
-In Sprint 9, this will be replaced with actual elohim inference that synthesizes a justified bracket from the sensemaking data.
+Stub that takes SensemakingResultView and creates a proposal with bridging statements as ranked-choice options.
 
 ```typescript
 @Injectable({ providedIn: 'root' })
 export class BracketSynthesisService {
-  // Sprint 9: replace with inference call
-  synthesizeBracket(sensemakingResult: SensemakingResult): Observable<ProposalView> {
-    // MVP: create proposal with bridging statements as options
+  private readonly governanceApi = inject(GovernanceApiService);
+
+  async synthesizeBracket(
+    entityType: string,
+    entityId: string,
+    sensemakingResult: SensemakingResultView
+  ): Promise<ProposalView> {
+    // MVP: Create proposal where options are bridging statements
+    const options = sensemakingResult.bridgingStatements.map((s, i) => ({
+      id: `synth-${s.id}`,
+      label: s.text,
+      description: `Bridging statement supported across ${sensemakingResult.clusters.length} opinion groups`,
+      position: i,
+    }));
+
+    // Create the proposal via API
+    const proposal = await this.governanceApi.createProposal({
+      // ... fields from CreateProposalInputView
+      votingMechanism: 'ranked-choice',
+      title: `Community synthesis: ${entityType} ${entityId}`,
+      body: 'Ranked-choice vote on bridging statements from sensemaking',
+    });
+
+    // Create options
+    await this.governanceApi.createProposalOptions(proposal.id, options);
+    return proposal;
   }
 }
 ```
 
-**Commit:** `feat(qahal): add bracket synthesis seam (Layer B preparation)`
+In Sprint 9, this replaces with inference: the elohim reads all cluster positions and bridging statements, then synthesizes a more nuanced bracket with justifications.
+
+Add to qahal barrel exports.
+
+**Commit:** `feat(qahal): add bracket synthesis seam for Layer B preparation`
 
 ---
 
-### Task 8: Integrate sensemaking into gateway
+### Task 8: Integrate sensemaking into gateway + routes
 
 **Files:**
-- Modify: FeedbackMechanismGatewayComponent
-- Add sensemaking route to qahal routing
+- Modify: `app/elohim-app/src/app/qahal/components/feedback-mechanism-gateway/feedback-mechanism-gateway.component.ts`
+- Modify: `app/elohim-app/src/app/qahal/community.routes.ts`
 
-When signal accumulation passes the "ready for sensemaking" threshold (Sprint 6), the gateway can show a "Sensemaking in progress" indicator and link to the sensemaking view.
+When `readyForSensemaking` is true, the gateway's "sensemaking available" badge becomes a link to the sensemaking view.
 
-Route: `governance/sensemaking` → shows ContributeStatementComponent + OpinionClusterVisualizationComponent
+Add route: `governance/sensemaking` → A page that shows:
+1. ContributeStatementComponent (top — participate first)
+2. OpinionClusterComponent (below — see the landscape)
+3. Bridging statements section
+4. "Synthesize bracket" button (calls BracketSynthesisService)
 
-**Commit:** `feat(qahal): integrate sensemaking into governance routes`
+Create a simple wrapper component for this route if needed.
+
+**Commit:** `feat(qahal): integrate sensemaking into gateway and routes`
 
 ---
 
-### Task 9: Tests and clustering algorithm tests
+### Task 9: Tests
 
-- Clustering algorithm: test with known vote patterns → expected clusters
-- Bridging statement detection: test cross-cluster agreement scoring
-- ContributeStatementComponent: submit and vote flow
-- SensemakingService: API integration
+- Clustering algorithm: Rust unit tests (Task 3 includes these)
+- SensemakingService API methods
+- SignalAccumulationService → sensemaking flow
+- BracketSynthesisService stub logic
 
-**Commit:** `test(qahal): add sensemaking and clustering tests`
+**Commit:** `test(qahal): add sensemaking service tests`
 
 ---
 
 ### Task 10: A2O scenarios
 
-- "Community opinion clustering reveals groups" — statements cluster into 2 groups
-- "Bridging statement surfaces common ground" — high cross-cluster agreement highlighted
-- "Elohim synthesizes bracket from sensemaking" — bridging statements become ranked-choice options
-- "Learner contributes statement to sensemaking" — statement added, vote recorded
-- "Sensemaking readiness triggered by signal threshold" — N signals → sensemaking begins
+**Files:**
+- Modify: `genesis/a2o/features/qahal/collective-governance.feature`
+
+Scenarios:
+- "Learner contributes statement to sensemaking" — Polis-style vote flow
+- "Community opinion clustering reveals groups" — 2 clusters with characteristic statements
+- "Bridging statement surfaces common ground" — cross-cluster agreement highlighted
+- "Sensemaking triggers bracket synthesis" — bridging statements become ranked-choice options
+- "Sensemaking readiness activates from signal threshold" — gateway badge links to sensemaking view
 
 **Commit:** `feat(a2o): add sensemaking and opinion clustering scenarios`
 
@@ -198,13 +314,13 @@ Route: `governance/sensemaking` → shows ContributeStatementComponent + Opinion
 
 | Task | What | Layer |
 |------|------|-------|
-| 1 | Statements table + CRUD + routes | Rust |
-| 2 | Opinion clustering algorithm | Rust |
-| 3 | SensemakingService | Service |
-| 4 | ContributeStatementComponent | Component |
-| 5 | OpinionClusterVisualizationComponent | Component |
-| 6 | BridgingStatementComponent | Component |
-| 7 | BracketSynthesisService (seam) | Service |
-| 8 | Integration into gateway | Integration |
+| 1 | Migration — statements + statement_votes | Rust |
+| 2 | Models, views, CRUD, routes + TS codegen | Rust |
+| 3 | Opinion clustering algorithm + tests | Rust |
+| 4 | GovernanceApiService sensemaking methods | Angular service |
+| 5 | ContributeStatementComponent (Polis flow) | Angular component |
+| 6 | Wire OpinionClusterComponent to backend | Angular integration |
+| 7 | BracketSynthesisService (Layer B seam) | Angular service |
+| 8 | Gateway + route integration | Integration |
 | 9 | Tests | Testing |
 | 10 | A2O scenarios | Scenarios |
