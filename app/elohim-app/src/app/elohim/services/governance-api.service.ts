@@ -30,6 +30,7 @@ import type {
   TallyResult,
   RecordSignalInputView,
   GovernanceSignalView,
+  SignalAggregateView,
   FileChallengeInputView,
   RespondToChallengeInputView,
   FileAppealInputView,
@@ -237,6 +238,31 @@ export class GovernanceApiService implements IGovernance {
   async recordSignal(signal: RecordSignalInputView): Promise<GovernanceSignalView> {
     return firstValueFrom(
       this.http.post<GovernanceSignalView>('/api/v1/governance/signals', signal)
+    );
+  }
+
+  async getSignalAggregate(
+    entityType: string,
+    entityId: string
+  ): Promise<SignalAggregateView> {
+    const emptyAggregate: SignalAggregateView = {
+      entityType,
+      entityId,
+      totalSignals: BigInt(0),
+      byType: {},
+      byValue: {},
+      uniqueParticipants: BigInt(0),
+      consensusStrength: 0,
+    };
+    return firstValueFrom(
+      this.http
+        .get<SignalAggregateView>('/api/v1/governance/signals/aggregate', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of(emptyAggregate)))
     );
   }
 
