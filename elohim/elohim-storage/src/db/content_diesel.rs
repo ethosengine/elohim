@@ -540,6 +540,7 @@ mod tests {
                 reach TEXT NOT NULL DEFAULT 'public',
                 validation_status TEXT NOT NULL DEFAULT 'valid',
                 created_by TEXT,
+                dht_anchor_hash TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )

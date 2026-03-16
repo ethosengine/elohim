@@ -553,6 +553,7 @@ mod tests {
                 governance_layer TEXT,
                 reach TEXT NOT NULL DEFAULT 'commons',
                 metadata_json TEXT,
+                dht_anchor_hash TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
