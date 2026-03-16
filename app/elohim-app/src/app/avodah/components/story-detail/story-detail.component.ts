@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
+import { CONTENT_TYPE_ICONS } from '@app/lamad/utils/content-icons';
 
 import {
   parseWorkStoryMeta,
@@ -160,6 +161,44 @@ import { AvodahApiService } from '../../services/avodah-api.service';
               <span class="empty-hint">Open to all — no mastery required</span>
             }
           </div>
+
+          <div class="section">
+            <label>Attachments</label>
+            @if (attachments.length > 0) {
+              <ul class="attachment-list">
+                @for (att of attachments; track att.relationshipId) {
+                  <li class="attachment-item">
+                    <span class="att-icon">{{ contentIcon(att.content.contentType) }}</span>
+                    <span class="att-title">{{ att.content.title }}</span>
+                    <button
+                      class="att-remove"
+                      (click)="removeAttachment(att.relationshipId)"
+                      data-testid="remove-attachment"
+                      aria-label="Remove attachment"
+                    >✕</button>
+                  </li>
+                }
+              </ul>
+            } @else if (!addingAttachment) {
+              <span class="empty-hint">No attachments</span>
+            }
+            @if (addingAttachment) {
+              <input
+                class="attach-input"
+                placeholder="Content ID…"
+                data-testid="attach-input"
+                (keydown.enter)="submitAttachment($event)"
+                (keydown.escape)="addingAttachment = false"
+                (blur)="addingAttachment = false"
+              />
+            } @else {
+              <button
+                class="attach-btn"
+                data-testid="add-attachment-btn"
+                (click)="addingAttachment = true"
+              >+ Attach content</button>
+            }
+          </div>
         </main>
       } @else {
         <div class="loading">Loading story...</div>
@@ -312,6 +351,16 @@ import { AvodahApiService } from '../../services/avodah-api.service';
         padding: 0.25rem 0;
         color: #a78bfa;
       }
+      .attachment-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+      .attachment-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border-radius: 6px; font-size: 0.85rem; }
+      .attachment-item:hover { background: rgba(99, 102, 241, 0.06); }
+      .att-icon { font-size: 1rem; }
+      .att-title { flex: 1; color: var(--lamad-text-secondary, #e2e8f0); }
+      .att-remove { background: none; border: none; color: var(--lamad-text-muted, #64748b); cursor: pointer; font-size: 0.75rem; padding: 0.125rem 0.375rem; border-radius: 4px; }
+      .att-remove:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+      .attach-input { width: 100%; background: rgba(15, 15, 26, 0.8); border: 1px solid var(--lamad-accent-primary, #6366f1); border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--lamad-text-secondary, #e2e8f0); outline: none; box-sizing: border-box; }
+      .attach-btn { background: none; border: 1px dashed rgba(99, 102, 241, 0.25); border-radius: 6px; color: var(--lamad-text-muted, #64748b); padding: 0.375rem 0.75rem; font-size: 0.8rem; cursor: pointer; width: 100%; }
+      .attach-btn:hover { border-color: var(--lamad-accent-primary, #6366f1); color: var(--lamad-accent-primary, #6366f1); }
       .loading {
         text-align: center;
         padding: 3rem;
@@ -328,6 +377,8 @@ export class StoryDetailComponent implements OnInit {
   story: ContentNode | null = null;
   projectId = '';
   projectTitle = '';
+  attachments: { relationshipId: string; content: ContentNode }[] = [];
+  addingAttachment = false;
   readonly editingTitle = signal(false);
   readonly editingDescription = signal(false);
 
@@ -339,6 +390,10 @@ export class StoryDetailComponent implements OnInit {
     return parseWorkStoryMeta(
       (this.story?.metadata ?? {}) as Record<string, unknown>,
     );
+  }
+
+  contentIcon(contentType: string): string {
+    return (CONTENT_TYPE_ICONS as Record<string, string>)[contentType] ?? '📄';
   }
 
   formatDate(iso: string): string {
@@ -372,6 +427,20 @@ export class StoryDetailComponent implements OnInit {
       metadata: { visibility },
     });
     (this.story.metadata as Record<string, unknown>)['visibility'] = visibility;
+  }
+
+  async submitAttachment(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const contentId = input.value.trim();
+    if (!contentId || !this.story) return;
+    await this.api.attachContent(this.story.id, contentId);
+    this.attachments = await this.api.getAttachments(this.story.id);
+    this.addingAttachment = false;
+  }
+
+  async removeAttachment(relationshipId: string): Promise<void> {
+    await this.api.detachContent(relationshipId);
+    this.attachments = this.attachments.filter(a => a.relationshipId !== relationshipId);
   }
 
   async saveTitle(event: Event): Promise<void> {
@@ -412,6 +481,9 @@ export class StoryDetailComponent implements OnInit {
         this.projectId,
         'board',
       ]);
+    }
+    if (this.story) {
+      this.attachments = await this.api.getAttachments(this.story.id);
     }
   }
 }
