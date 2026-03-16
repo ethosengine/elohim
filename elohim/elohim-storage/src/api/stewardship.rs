@@ -513,6 +513,10 @@ async fn handle_create_allocation(
     ctx: &AppContext,
     services: Option<Arc<Services>>,
 ) -> Response<Full<Bytes>> {
+    // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+    // Currently null for direct storage writes. Backfill needed for pre-coherence data.
+    // Note: NewStewardshipAllocation also omits the dht_anchor_hash field entirely —
+    // both the insert struct and an upsert_with_anchor function need to be added.
     let input_view: CreateAllocationInputView = match parse_body(req).await {
         Ok(v) => v,
         Err(_) => return response::bad_request("Invalid JSON body for create allocation"),

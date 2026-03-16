@@ -66,6 +66,8 @@ async fn handle_create(
     pool: &DbPool,
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+    // Currently null for direct storage writes. Backfill needed for pre-coherence data.
     let input_view: CreateAgreementInputView = parse_body(req).await?;
     let input = input_view.into();
     let mut conn = get_conn(pool)?;
