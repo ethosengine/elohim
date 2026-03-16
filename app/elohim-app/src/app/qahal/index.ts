@@ -24,6 +24,7 @@ export {
 } from './components/context-menu-only/context-menu-only.component';
 export { FeedbackMechanismGatewayComponent } from './components/feedback-mechanism-gateway/feedback-mechanism-gateway.component';
 export { PsephosBallotWrapperComponent } from './components/psephos-ballot-wrapper/psephos-ballot-wrapper.component';
+export { FileChallengeComponent } from './components/file-challenge/file-challenge.component';
 
 // Services
 export * from './services';
