@@ -13,3 +13,4 @@ export type { MechanismSelection } from './mechanism-selection.service';
 export { GovernanceRecognitionService } from './governance-recognition.service';
 export { SignalAccumulationService } from './signal-accumulation.service';
 export type { AccumulationStatus } from './signal-accumulation.service';
+export { BracketSynthesisService } from './bracket-synthesis.service';
