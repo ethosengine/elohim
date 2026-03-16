@@ -339,6 +339,8 @@ pub struct PathAttestationView {
     pub path_id: String,
     pub attestation_type: String,
     pub attestation_name: String,
+    /// DHT provenance: ActionHash of the Attestation entry in imagodei DNA. None for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<PathAttestation> for PathAttestationView {
@@ -348,6 +350,7 @@ impl From<PathAttestation> for PathAttestationView {
             path_id: a.path_id,
             attestation_type: a.attestation_type,
             attestation_name: a.attestation_name,
+            dht_anchor_hash: a.dht_anchor_hash,
         }
     }
 }
@@ -530,6 +533,8 @@ pub struct HumanRelationshipView {
     pub created_at: String,
     pub updated_at: String,
     pub expires_at: Option<String>,
+    /// DHT provenance: ActionHash of the HumanRelationship entry in imagodei DNA. None for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<HumanRelationship> for HumanRelationshipView {
@@ -556,6 +561,7 @@ impl From<HumanRelationship> for HumanRelationshipView {
             created_at: h.created_at,
             updated_at: h.updated_at,
             expires_at: h.expires_at,
+            dht_anchor_hash: h.dht_anchor_hash,
         }
     }
 }
@@ -601,6 +607,8 @@ pub struct ContributorPresenceView {
     pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
+    /// DHT provenance: ActionHash of the ContributorPresence entry in imagodei DNA. None for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<ContributorPresence> for ContributorPresenceView {
@@ -634,6 +642,7 @@ impl From<ContributorPresence> for ContributorPresenceView {
             metadata: parse_json_opt(&c.metadata_json),
             created_at: c.created_at,
             updated_at: c.updated_at,
+            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }
@@ -2332,6 +2341,8 @@ pub struct HumanView {
     pub app_id: String,
     pub created_at: String,
     pub updated_at: String,
+    /// DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Human> for HumanView {
@@ -2349,6 +2360,7 @@ impl From<Human> for HumanView {
             app_id: h.app_id,
             created_at: h.created_at,
             updated_at: h.updated_at,
+            dht_anchor_hash: h.dht_anchor_hash,
         }
     }
 }
