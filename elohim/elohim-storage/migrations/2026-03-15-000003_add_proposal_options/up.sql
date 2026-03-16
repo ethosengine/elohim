@@ -1,3 +1,10 @@
+-- proposal_options: Source of truth: DHT (derived from proposal via Link).
+-- Classification: A2 (Derived) — dht_anchor_hash links to parent proposal ActionHash.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+--
+-- proposals extension: voting_mechanism, score_min/max, dots, quorum, threshold columns added below.
+-- proposals source of truth: DHT (governance entry). Classification: A (Notarized).
+
 CREATE TABLE IF NOT EXISTS proposal_options (
     id TEXT PRIMARY KEY NOT NULL,
     proposal_id TEXT NOT NULL,

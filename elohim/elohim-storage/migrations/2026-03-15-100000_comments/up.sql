@@ -1,3 +1,7 @@
+-- comments: Source of truth: SQLite (operational).
+-- Classification: C (Operational) — reconstructable from content/parent references.
+-- No dht_anchor_hash needed.
+
 CREATE TABLE comments (
     id TEXT PRIMARY KEY NOT NULL,
     app_id TEXT NOT NULL DEFAULT 'lamad',

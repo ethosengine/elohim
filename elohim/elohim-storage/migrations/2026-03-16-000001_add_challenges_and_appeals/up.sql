@@ -1,4 +1,11 @@
 -- Sprint 5: Governance immune system — challenges and appeals tables
+-- challenges: Source of truth: DHT (governance entry).
+-- Classification: A (Notarized) — challenges are public acts, must be witnessed by the community.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+--
+-- appeals: Source of truth: DHT (governance entry).
+-- Classification: A (Notarized) — appeals are public acts, must be witnessed by the community.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
 -- Replaces the simple challenges table with a full challenge lifecycle + appeals
 
 DROP TABLE IF EXISTS challenges;

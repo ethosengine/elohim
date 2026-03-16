@@ -178,6 +178,9 @@ pub async fn handle(
                 created_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification A (Notarized): challenges are public acts, must be witnessed by the community.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let challenge = governance::create_challenge(&mut conn, &new)?;
             let sla = sla_service::compute_sla_status(&challenge);
@@ -251,6 +254,9 @@ pub async fn handle(
                 created_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification A (Notarized): appeals are public acts, must be witnessed by the community.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let appeal = governance::create_appeal(&mut conn, &new)?;
             Ok(response::created(&AppealView::from(appeal)))
         }
@@ -332,6 +338,9 @@ pub async fn handle(
                 passage_threshold: input.passage_threshold,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification A (Notarized): proposals are public deliberative acts.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let _result = governance::create_proposal(&mut conn, &new)?;
 
@@ -380,6 +389,10 @@ pub async fn handle(
                 updated_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification B2 (Agent-Scoped + Attestation): raw vote is private to the agent's source chain;
+            // dht_anchor_hash set when the tally Attestation is issued by the counting zome.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let vote = governance::cast_vote(&mut conn, &new_vote)?;
             let hide = proposal.voting_anonymous == 1;
             Ok(response::created(&VoteView::from_vote(vote, hide)))
@@ -415,6 +428,10 @@ pub async fn handle(
                 })
                 .collect();
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification A2 (Derived): proposal_options are derived from the parent proposal via Link;
+            // dht_anchor_hash links to parent Proposal ActionHash.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let results = governance::create_proposal_options(&mut conn, &new_options)?;
             let views: Vec<ProposalOptionView> =
@@ -534,6 +551,10 @@ pub async fn handle(
                 })
                 .collect();
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification B2 (Agent-Scoped + Attestation): raw ranked vote is private to the agent's source chain;
+            // dht_anchor_hash set when the tally Attestation is issued by the counting zome.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let results =
                 governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
             let hide = proposal.voting_anonymous == 1;
@@ -765,6 +786,10 @@ pub async fn handle(
                 created_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification B2 (Agent-Scoped + Attestation): raw governance signal is private to the agent;
+            // dht_anchor_hash set when the aggregate signal Attestation is notarized.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let result = governance::record_signal(&mut conn, &new_signal)?;
             Ok(response::created(&GovernanceSignalView::from(result)))
@@ -829,6 +854,9 @@ pub async fn handle(
                 created_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification A (Notarized): statements are community-visible Polis sensemaking entries.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let statement = governance::create_statement(&mut conn, &new)?;
             Ok(response::created(&StatementView::from(statement)))
@@ -883,6 +911,10 @@ pub async fn handle(
                 created_at: &now,
             };
 
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Classification B2 (Agent-Scoped + Attestation): statement vote is private to the agent's source chain;
+            // dht_anchor_hash set when the clustered aggregate Attestation is notarized.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let mut conn = get_conn(pool)?;
             let vote = governance::vote_on_statement(&mut conn, &new_vote)?;
             Ok(response::created(&StatementVoteView::from(vote)))

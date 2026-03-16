@@ -1,3 +1,12 @@
+-- ranked_votes: Source of truth: private source chain (agent-scoped ballot).
+-- Classification: B2 (Agent-Scoped + Attestation) — same pattern as votes;
+-- dht_anchor_hash populated when tally Attestation is issued.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+--
+-- governance_signals: Source of truth: private source chain (agent-scoped reaction).
+-- Classification: B2 — raw signal is private; aggregate Attestation is notarized.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+
 CREATE TABLE IF NOT EXISTS ranked_votes (
     id TEXT PRIMARY KEY NOT NULL,
     proposal_id TEXT NOT NULL,

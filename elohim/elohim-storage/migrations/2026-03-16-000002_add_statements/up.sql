@@ -1,3 +1,12 @@
+-- statements: Source of truth: DHT (Polis sensemaking entry).
+-- Classification: A (Notarized) — community-visible statements for opinion clustering.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+--
+-- statement_votes: Source of truth: private source chain (agent-scoped stance).
+-- Classification: B2 (Agent-Scoped + Attestation) — private stance;
+-- clustered aggregate is notarized.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+
 CREATE TABLE IF NOT EXISTS statements (
     id TEXT PRIMARY KEY NOT NULL,
     entity_type TEXT NOT NULL,

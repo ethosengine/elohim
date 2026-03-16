@@ -1,5 +1,13 @@
 -- Collectives: governance contexts with graduated participation
 -- Unifies communities and organizations under a single model.
+--
+-- collectives: Source of truth: DHT (Collective entry in imagodei DNA).
+-- Classification: A (Notarized) — collectives are community-visible governance contexts.
+-- Note: dht_anchor_hash not yet added (pre-P2P-coherence table; tracked as gap).
+--
+-- collective_participations: Source of truth: DHT (derived from Collective via Link).
+-- Classification: A2 (Derived) — participation is a witnessed act, linked to Collective ActionHash.
+-- Note: dht_anchor_hash not yet added (pre-P2P-coherence table; tracked as gap).
 
 CREATE TABLE collectives (
     id TEXT PRIMARY KEY NOT NULL,

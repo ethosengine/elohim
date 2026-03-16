@@ -1,3 +1,11 @@
+-- votes: Source of truth: private source chain (agent-scoped ballot).
+-- Classification: B2 (Agent-Scoped + Attestation) — raw vote is private;
+-- dht_anchor_hash populated when tally Attestation is issued.
+-- dht_anchor_hash added in migration 2026-03-16-300000_qahal_provenance.
+--
+-- proposals extension: voting_anonymous column added below.
+-- proposals source of truth: DHT (governance entry). Classification: A (Notarized).
+
 CREATE TABLE IF NOT EXISTS votes (
     id TEXT PRIMARY KEY NOT NULL,
     proposal_id TEXT NOT NULL,
