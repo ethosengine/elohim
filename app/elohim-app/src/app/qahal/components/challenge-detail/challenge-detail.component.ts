@@ -5,7 +5,7 @@
  * Reads the challenge ID from the route and displays challenge details.
  */
 
-import { Component, computed, inject, signal, type OnInit } from '@angular/core';
+import { Component, inject, signal, type OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import type { ChallengeView } from '@elohim/storage-client/generated';
@@ -29,7 +29,7 @@ import { GovernanceApiService } from '@app/elohim/services/governance-api.servic
         <div class="detail-header">
           <a routerLink=".." class="back-link">&larr; All challenges</a>
           <h2 class="detail-title">Challenge: {{ challenge()!.groundsPrimary }}</h2>
-          <span class="detail-status-badge">{{ challenge()!.status }}</span>
+          <span class="detail-status-badge">{{ challenge()!.state }}</span>
         </div>
 
         <dl class="detail-fields">
