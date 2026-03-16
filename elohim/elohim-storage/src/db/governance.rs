@@ -7,13 +7,13 @@ use diesel::prelude::*;
 
 use super::diesel_schema::{
     appeals, challenges, discussions, governance_signals, governance_states, precedents,
-    proposal_options, proposals, ranked_votes, votes,
+    proposal_options, proposals, ranked_votes, statement_votes, statements, votes,
 };
 use super::models::{
     Appeal, Challenge, Discussion, GovernanceSignal, GovernanceState, NewAppeal, NewChallenge,
     NewDiscussion, NewGovernanceSignal, NewGovernanceState, NewPrecedent, NewProposal,
-    NewProposalOption, NewRankedVote, NewVote, Precedent, Proposal, ProposalOption, RankedVote,
-    Vote,
+    NewProposalOption, NewRankedVote, NewStatementVote, NewVote, Precedent, Proposal,
+    ProposalOption, RankedVote, Statement, StatementVote, Vote,
 };
 use crate::error::StorageError;
 
@@ -580,4 +580,116 @@ pub fn count_signals(
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))
+}
+
+// ============================================================================
+// Sensemaking Statements
+// ============================================================================
+
+/// Create a new statement
+pub fn create_statement(
+    conn: &mut SqliteConnection,
+    new: &super::models::NewStatement,
+) -> Result<Statement, StorageError> {
+    diesel::insert_into(statements::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+    statements::table
+        .filter(statements::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Query statements by entity type and entity ID
+pub fn query_statements(
+    conn: &mut SqliteConnection,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<Vec<Statement>, StorageError> {
+    statements::table
+        .filter(statements::entity_type.eq(entity_type))
+        .filter(statements::entity_id.eq(entity_id))
+        .order(statements::created_at.desc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Vote on a statement (upsert): delete existing vote for this human+statement,
+/// insert new vote, then recount agree/disagree/pass from statement_votes.
+pub fn vote_on_statement(
+    conn: &mut SqliteConnection,
+    new_vote: &NewStatementVote,
+) -> Result<StatementVote, StorageError> {
+    // Delete existing vote for this human+statement
+    diesel::delete(
+        statement_votes::table
+            .filter(statement_votes::statement_id.eq(new_vote.statement_id))
+            .filter(statement_votes::human_id.eq(new_vote.human_id)),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+
+    // Insert new vote
+    diesel::insert_into(statement_votes::table)
+        .values(new_vote)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+    // Recount all votes for this statement
+    let all_votes: Vec<StatementVote> = statement_votes::table
+        .filter(statement_votes::statement_id.eq(new_vote.statement_id))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
+
+    let agree_count = all_votes.iter().filter(|v| v.vote == "agree").count() as i32;
+    let disagree_count = all_votes.iter().filter(|v| v.vote == "disagree").count() as i32;
+    let pass_count = all_votes.iter().filter(|v| v.vote == "pass").count() as i32;
+
+    diesel::update(statements::table.filter(statements::id.eq(new_vote.statement_id)))
+        .set((
+            statements::agree_count.eq(agree_count),
+            statements::disagree_count.eq(disagree_count),
+            statements::pass_count.eq(pass_count),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+
+    statement_votes::table
+        .filter(statement_votes::id.eq(new_vote.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Get all votes for a specific statement
+pub fn get_statement_votes(
+    conn: &mut SqliteConnection,
+    statement_id: &str,
+) -> Result<Vec<StatementVote>, StorageError> {
+    statement_votes::table
+        .filter(statement_votes::statement_id.eq(statement_id))
+        .order(statement_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Get all votes for all statements of a given entity (for clustering)
+pub fn get_all_votes_for_entity(
+    conn: &mut SqliteConnection,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<Vec<StatementVote>, StorageError> {
+    let statement_ids: Vec<String> = statements::table
+        .filter(statements::entity_type.eq(entity_type))
+        .filter(statements::entity_id.eq(entity_id))
+        .select(statements::id)
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
+
+    statement_votes::table
+        .filter(statement_votes::statement_id.eq_any(&statement_ids))
+        .order(statement_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }

@@ -129,3 +129,11 @@ export * from './RankedVoteView';
 export * from './RecordSignalInputView';
 export * from './TallyResult';
 export * from './TallyRound';
+
+// Sensemaking types
+export * from './CreateStatementInputView';
+export * from './OpinionClusterView';
+export * from './SensemakingResultView';
+export * from './StatementView';
+export * from './StatementVoteView';
+export * from './VoteOnStatementInputView';
