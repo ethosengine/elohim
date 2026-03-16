@@ -1,19 +1,12 @@
-import {
-  Component,
-  ChangeDetectionStrategy,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, viewChild } from '@angular/core';
+
 import { of } from 'rxjs';
 
 import { GateArtifactCardComponent } from '@app/elohim/components/gate-artifact-card/gate-artifact-card.component';
 
 import { CannedResponseService } from '../../services/canned-response.service';
-import {
-  ElohimMessageListComponent,
-  type ChatMessage,
-} from './elohim-message-list.component';
+
+import { ElohimMessageListComponent, type ChatMessage } from './elohim-message-list.component';
 
 @Component({
   selector: 'app-elohim-sidebar',
@@ -135,8 +128,7 @@ import {
 })
 export class ElohimSidebarComponent {
   private readonly cannedResponse = inject(CannedResponseService);
-  private readonly card =
-    viewChild<GateArtifactCardComponent>('sidebarCard');
+  private readonly card = viewChild<GateArtifactCardComponent>('sidebarCard');
 
   readonly expanded = signal(false);
   readonly messages = signal<ChatMessage[]>([]);
@@ -149,7 +141,7 @@ export class ElohimSidebarComponent {
     const text = cardRef.interaction.draftText();
     const reply = this.cannedResponse.respond(text);
 
-    this.messages.update((msgs) => [
+    this.messages.update(msgs => [
       ...msgs,
       { role: 'human' as const, text },
       { role: 'elohim' as const, text: reply },

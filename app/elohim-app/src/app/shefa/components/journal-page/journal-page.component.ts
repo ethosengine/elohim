@@ -1,21 +1,17 @@
-import {
-  Component,
-  ChangeDetectionStrategy,
-  DestroyRef,
-  inject,
-  viewChild,
-} from '@angular/core';
+import { Component, ChangeDetectionStrategy, DestroyRef, inject, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+
 import { Subject, switchMap, takeUntil } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import { JournalRoutingService } from '../../services/journal-routing.service';
-import { JournalEditorComponent } from './journal-editor.component';
-import { JournalConfirmComponent } from './journal-confirm.component';
-import { JournalRoutingCardsComponent } from './journal-routing-cards.component';
-import { JournalRoutedComponent } from './journal-routed.component';
+
 import { ElohimSidebarComponent } from './elohim-sidebar.component';
+import { JournalConfirmComponent } from './journal-confirm.component';
+import { JournalEditorComponent } from './journal-editor.component';
+import { JournalRoutedComponent } from './journal-routed.component';
+import { JournalRoutingCardsComponent } from './journal-routing-cards.component';
 
 @Component({
   selector: 'app-journal-page',
@@ -34,10 +30,7 @@ import { ElohimSidebarComponent } from './elohim-sidebar.component';
       <div class="journal-main">
         @switch (routing.state()) {
           @case ('writing') {
-            <app-journal-editor
-              [contentId]="contentId"
-              (finished)="onFinish($event)"
-            />
+            <app-journal-editor [contentId]="contentId" (finished)="onFinish($event)" />
           }
           @case ('confirming') {
             <app-journal-confirm
@@ -113,13 +106,13 @@ export class JournalPageComponent {
 
     this.route.paramMap
       .pipe(
-        switchMap((params) => {
+        switchMap(params => {
           this.contentId = params.get('id') ?? '';
           return this.storageApi.getContent(this.contentId);
         }),
-        takeUntil(destroy$),
+        takeUntil(destroy$)
       )
-      .subscribe((content) => {
+      .subscribe(content => {
         if (content) {
           this.editor()?.loadContent(content.title ?? '', content.contentBody ?? '');
         }

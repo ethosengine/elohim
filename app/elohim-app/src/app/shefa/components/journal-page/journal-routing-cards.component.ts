@@ -26,11 +26,7 @@ const REACH_LABELS: Record<string, string> = {
     <div class="collapsed-preview" data-testid="collapsed-text">
       <div class="preview-title">{{ previewTitle() }}</div>
       <div class="preview-body">{{ previewBody() }}</div>
-      <button
-        class="btn-edit"
-        data-testid="routing-edit-btn"
-        (click)="editRequested.emit()"
-      >
+      <button class="btn-edit" data-testid="routing-edit-btn" (click)="editRequested.emit()">
         Edit
       </button>
     </div>

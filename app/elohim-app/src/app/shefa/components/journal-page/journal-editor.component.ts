@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+
 import { Subject, debounceTime, switchMap, takeUntil } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
@@ -42,7 +43,9 @@ import { StorageApiService } from '@app/elohim/services/storage-api.service';
           class="btn-finish"
           data-testid="finish-btn"
           (click)="finished.emit({ title: title(), body: body() })"
-        >Finish</button>
+        >
+          Finish
+        </button>
       }
     </div>
   `,
@@ -137,11 +140,11 @@ export class JournalEditorComponent {
     this.bodyChange$
       .pipe(
         debounceTime(1500),
-        switchMap((contentBody) => {
+        switchMap(contentBody => {
           this.saveStatus.set('Saving...');
           return this.storageApi.updateContent(this.contentId(), { contentBody });
         }),
-        takeUntil(destroy$),
+        takeUntil(destroy$)
       )
       .subscribe({
         next: () => this.saveStatus.set('Saved'),

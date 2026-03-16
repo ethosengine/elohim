@@ -1,10 +1,4 @@
-import {
-  Component,
-  ChangeDetectionStrategy,
-  EventEmitter,
-  input,
-  Output,
-} from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, input, Output } from '@angular/core';
 
 @Component({
   selector: 'app-journal-confirm',
@@ -13,38 +7,16 @@ import {
   template: `
     @if (analyzing()) {
       <div class="shimmer" data-testid="confirm-shimmer"></div>
-      <button
-        class="btn-confirm"
-        disabled
-        data-testid="confirm-btn"
-      >
-        Looks good
-      </button>
-      <button
-        class="btn-edit"
-        (click)="editRequested.emit()"
-        data-testid="edit-btn"
-      >
-        Edit
-      </button>
+      <button class="btn-confirm" disabled data-testid="confirm-btn">Looks good</button>
+      <button class="btn-edit" (click)="editRequested.emit()" data-testid="edit-btn">Edit</button>
     } @else {
       <div class="artifact-preview" data-testid="confirm-text">{{ text() }}</div>
       <div class="intent-summary" data-testid="intent-summary">{{ intentSummary() }}</div>
       <div class="confirm-actions">
-        <button
-          class="btn-confirm"
-          (click)="confirmed.emit()"
-          data-testid="confirm-btn"
-        >
+        <button class="btn-confirm" (click)="confirmed.emit()" data-testid="confirm-btn">
           Looks good
         </button>
-        <button
-          class="btn-edit"
-          (click)="editRequested.emit()"
-          data-testid="edit-btn"
-        >
-          Edit
-        </button>
+        <button class="btn-edit" (click)="editRequested.emit()" data-testid="edit-btn">Edit</button>
       </div>
     }
   `,

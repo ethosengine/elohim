@@ -1,10 +1,4 @@
-import {
-  Component,
-  ChangeDetectionStrategy,
-  input,
-  computed,
-  output,
-} from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, computed, output } from '@angular/core';
 
 import type { RoutingSuggestion } from '../../models/journal-routing.model';
 
@@ -30,9 +24,7 @@ const REACH_LABELS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="routed-container">
-      <p class="routed-message" data-testid="routed-message">
-        Your words are where they belong.
-      </p>
+      <p class="routed-message" data-testid="routed-message">Your words are where they belong.</p>
 
       <ul class="routed-list">
         @for (card of postedCards(); track card.id) {
@@ -156,9 +148,7 @@ export class JournalRoutedComponent {
   readonly suggestions = input.required<RoutingSuggestion[]>();
   readonly writeAnother = output<void>();
 
-  readonly postedCards = computed(() =>
-    this.suggestions().filter((s) => s.status === 'posted'),
-  );
+  readonly postedCards = computed(() => this.suggestions().filter(s => s.status === 'posted'));
 
   reachIcon(reach: string): string {
     return REACH_ICONS[reach] ?? '';

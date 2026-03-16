@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, timer } from 'rxjs';
+
 import { map, take } from 'rxjs/operators';
+
+import { Observable, timer } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
@@ -66,7 +68,7 @@ export class JournalRoutingService {
   finish(text: string): void {
     this._journalText.set(text);
 
-    this.analyzeIntent(text).subscribe((analysis) => {
+    this.analyzeIntent(text).subscribe(analysis => {
       this._intentAnalysis.set(analysis);
       this._intentSummary.set(analysis.summary);
       this._state.set('confirming');
@@ -79,7 +81,7 @@ export class JournalRoutingService {
     const analysis = this._intentAnalysis();
     if (!analysis) return;
 
-    this.generateSuggestions(text, analysis).subscribe((suggestions) => {
+    this.generateSuggestions(text, analysis).subscribe(suggestions => {
       this._suggestions.set(suggestions);
       this._state.set('routing');
     });
@@ -92,7 +94,7 @@ export class JournalRoutingService {
 
   /** Post an individual card (filing = PATCH, derivative = POST). */
   postCard(id: string): void {
-    const card = this._suggestions().find((s) => s.id === id);
+    const card = this._suggestions().find(s => s.id === id);
     if (!card) return;
 
     this.updateCardStatus(id, 'posting');
@@ -152,7 +154,16 @@ export class JournalRoutingService {
         const lower = text.toLowerCase();
         const detectedTypes: DestinationType[] = [];
 
-        const exchangeKeywords = ['need', 'want', 'broken', 'repair', 'help', 'fix', 'hire', 'find'];
+        const exchangeKeywords = [
+          'need',
+          'want',
+          'broken',
+          'repair',
+          'help',
+          'fix',
+          'hire',
+          'find',
+        ];
         const governanceKeywords = [
           'should',
           'vote',
@@ -162,22 +173,15 @@ export class JournalRoutingService {
           'community',
           'rule',
         ];
-        const contentKeywords = [
-          'learned',
-          'discovered',
-          'guide',
-          'how-to',
-          'tutorial',
-          'explain',
-        ];
+        const contentKeywords = ['learned', 'discovered', 'guide', 'how-to', 'tutorial', 'explain'];
 
-        if (exchangeKeywords.some((kw) => lower.includes(kw))) {
+        if (exchangeKeywords.some(kw => lower.includes(kw))) {
           detectedTypes.push('exchange-request');
         }
-        if (governanceKeywords.some((kw) => lower.includes(kw))) {
+        if (governanceKeywords.some(kw => lower.includes(kw))) {
           detectedTypes.push('governance-proposal');
         }
-        if (contentKeywords.some((kw) => lower.includes(kw))) {
+        if (contentKeywords.some(kw => lower.includes(kw))) {
           detectedTypes.push('content');
         }
 
@@ -200,7 +204,7 @@ export class JournalRoutingService {
         const suggestedPath = this.guessFilingPath(lower);
 
         return { summary, detectedTypes, suggestedPath };
-      }),
+      })
     );
   }
 
@@ -210,7 +214,7 @@ export class JournalRoutingService {
    */
   private generateSuggestions(
     text: string,
-    intent: IntentAnalysis,
+    intent: IntentAnalysis
   ): Observable<RoutingSuggestion[]> {
     return timer(800).pipe(
       take(1),
@@ -237,7 +241,7 @@ export class JournalRoutingService {
         }
 
         return suggestions;
-      }),
+      })
     );
   }
 
@@ -245,10 +249,7 @@ export class JournalRoutingService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private buildDerivativeCard(
-    dtype: DestinationType,
-    suggestedPath: string,
-  ): RoutingSuggestion {
+  private buildDerivativeCard(dtype: DestinationType, suggestedPath: string): RoutingSuggestion {
     const titles: Record<DestinationType, string> = {
       'exchange-request': 'Post to exchange',
       'governance-proposal': 'Draft governance proposal',
@@ -285,21 +286,19 @@ export class JournalRoutingService {
     const learningKeywords = ['learned', 'studied', 'course', 'tutorial', 'formula', 'equation'];
     const workKeywords = ['meeting', 'project', 'deadline', 'client', 'office', 'salary'];
 
-    if (homeKeywords.some((kw) => lowerText.includes(kw))) return 'home-maintenance';
-    if (learningKeywords.some((kw) => lowerText.includes(kw))) return 'learning';
-    if (workKeywords.some((kw) => lowerText.includes(kw))) return 'work';
+    if (homeKeywords.some(kw => lowerText.includes(kw))) return 'home-maintenance';
+    if (learningKeywords.some(kw => lowerText.includes(kw))) return 'learning';
+    if (workKeywords.some(kw => lowerText.includes(kw))) return 'work';
     return 'general';
   }
 
   private updateCardStatus(id: string, status: RoutingSuggestion['status']): void {
-    this._suggestions.update((cards) =>
-      cards.map((c) => (c.id === id ? { ...c, status } : c)),
-    );
+    this._suggestions.update(cards => cards.map(c => (c.id === id ? { ...c, status } : c)));
   }
 
   private checkAllResolved(): void {
     const allResolved = this._suggestions().every(
-      (c) => c.status === 'posted' || c.status === 'dismissed',
+      c => c.status === 'posted' || c.status === 'dismissed'
     );
     if (allResolved) {
       this._state.set('routed');
