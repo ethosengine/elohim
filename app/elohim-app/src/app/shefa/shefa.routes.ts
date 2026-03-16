@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+import { identityGuard } from '@app/imagodei/guards/identity.guard';
+
 /**
  * Shefa routing - Economy context app
  *
@@ -89,6 +91,7 @@ export const SHEFA_ROUTES: Routes = [
       },
       {
         path: 'journal/:id',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/journal-page/journal-page.component').then(
             m => m.JournalPageComponent
