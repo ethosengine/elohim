@@ -70,3 +70,6 @@ export type { DiagnosticBundle } from './diagnostic-collector.service';
 // Issue report service (content-node API)
 export { IssueReportService } from './issue-report.service';
 export type { IssueReportInput, ResolutionStatus } from './issue-report.service';
+
+// SSE event streaming
+export { EventStreamService } from './event-stream.service';
