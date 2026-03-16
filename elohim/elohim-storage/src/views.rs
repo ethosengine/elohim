@@ -92,9 +92,15 @@ use crate::db::models::{
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
     GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
     PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
+<<<<<<< HEAD
     ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Statement,
     StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
     StewardshipAllocationWithPresence, Vote,
+=======
+    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Schedule, Step,
+    StewardCredential, StewardedNode, StewardshipAllocation, StewardshipAllocationWithPresence,
+    Vote,
+>>>>>>> feature/kairos-schedules
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -4601,6 +4607,7 @@ pub struct SetSessionIntentInputView {
 }
 
 // ============================================================================
+<<<<<<< HEAD
 // Sensemaking Statement Views
 // ============================================================================
 
@@ -4624,10 +4631,33 @@ pub struct StatementView {
 
 impl From<Statement> for StatementView {
     fn from(s: Statement) -> Self {
+=======
+// Schedule Views (Kairos temporal dimension)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ScheduleView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+    pub next_occurrence_at: Option<String>,
+    pub occurrence_count: i32,
+    pub created_at: String,
+}
+
+impl From<Schedule> for ScheduleView {
+    fn from(s: Schedule) -> Self {
+>>>>>>> feature/kairos-schedules
         Self {
             id: s.id,
             entity_type: s.entity_type,
             entity_id: s.entity_id,
+<<<<<<< HEAD
             human_id: s.human_id,
             text: s.text,
             agree_count: s.agree_count,
@@ -4635,11 +4665,19 @@ impl From<Statement> for StatementView {
             pass_count: s.pass_count,
             group_id: s.group_id,
             is_bridging: s.is_bridging != 0,
+=======
+            scheduled_at: s.scheduled_at,
+            expires_at: s.expires_at,
+            rrule: s.rrule,
+            next_occurrence_at: s.next_occurrence_at,
+            occurrence_count: s.occurrence_count,
+>>>>>>> feature/kairos-schedules
             created_at: s.created_at,
         }
     }
 }
 
+<<<<<<< HEAD
 /// Statement vote — API response
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -4706,6 +4744,26 @@ pub struct OpinionClusterView {
     pub member_count: usize,
     pub characteristic_statements: Vec<StatementView>,
     pub internal_agreement: f64,
+=======
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateScheduleInputView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateScheduleInputView {
+    pub scheduled_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub rrule: Option<String>,
+>>>>>>> feature/kairos-schedules
 }
 
 // ============================================================================
