@@ -136,6 +136,9 @@ export interface IStorageApi {
 
   /** Get stewardship data for a content piece. */
   getStewardship(contentId: string): Observable<ContentStewardshipView | null>;
+
+  /** Delete a content relationship by ID. */
+  deleteRelationship(id: string): Observable<void>;
 }
 
 /**

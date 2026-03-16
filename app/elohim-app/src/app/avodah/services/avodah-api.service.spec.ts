@@ -25,6 +25,18 @@ const MOCK_PROJECT_VIEW = {
   tags: ['household'],
 };
 
+const MOCK_RELATIONSHIP = {
+  id: 'rel-1',
+  sourceId: 'story-1',
+  targetId: 'concept-abc',
+  relationshipType: 'ATTACHED_TO',
+  confidence: 1,
+  inferenceSource: 'author',
+  metadata: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
 const MOCK_STORY_VIEW = {
   id: 'story-1',
   appId: 'lamad',
@@ -52,6 +64,9 @@ describe('AvodahApiService', () => {
     updateContent: ReturnType<typeof vi.fn>;
     createContent: ReturnType<typeof vi.fn>;
     createEconomicEvent: ReturnType<typeof vi.fn>;
+    getRelationships: ReturnType<typeof vi.fn>;
+    createRelationship: ReturnType<typeof vi.fn>;
+    deleteRelationship: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -60,6 +75,9 @@ describe('AvodahApiService', () => {
       updateContent: vi.fn().mockReturnValue(of(MOCK_STORY_VIEW)),
       createContent: vi.fn().mockReturnValue(of(MOCK_PROJECT_VIEW)),
       createEconomicEvent: vi.fn().mockReturnValue(of({})),
+      getRelationships: vi.fn(),
+      createRelationship: vi.fn().mockReturnValue(of({ id: 'rel-1' })),
+      deleteRelationship: vi.fn().mockReturnValue(of(undefined)),
     };
 
     TestBed.configureTestingModule({
@@ -124,6 +142,44 @@ describe('AvodahApiService', () => {
   it('updateStoryField patches via storageApi', async () => {
     await service.updateStoryField('story-1', { title: 'New title' });
     expect(storageSpy.updateContent).toHaveBeenCalledWith('story-1', { title: 'New title' });
+  });
+
+  it('getAttachments fetches ATTACHED_TO relationships and resolves content', async () => {
+    storageSpy.getRelationships.mockReturnValue(of([MOCK_RELATIONSHIP]));
+    storageSpy.getContents.mockReturnValue(
+      of([
+        {
+          ...MOCK_STORY_VIEW,
+          id: 'concept-abc',
+          contentType: 'concept',
+          title: 'Test Concept',
+        },
+      ]),
+    );
+    const attachments = await service.getAttachments('story-1');
+    expect(storageSpy.getRelationships).toHaveBeenCalledWith({
+      sourceId: 'story-1',
+      relationshipType: 'ATTACHED_TO',
+    });
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0].content.id).toBe('concept-abc');
+  });
+
+  it('attachContent creates ATTACHED_TO relationship', async () => {
+    storageSpy.createRelationship.mockReturnValue(of(MOCK_RELATIONSHIP));
+    await service.attachContent('story-1', 'concept-abc');
+    expect(storageSpy.createRelationship).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceId: 'story-1',
+        targetId: 'concept-abc',
+        relationshipType: 'ATTACHED_TO',
+      }),
+    );
+  });
+
+  it('detachContent deletes relationship', async () => {
+    await service.detachContent('rel-1');
+    expect(storageSpy.deleteRelationship).toHaveBeenCalledWith('rel-1');
   });
 
   it('createStory creates a work-story via storageApi', async () => {
