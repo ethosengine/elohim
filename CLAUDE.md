@@ -157,10 +157,11 @@ Before proposing design approaches for ANY feature involving data entities (tabl
 
 **This rule exists because** AI agents default to relational-DB patterns (UUID primary keys, REST-first design, CID-as-column). The protocol requires P2P-native thinking: DHT entry types first, content addressing for identity, storage as projection not truth.
 
-**The skill forces you to answer:**
-1. Is this entity notarized (DHT), agent-scoped (source-chain), or operational (SQLite-only)?
-2. Is identity content-derived (CID), agent-composite, or slug (must justify)?
-3. What coordinator function creates it? What signal projects it? (Answer BEFORE designing the HTTP route.)
+**The skill forces you to answer (5 categories: A/A2/B/B2/C):**
+1. Is this entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)?
+2. Does a DHT entry type ALREADY EXIST? (Lamad DNA is at 83/~100 — do NOT create new types without checking headroom.)
+3. Is identity content-derived (CID), agent-composite, or slug (must justify)?
+4. What coordinator function creates it? What signal projects it? (Answer BEFORE designing the HTTP route.)
 
 **If you're about to write "Option A: `GET /api/v1/thing`" without having answered these questions, STOP and invoke the skill.**
 
