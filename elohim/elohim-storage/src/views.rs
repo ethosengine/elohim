@@ -3323,6 +3323,7 @@ pub struct GovernanceStateView {
     pub signal_count: i32,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<GovernanceState> for GovernanceStateView {
@@ -3337,6 +3338,7 @@ impl From<GovernanceState> for GovernanceStateView {
             signal_count: g.signal_count,
             created_at: g.created_at,
             updated_at: g.updated_at,
+            dht_anchor_hash: g.dht_anchor_hash,
         }
     }
 }
@@ -3367,6 +3369,7 @@ pub struct ChallengeView {
     pub resolved_at: Option<String>,
     pub created_at: String,
     pub sla_status: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Challenge> for ChallengeView {
@@ -3394,6 +3397,7 @@ impl From<Challenge> for ChallengeView {
             resolved_at: c.resolved_at,
             created_at: c.created_at,
             sla_status: String::new(),
+            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }
@@ -3415,6 +3419,7 @@ pub struct AppealView {
     pub filed_at: String,
     pub decided_at: Option<String>,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Appeal> for AppealView {
@@ -3433,6 +3438,7 @@ impl From<Appeal> for AppealView {
             filed_at: a.filed_at,
             decided_at: a.decided_at,
             created_at: a.created_at,
+            dht_anchor_hash: a.dht_anchor_hash,
         }
     }
 }
@@ -3491,6 +3497,7 @@ pub struct ProposalView {
     pub dots_per_voter: Option<i32>,
     pub quorum_percentage: Option<f64>,
     pub passage_threshold: Option<f64>,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Proposal> for ProposalView {
@@ -3514,6 +3521,7 @@ impl From<Proposal> for ProposalView {
             dots_per_voter: p.dots_per_voter,
             quorum_percentage: p.quorum_percentage,
             passage_threshold: p.passage_threshold,
+            dht_anchor_hash: p.dht_anchor_hash,
         }
     }
 }
@@ -3528,6 +3536,7 @@ pub struct PrecedentView {
     pub interpretation: String,
     pub established_by: String,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Precedent> for PrecedentView {
@@ -3539,6 +3548,7 @@ impl From<Precedent> for PrecedentView {
             interpretation: p.interpretation,
             established_by: p.established_by,
             created_at: p.created_at,
+            dht_anchor_hash: p.dht_anchor_hash,
         }
     }
 }
@@ -3582,6 +3592,7 @@ pub struct VoteView {
     pub reason: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl VoteView {
@@ -3598,6 +3609,7 @@ impl VoteView {
             reason: v.reason,
             created_at: v.created_at,
             updated_at: v.updated_at,
+            dht_anchor_hash: v.dht_anchor_hash,
         }
     }
 }
@@ -3656,6 +3668,7 @@ pub struct ProposalOptionView {
     pub source: Option<String>,
     pub source_justification: Option<String>,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<ProposalOption> for ProposalOptionView {
@@ -3669,6 +3682,7 @@ impl From<ProposalOption> for ProposalOptionView {
             source: o.source,
             source_justification: o.source_justification,
             created_at: o.created_at,
+            dht_anchor_hash: o.dht_anchor_hash,
         }
     }
 }
@@ -3706,6 +3720,7 @@ pub struct RankedVoteView {
     pub reasoning: Option<String>,
     pub proxy_elohim_id: Option<String>,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl RankedVoteView {
@@ -3726,6 +3741,7 @@ impl RankedVoteView {
             reasoning: v.reasoning,
             proxy_elohim_id: v.proxy_elohim_id,
             created_at: v.created_at,
+            dht_anchor_hash: v.dht_anchor_hash,
         }
     }
 }
@@ -3775,6 +3791,7 @@ pub struct GovernanceSignalView {
     pub mechanism_level: i32,
     pub proxy_elohim_id: Option<String>,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<GovernanceSignal> for GovernanceSignalView {
@@ -3789,6 +3806,7 @@ impl From<GovernanceSignal> for GovernanceSignalView {
             mechanism_level: s.mechanism_level,
             proxy_elohim_id: s.proxy_elohim_id,
             created_at: s.created_at,
+            dht_anchor_hash: s.dht_anchor_hash,
         }
     }
 }
@@ -4664,6 +4682,7 @@ pub struct StatementView {
     pub group_id: Option<String>,
     pub is_bridging: bool,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Statement> for StatementView {
@@ -4680,6 +4699,7 @@ impl From<Statement> for StatementView {
             group_id: s.group_id,
             is_bridging: s.is_bridging != 0,
             created_at: s.created_at,
+            dht_anchor_hash: s.dht_anchor_hash,
         }
     }
 }
@@ -4694,6 +4714,7 @@ pub struct StatementVoteView {
     pub human_id: String,
     pub vote: String,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<StatementVote> for StatementVoteView {
@@ -4704,6 +4725,7 @@ impl From<StatementVote> for StatementVoteView {
             human_id: v.human_id,
             vote: v.vote,
             created_at: v.created_at,
+            dht_anchor_hash: v.dht_anchor_hash,
         }
     }
 }
