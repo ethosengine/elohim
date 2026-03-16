@@ -97,11 +97,14 @@ use crate::views::{
 };
 use bytes::Bytes;
 use doorway_client::{DoorwayRoutesBuilder, Route};
-use http_body_util::{BodyExt, Full};
+use http_body_util::{BodyExt, Either, Full};
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{header, Method, Request, Response, StatusCode};
+
+/// Unified response body: Left for normal (buffered) responses, Right for SSE (streaming).
+pub type ApiBody = Either<Full<Bytes>, crate::sse::SseBody>;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -273,7 +276,7 @@ impl HttpServer {
     async fn handle_request(
         &self,
         req: Request<Incoming>,
-    ) -> Result<Response<Full<Bytes>>, hyper::Error> {
+    ) -> Result<Response<ApiBody>, hyper::Error> {
         let path = req.uri().path().to_string();
         let method = req.method().clone();
 
@@ -394,6 +397,16 @@ impl HttpServer {
                             r#"{"error": "Sync API not enabled"}"#,
                         )))
                         .unwrap())
+                }
+            }
+
+            // SSE event stream — must be matched before the /api/v1/ catch-all
+            (Method::GET, "/api/v1/events") => {
+                if let Some(ref services) = self.services {
+                    let response = crate::sse::create_sse_stream(&services.events);
+                    return Ok(response.map(Either::Right));
+                } else {
+                    Ok(response::service_unavailable("Event bus not available"))
                 }
             }
 
@@ -566,13 +579,13 @@ impl HttpServer {
                         "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
                     ),
                 );
-                Ok(response)
+                Ok(response.map(Either::Left))
             }
             Err(e) => {
                 error!(error = %e, "Request error");
                 Ok(Self::with_cors_headers(Response::builder())
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Full::new(Bytes::from(format!("Error: {}", e))))
+                    .body(Either::Left(Full::new(Bytes::from(format!("Error: {}", e)))))
                     .unwrap())
             }
         }
