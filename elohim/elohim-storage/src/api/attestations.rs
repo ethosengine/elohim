@@ -63,6 +63,8 @@ pub async fn handle(
     match (&method, path_only) {
         // POST /api/v1/attestations/ → create
         (&Method::POST, "/" | "") => {
+            // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+            // Currently null for direct storage writes. Backfill needed for pre-coherence data.
             let input: CreateAttestationInputView = parse_body(req).await?;
             let id = uuid::Uuid::new_v4().to_string();
             let evidence_json = input

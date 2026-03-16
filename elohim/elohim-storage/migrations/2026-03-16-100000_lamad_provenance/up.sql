@@ -1,5 +1,7 @@
 -- P2P Coherence Sprint 2: Lamad (Content) Provenance
 -- Adds dht_anchor_hash to unanchored content pillar tables.
+-- DNA CLEANUP NOTE: PathChapter and PathStep exist as standalone entry types in lamad DNA (2 of 83).
+-- They may be collapsible into Link metadata on LearningPath. Audit deferred to dedicated cleanup sprint.
 
 -- content: Source of truth: DHT (Content entry in lamad DNA)
 -- Classification: A (Notarized) — dht_anchor_hash links to Content ActionHash

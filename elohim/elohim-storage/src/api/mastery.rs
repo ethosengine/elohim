@@ -196,6 +196,8 @@ async fn initialize_mastery(
     pool: &DbPool,
     ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+    // Currently null for direct storage writes. Backfill needed for pre-coherence data.
     let body: InitializeMasteryRequest = parse_body(req).await?;
 
     let input = CreateMasteryInput {

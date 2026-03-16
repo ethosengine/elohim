@@ -1,3 +1,5 @@
+-- relationships: Source of truth: DHT (Relationship entry in lamad DNA). Classification: A (Notarized).
+
 -- Content relationships (edges in the knowledge graph)
 -- Rich metadata for graph exploration: confidence, provenance, bidirectionality
 CREATE TABLE relationships (

@@ -1,3 +1,7 @@
+-- content_mastery: Source of truth: private source chain (agent-scoped)
+-- Classification: B2 (Agent-Scoped + Attestation) — raw mastery is private,
+-- dht_anchor_hash populated when mastery crosses threshold and Attestation issued
+
 -- Content mastery tracking using Bloom's taxonomy
 -- Includes freshness score for spaced repetition decay
 CREATE TABLE content_mastery (

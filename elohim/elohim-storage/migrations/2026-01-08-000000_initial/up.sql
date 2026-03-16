@@ -1,3 +1,12 @@
+-- Source of truth declarations for tables in this migration:
+-- content: DHT (Content entry in lamad DNA). Classification: A (Notarized).
+-- paths: DHT (LearningPath entry in lamad DNA). Classification: A (Notarized).
+-- chapters: DHT (derived from LearningPath via Link). Classification: A2 (Derived).
+-- steps: DHT (derived from LearningPath via chapter chain). Classification: A2 (Derived).
+-- relationships: DHT (Relationship entry in lamad DNA). Classification: A (Notarized).
+-- content_tags: SQLite (operational). Classification: C. Derived from content metadata.
+-- path_tags: SQLite (operational). Classification: C. Derived from path metadata.
+
 -- Initial Diesel migration with multi-tenant app scoping
 -- This migration creates the complete schema with app_id on all app-scoped tables
 

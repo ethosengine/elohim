@@ -1,3 +1,6 @@
+-- knowledge_maps: Source of truth: SQLite (operational)
+-- Classification: C (Operational) — personal sensemaking, reconstructable from content relationships
+
 -- Knowledge maps (domain, self, person, collective)
 CREATE TABLE IF NOT EXISTS knowledge_maps (
     id TEXT PRIMARY KEY NOT NULL,
