@@ -30,6 +30,10 @@ import type {
   TallyResult,
   RecordSignalInputView,
   GovernanceSignalView,
+  FileChallengeInputView,
+  RespondToChallengeInputView,
+  FileAppealInputView,
+  AppealView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -245,6 +249,69 @@ export class GovernanceApiService implements IGovernance {
             entityId: encodeURIComponent(entityId),
           },
         })
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  // --- Challenges & Appeals ---
+
+  async fileChallenge(input: FileChallengeInputView): Promise<ChallengeView> {
+    return firstValueFrom(
+      this.http.post<ChallengeView>('/api/v1/governance/challenges', input)
+    );
+  }
+
+  async respondToChallenge(
+    id: string,
+    input: RespondToChallengeInputView
+  ): Promise<ChallengeView> {
+    return firstValueFrom(
+      this.http.post<ChallengeView>(
+        `/api/v1/governance/challenges/${encodeURIComponent(id)}/respond`,
+        input
+      )
+    );
+  }
+
+  async fileAppeal(challengeId: string, input: FileAppealInputView): Promise<AppealView> {
+    return firstValueFrom(
+      this.http.post<AppealView>(
+        `/api/v1/governance/challenges/${encodeURIComponent(challengeId)}/appeal`,
+        input
+      )
+    );
+  }
+
+  async getChallengesForEntity(
+    entityType: string,
+    entityId: string
+  ): Promise<ChallengeView[]> {
+    return firstValueFrom(
+      this.http
+        .get<ChallengeView[]>('/api/v1/governance/challenges', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async getChallenge(id: string): Promise<ChallengeView | null> {
+    return firstValueFrom(
+      this.http
+        .get<ChallengeView>(`/api/v1/governance/challenges/${encodeURIComponent(id)}`)
+        .pipe(catchError(() => of(null)))
+    );
+  }
+
+  async getAppeals(challengeId: string): Promise<AppealView[]> {
+    return firstValueFrom(
+      this.http
+        .get<AppealView[]>(
+          `/api/v1/governance/challenges/${encodeURIComponent(challengeId)}/appeals`
+        )
         .pipe(catchError(() => of([])))
     );
   }
