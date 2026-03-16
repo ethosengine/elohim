@@ -24,9 +24,11 @@ use crate::tally;
 use crate::views::{
     AppealView, CastRankedVoteInputView, CastVoteInputView, ChallengeView,
     CreateDiscussionInputView, CreateProposalInputView, CreateProposalOptionInputView,
-    DiscussionView, FileAppealInputView, FileChallengeInputView, GovernanceSignalView,
-    GovernanceStateView, PostMessageInputView, PrecedentView, ProposalOptionView, ProposalView,
-    RankedVoteView, RecordSignalInputView, RespondToChallengeInputView, VoteView,
+    CreateStatementInputView, DiscussionView, FileAppealInputView, FileChallengeInputView,
+    GovernanceSignalView, GovernanceStateView, PostMessageInputView, PrecedentView,
+    ProposalOptionView, ProposalView, RankedVoteView, RecordSignalInputView,
+    RespondToChallengeInputView, StatementView, StatementVoteView, VoteOnStatementInputView,
+    VoteView,
 };
 
 use super::get_conn;
@@ -65,6 +67,13 @@ struct ProposalQuery {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SignalQuery {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct SensemakingQuery {
     pub entity_type: Option<String>,
     pub entity_id: Option<String>,
 }
@@ -794,6 +803,130 @@ pub async fn handle(
             let views: Vec<GovernanceSignalView> =
                 results.into_iter().map(GovernanceSignalView::from).collect();
             Ok(response::ok(&views))
+        }
+
+        // =================================================================
+        // Sensemaking: Statements, Votes, Clustering
+        // =================================================================
+
+        // POST /api/v1/governance/sensemaking/statements — Create a statement
+        (&Method::POST, "/sensemaking/statements") => {
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CreateStatementInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let now = crate::db::models::current_timestamp();
+            let statement_id = format!("stmt-{}", uuid::Uuid::new_v4());
+
+            let new = crate::db::models::NewStatement {
+                id: &statement_id,
+                entity_type: &input.entity_type,
+                entity_id: &input.entity_id,
+                human_id: &input.human_id,
+                text: &input.text,
+                created_at: &now,
+            };
+
+            let mut conn = get_conn(pool)?;
+            let statement = governance::create_statement(&mut conn, &new)?;
+            Ok(response::created(&StatementView::from(statement)))
+        }
+
+        // GET /api/v1/governance/sensemaking/statements?entityType=X&entityId=Y
+        (&Method::GET, "/sensemaking/statements") => {
+            let params: SensemakingQuery =
+                serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
+            }
+            let mut conn = get_conn(pool)?;
+            let results = governance::query_statements(&mut conn, entity_type, entity_id)?;
+            let views: Vec<StatementView> =
+                results.into_iter().map(StatementView::from).collect();
+            Ok(response::ok(&views))
+        }
+
+        // POST /api/v1/governance/sensemaking/statements/{id}/vote
+        (&Method::POST, p) if p.starts_with("/sensemaking/statements/") && p.ends_with("/vote") => {
+            let statement_id = p
+                .strip_prefix("/sensemaking/statements/")
+                .and_then(|s| s.strip_suffix("/vote"))
+                .ok_or_else(|| StorageError::InvalidInput("Statement ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: VoteOnStatementInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            // Validate vote value
+            if !["agree", "disagree", "pass"].contains(&input.vote.as_str()) {
+                return Ok(response::bad_request(
+                    "vote must be one of: agree, disagree, pass",
+                ));
+            }
+
+            let now = crate::db::models::current_timestamp();
+            let vote_id = format!("sv-{}-{}", statement_id, input.human_id);
+
+            let new_vote = crate::db::models::NewStatementVote {
+                id: &vote_id,
+                statement_id,
+                human_id: &input.human_id,
+                vote: &input.vote,
+                created_at: &now,
+            };
+
+            let mut conn = get_conn(pool)?;
+            let vote = governance::vote_on_statement(&mut conn, &new_vote)?;
+            Ok(response::created(&StatementVoteView::from(vote)))
+        }
+
+        // GET /api/v1/governance/sensemaking/votes?entityType=X&entityId=Y
+        (&Method::GET, "/sensemaking/votes") => {
+            let params: SensemakingQuery =
+                serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
+            }
+            let mut conn = get_conn(pool)?;
+            let results =
+                governance::get_all_votes_for_entity(&mut conn, entity_type, entity_id)?;
+            let views: Vec<StatementVoteView> =
+                results.into_iter().map(StatementVoteView::from).collect();
+            Ok(response::ok(&views))
+        }
+
+        // GET /api/v1/governance/sensemaking/clusters?entityType=X&entityId=Y
+        (&Method::GET, "/sensemaking/clusters") => {
+            let params: SensemakingQuery =
+                serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
+            }
+            let mut conn = get_conn(pool)?;
+            let stmts = governance::query_statements(&mut conn, entity_type, entity_id)?;
+            let votes = governance::get_all_votes_for_entity(&mut conn, entity_type, entity_id)?;
+            let result = crate::sensemaking::clustering::cluster_opinions(
+                entity_type, entity_id, &stmts, &votes,
+            );
+            Ok(response::ok(&result))
         }
 
         _ => Ok(response::not_found(&format!(

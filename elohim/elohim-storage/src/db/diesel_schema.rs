@@ -788,6 +788,33 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    statements (id) {
+        id -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        human_id -> Text,
+        text -> Text,
+        agree_count -> Integer,
+        disagree_count -> Integer,
+        pass_count -> Integer,
+        group_id -> Nullable<Text>,
+        is_bridging -> Integer,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    statement_votes (id) {
+        id -> Text,
+        statement_id -> Text,
+        human_id -> Text,
+        vote -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -839,6 +866,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     rea_commitments,
     relationships,
     schema_version,
+    statement_votes,
+    statements,
     steward_affinity,
     steward_credentials,
     stewarded_nodes,

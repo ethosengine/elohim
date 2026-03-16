@@ -9,6 +9,7 @@ import { identityGuard } from '@app/imagodei/guards/identity.guard';
  * - /community - Community home (landing page)
  * - /community/directory - Community directory
  * - /community/collective/:id - Collective detail
+ * - /community/governance/sensemaking - Sensemaking page (query: entityType, entityId)
  * - /community/governance/challenges - Challenge list
  * - /community/governance/challenges/new - File a new challenge
  * - /community/governance/challenges/:id - Challenge detail
@@ -58,6 +59,14 @@ export const COMMUNITY_ROUTES: Routes = [
             m => m.CollectiveDetailComponent
           ),
         data: { title: 'Collective' },
+      },
+      {
+        path: 'governance/sensemaking',
+        loadComponent: async () =>
+          import('./components/sensemaking-page/sensemaking-page.component').then(
+            m => m.SensemakingPageComponent
+          ),
+        data: { title: 'Community Sensemaking' },
       },
       {
         path: 'governance/challenges',

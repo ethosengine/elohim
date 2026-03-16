@@ -92,9 +92,9 @@ use crate::db::models::{
     ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
     GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
     PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
-    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Step,
-    StewardCredential, StewardedNode, StewardshipAllocation, StewardshipAllocationWithPresence,
-    Vote,
+    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Statement,
+    StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
+    StewardshipAllocationWithPresence, Vote,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -4598,6 +4598,114 @@ pub struct ImagodeiObservationView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct SetSessionIntentInputView {
     pub intent: String,
+}
+
+// ============================================================================
+// Sensemaking Statement Views
+// ============================================================================
+
+/// Statement — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StatementView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub text: String,
+    pub agree_count: i32,
+    pub disagree_count: i32,
+    pub pass_count: i32,
+    pub group_id: Option<String>,
+    pub is_bridging: bool,
+    pub created_at: String,
+}
+
+impl From<Statement> for StatementView {
+    fn from(s: Statement) -> Self {
+        Self {
+            id: s.id,
+            entity_type: s.entity_type,
+            entity_id: s.entity_id,
+            human_id: s.human_id,
+            text: s.text,
+            agree_count: s.agree_count,
+            disagree_count: s.disagree_count,
+            pass_count: s.pass_count,
+            group_id: s.group_id,
+            is_bridging: s.is_bridging != 0,
+            created_at: s.created_at,
+        }
+    }
+}
+
+/// Statement vote — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StatementVoteView {
+    pub id: String,
+    pub statement_id: String,
+    pub human_id: String,
+    pub vote: String,
+    pub created_at: String,
+}
+
+impl From<StatementVote> for StatementVoteView {
+    fn from(v: StatementVote) -> Self {
+        Self {
+            id: v.id,
+            statement_id: v.statement_id,
+            human_id: v.human_id,
+            vote: v.vote,
+            created_at: v.created_at,
+        }
+    }
+}
+
+/// Create a statement — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateStatementInputView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub human_id: String,
+    pub text: String,
+}
+
+/// Vote on a statement — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct VoteOnStatementInputView {
+    pub human_id: String,
+    pub vote: String,
+}
+
+/// Sensemaking clustering result — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SensemakingResultView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub clusters: Vec<OpinionClusterView>,
+    pub bridging_statements: Vec<StatementView>,
+    pub total_participants: usize,
+    pub total_statements: usize,
+}
+
+/// Opinion cluster within a sensemaking result
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct OpinionClusterView {
+    pub id: String,
+    pub member_count: usize,
+    pub characteristic_statements: Vec<StatementView>,
+    pub internal_agreement: f64,
 }
 
 // ============================================================================

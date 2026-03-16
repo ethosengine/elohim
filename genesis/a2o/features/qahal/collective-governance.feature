@@ -201,3 +201,38 @@ Feature: Collective governance
     When the gateway checks accumulation status
     Then a "Community consensus" badge appears
     And no sensemaking prompt is shown
+
+  Scenario: Learner contributes statement to sensemaking
+    Given content "climate-adaptation" has sensemaking activated
+    When a learner is presented with the statement "We should prioritize local food systems"
+    And the learner votes "agree"
+    Then the vote is recorded and the next unvoted statement is shown
+    When the learner has voted on all statements
+    Then they can contribute their own statement for others to vote on
+
+  Scenario: Community opinion clustering reveals distinct groups
+    Given content "education-funding" has 20 statements with 15 voters
+    When the clustering algorithm runs
+    Then at least 2 opinion clusters are identified
+    And each cluster shows its characteristic statements
+    And the cluster visualization displays participant positions
+
+  Scenario: Bridging statement surfaces common ground
+    Given 2 opinion clusters exist on content "curriculum-approach"
+    And the statement "Students learn best with hands-on projects" has >60% agreement in both clusters
+    Then it is identified as a bridging statement
+    And highlighted with a "Common ground" indicator
+
+  Scenario: Sensemaking triggers bracket synthesis from bridging statements
+    Given sensemaking on content "assessment-methods" has found 3 bridging statements
+    When bracket synthesis is triggered
+    Then a ranked-choice proposal is created
+    And the proposal options are the bridging statements
+    And the community can vote on the synthesized bracket
+
+  Scenario: Sensemaking view accessible from gateway badge
+    Given content "teaching-philosophy" has readyForSensemaking status
+    When a learner views the content
+    Then the gateway shows a "Diverse perspectives — sensemaking available" link
+    When the learner clicks the link
+    Then the sensemaking view opens with statement voting and cluster visualization

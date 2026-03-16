@@ -35,6 +35,11 @@ import type {
   RespondToChallengeInputView,
   FileAppealInputView,
   AppealView,
+  StatementView,
+  StatementVoteView,
+  CreateStatementInputView,
+  VoteOnStatementInputView,
+  SensemakingResultView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -339,6 +344,76 @@ export class GovernanceApiService implements IGovernance {
           `/api/v1/governance/challenges/${encodeURIComponent(challengeId)}/appeals`
         )
         .pipe(catchError(() => of([])))
+    );
+  }
+
+  // --- Sensemaking ---
+
+  async submitStatement(input: CreateStatementInputView): Promise<StatementView> {
+    return firstValueFrom(
+      this.http.post<StatementView>('/api/v1/governance/sensemaking/statements', input)
+    );
+  }
+
+  async voteOnStatement(
+    statementId: string,
+    input: VoteOnStatementInputView
+  ): Promise<StatementVoteView> {
+    return firstValueFrom(
+      this.http.post<StatementVoteView>(
+        `/api/v1/governance/sensemaking/statements/${encodeURIComponent(statementId)}/vote`,
+        input
+      )
+    );
+  }
+
+  async getStatements(entityType: string, entityId: string): Promise<StatementView[]> {
+    return firstValueFrom(
+      this.http
+        .get<StatementView[]>('/api/v1/governance/sensemaking/statements', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async getStatementVotes(entityType: string, entityId: string): Promise<StatementVoteView[]> {
+    return firstValueFrom(
+      this.http
+        .get<StatementVoteView[]>('/api/v1/governance/sensemaking/votes', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async getClusters(
+    entityType: string,
+    entityId: string
+  ): Promise<SensemakingResultView> {
+    const emptyResult: SensemakingResultView = {
+      entityType,
+      entityId,
+      clusters: [],
+      bridgingStatements: [],
+      totalParticipants: 0,
+      totalStatements: 0,
+    };
+    return firstValueFrom(
+      this.http
+        .get<SensemakingResultView>('/api/v1/governance/sensemaking/clusters', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of(emptyResult)))
     );
   }
 }

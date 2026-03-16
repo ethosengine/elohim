@@ -31,6 +31,8 @@ export { ChallengeRouteComponent } from './components/challenge-route/challenge-
 export { RespondToChallengeComponent } from './components/respond-to-challenge/respond-to-challenge.component';
 export { FileAppealComponent } from './components/file-appeal/file-appeal.component';
 export { FeedbackAggregateComponent } from './components/feedback-aggregate/feedback-aggregate.component';
+export { ContributeStatementComponent } from './components/contribute-statement/contribute-statement.component';
+export { SensemakingPageComponent } from './components/sensemaking-page/sensemaking-page.component';
 
 // Services
 export * from './services';

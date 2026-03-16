@@ -5361,6 +5361,37 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/governance/sensemaking — Sensemaking statements & clustering
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/governance/sensemaking/statements")
+                .handler("create_statement")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/sensemaking/statements")
+                .handler("list_statements")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance/sensemaking/statements/{id}/vote")
+                .handler("vote_on_statement")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/sensemaking/votes")
+                .handler("list_statement_votes")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance/sensemaking/clusters")
+                .handler("compute_clusters")
+                .cache_ttl(10)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/economic-events — REA economic events
         // =====================================================================
         .route(
