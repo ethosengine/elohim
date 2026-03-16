@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
+import { UpdateContentPatch } from '../../elohim/interfaces';
 import { StorageApiService } from '../../elohim/services/storage-api.service';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { WorkStoryStatus } from '../models/work-story.model';
@@ -52,6 +53,10 @@ export class AvodahApiService {
         } as never)
       );
     }
+  }
+
+  async updateStoryField(storyId: string, patch: UpdateContentPatch): Promise<void> {
+    await firstValueFrom(this.storageApi.updateContent(storyId, patch));
   }
 
   async createStory(
