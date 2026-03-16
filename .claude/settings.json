@@ -71,6 +71,16 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-link-check.py\"",
             "timeout": 3000
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/p2p-plan-audit.py\"",
+            "timeout": 3000
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/p2p-schema-audit.py\"",
+            "timeout": 3000
           }
         ]
       },
