@@ -1,7 +1,7 @@
 /**
  * GovernanceApiService Tests
  *
- * Tests that Sprint 4 governance API methods call the correct
+ * Tests that Sprint 4 & 5 governance API methods call the correct
  * HTTP endpoints with proper parameters.
  */
 
@@ -12,11 +12,16 @@ import { provideHttpClient } from '@angular/common/http';
 import { describe, expect, it } from 'vitest';
 
 import type {
+  AppealView,
   CastRankedVoteInputView,
+  ChallengeView,
+  FileAppealInputView,
+  FileChallengeInputView,
   GovernanceSignalView,
   ProposalOptionView,
   RankedVoteView,
   RecordSignalInputView,
+  RespondToChallengeInputView,
   TallyResult,
 } from '@elohim/storage-client/generated';
 
@@ -231,6 +236,207 @@ describe('GovernanceApiService', () => {
       const result = await promise;
       expect(result).toHaveLength(1);
       expect(result[0].optionId).toBe('opt-1');
+    });
+  });
+
+  // --- Sprint 5: Challenges & Appeals ---
+
+  const mockChallenge: ChallengeView = {
+    id: 'ch-1',
+    entityType: 'content',
+    entityId: 'entity-1',
+    challengerId: 'human-1',
+    standingBasis: 'steward',
+    groundsPrimary: 'accuracy',
+    groundsSecondary: null,
+    evidence: 'The claim is unsupported.',
+    requestedOutcome: 'correction',
+    slaDeadline: '2026-03-20T00:00:00Z',
+    state: 'pending',
+    outcome: null,
+    reasoning: null,
+    actions: null,
+    setsPrecedent: false,
+    respondedAt: null,
+    respondedBy: null,
+    createdAt: '2026-03-15T00:00:00Z',
+  };
+
+  const mockAppeal: AppealView = {
+    id: 'appeal-1',
+    challengeId: 'ch-1',
+    appellantId: 'human-1',
+    grounds: 'New evidence available',
+    additionalEvidence: 'See document X',
+    state: 'pending',
+    escalationLevel: null,
+    decision: null,
+    decisionReasoning: null,
+    decidedBy: null,
+    filedAt: '2026-03-16T00:00:00Z',
+    decidedAt: null,
+    createdAt: '2026-03-16T00:00:00Z',
+  };
+
+  describe('fileChallenge', () => {
+    it('should POST to /api/v1/governance/challenges', async () => {
+      const input: FileChallengeInputView = {
+        entityType: 'content',
+        entityId: 'entity-1',
+        challengerId: 'human-1',
+        standingBasis: 'steward',
+        groundsPrimary: 'accuracy',
+        groundsSecondary: null,
+        evidence: 'The claim is unsupported.',
+        requestedOutcome: 'correction',
+      };
+
+      const promise = service.fileChallenge(input);
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/challenges' && r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(input);
+      req.flush(mockChallenge);
+
+      const result = await promise;
+      expect(result.id).toBe('ch-1');
+      expect(result.state).toBe('pending');
+      expect(result.groundsPrimary).toBe('accuracy');
+    });
+  });
+
+  describe('respondToChallenge', () => {
+    it('should POST to /api/v1/governance/challenges/{id}/respond', async () => {
+      const input: RespondToChallengeInputView = {
+        outcome: 'upheld',
+        reasoning: 'The evidence supports the challenge.',
+        actions: 'Content will be corrected.',
+        setsPrecedent: true,
+      };
+
+      const promise = service.respondToChallenge('ch-1', input);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/challenges/ch-1/respond' && r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(input);
+      req.flush({ ...mockChallenge, state: 'resolved', outcome: 'upheld' });
+
+      const result = await promise;
+      expect(result.state).toBe('resolved');
+      expect(result.outcome).toBe('upheld');
+    });
+  });
+
+  describe('fileAppeal', () => {
+    it('should POST to /api/v1/governance/challenges/{id}/appeal', async () => {
+      const input: FileAppealInputView = {
+        grounds: 'New evidence available',
+        additionalEvidence: 'See document X',
+      };
+
+      const promise = service.fileAppeal('ch-1', input);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/challenges/ch-1/appeal' && r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(input);
+      req.flush(mockAppeal);
+
+      const result = await promise;
+      expect(result.id).toBe('appeal-1');
+      expect(result.challengeId).toBe('ch-1');
+      expect(result.grounds).toBe('New evidence available');
+    });
+  });
+
+  describe('getChallengesForEntity', () => {
+    it('should GET /api/v1/governance/challenges with entityType and entityId params', async () => {
+      const promise = service.getChallengesForEntity('content', 'entity-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/challenges' &&
+          r.method === 'GET' &&
+          r.params.get('entityType') === 'content' &&
+          r.params.get('entityId') === 'entity-1',
+      );
+      req.flush([mockChallenge]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].entityType).toBe('content');
+      expect(result[0].entityId).toBe('entity-1');
+    });
+
+    it('should return empty array on error', async () => {
+      const promise = service.getChallengesForEntity('content', 'entity-missing');
+
+      const req = httpMock.expectOne((r) => r.url === '/api/v1/governance/challenges');
+      req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+
+      const result = await promise;
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getChallenge', () => {
+    it('should GET /api/v1/governance/challenges/{id}', async () => {
+      const promise = service.getChallenge('ch-1');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/challenges/ch-1' && r.method === 'GET',
+      );
+      req.flush(mockChallenge);
+
+      const result = await promise;
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe('ch-1');
+      expect(result!.challengerId).toBe('human-1');
+    });
+
+    it('should return null on error', async () => {
+      const promise = service.getChallenge('ch-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/challenges/ch-missing',
+      );
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
+
+      const result = await promise;
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getAppeals', () => {
+    it('should GET /api/v1/governance/challenges/{id}/appeals', async () => {
+      const promise = service.getAppeals('ch-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/challenges/ch-1/appeals' && r.method === 'GET',
+      );
+      req.flush([mockAppeal]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('appeal-1');
+      expect(result[0].challengeId).toBe('ch-1');
+    });
+
+    it('should return empty array on error', async () => {
+      const promise = service.getAppeals('ch-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/challenges/ch-missing/appeals',
+      );
+      req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+
+      const result = await promise;
+      expect(result).toEqual([]);
     });
   });
 });
