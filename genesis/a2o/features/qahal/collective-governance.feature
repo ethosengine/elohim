@@ -127,3 +127,45 @@ Feature: Collective governance
     Given a learner has submitted a vote on a proposal
     Then an REA economic event is generated with type "governance-participation"
     And the learner's steward affinity increases proportional to mechanism level
+
+  Scenario: Learner challenges inaccurate content
+    Given content "intro-to-photosynthesis" has governance state "active"
+    When a learner files a challenge with grounds "factual-error"
+    And provides evidence "The diagram shows CO2 being released, but photosynthesis absorbs CO2"
+    And their standing is "community-member"
+    Then the challenge is recorded with state "pending"
+    And a response deadline is set 3 days from filing
+
+  Scenario: Challenge list shows SLA countdown
+    Given content "intro-to-photosynthesis" has a pending challenge
+    And the response deadline is in 2 days
+    When a learner views the challenge list
+    Then the SLA indicator shows "on_time" in green
+    And displays "Response due in 2d"
+
+  Scenario: Elohim responds to challenge within SLA
+    Given a pending challenge exists for content "intro-to-photosynthesis"
+    When the elohim responds with outcome "upheld"
+    And provides reasoning "The diagram was indeed incorrect — CO2 is absorbed during photosynthesis"
+    And marks the response as precedent-setting
+    Then the challenge state changes to "responded"
+    And the SLA status shows "resolved"
+
+  Scenario: Learner appeals rejected challenge
+    Given a challenge was rejected with reasoning "The content is metaphorical, not literal"
+    When the challenger files an appeal with grounds "disproportionate-response"
+    And provides additional evidence "Students are being tested on this content literally"
+    Then the appeal is recorded and escalates to the next governance level
+
+  Scenario: SLA overdue triggers visual warning
+    Given a challenge has been pending for 4 days
+    And the response deadline was 3 days after filing
+    When the challenge list is viewed
+    Then the SLA indicator shows "overdue" in red
+    And displays "OVERDUE by 1d"
+
+  Scenario: Challenge response sets referenceable precedent
+    Given a challenge response was marked as precedent-setting
+    When another similar challenge is filed
+    Then the precedent is visible in the challenge detail
+    And the elohim can reference it in their response
