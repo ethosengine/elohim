@@ -3885,9 +3885,9 @@ pub struct StewardCredentialView {
     pub affinity_coefficient: f32,
     pub credential_type: String,
     pub status: String,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<StewardCredential> for StewardCredentialView {
@@ -3899,9 +3899,9 @@ impl From<StewardCredential> for StewardCredentialView {
             affinity_coefficient: s.affinity_coefficient,
             credential_type: s.credential_type,
             status: s.status,
+            dht_anchor_hash: s.dht_anchor_hash,
             created_at: s.created_at,
             updated_at: s.updated_at,
-            dht_anchor_hash: s.dht_anchor_hash,
         }
     }
 }
@@ -3917,8 +3917,8 @@ pub struct PremiumGateView {
     pub gated_resource_ids: JsonVal,
     pub gate_title: String,
     pub gate_description: Option<String>,
-    pub created_at: String,
     pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
 }
 
 impl From<PremiumGate> for PremiumGateView {
@@ -3931,8 +3931,8 @@ impl From<PremiumGate> for PremiumGateView {
             gated_resource_ids: parse_json(&g.gated_resource_ids),
             gate_title: g.gate_title,
             gate_description: g.gate_description,
-            created_at: g.created_at,
             dht_anchor_hash: g.dht_anchor_hash,
+            created_at: g.created_at,
         }
     }
 }
@@ -4236,9 +4236,9 @@ pub struct StewardedNodeView {
     pub custodian_opt_in: bool,
     pub region: Option<String>,
     pub context_epr_id: Option<String>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
     pub stewards: Vec<NodeStewardshipView>,
 }
 
@@ -4256,9 +4256,9 @@ impl From<StewardedNode> for StewardedNodeView {
             custodian_opt_in: n.custodian_opt_in == 1,
             region: n.region,
             context_epr_id: n.context_epr_id,
+            dht_anchor_hash: n.dht_anchor_hash,
             created_at: n.created_at,
             updated_at: n.updated_at,
-            dht_anchor_hash: n.dht_anchor_hash,
             stewards: vec![],
         }
     }

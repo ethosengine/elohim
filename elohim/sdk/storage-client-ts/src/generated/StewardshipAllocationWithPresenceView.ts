@@ -10,4 +10,4 @@ contributionEvidence: JsonValue | null, governanceState: string, disputeId: stri
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, createdAt: string, updatedAt: string, };
+metadata: JsonValue | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };

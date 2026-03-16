@@ -63,6 +63,7 @@ mod tests {
             last_recognition_at: None,
             note: None,
             metadata_json: None,
+            dht_anchor_hash: None,
             created_at: "2026-03-14 00:00:00".to_string(),
             updated_at: "2026-03-14 00:00:00".to_string(),
         }

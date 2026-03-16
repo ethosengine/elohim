@@ -4,4 +4,4 @@ import type { NodeStewardshipView } from "./NodeStewardshipView";
 /**
  * API output for a stewarded node, with stewards joined in.
  */
-export type StewardedNodeView = { id: string, displayName: string, claimStatus: string, cpuCores: number, memoryGb: number, storageTb: number, bandwidthMbps: number, stewardTier: string, custodianOptIn: boolean, region: string | null, contextEprId: string | null, createdAt: string, updatedAt: string, stewards: Array<NodeStewardshipView>, };
+export type StewardedNodeView = { id: string, displayName: string, claimStatus: string, cpuCores: number, memoryGb: number, storageTb: number, bandwidthMbps: number, stewardTier: string, custodianOptIn: boolean, region: string | null, contextEprId: string | null, dhtAnchorHash: string | null, createdAt: string, updatedAt: string, stewards: Array<NodeStewardshipView>, };
