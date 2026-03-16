@@ -14,17 +14,19 @@ use serde::Deserialize;
 use crate::db::diesel_schema::proposals;
 use crate::db::governance;
 use crate::db::models::{
-    NewDiscussion, NewGovernanceSignal, NewProposal, NewProposalOption, NewRankedVote, NewVote,
+    NewAppeal, NewChallenge, NewDiscussion, NewGovernanceSignal, NewProposal, NewProposalOption,
+    NewRankedVote, NewVote,
 };
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::response;
+use crate::services::{response, sla_service};
 use crate::tally;
 use crate::views::{
-    CastRankedVoteInputView, CastVoteInputView, ChallengeView, CreateDiscussionInputView,
-    CreateProposalInputView, CreateProposalOptionInputView, DiscussionView, GovernanceSignalView,
+    AppealView, CastRankedVoteInputView, CastVoteInputView, ChallengeView,
+    CreateDiscussionInputView, CreateProposalInputView, CreateProposalOptionInputView,
+    DiscussionView, FileAppealInputView, FileChallengeInputView, GovernanceSignalView,
     GovernanceStateView, PostMessageInputView, PrecedentView, ProposalOptionView, ProposalView,
-    RankedVoteView, RecordSignalInputView, VoteView,
+    RankedVoteView, RecordSignalInputView, RespondToChallengeInputView, VoteView,
 };
 
 use super::get_conn;
@@ -44,6 +46,13 @@ struct GovernanceStateQuery {
 #[serde(rename_all = "camelCase")]
 struct ContentQuery {
     pub content_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ChallengeQuery {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -131,6 +140,112 @@ pub async fn handle(
             Ok(response::ok(&views))
         }
 
+        // POST /api/v1/governance/challenges — File a new challenge
+        (&Method::POST, "/challenges") => {
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: FileChallengeInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let now = crate::db::models::current_timestamp();
+            let challenge_id = format!("chal-{}", uuid::Uuid::new_v4());
+            let response_deadline = sla_service::compute_response_deadline(&now);
+
+            let new = NewChallenge {
+                id: &challenge_id,
+                entity_type: &input.entity_type,
+                entity_id: &input.entity_id,
+                challenger_id: &input.challenger_id,
+                standing_basis: &input.standing_basis,
+                grounds_primary: &input.grounds_primary,
+                grounds_secondary: input.grounds_secondary.as_deref(),
+                evidence: &input.evidence,
+                requested_outcome: input.requested_outcome.as_deref(),
+                state: "pending",
+                filed_at: &now,
+                response_deadline: &response_deadline,
+                created_at: &now,
+            };
+
+            let mut conn = get_conn(pool)?;
+            let challenge = governance::create_challenge(&mut conn, &new)?;
+            let sla = sla_service::compute_sla_status(&challenge);
+            let mut view = ChallengeView::from(challenge);
+            view.sla_status = sla.as_str().to_string();
+            Ok(response::created(&view))
+        }
+
+        // POST /api/v1/governance/challenges/{id}/respond — Respond to a challenge
+        (&Method::POST, p) if p.starts_with("/challenges/") && p.ends_with("/respond") => {
+            let id = p
+                .strip_prefix("/challenges/")
+                .and_then(|s| s.strip_suffix("/respond"))
+                .ok_or_else(|| StorageError::InvalidInput("Challenge ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: RespondToChallengeInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let mut conn = get_conn(pool)?;
+            let challenge = governance::respond_to_challenge(
+                &mut conn,
+                id,
+                &input.outcome,
+                &input.reasoning,
+                input.actions.as_deref(),
+                "system",
+                input.sets_precedent,
+            )?;
+            let sla = sla_service::compute_sla_status(&challenge);
+            let mut view = ChallengeView::from(challenge);
+            view.sla_status = sla.as_str().to_string();
+            Ok(response::ok(&view))
+        }
+
+        // POST /api/v1/governance/challenges/{id}/appeal — File an appeal against a challenge decision
+        (&Method::POST, p) if p.starts_with("/challenges/") && p.ends_with("/appeal") => {
+            let challenge_id = p
+                .strip_prefix("/challenges/")
+                .and_then(|s| s.strip_suffix("/appeal"))
+                .ok_or_else(|| StorageError::InvalidInput("Challenge ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: FileAppealInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let now = crate::db::models::current_timestamp();
+            let appeal_id = format!("appl-{}", uuid::Uuid::new_v4());
+
+            // Get the challenge to derive appellant_id (challenger is the default appellant)
+            let mut conn = get_conn(pool)?;
+            let challenge = governance::get_challenge(&mut conn, challenge_id)?
+                .ok_or_else(|| {
+                    StorageError::NotFound(format!("Challenge {} not found", challenge_id))
+                })?;
+
+            let new = NewAppeal {
+                id: &appeal_id,
+                challenge_id,
+                appellant_id: &challenge.challenger_id,
+                grounds: &input.grounds,
+                additional_evidence: input.additional_evidence.as_deref(),
+                state: "pending",
+                filed_at: &now,
+                created_at: &now,
+            };
+
+            let appeal = governance::create_appeal(&mut conn, &new)?;
+            Ok(response::created(&AppealView::from(appeal)))
+        }
+
         // GET /api/v1/governance/challenges/{id}
         (&Method::GET, p) if p.starts_with("/challenges/") => {
             let sub = p.strip_prefix("/challenges").unwrap_or("");
@@ -138,22 +253,50 @@ pub async fn handle(
                 .ok_or_else(|| StorageError::InvalidInput("Challenge ID required".to_string()))?;
             let mut conn = get_conn(pool)?;
             let result = governance::get_challenge(&mut conn, id)?;
-            Ok(response::from_option(
-                Ok(result.map(ChallengeView::from)),
-                &format!("Challenge {} not found", id),
-            ))
+            match result {
+                Some(challenge) => {
+                    let sla = sla_service::compute_sla_status(&challenge);
+                    let mut view = ChallengeView::from(challenge);
+                    view.sla_status = sla.as_str().to_string();
+                    Ok(response::ok(&view))
+                }
+                None => Ok(response::not_found(&format!("Challenge {} not found", id))),
+            }
         }
 
-        // GET /api/v1/governance/challenges?contentId=X
+        // GET /api/v1/governance/challenges?entityType=X&entityId=Y
         (&Method::GET, "/challenges") => {
-            let params: ContentQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
-            let content_id = params.content_id.as_deref().unwrap_or("");
-            if content_id.is_empty() {
-                return Ok(response::bad_request("contentId query param is required"));
+            let params: ChallengeQuery =
+                serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
             }
             let mut conn = get_conn(pool)?;
-            let results = governance::query_challenges(&mut conn, content_id)?;
-            let views: Vec<ChallengeView> = results.into_iter().map(ChallengeView::from).collect();
+            let results = governance::query_challenges(&mut conn, entity_type, entity_id)?;
+            let views: Vec<ChallengeView> = results
+                .into_iter()
+                .map(|c| {
+                    let sla = sla_service::compute_sla_status(&c);
+                    let mut view = ChallengeView::from(c);
+                    view.sla_status = sla.as_str().to_string();
+                    view
+                })
+                .collect();
+            Ok(response::ok(&views))
+        }
+
+        // GET /api/v1/governance/appeals/{challengeId} — List appeals for a challenge
+        (&Method::GET, p) if p.starts_with("/appeals/") => {
+            let sub = p.strip_prefix("/appeals").unwrap_or("");
+            let challenge_id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Challenge ID required".to_string()))?;
+            let mut conn = get_conn(pool)?;
+            let results = governance::query_appeals_for_challenge(&mut conn, challenge_id)?;
+            let views: Vec<AppealView> = results.into_iter().map(AppealView::from).collect();
             Ok(response::ok(&views))
         }
 
