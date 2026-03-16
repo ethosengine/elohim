@@ -154,6 +154,7 @@ diesel::table! {
         metadata_json -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -211,6 +212,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         expires_at -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -240,6 +242,7 @@ diesel::table! {
         path_id -> Text,
         attestation_type -> Text,
         attestation_name -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -392,6 +395,7 @@ diesel::table! {
         app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 

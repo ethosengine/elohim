@@ -290,6 +290,8 @@ pub struct PathAttestation {
     pub path_id: String,
     pub attestation_type: String,
     pub attestation_name: String,
+    /// Source of truth: DHT (Attestation entry in imagodei DNA). NULL for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New path attestation for INSERT
@@ -425,6 +427,8 @@ pub struct HumanRelationship {
     pub created_at: String,
     pub updated_at: String,
     pub expires_at: Option<String>,
+    /// Source of truth: DHT (HumanRelationship entry in imagodei DNA). NULL for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New human relationship for INSERT
@@ -490,6 +494,8 @@ pub struct ContributorPresence {
     pub metadata_json: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (ContributorPresence entry in imagodei DNA). NULL for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New contributor presence for INSERT (minimal fields - DB defaults handle the rest)
@@ -741,6 +747,8 @@ pub struct Human {
     pub app_id: String,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (Human entry in imagodei DNA). NULL for pre-coherence rows.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New human for INSERT
