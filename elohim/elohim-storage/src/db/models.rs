@@ -84,6 +84,8 @@ pub struct Content {
     pub created_at: String,
     pub updated_at: String,
     pub content_body: Option<String>,
+    /// Source of truth: DHT (Content entry in lamad DNA). Classification: A (Notarized).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// Content with tags attached (API response)
@@ -156,6 +158,8 @@ pub struct Path {
     pub created_by: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (LearningPath entry in lamad DNA). Classification: A (Notarized).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New path for INSERT
@@ -212,6 +216,8 @@ pub struct Chapter {
     pub description: Option<String>,
     pub order_index: i32,
     pub estimated_duration: Option<String>,
+    /// Source of truth: DHT (derived from LearningPath via Link). Classification: A2 (Derived).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New chapter for INSERT
@@ -249,6 +255,8 @@ pub struct Step {
     pub order_index: i32,
     pub estimated_duration: Option<String>,
     pub metadata_json: Option<String>,
+    /// Source of truth: DHT (derived from LearningPath via chapter chain Link). Classification: A2 (Derived).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New step for INSERT
@@ -353,6 +361,8 @@ pub struct Relationship {
     pub metadata_json: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (Relationship entry in lamad DNA). Classification: A (Notarized).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New relationship for INSERT
@@ -595,6 +605,9 @@ pub struct ContentMastery {
     pub privileges_json: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: private source chain (agent-scoped). Classification: B2 (Agent-Scoped + Attestation).
+    /// Populated only when mastery crosses threshold and an Attestation is issued to the DHT.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New content mastery for INSERT (minimal - uses DB defaults for counters/scores)
@@ -1764,6 +1777,8 @@ pub struct ContentAttestation {
     pub revocation: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (Attestation entry in imagodei DNA). Classification: A (Notarized).
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New content attestation for INSERT
@@ -2067,6 +2082,9 @@ pub struct NewNodeStewardship {
 // ============================================================================
 
 /// Knowledge map from the database
+///
+/// Operational (Category C): personal sensemaking, reconstructable from content relationships.
+/// No dht_anchor_hash needed.
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = knowledge_maps)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

@@ -67,6 +67,7 @@ diesel::table! {
         description -> Nullable<Text>,
         order_index -> Integer,
         estimated_duration -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -88,6 +89,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         content_body -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -110,6 +112,7 @@ diesel::table! {
         privileges_json -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -264,6 +267,7 @@ diesel::table! {
         created_by -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -284,6 +288,7 @@ diesel::table! {
         metadata_json -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -404,6 +409,7 @@ diesel::table! {
         order_index -> Integer,
         estimated_duration -> Nullable<Text>,
         metadata_json -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -603,6 +609,7 @@ diesel::table! {
         revocation -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
