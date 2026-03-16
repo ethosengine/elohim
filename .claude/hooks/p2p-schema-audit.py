@@ -118,6 +118,10 @@ def audit_view(lines: list[str]) -> list[str]:
 
         view_name = view_match.group(1)
 
+        # Skip input/creation views — they don't have DHT anchors
+        if re.search(r'^(?:Create|Update|Seed)', view_name):
+            continue
+
         lookahead = ''.join(lines[i : min(len(lines), i + 30)])
         has_id = bool(re.search(r'pub\s+id\s*:', lookahead))
         has_anchor = 'dht_anchor_hash' in lookahead
