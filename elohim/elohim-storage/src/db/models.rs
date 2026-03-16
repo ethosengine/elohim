@@ -1011,6 +1011,7 @@ pub struct StewardshipAllocation {
     pub last_recognition_at: Option<String>,
     pub note: Option<String>,
     pub metadata_json: Option<String>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -1793,6 +1794,7 @@ pub struct StewardCredential {
     pub affinity_coefficient: f32,
     pub credential_type: String,
     pub status: String,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -1825,6 +1827,7 @@ pub struct PremiumGate {
     pub gated_resource_ids: String,
     pub gate_title: String,
     pub gate_description: Option<String>,
+    pub dht_anchor_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -1857,6 +1860,7 @@ pub struct AccessGrant {
     pub granted_at: String,
     pub expires_at: Option<String>,
     pub status: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New access grant for INSERT

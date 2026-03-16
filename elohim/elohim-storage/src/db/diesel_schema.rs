@@ -319,6 +319,7 @@ diesel::table! {
         last_recognition_at -> Nullable<Text>,
         note -> Nullable<Text>,
         metadata_json -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
     }
@@ -609,6 +610,7 @@ diesel::table! {
         affinity_coefficient -> Float,
         credential_type -> Text,
         status -> Text,
+        dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
     }
@@ -623,6 +625,7 @@ diesel::table! {
         gated_resource_ids -> Text,
         gate_title -> Text,
         gate_description -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
     }
 }
@@ -636,6 +639,7 @@ diesel::table! {
         granted_at -> Text,
         expires_at -> Nullable<Text>,
         status -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
