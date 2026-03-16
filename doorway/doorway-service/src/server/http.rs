@@ -105,6 +105,8 @@ pub struct AppState {
     pub cors_config: crate::cors::CorsConfig,
     /// Dynamic route registry — steward peer routes + external agent routes
     pub route_registry: Arc<RouteRegistry>,
+    /// Journal inference mode — determined at boot by sidecar availability
+    pub journal_inference_available: bool,
 }
 
 impl AppState {
@@ -174,6 +176,7 @@ impl AppState {
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
+            journal_inference_available: false,
         }
     }
 
@@ -247,6 +250,7 @@ impl AppState {
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
+            journal_inference_available: false,
         }
     }
 
@@ -335,6 +339,7 @@ impl AppState {
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
+            journal_inference_available: false,
         }
     }
 
@@ -417,6 +422,7 @@ impl AppState {
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
+            journal_inference_available: false,
         })
     }
 
@@ -1198,6 +1204,19 @@ async fn handle_request(
         (Method::GET, p) if p.starts_with("/api/v1/humans/") && p.ends_with("/collectives") => {
             return Ok(to_boxed(
                 routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // Journal routing (intent analysis + suggestion generation)
+        (Method::POST, "/api/v1/journal/analyze") => {
+            return Ok(to_boxed(
+                routes::handle_journal_analyze(req, Arc::clone(&state)).await,
+            ));
+        }
+
+        (Method::POST, "/api/v1/journal/suggest") => {
+            return Ok(to_boxed(
+                routes::handle_journal_suggest(req, Arc::clone(&state)).await,
             ));
         }
 

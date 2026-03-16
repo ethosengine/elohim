@@ -110,4 +110,45 @@ describe('JournalEditorComponent', () => {
     expect(component.title()).toBe('Loaded Title');
     expect(component.body()).toBe('Loaded Body');
   });
+
+  it('should show Finish button when body is non-empty', () => {
+    component.loadContent('Title', 'Some body');
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('[data-testid="finish-btn"]');
+    expect(btn).toBeTruthy();
+  });
+
+  it('should not show Finish button when body is empty', () => {
+    component.loadContent('Title', '');
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('[data-testid="finish-btn"]');
+    expect(btn).toBeFalsy();
+  });
+
+  it('should emit finished with title and body when clicked', () => {
+    const spy = vi.fn();
+    component.finished.emit = spy;
+    component.loadContent('My Title', 'My body text');
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('[data-testid="finish-btn"]') as HTMLButtonElement;
+    btn.click();
+    expect(spy).toHaveBeenCalledWith({ title: 'My Title', body: 'My body text' });
+  });
+
+  it('should disable inputs when readonly', () => {
+    fixture.componentRef.setInput('readonly', true);
+    fixture.detectChanges();
+    const title = fixture.nativeElement.querySelector('[data-testid="journal-title"]') as HTMLInputElement;
+    const body = fixture.nativeElement.querySelector('[data-testid="journal-body"]') as HTMLTextAreaElement;
+    expect(title.readOnly).toBe(true);
+    expect(body.readOnly).toBe(true);
+  });
+
+  it('should hide Finish button when readonly', () => {
+    fixture.componentRef.setInput('readonly', true);
+    component.loadContent('Title', 'Body');
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('[data-testid="finish-btn"]');
+    expect(btn).toBeFalsy();
+  });
 });
