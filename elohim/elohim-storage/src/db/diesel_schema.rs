@@ -441,13 +441,44 @@ diesel::table! {
 diesel::table! {
     challenges (id) {
         id -> Text,
-        content_id -> Text,
-        challenger_presence_id -> Text,
-        reason -> Text,
-        status -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        challenger_id -> Text,
+        standing_basis -> Text,
+        grounds_primary -> Text,
+        grounds_secondary -> Nullable<Text>,
         evidence -> Text,
+        requested_outcome -> Nullable<Text>,
+        state -> Text,
+        response_outcome -> Nullable<Text>,
+        response_reasoning -> Nullable<Text>,
+        response_actions -> Nullable<Text>,
+        response_by -> Nullable<Text>,
+        sets_precedent -> Integer,
+        filed_at -> Text,
+        acknowledged_at -> Nullable<Text>,
+        response_deadline -> Text,
+        responded_at -> Nullable<Text>,
+        resolved_at -> Nullable<Text>,
         created_at -> Text,
-        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    appeals (id) {
+        id -> Text,
+        challenge_id -> Text,
+        appellant_id -> Text,
+        grounds -> Text,
+        additional_evidence -> Nullable<Text>,
+        state -> Text,
+        escalation_level -> Nullable<Text>,
+        decision -> Nullable<Text>,
+        decision_reasoning -> Nullable<Text>,
+        decided_by -> Nullable<Text>,
+        filed_at -> Text,
+        decided_at -> Nullable<Text>,
+        created_at -> Text,
     }
 }
 
@@ -771,6 +802,7 @@ diesel::joinable!(steps -> paths (path_id));
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
     agreements,
+    appeals,
     apps,
     challenges,
     chapters,
