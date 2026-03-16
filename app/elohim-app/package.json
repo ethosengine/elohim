@@ -29,7 +29,7 @@
     "hc:start": "./scripts/hc-start.sh",
     "hc:start:seed": "./scripts/hc-start.sh --seed",
     "hc:start:conductor": "./scripts/hc-start.sh --conductor",
-    "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp 8090/tcp 2>/dev/null ; rm -f ../../scripts/local-dev/.hc_live_* ; echo 'Stopped Elohim P2P services'",
+    "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp 8090/tcp 8095/tcp 2>/dev/null ; rm -f ../../scripts/local-dev/.hc_live_* ; echo 'Stopped Elohim P2P services'",
     "hc:reset": "npm run hc:stop && rm -rf ../../scripts/local-dev/.hc* ../../scripts/local-dev/.sandbox* ../../scripts/local-dev/conductor-data /tmp/elohim-storage && echo 'Cleared all Elohim data'",
     "hc:status": "echo '=== Doorway ===' && curl -s http://localhost:8888/status 2>/dev/null | head -20 && echo && echo '=== Storage ===' && curl -s http://localhost:8090/db/stats 2>/dev/null || echo 'Services not running'",
     "hc:build": "./scripts/hc-build.sh",

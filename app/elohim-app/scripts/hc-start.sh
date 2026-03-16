@@ -281,6 +281,51 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Step 2.5: Elohim Agent SDK (Inference Sidecar)
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "┌──────────────────────────────────────────────────────────────┐"
+echo "│ Step 2.5: Elohim Agent SDK (Inference Sidecar)                │"
+echo "└──────────────────────────────────────────────────────────────┘"
+
+AGENT_SDK_DIR="$APP_DIR/../../elohim/elohim-agent/elohim-agent-sdk"
+AGENT_SDK_PORT="${ELOHIM_AGENT_PORT:-8095}"
+
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo "   ⚠️  ANTHROPIC_API_KEY not set — sidecar skipped (gate falls back to PassThrough)"
+else
+    # Check if already running
+    if curl -s "http://localhost:$AGENT_SDK_PORT/health" >/dev/null 2>&1; then
+        echo "   ✅ Agent SDK already running (port: $AGENT_SDK_PORT)"
+    else
+        # Build if needed
+        if [ ! -d "$AGENT_SDK_DIR/dist" ] || [ "$FORCE_BUILD" = true ]; then
+            echo "   🔨 Building agent SDK..."
+            cd "$AGENT_SDK_DIR"
+            pnpm build
+            echo "   ✅ Build complete"
+        fi
+
+        # Start sidecar
+        cd "$AGENT_SDK_DIR"
+        ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+        ELOHIM_AGENT_PORT="$AGENT_SDK_PORT" \
+        pnpm start &
+
+        echo -n "   ⏳ Waiting for agent SDK"
+        for i in {1..10}; do
+            if curl -s "http://localhost:$AGENT_SDK_PORT/health" >/dev/null 2>&1; then
+                echo ""
+                echo "   ✅ Agent SDK ready (port: $AGENT_SDK_PORT)"
+                break
+            fi
+            printf "."
+            sleep 1
+        done
+    fi
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Step 4: Start Doorway
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
@@ -358,6 +403,11 @@ echo "├─────────────┼─────────�
 printf "│ Conductor   │ ws://localhost:%-5s (admin)                   │\n" "$ADMIN_PORT"
 echo "│             │ ws://localhost:4445  (app)                     │"
 printf "│ Storage     │ http://localhost:%-4s (content DB + blobs)    │\n" "$STORAGE_PORT"
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+printf "│ Agent SDK   │ http://localhost:%-4s (inference sidecar)     │\n" "${ELOHIM_AGENT_PORT:-8095}"
+else
+echo "│ Agent SDK   │ (skipped — no ANTHROPIC_API_KEY)              │"
+fi
 echo "│ Doorway     │ http://localhost:8888 (unified API)           │"
 echo "└─────────────┴────────────────────────────────────────────────┘"
 echo ""
