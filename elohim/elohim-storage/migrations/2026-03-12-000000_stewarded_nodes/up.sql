@@ -1,3 +1,7 @@
+-- Source of truth: Holochain DHT (StewardedResource entry in lamad DNA)
+-- Classification: A (Notarized) — dht_anchor_hash links to StewardedResource ActionHash
+-- node_stewardship: Source of truth: SQLite (operational). Classification: C.
+
 -- StewardedNode: a physical node registered on the DHT and projected to storage
 CREATE TABLE stewarded_nodes (
     id TEXT PRIMARY KEY NOT NULL,

@@ -1,3 +1,6 @@
+-- Source of truth: Holochain DHT (EconomicEvent entry in lamad DNA)
+-- Classification: A (Notarized) — dht_anchor_hash links to EconomicEvent ActionHash
+
 -- Economic events for hREA/ValueFlows integration
 -- Tracks value flows: content engagement, recognition transfer, stewardship
 CREATE TABLE economic_events (

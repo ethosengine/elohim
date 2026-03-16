@@ -1,3 +1,6 @@
+-- Source of truth: Holochain DHT (derived from Agreement via Link)
+-- Classification: A2 (Derived) — dht_anchor_hash links to parent Agreement ActionHash
+
 -- Stewardship allocations - one-to-many content stewardship with allocation ratios
 -- Philosophy: Content isn't "owned" but "stewarded" by multiple contributors
 -- Ratios are computed from contribution history and negotiated by Elohim governance

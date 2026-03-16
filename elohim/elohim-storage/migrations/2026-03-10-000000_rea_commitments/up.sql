@@ -1,3 +1,6 @@
+-- Source of truth: Holochain DHT (Commitment entry in lamad DNA)
+-- Classification: A (Notarized) — dht_anchor_hash links to Commitment ActionHash
+
 -- REA Commitment: a binding promise of future economic activity (ValueFlows)
 -- Supports paired give/take actions for bilateral exchange.
 

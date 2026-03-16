@@ -1,3 +1,7 @@
+-- Source of truth: SQLite (operational)
+-- Classification: C (Operational) — reconstructable from economic_events curation acts
+-- Reconstruction: SELECT steward_id, content_id, SUM(value) FROM economic_events WHERE action='curate' GROUP BY steward_id, content_id
+
 CREATE TABLE IF NOT EXISTS steward_affinity (
     id TEXT PRIMARY KEY NOT NULL,
     app_id TEXT NOT NULL DEFAULT 'lamad',
