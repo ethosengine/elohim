@@ -150,6 +150,7 @@ pub struct ContentView {
     pub created_at: String,
     pub updated_at: String,
     pub content_body: Option<String>,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Content> for ContentView {
@@ -171,6 +172,7 @@ impl From<Content> for ContentView {
             created_at: c.created_at,
             updated_at: c.updated_at,
             content_body: c.content_body,
+            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }
@@ -223,6 +225,7 @@ pub struct PathView {
     pub created_by: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Path> for PathView {
@@ -242,6 +245,7 @@ impl From<Path> for PathView {
             created_by: p.created_by,
             created_at: p.created_at,
             updated_at: p.updated_at,
+            dht_anchor_hash: p.dht_anchor_hash,
         }
     }
 }
@@ -261,6 +265,7 @@ pub struct ChapterView {
     pub description: Option<String>,
     pub order_index: i32,
     pub estimated_duration: Option<String>,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Chapter> for ChapterView {
@@ -273,6 +278,7 @@ impl From<Chapter> for ChapterView {
             description: c.description,
             order_index: c.order_index,
             estimated_duration: c.estimated_duration,
+            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }
@@ -298,6 +304,7 @@ pub struct StepView {
     pub estimated_duration: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
     pub metadata: Option<JsonVal>,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Step> for StepView {
@@ -315,6 +322,7 @@ impl From<Step> for StepView {
             order_index: s.order_index,
             estimated_duration: s.estimated_duration,
             metadata: parse_json_opt(&s.metadata_json),
+            dht_anchor_hash: s.dht_anchor_hash,
         }
     }
 }
@@ -446,6 +454,7 @@ pub struct RelationshipView {
     pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<Relationship> for RelationshipView {
@@ -466,6 +475,7 @@ impl From<Relationship> for RelationshipView {
             metadata: parse_json_opt(&r.metadata_json),
             created_at: r.created_at,
             updated_at: r.updated_at,
+            dht_anchor_hash: r.dht_anchor_hash,
         }
     }
 }
@@ -811,6 +821,7 @@ pub struct ContentMasteryView {
     pub privileges: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<ContentMastery> for ContentMasteryView {
@@ -833,6 +844,7 @@ impl From<ContentMastery> for ContentMasteryView {
             privileges: parse_json_opt(&m.privileges_json),
             created_at: m.created_at,
             updated_at: m.updated_at,
+            dht_anchor_hash: m.dht_anchor_hash,
         }
     }
 }
@@ -3840,6 +3852,7 @@ pub struct ContentAttestationView {
     pub revocation: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 impl From<ContentAttestation> for ContentAttestationView {
@@ -3856,6 +3869,7 @@ impl From<ContentAttestation> for ContentAttestationView {
             revocation: parse_json_opt(&c.revocation),
             created_at: c.created_at,
             updated_at: c.updated_at,
+            dht_anchor_hash: c.dht_anchor_hash,
         }
     }
 }
