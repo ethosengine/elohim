@@ -122,6 +122,7 @@ export * from './BallotEntry';
 export * from './CastRankedVoteInputView';
 export * from './CreateProposalOptionInputView';
 export * from './GovernanceSignalView';
+export * from './SignalAggregateView';
 export * from './OptionResult';
 export * from './ProposalOptionView';
 export * from './RankedVoteView';

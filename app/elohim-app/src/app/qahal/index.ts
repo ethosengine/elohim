@@ -30,6 +30,7 @@ export { ChallengeDetailComponent } from './components/challenge-detail/challeng
 export { ChallengeRouteComponent } from './components/challenge-route/challenge-route.component';
 export { RespondToChallengeComponent } from './components/respond-to-challenge/respond-to-challenge.component';
 export { FileAppealComponent } from './components/file-appeal/file-appeal.component';
+export { FeedbackAggregateComponent } from './components/feedback-aggregate/feedback-aggregate.component';
 
 // Services
 export * from './services';

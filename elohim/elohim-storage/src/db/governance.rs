@@ -506,6 +506,69 @@ pub fn query_signals(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// Aggregate signals for an entity: totals, by-type, by-value, unique participants, consensus strength
+pub fn aggregate_signals(
+    conn: &mut SqliteConnection,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<crate::views::SignalAggregateView, StorageError> {
+    let signals = query_signals(conn, entity_type, entity_id)?;
+    let total_signals = signals.len() as i64;
+
+    if total_signals == 0 {
+        return Ok(crate::views::SignalAggregateView {
+            entity_type: entity_type.to_string(),
+            entity_id: entity_id.to_string(),
+            total_signals: 0,
+            by_type: std::collections::HashMap::new(),
+            by_value: std::collections::HashMap::new(),
+            unique_participants: 0,
+            consensus_strength: 0.0,
+        });
+    }
+
+    let mut by_type: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut by_value: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut participants: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for signal in &signals {
+        *by_type.entry(signal.signal_type.clone()).or_insert(0) += 1;
+        *by_value.entry(signal.signal_value.clone()).or_insert(0) += 1;
+        participants.insert(signal.human_id.clone());
+    }
+
+    let unique_participants = participants.len() as i64;
+
+    // Compute consensus_strength using normalized Shannon entropy
+    let consensus_strength = {
+        let num_distinct = by_value.len();
+        if num_distinct <= 1 {
+            1.0
+        } else {
+            let total = total_signals as f64;
+            let entropy: f64 = by_value
+                .values()
+                .map(|&count| {
+                    let p = count as f64 / total;
+                    -p * p.ln()
+                })
+                .sum();
+            let max_entropy = (num_distinct as f64).ln();
+            1.0 - (entropy / max_entropy)
+        }
+    };
+
+    Ok(crate::views::SignalAggregateView {
+        entity_type: entity_type.to_string(),
+        entity_id: entity_id.to_string(),
+        total_signals,
+        by_type,
+        by_value,
+        unique_participants,
+        consensus_strength,
+    })
+}
+
 pub fn count_signals(
     conn: &mut SqliteConnection,
     entity_type: &str,

@@ -24,10 +24,15 @@ import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
 import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feedback.component';
 import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
 import { FileChallengeComponent } from '../file-challenge/file-challenge.component';
+import { FeedbackAggregateComponent } from '../feedback-aggregate/feedback-aggregate.component';
 import {
   MechanismSelectionService,
   type MechanismSelection,
 } from '../../services/mechanism-selection.service';
+import {
+  SignalAccumulationService,
+  type AccumulationStatus,
+} from '../../services/signal-accumulation.service';
 
 @Component({
   selector: 'qahal-feedback-mechanism-gateway',
@@ -38,6 +43,7 @@ import {
     GraduatedFeedbackComponent,
     PsephosBallotWrapperComponent,
     FileChallengeComponent,
+    FeedbackAggregateComponent,
   ],
   template: `
     @if (showChallengeForm()) {
@@ -89,6 +95,26 @@ import {
           [proposal]="sel.activeProposal"
           [mechanism]="sel.mechanism"
           (ballotSubmitted)="onBallotSubmitted($event)" />
+      }
+
+      <!-- Signal aggregate - shows what others thought -->
+      <app-feedback-aggregate
+        [entityType]="entityType()"
+        [entityId]="entityId()" />
+
+      <!-- Accumulation status badges -->
+      @if (accumulationStatus(); as status) {
+        @if (status.readyForSensemaking) {
+          <div class="accumulation-badge sensemaking">
+            Diverse perspectives on this content — sensemaking available
+          </div>
+        }
+        @if (status.controversyDetected) {
+          <div class="accumulation-badge controversy">Active discussion</div>
+        }
+        @if (status.settled) {
+          <div class="accumulation-badge settled">Community consensus</div>
+        }
       }
     } @else {
       <div class="gateway-loading">Loading governance...</div>
@@ -153,6 +179,31 @@ import {
       color: var(--text-primary, #333);
     }
 
+    .accumulation-badge {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.25rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 999px;
+      line-height: 1.4;
+    }
+
+    .accumulation-badge.sensemaking {
+      background: var(--sensemaking-bg, #e8f0fe);
+      color: var(--sensemaking-fg, #1a56db);
+    }
+
+    .accumulation-badge.controversy {
+      background: var(--controversy-bg, #fef3c7);
+      color: var(--controversy-fg, #92400e);
+    }
+
+    .accumulation-badge.settled {
+      background: var(--settled-bg, #d1fae5);
+      color: var(--settled-fg, #065f46);
+    }
+
     @media (prefers-color-scheme: dark) {
       .challenge-panel {
         background: var(--surface, #1a1a1a);
@@ -161,6 +212,21 @@ import {
 
       .challenge-close:hover {
         background: var(--surface-elevated, #2a2a2a);
+      }
+
+      .accumulation-badge.sensemaking {
+        background: var(--sensemaking-bg, #1e3a5f);
+        color: var(--sensemaking-fg, #93bbfc);
+      }
+
+      .accumulation-badge.controversy {
+        background: var(--controversy-bg, #4a3520);
+        color: var(--controversy-fg, #fbbf24);
+      }
+
+      .accumulation-badge.settled {
+        background: var(--settled-bg, #14432a);
+        color: var(--settled-fg, #6ee7b7);
       }
     }
   `,
@@ -177,6 +243,7 @@ export class FeedbackMechanismGatewayComponent {
 
   private readonly governanceApi = inject(GovernanceApiService);
   private readonly mechanismSelection = inject(MechanismSelectionService);
+  private readonly signalAccumulation = inject(SignalAccumulationService);
 
   /** Whether the inline challenge form is currently shown. */
   readonly showChallengeForm = signal(false);
@@ -186,6 +253,9 @@ export class FeedbackMechanismGatewayComponent {
 
   /** Active proposal for this entity (if any). */
   private readonly activeProposal = signal<ProposalView | undefined>(undefined);
+
+  /** Accumulation status derived from signal aggregates. */
+  readonly accumulationStatus = signal<AccumulationStatus | null>(null);
 
   /** Whether governance data has been loaded (distinguishes null-state from not-yet-loaded). */
   private readonly loaded = signal(false);
@@ -248,13 +318,15 @@ export class FeedbackMechanismGatewayComponent {
   private async loadGovernanceData(entityType: string, entityId: string): Promise<void> {
     this.loaded.set(false);
 
-    const [state, proposals] = await Promise.all([
+    const [state, proposals, accumulation] = await Promise.all([
       this.governanceApi.getGovernanceState(entityType, entityId),
       this.governanceApi.queryProposals(entityId, 'active'),
+      this.signalAccumulation.getAccumulationStatus(entityType, entityId),
     ]);
 
     this.governanceState.set(state);
     this.activeProposal.set(proposals.length > 0 ? proposals[0] : undefined);
+    this.accumulationStatus.set(accumulation);
     this.loaded.set(true);
   }
 }
