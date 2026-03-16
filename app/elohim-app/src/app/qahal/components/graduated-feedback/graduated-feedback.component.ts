@@ -1,8 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, OnInit, Output, inject, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
-// @coverage: 100.0% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -11,6 +9,12 @@ import {
   GraduatedFeedbackInput,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
+import type {
+  RecordSignalInputView,
+  GovernanceSignalView,
+} from '@elohim/storage-client/generated';
 
 /**
  * GraduatedFeedbackComponent - Context-Aware Scaled Responses
@@ -19,6 +23,7 @@ import {
  * - Positions are context-specific (accuracy, usefulness, proposals)
  * - Intensity captures how strongly respondent feels (ARCH pattern)
  * - Optional reasoning for deliberative engagement
+ * - Records signals to governance API backend (mechanism level 2)
  *
  * Friction Level: Medium
  * - More thoughtful than reactions
@@ -29,15 +34,279 @@ import {
   selector: 'app-graduated-feedback',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './graduated-feedback.component.html',
-  styleUrls: ['./graduated-feedback.component.css'],
+  template: `
+    <div class="graduated-feedback" [class.compact]="compact()">
+      <h4 class="feedback-label">{{ currentScale.label }}</h4>
+
+      <div class="positions" role="radiogroup" [attr.aria-label]="currentScale.label">
+        @for (position of currentScale.positions; track position.index) {
+          <button
+            class="position-btn"
+            [class.selected]="selectedPosition === position.index"
+            [style.border-color]="position.color"
+            [style.background-color]="
+              selectedPosition === position.index ? position.color : 'transparent'
+            "
+            [style.color]="selectedPosition === position.index ? '#fff' : position.color"
+            role="radio"
+            [attr.aria-checked]="selectedPosition === position.index"
+            [attr.aria-label]="position.label"
+            [attr.data-testid]="'position-' + position.label.toLowerCase().replace(' ', '-')"
+            (click)="selectPosition(position)"
+          >
+            {{ position.label }}
+          </button>
+        }
+      </div>
+
+      @if (selectedPosition !== null) {
+        <div class="intensity-section">
+          <label class="intensity-label" for="intensity-slider">
+            Intensity: {{ getIntensityLabel() }} ({{ intensity }}/10)
+          </label>
+          <input
+            id="intensity-slider"
+            type="range"
+            min="1"
+            max="10"
+            [(ngModel)]="intensity"
+            class="intensity-slider"
+            data-testid="intensity-slider"
+          />
+        </div>
+      }
+
+      @if (showReasoningField || reasoningRequired) {
+        <div class="reasoning-section">
+          <label class="reasoning-label" for="reasoning-text">
+            {{ reasoningRequired ? 'Reasoning (required)' : 'Reasoning (optional)' }}
+          </label>
+          <textarea
+            id="reasoning-text"
+            [(ngModel)]="reasoning"
+            class="reasoning-textarea"
+            placeholder="Share your thinking..."
+            rows="3"
+            data-testid="reasoning-textarea"
+          ></textarea>
+        </div>
+      } @else if (selectedPosition !== null) {
+        <button
+          class="toggle-reasoning-btn"
+          (click)="toggleReasoning()"
+          data-testid="toggle-reasoning-btn"
+        >
+          Add reasoning
+        </button>
+      }
+
+      @if (selectedPosition !== null) {
+        <div class="submit-section">
+          <button
+            class="submit-btn"
+            [disabled]="!canSubmit || isSubmitting"
+            (click)="submit()"
+            data-testid="submit-feedback-btn"
+          >
+            {{ isSubmitting ? 'Submitting...' : hasSubmitted ? 'Update Feedback' : 'Submit' }}
+          </button>
+          @if (hasSubmitted) {
+            <button
+              class="reset-btn"
+              (click)="reset()"
+              data-testid="reset-feedback-btn"
+            >
+              Reset
+            </button>
+          }
+        </div>
+      }
+
+      @if (showAggregates() && stats && stats.totalResponses > 0) {
+        <div class="aggregate-section">
+          <p class="aggregate-header">
+            Community response ({{ stats.totalResponses }}
+            {{ stats.totalResponses === 1 ? 'response' : 'responses' }})
+          </p>
+          <div class="distribution-bar">
+            @for (position of currentScale.positions; track position.index) {
+              @if (getDistributionWidth(position) > 0) {
+                <div
+                  class="distribution-segment"
+                  [style.width.%]="getDistributionWidth(position)"
+                  [style.background-color]="position.color"
+                  [title]="
+                    position.label +
+                    ': ' +
+                    formatPercentage(getDistributionWidth(position) / 100)
+                  "
+                ></div>
+              }
+            }
+          </div>
+          @if (apiDistribution && hasApiData) {
+            <p class="api-aggregate-note">Includes governance network data</p>
+          }
+        </div>
+      }
+    </div>
+  `,
+  styles: [
+    `
+      .graduated-feedback {
+        padding: 1rem;
+      }
+      .graduated-feedback.compact {
+        padding: 0.5rem;
+      }
+      .feedback-label {
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+        font-weight: 500;
+      }
+      .positions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .position-btn {
+        padding: 0.5rem 0.75rem;
+        border: 2px solid;
+        border-radius: 0.375rem;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+      .position-btn:hover {
+        opacity: 0.85;
+      }
+      .position-btn.selected {
+        font-weight: 600;
+      }
+      .intensity-section {
+        margin-top: 1rem;
+      }
+      .intensity-label {
+        display: block;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+        color: var(--text-secondary, #666);
+      }
+      .intensity-slider {
+        width: 100%;
+      }
+      .reasoning-section {
+        margin-top: 1rem;
+      }
+      .reasoning-label {
+        display: block;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+        color: var(--text-secondary, #666);
+      }
+      .reasoning-textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid var(--border-color, #ddd);
+        border-radius: 0.25rem;
+        font-family: inherit;
+        font-size: 0.875rem;
+        resize: vertical;
+      }
+      .toggle-reasoning-btn {
+        margin-top: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        border: none;
+        background: transparent;
+        color: var(--link-color, #2196f3);
+        cursor: pointer;
+        font-size: 0.813rem;
+      }
+      .submit-section {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.5rem;
+      }
+      .submit-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        background: var(--primary-color, #2196f3);
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.875rem;
+      }
+      .submit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .reset-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color, #ddd);
+        border-radius: 0.25rem;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.875rem;
+      }
+      .aggregate-section {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-color, #eee);
+      }
+      .aggregate-header {
+        font-size: 0.813rem;
+        color: var(--text-secondary, #666);
+        margin: 0 0 0.5rem;
+      }
+      .distribution-bar {
+        display: flex;
+        height: 0.5rem;
+        border-radius: 0.25rem;
+        overflow: hidden;
+      }
+      .distribution-segment {
+        transition: width 0.3s ease;
+      }
+      .api-aggregate-note {
+        font-size: 0.75rem;
+        color: var(--text-tertiary, #999);
+        margin: 0.25rem 0 0;
+        font-style: italic;
+      }
+    `,
+  ],
 })
 export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
-  @Input() contentId!: string;
-  @Input() context: FeedbackContext = 'usefulness';
-  @Input() requiresReasoning = false;
-  @Input() showAggregates = true;
-  @Input() compact = false;
+  /** Entity type for governance signals (e.g. 'content', 'proposal') */
+  readonly entityType = input<string>('content');
+
+  /** Entity ID for governance signals */
+  readonly entityId = input<string>('');
+
+  /**
+   * Legacy content ID input — used as fallback for entityId when entityId is not provided.
+   * Prefer entityId + entityType for new usage.
+   */
+  readonly contentId = input<string>('');
+
+  /** Feedback context determining the scale used */
+  readonly context = input<FeedbackContext>('usefulness');
+
+  /** Whether reasoning is always required */
+  readonly requiresReasoningInput = input<boolean>(false, { alias: 'requiresReasoning' });
+
+  /** Resolved entity ID: prefers entityId input, falls back to contentId */
+  private get resolvedEntityId(): string {
+    return this.entityId() || this.contentId();
+  }
+
+  /** Show aggregate distribution */
+  readonly showAggregates = input<boolean>(true);
+
+  /** Compact mode */
+  readonly compact = input<boolean>(false);
 
   @Output() feedbackSubmitted = new EventEmitter<GraduatedFeedbackInput>();
 
@@ -51,8 +320,12 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   hasSubmitted = false;
   showReasoningField = false;
 
-  // Aggregate stats
+  // Aggregate stats (local)
   stats: FeedbackStats | null = null;
+
+  // API-sourced distribution data
+  apiDistribution: Record<string, number> = {};
+  hasApiData = false;
 
   // Context-specific scales
   readonly scales: Record<FeedbackContext, ScaleDefinition> = {
@@ -111,11 +384,16 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   private readonly signalService = inject(GovernanceSignalService);
+  private readonly governanceApi = inject(GovernanceApiService);
+  private readonly governanceRecognition = inject(GovernanceRecognitionService);
+
+  private static readonly CURRENT_USER_ID = 'current-user';
 
   ngOnInit(): void {
-    if (this.showAggregates) {
+    if (this.showAggregates()) {
       this.loadStats();
     }
+    this.loadApiSignals();
     this.subscribeToChanges();
   }
 
@@ -128,7 +406,7 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
    * Get the current scale definition.
    */
   get currentScale(): ScaleDefinition {
-    return this.scales[this.context];
+    return this.scales[this.context()];
   }
 
   /**
@@ -141,10 +419,19 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
 
   /**
    * Check if reasoning is required for current selection.
+   * Reasoning is required if: explicitly set via input, position demands it,
+   * or the selected position is in the bottom 2 options (negative feedback).
    */
   get reasoningRequired(): boolean {
-    if (this.requiresReasoning) return true;
-    return this.selectedPositionData?.requiresReasoning ?? false;
+    if (this.requiresReasoningInput()) return true;
+    if (this.selectedPositionData?.requiresReasoning) return true;
+
+    // For negative feedback (bottom 2 options on any scale), require reasoning
+    if (this.selectedPosition !== null && this.selectedPosition <= 0.25) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -162,8 +449,8 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   selectPosition(position: ScalePosition): void {
     this.selectedPosition = position.index;
 
-    // Show reasoning field if required or if it's a critical position
-    if (position.requiresReasoning || this.requiresReasoning) {
+    // Show reasoning field if required or if it's a critical/negative position
+    if (position.requiresReasoning || this.requiresReasoningInput() || position.index <= 0.25) {
       this.showReasoningField = true;
     }
   }
@@ -176,7 +463,7 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Submit the feedback.
+   * Submit the feedback to both local signal service and governance API.
    */
   submit(): void {
     if (!this.canSubmit || this.isSubmitting) return;
@@ -185,15 +472,16 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
     const positionData = this.selectedPositionData!;
 
     const feedback: GraduatedFeedbackInput = {
-      context: this.context,
+      context: this.context(),
       position: positionData.label,
       positionIndex: positionData.index,
       intensity: this.intensity,
       reasoning: this.reasoning.trim() || undefined,
     };
 
+    // Record locally via existing signal service
     this.signalService
-      .recordGraduatedFeedback(this.contentId, feedback)
+      .recordGraduatedFeedback(this.resolvedEntityId, feedback)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: success => {
@@ -201,13 +489,43 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
           if (success) {
             this.hasSubmitted = true;
             this.feedbackSubmitted.emit(feedback);
-            // Refresh stats
             this.loadStats();
           }
         },
         error: () => {
           this.isSubmitting = false;
         },
+      });
+
+    // Record to governance API backend
+    const signalValue = `${this.context()}:${positionData.label.toLowerCase().replace(/\s+/g, '-')}`;
+    const signal: RecordSignalInputView = {
+      entityType: this.entityType(),
+      entityId: this.resolvedEntityId,
+      humanId: GraduatedFeedbackComponent.CURRENT_USER_ID,
+      signalType: 'graduated',
+      signalValue,
+      mechanismLevel: 2,
+      proxyElohimId: null,
+    };
+
+    this.governanceApi.recordSignal(signal).catch(() => {
+      // API failure is non-blocking; local signal is already recorded
+    });
+
+    // Generate REA economic event for governance participation
+    // Block positions (index 0 on proposal scale) use 'block' participation type
+    const isBlock = this.context() === 'proposal' && positionData.index === 0;
+    this.governanceRecognition
+      .recordParticipation({
+        entityType: this.entityType(),
+        entityId: this.resolvedEntityId,
+        humanId: GraduatedFeedbackComponent.CURRENT_USER_ID,
+        mechanismLevel: 2,
+        participationType: isBlock ? 'block' : 'graduated-feedback',
+      })
+      .catch(() => {
+        // Recognition failure is non-blocking
       });
   }
 
@@ -251,16 +569,60 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
 
   private loadStats(): void {
     this.signalService
-      .getFeedbackStats(this.contentId)
+      .getFeedbackStats(this.resolvedEntityId)
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
         this.stats = stats;
       });
   }
 
+  /**
+   * Load existing signals from the governance API to show aggregate distribution
+   * and determine if the current user has already submitted feedback.
+   */
+  private loadApiSignals(): void {
+    this.governanceApi
+      .getSignals(this.entityType(), this.resolvedEntityId)
+      .then((signals: GovernanceSignalView[]) => {
+        const graduatedSignals = signals.filter(s => s.signalType === 'graduated');
+
+        if (graduatedSignals.length === 0) return;
+
+        // Build distribution from API signals
+        const distribution: Record<string, number> = {};
+        for (const sig of graduatedSignals) {
+          distribution[sig.signalValue] = (distribution[sig.signalValue] ?? 0) + 1;
+        }
+        this.apiDistribution = distribution;
+        this.hasApiData = true;
+
+        // Check if current user already submitted
+        const userSignal = graduatedSignals.find(
+          s => s.humanId === GraduatedFeedbackComponent.CURRENT_USER_ID
+        );
+        if (userSignal) {
+          this.hasSubmitted = true;
+          // Parse signal value to restore selection: "context:position-label"
+          const parts = userSignal.signalValue.split(':');
+          if (parts.length === 2) {
+            const posLabel = parts[1].replace(/-/g, ' ');
+            const matchingPosition = this.currentScale.positions.find(
+              p => p.label.toLowerCase() === posLabel
+            );
+            if (matchingPosition) {
+              this.selectedPosition = matchingPosition.index;
+            }
+          }
+        }
+      })
+      .catch(() => {
+        // API unavailable — rely on local signals only
+      });
+  }
+
   private subscribeToChanges(): void {
     this.signalService.signalChanges$.pipe(takeUntil(this.destroy$)).subscribe(change => {
-      if (change?.type === 'graduated-feedback' && change.contentId === this.contentId) {
+      if (change?.type === 'graduated-feedback' && change.contentId === this.resolvedEntityId) {
         this.loadStats();
       }
     });

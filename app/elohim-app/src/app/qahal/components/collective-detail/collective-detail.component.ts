@@ -8,6 +8,7 @@ import { forkJoin } from 'rxjs';
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 
 import { FaceCardComponent } from '../face-card/face-card.component';
+import { FeedbackMechanismGatewayComponent } from '../feedback-mechanism-gateway/feedback-mechanism-gateway.component';
 
 import type {
   CollectiveView,
@@ -33,7 +34,7 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
 @Component({
   selector: 'app-collective-detail',
   standalone: true,
-  imports: [CommonModule, FaceCardComponent],
+  imports: [CommonModule, FaceCardComponent, FeedbackMechanismGatewayComponent],
   template: `
     <div class="detail">
       <div class="header">
@@ -135,6 +136,14 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
             }
           </div>
         }
+      }
+
+      <!-- Feedback Mechanism Gateway (governance at the collective level) -->
+      @if (collective()) {
+        <qahal-feedback-mechanism-gateway
+          [entityType]="'collective'"
+          [entityId]="collective()!.id"
+        />
       }
     </div>
   `,

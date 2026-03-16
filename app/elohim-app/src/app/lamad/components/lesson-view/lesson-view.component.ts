@@ -28,6 +28,8 @@ import {
   InteractiveRenderer,
   RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
+import { FeedbackMechanismGatewayComponent } from '@app/qahal';
+
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
@@ -72,6 +74,7 @@ interface InlineQuizCompletionEvent {
     RouterModule,
     RelatedConceptsPanelComponent,
     MiniGraphComponent,
+    FeedbackMechanismGatewayComponent,
     // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,6 +134,12 @@ interface InlineQuizCompletionEvent {
           </app-inline-quiz>
         }
         -->
+
+        <!-- Feedback Mechanism Gateway (governance at the point of content) -->
+        <qahal-feedback-mechanism-gateway
+          [entityType]="'content'"
+          [entityId]="content.id"
+        ></qahal-feedback-mechanism-gateway>
       </div>
 
       <!-- Exploration panel toggle (mobile) -->

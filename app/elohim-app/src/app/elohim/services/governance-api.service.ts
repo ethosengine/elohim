@@ -23,6 +23,13 @@ import type {
   CastVoteInputView,
   CreateDiscussionInputView,
   PostMessageInputView,
+  ProposalOptionView,
+  CreateProposalOptionInputView,
+  CastRankedVoteInputView,
+  RankedVoteView,
+  TallyResult,
+  RecordSignalInputView,
+  GovernanceSignalView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -160,6 +167,85 @@ export class GovernanceApiService implements IGovernance {
         `/api/v1/governance/discussions/${encodeURIComponent(discussionId)}/messages`,
         input
       )
+    );
+  }
+
+  // --- Proposal Options ---
+
+  async getProposalOptions(proposalId: string): Promise<ProposalOptionView[]> {
+    return firstValueFrom(
+      this.http
+        .get<ProposalOptionView[]>(
+          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/options`
+        )
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async createProposalOptions(
+    proposalId: string,
+    options: CreateProposalOptionInputView[]
+  ): Promise<ProposalOptionView[]> {
+    return firstValueFrom(
+      this.http.post<ProposalOptionView[]>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/options`,
+        options
+      )
+    );
+  }
+
+  // --- Ranked Votes (multi-mechanism) ---
+
+  async castRankedVotes(
+    proposalId: string,
+    ballot: CastRankedVoteInputView
+  ): Promise<RankedVoteView[]> {
+    return firstValueFrom(
+      this.http.post<RankedVoteView[]>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/ranked-votes`,
+        ballot
+      )
+    );
+  }
+
+  async getRankedVotes(proposalId: string): Promise<RankedVoteView[]> {
+    return firstValueFrom(
+      this.http
+        .get<RankedVoteView[]>(
+          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/ranked-votes`
+        )
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  // --- Tally ---
+
+  async getTally(proposalId: string): Promise<TallyResult> {
+    return firstValueFrom(
+      this.http.get<TallyResult>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/tally`
+      )
+    );
+  }
+
+  // --- Governance Signals ---
+
+  async recordSignal(signal: RecordSignalInputView): Promise<GovernanceSignalView> {
+    return firstValueFrom(
+      this.http.post<GovernanceSignalView>('/api/v1/governance/signals', signal)
+    );
+  }
+
+  async getSignals(entityType: string, entityId: string): Promise<GovernanceSignalView[]> {
+    return firstValueFrom(
+      this.http
+        .get<GovernanceSignalView[]>('/api/v1/governance/signals', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of([])))
     );
   }
 }
