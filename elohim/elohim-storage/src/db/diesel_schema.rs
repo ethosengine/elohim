@@ -449,6 +449,7 @@ diesel::table! {
         mechanism_level -> Integer,
         proxy_elohim_id -> Nullable<Text>,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -463,6 +464,7 @@ diesel::table! {
         signal_count -> Integer,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -489,6 +491,7 @@ diesel::table! {
         responded_at -> Nullable<Text>,
         resolved_at -> Nullable<Text>,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -507,6 +510,7 @@ diesel::table! {
         filed_at -> Text,
         decided_at -> Nullable<Text>,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -520,6 +524,7 @@ diesel::table! {
         source -> Nullable<Text>,
         source_justification -> Nullable<Text>,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -538,6 +543,7 @@ diesel::table! {
         proxy_justification -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -561,6 +567,7 @@ diesel::table! {
         dots_per_voter -> Nullable<Integer>,
         quorum_percentage -> Nullable<Double>,
         passage_threshold -> Nullable<Double>,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -572,6 +579,7 @@ diesel::table! {
         interpretation -> Text,
         established_by -> Text,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -597,6 +605,7 @@ diesel::table! {
         anonymous -> Integer,
         created_at -> Text,
         updated_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -833,6 +842,7 @@ diesel::table! {
         group_id -> Nullable<Text>,
         is_bridging -> Integer,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 
@@ -843,6 +853,7 @@ diesel::table! {
         human_id -> Text,
         vote -> Text,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 

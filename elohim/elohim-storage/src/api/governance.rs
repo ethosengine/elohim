@@ -488,6 +488,7 @@ pub async fn handle(
                     proxy_justification: input.proxy_justification.clone(),
                     created_at: now.clone(),
                     updated_at: now.clone(),
+                    dht_anchor_hash: None,
                 })
                 .collect();
 

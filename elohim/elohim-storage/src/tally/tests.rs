@@ -11,6 +11,7 @@ fn make_option(id: &str, label: &str, pos: i32) -> ProposalOption {
         source: None,
         source_justification: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
     }
 }
 
@@ -29,6 +30,7 @@ fn make_ranked_vote(human: &str, option: &str, rank: i32) -> RankedVote {
         proxy_justification: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
     }
 }
 
@@ -47,6 +49,7 @@ fn make_approval_vote(human: &str, option: &str, approved: bool) -> RankedVote {
         proxy_justification: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
     }
 }
 
@@ -65,6 +68,7 @@ fn make_score_vote(human: &str, option: &str, score: i32) -> RankedVote {
         proxy_justification: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
     }
 }
 
@@ -83,6 +87,7 @@ fn make_dot_vote(human: &str, option: &str, dots: i32) -> RankedVote {
         proxy_justification: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
     }
 }
 

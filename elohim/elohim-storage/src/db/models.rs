@@ -1441,6 +1441,9 @@ pub struct GovernanceState {
     pub signal_count: i32,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: DHT (derived from proposal lifecycle). Classification: A2 (Derived).
+    /// dht_anchor_hash links to the parent proposal ActionHash.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New governance state for INSERT
@@ -1481,6 +1484,9 @@ pub struct Challenge {
     pub responded_at: Option<String>,
     pub resolved_at: Option<String>,
     pub created_at: String,
+    /// Source of truth: DHT (governance entry). Classification: A (Notarized).
+    /// Challenges are public acts that must be witnessed by the community.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New challenge for INSERT
@@ -1520,6 +1526,9 @@ pub struct Appeal {
     pub filed_at: String,
     pub decided_at: Option<String>,
     pub created_at: String,
+    /// Source of truth: DHT (governance entry). Classification: A (Notarized).
+    /// Appeals are public acts that must be witnessed by the community.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New appeal for INSERT
@@ -1559,6 +1568,9 @@ pub struct Proposal {
     pub dots_per_voter: Option<i32>,
     pub quorum_percentage: Option<f64>,
     pub passage_threshold: Option<f64>,
+    /// Source of truth: DHT (governance entry in lamad DNA). Classification: A (Notarized).
+    /// dht_anchor_hash links to the proposal ActionHash on the DHT.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New proposal for INSERT
@@ -1590,6 +1602,9 @@ pub struct Precedent {
     pub interpretation: String,
     pub established_by: String,
     pub created_at: String,
+    /// Source of truth: DHT (governance memory). Classification: A (Notarized).
+    /// Precedents are immutable governance records — once set, the community relies on them.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New precedent for INSERT
@@ -1604,6 +1619,7 @@ pub struct NewPrecedent<'a> {
 }
 
 /// Discussion entry on content
+/// Operational (Category C): reconstructable from thread/parent references. No dht_anchor_hash needed.
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = discussions)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -1641,6 +1657,9 @@ pub struct Vote {
     pub anonymous: i32,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: private source chain (agent-scoped ballot). Classification: B2.
+    /// Raw vote is private; dht_anchor_hash populated when tally Attestation is issued.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New vote for INSERT
@@ -1674,6 +1693,9 @@ pub struct ProposalOption {
     pub source: Option<String>,
     pub source_justification: Option<String>,
     pub created_at: String,
+    /// Source of truth: DHT (derived from proposal via Link). Classification: A2 (Derived).
+    /// dht_anchor_hash links to the parent proposal ActionHash.
+    pub dht_anchor_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -1711,6 +1733,9 @@ pub struct RankedVote {
     pub proxy_justification: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Source of truth: private source chain (agent-scoped ballot). Classification: B2.
+    /// Raw vote is private; dht_anchor_hash populated when tally Attestation is issued.
+    pub dht_anchor_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -1749,6 +1774,9 @@ pub struct GovernanceSignal {
     pub mechanism_level: i32,
     pub proxy_elohim_id: Option<String>,
     pub created_at: String,
+    /// Source of truth: private source chain (agent-scoped reaction). Classification: B2.
+    /// Raw signal is private; dht_anchor_hash populated when aggregate Attestation is issued.
+    pub dht_anchor_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -2243,6 +2271,7 @@ pub struct NewImagodeiObservation<'a> {
 // ============================================================================
 
 /// Comment from the comments table (Queryable)
+/// Operational (Category C): reconstructable from parent references. No dht_anchor_hash needed.
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = comments)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -2293,6 +2322,9 @@ pub struct Statement {
     pub group_id: Option<String>,
     pub is_bridging: i32,
     pub created_at: String,
+    /// Source of truth: DHT (Polis sensemaking entry). Classification: A (Notarized).
+    /// Community-visible statements must be witnessed to establish shared deliberative record.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New statement for INSERT
@@ -2317,6 +2349,9 @@ pub struct StatementVote {
     pub human_id: String,
     pub vote: String,
     pub created_at: String,
+    /// Source of truth: private source chain (agent-scoped stance). Classification: B2.
+    /// Private stance; dht_anchor_hash populated when clustered aggregate Attestation is issued.
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New statement vote for INSERT

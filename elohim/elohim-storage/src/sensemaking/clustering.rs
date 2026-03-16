@@ -320,6 +320,7 @@ mod tests {
             group_id: None,
             is_bridging: 0,
             created_at: "2026-03-16T00:00:00Z".to_string(),
+            dht_anchor_hash: None,
         }
     }
 
@@ -330,6 +331,7 @@ mod tests {
             human_id: human_id.to_string(),
             vote: vote.to_string(),
             created_at: "2026-03-16T00:00:00Z".to_string(),
+            dht_anchor_hash: None,
         }
     }
 
