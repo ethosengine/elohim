@@ -16,7 +16,7 @@ describe('JournalPageComponent', () => {
         of({
           id: 'journal-1',
           title: 'Test',
-          contentBody: 'Body',
+          contentBody: 'Body text',
           contentType: 'journal',
         }),
       ),
@@ -41,20 +41,36 @@ describe('JournalPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should render two-panel layout', () => {
-    const layout = fixture.nativeElement.querySelector(
-      '[data-testid="journal-layout"]',
-    );
-    expect(layout).toBeTruthy();
-  });
-
-  it('should contain the editor', () => {
+  it('should render editor in writing state', () => {
     const editor = fixture.nativeElement.querySelector('app-journal-editor');
     expect(editor).toBeTruthy();
   });
 
-  it('should contain the sidebar', () => {
+  it('should render sidebar in all states', () => {
     const sidebar = fixture.nativeElement.querySelector('app-elohim-sidebar');
     expect(sidebar).toBeTruthy();
+  });
+
+  it('should render two-panel layout', () => {
+    const layout = fixture.nativeElement.querySelector('[data-testid="journal-layout"]');
+    expect(layout).toBeTruthy();
+  });
+
+  it('should not render confirm component in writing state', () => {
+    const confirm = fixture.nativeElement.querySelector('app-journal-confirm');
+    expect(confirm).toBeFalsy();
+  });
+
+  it('should call routing.finish when editor emits finished', () => {
+    const spy = vi.spyOn(component.routing, 'finish');
+    component.onFinish({ title: 'T', body: 'B' });
+    expect(spy).toHaveBeenCalledWith('B');
+  });
+
+  it('should call routing.setContentId on finish', () => {
+    const spy = vi.spyOn(component.routing, 'setContentId');
+    component.contentId = 'journal-1';
+    component.onFinish({ title: 'T', body: 'B' });
+    expect(spy).toHaveBeenCalledWith('journal-1');
   });
 });

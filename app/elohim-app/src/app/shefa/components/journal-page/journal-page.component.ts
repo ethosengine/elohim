@@ -10,18 +10,60 @@ import { Subject, switchMap, takeUntil } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
+import { JournalRoutingService } from '../../services/journal-routing.service';
 import { JournalEditorComponent } from './journal-editor.component';
+import { JournalConfirmComponent } from './journal-confirm.component';
+import { JournalRoutingCardsComponent } from './journal-routing-cards.component';
+import { JournalRoutedComponent } from './journal-routed.component';
 import { ElohimSidebarComponent } from './elohim-sidebar.component';
 
 @Component({
   selector: 'app-journal-page',
   standalone: true,
-  imports: [JournalEditorComponent, ElohimSidebarComponent],
+  imports: [
+    JournalEditorComponent,
+    ElohimSidebarComponent,
+    JournalConfirmComponent,
+    JournalRoutingCardsComponent,
+    JournalRoutedComponent,
+  ],
+  providers: [JournalRoutingService],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="journal-layout" data-testid="journal-layout">
       <div class="journal-main">
-        <app-journal-editor [contentId]="contentId" />
+        @switch (routing.state()) {
+          @case ('writing') {
+            <app-journal-editor
+              [contentId]="contentId"
+              (finished)="onFinish($event)"
+            />
+          }
+          @case ('confirming') {
+            <app-journal-confirm
+              [text]="routing.journalText()"
+              [intentSummary]="routing.intentSummary()"
+              [analyzing]="!routing.intentSummary()"
+              (confirmed)="onConfirm()"
+              (editRequested)="onEdit()"
+            />
+          }
+          @case ('routing') {
+            <app-journal-routing-cards
+              [suggestions]="routing.suggestions()"
+              [journalText]="routing.journalText()"
+              (postCard)="onPostCard($event)"
+              (dismissCard)="onDismissCard($event)"
+              (editRequested)="onEdit()"
+            />
+          }
+          @case ('routed') {
+            <app-journal-routed
+              [suggestions]="routing.suggestions()"
+              (writeAnother)="onWriteAnother()"
+            />
+          }
+        }
       </div>
       <div class="journal-sidebar">
         <app-elohim-sidebar />
@@ -55,6 +97,8 @@ import { ElohimSidebarComponent } from './elohim-sidebar.component';
 export class JournalPageComponent {
   contentId = '';
 
+  readonly routing = inject(JournalRoutingService);
+
   private readonly route = inject(ActivatedRoute);
   private readonly storageApi = inject(StorageApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -80,5 +124,31 @@ export class JournalPageComponent {
           this.editor()?.loadContent(content.title ?? '', content.contentBody ?? '');
         }
       });
+  }
+
+  onFinish(event: { title: string; body: string }): void {
+    this.routing.setContentId(this.contentId);
+    this.routing.finish(event.body);
+  }
+
+  onConfirm(): void {
+    this.routing.confirm();
+  }
+
+  onEdit(): void {
+    this.routing.edit();
+  }
+
+  onPostCard(id: string): void {
+    this.routing.postCard(id);
+  }
+
+  onDismissCard(id: string): void {
+    this.routing.dismissCard(id);
+  }
+
+  onWriteAnother(): void {
+    // Navigate to new journal — for now just reset
+    this.routing.edit();
   }
 }
