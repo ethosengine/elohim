@@ -15,6 +15,7 @@ doorway-client = { path = "../../crates/doorway-client" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "fs"] }
+tokio-stream = { version = "0.1", features = ["sync", "time"] }
 
 # HTTP server for shard API
 hyper = { version = "1", features = ["full", "http1", "server"] }
