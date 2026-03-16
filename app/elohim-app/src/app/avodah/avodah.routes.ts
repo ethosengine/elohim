@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+import { identityGuard } from '@app/imagodei/guards/identity.guard';
+
 /**
  * Avodah routing - Work management pillar
  *
@@ -34,6 +36,7 @@ export const AVODAH_ROUTES: Routes = [
       },
       {
         path: 'projects/:id/board',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/project-board/project-board.component').then(
             m => m.ProjectBoardComponent
@@ -42,6 +45,7 @@ export const AVODAH_ROUTES: Routes = [
       },
       {
         path: 'projects/:id/backlog',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/project-backlog/project-backlog.component').then(
             m => m.ProjectBacklogComponent
@@ -50,6 +54,7 @@ export const AVODAH_ROUTES: Routes = [
       },
       {
         path: 'projects/:id/stories/:storyId',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/story-detail/story-detail.component').then(
             m => m.StoryDetailComponent
@@ -58,6 +63,7 @@ export const AVODAH_ROUTES: Routes = [
       },
       {
         path: 'projects/:id/tasks',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/task-list/task-list.component').then(m => m.TaskListComponent),
         data: { title: 'Avodah — Tasks' },

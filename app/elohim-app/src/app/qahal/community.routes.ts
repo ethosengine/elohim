@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+import { identityGuard } from '@app/imagodei/guards/identity.guard';
+
 /**
  * Community routing - Community context app
  *
@@ -67,6 +69,7 @@ export const COMMUNITY_ROUTES: Routes = [
       },
       {
         path: 'governance/challenges/new',
+        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/challenge-route/challenge-route.component').then(
             m => m.ChallengeRouteComponent
