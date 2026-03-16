@@ -6,6 +6,8 @@
 -- relationships: DHT (Relationship entry in lamad DNA). Classification: A (Notarized).
 -- content_tags: SQLite (operational). Classification: C. Derived from content metadata.
 -- path_tags: SQLite (operational). Classification: C. Derived from path metadata.
+-- path_attestations: Source of truth: DHT (Attestation entry in imagodei DNA). Classification: A (Notarized).
+--   dht_anchor_hash added in migration 2026-03-16-200000_imagodei_provenance.
 
 -- Initial Diesel migration with multi-tenant app scoping
 -- This migration creates the complete schema with app_id on all app-scoped tables

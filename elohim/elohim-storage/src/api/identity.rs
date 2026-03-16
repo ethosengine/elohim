@@ -55,6 +55,8 @@ async fn register_human(
     req: Request<Incoming>,
     pool: &DbPool,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+    // Currently null for direct storage writes. Backfill needed for pre-coherence data.
     let body: CreateHumanInputView = parse_body(req).await?;
 
     let affinities_json = serde_json::to_string(&body.affinities)

@@ -1,3 +1,6 @@
+-- human_relationships: Source of truth: DHT (HumanRelationship entry in imagodei DNA). Classification: A (Notarized).
+-- This table is a read-optimized projection. dht_anchor_hash added in migration 2026-03-16-200000_imagodei_provenance.
+
 -- Human relationships with intimacy levels and consent tracking
 -- Supports the Imagodei identity layer for custody and emergency protocols
 CREATE TABLE human_relationships (

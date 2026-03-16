@@ -1,3 +1,6 @@
+-- contributor_presences: Source of truth: DHT (ContributorPresence entry in imagodei DNA). Classification: A (Notarized).
+-- This table is a read-optimized projection. dht_anchor_hash added in migration 2026-03-16-200000_imagodei_provenance.
+
 -- Contributor presences for stewardship lifecycle
 -- Tracks recognition accumulation and claim verification for absent contributors
 CREATE TABLE contributor_presences (

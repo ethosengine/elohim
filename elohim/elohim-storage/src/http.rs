@@ -2894,6 +2894,8 @@ impl HttpServer {
                 }
             }
             Method::POST => {
+                // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
+                // Currently null for direct storage writes. Backfill needed for pre-coherence data.
                 let body = req
                     .collect()
                     .await
