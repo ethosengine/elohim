@@ -151,6 +151,19 @@ Before implementing a feature, find or write the a2o scenario that describes the
 
 When story-first isn't practical (prototyping, spikes), capture implementation intent before committing by appending to `.claude/data/dev-intent.jsonl` — a 3-4 sentence summary of what was built, the learner impact, and which a2o feature file needs updating. Then run `/close-loop` to generate scenario updates from your intent.
 
+### P2P Design Gate (MANDATORY)
+
+Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill. This gates brainstorming step 3 — no approaches may be proposed until the skill's decision tree is completed and the user has validated the entity classifications.
+
+**This rule exists because** AI agents default to relational-DB patterns (UUID primary keys, REST-first design, CID-as-column). The protocol requires P2P-native thinking: DHT entry types first, content addressing for identity, storage as projection not truth.
+
+**The skill forces you to answer:**
+1. Is this entity notarized (DHT), agent-scoped (source-chain), or operational (SQLite-only)?
+2. Is identity content-derived (CID), agent-composite, or slug (must justify)?
+3. What coordinator function creates it? What signal projects it? (Answer BEFORE designing the HTTP route.)
+
+**If you're about to write "Option A: `GET /api/v1/thing`" without having answered these questions, STOP and invoke the skill.**
+
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required
