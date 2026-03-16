@@ -169,3 +169,35 @@ Feature: Collective governance
     When another similar challenge is filed
     Then the precedent is visible in the challenge detail
     And the elohim can reference it in their response
+
+  Scenario: Signal aggregate shows community feedback distribution
+    Given content "intro-to-ecology" has received 30 governance signals
+    When the feedback aggregate is displayed
+    Then the distribution shows counts by signal type and value
+    And the total participant count is visible
+
+  Scenario: Consensus strength indicator reflects agreement level
+    Given content "basic-arithmetic" has 25 signals with 90% agreeing on accuracy
+    When the feedback aggregate is displayed
+    Then the consensus strength shows "Strong consensus"
+    And the consensus meter indicates 0.9
+
+  Scenario: Signal accumulation triggers sensemaking readiness
+    Given content "climate-models" has received 22 signals
+    And the consensus strength is 0.45
+    When the gateway checks accumulation status
+    Then sensemaking readiness is indicated
+    And a "Diverse perspectives — sensemaking available" message appears
+
+  Scenario: Controversy detected on divisive content
+    Given content "education-funding-models" has received 15 signals
+    And the consensus strength is 0.2
+    When the gateway checks accumulation status
+    Then an "Active discussion" badge appears on the content
+
+  Scenario: Content reaches settled status through sustained consensus
+    Given content "multiplication-tables" has received 35 signals
+    And the consensus strength is 0.92
+    When the gateway checks accumulation status
+    Then a "Community consensus" badge appears
+    And no sensemaking prompt is shown
