@@ -3,4 +3,4 @@
 /**
  * Governance signal — API response
  */
-export type GovernanceSignalView = { id: string, entityType: string, entityId: string, humanId: string, signalType: string, signalValue: string, mechanismLevel: number, proxyElohimId: string | null, createdAt: string, };
+export type GovernanceSignalView = { id: string, entityType: string, entityId: string, humanId: string, signalType: string, signalValue: string, mechanismLevel: number, proxyElohimId: string | null, createdAt: string, dhtAnchorHash: string | null, };

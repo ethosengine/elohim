@@ -3,4 +3,4 @@
 /**
  * Proposal option — API response
  */
-export type ProposalOptionView = { id: string, proposalId: string, label: string, description: string, position: number, source: string | null, sourceJustification: string | null, createdAt: string, };
+export type ProposalOptionView = { id: string, proposalId: string, label: string, description: string, position: number, source: string | null, sourceJustification: string | null, createdAt: string, dhtAnchorHash: string | null, };

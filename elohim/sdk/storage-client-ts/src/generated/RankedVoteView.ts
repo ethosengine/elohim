@@ -3,4 +3,4 @@
 /**
  * Ranked/scored/dot vote — API response
  */
-export type RankedVoteView = { id: string, proposalId: string, humanId: string | null, optionId: string, rank: number | null, score: number | null, dots: number | null, approved: boolean | null, reasoning: string | null, proxyElohimId: string | null, createdAt: string, };
+export type RankedVoteView = { id: string, proposalId: string, humanId: string | null, optionId: string, rank: number | null, score: number | null, dots: number | null, approved: boolean | null, reasoning: string | null, proxyElohimId: string | null, createdAt: string, dhtAnchorHash: string | null, };

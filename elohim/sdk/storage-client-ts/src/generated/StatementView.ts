@@ -3,4 +3,4 @@
 /**
  * Statement — API response
  */
-export type StatementView = { id: string, entityType: string, entityId: string, humanId: string, text: string, agreeCount: number, disagreeCount: number, passCount: number, groupId: string | null, isBridging: boolean, createdAt: string, };
+export type StatementView = { id: string, entityType: string, entityId: string, humanId: string, text: string, agreeCount: number, disagreeCount: number, passCount: number, groupId: string | null, isBridging: boolean, createdAt: string, dhtAnchorHash: string | null, };

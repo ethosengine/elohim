@@ -3,4 +3,4 @@
 /**
  * Statement vote — API response
  */
-export type StatementVoteView = { id: string, statementId: string, humanId: string, vote: string, createdAt: string, };
+export type StatementVoteView = { id: string, statementId: string, humanId: string, vote: string, createdAt: string, dhtAnchorHash: string | null, };

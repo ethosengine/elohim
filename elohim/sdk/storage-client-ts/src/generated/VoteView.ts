@@ -3,4 +3,4 @@
 /**
  * Vote on a governance proposal — API response
  */
-export type VoteView = { id: string, proposalId: string, humanId: string | null, position: string, reason: string | null, createdAt: string, updatedAt: string, };
+export type VoteView = { id: string, proposalId: string, humanId: string | null, position: string, reason: string | null, createdAt: string, updatedAt: string, dhtAnchorHash: string | null, };
