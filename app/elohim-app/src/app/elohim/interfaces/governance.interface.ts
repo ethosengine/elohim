@@ -13,6 +13,10 @@ import type {
   TallyResult,
   RecordSignalInputView,
   GovernanceSignalView,
+  FileChallengeInputView,
+  RespondToChallengeInputView,
+  FileAppealInputView,
+  AppealView,
 } from '@elohim/storage-client/generated';
 
 export interface IGovernance {
@@ -47,6 +51,14 @@ export interface IGovernance {
   // Governance Signals
   recordSignal(signal: RecordSignalInputView): Promise<GovernanceSignalView>;
   getSignals(entityType: string, entityId: string): Promise<GovernanceSignalView[]>;
+
+  // Challenges & Appeals
+  fileChallenge(input: FileChallengeInputView): Promise<ChallengeView>;
+  respondToChallenge(id: string, input: RespondToChallengeInputView): Promise<ChallengeView>;
+  fileAppeal(challengeId: string, input: FileAppealInputView): Promise<AppealView>;
+  getChallengesForEntity(entityType: string, entityId: string): Promise<ChallengeView[]>;
+  getChallenge(id: string): Promise<ChallengeView | null>;
+  getAppeals(challengeId: string): Promise<AppealView[]>;
 }
 
 export const GOVERNANCE = new InjectionToken<IGovernance>('Governance');
