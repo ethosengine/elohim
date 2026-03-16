@@ -1,0 +1,17 @@
+# Mishpat DNA - Formal Governance & Justice
+---
+manifest_version: "0"
+name: mishpat
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: mishpat_integrity
+      path: "target/wasm32-unknown-unknown/release/mishpat_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: mishpat
+      path: "target/wasm32-unknown-unknown/release/mishpat.wasm"
+      dependencies:
+        - name: mishpat_integrity
