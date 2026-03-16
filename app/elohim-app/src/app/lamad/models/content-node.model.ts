@@ -748,6 +748,9 @@ export enum ContentRelationshipType {
 
   /** Suggested next content */
   FOLLOWS = 'FOLLOWS',
+
+  /** Attachment link (story → attached content) */
+  ATTACHED_TO = 'ATTACHED_TO',
 }
 
 export { ContentRelationshipType as RelationshipType };

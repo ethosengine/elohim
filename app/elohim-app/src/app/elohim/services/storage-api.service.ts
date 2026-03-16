@@ -336,6 +336,15 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
     );
   }
 
+  deleteRelationship(id: string): Observable<void> {
+    return this.http
+      .delete<void>(`${this.baseUrl}/db/relationships/${encodeURIComponent(id)}`)
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError(error => this.handleError('deleteRelationship', error))
+      );
+  }
+
   // ==========================================================================
   // Human Relationships
   // ==========================================================================
