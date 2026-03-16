@@ -380,6 +380,19 @@ export class GovernanceApiService implements IGovernance {
     );
   }
 
+  async getStatementVotes(entityType: string, entityId: string): Promise<StatementVoteView[]> {
+    return firstValueFrom(
+      this.http
+        .get<StatementVoteView[]>('/api/v1/governance/sensemaking/votes', {
+          params: {
+            entityType: encodeURIComponent(entityType),
+            entityId: encodeURIComponent(entityId),
+          },
+        })
+        .pipe(catchError(() => of([])))
+    );
+  }
+
   async getClusters(
     entityType: string,
     entityId: string

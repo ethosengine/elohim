@@ -13,12 +13,17 @@ import {
   inject,
 } from '@angular/core';
 
+import { from } from 'rxjs';
+
 // @coverage: 80.0% (2026-02-24)
 
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import {
   GovernanceSignalService,
   OpinionCluster,
 } from '@app/elohim/services/governance-signal.service';
+
+import type { StatementView, StatementVoteView, OpinionClusterView } from '@elohim/storage-client/generated';
 
 /**
  * OpinionClusterComponent - Polis-style 2D Opinion Visualization
@@ -48,6 +53,8 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
   @Input() contextId!: string;
+  @Input() entityType?: string;
+  @Input() entityId?: string;
   @Input() statements: Statement[] = [];
   @Input() votes: StatementVote[] = [];
   @Input() showLabels = true;
@@ -84,9 +91,21 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   consensusScore = 0;
 
   private readonly signalService = inject(GovernanceSignalService);
+  private readonly governanceApi = inject(GovernanceApiService);
 
   ngOnInit(): void {
-    this.loadClusterData();
+    // If entityType/entityId are provided and no statements/votes were passed in,
+    // load data from the sensemaking backend
+    if (
+      this.entityType &&
+      this.entityId &&
+      this.statements.length === 0 &&
+      this.votes.length === 0
+    ) {
+      this.loadFromBackend(this.entityType, this.entityId);
+    } else {
+      this.loadClusterData();
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -108,6 +127,48 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
       this.clusters = clusters;
       this.clusterCount = clusters.length;
       this.identifyConsensusAndDivisive();
+      this.render();
+    });
+  }
+
+  /**
+   * Load sensemaking data from the governance backend.
+   * Uses two parallel requests: statements + votes, then feeds
+   * them into the same recalculation pipeline as input-driven data.
+   * Also loads pre-computed clusters from the backend as a fallback
+   * to enrich the visualization if local PCA yields no clusters.
+   */
+  private loadFromBackend(entityType: string, entityId: string): void {
+    // Load statements and votes in parallel, then recalculate locally
+    from(
+      Promise.all([
+        this.governanceApi.getStatements(entityType, entityId),
+        this.governanceApi.getStatementVotes(entityType, entityId),
+        this.governanceApi.getClusters(entityType, entityId),
+      ])
+    ).subscribe(([backendStatements, backendVotes, sensemakingResult]) => {
+      // Map backend types to the component's internal types
+      this.statements = backendStatements.map(mapStatementViewToStatement);
+      this.votes = backendVotes.map(mapStatementVoteViewToVote);
+
+      // If we have enough data for local computation, use it
+      if (this.statements.length > 0 && this.votes.length > 0) {
+        this.recalculateClusters();
+      }
+
+      // Overlay pre-computed clusters from backend if local computation
+      // produced no clusters (e.g. too few votes for local PCA)
+      if (this.clusters.length === 0 && sensemakingResult.clusters.length > 0) {
+        this.clusters = sensemakingResult.clusters.map(mapOpinionClusterViewToCluster);
+        this.clusterCount = this.clusters.length;
+        this.totalParticipants = sensemakingResult.totalParticipants;
+
+        // Use bridging statements as consensus statements
+        this.consensusStatements = sensemakingResult.bridgingStatements.map(
+          mapStatementViewToStatement
+        );
+      }
+
       this.render();
     });
   }
@@ -724,4 +785,56 @@ interface ParticipantPosition {
   cluster: string | null;
   isCurrentUser: boolean;
   voteCount: number;
+}
+
+// ===========================================================================
+// Backend Type Mapping Functions
+// ===========================================================================
+
+/** Palette for dynamically assigning colors to backend clusters. */
+const CLUSTER_COLORS = ['#3498db', '#9b59b6', '#27ae60', '#f39c12', '#e74c3c', '#1abc9c'];
+
+/** Map a StatementView from the storage-client to the component's Statement type. */
+function mapStatementViewToStatement(sv: StatementView): Statement {
+  return {
+    id: sv.id,
+    text: sv.text,
+    author: sv.humanId,
+    createdAt: sv.createdAt ? new Date(sv.createdAt) : undefined,
+  };
+}
+
+/**
+ * Map a StatementVoteView from the storage-client to the component's StatementVote type.
+ * The backend stores vote as a string ('agree'|'disagree'|'pass');
+ * the component expects a numeric value: 1 (agree), -1 (disagree), 0 (pass).
+ */
+function mapStatementVoteViewToVote(vv: StatementVoteView): StatementVote {
+  const VOTE_VALUE_MAP: Record<string, number> = {
+    agree: 1,
+    disagree: -1,
+    pass: 0,
+  };
+  return {
+    participantId: vv.humanId,
+    statementId: vv.statementId,
+    value: VOTE_VALUE_MAP[vv.vote] ?? 0,
+    timestamp: vv.createdAt ? new Date(vv.createdAt) : undefined,
+  };
+}
+
+/** Map an OpinionClusterView from the storage-client to the component's OpinionCluster type. */
+function mapOpinionClusterViewToCluster(cv: OpinionClusterView, index: number): OpinionCluster {
+  return {
+    id: cv.id,
+    label: `Group ${index + 1}`,
+    memberCount: cv.memberCount,
+    centroid: [
+      // Spread clusters in a circle when no explicit centroid is provided
+      Math.cos((index / Math.max(1, 4)) * Math.PI * 2) * 0.5,
+      Math.sin((index / Math.max(1, 4)) * Math.PI * 2) * 0.5,
+    ],
+    averagePosition: cv.internalAgreement,
+    color: CLUSTER_COLORS[index % CLUSTER_COLORS.length],
+  };
 }
