@@ -108,25 +108,21 @@ Add:
 - `RespondToChallengeInputView` (Deserialize) — outcome, reasoning, actions, sets_precedent
 - `FileAppealInputView` (Deserialize) — grounds, additional_evidence
 
-Add `SlaStatus` computed field to ChallengeView:
-```rust
-pub sla_status: String, // "on_time", "warning", "overdue"
-```
+ChallengeView includes an `sla_status` field populated by the service layer (Task 4), not computed in the From impl. The View layer passes it through — it doesn't compute it.
 
-Compute based on: if responded_at exists → "resolved", else if now > response_deadline → "overdue", else if now > (response_deadline - 1 day) → "warning", else → "on_time"
-
-**Commit:** `feat(storage): add Challenge and Appeal view types with SLA status`
+**Commit:** `feat(storage): add Challenge and Appeal view types`
 
 ---
 
-### Task 4: CRUD functions and HTTP routes
+### Task 4: CRUD functions, SLA service, and HTTP routes
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/db/governance.rs`
+- Create: `elohim/elohim-storage/src/services/sla_service.rs`
 - Modify: `elohim/elohim-storage/src/api/governance.rs`
 - Modify: `elohim/elohim-storage/src/http.rs`
 
-CRUD:
+**CRUD (db/governance.rs):**
 - `create_challenge(conn, new: &NewChallenge) -> Result<Challenge>`
 - `get_challenge(conn, id: &str) -> Result<Option<Challenge>>`
 - `query_challenges(conn, entity_type: &str, entity_id: &str) -> Result<Vec<Challenge>>`
@@ -135,17 +131,63 @@ CRUD:
 - `get_appeal(conn, id: &str) -> Result<Option<Appeal>>`
 - `query_appeals_for_challenge(conn, challenge_id: &str) -> Result<Vec<Appeal>>`
 
-HTTP routes:
-- `POST /challenges` — file challenge, auto-compute response_deadline (filed_at + 3 days)
-- `GET /challenges?entityType=X&entityId=Y` — list challenges for entity
-- `GET /challenges/{id}` — get challenge detail
-- `POST /challenges/{id}/respond` — respond to challenge (updates state, sets responded_at)
-- `POST /challenges/{id}/appeal` — file appeal (creates appeal record)
-- `GET /appeals/{challengeId}` — list appeals for challenge
+**SLA service (services/sla_service.rs) — domain logic, not view layer:**
+
+SLA computation is business logic. It belongs in a service, not in `From<Challenge>`.
+
+```rust
+pub enum SlaStatus {
+    OnTime,
+    Warning,
+    Overdue,
+    Resolved,
+}
+
+impl SlaStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::OnTime => "on_time",
+            Self::Warning => "warning",
+            Self::Overdue => "overdue",
+            Self::Resolved => "resolved",
+        }
+    }
+}
+
+/// Compute SLA status for a challenge.
+pub fn compute_sla_status(challenge: &Challenge) -> SlaStatus {
+    if challenge.responded_at.is_some() || challenge.resolved_at.is_some() {
+        return SlaStatus::Resolved;
+    }
+    let now = chrono::Utc::now();
+    let deadline = parse_timestamp(&challenge.response_deadline);
+    let warning_threshold = deadline - chrono::Duration::days(1);
+    if now > deadline { SlaStatus::Overdue }
+    else if now > warning_threshold { SlaStatus::Warning }
+    else { SlaStatus::OnTime }
+}
+
+/// Compute response_deadline from filed_at (default: +3 days).
+pub fn compute_response_deadline(filed_at: &str) -> String {
+    let filed = parse_timestamp(filed_at);
+    let deadline = filed + chrono::Duration::days(3);
+    format_timestamp(deadline)
+}
+```
+
+The API handler calls `compute_sla_status()` and sets `sla_status` on the ChallengeView before returning. The View's `From<Challenge>` impl sets `sla_status: String::new()` as a placeholder — the handler fills it with the service result. This keeps the View layer as pure data transformation and the service as domain logic.
+
+**HTTP routes (api/governance.rs):**
+- `POST /challenges` — file challenge, compute response_deadline via SLA service
+- `GET /challenges?entityType=X&entityId=Y` — list challenges, compute sla_status for each
+- `GET /challenges/{id}` — get challenge detail with sla_status
+- `POST /challenges/{id}/respond` — respond (updates state, sets responded_at)
+- `POST /challenges/{id}/appeal` — file appeal
+- `GET /appeals/{challengeId}` — list appeals
 
 Register routes in http.rs.
 
-**Commit:** `feat(storage): add challenge/appeal CRUD and HTTP routes`
+**Commit:** `feat(storage): add challenge/appeal CRUD, SLA service, and HTTP routes`
 
 ---
 
