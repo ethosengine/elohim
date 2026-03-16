@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   DestroyRef,
+  EventEmitter,
   inject,
   input,
   signal,
@@ -21,6 +22,7 @@ import { StorageApiService } from '@app/elohim/services/storage-api.service';
         data-testid="journal-title"
         aria-label="Journal title"
         [value]="title()"
+        [readOnly]="readonly()"
         (input)="onTitleInput($event)"
         (blur)="saveTitle()"
         placeholder="Untitled"
@@ -31,9 +33,17 @@ import { StorageApiService } from '@app/elohim/services/storage-api.service';
         data-testid="journal-body"
         aria-label="Journal body"
         [value]="body()"
+        [readOnly]="readonly()"
         (input)="onBodyInput($event)"
         placeholder="Start writing..."
       ></textarea>
+      @if (body() && !readonly()) {
+        <button
+          class="btn-finish"
+          data-testid="finish-btn"
+          (click)="finished.emit({ title: title(), body: body() })"
+        >Finish</button>
+      }
     </div>
   `,
   styles: [
@@ -84,14 +94,33 @@ import { StorageApiService } from '@app/elohim/services/storage-api.service';
       .journal-body::placeholder {
         color: var(--text-disabled, #9aa0a6);
       }
+
+      .btn-finish {
+        align-self: flex-end;
+        padding: 0.625rem 1.25rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-md, 8px);
+        cursor: pointer;
+        background: var(--success, #34a853);
+        color: white;
+        transition: all 0.15s ease;
+        margin-top: 1rem;
+      }
+      .btn-finish:hover {
+        background: var(--success-dark, #1e8e3e);
+      }
     `,
   ],
 })
 export class JournalEditorComponent {
   readonly contentId = input.required<string>();
+  readonly readonly = input(false);
   readonly title = signal('');
   readonly body = signal('');
   readonly saveStatus = signal('');
+  readonly finished = new EventEmitter<{ title: string; body: string }>();
 
   private readonly storageApi = inject(StorageApiService);
   private readonly destroyRef = inject(DestroyRef);
