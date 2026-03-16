@@ -5349,6 +5349,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            Route::get("/api/v1/governance/signals/aggregate")
+                .handler("aggregate_signals")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
             Route::get("/api/v1/governance/signals")
                 .handler("list_signals")
                 .cache_ttl(30)

@@ -763,6 +763,22 @@ pub async fn handle(
             Ok(response::created(&GovernanceSignalView::from(result)))
         }
 
+        // GET /api/v1/governance/signals/aggregate?entityType=X&entityId=Y — Aggregate signals
+        (&Method::GET, "/signals/aggregate") => {
+            let params: SignalQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
+            let entity_type = params.entity_type.as_deref().unwrap_or("");
+            let entity_id = params.entity_id.as_deref().unwrap_or("");
+            if entity_type.is_empty() || entity_id.is_empty() {
+                return Ok(response::bad_request(
+                    "entityType and entityId query params are required",
+                ));
+            }
+            let mut conn = get_conn(pool)?;
+            let aggregate =
+                governance::aggregate_signals(&mut conn, entity_type, entity_id)?;
+            Ok(response::ok(&aggregate))
+        }
+
         // GET /api/v1/governance/signals?entityType=X&entityId=Y — List governance signals
         (&Method::GET, "/signals") => {
             let params: SignalQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();

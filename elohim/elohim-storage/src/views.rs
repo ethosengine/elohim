@@ -18,6 +18,8 @@
 //! - Convert to internal DB Input types (snake_case with String fields)
 //! - Encapsulate JSON serialization at the API boundary
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
@@ -3755,6 +3757,20 @@ impl From<GovernanceSignal> for GovernanceSignalView {
             created_at: s.created_at,
         }
     }
+}
+
+/// Aggregated governance signal statistics for an entity
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SignalAggregateView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub total_signals: i64,
+    pub by_type: HashMap<String, i64>,
+    pub by_value: HashMap<String, i64>,
+    pub unique_participants: i64,
+    pub consensus_strength: f64,
 }
 
 /// Record a governance signal — API request
