@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { UpdateContentPatch } from '../../elohim/interfaces';
 import { StorageApiService } from '../../elohim/services/storage-api.service';
-import { ContentNode } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentRelationshipType } from '../../lamad/models/content-node.model';
 import { WorkStoryStatus } from '../models/work-story.model';
 
 import type { ContentWithTagsView } from '@elohim/storage-client/generated';
@@ -84,5 +84,38 @@ export class AvodahApiService {
       } as never)
     );
     return toContentNode(view);
+  }
+
+  async getAttachments(storyId: string): Promise<{ relationshipId: string; content: ContentNode }[]> {
+    const relationships = await firstValueFrom(
+      this.storageApi.getRelationships({
+        sourceId: storyId,
+        relationshipType: ContentRelationshipType.ATTACHED_TO,
+      }),
+    );
+    if (relationships.length === 0) return [];
+
+    const allContent = await firstValueFrom(this.storageApi.getContents({}));
+    const contentMap = new Map(allContent.map(v => [v.id, toContentNode(v)]));
+
+    return relationships
+      .filter(r => contentMap.has(r.targetId))
+      .map(r => ({ relationshipId: r.id, content: contentMap.get(r.targetId)! }));
+  }
+
+  async attachContent(storyId: string, contentId: string): Promise<void> {
+    await firstValueFrom(
+      this.storageApi.createRelationship({
+        sourceId: storyId,
+        targetId: contentId,
+        relationshipType: ContentRelationshipType.ATTACHED_TO,
+        confidence: 1,
+        inferenceSource: 'author',
+      }),
+    );
+  }
+
+  async detachContent(relationshipId: string): Promise<void> {
+    await firstValueFrom(this.storageApi.deleteRelationship(relationshipId));
   }
 }
