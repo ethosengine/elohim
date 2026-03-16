@@ -53,7 +53,22 @@ import { StoryCardComponent } from '../story-card/story-card.component';
                     (cardClick)="openStory(story)"
                   />
               </div>
-              <div class="add-story">+ Add story</div>
+              @if (addingInColumn === col.id) {
+                <input
+                  class="add-story-input"
+                  placeholder="Story title…"
+                  data-testid="add-story-input"
+                  (keydown.enter)="submitNewStory($event, col.id)"
+                  (keydown.escape)="addingInColumn = null"
+                  (blur)="addingInColumn = null"
+                />
+              } @else {
+                <div
+                  class="add-story"
+                  data-testid="add-story-btn"
+                  (click)="addingInColumn = col.id"
+                >+ Add story</div>
+              }
             </div>
           }
         </div>
@@ -168,6 +183,18 @@ import { StoryCardComponent } from '../story-card/story-card.component';
         border-radius: 6px;
         outline: 2px dashed rgba(99, 102, 241, 0.3);
       }
+      .add-story-input {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        border: 1px solid var(--lamad-accent-primary, #6366f1);
+        border-radius: 6px;
+        background: rgba(15, 15, 26, 0.8);
+        color: var(--lamad-text-secondary, #e2e8f0);
+        margin-top: 0.5rem;
+        outline: none;
+        box-sizing: border-box;
+      }
       app-story-card[draggable='true'] {
         cursor: grab;
       }
@@ -184,6 +211,7 @@ export class ProjectBoardComponent implements OnInit {
   private readonly api = inject(AvodahApiService);
   private draggedStoryId: string | null = null;
 
+  addingInColumn: string | null = null;
   project: ContentNode | null = null;
   stories: ContentNode[] = [];
   columns: BoardColumn[] = DEFAULT_BOARD_COLUMNS;
@@ -246,6 +274,16 @@ export class ProjectBoardComponent implements OnInit {
       column.id as WorkStoryStatus,
       column.isTerminal ?? false,
     );
+  }
+
+  async submitNewStory(event: Event, columnId: string): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const title = input.value.trim();
+    if (!title) return;
+    const projectId = this.route.snapshot.params['id'] as string;
+    const newStory = await this.api.createStory(projectId, title, columnId as WorkStoryStatus);
+    this.stories = [...this.stories, newStory];
+    this.addingInColumn = null;
   }
 
   openStory(story: ContentNode): void {
