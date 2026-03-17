@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "parent": null,
+  "canRead": [],
+  "compatibility": "genesis",
+  "breaking": false,
+  "created": "2026-03-17T00:00:00Z",
+  "migrationFrom": {}
+}
