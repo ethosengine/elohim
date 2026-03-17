@@ -30,6 +30,14 @@ roles:
     dna:
       path: "imagodei.dna"
 
+  # Mishpat DNA - Governance
+  - name: mishpat
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "mishpat.dna"
+
   # Node Registry DNA - Discovery & Health
   - name: node_registry
     provisioning:

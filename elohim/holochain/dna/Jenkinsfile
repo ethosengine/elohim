@@ -341,6 +341,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     echo "   ✅ node-registry.dna"
 
                                     echo ""
+                                    echo "=== Building mishpat DNA (governance) ==="
+                                    cd ../mishpat
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o ../elohim/workdir/mishpat.dna
+                                    echo "   ✅ mishpat.dna"
+
+                                    echo ""
                                     echo "=== Injecting version metadata into hApp manifest ==="
                                     cd ../elohim
                                     _hv=$(grep HAPP_VERSION ../../../../VERSION | cut -d= -f2)
