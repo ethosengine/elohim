@@ -35,6 +35,7 @@ export { ContributeStatementComponent } from './components/contribute-statement/
 export { SensemakingPageComponent } from './components/sensemaking-page/sensemaking-page.component';
 export { GovernanceDispositionComponent } from './components/governance-disposition/governance-disposition.component';
 export { ProxyVoteNotificationComponent } from './components/proxy-vote-notification/proxy-vote-notification.component';
+export { ProxyVoteListComponent } from './components/proxy-vote-list/proxy-vote-list.component';
 
 // Services
 export * from './services';
