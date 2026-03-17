@@ -1,0 +1,12 @@
+{
+  "$schema": "Research repos that provide deep context for development. Cloned on demand, gitignored.",
+  "repos": [
+    {
+      "name": "polis",
+      "url": "https://github.com/compdemocracy/polis.git",
+      "path": "ekklesia/research/polis",
+      "relevance": "Sprint 7 sensemaking — cosine similarity clustering, PCA projection, bridging statement detection, real-time opinion visualization",
+      "pillar": "qahal"
+    }
+  ]
+}

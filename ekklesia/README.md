@@ -1,15 +1,37 @@
 # Ekklesia — Governance Research & References
 
-Research repositories and references for the qahal governance pillar.
+Deep-context research repos for the qahal governance pillar. Cloned on demand, gitignored.
 
-## research/ (gitignored)
-
-Clone these locally for reference:
+## Usage
 
 ```bash
-git clone https://github.com/compdemocracy/polis.git ekklesia/research/polis
+./ekklesia/research.sh status          # Show what's cloned vs available
+./ekklesia/research.sh clone           # Clone all repos from manifest
+./ekklesia/research.sh clone polis     # Clone specific repo
+./ekklesia/research.sh clean           # Remove all (reclaim space)
+./ekklesia/research.sh clean polis     # Remove specific repo
+./ekklesia/research.sh pull            # Pull latest on cloned repos
+./ekklesia/research.sh size            # Show disk usage
 ```
 
-| Repo | What | Why |
-|------|------|-----|
-| `compdemocracy/polis` | Real-time opinion clustering + bridging statements | Sprint 7 sensemaking algorithm reference — cosine similarity, PCA, consensus detection |
+## Adding a new research repo
+
+Edit `research-manifest.json`:
+
+```json
+{
+  "name": "repo-name",
+  "url": "https://github.com/org/repo.git",
+  "path": "ekklesia/research/repo-name",
+  "relevance": "Why this matters for the protocol",
+  "pillar": "qahal|lamad|shefa|imagodei|elohim"
+}
+```
+
+Then run `./ekklesia/research.sh clone repo-name`.
+
+## Current repos
+
+| Repo | Pillar | Relevance |
+|------|--------|-----------|
+| `compdemocracy/polis` | qahal | Sensemaking algorithm reference — clustering, PCA, consensus, bridging statements |
