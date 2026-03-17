@@ -18,6 +18,7 @@ import type {
   CreateStatementInputView,
   FileAppealInputView,
   FileChallengeInputView,
+  GovernanceDispositionView,
   GovernanceSignalView,
   ProposalOptionView,
   RankedVoteView,
@@ -27,6 +28,7 @@ import type {
   StatementView,
   StatementVoteView,
   TallyResult,
+  UpdateDispositionInputView,
   VoteOnStatementInputView,
 } from '@elohim/storage-client/generated';
 
@@ -604,6 +606,221 @@ describe('GovernanceApiService', () => {
       expect(result.bridgingStatements).toEqual([]);
       expect(result.totalParticipants).toBe(0);
       expect(result.totalStatements).toBe(0);
+    });
+  });
+
+  // --- Sprint 8: Governance Dispositions & Proxy Voting ---
+
+  const mockDisposition: GovernanceDispositionView = {
+    id: 'disp-1',
+    humanId: 'human-1',
+    riskTolerance: 0.6,
+    changeOpenness: 0.7,
+    consensusPreference: 0.8,
+    priorityValues: { accuracy: 0.9, fairness: 0.85 },
+    votingPatternSummary: { totalProposals: 12, agreementRate: 0.75 },
+    totalVotesCast: 42,
+    totalChallengesFiled: 3,
+    totalSignalsRecorded: 87,
+    dhtAnchorHash: null,
+    lastComputedAt: '2026-03-17T00:00:00Z',
+    createdAt: '2026-03-01T00:00:00Z',
+    updatedAt: '2026-03-17T00:00:00Z',
+  };
+
+  const mockProxyVote: RankedVoteView = {
+    id: 'pv-1',
+    proposalId: 'prop-1',
+    humanId: 'human-1',
+    optionId: 'opt-1',
+    rank: 1,
+    score: null,
+    dots: null,
+    approved: null,
+    reasoning: 'Based on governance disposition analysis',
+    proxyElohimId: 'elohim-agent-1',
+    createdAt: '2026-03-17T00:00:00Z',
+  };
+
+  describe('getDisposition', () => {
+    it('should GET /api/v1/governance/dispositions/{humanId}', async () => {
+      const promise = service.getDisposition('human-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/dispositions/human-1' && r.method === 'GET',
+      );
+      req.flush(mockDisposition);
+
+      const result = await promise;
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe('disp-1');
+      expect(result!.humanId).toBe('human-1');
+      expect(result!.riskTolerance).toBe(0.6);
+      expect(result!.changeOpenness).toBe(0.7);
+      expect(result!.consensusPreference).toBe(0.8);
+      expect(result!.totalVotesCast).toBe(42);
+    });
+
+    it('should return null on error', async () => {
+      const promise = service.getDisposition('human-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/dispositions/human-missing',
+      );
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
+
+      const result = await promise;
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('computeDisposition', () => {
+    it('should POST to /api/v1/governance/dispositions/{humanId}/compute', async () => {
+      const promise = service.computeDisposition('human-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/dispositions/human-1/compute' &&
+          r.method === 'POST',
+      );
+      expect(req.request.body).toBeNull();
+      req.flush(mockDisposition);
+
+      const result = await promise;
+      expect(result.id).toBe('disp-1');
+      expect(result.humanId).toBe('human-1');
+      expect(result.riskTolerance).toBe(0.6);
+      expect(result.totalChallengesFiled).toBe(3);
+      expect(result.totalSignalsRecorded).toBe(87);
+    });
+  });
+
+  describe('updateDisposition', () => {
+    it('should PUT to /api/v1/governance/dispositions/{humanId}', async () => {
+      const overrides: UpdateDispositionInputView = {
+        riskTolerance: 0.4,
+        changeOpenness: null,
+        consensusPreference: 0.9,
+        priorityValues: { accuracy: 0.95 },
+      };
+
+      const updated = { ...mockDisposition, riskTolerance: 0.4, consensusPreference: 0.9 };
+      const promise = service.updateDisposition('human-1', overrides);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/dispositions/human-1' && r.method === 'PUT',
+      );
+      expect(req.request.body).toEqual(overrides);
+      req.flush(updated);
+
+      const result = await promise;
+      expect(result.riskTolerance).toBe(0.4);
+      expect(result.consensusPreference).toBe(0.9);
+    });
+  });
+
+  describe('castProxyVotes', () => {
+    it('should POST to /api/v1/governance/proposals/{id}/proxy-votes', async () => {
+      const ballot: CastRankedVoteInputView = {
+        humanId: 'human-1',
+        ballots: [
+          { optionId: 'opt-1', rank: 1, score: null, dots: null, approved: null },
+        ],
+        reasoning: 'Based on governance disposition analysis',
+        proxyElohimId: 'elohim-agent-1',
+        proxyJustification: 'Human has not engaged within voting window',
+      };
+
+      const promise = service.castProxyVotes('prop-1', ballot);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/proposals/prop-1/proxy-votes' &&
+          r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(ballot);
+      req.flush([mockProxyVote]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].proxyElohimId).toBe('elohim-agent-1');
+      expect(result[0].reasoning).toBe('Based on governance disposition analysis');
+    });
+  });
+
+  describe('getProxyVotes', () => {
+    it('should GET /api/v1/governance/proposals/{id}/proxy-votes', async () => {
+      const promise = service.getProxyVotes('prop-1');
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/proposals/prop-1/proxy-votes' &&
+          r.method === 'GET',
+      );
+      req.flush([mockProxyVote]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('pv-1');
+      expect(result[0].proxyElohimId).toBe('elohim-agent-1');
+    });
+
+    it('should return empty array on error', async () => {
+      const promise = service.getProxyVotes('prop-missing');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/governance/proposals/prop-missing/proxy-votes',
+      );
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
+
+      const result = await promise;
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('overrideProxyVote', () => {
+    it('should POST to /api/v1/governance/proposals/{id}/override-proxy', async () => {
+      const ballot: CastRankedVoteInputView = {
+        humanId: 'human-1',
+        ballots: [
+          { optionId: 'opt-2', rank: 1, score: null, dots: null, approved: null },
+        ],
+        reasoning: 'I disagree with my elohim on this one',
+        proxyElohimId: null,
+        proxyJustification: null,
+      };
+
+      const overrideResult: RankedVoteView = {
+        id: 'rv-override-1',
+        proposalId: 'prop-1',
+        humanId: 'human-1',
+        optionId: 'opt-2',
+        rank: 1,
+        score: null,
+        dots: null,
+        approved: null,
+        reasoning: 'I disagree with my elohim on this one',
+        proxyElohimId: null,
+        createdAt: '2026-03-17T01:00:00Z',
+      };
+
+      const promise = service.overrideProxyVote('prop-1', ballot);
+
+      const req = httpMock.expectOne(
+        (r) =>
+          r.url === '/api/v1/governance/proposals/prop-1/override-proxy' &&
+          r.method === 'POST',
+      );
+      expect(req.request.body).toEqual(ballot);
+      req.flush([overrideResult]);
+
+      const result = await promise;
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('rv-override-1');
+      expect(result[0].proxyElohimId).toBeNull();
+      expect(result[0].optionId).toBe('opt-2');
     });
   });
 });
