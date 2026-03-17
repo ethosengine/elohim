@@ -14,38 +14,21 @@ import { ContentType, ContentFormat } from '../models/content-node.model';
  * These represent the semantic category of content.
  */
 export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
-  // Wire types (from healing.rs)
+  // Wire types (from protocol schema)
   epic: '📖',
   concept: '💡',
   lesson: '📝',
   scenario: '✓',
   assessment: '📝',
-
+  resource: '📦',
   reflection: '🪞',
   discussion: '💬',
   exercise: '🏋️',
   example: '📌',
   reference: '📑',
   article: '📰',
-  feature: '⚡',
-  practice: '🔄',
   human: '🧑',
-  organization: '🏢',
-  contributor: '🤝',
-  video: '🎬',
-  audio: '🎧',
-  book: '📕',
-  'book-chapter': '📚',
-  documentary: '🎞️',
-  'bible-verse': '✝️',
-  activity: '🏃',
-  narrative: '📜',
-  'course-module': '🎓',
-  module: '📦',
-  quiz: '❓',
-  podcast: '🎙️',
   role: '👤',
-  simulation: '🎮',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',
@@ -196,14 +179,14 @@ export function inferContentTypeFromId(contentId: string): ContentType {
 
   if (id.includes('quiz') || id.includes('assessment')) return 'assessment';
   if (id.includes('discovery-assessment')) return 'discovery-assessment';
-  if (id.includes('video')) return 'video';
-  if (id.includes('simulation') || id.includes('app-')) return 'simulation';
+  if (id.includes('video')) return 'resource';
+  if (id.includes('simulation') || id.includes('app-')) return 'resource';
   if (id.includes('scenario')) return 'scenario';
-  if (id.includes('feature')) return 'feature';
+  if (id.includes('feature')) return 'scenario';
   if (id.includes('epic')) return 'epic';
-  if (id.includes('book-chapter') || id.includes('chapter')) return 'book-chapter';
+  if (id.includes('book-chapter') || id.includes('chapter')) return 'resource';
   if (id.includes('tool')) return 'tool';
-  if (id.includes('organization') || id.includes('org-')) return 'organization';
+  if (id.includes('organization') || id.includes('org-')) return 'resource';
   if (id.includes('path-')) return 'path';
 
   return 'concept';

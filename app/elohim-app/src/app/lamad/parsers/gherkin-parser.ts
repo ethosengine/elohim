@@ -78,7 +78,7 @@ export class GherkinParser {
 
     const feature: FeatureNode = {
       id: featureId,
-      contentType: 'feature',
+      contentType: 'scenario',
       title: featureTitle,
       description: descriptionLines.join(' '),
       tags,
