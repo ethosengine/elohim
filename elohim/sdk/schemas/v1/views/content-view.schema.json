@@ -1,0 +1,28 @@
+{
+  "$id": "epr:schema:view:content",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentView",
+  "description": "Content record as returned by the storage API. Source of truth: DHT (Notarized, Category A).",
+  "type": "object",
+  "required": ["id", "appId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "appId": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "contentType": { "$ref": "../enums/content-type.schema.json" },
+    "contentFormat": { "$ref": "../enums/content-format.schema.json" },
+    "blobHash": { "type": ["string", "null"] },
+    "blobCid": { "type": ["string", "null"] },
+    "contentSizeBytes": { "type": ["integer", "null"] },
+    "metadata": {},
+    "reach": { "$ref": "../enums/reach.schema.json" },
+    "validationStatus": { "$ref": "../enums/validation-status.schema.json" },
+    "createdBy": { "type": ["string", "null"] },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "contentBody": { "type": ["string", "null"] },
+    "dhtAnchorHash": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}
