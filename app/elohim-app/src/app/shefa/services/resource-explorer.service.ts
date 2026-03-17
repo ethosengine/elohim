@@ -37,26 +37,18 @@ export const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: Content
   {
     title: 'Articles',
     icon: 'article',
-    types: ['concept', 'epic', 'feature', 'book-chapter', 'article', 'reference', 'example'],
+    types: ['concept', 'epic', 'article', 'reference', 'example'],
   },
-  { title: 'Assessments', icon: 'quiz', types: ['assessment', 'discovery-assessment', 'quiz'] },
-  { title: 'Videos', icon: 'videocam', types: ['video', 'documentary', 'podcast', 'audio'] },
-  { title: 'Simulations', icon: 'sports_esports', types: ['simulation'] },
-  { title: 'Tools', icon: 'build', types: ['tool'] },
-  { title: 'Learning Paths', icon: 'route', types: ['path'] },
+  { title: 'Assessments', icon: 'quiz', types: ['assessment'] },
+  { title: 'Resources', icon: 'library_books', types: ['resource'] },
   { title: 'Scenarios', icon: 'checklist', types: ['scenario'] },
-  { title: 'Instruments', icon: 'science', types: ['instrument'] },
-  { title: 'Scripture', icon: 'menu_book', types: ['bible-verse'] },
-  { title: 'Organizations', icon: 'business', types: ['organization', 'community'] },
-  { title: 'Books', icon: 'auto_stories', types: ['book'] },
-  { title: 'People', icon: 'people', types: ['human', 'contributor', 'role'] },
+  { title: 'People', icon: 'people', types: ['human', 'role'] },
   {
     title: 'Activities',
     icon: 'directions_run',
-    types: ['activity', 'practice', 'exercise', 'reflection', 'discussion'],
+    types: ['exercise', 'reflection', 'discussion'],
   },
-  { title: 'Narratives', icon: 'history_edu', types: ['narrative'] },
-  { title: 'Courses', icon: 'school', types: ['course-module', 'module', 'lesson'] },
+  { title: 'Courses', icon: 'school', types: ['lesson'] },
 ];
 
 /**
@@ -225,7 +217,7 @@ export class ResourceExplorerService implements LensProvider {
             parentId,
             childIds: [],
             itemCount: 0,
-            icon: entry.contentType === 'video' ? 'videocam' : 'description',
+            icon: entry.contentType === 'resource' ? 'library_books' : 'description',
             order: index,
           }));
       })

@@ -960,16 +960,23 @@ describe('ContentService', () => {
       new Promise<void>(done => {
         const richMediaIndex = {
           nodes: [
-            { ...mockContentIndex.nodes[0], category: 'test', contentType: 'video' as ContentType },
+            {
+              ...mockContentIndex.nodes[0],
+              category: 'test',
+              contentType: 'resource' as ContentType,
+              url: 'https://youtube.com/watch?v=123',
+            },
             {
               ...mockContentIndex.nodes[1],
               category: 'test',
-              contentType: 'book-chapter' as ContentType,
+              contentType: 'resource' as ContentType,
+              tags: ['book'],
             },
             {
               ...mockContentIndex.nodes[2],
               category: 'test',
-              contentType: 'organization' as ContentType,
+              contentType: 'resource' as ContentType,
+              tags: ['organization'],
             },
           ],
         };

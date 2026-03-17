@@ -22,7 +22,7 @@ describe('GherkinParser', () => {
 
         expect(result.feature).toBeDefined();
         expect(result.feature.title).toBe('User Login');
-        expect(result.feature.contentType).toBe('feature');
+        expect(result.feature.contentType).toBe('scenario');
         expect(result.feature.category).toBe('authentication');
         expect(result.scenarios.length).toBe(1);
         expect(result.scenarios[0].title).toBe('Successful login');
