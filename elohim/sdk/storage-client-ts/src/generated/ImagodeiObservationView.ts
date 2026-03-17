@@ -4,4 +4,4 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Imagodei observation output view.
  */
-export type ImagodeiObservationView = { id: string, humanId: string, observedAt: string, observationType: string, content: string, structuredSignals: JsonValue | null, trustDelta: number, visibilityLayer: string, relevanceDecay: number, createdAt: string, };
+export type ImagodeiObservationView = { id: string, humanId: string, observedAt: string, observationType: string, content: string, structuredSignals: JsonValue | null, trustDelta: number, visibilityLayer: string, relevanceDecay: number, createdAt: string, dhtAnchorHash: string | null, };

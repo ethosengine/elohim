@@ -63,6 +63,7 @@ mod tests {
             relevance_decay,
             superseded_by: None,
             created_at: "2026-03-14 00:00:00".to_string(),
+            dht_anchor_hash: None,
         }
     }
 

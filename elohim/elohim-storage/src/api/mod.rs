@@ -279,6 +279,7 @@ pub async fn evaluate_gate(
                         originating_elohim: "sidecar",
                         relevance_decay: 1.0,
                         superseded_by: None,
+                        dht_anchor_hash: None, // TODO(p2p-coherence): populate when trust attestation issued
                     };
                     if let Err(e) = crate::db::imagodei_observations::create_observation(
                         &mut conn, ctx, &new_obs,
@@ -312,6 +313,7 @@ pub async fn evaluate_gate(
                     originating_elohim: "gate",
                     relevance_decay: 0.5,
                     superseded_by: None,
+                    dht_anchor_hash: None, // TODO(p2p-coherence): populate when trust attestation issued
                 };
                 let _ =
                     crate::db::imagodei_observations::create_observation(&mut conn, ctx, &new_obs);

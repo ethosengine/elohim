@@ -7,7 +7,7 @@
 //!
 //! ## Usage
 //!
-//! ```
+//! ```text
 //! GET /api/v1/events
 //! Accept: text/event-stream
 //! ```

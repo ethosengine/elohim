@@ -1,0 +1,3 @@
+-- SQLite does not support DROP COLUMN before 3.35.0
+-- This migration only adds a nullable column (safe to leave on rollback)
+-- and documentation comments (no schema effect).

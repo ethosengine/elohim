@@ -826,6 +826,7 @@ diesel::table! {
         relevance_decay -> Float,
         superseded_by -> Nullable<Text>,
         created_at -> Text,
+        dht_anchor_hash -> Nullable<Text>,
     }
 }
 

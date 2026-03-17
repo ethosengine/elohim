@@ -4652,6 +4652,7 @@ pub struct ImagodeiObservationView {
     pub visibility_layer: String,
     pub relevance_decay: f64,
     pub created_at: String,
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// Session intent input view.

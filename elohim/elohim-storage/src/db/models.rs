@@ -2246,6 +2246,8 @@ pub struct ImagodeiObservation {
     pub relevance_decay: f32,
     pub superseded_by: Option<String>,
     pub created_at: String,
+    /// B2: populated when trust attestation is issued from aggregate observations
+    pub dht_anchor_hash: Option<String>,
 }
 
 /// New observation for INSERT
@@ -2264,6 +2266,8 @@ pub struct NewImagodeiObservation<'a> {
     pub originating_elohim: &'a str,
     pub relevance_decay: f32,
     pub superseded_by: Option<&'a str>,
+    /// B2: NULL on creation, populated when trust attestation is issued
+    pub dht_anchor_hash: Option<&'a str>,
 }
 
 // ============================================================================

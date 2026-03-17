@@ -142,7 +142,8 @@ mod tests {
                 originating_elohim TEXT NOT NULL,
                 relevance_decay REAL NOT NULL DEFAULT 1.0,
                 superseded_by TEXT,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                dht_anchor_hash TEXT
             );
             "#,
         )
@@ -177,6 +178,7 @@ mod tests {
             originating_elohim: "elohim-alpha",
             relevance_decay: 1.0,
             superseded_by: None,
+            dht_anchor_hash: None,
         }
     }
 

@@ -77,6 +77,7 @@ async fn handle_confirm(
         originating_elohim: "gate",
         relevance_decay: 0.8_f32,
         superseded_by: None,
+        dht_anchor_hash: None, // TODO(p2p-coherence): populate when trust attestation issued
     };
     let _ = crate::db::imagodei_observations::create_observation(&mut conn, ctx, &new_obs);
 
