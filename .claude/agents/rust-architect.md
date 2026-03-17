@@ -107,8 +107,6 @@ Abstracts doorway vs Tauri runtime via `IConnectionStrategy`. Angular doesn't kn
 
 **Before writing any code, classify the entity.** Invoke the `p2p-design-gate` skill or apply its decision tree.
 
-**DNA Capacity Warning**: Lamad DNA is at **83/~100 entry types**. Do NOT add new entry types without confirming headroom. Most entities already have DHT entry types — the typical gap is the missing `dht_anchor_hash` in storage, not a missing entry type. Use Links (Category A2 in the skill) for relationships and attributes of existing entries.
-
 ```
 Does the community need to witness/verify this data?
   YES → Does a DHT entry type ALREADY EXIST?
