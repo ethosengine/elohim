@@ -16,11 +16,12 @@ use super::diesel_schema::{
     access_grants, agreements, appeals, apps, challenges, chapters, collective_participations,
     collectives, comments, content, content_attestations, content_mastery, content_tags,
     contributor_dashboards, contributor_presences, custodian_metrics, device_policies, discussions,
-    economic_events, governance_signals, governance_states, human_relationships, humans,
-    imagodei_observations, knowledge_maps, local_sessions, node_stewardship, path_attestations,
-    path_extensions, path_tags, paths, precedents, premium_gates, proposal_options, proposals,
-    ranked_votes, rea_commitments, relationships, schedules, statement_votes, statements, steps,
-    steward_credentials, stewarded_nodes, stewardship_allocations, votes,
+    economic_events, governance_dispositions, governance_signals, governance_states,
+    human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
+    node_stewardship, path_attestations, path_extensions, path_tags, paths, precedents,
+    premium_gates, proposal_options, proposals, ranked_votes, rea_commitments, relationships,
+    schedules, statement_votes, statements, steps, steward_credentials, stewarded_nodes,
+    stewardship_allocations, votes,
 };
 
 // ============================================================================
@@ -1791,6 +1792,52 @@ pub struct NewGovernanceSignal<'a> {
     pub mechanism_level: i32,
     pub proxy_elohim_id: Option<&'a str>,
     pub created_at: &'a str,
+}
+
+// ============================================================================
+// Governance Disposition Models
+// ============================================================================
+
+/// Classification: B (Agent-Scoped). Private governance profile.
+/// Source of truth: agent source chain. NOT published to DHT.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = governance_dispositions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct GovernanceDisposition {
+    pub id: String,
+    pub human_id: String,
+    pub risk_tolerance: f32,
+    pub change_openness: f32,
+    pub consensus_preference: f32,
+    pub priority_values: String,
+    pub voting_pattern_summary: String,
+    pub total_votes_cast: i32,
+    pub total_challenges_filed: i32,
+    pub total_signals_recorded: i32,
+    /// Classification B: NOT published to DHT. Agent-scoped only.
+    pub dht_anchor_hash: Option<String>,
+    pub last_computed_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New governance disposition for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = governance_dispositions)]
+pub struct NewGovernanceDisposition<'a> {
+    pub id: &'a str,
+    pub human_id: &'a str,
+    pub risk_tolerance: f32,
+    pub change_openness: f32,
+    pub consensus_preference: f32,
+    pub priority_values: &'a str,
+    pub voting_pattern_summary: &'a str,
+    pub total_votes_cast: i32,
+    pub total_challenges_filed: i32,
+    pub total_signals_recorded: i32,
+    pub last_computed_at: &'a str,
+    pub created_at: &'a str,
+    pub updated_at: &'a str,
 }
 
 // ============================================================================
