@@ -1,0 +1,8 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["genesis/data/lamad/content/*.json"],
+      "url": "./elohim/sdk/schemas/current/inputs/create-content-input.schema.json"
+    }
+  ]
+}
