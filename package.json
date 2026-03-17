@@ -26,7 +26,8 @@
   "devDependencies": {
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "json-schema-to-typescript": "^15.0.4"
   },
   "scripts": {
     "prepare": "husky",
@@ -43,6 +44,7 @@
     "a2o:lint": "pnpm --filter @elohim/a2o lint",
     "schema:check-dna": "node elohim/sdk/schemas/scripts/check-dna.mjs",
     "schema:test": "node elohim/sdk/schemas/scripts/test-schema.mjs",
-    "schema:validate": "node elohim/sdk/schemas/scripts/validate-seeds.mjs"
+    "schema:validate": "node elohim/sdk/schemas/scripts/validate-seeds.mjs",
+    "schema:codegen:ts": "node elohim/sdk/schemas/scripts/codegen-ts.mjs"
   }
 }
