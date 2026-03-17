@@ -128,7 +128,21 @@ run_gate() {
 
   cd "$PROJECT_DIR" || return 1
 
-  if command -v just >/dev/null 2>&1 && [ -f justfile ]; then
+  # Schema checks run pnpm scripts directly — no justfile needed
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ]; then
+    case "$PROJECT_NAME" in
+      schema-validate)
+        echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
+        pnpm run schema:validate 2>&1
+        rc=$?
+        ;;
+      schema-dna)
+        echo "[$PROJECT_NAME] Checking DNA constants against protocol schemas..."
+        pnpm run schema:check-dna 2>&1
+        rc=$?
+        ;;
+    esac
+  elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
     echo "[$PROJECT_NAME] Running quality gate via just..."
     just gate 2>&1
     rc=$?
