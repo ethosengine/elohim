@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:constitutional-layer",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConstitutionalLayer",
+  "description": "Governance authority hierarchy (1=most flexible, 7=most immutable). Defined in elohim/constitution/src/types.rs.",
+  "type": "string",
+  "enum": ["individual", "family", "community", "provincial", "nation-state", "bioregional", "global"],
+  "_source": {
+    "file": "elohim/constitution/src/types.rs",
+    "type": "ConstitutionalLayer"
+  }
+}

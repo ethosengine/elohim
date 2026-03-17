@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:relationship-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RelationshipType",
+  "description": "Content graph edge types.",
+  "type": "string",
+  "enum": ["contains", "belongs_to", "describes", "implements", "validates", "relates_to", "references", "depends_on", "requires", "follows", "derived_from", "source_of"]
+}

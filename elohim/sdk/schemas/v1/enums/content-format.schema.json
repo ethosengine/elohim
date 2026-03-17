@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:enum:content-format",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentFormat",
+  "description": "Content format for rendering. Matches DNA CONTENT_FORMATS constant.",
+  "type": "string",
+  "enum": ["markdown", "html", "video", "audio", "interactive", "external"],
+  "_dna": {
+    "constant": "CONTENT_FORMATS",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+  }
+}

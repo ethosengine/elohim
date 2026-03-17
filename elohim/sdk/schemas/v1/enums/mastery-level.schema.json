@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:enum:mastery-level",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MasteryLevel",
+  "description": "Bloom's taxonomy-aligned mastery progression. Matches DNA MASTERY_LEVELS constant.",
+  "type": "string",
+  "enum": ["not_started", "seen", "remember", "understand", "apply", "analyze", "evaluate", "create"],
+  "_dna": {
+    "constant": "MASTERY_LEVELS",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+  }
+}
