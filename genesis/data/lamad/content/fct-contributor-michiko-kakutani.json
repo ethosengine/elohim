@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-michiko-kakutani",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Michiko Kakutani",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Michiko Kakutani\n\n**Role:** author\n\n**Works:** The Death of Truth\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-01-church-dilemma"
+    "sourceModule": "fct-module-01-church-dilemma",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.190261",
   "updatedAt": "2025-12-24T03:05:26.065Z",

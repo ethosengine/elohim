@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-elderly-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Lifelong Learning and Wisdom Sharing for Elderly",
   "description": "As an elderly person in the value scanner system Operating at the educational governance layer I want to continue learning and sharing knowledge throughout my life So that I experience ongoing growth and contribute accumulated wisdom",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Lifelong Learning and Wisdom Sharing for Elderly",

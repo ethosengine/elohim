@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-individual-family",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual/Family Governance for Appellant",
   "description": "As an appellant in the governance system Operating at the individual/family governance layer I want to challenge agent decisions that affect my personal autonomy and privacy So that I can maintain dignity while receiving care, and ensure agents remain accountable",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual/Family Governance for Appellant",

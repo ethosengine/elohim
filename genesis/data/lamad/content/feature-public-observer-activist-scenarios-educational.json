@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-activist-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:activist:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Education Justice Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the educational governance layer I want to fight for equitable education and challenge segregation So that all students get quality education regardless of race or class",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Education Justice Advocacy for Activist",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-the-sum-of-us",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The Sum of Us",
   "description": "Book by Heather Mc",
   "content": "# The Sum of Us\n\n**Author:** Heather Mc\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Heather Mc"
+    "author": "Heather Mc",
+    "originalContentType": "book"
   },
   "_contributor": "Heather Mc",
   "createdAt": "2025-11-28T21:10:19.219778",

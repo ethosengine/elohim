@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-about-us-readme",
   "did": "did:web:elohim.host:content:governance:organizations:about-us:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "&amp;nbsp; About Us The Cities Coalition for Digital Rights, launched by the Cities of Amsterdam, Barcelona and New York in November 2018 and now with a membership of over 50 cities worldwide,",
@@ -39,7 +39,8 @@
         "inspiration": "[How About us inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

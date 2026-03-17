@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace Layer Value Recognition for Caregiver",
   "description": "As a caregiver navigating employment while providing intensive care Operating at the workplace/organizational governance layer I want workplace systems that recognize and accommodate caregiving realities So that caregivers can maintain employment without choosing between work and care",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace Layer Value Recognition for Caregiver",

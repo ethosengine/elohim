@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Senior",
   "description": "As a senior in early retirement in the value scanner system Operating at the household governance layer I want to coordinate household care economy and resource management So that retirement household patterns support both care contributions and personal well-being",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Senior",

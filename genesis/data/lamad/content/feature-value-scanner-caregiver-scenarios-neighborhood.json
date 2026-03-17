@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Caregiver",
   "description": "As a caregiver needing neighborhood support and connection Operating at the neighborhood governance layer I want neighborhood care economy to provide practical support and social connection So that intensive caregiving doesn't result in isolation and unsupported burden",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Caregiver",

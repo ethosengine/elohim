@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-the-color-of-law",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The Color of Law",
   "description": "Book by Richard Rothstein",
   "content": "# The Color of Law\n\n**Author:** Richard Rothstein\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Richard Rothstein"
+    "author": "Richard Rothstein",
+    "originalContentType": "book"
   },
   "_contributor": "Richard Rothstein",
   "createdAt": "2025-11-28T21:10:19.219745",

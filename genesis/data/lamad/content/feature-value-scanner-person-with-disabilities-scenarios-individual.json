@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities living independently with support Operating at the individual governance layer I want my full autonomy, accessibility needs, and care contributions to be recognized So that I can flourish with dignity as a complete person with agency and voice",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Person with Disabilities",

@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-family",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family-Level Appeal Process for Appellant",
   "description": "As an appellant in the governance system Operating at the family governance layer I want to appeal Family Elohim decisions that affect family dynamics and relationships So that family autonomy and care can be balanced with individual dignity",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family-Level Appeal Process for Appellant",

@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-ezra-klein",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Ezra Klein",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Ezra Klein\n\n**Role:** author\n\n**Works:** Why We're Polarized\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-01-church-dilemma"
+    "sourceModule": "fct-module-01-church-dilemma",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.189598",
   "updatedAt": "2025-12-24T03:05:26.051Z",

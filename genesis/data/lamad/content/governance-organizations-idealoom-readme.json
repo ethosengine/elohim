@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-idealoom-readme",
   "did": "did:web:elohim.host:content:governance:organizations:idealoom:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "IdeaLoom is a Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, reach a common understanding, and develop solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation of conversations on complex issue…",
@@ -39,7 +39,8 @@
         "inspiration": "[How IdeaLoom inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
   "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Food Service Industry Transformation Through Franchise Conversions",
   "description": "As a franchise_operator in the autonomous_entity system Operating at the industry_sector governance layer I want to participate in democratizing food service industry So that franchise extraction model is replaced by democratic coordination",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Food Service Industry Transformation Through Franchise Conversions",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Young Adult",
   "description": "As a young adult making independent consumption decisions Operating at the ecological/bioregional governance layer I want to understand environmental impacts and make sustainable choices So that I balance ecological responsibility with budget constraints",
@@ -39,7 +39,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 15
+    "scenarioCount": 15,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Young Adult",

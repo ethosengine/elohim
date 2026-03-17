@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-tema-okun",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Tema Okun",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Tema Okun\n\n**Role:** author\n\n**Works:** The Characteristics of White Supremacy Culture\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-12-fairness-justice"
+    "sourceModule": "fct-module-12-fairness-justice",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.220456",
   "updatedAt": "2025-12-24T03:05:26.079Z",

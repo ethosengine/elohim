@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-parent-scenarios-community",
   "did": "did:web:elohim.host:content:public-observer:parent:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Parent Advocacy",
   "description": "As a parent in the public_observer system Operating at the community governance layer I want to engage in decisions affecting my children within my limited time So that my children's needs shape community decisions without requiring full-time advocacy",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Parent Advocacy",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

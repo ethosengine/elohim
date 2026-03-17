@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Single Parent",
   "description": "As a single parent managing family relationships and decisions alone Operating at the family governance layer I want to serve each child's needs while managing family dynamics without co-parent support So that my children thrive despite having only one actively present parent",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Single Parent",

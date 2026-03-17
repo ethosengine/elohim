@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-parent-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Parent",
   "description": "As a parent who is both professional teacher and primary educator of own children Operating at the educational governance layer I want recognition that parents are children's primary educators So that home and school learning are coordinated and parent education work is valued",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Parent",

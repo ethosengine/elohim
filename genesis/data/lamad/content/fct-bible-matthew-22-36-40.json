@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-matthew-22-36-40",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Matthew 22:36-40",
   "description": "Scripture reference used in FCT Module 8",
   "content": "## Matthew 22:36-40\n\n> Matthew 22:36-40 (ESV)\n36 “Teacher, which is the great commandment in the Law?” 37 And he said to him, “You shall love the Lord your God with all your heart and with all your soul and with all your mind. 38 This is the great and first commandment. 39 And a second is like it: You shall love your neighbor as yourself. 40 On these two commandments depend all the Law and the Prophets.”\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-08-centering-love",
-    "thematicContext": "Centering Values: Love"
+    "thematicContext": "Centering Values: Love",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.208401",
   "updatedAt": "2025-12-24T03:05:25.997Z",

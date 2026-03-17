@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-2-corinthians-5-17-19",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "2 Corinthians 5:17-19",
   "description": "Scripture reference used in FCT Module 3",
   "content": "## 2 Corinthians 5:17-19\n\n> 2 Corinthians 5:17-19: \"Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here\\! All this is from God, who reconciled us to himself through Christ and gave us the ministry of reconciliation.\" This passage speaks to the heart of the Christian message of renewal and reconciliation, not just between God and humanity, but among humans themselves.\nWisdom and the Spirit:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-03-problem-well-stated",
-    "thematicContext": "A Problem Well Stated"
+    "thematicContext": "A Problem Well Stated",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.195685",
   "updatedAt": "2025-12-24T03:05:25.929Z",

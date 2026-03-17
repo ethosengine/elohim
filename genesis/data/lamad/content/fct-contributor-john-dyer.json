@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-john-dyer",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "John Dyer",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# John Dyer\n\n**Role:** author\n\n**Works:** From the Garden to the City\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-14-ready-to-act"
+    "sourceModule": "fct-module-14-ready-to-act",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.224883",
   "updatedAt": "2025-12-24T03:05:26.064Z",

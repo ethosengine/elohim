@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Teen",
   "description": "As a teen (ages 14-17) in the value scanner system Operating at the individual governance layer I want adult-level economic autonomy with appropriate scaffolding So that I build real capability for financial independence and self-governance",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Teen",

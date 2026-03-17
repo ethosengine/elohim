@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-activist-scenarios-global",
   "did": "did:web:elohim.host:content:social-medium:activist:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "International Solidarity and Global Coordination for Activist",
   "description": "As an activist in the social_medium system Operating at the global governance layer I want to coordinate across borders and build international movements So that humanity can address planetary-scale challenges through solidarity",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "International Solidarity and Global Coordination for Activist",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

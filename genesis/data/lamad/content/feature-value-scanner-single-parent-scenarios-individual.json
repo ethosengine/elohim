@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Single Parent",
   "description": "As a single parent managing solo household responsibilities Operating at the individual governance layer I want to maintain personal autonomy and identity despite overwhelming care demands So that I can sustain myself while providing superhuman care for my family",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Single Parent",

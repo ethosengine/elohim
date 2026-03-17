@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-activist-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Environmental Justice Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the ecological_bioregional governance layer I want to fight pollution and demand environmental justice So that communities of color and low-income neighborhoods get environmental protection",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental Justice Advocacy for Activist",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

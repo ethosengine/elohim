@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-preteen-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Preteen",
   "description": "As a preteen (ages 11-13) in the value scanner system Operating at the individual governance layer I want autonomy to manage real household responsibilities with dignity So that my substantial care contributions are recognized and I develop capability under real constraints",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Preteen",

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-consilience-project-institute-for-quantitative-social-science-readme",
   "did": "did:web:elohim.host:content:governance:organizations:consilience-project-institute-for-quantitative-social-science:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Technology Architect and Senior Software Engineer, Consilience, Data Science. 1737 Cambridge St, K328 Cambridge, MA 02138. rtreacy@hmdc.harvard.edu.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Consilience Project | Institute for Quantitative Social Science inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

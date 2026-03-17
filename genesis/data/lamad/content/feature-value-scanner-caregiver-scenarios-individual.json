@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Caregiver",
   "description": "As a caregiver for dependent adults Operating at the individual governance layer I want my personal well-being and identity maintained amid intensive caregiving So that I can sustain care work without losing myself or collapsing from burnout",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Caregiver",

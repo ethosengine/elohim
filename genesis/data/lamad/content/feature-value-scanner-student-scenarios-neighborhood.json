@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Student",
   "description": "As a student living temporarily in a college neighborhood Operating at the neighborhood governance layer I want to participate in local care economy as real community member So that I build belonging and contribute to neighborhood flourishing now",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Student",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-teacher-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "State Education Policy Engagement for Teacher",
   "description": "As a teacher in the public_observer system Operating at the provincial/state governance layer I want to inform state education policy with classroom expertise So that state decisions reflect teaching and learning realities",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "State Education Policy Engagement for Teacher",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

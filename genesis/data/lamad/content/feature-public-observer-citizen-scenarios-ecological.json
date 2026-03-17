@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-citizen-scenarios-ecological",
   "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:ecological",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological Governance for Citizen",
   "description": "As a citizen in the public_observer system Operating at the ecological_bioregional governance layer I want to participate in environmental decisions affecting my community So that sustainability commitments become action not just performance",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological Governance for Citizen",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

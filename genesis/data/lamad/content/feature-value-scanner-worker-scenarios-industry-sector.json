@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-industry-sector",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Industry-Level Worker Advocacy and Sector Transformation",
   "description": "As a worker in the food service industry I need to participate in industry-level advocacy for systemic change So that workers across the sector gain dignity, fair compensation, and care-aligned conditions",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Industry-Level Worker Advocacy and Sector Transformation",

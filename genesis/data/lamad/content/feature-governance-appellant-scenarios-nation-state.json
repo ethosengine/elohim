@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-nation-state",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National-Level Appeal Process for Appellant",
   "description": "As an appellant in the governance system Operating at the national governance layer I want appeals addressing fundamental constitutional questions So that national precedent protects human dignity across all jurisdictions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National-Level Appeal Process for Appellant",

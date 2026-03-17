@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-child-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Child",
   "description": "As a child (ages 8-10) in guided autonomy Operating at the individual governance layer I want to make real choices with real consequences So that I develop agency and learn that I am a capable steward of resources",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Child",

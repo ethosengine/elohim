@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Worker Self-Care and Autonomy",
   "description": "As a worker balancing employment and care needs I need to maintain individual autonomy and self-care despite work demands So that I can preserve my dignity, health, and capacity for human flourishing",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Worker Self-Care and Autonomy",

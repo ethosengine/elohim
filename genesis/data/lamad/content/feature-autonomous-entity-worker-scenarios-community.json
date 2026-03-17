@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-worker-scenarios-community",
   "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Stakeholder Relationships for Worker",
   "description": "As a worker in the autonomous_entity system Operating at the community governance layer I want meaningful relationships with our community stakeholders So that we serve community needs while protecting worker autonomy",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Stakeholder Relationships for Worker",

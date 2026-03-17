@@ -1,7 +1,7 @@
 {
   "id": "product-test-doorway-hosting",
   "did": "did:elohim:product-test-doorway-hosting",
-  "contentType": "feature",
+  "contentType": "scenario",
   "contentFormat": "gherkin",
   "title": "Doorway Hosting Flow Product Tests",
   "description": "BDD product tests validating the visitor to hosted user journey through Doorway",
@@ -18,7 +18,8 @@
     "category": "doorway",
     "testType": "product",
     "scenarioCount": 5,
-    "priority": "critical"
+    "priority": "critical",
+    "originalContentType": "feature"
   },
   "openGraph": {
     "title": "Doorway Hosting Flow Product Tests",
@@ -33,7 +34,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

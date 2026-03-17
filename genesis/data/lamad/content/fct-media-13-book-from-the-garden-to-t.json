@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-from-the-garden-to-t",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "From the Garden to the City",
   "description": "Book by John Dyer",
   "content": "# From the Garden to the City\n\n**Author:** John Dyer\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "John Dyer"
+    "author": "John Dyer",
+    "originalContentType": "book"
   },
   "_contributor": "John Dyer",
   "createdAt": "2025-11-28T21:10:19.224874",

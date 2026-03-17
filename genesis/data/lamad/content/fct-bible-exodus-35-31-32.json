@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-exodus-35-31-32",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Exodus 35:31-32",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## Exodus 35:31-32\n\n> Exodus 35:31-32 - \"...and he has filled him with the Spirit of God, with skill, with intelligence, with knowledge, and with all craftsmanship, to devise artistic designs...\"\nAccepting Circumstances and Responding Wisely:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224081",
   "updatedAt": "2025-12-24T03:05:25.951Z",

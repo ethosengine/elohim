@@ -1,6 +1,6 @@
 {
   "id": "fct-media-12-book-the-new-parish",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The New Parish",
   "description": "Book by Paul Sparks",
   "content": "# The New Parish\n\n**Author:** Paul Sparks\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-13-helping-thrive",
     "mediaType": "book",
-    "author": "Paul Sparks"
+    "author": "Paul Sparks",
+    "originalContentType": "book"
   },
   "_contributor": "Paul Sparks",
   "createdAt": "2025-11-28T21:10:19.224337",

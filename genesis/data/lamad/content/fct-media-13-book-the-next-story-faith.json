@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-the-next-story-faith",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The Next Story: Faith, Friends, Family, and the Digital World",
   "description": "Book by Tim Challies",
   "content": "# The Next Story: Faith, Friends, Family, and the Digital World\n\n**Author:** Tim Challies\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "Tim Challies"
+    "author": "Tim Challies",
+    "originalContentType": "book"
   },
   "_contributor": "Tim Challies",
   "createdAt": "2025-11-28T21:10:19.225018",

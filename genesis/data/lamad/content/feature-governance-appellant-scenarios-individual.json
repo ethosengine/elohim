@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-individual",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual-Level Appeal Process for Appellant",
   "description": "As an appellant in the governance system Operating at the individual governance layer I want to appeal AI agent decisions that affect my personal autonomy and dignity So that I have meaningful recourse and my voice is heard in decisions that govern me",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual-Level Appeal Process for Appellant",

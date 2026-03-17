@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Senior",
   "description": "As a senior in early retirement in the value scanner system Operating at the neighborhood governance layer I want to contribute to neighborhood care economy and build local social capital So that neighborhood resilience is strengthened and my future aging is supported",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Senior",

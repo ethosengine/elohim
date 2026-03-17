@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Young Adult",
   "description": "As a young adult (ages 18-25) in early independence Operating at the individual governance layer I want to build adult life skills and manage resources effectively So that I develop sustainable practices and personal agency",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Young Adult",

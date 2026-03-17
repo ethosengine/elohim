@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-elderly-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Dignity-Preserving Care Coordination for Elderly",
   "description": "As an elderly person living in my own home Operating at the household governance layer I want to maintain my household with support while preserving my sense of home So that I remain in control of my own living space despite needing assistance",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Dignity-Preserving Care Coordination for Elderly",

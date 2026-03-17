@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-preteen-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Preteen",
   "description": "As a preteen in the value scanner system Operating at the community governance layer I want my care contributions to connect me to community resources and support So that my family receives reciprocal care through dignified community networks",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Preteen",

@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-responsible-tech-guide-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:responsible-tech-guide:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "There is a vibrant community focused on reducing the harms of technology, diversifying the tech pipeline, and ensuring that technology is aligned with the public interest.",
@@ -39,7 +39,8 @@
         "inspiration": "[How Responsible Tech Guide inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -70,7 +71,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

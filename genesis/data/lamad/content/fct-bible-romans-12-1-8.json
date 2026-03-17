@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-romans-12-1-8",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Romans 12:1-8",
   "description": "Scripture reference used in FCT Module 2",
   "content": "## Romans 12:1-8\n\n> Romans 12:1-8 - Offering our bodies as a living sacrifice and using our gifts to serve the body of Christ.\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-02-systems-thinking",
-    "thematicContext": "Systems Thinking"
+    "thematicContext": "Systems Thinking",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.191165",
   "updatedAt": "2025-12-24T03:05:26.047Z",

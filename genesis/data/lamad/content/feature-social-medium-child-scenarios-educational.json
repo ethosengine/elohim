@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-child-scenarios-educational",
   "did": "did:web:elohim.host:content:social-medium:child:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Participation for Child",
   "description": "As a child in the social_medium system Operating at the educational governance layer I want to participate in learning communities safely So that I can grow intellectually while protected and supported",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Participation for Child",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

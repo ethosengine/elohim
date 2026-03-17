@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-sustainable-shopping-eco-friendly-fair-trade-clothing-shoes-more-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:sustainable-shopping-eco-friendly-fair-trade-clothing-shoes-more:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "With a DoneGood gift card your giftee can shop thousands of unique and purposeful goods—and know that no matter what they choose, they’re doing good for the planet and for the person who made their gift.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Sustainable Shopping – Eco-Friendly, Fair Trade Clothing, Shoes & More inspires the value_scanner epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

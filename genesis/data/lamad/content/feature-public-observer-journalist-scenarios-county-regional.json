@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-journalist-scenarios-county-regional",
   "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Regional Pattern Journalism for Journalist",
   "description": "As a journalist in the public_observer system Operating at the county/regional governance layer I want pattern detection across jurisdictional boundaries So that regional investigations expose systemic issues",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Regional Pattern Journalism for Journalist",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

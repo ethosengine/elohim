@@ -1,7 +1,7 @@
 {
   "id": "product-test-lamad-paths",
   "did": "did:elohim:product-test-lamad-paths",
-  "contentType": "feature",
+  "contentType": "scenario",
   "contentFormat": "gherkin",
   "title": "Lamad Learning Paths Product Tests",
   "description": "BDD product tests validating learning path navigation and progression in Lamad",
@@ -20,7 +20,8 @@
     "category": "lamad",
     "testType": "product",
     "scenarioCount": 5,
-    "priority": "high"
+    "priority": "high",
+    "originalContentType": "feature"
   },
   "openGraph": {
     "title": "Lamad Learning Paths Product Tests",
@@ -35,7 +36,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

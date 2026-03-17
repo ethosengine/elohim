@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace/Organizational Layer Value Recognition for Young Adult",
   "description": "As a young adult in my first full-time professional role Operating at the workplace/organizational governance layer I want to understand my labor's value and maintain wholeness So that I build professional capability while preserving personal well-being",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace/Organizational Layer Value Recognition for Young Adult",

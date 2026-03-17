@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-elder-scenarios-family",
   "did": "did:web:elohim.host:content:social-medium:elder:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Intergenerational Family Connection for Elder",
   "description": "As an elder in the social_medium system Operating at the family governance layer I want to maintain meaningful relationships with my family across distances So that I remain connected with children and grandchildren despite geographic separation",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Intergenerational Family Connection for Elder",

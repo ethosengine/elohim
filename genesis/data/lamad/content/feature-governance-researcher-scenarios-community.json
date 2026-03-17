@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-researcher-scenarios-community",
   "did": "did:web:elohim.host:content:governance:researcher:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community-Level Governance Research for Researcher",
   "description": "As a researcher in the governance system Operating at the community governance layer I want to conduct intensive case studies of how sortition governance works in practice So that I can understand lived experience and inform democratic AI governance theory",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community-Level Governance Research for Researcher",

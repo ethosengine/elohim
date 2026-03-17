@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-parent-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Education Policy Parent Advocacy",
   "description": "As a parent in the public_observer system Operating at the educational governance layer I want to engage with education policy and school board decisions So that my children's education serves their learning not bureaucratic convenience",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Education Policy Parent Advocacy",
@@ -70,7 +71,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

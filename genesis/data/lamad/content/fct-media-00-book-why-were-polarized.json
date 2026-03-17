@@ -1,6 +1,6 @@
 {
   "id": "fct-media-00-book-why-were-polarized",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Why We're Polarized",
   "description": "Book by Ezra Klein",
   "content": "# Why We're Polarized\n\n**Author:** Ezra Klein\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "social-fragmentation",
     "sourceModule": "fct-module-01-church-dilemma",
     "mediaType": "book",
-    "author": "Ezra Klein"
+    "author": "Ezra Klein",
+    "originalContentType": "book"
   },
   "_contributor": "Ezra Klein",
   "createdAt": "2025-11-28T21:10:19.189590",

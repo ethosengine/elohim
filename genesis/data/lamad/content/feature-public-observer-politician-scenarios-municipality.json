@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-politician-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Governance for Elected Representative",
   "description": "As a politician in the public_observer system Operating at the municipality governance layer I want to understand constituent needs and make informed decisions So that I can genuinely represent my community despite information asymmetry and capture pressures",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Governance for Elected Representative",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

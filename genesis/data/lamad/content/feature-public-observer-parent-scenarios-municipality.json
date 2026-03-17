@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-parent-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Parent Advocacy for Children's Needs",
   "description": "As a parent in the public_observer system Operating at the municipal governance layer I want to influence municipal decisions affecting my children's wellbeing So that city policies support children's safety, health, development, and opportunity",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Parent Advocacy for Children's Needs",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

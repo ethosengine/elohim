@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-developer-interests-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Development Navigation for Developer Interests",
   "description": "As a developer in the public_observer system Operating at the municipality governance layer I want transparent approval processes and honest engagement infrastructure So that responsible development gains competitive advantage over extractive practices",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Development Navigation for Developer Interests",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

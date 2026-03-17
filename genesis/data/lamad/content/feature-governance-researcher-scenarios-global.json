@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-researcher-scenarios-global",
   "did": "did:web:elohim.host:content:governance:researcher:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Global-Level Governance Research for Researcher",
   "description": "As a researcher in the governance system Operating at the global governance layer I want to study protocol adoption and governance across all humanity So that I can understand universal patterns and cultural variations in democratic AI",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Global-Level Governance Research for Researcher",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-grandparent-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Grandparent",
   "description": "As a grandparent coordinating care work within my household Operating at the household governance layer I want fair distribution of grandparenting labor and household impact So that care for grandchildren enhances rather than strains our household",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Grandparent",

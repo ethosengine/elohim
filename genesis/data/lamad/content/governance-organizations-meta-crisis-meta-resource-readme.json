@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-meta-crisis-meta-resource-readme",
   "did": "did:web:elohim.host:content:governance:organizations:-meta-crisis-meta-resource:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "🤯 Meta-Crisis Meta-Resource",
@@ -31,7 +31,8 @@
         "inspiration": "[How 🤯 Meta-Crisis Meta-Resource inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

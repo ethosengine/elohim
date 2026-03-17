@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-solarpunk-uzy71bfs-readme",
   "did": "did:web:elohim.host:content:governance:organizations:solarpunk-uzy71bfs:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through both. Solarpunk also emphasizes handcrafted wares (as opposed to mass-produced products) and communit…",
@@ -31,7 +31,8 @@
         "inspiration": "[How Solarpunk inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

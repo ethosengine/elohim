@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Caregiver",
   "description": "As a caregiver engaging with community care economy Operating at the community governance layer I want community systems that recognize family caregiving as essential care work So that community care economy sustains family caregivers and values their contributions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Caregiver",

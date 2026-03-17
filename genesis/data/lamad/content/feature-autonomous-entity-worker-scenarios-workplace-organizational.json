@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Democratic Workplace Governance for Worker",
   "description": "As a worker in the autonomous_entity system Operating at the workplace_organizational governance layer I want democratic control over my workplace operations So that we collectively shape our working conditions and value distribution",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic Workplace Governance for Worker",

@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-our-philosophy-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:our-philosophy:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "We are building the technological tools and social patterns and practices to enable the next economy — one that is distributed, equitable, and regenerative.",
@@ -45,7 +45,8 @@
         "inspiration": "[How Our Philosophy inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

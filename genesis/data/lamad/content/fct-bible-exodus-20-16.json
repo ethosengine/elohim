@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-exodus-20-16",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Exodus 20:16",
   "description": "Scripture reference used in FCT Module 10",
   "content": "## Exodus 20:16\n\n> Exodus 20:16 - \"You shall not bear false witness against your neighbor.\" (One of the Ten Commandments)\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-10-recognize-distortions",
-    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.210995",
   "updatedAt": "2025-12-24T03:05:25.951Z",

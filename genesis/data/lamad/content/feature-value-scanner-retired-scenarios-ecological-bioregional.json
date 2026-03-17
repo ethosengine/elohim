@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-retired-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Retired Person",
   "description": "As a retired person in the value scanner system Operating at the ecological/bioregional governance layer I want my construction knowledge applied to sustainable building and resource conservation valued So that retirement enables ecological stewardship and my skills serve bioregional flourishing",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Retired Person",

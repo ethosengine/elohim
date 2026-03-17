@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-pubhubs-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:pubhubs:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "PubHubs - Sociaal platform gebaseerd op publieke waarden.",
@@ -45,7 +45,8 @@
         "inspiration": "[How PubHubs inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -76,7 +77,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

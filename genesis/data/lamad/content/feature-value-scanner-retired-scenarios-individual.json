@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-retired-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Retired Person",
   "description": "As a retired person in post-employment life in the value scanner system Operating at the individual governance layer I want my continued care contributions and dignity to be recognized So that retirement is experienced as transition to care economy participation, not obsolescence",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Retired Person",

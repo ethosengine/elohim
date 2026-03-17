@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-preteen-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Preteen",
   "description": "As a preteen in the value scanner system Operating at the family governance layer I want my substantial care contributions to be visible to my family So that I am recognized as a junior partner in family governance while preventing parentification damage",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Preteen",

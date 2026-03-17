@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-activist-scenarios-individual",
   "did": "did:web:elohim.host:content:social-medium:activist:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Digital Sovereignty for Activist",
   "description": "As an activist in the social_medium system Operating at the individual governance layer I want to maintain my digital sovereignty and personal security So that I can organize for change without fear of surveillance or suppression",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Digital Sovereignty for Activist",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

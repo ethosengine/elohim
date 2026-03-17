@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-jigsaw-readme",
   "did": "did:web:elohim.host:content:governance:organizations:jigsaw:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Jigsaw is a unit within Google that explores threats to open societies, and builds technology that inspires scalable solutions.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Jigsaw inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

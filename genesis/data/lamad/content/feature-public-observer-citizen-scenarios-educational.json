@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-citizen-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Governance for Citizen",
   "description": "As a citizen in the public_observer system Operating at the educational governance layer I want to understand education policy decisions affecting my community So that schools serve children and families effectively",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Governance for Citizen",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

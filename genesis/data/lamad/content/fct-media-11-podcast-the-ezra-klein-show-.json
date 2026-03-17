@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-podcast-the-ezra-klein-show-",
-  "contentType": "podcast",
+  "contentType": "resource",
   "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
   "description": "Podcast recommended in FCT Module 12",
   "content": "# \"The Ezra Klein Show\" episode with Tressie McMillan Cottom\n",
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
-    "mediaType": "podcast"
+    "mediaType": "podcast",
+    "originalContentType": "podcast"
   },
   "createdAt": "2025-11-28T21:10:19.220395",
   "updatedAt": "2025-12-26T21:04:01.813Z",

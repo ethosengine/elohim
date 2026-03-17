@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Young Adult",
   "description": "As a young adult establishing myself in a new community Operating at the community governance layer I want to access resources and contribute to collective flourishing So that I build my position as an independent adult in community networks",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Young Adult",

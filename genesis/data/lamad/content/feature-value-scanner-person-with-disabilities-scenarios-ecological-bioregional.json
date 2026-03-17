@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities engaging with ecological and environmental systems Operating at the ecological/bioregional governance layer I want disability justice and ecological justice recognized as interconnected So that both movements strengthen each other toward interdependent flourishing",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological Layer Value Recognition for Person with Disabilities",

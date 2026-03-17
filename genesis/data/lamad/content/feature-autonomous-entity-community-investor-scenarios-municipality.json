@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-community-investor-scenarios-municipality",
   "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Economic Development Through Democratic Investment",
   "description": "As a community_investor in the autonomous_entity system Operating at the municipality governance layer I want to support citywide democratic economy development So that municipal policy enables community investment and democratic ownership",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Economic Development Through Democratic Investment",

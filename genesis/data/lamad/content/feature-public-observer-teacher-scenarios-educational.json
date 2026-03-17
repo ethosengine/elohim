@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-teacher-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Education Policy and Professional Expertise for Teacher",
   "description": "As a teacher in the public_observer system Operating at the educational governance layer I want to center professional expertise in education decisions So that education policy serves student learning not bureaucratic compliance",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Education Policy and Professional Expertise for Teacher",
@@ -65,7 +66,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

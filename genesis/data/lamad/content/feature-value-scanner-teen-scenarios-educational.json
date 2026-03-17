@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the educational governance layer I want my formal education to integrate with care economy learning So that I build comprehensive value literacy and understand education as care work",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Teen",

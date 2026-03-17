@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-genisis-11-1",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Genisis 11:1",
   "description": "Scripture reference used in FCT Module 1",
   "content": "## Genisis 11:1\n\n> Tower of Babel (Genisis 11: 1-9)  \"(verse 6). And the Lord said, \"“Behold, they are one people, and they have all one language, and this is only the beginning of what they will do. And nothing that they propose to do will now be impossible for them. 7 Come, let us go down and there confuse their language, so that they may not understand one another’s speech”\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-01-church-dilemma",
-    "thematicContext": "The Church Dilemma"
+    "thematicContext": "The Church Dilemma",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.181589",
   "updatedAt": "2025-12-24T03:05:25.965Z",

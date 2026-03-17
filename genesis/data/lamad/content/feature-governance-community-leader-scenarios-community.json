@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-community-leader-scenarios-community",
   "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community-Level Governance Integration for Community Leader",
   "description": "As a community_leader in the governance system Operating at the community governance layer I want to integrate Elohim Protocol with existing democratic structures So that AI governance serves community flourishing while respecting local sovereignty",
@@ -38,7 +38,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 14
+    "scenarioCount": 14,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community-Level Governance Integration for Community Leader",

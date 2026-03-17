@@ -1,6 +1,6 @@
 {
   "id": "fct-video-07-00",
-  "contentType": "video",
+  "contentType": "resource",
   "title": ", justice, and mass incarceration in the United States. This could deeply challenge suburban views on law enforcement and systemic racism.",
   "description": "Recommended video for Centering Values: Love",
   "content": "**Platform:** youtube",
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "fct-media",
     "sourceModule": "fct-module-08-centering-love",
-    "mediaType": "video"
+    "mediaType": "video",
+    "originalContentType": "video"
   },
   "createdAt": "2025-11-28T02:47:31.019976",
   "updatedAt": "2025-12-26T21:04:01.845Z",

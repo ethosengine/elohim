@@ -1,7 +1,7 @@
 {
   "id": "public-observer-books-the-ministry-for-the-future-readme",
   "did": "did:web:elohim.host:content:public-observer:books:the-ministry-for-the-future:readme",
-  "contentType": "book-chapter",
+  "contentType": "reference",
   "activityPubType": "Document",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "ONE OF BARACK OBAMA’S FAVORITE BOOKS OF THE YEAR “The best science-fiction nonfiction novel I’ve ever read.” --Jonathan Lethem “If I could get policymakers, and citizens, everywhere to read just one book this year, it would be Kim Stanley Robinson’s The Ministry for the Future.” --Ezra Klein (…",
@@ -31,7 +31,8 @@
         "inspiration": "[How The Ministry for the Future inspires the public_observer epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "book-chapter"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Adult",
   "description": "As an adult making consumption choices Operating at the ecological/bioregional governance layer I want to balance cost, nutrition, and environmental impact So that care for people and care for planet are integrated",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Adult",

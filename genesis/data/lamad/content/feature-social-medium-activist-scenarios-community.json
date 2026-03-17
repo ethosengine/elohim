@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-activist-scenarios-community",
   "did": "did:web:elohim.host:content:social-medium:activist:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Organizing for Activist",
   "description": "As an activist in the social_medium system Operating at the community governance layer I want to organize local action and build community power So that communities can address local issues through collective action",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Organizing for Activist",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

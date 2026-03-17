@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Healthcare Layer Value Recognition for Caregiver",
   "description": "As a caregiver navigating complex medical systems Operating at the healthcare/medical governance layer I want medical system navigation support and caregiver-as-partner recognition So that care recipients receive appropriate care and caregivers are supported as essential care team members",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Healthcare Layer Value Recognition for Caregiver",

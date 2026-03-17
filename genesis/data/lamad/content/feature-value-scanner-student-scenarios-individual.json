@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Student",
   "description": "As a student learning to manage adult independence on limited resources Operating at the individual governance layer I want to develop care economy skills and build sustainable adult patterns So that I can thrive now and carry these capabilities throughout adult life",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Student",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Integration and Local Resource Access During Temporary Vulnerability",
   "description": "As a person in temporary housing navigating crisis I want to build neighborhood connections and access local resources So that I can create stability and support in my current location regardless of housing permanence",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Integration and Local Resource Access During Temporary Vulnerability",

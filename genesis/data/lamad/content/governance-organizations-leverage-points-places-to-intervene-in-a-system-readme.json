@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-leverage-points-places-to-intervene-in-a-system-readme",
   "did": "did:web:elohim.host:content:governance:organizations:leverage-points-places-to-intervene-in-a-system:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
@@ -31,7 +31,8 @@
         "inspiration": "[How Leverage Points: Places to Intervene in a System inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

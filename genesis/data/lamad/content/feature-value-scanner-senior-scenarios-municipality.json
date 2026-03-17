@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-municipality",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipality Layer Value Recognition for Senior",
   "description": "As a senior in early retirement in the value scanner system Operating at the municipality governance layer I want to access appropriate services and influence municipal policy So that municipal systems support senior flourishing and recognize senior contributions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipality Layer Value Recognition for Senior",

@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-colossians-3-23-24",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Colossians 3:23-24",
   "description": "Scripture reference used in FCT Module 14",
   "content": "## Colossians 3:23-24\n\n> Colossians 3:23-24 - Whatever you do, work at it with all your heart, as working for the Lord\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-14-ready-to-act",
-    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224704",
   "updatedAt": "2025-12-24T03:05:25.931Z",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-child-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Child",
   "description": "As a child in the value scanner system Operating at the neighborhood governance layer I want to understand how my choices connect to community patterns So that I learn care economy operates beyond just my family",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Child",

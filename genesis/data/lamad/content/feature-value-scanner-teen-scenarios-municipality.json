@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-municipality",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the municipal governance layer I want to engage with public systems and local policy as a constitutional participant So that I learn civic engagement and my generation's voice shapes systems for collective flourishing",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Layer Value Recognition for Teen",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-community-organizer-scenarios-district",
   "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "District-Level Education Organizing for Community Organizer",
   "description": "As a community organizer in the public_observer system Operating at the district governance layer I want to build parent and student power for education justice So that school district decisions prioritize equity and community voice",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "District-Level Education Organizing for Community Organizer",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

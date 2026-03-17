@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Healthcare Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities navigating medical systems Operating at the healthcare/medical governance layer I want to maintain authority over my body and receive respectful care So that medical systems serve my flourishing rather than pathologizing my existence",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Healthcare Layer Value Recognition for Person with Disabilities",

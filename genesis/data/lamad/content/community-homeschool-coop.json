@@ -1,7 +1,7 @@
 {
   "id": "community-homeschool-coop",
   "did": "did:web:elohim.host:community:homeschool-coop",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Group",
   "title": "Homeschool Coop",
   "description": "Community with 3 members",
@@ -18,7 +18,8 @@
   ],
   "metadata": {
     "category": "community",
-    "memberCount": 3
+    "memberCount": 3,
+    "originalContentType": "organization"
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
@@ -26,7 +27,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

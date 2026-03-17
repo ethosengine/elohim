@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Autonomy and Self-Direction for IDD Community Members",
   "description": "As an IDD community member I want to exercise maximum autonomy within my capabilities So that I can direct my own life with dignity and appropriate support",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Autonomy and Self-Direction for IDD Community Members",

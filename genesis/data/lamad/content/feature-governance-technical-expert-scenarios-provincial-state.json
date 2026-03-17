@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-technical-expert-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Provincial/State-Level Technical Expertise for Council Advisory",
   "description": "As a technical_expert in the governance system Operating at the provincial_state governance layer I want to explain complex AI systems to Constitutional Councils So that citizen deliberation is informed without being dominated by expertise",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Provincial/State-Level Technical Expertise for Council Advisory",

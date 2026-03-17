@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-solutions-ecochain-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:solutions-ecochain:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "LCA software used to give you one footprint at a time. With our Environmental Intelligence Platform, you can generate hundreds. Try out now.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Solutions - Ecochain inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

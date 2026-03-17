@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities participating in neighborhood life Operating at the neighborhood governance layer I want to contribute to and benefit from neighborhood care economy with full accessibility So that I can be a full neighbor whose presence improves the neighborhood for everyone",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Person with Disabilities",

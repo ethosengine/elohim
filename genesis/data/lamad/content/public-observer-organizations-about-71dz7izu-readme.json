@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-about-71dz7izu-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:about-71dz7izu:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Landano allows property owners to manage land records for their real estate property via an easy-to-use, decentralized app (dApp [https://www.ledger.com/academy/what-is-a-dapp]) and our Open Cadastral Map",
@@ -31,7 +31,8 @@
         "inspiration": "[How About inspires the public_observer epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

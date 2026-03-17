@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Single Parent",
   "description": "As a single parent interfacing with educational systems Operating at the educational governance layer I want schools to recognize and accommodate single-parent family realities So that my children receive full educational support despite our family structure",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Single Parent",

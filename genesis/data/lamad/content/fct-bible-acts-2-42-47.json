@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-acts-2-42-47",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Acts 2:42-47",
   "description": "Scripture reference used in FCT Module 11",
   "content": "## Acts 2:42-47\n\n> Acts 2:42-47 - The fellowship of believers\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-11-collaboration-sensemaking",
-    "thematicContext": "Creating Shared Understanding: Collaboration"
+    "thematicContext": "Creating Shared Understanding: Collaboration",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.215047",
   "updatedAt": "2025-12-24T03:05:25.930Z",

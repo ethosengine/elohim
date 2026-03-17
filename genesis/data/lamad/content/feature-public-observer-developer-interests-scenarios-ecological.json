@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-developer-interests-scenarios-ecological",
   "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:ecological",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Environmental Development Accountability for Developer Interests",
   "description": "As a developer in the public_observer system Operating at the ecological governance layer I want transparent environmental standards and honest sustainability So that genuine environmental responsibility creates competitive advantage",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental Development Accountability for Developer Interests",
@@ -65,7 +66,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -1,6 +1,6 @@
 {
   "id": "fct-media-07-documentary-poverty-inc",
-  "contentType": "documentary",
+  "contentType": "resource",
   "title": "Poverty, Inc.",
   "description": "Poverty, Inc. (2014)",
   "content": "# Poverty, Inc.\n",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-08-centering-love",
     "mediaType": "documentary",
-    "year": "2014"
+    "year": "2014",
+    "originalContentType": "documentary"
   },
   "_organization": null,
   "createdAt": "2025-11-28T21:10:19.209138",

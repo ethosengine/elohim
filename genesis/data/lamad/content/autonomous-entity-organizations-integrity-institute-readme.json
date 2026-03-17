@@ -1,7 +1,7 @@
 {
   "id": "autonomous-entity-organizations-integrity-institute-readme",
   "did": "did:web:elohim.host:content:autonomous-entity:organizations:integrity-institute:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best.",
@@ -39,7 +39,8 @@
         "inspiration": "[How Integrity Institute inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

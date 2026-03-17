@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Relationships and Adult Autonomy",
   "description": "As an adult IDD community member with family connections I want to maintain family relationships while exercising adult autonomy So that I am seen as an adult family member, not a perpetual child",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Relationships and Adult Autonomy",

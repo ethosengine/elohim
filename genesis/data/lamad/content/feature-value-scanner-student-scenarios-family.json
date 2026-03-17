@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Student",
   "description": "As a student maintaining family connection while establishing independence Operating at the family governance layer I want to participate in family care economy despite geographic distance So that family relationships continue while I develop adult autonomy",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Student",

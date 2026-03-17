@@ -1,7 +1,7 @@
 {
   "id": "product-test-shefa-dashboard",
   "did": "did:elohim:product-test-shefa-dashboard",
-  "contentType": "feature",
+  "contentType": "scenario",
   "contentFormat": "gherkin",
   "title": "Shefa Dashboard Product Tests",
   "description": "BDD product tests validating the Shefa dashboard displays and functions correctly",
@@ -18,7 +18,8 @@
     "category": "shefa",
     "testType": "product",
     "scenarioCount": 4,
-    "priority": "high"
+    "priority": "high",
+    "originalContentType": "feature"
   },
   "openGraph": {
     "title": "Shefa Dashboard Product Tests",
@@ -33,7 +34,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

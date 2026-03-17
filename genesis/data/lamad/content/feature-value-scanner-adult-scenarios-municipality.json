@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-municipality",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Layer Value Recognition for Adult",
   "description": "As an adult engaging with municipal governance Operating at the municipal governance layer I want my care contributions to influence public policy So that municipal systems recognize and support care economy at scale",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Layer Value Recognition for Adult",

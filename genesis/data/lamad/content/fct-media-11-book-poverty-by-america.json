@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-poverty-by-america",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Poverty, by America",
   "description": "Book by Matthew Desmond",
   "content": "# Poverty, by America\n\n**Author:** Matthew Desmond\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Matthew Desmond"
+    "author": "Matthew Desmond",
+    "originalContentType": "book"
   },
   "_contributor": "Matthew Desmond",
   "createdAt": "2025-11-28T21:10:19.219706",

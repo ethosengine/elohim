@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-constitutional-council-member-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Provincial/State-Level Constitutional Council Deliberation for Council Member",
   "description": "As a constitutional_council_member in the governance system Operating at the provincial_state governance layer I want to deliberate on complex regional appeals and establish precedent So that constitutional interpretation guides multiple communities coherently",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Provincial/State-Level Constitutional Council Deliberation for Council Member",

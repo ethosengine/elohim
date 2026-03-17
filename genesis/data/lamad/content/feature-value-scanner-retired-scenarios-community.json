@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-retired-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Retired Person",
   "description": "As a retired person in the value scanner system Operating at the community governance layer I want my volunteer labor and community leadership recognized as valuable contribution So that retired people are understood as community builders, not economic dependents",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Retired Person",

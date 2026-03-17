@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-happy-planet-index-how-happy-is-the-planet-readme",
   "did": "did:web:elohim.host:content:governance:organizations:happy-planet-index-how-happy-is-the-planet:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "How happy Is the planet",
@@ -31,7 +31,8 @@
         "inspiration": "[How Happy Planet Index – How happy Is the planet inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

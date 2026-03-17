@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-acts-1-8",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Acts 1:8",
   "description": "Scripture reference used in FCT Module 14",
   "content": "## Acts 1:8\n\n> Acts 1:8 - You will be my witnesses\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-14-ready-to-act",
-    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224757",
   "updatedAt": "2025-12-24T03:05:25.930Z",

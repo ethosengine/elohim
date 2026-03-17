@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-ephesians-4-11-16",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Ephesians 4:11-16",
   "description": "Scripture reference used in FCT Module 2",
   "content": "## Ephesians 4:11-16\n\n> Ephesians 4:11-16 - Different roles within the church (apostles, prophets, evangelists, pastors, and teachers) work together to build up the body of Christ.\nPersonal Systems\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-02-systems-thinking",
-    "thematicContext": "Systems Thinking"
+    "thematicContext": "Systems Thinking",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.191150",
   "updatedAt": "2025-12-24T03:05:25.950Z",

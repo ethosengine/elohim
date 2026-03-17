@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Care Participation for Workers",
   "description": "As a worker living in a neighborhood I need to participate in neighborhood care economy when possible So that I can contribute to and benefit from local community resilience",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Care Participation for Workers",

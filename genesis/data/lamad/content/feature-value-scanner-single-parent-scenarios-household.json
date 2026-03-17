@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Single Parent",
   "description": "As a single parent managing solo household operations Operating at the household governance layer I want efficient household management with AI support replacing missing co-parent So that my household thrives despite having only one adult making all decisions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Single Parent",

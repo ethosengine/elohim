@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-child-scenarios-affinity-network",
   "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Age-Appropriate Interest Communities for Child",
   "description": "As a child in the social_medium system Operating at the affinity_network governance layer I want to pursue my interests with others who share them So that I can develop skills, make friends, and explore my passions safely",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Age-Appropriate Interest Communities for Child",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

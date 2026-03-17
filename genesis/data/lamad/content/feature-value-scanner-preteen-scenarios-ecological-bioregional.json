@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Preteen",
   "description": "As a preteen in the value scanner system Operating at the ecological/bioregional governance layer I want to understand how my food choices connect to ecological systems and care labor So that I develop stewardship extending beyond my household to the land and people who feed us",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Preteen",

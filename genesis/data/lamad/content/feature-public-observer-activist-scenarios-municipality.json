@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-activist-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:activist:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Civic Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the municipality governance layer I want to track multiple civic bodies and hold power accountable So that policy serves community wellbeing not special interests",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Civic Advocacy for Activist",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

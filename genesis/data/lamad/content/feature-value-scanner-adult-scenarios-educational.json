@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Literacy for Adult",
   "description": "As an adult educator and parent Operating at the educational governance layer I want to teach value literacy to the next generation So that children grow up understanding care creates value",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Literacy for Adult",

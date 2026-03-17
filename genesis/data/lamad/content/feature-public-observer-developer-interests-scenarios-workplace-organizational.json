@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Employment and Labor Accountability for Developer Interests",
   "description": "As a developer in the public_observer system Operating at the workplace_organizational governance layer I want transparent labor practices and honest job creation accounting So that responsible employment practices create competitive advantage",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Employment and Labor Accountability for Developer Interests",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

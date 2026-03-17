@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-policy-maker-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Provincial/State-Level Policy Making for AI Governance",
   "description": "As a policy_maker in the governance system Operating at the provincial_state governance layer I want to create enabling legislation for democratic AI governance So that protocol serves communities while integrating with existing law",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Provincial/State-Level Policy Making for AI Governance",

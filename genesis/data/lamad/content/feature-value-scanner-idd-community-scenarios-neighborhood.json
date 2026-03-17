@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Participation and Community Presence",
   "description": "As an IDD community member living in the neighborhood I want to participate in neighborhood life and build local connections So that I am seen as a contributing neighbor, not just someone who needs support",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Participation and Community Presence",

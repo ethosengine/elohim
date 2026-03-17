@@ -1,7 +1,7 @@
 {
   "id": "governance-books-finite-and-infinite-games-readme",
   "did": "did:web:elohim.host:content:governance:books:finite-and-infinite-games:readme",
-  "contentType": "book-chapter",
+  "contentType": "reference",
   "activityPubType": "Document",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "“There are at least two kinds of games,” states James P. Carse as he begins this extraordinary book. “One could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.”Finite games are the familiar contests of…",
@@ -31,7 +31,8 @@
         "inspiration": "[How Finite and Infinite Games inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "book-chapter"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-constitutional-council-member-scenarios-community",
   "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community-Level Constitutional Council Deliberation for Council Member",
   "description": "As a constitutional_council_member in the governance system Operating at the community governance layer I want to provide democratic oversight of AI decisions through citizen deliberation So that agent governance remains accountable without being controllable",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community-Level Constitutional Council Deliberation for Council Member",

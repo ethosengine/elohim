@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-home-2021-edemocracy-network-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:home-2021-edemocracy-network:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "This is what democracy looks like? We are a non-profit organization that helps community members achieve fair, accessible and engaging public consultation processes that prioritize ensuring all voices are heard. We are focused on climate solutions, […]",
@@ -39,7 +39,8 @@
         "inspiration": "[How Home 2021 - eDemocracy Network inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -70,7 +71,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

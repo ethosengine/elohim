@@ -1,6 +1,6 @@
 {
   "id": "fct-media-05-video-shiny-happy-people-d",
-  "contentType": "video",
+  "contentType": "resource",
   "title": "Shiny Happy People: Duggar Family Secrets",
   "description": "Shiny Happy People: Duggar Family Secrets (2023)",
   "content": "# Shiny Happy People: Duggar Family Secrets\n",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-06-harmful-consequences",
     "mediaType": "video",
-    "year": "2023"
+    "year": "2023",
+    "originalContentType": "video"
   },
   "_organization": null,
   "createdAt": "2025-11-28T21:10:19.205408",

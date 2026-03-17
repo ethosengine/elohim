@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Bioregional Sustainable Economy Investment and Stewardship",
   "description": "As a community_investor in the autonomous_entity system Operating at the ecological_bioregional governance layer I want to invest in bioregional ecological sustainability and resilience So that capital supports regenerative economy aligned with ecological systems",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional Sustainable Economy Investment and Stewardship",

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-oecd-better-life-index-readme",
   "did": "did:web:elohim.host:content:governance:organizations:oecd-better-life-index:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
@@ -31,7 +31,8 @@
         "inspiration": "[How OECD Better Life Index inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

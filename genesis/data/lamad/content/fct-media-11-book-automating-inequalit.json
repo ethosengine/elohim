@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-automating-inequalit",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Automating Inequality",
   "description": "Book by Virginia Eubanks",
   "content": "# Automating Inequality\n\n**Author:** Virginia Eubanks\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Virginia Eubanks"
+    "author": "Virginia Eubanks",
+    "originalContentType": "book"
   },
   "_contributor": "Virginia Eubanks",
   "createdAt": "2025-11-28T21:10:19.220137",

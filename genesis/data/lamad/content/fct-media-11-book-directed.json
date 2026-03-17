@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-directed",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "directed",
   "description": "Book by Ava Du",
   "content": "# directed\n\n**Author:** Ava Du\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Ava Du"
+    "author": "Ava Du",
+    "originalContentType": "book"
   },
   "_contributor": "Ava Du",
   "createdAt": "2025-11-28T21:10:19.220221",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-caregiver-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Caregiver",
   "description": "As a caregiver managing household for dependent adults Operating at the household governance layer I want household governance that recognizes care complexity and reduced capacity So that household functions sustainably despite intensive care demands",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Caregiver",

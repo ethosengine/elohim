@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-journalist-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "State Policy and Accountability Journalism for Journalist",
   "description": "As a journalist in the public_observer system Operating at the provincial/state governance layer I want to connect state policy to local impacts So that policy journalism serves communities not just political insiders",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "State Policy and Accountability Journalism for Journalist",
@@ -65,7 +66,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

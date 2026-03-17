@@ -1,7 +1,7 @@
 {
   "id": "governance-video-transitiontowns-readme",
   "did": "did:web:elohim.host:content:governance:video:transitiontowns:readme",
-  "contentType": "video",
+  "contentType": "resource",
   "activityPubType": "Video",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "An international movement of communities reimagining and rebuilding our world.",
@@ -31,7 +31,8 @@
         "inspiration": "[How TransitionTowns inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "video"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

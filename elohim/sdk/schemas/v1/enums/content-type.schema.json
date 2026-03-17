@@ -2,16 +2,22 @@
   "$id": "epr:schema:enum:content-type",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ContentType",
-  "description": "Content type vocabulary. Values marked [DNA] are notarized in the Holochain DHT.",
+  "description": "Content type vocabulary. Values marked [DNA] are notarized in the Holochain DHT. Values marked [storage] are storage-only projections not validated by DNA.",
   "type": "string",
   "enum": [
     "epic", "concept", "lesson", "scenario", "assessment",
     "resource", "reflection", "discussion", "exercise",
-    "example", "reference", "article"
+    "example", "reference", "article",
+    "human", "role"
   ],
   "_dna": {
     "constant": "CONTENT_TYPES",
     "zome": "content_store_integrity",
     "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+  },
+  "_storageOnly": ["human", "role"],
+  "_storageOnlyRationale": {
+    "human": "Imagodei identity entity. Notarized in imagodei DNA as Human entry type. Stored in lamad content graph for cross-domain referencing.",
+    "role": "Governance archetype. Conceptually belongs to qahal/mishpat domain. Stored as learning content about governance roles."
   }
 }

@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-michelle-alexander",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Michelle Alexander",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Michelle Alexander\n\n**Role:** author\n\n**Works:** The New Jim Crow\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-12-fairness-justice"
+    "sourceModule": "fct-module-12-fairness-justice",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.220105",
   "updatedAt": "2025-12-24T03:05:26.065Z",

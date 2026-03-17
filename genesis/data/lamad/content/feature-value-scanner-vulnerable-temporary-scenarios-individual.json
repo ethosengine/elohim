@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Autonomy and Agency During Temporary Vulnerability",
   "description": "As a person experiencing temporary vulnerability I want to maintain individual autonomy and decision-making authority So that I can rebuild my life according to my values while receiving dignified support",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Autonomy and Agency During Temporary Vulnerability",

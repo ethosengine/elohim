@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-philippians-4-8",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Philippians 4:8",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## Philippians 4:8\n\n> Philippians 4:8 - \"Finally, brothers, whatever is true, whatever is honorable, whatever is just, whatever is pure, whatever is lovely, whatever is commendable, if there is any excellence, if there is anything worthy of praise, think about these things.\"\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224185",
   "updatedAt": "2025-12-24T03:05:26.029Z",

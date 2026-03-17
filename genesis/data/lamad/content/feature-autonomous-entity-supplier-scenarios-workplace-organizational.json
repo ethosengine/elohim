@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Democratic Farm Governance and Farmworker Empowerment",
   "description": "As a supplier in the autonomous_entity system Operating at the workplace_organizational governance layer I want farmworkers to gain ownership and democratic voice So that farm transforms from hierarchical extraction to democratic stewardship",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic Farm Governance and Farmworker Empowerment",

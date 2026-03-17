@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-habits-of-the-high-t",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Habits of the High-Tech Heart",
   "description": "Book by Quentin Schultze",
   "content": "# Habits of the High-Tech Heart\n\n**Author:** Quentin Schultze\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "Quentin Schultze"
+    "author": "Quentin Schultze",
+    "originalContentType": "book"
   },
   "_contributor": "Quentin Schultze",
   "createdAt": "2025-11-28T21:10:19.225124",

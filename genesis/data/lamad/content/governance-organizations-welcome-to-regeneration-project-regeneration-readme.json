@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-welcome-to-regeneration-project-regeneration-readme",
   "did": "did:web:elohim.host:content:governance:organizations:welcome-to-regeneration-project-regeneration:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Regeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Welcome to Regeneration | Project Regeneration inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

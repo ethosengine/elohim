@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-citizen-scenarios-community",
   "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Civic Democracy for Citizen",
   "description": "As a citizen in the public_observer system Operating at the community governance layer I want to participate in neighborhood decisions without overwhelming time commitment So that I can shape my community while managing work and family responsibilities",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Civic Democracy for Citizen",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

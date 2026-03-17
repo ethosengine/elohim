@@ -1,7 +1,7 @@
 {
   "id": "governance-video-the-permaculture-principles-readme",
   "did": "did:web:elohim.host:content:governance:video:the-permaculture-principles:readme",
-  "contentType": "video",
+  "contentType": "resource",
   "activityPubType": "Video",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren’s 12 principle ver...",
@@ -31,7 +31,8 @@
         "inspiration": "[How The Permaculture Principles inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "video"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

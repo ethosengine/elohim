@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-philippians-1-9-10",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Philippians 1:9-10",
   "description": "Scripture reference used in FCT Module 6",
   "content": "## Philippians 1:9-10\n\n> Philippians 1:9-10 - \"And this is my prayer: that your love may abound more and more in knowledge and depth of insight, so that you may be able to discern what is best...\"\nRegenerative systems and restoration:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-06-harmful-consequences",
-    "thematicContext": "Minimizing Harmful Consequences"
+    "thematicContext": "Minimizing Harmful Consequences",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.201348",
   "updatedAt": "2025-12-24T03:05:26.010Z",

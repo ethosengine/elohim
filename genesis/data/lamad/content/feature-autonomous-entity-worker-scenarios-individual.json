@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-worker-scenarios-individual",
   "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Dignity and Data Sovereignty for Worker",
   "description": "As a worker in the autonomous_entity system Operating at the individual governance layer I want my personal dignity protected and my data sovereign So that I am valued as a person, not exploited as a resource",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Dignity and Data Sovereignty for Worker",

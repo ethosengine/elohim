@@ -1,6 +1,6 @@
 {
   "id": "fct-video-04-00",
-  "contentType": "video",
+  "contentType": "resource",
   "title": "is Haugen - 60mins interview or Congressional Testimony",
   "description": "Recommended video for Respecting Human Nature",
   "content": "**Platform:** youtube",
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "fct-media",
     "sourceModule": "fct-module-05-respecting-human-nature",
-    "mediaType": "video"
+    "mediaType": "video",
+    "originalContentType": "video"
   },
   "createdAt": "2025-11-28T02:47:31.018220",
   "updatedAt": "2025-12-26T21:04:01.845Z",

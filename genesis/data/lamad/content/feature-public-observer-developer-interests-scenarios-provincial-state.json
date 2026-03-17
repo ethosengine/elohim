@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-developer-interests-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "State Development Policy and Accountability for Developer Interests",
   "description": "As a developer in the public_observer system Operating at the provincial_state governance layer I want transparent policy frameworks and accountable lobbying So that state policy serves community development not just developer extraction",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "State Development Policy and Accountability for Developer Interests",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

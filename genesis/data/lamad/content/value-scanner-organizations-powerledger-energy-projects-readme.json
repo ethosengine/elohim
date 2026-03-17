@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-powerledger-energy-projects-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:powerledger-energy-projects:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
@@ -39,7 +39,8 @@
         "inspiration": "[How Powerledger Energy Projects inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

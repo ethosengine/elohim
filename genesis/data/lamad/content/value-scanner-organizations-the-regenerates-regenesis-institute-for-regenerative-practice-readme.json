@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-the-regenerates-regenesis-institute-for-regenerative-practice-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:the-regenerates-regenesis-institute-for-regenerative-practice:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
@@ -31,7 +31,8 @@
         "inspiration": "[How The Regenerates | Regenesis Institute for Regenerative Practice inspires the value_scanner epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

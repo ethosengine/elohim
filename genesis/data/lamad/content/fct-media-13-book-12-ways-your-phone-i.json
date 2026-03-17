@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-12-ways-your-phone-i",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "12 Ways Your Phone Is Changing You",
   "description": "Book by Tony Reinke",
   "content": "# 12 Ways Your Phone Is Changing You\n\n**Author:** Tony Reinke\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "Tony Reinke"
+    "author": "Tony Reinke",
+    "originalContentType": "book"
   },
   "_contributor": "Tony Reinke",
   "createdAt": "2025-11-28T21:10:19.225366",

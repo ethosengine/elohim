@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-child-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Literacy for Young Child",
   "description": "As a young child in the value scanner system Operating at the educational governance layer I want to learn value literacy through direct experience So that I understand that care creates value and my choices matter",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Literacy for Young Child",

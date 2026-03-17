@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-elderly-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Autonomy Preservation for Elderly",
   "description": "As an elderly person (ages 75+) in the value scanner system Operating at the individual governance layer I want to maintain autonomy and agency over my own life So that I remain a person with dignity despite requiring substantial assistance",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Autonomy Preservation for Elderly",

@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-kolibri-a-free-open-source-education-for-all-learning-equality-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:kolibri-a-free-open-source-education-for-all-learning-equality:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
@@ -39,7 +39,8 @@
         "inspiration": "[How Kolibri : A Free, Open Source Education for All | Learning Equality inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

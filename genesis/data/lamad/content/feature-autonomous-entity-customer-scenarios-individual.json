@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-customer-scenarios-individual",
   "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ethical Consumption and Dignified Service for Customer",
   "description": "As a customer in the autonomous_entity system Operating at the individual governance layer I want consumption aligned with values and genuine human connection So that I support dignity and community rather than extraction",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ethical Consumption and Dignified Service for Customer",

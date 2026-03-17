@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-community-moderator-scenarios-community",
   "did": "did:web:elohim.host:content:social-medium:community-moderator:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Space Moderation with Restorative Approach",
   "description": "As a community_moderator in the social_medium system Operating at the community governance layer I want to maintain healthy spaces where human flourishing is possible So that communities can coordinate and communicate without harm",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Space Moderation with Restorative Approach",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

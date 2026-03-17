@@ -1,7 +1,7 @@
 {
   "id": "community-local-business",
   "did": "did:web:elohim.host:community:local-business",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Group",
   "title": "Local Business",
   "description": "Community with 2 members",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "community",
-    "memberCount": 2
+    "memberCount": 2,
+    "originalContentType": "organization"
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
@@ -25,7 +26,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

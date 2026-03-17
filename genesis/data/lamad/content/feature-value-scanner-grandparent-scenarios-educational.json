@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-grandparent-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Grandparent",
   "description": "As a grandparent providing developmental and educational care Operating at the educational governance layer I want my teaching and learning support to be recognized as sophisticated work So that informal education by grandparents is valued alongside formal schooling",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Grandparent",

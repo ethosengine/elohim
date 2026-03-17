@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-small-business-owner-scenarios-community",
   "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Institution Building for Small Business Owner",
   "description": "As a small_business_owner in the autonomous_entity system Operating at the community governance layer I want my business to become genuine community institution So that neighborhood embeddedness is preserved and deepened beyond individual ownership",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Institution Building for Small Business Owner",

@@ -1,6 +1,6 @@
 {
   "id": "fct-media-10-book-the-knowledge-illusi",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The Knowledge Illusion: Why We Never Think Alone",
   "description": "Book by Steven Sloman",
   "content": "# The Knowledge Illusion: Why We Never Think Alone\n\n**Author:** Steven Sloman\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "knowledge-systems",
     "sourceModule": "fct-module-11-collaboration-sensemaking",
     "mediaType": "book",
-    "author": "Steven Sloman"
+    "author": "Steven Sloman",
+    "originalContentType": "book"
   },
   "_contributor": "Steven Sloman",
   "createdAt": "2025-11-28T21:10:19.218281",

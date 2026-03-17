@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-journalist-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Education Accountability Journalism for Journalist",
   "description": "As a journalist in the public_observer system Operating at the educational governance layer I want comprehensive education governance surveillance So that education journalism holds systems accountable for equity",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Education Accountability Journalism for Journalist",
@@ -65,7 +66,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

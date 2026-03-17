@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-james-1-27",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "James 1:27",
   "description": "Scripture reference used in FCT Module 9",
   "content": "## James 1:27\n\n> James 1:27 ASV\n27 Pure religion and undefiled before our God and Father is this, to visit the fatherless and widows in their affliction, and to keep oneself unspotted from the world.\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-09-fruits-of-spirit",
-    "thematicContext": "Centering Values: Fruits of the Spirit"
+    "thematicContext": "Centering Values: Fruits of the Spirit",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.210200",
   "updatedAt": "2025-12-24T03:05:25.967Z",

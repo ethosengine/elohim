@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities managing an independent household with support Operating at the household governance layer I want to maintain full authority over my household while coordinating needed assistance So that I can live independently with dignity, managing my home as I choose",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Person with Disabilities",

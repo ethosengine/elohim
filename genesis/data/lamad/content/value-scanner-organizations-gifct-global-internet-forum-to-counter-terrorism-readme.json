@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-gifct-global-internet-forum-to-counter-terrorism-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:gifct-global-internet-forum-to-counter-terrorism:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Global Internet Forum to Counter Terrorism brings together the technology industry, government, civil society, and academia to foster collaboration and information-sharing to counter terrorist and violent extremist activity online.",
@@ -39,7 +39,8 @@
         "inspiration": "[How GIFCT | Global Internet Forum to Counter Terrorism inspires the autonomous_entity epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

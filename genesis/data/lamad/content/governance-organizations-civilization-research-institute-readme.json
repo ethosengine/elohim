@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-civilization-research-institute-readme",
   "did": "did:web:elohim.host:content:governance:organizations:civilization-research-institute:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Civilization Research Institute is focused on advancing humanity's collective intelligence. · We believe that improving collective sensemaking — our ability to make ...",
@@ -31,7 +31,8 @@
         "inspiration": "[How Civilization Research Institute inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

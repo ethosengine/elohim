@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-holochain-app-framework-with-p2p-networking-readme",
   "did": "did:web:elohim.host:content:governance:organizations:holochain-app-framework-with-p2p-networking:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Holochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps.",
@@ -45,7 +45,8 @@
         "inspiration": "[How Holochain | App framework with P2P networking inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

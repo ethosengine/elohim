@@ -1,7 +1,7 @@
 {
   "id": "community-local-church",
   "did": "did:web:elohim.host:community:local-church",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Group",
   "title": "Local Church",
   "description": "Community with 13 members",
@@ -28,7 +28,8 @@
   ],
   "metadata": {
     "category": "community",
-    "memberCount": 13
+    "memberCount": 13,
+    "originalContentType": "organization"
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
@@ -36,7 +37,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

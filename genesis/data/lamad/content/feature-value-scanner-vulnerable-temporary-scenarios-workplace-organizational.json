@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace Navigation and Employment Search During Temporary Vulnerability",
   "description": "As a person seeking employment while navigating temporary vulnerability I want tools to find dignified work while avoiding exploitation So that I can build toward economic stability without sacrificing recovery or wellbeing",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace Navigation and Employment Search During Temporary Vulnerability",

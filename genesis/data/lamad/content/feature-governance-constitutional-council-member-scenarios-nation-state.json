@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-constitutional-council-member-scenarios-nation-state",
   "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National-Level Constitutional Council Deliberation for Council Member",
   "description": "As a constitutional_council_member in the governance system Operating at the nation_state governance layer I want to deliberate on fundamental constitutional questions affecting millions So that national precedent protects human dignity and democratic governance at scale",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National-Level Constitutional Council Deliberation for Council Member",

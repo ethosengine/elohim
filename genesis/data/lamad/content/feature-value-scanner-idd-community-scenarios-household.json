@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Participation and Group Home Governance",
   "description": "As an IDD community member living in a group home I want to contribute to household life and participate in governance So that I live in a community of mutual care, not as a managed client",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Participation and Group Home Governance",

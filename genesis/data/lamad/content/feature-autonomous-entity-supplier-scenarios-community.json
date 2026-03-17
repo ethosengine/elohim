@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-supplier-scenarios-community",
   "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Local Food Security and Community Agricultural Stewardship",
   "description": "As a supplier in the autonomous_entity system Operating at the community governance layer I want farm to serve community food security and democratic participation So that agriculture becomes community institution, not private extraction",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Local Food Security and Community Agricultural Stewardship",

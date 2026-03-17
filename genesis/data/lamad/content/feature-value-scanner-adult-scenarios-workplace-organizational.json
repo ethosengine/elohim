@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace/Organizational Layer Value Recognition for Adult",
   "description": "As an adult worker with care responsibilities Operating at the workplace/organizational governance layer I want workplace policies to recognize workers' care economy participation So that employment supports rather than undermines household and community care",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace/Organizational Layer Value Recognition for Adult",

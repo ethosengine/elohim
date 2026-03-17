@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Senior",
   "description": "As a senior in early retirement in the value scanner system Operating at the educational governance layer I want to continue learning and share accumulated knowledge So that education is understood as lifelong and senior knowledge is valued and transmitted",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Senior",

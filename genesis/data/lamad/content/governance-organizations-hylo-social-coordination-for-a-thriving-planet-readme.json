@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-hylo-social-coordination-for-a-thriving-planet-readme",
   "did": "did:web:elohim.host:content:governance:organizations:hylo-social-coordination-for-a-thriving-planet:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Hylo amplifies cooperation among people regenerating our communities and our planet, enabling collective action through emergent, decentralized collaboration.",
@@ -45,7 +45,8 @@
         "inspiration": "[How Hylo — Social Coordination for a Thriving Planet inspires the autonomous_entity epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-matthew-22-37-39",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Matthew 22:37-39",
   "description": "Scripture reference used in FCT Module 11",
   "content": "## Matthew 22:37-39\n\n> Matthew 22:37-39 - The greatest commandments to love God and neighbor\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-11-collaboration-sensemaking",
-    "thematicContext": "Creating Shared Understanding: Collaboration"
+    "thematicContext": "Creating Shared Understanding: Collaboration",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.215102",
   "updatedAt": "2025-12-24T03:05:25.997Z",

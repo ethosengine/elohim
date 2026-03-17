@@ -1,6 +1,6 @@
 {
   "id": "fct-media-00-video-the-hidden-tribes-of",
-  "contentType": "video",
+  "contentType": "resource",
   "title": "The Hidden Tribes of America",
   "description": "The Hidden Tribes of America",
   "content": "# The Hidden Tribes of America\n",
@@ -18,7 +18,8 @@
     "category": "social-fragmentation",
     "sourceModule": "fct-module-01-church-dilemma",
     "mediaType": "video",
-    "year": null
+    "year": null,
+    "originalContentType": "video"
   },
   "_organization": null,
   "createdAt": "2025-11-28T21:10:19.189562",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Middle-Aged Adult",
   "description": "As a middle-aged adult in the value scanner system Operating at the ecological/bioregional governance layer I want to integrate care for people with care for planet through sustainable practices So that I model ecological stewardship for the next generation and build resilient bioregional care economy",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Middle-Aged Adult",

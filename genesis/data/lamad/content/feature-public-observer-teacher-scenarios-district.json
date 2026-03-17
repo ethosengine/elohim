@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-teacher-scenarios-district",
   "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "District Governance and Resource Allocation for Teacher",
   "description": "As a teacher in the public_observer system Operating at the district governance layer I want to inform board decisions with professional expertise So that district policies support effective teaching and student learning",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "District Governance and Resource Allocation for Teacher",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

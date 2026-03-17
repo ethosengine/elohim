@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-content-creator-scenarios-community",
   "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Storytelling and Local Documentation",
   "description": "As a content_creator in the social_medium system Operating at the community governance layer I want to document and share local stories and knowledge So that community memory is preserved and local voices are amplified",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Storytelling and Local Documentation",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

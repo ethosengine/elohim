@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-exodus-19-5-6",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Exodus 19:5-6",
   "description": "Scripture reference used in FCT Module 3",
   "content": "## Exodus 19:5-6\n\n> Exodus 19:5-6: Through the covenant at Sinai, God sets apart the Israelites as a \"kingdom of priests and a holy nation,\" tasked with upholding divine laws that include moral and ethical standards, such as the prohibition of practices like human sacrifice found among their neighbors.\nNew Testament Themes:\nThe Kingdom of Heaven and a New Way of Living:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-03-problem-well-stated",
-    "thematicContext": "A Problem Well Stated"
+    "thematicContext": "A Problem Well Stated",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.195654",
   "updatedAt": "2025-12-24T03:05:25.951Z",

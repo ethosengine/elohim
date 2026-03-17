@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-proverbs-3-5-6",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Proverbs 3:5-6",
   "description": "Scripture reference used in FCT Module 3",
   "content": "## Proverbs 3:5-6\n\n> Proverbs 3:5-6: \"Trust in the Lord with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.\" This passage emphasizes the limitations of human wisdom and the need for divine guidance.\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-03-problem-well-stated",
-    "thematicContext": "A Problem Well Stated"
+    "thematicContext": "A Problem Well Stated",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.195623",
   "updatedAt": "2025-12-24T03:05:26.031Z",

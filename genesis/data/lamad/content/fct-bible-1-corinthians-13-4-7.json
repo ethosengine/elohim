@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-1-corinthians-13-4-7",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "1 Corinthians 13:4-7",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## 1 Corinthians 13:4-7\n\n> 1 Corinthians 13:4-7 - \"Love is patient and kind... It does not insist on its own way...\"\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224111",
   "updatedAt": "2025-12-24T03:05:25.895Z",

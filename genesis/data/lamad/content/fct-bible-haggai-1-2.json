@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-haggai-1-2",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Haggai 1:2",
   "description": "Scripture reference used in FCT Module 7",
   "content": "## Haggai 1:2\n\n> Haggai 1:2‭-‬11 ESV\nhttps://bible.com/bible/59/hag.1.2-11.ESV\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-07-regeneration",
-    "thematicContext": "Regeneration and Reconciliation"
+    "thematicContext": "Regeneration and Reconciliation",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.207403",
   "updatedAt": "2025-12-24T03:05:25.965Z",

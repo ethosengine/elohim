@@ -1,7 +1,7 @@
 {
   "id": "governance-video-not-just-bikes-readme",
   "did": "did:web:elohim.host:content:governance:video:not-just-bikes:readme",
-  "contentType": "video",
+  "contentType": "resource",
   "activityPubType": "Video",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Stories of great urban planning and urban experiences from the Netherlands and beyond. There are a lot of reasons why Dutch cities are so great; it’s not just bikes. Unfortunately I’ve been overwhelmed with emails and DMs, and I can’t answer most of them anymore. If you really think you need to con…",
@@ -31,7 +31,8 @@
         "inspiration": "[How Not Just Bikes inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "video"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

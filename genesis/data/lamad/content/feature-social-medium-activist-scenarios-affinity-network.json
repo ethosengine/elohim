@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-activist-scenarios-affinity-network",
   "did": "did:web:elohim.host:content:social-medium:activist:scenarios:affinity-network",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Movement Building Through Affinity Networks for Activist",
   "description": "As an activist in the social_medium system Operating at the affinity_network governance layer I want to build solidarity and coordinate action across geographies So that movements can grow while respecting local autonomy and context",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Movement Building Through Affinity Networks for Activist",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-vi-hart",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Vi Hart",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Vi Hart\n\n**Role:** author\n\n**Works:** Revisit this interactive demonstration\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-12-fairness-justice"
+    "sourceModule": "fct-module-12-fairness-justice",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.219677",
   "updatedAt": "2025-12-24T03:05:26.080Z",

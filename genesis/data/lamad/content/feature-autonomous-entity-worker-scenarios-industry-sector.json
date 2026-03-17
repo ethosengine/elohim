@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-worker-scenarios-industry-sector",
   "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:industry-sector",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Industry Sector Coordination and Solidarity for Worker",
   "description": "As a worker in the autonomous_entity system Operating at the industry_sector governance layer I want to coordinate with workers across businesses for collective power So that we build sector-wide solidarity and resist race-to-bottom pressures",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Industry Sector Coordination and Solidarity for Worker",

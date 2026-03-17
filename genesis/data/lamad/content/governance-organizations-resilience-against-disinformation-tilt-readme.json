@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-resilience-against-disinformation-tilt-readme",
   "did": "did:web:elohim.host:content:governance:organizations:resilience-against-disinformation-tilt:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "In search for solutions against disinformation, radicalisation or online manipulation? This is our field of expertise. Tiltstudio.co",
@@ -31,7 +31,8 @@
         "inspiration": "[How Resilience against disinformation - Tilt inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

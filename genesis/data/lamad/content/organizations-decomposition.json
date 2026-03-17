@@ -1,7 +1,7 @@
 {
   "id": "organizations-decomposition",
   "did": "did:web:elohim.host:content:organizations-decomposition",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Organizations Decomposition Summary",
   "description": "**Date:** 2025-11-18 **Source:** `docs/keen.json` **Total Organizations:** 103",
@@ -13,7 +13,8 @@
   "sourcePath": "ORGANIZATIONS_DECOMPOSITION.md",
   "relatedNodeIds": [],
   "metadata": {
-    "category": "general"
+    "category": "general",
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizations Decomposition Summary",
@@ -44,7 +45,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

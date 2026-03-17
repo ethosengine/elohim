@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-dework-readme",
   "did": "did:web:elohim.host:content:governance:organizations:dework:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The task manager for DAOs and decentralized work",
@@ -31,7 +31,8 @@
         "inspiration": "[How Dework inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

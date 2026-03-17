@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Care Participation for Workers",
   "description": "As a worker maintaining family connections I need to participate in family care despite employment constraints So that I can honor family relationships while managing work demands",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Care Participation for Workers",

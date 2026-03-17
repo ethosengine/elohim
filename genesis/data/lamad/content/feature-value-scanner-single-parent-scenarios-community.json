@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Single Parent",
   "description": "As a single parent participating in community care economy Operating at the community governance layer I want to access community resources based on care contributions, not charity So that I receive dignified support for my superhuman care work without stigma",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Single Parent",

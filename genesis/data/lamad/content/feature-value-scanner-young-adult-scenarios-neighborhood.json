@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Young Adult",
   "description": "As a young adult new to my neighborhood Operating at the neighborhood governance layer I want to build community connections through care participation So that I establish roots and mutual support networks in a new place",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Young Adult",

@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-home-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:home:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Amplifying cooperation in service to regeneration in the Bay Area bioregion through technology, collective action and rebuilding the commons",
@@ -39,7 +39,8 @@
         "inspiration": "[How Home inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

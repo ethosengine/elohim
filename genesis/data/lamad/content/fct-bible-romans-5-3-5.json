@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-romans-5-3-5",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Romans 5:3-5",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## Romans 5:3-5\n\n> Romans 5:3-5 - \"...we rejoice in our sufferings, knowing that suffering produces endurance, and endurance produces character, and character produces hope...\"\nGratitude, Creativity, and Learning:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224058",
   "updatedAt": "2025-12-24T03:05:26.049Z",

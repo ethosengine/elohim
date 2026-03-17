@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-about-p2p-foundation-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:about-p2p-foundation:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Read about our Story, Mission, and Strategic Priorities",
@@ -39,7 +39,8 @@
         "inspiration": "[How About - P2P Foundation inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

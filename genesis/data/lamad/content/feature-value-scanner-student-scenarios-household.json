@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Student",
   "description": "As a student living with roommates and learning household coordination Operating at the household governance layer I want fair distribution of household labor and recognition of care contributions So that our shared living is sustainable and equitable for all",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Student",

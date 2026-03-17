@@ -1,7 +1,7 @@
 {
   "id": "autonomous-entity-organizations-conversence39s-idealoom-platform-readme",
   "did": "did:web:elohim.host:content:autonomous-entity:organizations:conversence39s-idealoom-platform:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;...",
@@ -45,7 +45,8 @@
         "inspiration": "[How Conversence&#39;s IdeaLoom platform inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-sociocracy-basic-concepts-and-principles-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:sociocracy-basic-concepts-and-principles:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
@@ -45,7 +45,8 @@
         "inspiration": "[How Sociocracy - basic concepts and principles inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -76,7 +77,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

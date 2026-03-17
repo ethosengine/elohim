@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-ethics-in-the-age-of",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Ethics in the Age of Technology",
   "description": "Book by George Hunsberger",
   "content": "# Ethics in the Age of Technology\n\n**Author:** George Hunsberger\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "George Hunsberger"
+    "author": "George Hunsberger",
+    "originalContentType": "book"
   },
   "_contributor": "George Hunsberger",
   "createdAt": "2025-11-28T21:10:19.225410",

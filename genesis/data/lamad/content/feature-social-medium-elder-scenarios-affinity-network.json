@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-elder-scenarios-affinity-network",
   "did": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Interest Communities and Peer Connection for Elder",
   "description": "As an elder in the social_medium system Operating at the affinity_network governance layer I want to connect with others who share my interests and experiences So that I can pursue passions, build friendships, and combat isolation",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Interest Communities and Peer Connection for Elder",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

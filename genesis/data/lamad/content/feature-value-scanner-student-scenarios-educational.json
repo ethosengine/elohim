@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Recognition for Student",
   "description": "As a student whose primary work is learning and development Operating at the educational governance layer I want my learning recognized as valuable work and care economy participation So that education is understood as mutual care investment rather than mere credential acquisition",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Recognition for Student",

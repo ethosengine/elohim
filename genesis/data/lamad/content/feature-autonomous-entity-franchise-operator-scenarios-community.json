@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-franchise-operator-scenarios-community",
   "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Wealth Reclamation Through Franchise Conversion",
   "description": "As a franchise_operator in the autonomous_entity system Operating at the community governance layer I want franchise locations to transform from extraction sites to community institutions So that neighborhood wealth circulates locally instead of extracting to distant corporation",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Wealth Reclamation Through Franchise Conversion",

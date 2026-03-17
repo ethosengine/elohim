@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-how-we-work-readme",
   "did": "did:web:elohim.host:content:governance:organizations:how-we-work:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Transforming the way humans inhabit the Earth",
@@ -31,7 +31,8 @@
         "inspiration": "[How How we work inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

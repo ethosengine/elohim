@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-technical-expert-scenarios-global",
   "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Global-Level Technical Expertise for Planetary AI Governance",
   "description": "As a technical_expert in the governance system Operating at the global governance layer I want to inform Global Constitutional Convention about superintelligence governance So that humanity can make informed democratic choices about existential questions",
@@ -38,7 +38,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 14
+    "scenarioCount": 14,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Global-Level Technical Expertise for Planetary AI Governance",

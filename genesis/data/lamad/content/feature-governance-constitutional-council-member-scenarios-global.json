@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-constitutional-council-member-scenarios-global",
   "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Global-Level Constitutional Council Deliberation for Council Member",
   "description": "As a constitutional_council_member in the governance system Operating at the global governance layer I want to participate in planetary constitutional governance So that humanity collectively shapes how we govern with superintelligent AI",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Global-Level Constitutional Council Deliberation for Council Member",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Senior",
   "description": "As a senior in early retirement in the value scanner system Operating at the family governance layer I want my multigenerational care contributions to be visible and valued So that family care economy operates on reciprocity and recognition, not invisibility",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Senior",

@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-researcher-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Provincial/State-Level Governance Research for Researcher",
   "description": "As a researcher in the governance system Operating at the provincial/state governance layer I want to conduct comparative quantitative studies across many communities So that I can identify patterns, test hypotheses, and provide generalizable findings",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Provincial/State-Level Governance Research for Researcher",

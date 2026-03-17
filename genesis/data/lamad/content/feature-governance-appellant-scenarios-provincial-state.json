@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Provincial/State-Level Appeal Process for Appellant",
   "description": "As an appellant in the governance system Operating at the provincial/state governance layer I want appeals that establish regional constitutional precedent So that complex cases and novel situations get proper deliberation and create guidance",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Provincial/State-Level Appeal Process for Appellant",

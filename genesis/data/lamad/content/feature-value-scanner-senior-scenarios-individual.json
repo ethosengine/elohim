@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-senior-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Senior",
   "description": "As a senior in early retirement (ages 65-74) in the value scanner system Operating at the individual governance layer I want my personal autonomy, dignity, and care contributions to be recognized So that retirement is experienced as liberation for care work, not obsolescence",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Senior",

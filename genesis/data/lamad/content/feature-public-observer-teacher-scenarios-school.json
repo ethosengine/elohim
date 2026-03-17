@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-teacher-scenarios-school",
   "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:school",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "School-Level Teacher Voice and Conditions for Teacher",
   "description": "As a teacher in the public_observer system Operating at the school governance layer I want to contribute professional expertise without retaliation So that school decisions reflect classroom realities and student needs",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 6
+    "scenarioCount": 6,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "School-Level Teacher Voice and Conditions for Teacher",
@@ -63,7 +64,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-board-member-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Employment and Economic Development Governance for Board Member",
   "description": "As a board member serving on employment, pension, or economic development board in the public_observer system Operating at the workplace organizational functional layer I want independent analysis of labor, employment, and economic development decisions So that I can balance fiduciary duties with community and worker interests despite limited expertise",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Employment and Economic Development Governance for Board Member",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

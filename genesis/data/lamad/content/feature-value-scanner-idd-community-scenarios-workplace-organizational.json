@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace Inclusion and Organizational Participation",
   "description": "As an IDD community member with part-time employment I want to be valued as a real worker with genuine contributions So that I experience dignity, fair compensation, and meaningful work",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace Inclusion and Organizational Participation",

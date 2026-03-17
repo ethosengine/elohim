@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace/Organizational Layer Value Recognition for Student",
   "description": "As a student working part-time to support educational and basic needs Operating at the workplace/organizational governance layer I want fair treatment, recognition of my constraints, and care economy awareness So that my work supports rather than undermines my development and well-being",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace/Organizational Layer Value Recognition for Student",

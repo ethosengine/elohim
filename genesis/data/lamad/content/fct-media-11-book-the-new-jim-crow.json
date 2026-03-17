@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-the-new-jim-crow",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The New Jim Crow",
   "description": "Book by Michelle Alexander",
   "content": "# The New Jim Crow\n\n**Author:** Michelle Alexander\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Michelle Alexander"
+    "author": "Michelle Alexander",
+    "originalContentType": "book"
   },
   "_contributor": "Michelle Alexander",
   "createdAt": "2025-11-28T21:10:19.220098",

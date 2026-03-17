@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-child-scenarios-family",
   "did": "did:web:elohim.host:content:social-medium:child:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Communication and Safety for Child",
   "description": "As a child in the social_medium system Operating at the family governance layer I want to communicate safely with my family and learn digital wisdom So that I can build healthy relationships while protected from harm",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Communication and Safety for Child",

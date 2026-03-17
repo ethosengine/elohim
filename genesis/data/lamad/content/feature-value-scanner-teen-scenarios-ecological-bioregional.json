@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the ecological/bioregional governance layer I want to understand how my consumption choices affect ecological systems So that I participate in bioregional care economy and extend stewardship to land, water, and future generations",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Teen",

@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-policy-maker-scenarios-nation-state",
   "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National-Level Policy Making for AI Governance",
   "description": "As a policy_maker in the governance system Operating at the nation_state governance layer I want to establish national framework for democratic AI governance So that protocol can flourish while integrating with national law and institutions",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National-Level Policy Making for AI Governance",

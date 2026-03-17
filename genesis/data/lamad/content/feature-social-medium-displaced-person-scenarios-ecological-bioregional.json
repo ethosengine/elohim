@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Climate Displacement and Bioregional Coordination",
   "description": "As a displaced_person in the social_medium system Operating at the ecological_bioregional governance layer I want to maintain community cohesion despite climate displacement So that my community can support each other and coordinate across distance",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Climate Displacement and Bioregional Coordination",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

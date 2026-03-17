@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-proverbs-31-8-9",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Proverbs 31:8-9",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## Proverbs 31:8-9\n\n> Proverbs 31:8-9 - \"Open your mouth for the mute, for the rights of all who are destitute. Open your mouth, judge righteously, defend the rights of the poor and needy.\"\nProtecting Attention and Time:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224148",
   "updatedAt": "2025-12-24T03:05:26.031Z",

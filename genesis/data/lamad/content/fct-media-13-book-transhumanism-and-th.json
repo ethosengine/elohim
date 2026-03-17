@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-transhumanism-and-th",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Transhumanism and the Image of God",
   "description": "Book by Jacob Shatzer",
   "content": "# Transhumanism and the Image of God\n\n**Author:** Jacob Shatzer\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "Jacob Shatzer"
+    "author": "Jacob Shatzer",
+    "originalContentType": "book"
   },
   "_contributor": "Jacob Shatzer",
   "createdAt": "2025-11-28T21:10:19.225064",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-teacher-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Teacher Working Conditions and Labor Rights for Teacher",
   "description": "As a teacher in the public_observer system Operating at the workplace_organizational governance layer I want transparency and advocacy power for working conditions So that teaching becomes sustainable and professionally respected work",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher Working Conditions and Labor Rights for Teacher",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

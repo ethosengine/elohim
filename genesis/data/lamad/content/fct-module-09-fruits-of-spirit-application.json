@@ -1,6 +1,6 @@
 {
   "id": "fct-module-09-fruits-of-spirit-application",
-  "contentType": "practice",
+  "contentType": "exercise",
   "title": "Application: Centering Values: Fruits of the Spirit",
   "description": "Practical application and action steps",
   "content": "**Instructions:** To implement these measures, the church might:  \nDevelop a \"Fruit of the Spirit\" assessment tool for individual and communal reflection.  \nCreate small groups focused on cultivating specific fruits.  \nImplement a mentoring program pairing mature believers with newer ones.  \nRedesign church programs to intentionally foster these fruits.  \nPartner with local organizations to measure community impact.  \nUse technology to facilitate connection, accountability, and growth in these areas.\n\nThis approach would require a significant shift from typical suburban church metrics, focusing on qualitative growth and community impact rather than numbers and budgets. It would challenge members to live out their faith more intentionally and holistically, addressing the externalities of their lifestyles and consumption habits. The result could be a church that truly embodies the Fruits of the Spirit, making a tangible difference in individual lives and the broader community.\n**PracticeType:** application",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "fct-practice",
-    "sourceModule": "fct-module-09-fruits-of-spirit"
+    "sourceModule": "fct-module-09-fruits-of-spirit",
+    "originalContentType": "practice"
   },
   "createdAt": "2025-11-28T21:10:19.210675",
   "updatedAt": "2025-12-26T21:04:01.831Z",

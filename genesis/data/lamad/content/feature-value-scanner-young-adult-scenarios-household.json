@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Young Adult",
   "description": "As a young adult managing my first independent household Operating at the household governance layer I want to coordinate shared resources and responsibilities effectively So that I build sustainable household management practices",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Young Adult",

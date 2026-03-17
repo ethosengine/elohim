@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace Care Economy and Worker Advocacy",
   "description": "As a worker in an employment relationship I need tools for understanding my rights and advocating for care-aligned workplace conditions So that my workplace respects my dignity and enables my capacity for care and flourishing",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace Care Economy and Worker Advocacy",

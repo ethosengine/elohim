@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-researcher-scenarios-national",
   "did": "did:web:elohim.host:content:governance:researcher:scenarios:national",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National Governance for Researcher",
   "description": "As a researcher in the governance system Operating at the national governance layer I want to conduct longitudinal research on democratic AI governance So that long-term effects and transformations are rigorously documented",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National Governance for Researcher",

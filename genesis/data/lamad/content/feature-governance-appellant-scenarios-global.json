@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-global",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Global Governance for Appellant",
   "description": "As an appellant in the governance system Operating at the global governance layer I want participation in humanity's constitutional evolution So that lived experience of dignity violations shapes universal principles",
@@ -33,7 +33,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 9
+    "scenarioCount": 9,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Global Governance for Appellant",

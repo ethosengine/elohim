@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Environmental Wisdom for Elderly",
   "description": "As an elderly person in the value scanner system Operating at the ecological/bioregional governance layer I want to contribute my accumulated environmental knowledge So that my lifetime of observation informs ecological stewardship",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Environmental Wisdom for Elderly",

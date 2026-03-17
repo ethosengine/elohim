@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Care Coordination for Workers",
   "description": "As a worker living in a shared household I need to coordinate care work fairly with roommates So that household responsibilities don't overwhelm me on top of employment demands",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Care Coordination for Workers",

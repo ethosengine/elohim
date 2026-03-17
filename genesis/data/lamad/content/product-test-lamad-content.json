@@ -1,7 +1,7 @@
 {
   "id": "product-test-lamad-content",
   "did": "did:elohim:product-test-lamad-content",
-  "contentType": "feature",
+  "contentType": "scenario",
   "contentFormat": "gherkin",
   "title": "Lamad Content Display Product Tests",
   "description": "BDD product tests validating content loading and display in the Lamad learning system",
@@ -19,7 +19,8 @@
     "category": "lamad",
     "testType": "product",
     "scenarioCount": 6,
-    "priority": "critical"
+    "priority": "critical",
+    "originalContentType": "feature"
   },
   "openGraph": {
     "title": "Lamad Content Display Product Tests",
@@ -34,7 +35,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

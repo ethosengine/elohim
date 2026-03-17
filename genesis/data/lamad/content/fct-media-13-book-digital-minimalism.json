@@ -1,6 +1,6 @@
 {
   "id": "fct-media-13-book-digital-minimalism",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Digital Minimalism",
   "description": "Book by Cal Newport",
   "content": "# Digital Minimalism\n\n**Author:** Cal Newport\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-14-ready-to-act",
     "mediaType": "book",
-    "author": "Cal Newport"
+    "author": "Cal Newport",
+    "originalContentType": "book"
   },
   "_contributor": "Cal Newport",
   "createdAt": "2025-11-28T21:10:19.224945",

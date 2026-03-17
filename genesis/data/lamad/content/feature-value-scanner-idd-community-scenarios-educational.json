@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Lifelong Learning and Educational Participation",
   "description": "As an IDD community member I want to continue learning and growing throughout my life So that I can develop new skills, pursue interests, and experience ongoing growth",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Lifelong Learning and Educational Participation",

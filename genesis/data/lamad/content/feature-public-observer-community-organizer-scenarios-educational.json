@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-community-organizer-scenarios-educational",
   "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Education Justice Organizing for Community Organizer",
   "description": "As a community organizer in the public_observer system Operating at the educational functional layer I want to organize communities for equitable education access and quality So that all students receive resources and opportunities regardless of neighborhood or background",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Education Justice Organizing for Community Organizer",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

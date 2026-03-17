@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-matthew-14-22-31",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Matthew 14:22-31",
   "description": "Scripture reference used in FCT Module 1",
   "content": "## Matthew 14:22-31\n\n> Matthew 14:22-31 s  But Jesus immediately said to them: “Take courage\\! It is I. Don’t be afraid.”\n“Lord, if it’s you,” Peter replied, “tell me to come to you on the water.” “Come,” he said.\nThen Peter got down out of the boat, walked on the water and came toward Jesus. But when he saw the wind, he was afraid and, beginning to sink, cried out, “Lord, save me\\!” Immediately Jesus reached out his hand and caught him. “You of little faith,” he said, “why did you doubt?”\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-01-church-dilemma",
-    "thematicContext": "The Church Dilemma"
+    "thematicContext": "The Church Dilemma",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.181638",
   "updatedAt": "2025-12-24T03:05:25.996Z",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-activist-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Labor Justice Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the workplace_organizational governance layer I want to fight for worker protections and living wages So that economic justice becomes civic policy priority",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Labor Justice Advocacy for Activist",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

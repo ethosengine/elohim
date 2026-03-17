@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-commons-transition-commons-transition-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:commons-transition-commons-transition:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Commons Transition showcases practical experiences and policy proposals for a more humane and environmentally grounded mode of societal organization.",
@@ -39,7 +39,8 @@
         "inspiration": "[How Commons Transition - Commons Transition inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

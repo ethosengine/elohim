@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-vulnerable-temporary-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Care Economy Participation During Temporary Vulnerability",
   "description": "As a person experiencing temporary vulnerability I want to participate in community care economy as both recipient and contributor So that I receive dignified support while maintaining agency and building toward stability",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Care Economy Participation During Temporary Vulnerability",

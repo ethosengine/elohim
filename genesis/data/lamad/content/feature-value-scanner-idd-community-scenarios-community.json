@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-idd-community-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Engagement and IDD Peer Support",
   "description": "As an IDD community member I want to connect with IDD peers and participate in broader community life So that I experience belonging, mutual support, and valued community participation",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Engagement and IDD Peer Support",

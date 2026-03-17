@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-researcher-scenarios-nation-state",
   "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National-Level Governance Research for Researcher",
   "description": "As a researcher in the governance system Operating at the national governance layer I want to analyze governance patterns affecting entire nations So that I can inform national policy and understand democratic AI at scale",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National-Level Governance Research for Researcher",

@@ -1,7 +1,7 @@
 {
   "id": "autonomous-entity-organizations-design-justice-network-readme",
   "did": "did:web:elohim.host:content:autonomous-entity:organizations:design-justice-network:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Design justice rethinks design processes, centers people who are normally marginalized by design, and uses collaborative, creative practices to address the deepest challenges our communities face.",
@@ -39,7 +39,8 @@
         "inspiration": "[How Design Justice Network inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-journalist-scenarios-community",
   "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Hyperlocal Journalism for Journalist",
   "description": "As a journalist in the public_observer system Operating at the community governance layer I want comprehensive neighborhood surveillance infrastructure So that hyperlocal journalism can exist despite resource constraints",
@@ -30,7 +30,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 6
+    "scenarioCount": 6,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Hyperlocal Journalism for Journalist",
@@ -63,7 +64,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

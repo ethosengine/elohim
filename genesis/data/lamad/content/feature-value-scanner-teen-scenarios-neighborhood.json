@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the neighborhood governance layer I want to participate actively in neighborhood-level care patterns So that I learn how communities function and contribute to collective neighborhood flourishing",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Teen",

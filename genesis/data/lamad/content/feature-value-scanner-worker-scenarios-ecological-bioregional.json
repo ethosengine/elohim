@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological and Bioregional Care Work for Workers in Food Systems",
   "description": "As a worker in food preparation and service I need to understand and participate in ecological care within food systems So that my labor contributes to bioregional food sovereignty and environmental flourishing",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological and Bioregional Care Work for Workers in Food Systems",

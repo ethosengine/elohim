@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Adult",
   "description": "As an adult in the sandwich generation Operating at the family governance layer I want to coordinate care across multiple generations So that care flows effectively upward, downward, inward, and outward",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Adult",

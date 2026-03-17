@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-grandparent-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Grandparent",
   "description": "As a retired grandparent with time and skills to contribute Operating at the community governance layer I want my community care contributions to be recognized and valued So that retirement is experienced as liberation for community service",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Grandparent",

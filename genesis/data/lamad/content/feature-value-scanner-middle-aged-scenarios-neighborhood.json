@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-middle-aged-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Middle-Aged Adult",
   "description": "As a middle-aged adult in the value scanner system Operating at the neighborhood governance layer I want to participate in neighborhood care economy and mutual support So that I build local resilience, share resources, and strengthen community ties",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Middle-Aged Adult",

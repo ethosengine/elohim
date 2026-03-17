@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-politician-scenarios-district",
   "did": "did:web:elohim.host:content:public-observer:politician:scenarios:district",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "School District Governance for Elected Representative",
   "description": "As a politician in the public_observer system Operating at the district governance layer I want to understand district operations and community needs So that I can govern complex education systems serving thousands of children effectively",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "School District Governance for Elected Representative",
@@ -67,7 +68,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

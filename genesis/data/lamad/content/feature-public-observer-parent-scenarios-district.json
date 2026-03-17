@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-parent-scenarios-district",
   "did": "did:web:elohim.host:content:public-observer:parent:scenarios:district",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "School District Parent Advocacy",
   "description": "As a parent in the public_observer system Operating at the district governance layer I want to influence district decisions affecting my children's education So that resource allocation and policies serve student wellbeing not bureaucratic convenience",
@@ -33,7 +33,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 9
+    "scenarioCount": 9,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "School District Parent Advocacy",
@@ -66,7 +67,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

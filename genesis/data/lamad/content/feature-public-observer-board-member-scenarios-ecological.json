@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-board-member-scenarios-ecological",
   "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:ecological",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Environmental and Planning Governance for Board Member",
   "description": "As a board member serving on planning commission or environmental board in the public_observer system Operating at the ecological functional layer I want independent environmental analysis and sustainability expertise So that I can make informed decisions on development and environmental impacts despite lacking technical expertise",
@@ -33,7 +33,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 9
+    "scenarioCount": 9,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental and Planning Governance for Board Member",
@@ -66,7 +67,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

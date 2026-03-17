@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Adult",
   "description": "As an adult participating in community governance Operating at the community governance layer I want my care contributions to create community resilience So that community resources and leadership reflect demonstrated care work",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Adult",

@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-genesis-1-26-28",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Genesis 1:26-28",
   "description": "Scripture reference used in FCT Module 11",
   "content": "## Genesis 1:26-28\n\n> Genesis 1:26-28 - Humans created in God's image and given stewardship\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-11-collaboration-sensemaking",
-    "thematicContext": "Creating Shared Understanding: Collaboration"
+    "thematicContext": "Creating Shared Understanding: Collaboration",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.215060",
   "updatedAt": "2025-12-24T03:05:25.964Z",

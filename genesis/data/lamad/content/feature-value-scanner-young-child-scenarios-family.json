@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-child-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Young Child",
   "description": "As a young child in the value scanner system Operating at the family governance layer I want my care contributions to be visible to my family So that I am recognized as a valued contributor to family flourishing",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Young Child",

@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-forward-labs-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:forward-labs:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
@@ -39,7 +39,8 @@
         "inspiration": "[How Forward Labs inspires the social_medium epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -70,7 +71,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

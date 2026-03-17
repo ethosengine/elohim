@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-citizen-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Civic Democracy for Citizen",
   "description": "As a citizen in the public_observer system Operating at the municipality governance layer I want to engage meaningfully with city decisions without policy expertise So that democracy works for working people with limited time",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Civic Democracy for Citizen",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

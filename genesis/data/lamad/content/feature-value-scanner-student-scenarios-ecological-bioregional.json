@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-ecological-bioregional",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Ecological/Bioregional Layer Value Recognition for Student",
   "description": "As a student studying environmental science and developing ecological awareness Operating at the ecological/bioregional governance layer I want to connect personal choices to planetary care and understand ecological stewardship So that I develop integrated care economy practice from individual to planetary scale",
@@ -38,7 +38,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 14
+    "scenarioCount": 14,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological/Bioregional Layer Value Recognition for Student",

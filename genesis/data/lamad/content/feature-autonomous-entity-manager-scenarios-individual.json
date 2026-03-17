@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-manager-scenarios-individual",
   "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Liberation and Purpose for Manager",
   "description": "As a manager in the autonomous_entity system Operating at the individual governance layer I want liberation from extraction role and meaningful purpose So that I serve rather than dominate, coordinate rather than control",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Liberation and Purpose for Manager",

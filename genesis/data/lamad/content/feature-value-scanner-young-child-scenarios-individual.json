@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-child-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Young Child",
   "description": "As a young child (ages 5-7) in the value scanner system Operating at the individual governance layer I want my personal choices and care contributions to be recognized So that I learn that my agency matters and care creates value",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Young Child",

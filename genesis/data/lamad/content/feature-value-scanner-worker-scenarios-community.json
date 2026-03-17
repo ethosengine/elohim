@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-worker-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Care Economy Participation for Workers",
   "description": "As a worker serving community through my labor I need to participate in community care economy as both contributor and recipient So that I receive recognition and support proportional to my care contributions",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Care Economy Participation for Workers",

@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-young-adult-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Layer Value Literacy for Young Adult",
   "description": "As a young adult continuing my education and development Operating at the educational governance layer I want to learn practical life skills and develop capabilities So that I build competence for lifelong flourishing",
@@ -38,7 +38,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 14
+    "scenarioCount": 14,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Layer Value Literacy for Young Adult",

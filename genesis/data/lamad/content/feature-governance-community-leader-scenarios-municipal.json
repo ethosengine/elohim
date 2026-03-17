@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-community-leader-scenarios-municipal",
   "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Governance for Community Leader",
   "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate across Riverside neighborhoods for citywide flourishing So that diverse neighborhood needs are balanced within shared infrastructure",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Governance for Community Leader",

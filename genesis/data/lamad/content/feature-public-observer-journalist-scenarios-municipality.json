@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-journalist-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "City Hall Accountability Journalism for Journalist",
   "description": "As a journalist in the public_observer system Operating at the municipality governance layer I want comprehensive civic surveillance across all municipal bodies So that accountability journalism survives despite newsroom cuts",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "City Hall Accountability Journalism for Journalist",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

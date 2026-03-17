@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Labor and Worker Organizing for Community Organizer",
   "description": "As a community organizer in the public_observer system Operating at the workplace_organizational functional layer I want to build worker power and worker-community coalitions for economic justice So that civic policy prioritizes living wages, workplace protections, and worker voice",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Labor and Worker Organizing for Community Organizer",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

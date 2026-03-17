@@ -1,6 +1,6 @@
 {
   "id": "fct-contributor-richard-rothstein",
-  "contentType": "contributor",
+  "contentType": "resource",
   "title": "Richard Rothstein",
   "description": "Author, speaker, or creator referenced in FCT",
   "content": "# Richard Rothstein\n\n**Role:** author\n\n**Works:** The Color of Law\n\n",
@@ -17,7 +17,8 @@
   ],
   "metadata": {
     "category": "contributor",
-    "sourceModule": "fct-module-12-fairness-justice"
+    "sourceModule": "fct-module-12-fairness-justice",
+    "originalContentType": "contributor"
   },
   "createdAt": "2025-11-28T21:10:19.219751",
   "updatedAt": "2025-12-24T03:05:26.078Z",

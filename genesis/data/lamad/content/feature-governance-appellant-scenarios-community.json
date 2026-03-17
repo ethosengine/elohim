@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-appellant-scenarios-community",
   "did": "did:web:elohim.host:content:governance:appellant:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community-Level Appeal Process for Appellant",
   "description": "As an appellant in the governance system Operating at the community governance layer I want rapid, accessible appeals for Community Elohim decisions So that local governance remains responsive and accountable to community members",
@@ -35,7 +35,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 11
+    "scenarioCount": 11,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community-Level Appeal Process for Appellant",

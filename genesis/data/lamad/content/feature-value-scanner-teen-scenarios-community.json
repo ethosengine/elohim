@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the community governance layer I want to be recognized as a full participant in community care economy So that I access resources based on contribution and build relationships with community institutions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Teen",

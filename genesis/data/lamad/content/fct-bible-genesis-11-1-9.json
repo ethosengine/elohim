@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-genesis-11-1-9",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Genesis 11:1-9",
   "description": "Scripture reference used in FCT Module 3",
   "content": "## Genesis 11:1-9\n\n> Genesis 11:1-9 (The Tower of Babel): Illustrates the hubris of humanity in attempting to elevate themselves to the status of gods, only to be confounded by their own limitations. This story echoes Schmachtenberger's point about the need for wisdom and prudence to accompany power.\nThe Covenant and Moral Evolution:\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-03-problem-well-stated",
-    "thematicContext": "A Problem Well Stated"
+    "thematicContext": "A Problem Well Stated",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.195634",
   "updatedAt": "2025-12-24T03:05:25.964Z",

@@ -1,7 +1,7 @@
 {
   "id": "governance-video-climate-town-readme",
   "did": "did:web:elohim.host:content:governance:video:climate-town:readme",
-  "contentType": "video",
+  "contentType": "resource",
   "activityPubType": "Video",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn’t make you want to eat a cyanide pill. Get informed about the climate crisis before the weather does it for you.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Climate Town inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "video"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

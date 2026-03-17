@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-teen-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace/Organizational Layer Value Recognition for Teen",
   "description": "As a teen in the value scanner system Operating at the workplace/organizational governance layer I want my paid work recognized as care labor with fair compensation and healthy conditions So that I learn to recognize my rights as a worker and expect all work to operate on care economy principles",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace/Organizational Layer Value Recognition for Teen",

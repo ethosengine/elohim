@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-1-kings-3-16-28",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "1 Kings 3:16-28",
   "description": "Scripture reference used in FCT Module 4",
   "content": "## 1 Kings 3:16-28\n\n> The Wisdom of Solomon (1 Kings 3:16-28) - Solomon's wise judgment demonstrates the value of discernment and understanding, qualities that are essential in developing and implementing technology for the greater good.\nElevating Moral and Ethical Values\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-04-scaling-wisdom",
-    "thematicContext": "Setting the Stage: Scaling Wisdom"
+    "thematicContext": "Setting the Stage: Scaling Wisdom",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.196590",
   "updatedAt": "2025-12-24T03:05:25.907Z",

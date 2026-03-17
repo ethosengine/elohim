@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-matthew-5-1-7",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Matthew 5:1-7",
   "description": "Scripture reference used in FCT Module 4",
   "content": "## Matthew 5:1-7\n\n> The Sermon on the Mount (Matthew 5-7) - This sermon by Jesus covers a wide range of teachings on righteousness, ethical behavior, and the importance of internal motives over external appearances, applicable in guiding the motives behind technological innovation.\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-04-scaling-wisdom",
-    "thematicContext": "Setting the Stage: Scaling Wisdom"
+    "thematicContext": "Setting the Stage: Scaling Wisdom",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.196624",
   "updatedAt": "2025-12-24T03:05:25.997Z",

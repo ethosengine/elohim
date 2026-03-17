@@ -1,6 +1,6 @@
 {
   "id": "fct-media-00-book-the-enigma-of-reason",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "The Enigma of Reason",
   "description": "Book by Hugo Mercier",
   "content": "# The Enigma of Reason\n\n**Author:** Hugo Mercier\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "knowledge-systems",
     "sourceModule": "fct-module-01-church-dilemma",
     "mediaType": "book",
-    "author": "Hugo Mercier"
+    "author": "Hugo Mercier",
+    "originalContentType": "book"
   },
   "_contributor": "Hugo Mercier",
   "createdAt": "2025-11-28T21:10:19.190364",

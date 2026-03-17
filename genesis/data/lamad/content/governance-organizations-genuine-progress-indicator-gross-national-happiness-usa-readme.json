@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-genuine-progress-indicator-gross-national-happiness-usa-readme",
   "did": "did:web:elohim.host:content:governance:organizations:genuine-progress-indicator-gross-national-happiness-usa:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Genuine Progress Indicator takes into account the well-being of a nation by incorporating environmental and social factors which are not measured by GDP.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Genuine Progress Indicator - Gross National Happiness USA inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

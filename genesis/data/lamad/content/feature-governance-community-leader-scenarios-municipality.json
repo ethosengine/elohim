@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-community-leader-scenarios-municipality",
   "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal-Level Governance Coordination for Community Leader",
   "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate protocol across neighborhoods within the city So that different areas can collaborate while respecting local differences",
@@ -38,7 +38,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 14
+    "scenarioCount": 14,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal-Level Governance Coordination for Community Leader",

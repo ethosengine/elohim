@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-elder-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Participation and Wisdom Sharing for Elder",
   "description": "As an elder in the social_medium system Operating at the neighborhood governance layer I want to participate in community life and share my experience So that I remain engaged, valued, and connected while contributing wisdom",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Participation and Wisdom Sharing for Elder",

@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-activist-scenarios-provincial-state",
   "did": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "State-Level Policy Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the provincial_state governance layer I want to connect local struggles to state policy solutions So that structural barriers can be addressed at appropriate scale",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "State-Level Policy Advocacy for Activist",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

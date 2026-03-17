@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-technical-expert-scenarios-nation-state",
   "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "National-Level Technical Expertise for Constitutional Governance",
   "description": "As a technical_expert in the governance system Operating at the nation_state governance layer I want to advise on national constitutional questions involving technical complexity So that democratic governance of AI is informed by technical reality",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "National-Level Technical Expertise for Constitutional Governance",

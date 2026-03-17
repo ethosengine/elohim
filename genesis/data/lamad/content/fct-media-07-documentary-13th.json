@@ -1,6 +1,6 @@
 {
   "id": "fct-media-07-documentary-13th",
-  "contentType": "documentary",
+  "contentType": "resource",
   "title": "13th",
   "description": "13th (2016)",
   "content": "# 13th\n",
@@ -18,7 +18,8 @@
     "category": "fct-media",
     "sourceModule": "fct-module-08-centering-love",
     "mediaType": "documentary",
-    "year": "2016"
+    "year": "2016",
+    "originalContentType": "documentary"
   },
   "_organization": null,
   "createdAt": "2025-11-28T21:10:19.209894",

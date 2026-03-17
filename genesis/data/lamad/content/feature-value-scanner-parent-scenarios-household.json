@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-parent-scenarios-household",
   "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Household Layer Value Recognition for Parent",
   "description": "As a parent managing most household care labor Operating at the household governance layer I want equitable partnership and fair labor distribution So that household care is shared and all contributions are valued",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Household Layer Value Recognition for Parent",

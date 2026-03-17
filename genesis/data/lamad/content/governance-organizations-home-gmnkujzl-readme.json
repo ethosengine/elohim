@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-home-gmnkujzl-readme",
   "did": "did:web:elohim.host:content:governance:organizations:home-gmnkujzl:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "We are Mobius, a home for people creating Liberatory Technology products, systems and narratives.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Home inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

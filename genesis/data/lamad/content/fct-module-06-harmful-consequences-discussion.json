@@ -1,6 +1,6 @@
 {
   "id": "fct-module-06-harmful-consequences-discussion",
-  "contentType": "activity",
+  "contentType": "exercise",
   "title": "Discussion: Minimizing Harmful Consequences",
   "description": "Group discussion and reflection activity",
   "content": "**Instructions:** Identifying Externalities Worksheet\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "fct-activity",
     "sourceModule": "fct-module-06-harmful-consequences",
-    "activityType": "discussion"
+    "activityType": "discussion",
+    "originalContentType": "activity"
   },
   "createdAt": "2025-11-28T21:10:19.206992",
   "updatedAt": "2025-12-24T03:05:26.192Z",

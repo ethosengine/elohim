@@ -1,7 +1,7 @@
 {
   "id": "feature-social-medium-refugee-scenarios-global",
   "did": "did:web:elohim.host:content:social-medium:refugee:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Cross-Border Connection and Protection for Refugee",
   "description": "As a refugee in the social_medium system Operating at the global governance layer I want to maintain connection with family and culture across borders So that I can preserve relationships and identity despite forced displacement",
@@ -28,7 +28,8 @@
   "metadata": {
     "category": "social-medium",
     "epic": "social_medium",
-    "scenarioCount": 4
+    "scenarioCount": 4,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Cross-Border Connection and Protection for Refugee",
@@ -61,7 +62,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

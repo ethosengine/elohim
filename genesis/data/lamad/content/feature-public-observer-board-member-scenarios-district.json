@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-board-member-scenarios-district",
   "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:district",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "District Governance for Board Member",
   "description": "As a board member serving on a district board in the public_observer system Operating at the district governance layer I want independent analysis and accessible expertise for district-wide decisions So that I can exercise informed judgment on consequential policies affecting thousands of constituents",
@@ -31,7 +31,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 7
+    "scenarioCount": 7,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "District Governance for Board Member",
@@ -64,7 +65,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

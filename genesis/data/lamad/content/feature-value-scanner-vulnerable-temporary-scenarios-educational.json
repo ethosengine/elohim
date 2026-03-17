@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
   "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Educational Coordination and Advocacy During Temporary Vulnerability",
   "description": "As a parent navigating crisis while coordinating children's education I want tools to maintain educational continuity and access support services So that my children's education doesn't suffer due to our temporary circumstances",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": null,
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational Coordination and Advocacy During Temporary Vulnerability",

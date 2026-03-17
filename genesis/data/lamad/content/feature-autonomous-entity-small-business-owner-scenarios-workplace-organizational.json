@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Democratic Transition and Knowledge Transfer for Small Business Owner",
   "description": "As a small_business_owner in the autonomous_entity system Operating at the workplace_organizational governance layer I want to facilitate workers' transition to democratic ownership with dignity So that my legacy becomes community institution and workers gain autonomy",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic Transition and Knowledge Transfer for Small Business Owner",

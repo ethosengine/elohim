@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Adult",
   "description": "As an adult in prime working/parenting years (ages 26-45) Operating at the individual governance layer I want my personal choices and care contributions to be recognized So that I can maintain my own flourishing while caring for others",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Adult",

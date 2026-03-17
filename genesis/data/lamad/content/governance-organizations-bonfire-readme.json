@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-bonfire-readme",
   "did": "did:web:elohim.host:content:governance:organizations:bonfire:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "A federated social network for individuals and communities to design, operate and control their own digital lives.",
@@ -45,7 +45,8 @@
         "inspiration": "[How Bonfire inspires the value_scanner epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

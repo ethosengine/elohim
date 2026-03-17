@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-democracy-earth-foundation-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:democracy-earth-foundation:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Tools for a borderless democracy. For everyone, anywhere.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Democracy Earth Foundation inspires the public_observer epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

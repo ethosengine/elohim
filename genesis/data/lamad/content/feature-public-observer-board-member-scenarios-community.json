@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-board-member-scenarios-community",
   "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Board Governance for Board Member",
   "description": "As a board member serving on a community or neighborhood board in the public_observer system Operating at the community governance layer I want hyperlocal data and community input to inform decisions So that I can represent diverse neighborhood interests and connect local needs to broader governance",
@@ -32,7 +32,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 8
+    "scenarioCount": 8,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Board Governance for Board Member",
@@ -65,7 +66,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

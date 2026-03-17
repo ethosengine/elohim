@@ -1,7 +1,7 @@
 {
   "id": "feature-autonomous-entity-manager-scenarios-community",
   "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Service and Accountability for Manager",
   "description": "As a manager in the autonomous_entity system Operating at the community governance layer I want to serve community needs through workplace coordination So that ChickenMax functions as community institution, not extraction site",
@@ -34,7 +34,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "epic": "autonomous_entity",
-    "scenarioCount": 10
+    "scenarioCount": 10,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Service and Accountability for Manager",

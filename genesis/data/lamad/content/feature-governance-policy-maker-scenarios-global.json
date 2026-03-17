@@ -1,7 +1,7 @@
 {
   "id": "feature-governance-policy-maker-scenarios-global",
   "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:global",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Global-Level Policy Making for AI Governance",
   "description": "As a policy_maker in the governance system Operating at the global governance layer I want to participate in international AI governance frameworks So that democratic governance can flourish globally and resist authoritarian capture",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "governance",
     "epic": "governance",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Global-Level Policy Making for AI Governance",

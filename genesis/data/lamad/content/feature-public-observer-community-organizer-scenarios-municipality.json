@@ -1,7 +1,7 @@
 {
   "id": "feature-public-observer-community-organizer-scenarios-municipality",
   "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Municipal Coalition Building for Community Organizer",
   "description": "As a community organizer in the public_observer system Operating at the municipality governance layer I want to mobilize multi-community coalitions for citywide policy campaigns So that collective power holds municipal government accountable to residents",
@@ -29,7 +29,8 @@
   "metadata": {
     "category": "public-observer",
     "epic": "public_observer",
-    "scenarioCount": 5
+    "scenarioCount": 5,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Coalition Building for Community Organizer",
@@ -62,7 +63,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

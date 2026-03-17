@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-adult-scenarios-neighborhood",
   "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Neighborhood Layer Value Recognition for Adult",
   "description": "As an adult participating in neighborhood care economy Operating at the neighborhood governance layer I want to engage in resource sharing and mutual aid So that neighborhood resilience is built through visible care contributions",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood Layer Value Recognition for Adult",

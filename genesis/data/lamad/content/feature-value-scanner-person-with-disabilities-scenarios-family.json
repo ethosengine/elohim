@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-person-with-disabilities-scenarios-family",
   "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Family Layer Value Recognition for Person with Disabilities",
   "description": "As a person with disabilities participating in family relationships Operating at the family governance layer I want my autonomy respected and my contributions recognized within family So that I can engage as a full adult family member, not as dependent child or burden",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Family Layer Value Recognition for Person with Disabilities",

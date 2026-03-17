@@ -1,6 +1,6 @@
 {
   "id": "fct-bible-acts-4-32-35",
-  "contentType": "bible-verse",
+  "contentType": "reference",
   "title": "Acts 4:32-35",
   "description": "Scripture reference used in FCT Module 13",
   "content": "## Acts 4:32-35\n\n> Acts 4:32-35 - \"Now the full number of those who believed were of one heart and soul, and no one said that any of the things that belonged to him was his own, but they had everything in common...\"\n\n*ESV Translation*\n",
@@ -19,7 +19,8 @@
   "metadata": {
     "category": "scripture",
     "sourceModule": "fct-module-13-helping-thrive",
-    "thematicContext": "Helping People Thrive"
+    "thematicContext": "Helping People Thrive",
+    "originalContentType": "bible-verse"
   },
   "createdAt": "2025-11-28T21:10:19.224140",
   "updatedAt": "2025-12-24T03:05:25.930Z",

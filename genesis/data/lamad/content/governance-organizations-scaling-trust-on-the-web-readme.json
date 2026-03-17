@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-scaling-trust-on-the-web-readme",
   "did": "did:web:elohim.host:content:governance:organizations:scaling-trust-on-the-web:readme",
-  "contentType": "organization",
+  "contentType": "resource",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Task Force for a Trustworthy Future Web’s report captures analysis of the systems gaps and critical opportunities that will define how the next generation of online spaces will be constructed.",
@@ -31,7 +31,8 @@
         "inspiration": "[How Scaling trust on the web inspires the governance epic]",
         "parallel_work": []
       }
-    }
+    },
+    "originalContentType": "organization"
   },
   "openGraphMetadata": {
     "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",

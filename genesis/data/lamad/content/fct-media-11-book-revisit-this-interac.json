@@ -1,6 +1,6 @@
 {
   "id": "fct-media-11-book-revisit-this-interac",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Revisit this interactive demonstration",
   "description": "Book by Vi Hart",
   "content": "# Revisit this interactive demonstration\n\n**Author:** Vi Hart\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "algorithmic-bias",
     "sourceModule": "fct-module-12-fairness-justice",
     "mediaType": "book",
-    "author": "Vi Hart"
+    "author": "Vi Hart",
+    "originalContentType": "book"
   },
   "_contributor": "Vi Hart",
   "createdAt": "2025-11-28T21:10:19.219669",

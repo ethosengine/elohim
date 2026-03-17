@@ -1,6 +1,6 @@
 {
   "id": "fct-media-00-book-deep-work",
-  "contentType": "book",
+  "contentType": "resource",
   "title": "Deep Work",
   "description": "Book by Cal Newport",
   "content": "# Deep Work\n\n**Author:** Cal Newport\n**Format:** book",
@@ -18,7 +18,8 @@
     "category": "deep-thinking",
     "sourceModule": "fct-module-01-church-dilemma",
     "mediaType": "book",
-    "author": "Cal Newport"
+    "author": "Cal Newport",
+    "originalContentType": "book"
   },
   "_contributor": "Cal Newport",
   "createdAt": "2025-11-28T21:10:19.190460",

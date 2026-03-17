@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
   "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Workplace/Organizational Layer Value Recognition for Single Parent",
   "description": "As a single parent worker managing impossible work-care conflicts Operating at the workplace/organizational governance layer I want workplace policies that recognize single parents' realities and constraints So that I can sustain employment while providing sole care for my children",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace/Organizational Layer Value Recognition for Single Parent",

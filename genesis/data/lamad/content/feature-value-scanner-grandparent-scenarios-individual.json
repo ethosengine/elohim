@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-grandparent-scenarios-individual",
   "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Individual Layer Value Recognition for Grandparent",
   "description": "As a grandparent providing substantial care work across generations Operating at the individual governance layer I want my autonomy, identity, and care contributions to be recognized So that my grandparenting is valued as sophisticated work, not just leisure",
@@ -36,7 +36,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 12
+    "scenarioCount": 12,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual Layer Value Recognition for Grandparent",

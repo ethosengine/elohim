@@ -1,7 +1,7 @@
 {
   "id": "feature-value-scanner-student-scenarios-community",
   "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community",
-  "contentType": "feature",
+  "contentType": "scenario",
   "activityPubType": "Article",
   "title": "Community Layer Value Recognition for Student",
   "description": "As a student building care networks in temporary community Operating at the community governance layer I want to participate in student mutual aid and broader community care economy So that I develop reciprocal relationships that provide support and teach community building",
@@ -37,7 +37,8 @@
   "metadata": {
     "category": "value-scanner",
     "epic": "value_scanner",
-    "scenarioCount": 13
+    "scenarioCount": 13,
+    "originalContentType": "feature"
   },
   "openGraphMetadata": {
     "ogTitle": "Community Layer Value Recognition for Student",
