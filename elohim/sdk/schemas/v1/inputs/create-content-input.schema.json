@@ -1,0 +1,25 @@
+{
+  "$id": "epr:schema:input:create-content",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateContentInput",
+  "description": "Input for creating content records. Must match Rust CreateContentInputView in views.rs.",
+  "type": "object",
+  "required": ["id", "title"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "description": "Unique content identifier" },
+    "title": { "type": "string", "minLength": 1, "description": "Display title" },
+    "schemaVersion": { "type": "integer", "default": 1, "description": "Schema version for migration tracking" },
+    "description": { "type": "string", "description": "Brief summary" },
+    "contentType": { "$ref": "../enums/content-type.schema.json", "description": "Semantic content category" },
+    "contentFormat": { "$ref": "../enums/content-format.schema.json", "description": "Rendering format hint" },
+    "contentBody": { "type": "string", "description": "Full content body" },
+    "blobHash": { "type": "string", "description": "SHA-256 hash of associated blob" },
+    "blobCid": { "type": "string", "description": "CIDv1 content address of associated blob" },
+    "contentSizeBytes": { "type": "integer", "description": "Size of content/blob in bytes" },
+    "metadata": { "type": "object", "description": "Domain-specific metadata" },
+    "reach": { "$ref": "../enums/reach.schema.json", "description": "Visibility/access level" },
+    "createdBy": { "type": "string", "description": "Creator agent ID" },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Categorization tags" }
+  },
+  "additionalProperties": false
+}
