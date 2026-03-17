@@ -7,6 +7,8 @@ import {
   GovernanceSignalService,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 
 import { GraduatedFeedbackComponent, FeedbackContext } from './graduated-feedback.component';
 import { vi } from 'vitest';
@@ -15,6 +17,8 @@ describe('GraduatedFeedbackComponent', () => {
   let component: GraduatedFeedbackComponent;
   let fixture: ComponentFixture<GraduatedFeedbackComponent>;
   let mockSignalService: any;
+  let mockGovernanceApi: any;
+  let mockGovernanceRecognition: any;
   let signalChanges$: Subject<any>;
 
   const mockStats: FeedbackStats = {
@@ -41,14 +45,27 @@ describe('GraduatedFeedbackComponent', () => {
     mockSignalService.getFeedbackStats.mockReturnValue(of(mockStats));
     mockSignalService.recordGraduatedFeedback.mockReturnValue(of(true));
 
+    mockGovernanceApi = {
+      recordSignal: vi.fn().mockResolvedValue(undefined),
+      getSignals: vi.fn().mockResolvedValue([]),
+    };
+
+    mockGovernanceRecognition = {
+      recordParticipation: vi.fn().mockResolvedValue(undefined),
+    };
+
     await TestBed.configureTestingModule({
       imports: [GraduatedFeedbackComponent, FormsModule],
-      providers: [{ provide: GovernanceSignalService, useValue: mockSignalService }],
+      providers: [
+        { provide: GovernanceSignalService, useValue: mockSignalService },
+        { provide: GovernanceApiService, useValue: mockGovernanceApi },
+        { provide: GovernanceRecognitionService, useValue: mockGovernanceRecognition },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(GraduatedFeedbackComponent);
     component = fixture.componentInstance;
-    component.contentId = 'content-1';
+    fixture.componentRef.setInput('contentId', 'content-1');
   });
 
   afterEach(() => {
@@ -61,7 +78,7 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('initialization', () => {
     it('should have default context as usefulness', () => {
-      expect(component.context).toBe('usefulness');
+      expect(component.context()).toBe('usefulness');
     });
 
     it('should have default intensity of 5', () => {
@@ -73,7 +90,7 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should load stats when showAggregates is true', fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
 
@@ -82,7 +99,7 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should not load stats when showAggregates is false', fakeAsync(() => {
-      component.showAggregates = false;
+      fixture.componentRef.setInput('showAggregates', false);
       fixture.detectChanges();
       tick();
 
@@ -120,15 +137,15 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('currentScale getter', () => {
     it('should return scale for current context', () => {
-      component.context = 'accuracy';
+      fixture.componentRef.setInput('context', 'accuracy');
       expect(component.currentScale.label).toContain('accurate');
     });
 
     it('should change when context changes', () => {
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('context', 'usefulness');
       const usefulnessLabel = component.currentScale.label;
 
-      component.context = 'clarity';
+      fixture.componentRef.setInput('context', 'clarity');
       const clarityLabel = component.currentScale.label;
 
       expect(usefulnessLabel).not.toBe(clarityLabel);
@@ -142,7 +159,7 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should return position data when selected', () => {
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('context', 'usefulness');
       component.selectedPosition = 0.5;
       expect(component.selectedPositionData?.label).toBe('Useful');
     });
@@ -150,20 +167,20 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('reasoningRequired getter', () => {
     it('should return true when requiresReasoning input is true', () => {
-      component.requiresReasoning = true;
+      fixture.componentRef.setInput('requiresReasoning', true);
       component.selectedPosition = 0.5;
       expect(component.reasoningRequired).toBe(true);
     });
 
     it('should return true for positions that require reasoning', () => {
-      component.context = 'proposal';
+      fixture.componentRef.setInput('context', 'proposal');
       component.selectedPosition = 0; // Block position requires reasoning
       expect(component.reasoningRequired).toBe(true);
     });
 
     it('should return false for normal positions', () => {
-      component.requiresReasoning = false;
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('requiresReasoning', false);
+      fixture.componentRef.setInput('context', 'usefulness');
       component.selectedPosition = 0.5;
       expect(component.reasoningRequired).toBe(false);
     });
@@ -176,20 +193,20 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should return true when position selected and no reasoning required', () => {
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('context', 'usefulness');
       component.selectedPosition = 0.5;
       expect(component.canSubmit).toBe(true);
     });
 
     it('should return false when reasoning required but empty', () => {
-      component.context = 'proposal';
+      fixture.componentRef.setInput('context', 'proposal');
       component.selectedPosition = 0; // Block
       component.reasoning = '';
       expect(component.canSubmit).toBe(false);
     });
 
     it('should return true when reasoning required and provided', () => {
-      component.context = 'proposal';
+      fixture.componentRef.setInput('context', 'proposal');
       component.selectedPosition = 0; // Block
       component.reasoning = 'My reasoning for blocking';
       expect(component.canSubmit).toBe(true);
@@ -205,7 +222,7 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should show reasoning field when position requires it', () => {
-      component.context = 'proposal';
+      fixture.componentRef.setInput('context', 'proposal');
       const blockPosition = component.currentScale.positions[0]; // Block
       component.selectPosition(blockPosition);
 
@@ -213,7 +230,7 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should show reasoning field when component requires it', () => {
-      component.requiresReasoning = true;
+      fixture.componentRef.setInput('requiresReasoning', true);
       const position = component.currentScale.positions[2];
       component.selectPosition(position);
 
@@ -249,7 +266,7 @@ describe('GraduatedFeedbackComponent', () => {
     });
 
     it('should submit feedback with correct data', fakeAsync(() => {
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('context', 'usefulness');
       component.selectedPosition = 0.5;
       component.intensity = 7;
       component.reasoning = 'Very helpful content';
@@ -270,7 +287,7 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should not include reasoning when empty', fakeAsync(() => {
-      component.context = 'usefulness';
+      fixture.componentRef.setInput('context', 'usefulness');
       component.selectedPosition = 0.5;
       component.reasoning = '   ';
 
@@ -303,7 +320,7 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should refresh stats on success', fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
 
@@ -348,7 +365,7 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('getDistributionWidth()', () => {
     beforeEach(fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
     }));
@@ -435,7 +452,7 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('signal changes subscription', () => {
     it('should refresh stats when relevant signal change occurs', fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
 
@@ -451,7 +468,7 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should not refresh for different content', fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
 
@@ -467,7 +484,7 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should not refresh for different signal type', fakeAsync(() => {
-      component.showAggregates = true;
+      fixture.componentRef.setInput('showAggregates', true);
       fixture.detectChanges();
       tick();
 

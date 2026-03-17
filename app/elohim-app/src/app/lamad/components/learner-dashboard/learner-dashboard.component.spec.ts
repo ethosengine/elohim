@@ -29,6 +29,16 @@ describe('LearnerDashboardComponent', () => {
   let profileSubject: BehaviorSubject<LearnerMasteryProfile | null>;
   let masterySubject: BehaviorSubject<ContentMastery[]>;
 
+  // Build dynamic dates relative to "today" so streak dots always fall within the last30Days window
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const twoDaysAgoDate = new Date(today);
+  twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
+  const twoDaysAgoStr = twoDaysAgoDate.toISOString().slice(0, 10);
+
   const buildProfile = (overrides: Partial<LearnerMasteryProfile> = {}): LearnerMasteryProfile => ({
     learnerLevel: {
       level: 3,
@@ -57,9 +67,9 @@ describe('LearnerDashboardComponent', () => {
       currentStreak: 3,
       bestStreak: 7,
       todayActive: true,
-      lastActiveDate: '2026-02-15',
-      streakStartDate: '2026-02-13',
-      recentActivity: { '2026-02-15': true, '2026-02-14': true, '2026-02-13': true },
+      lastActiveDate: todayStr,
+      streakStartDate: twoDaysAgoStr,
+      recentActivity: { [todayStr]: true, [yesterdayStr]: true, [twoDaysAgoStr]: true },
     },
     recentLevelUps: [
       {
@@ -67,7 +77,7 @@ describe('LearnerDashboardComponent', () => {
         contentId: 'content-1',
         fromLevel: 'seen' as MasteryLevel,
         toLevel: 'remember' as MasteryLevel,
-        timestamp: '2026-02-15T10:00:00.000Z',
+        timestamp: yesterday.toISOString(),
         pointsEarned: 20,
         isGateLevel: false,
       },
@@ -88,12 +98,12 @@ describe('LearnerDashboardComponent', () => {
           progressPercent: 60,
           completedSteps: 6,
           totalSteps: 10,
-          lastActiveAt: '2026-02-15T10:00:00.000Z',
+          lastActiveAt: yesterday.toISOString(),
         },
       ],
       completed: [],
     },
-    computedAt: '2026-02-15T12:00:00.000Z',
+    computedAt: today.toISOString(),
     ...overrides,
   });
 
@@ -271,8 +281,8 @@ describe('LearnerDashboardComponent', () => {
       pathId: 'path-1',
       currentStepIndex: 6,
       completedStepIndices: [0, 1, 2, 3, 4, 5],
-      startedAt: '2026-02-10T10:00:00.000Z',
-      lastActivityAt: '2026-02-15T10:00:00.000Z',
+      startedAt: twoDaysAgoDate.toISOString(),
+      lastActivityAt: yesterday.toISOString(),
       stepAffinity: {},
       stepNotes: {},
       reflectionResponses: {},
@@ -280,7 +290,7 @@ describe('LearnerDashboardComponent', () => {
     };
 
     const mockPathIndex: PathIndex = {
-      lastUpdated: '2026-02-15T12:00:00.000Z',
+      lastUpdated: today.toISOString(),
       totalCount: 1,
       paths: [
         {
@@ -507,10 +517,9 @@ describe('LearnerDashboardComponent', () => {
 
   describe('xpEarnedThisWeek', () => {
     it('should sum points from recent level-ups within the last 7 days', () => {
-      const now = new Date();
-      const twoDaysAgo = new Date(now);
+      const twoDaysAgo = new Date(today);
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const tenDaysAgo = new Date(now);
+      const tenDaysAgo = new Date(today);
       tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
       profileSubject.next(

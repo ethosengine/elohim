@@ -4,6 +4,7 @@ import { SimpleChange, SimpleChanges } from '@angular/core';
 import { of } from 'rxjs';
 
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 
 import { OpinionClusterComponent, Statement, StatementVote } from './opinion-cluster.component';
 import { type Mock, vi } from 'vitest';
@@ -22,6 +23,7 @@ describe('OpinionClusterComponent', () => {
   let component: OpinionClusterComponent;
   let fixture: ComponentFixture<OpinionClusterComponent>;
   let mockSignalService: any;
+  let mockGovernanceApi: any;
 
   // Mock clusters matching the service interface
   const mockClusters: MockOpinionCluster[] = [
@@ -49,9 +51,20 @@ describe('OpinionClusterComponent', () => {
     };
     mockSignalService.computeOpinionClusters.mockReturnValue(of(mockClusters));
 
+    mockGovernanceApi = {
+      recordSignal: vi.fn().mockResolvedValue(undefined),
+      getSignals: vi.fn().mockResolvedValue([]),
+      getStatements: vi.fn().mockResolvedValue([]),
+      getStatementVotes: vi.fn().mockResolvedValue([]),
+      getClusters: vi.fn().mockResolvedValue({ clusters: [], totalParticipants: 0, bridgingStatements: [] }),
+    };
+
     await TestBed.configureTestingModule({
       imports: [OpinionClusterComponent],
-      providers: [{ provide: GovernanceSignalService, useValue: mockSignalService }],
+      providers: [
+        { provide: GovernanceSignalService, useValue: mockSignalService },
+        { provide: GovernanceApiService, useValue: mockGovernanceApi },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(OpinionClusterComponent);

@@ -6,6 +6,8 @@ import {
   GovernanceSignalService,
   ReactionCounts,
 } from '@app/elohim/services/governance-signal.service';
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 import {
   EmotionalReactionType,
   EmotionalReactionConstraints,
@@ -21,6 +23,8 @@ describe('ReactionBarComponent', () => {
   let component: ReactionBarComponent;
   let fixture: ComponentFixture<ReactionBarComponent>;
   let mockSignalService: any;
+  let mockGovernanceApi: any;
+  let mockGovernanceRecognition: any;
   let signalChanges$: Subject<any>;
 
   const mockReactionCounts: ReactionCounts = {
@@ -50,14 +54,27 @@ describe('ReactionBarComponent', () => {
     mockSignalService.recordReaction.mockReturnValue(of(true));
     mockSignalService.recordMediationProceed.mockReturnValue(of(true));
 
+    mockGovernanceApi = {
+      recordSignal: vi.fn().mockResolvedValue(undefined),
+      getSignals: vi.fn().mockResolvedValue([]),
+    };
+
+    mockGovernanceRecognition = {
+      recordParticipation: vi.fn().mockResolvedValue(undefined),
+    };
+
     await TestBed.configureTestingModule({
       imports: [ReactionBarComponent],
-      providers: [{ provide: GovernanceSignalService, useValue: mockSignalService }],
+      providers: [
+        { provide: GovernanceSignalService, useValue: mockSignalService },
+        { provide: GovernanceApiService, useValue: mockGovernanceApi },
+        { provide: GovernanceRecognitionService, useValue: mockGovernanceRecognition },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ReactionBarComponent);
     component = fixture.componentInstance;
-    component.contentId = 'content-1';
+    fixture.componentRef.setInput('contentId', 'content-1');
   });
 
   afterEach(() => {
@@ -70,9 +87,9 @@ describe('ReactionBarComponent', () => {
 
   describe('initialization', () => {
     it('should have default values', () => {
-      expect(component.showCounts).toBe(true);
-      expect(component.compact).toBe(false);
-      expect(component.contentType).toBe('learning-content');
+      expect(component.showCounts()).toBe(true);
+      expect(component.compact()).toBe(false);
+      expect(component.contentType()).toBe('learning-content');
     });
 
     it('should build available reactions on init', fakeAsync(() => {
@@ -126,7 +143,7 @@ describe('ReactionBarComponent', () => {
 
   describe('buildAvailableReactions()', () => {
     it('should use allowedReactions when provided', fakeAsync(() => {
-      component.allowedReactions = ['moved', 'grateful'];
+      fixture.componentRef.setInput('allowedReactions', ['moved', 'grateful']);
       fixture.detectChanges();
       tick();
 
@@ -136,13 +153,13 @@ describe('ReactionBarComponent', () => {
     }));
 
     it('should use constraints when provided', fakeAsync(() => {
-      component.constraints = {
+      fixture.componentRef.setInput('constraints', {
         permittedTypes: ['inspired', 'hopeful'],
         mediatedTypes: [],
         requireAttribution: false,
         authorCanHide: false,
         criticalRequiresReasoning: false,
-      };
+      });
       fixture.detectChanges();
       tick();
 
@@ -164,13 +181,13 @@ describe('ReactionBarComponent', () => {
           consequenceExplanation: 'Your reaction will be logged.',
         },
       };
-      component.constraints = {
+      fixture.componentRef.setInput('constraints', {
         permittedTypes: ['moved'],
         mediatedTypes: [mediatedReaction],
         requireAttribution: false,
         authorCanHide: false,
         criticalRequiresReasoning: false,
-      };
+      });
       fixture.detectChanges();
       tick();
 
@@ -180,7 +197,7 @@ describe('ReactionBarComponent', () => {
     }));
 
     it('should set correct labels for reactions', fakeAsync(() => {
-      component.allowedReactions = ['moved'];
+      fixture.componentRef.setInput('allowedReactions', ['moved']);
       fixture.detectChanges();
       tick();
 
@@ -189,7 +206,7 @@ describe('ReactionBarComponent', () => {
     }));
 
     it('should include descriptions from model', fakeAsync(() => {
-      component.allowedReactions = ['moved'];
+      fixture.componentRef.setInput('allowedReactions', ['moved']);
       fixture.detectChanges();
       tick();
 
@@ -200,7 +217,7 @@ describe('ReactionBarComponent', () => {
 
   describe('onReactionClick()', () => {
     beforeEach(fakeAsync(() => {
-      component.allowedReactions = ['moved', 'grateful'];
+      fixture.componentRef.setInput('allowedReactions', ['moved', 'grateful']);
       fixture.detectChanges();
       tick();
     }));
@@ -229,13 +246,13 @@ describe('ReactionBarComponent', () => {
           consequenceExplanation: 'Your reaction will be logged.',
         },
       };
-      component.constraints = {
+      fixture.componentRef.setInput('constraints', {
         permittedTypes: ['concerned'],
         mediatedTypes: [mediatedReaction],
         requireAttribution: false,
         authorCanHide: false,
         criticalRequiresReasoning: false,
-      };
+      });
       (component as any).buildAvailableReactions();
       tick();
 
@@ -281,13 +298,13 @@ describe('ReactionBarComponent', () => {
           consequenceExplanation: 'Your reaction will be visible.',
         },
       };
-      component.constraints = {
+      fixture.componentRef.setInput('constraints', {
         permittedTypes: ['concerned'],
         mediatedTypes: [mediationConfig],
         requireAttribution: false,
         authorCanHide: false,
         criticalRequiresReasoning: false,
-      };
+      });
       fixture.detectChanges();
       tick();
       mediatedReaction = component.availableReactions.find(r => r.type === 'concerned')!;
@@ -331,13 +348,13 @@ describe('ReactionBarComponent', () => {
           consequenceExplanation: 'Your reaction will not be visible.',
         },
       };
-      component.constraints = {
+      fixture.componentRef.setInput('constraints', {
         permittedTypes: ['uncomfortable'],
         mediatedTypes: [invisibleMediationConfig],
         requireAttribution: false,
         authorCanHide: false,
         criticalRequiresReasoning: false,
-      };
+      });
       (component as any).buildAvailableReactions();
       tick();
 
@@ -397,7 +414,7 @@ describe('ReactionBarComponent', () => {
 
   describe('getReactionDisplay()', () => {
     beforeEach(fakeAsync(() => {
-      component.allowedReactions = ['moved', 'grateful'];
+      fixture.componentRef.setInput('allowedReactions', ['moved', 'grateful']);
       fixture.detectChanges();
       tick();
     }));
@@ -438,11 +455,13 @@ describe('ReactionBarComponent', () => {
   describe('isUserReaction()', () => {
     it('should return true when matches user reaction', () => {
       component.userReaction = 'moved';
+      component.userSubmittedReactions.add('moved');
       expect(component.isUserReaction('moved')).toBe(true);
     });
 
     it('should return false when does not match', () => {
       component.userReaction = 'grateful';
+      component.userSubmittedReactions.add('grateful');
       expect(component.isUserReaction('moved')).toBe(false);
     });
 
