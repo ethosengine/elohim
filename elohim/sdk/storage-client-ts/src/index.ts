@@ -44,3 +44,6 @@ export { StorageClient } from './client';
 
 // Automerge Sync
 export { AutomergeSync, SyncResult, createSync } from './sync';
+
+// Generated types from Rust via ts-rs
+export * from './generated';

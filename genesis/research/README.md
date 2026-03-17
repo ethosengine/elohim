@@ -1,5 +1,21 @@
 # Research Index
 
+## Deep-Context Repos (cloned on demand)
+
+Reference repos cloned locally for deep research. The `repos/` directory is gitignored — only the manifest is tracked.
+
+```bash
+./genesis/research/research.sh status          # Show what's cloned vs available
+./genesis/research/research.sh clone           # Clone all repos from manifest
+./genesis/research/research.sh clone polis     # Clone specific repo
+./genesis/research/research.sh clean           # Remove all (reclaim space)
+./genesis/research/research.sh size            # Show disk usage
+```
+
+Add repos by editing `research-manifest.json`. See the manifest for current repos and relevance notes.
+
+---
+
 Research lives at each module boundary alongside the code it informs. This index connects the open questions driving each area of the protocol to where the thinking lives.
 
 The sections below are ordered by the protocol's deepest conviction: that the hardest problem in human coordination isn't computation — it's legitimacy. People don't reject distributions because the math is wrong. They reject them because they can't see *why*. The protocol's answer is to collect richer signals than money can carry, let composable pipelines do honest math, and let elohim tell the story.

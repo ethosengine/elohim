@@ -12,7 +12,7 @@ export function isGatedResponse(response: unknown): response is GatedResponse<un
     response != null &&
     typeof response === 'object' &&
     'gate' in response &&
-    (response as Record<string, unknown>).gate != null
+    (response as Record<string, unknown>)['gate'] != null
   );
 }
 

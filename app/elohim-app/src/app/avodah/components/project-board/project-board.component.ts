@@ -52,6 +52,7 @@ import { StoryCardComponent } from '../story-card/story-card.component';
                     (dragstart)="onDragStart($event, story)"
                     (cardClick)="openStory(story)"
                   />
+                }
               </div>
               @if (addingInColumn === col.id) {
                 <input

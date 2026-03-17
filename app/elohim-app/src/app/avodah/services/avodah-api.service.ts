@@ -12,11 +12,11 @@ import type { ContentWithTagsView } from '@elohim/storage-client/generated';
 function toContentNode(view: ContentWithTagsView): ContentNode {
   return {
     id: view.id,
-    contentType: view.contentType,
+    contentType: view.contentType as ContentNode['contentType'],
     title: view.title,
     description: view.description ?? '',
     content: view.contentBody ?? '',
-    contentFormat: view.contentFormat,
+    contentFormat: view.contentFormat as ContentNode['contentFormat'],
     tags: view.tags ?? [],
     relatedNodeIds: [],
     metadata: (view.metadata as Record<string, unknown>) ?? {},

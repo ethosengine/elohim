@@ -2,9 +2,9 @@ import {
   Component,
   ChangeDetectionStrategy,
   DestroyRef,
-  EventEmitter,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core';
 
@@ -123,7 +123,7 @@ export class JournalEditorComponent {
   readonly title = signal('');
   readonly body = signal('');
   readonly saveStatus = signal('');
-  readonly finished = new EventEmitter<{ title: string; body: string }>();
+  readonly finished = output<{ title: string; body: string }>();
 
   private readonly storageApi = inject(StorageApiService);
   private readonly destroyRef = inject(DestroyRef);

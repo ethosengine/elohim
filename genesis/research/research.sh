@@ -4,13 +4,13 @@ set -euo pipefail
 # research.sh — Hydrate/dehydrate research repos for deep-context work.
 #
 # Usage:
-#   ./ekklesia/research.sh status    # Show what's cloned vs available
-#   ./ekklesia/research.sh clone     # Clone all repos from manifest
-#   ./ekklesia/research.sh clone polis  # Clone specific repo
-#   ./ekklesia/research.sh clean     # Remove all cloned repos (reclaim space)
-#   ./ekklesia/research.sh clean polis  # Remove specific repo
-#   ./ekklesia/research.sh pull      # Pull latest on all cloned repos
-#   ./ekklesia/research.sh size      # Show disk usage of research repos
+#   ./genesis/research/research.sh status    # Show what's cloned vs available
+#   ./genesis/research/research.sh clone     # Clone all repos from manifest
+#   ./genesis/research/research.sh clone polis  # Clone specific repo
+#   ./genesis/research/research.sh clean     # Remove all cloned repos (reclaim space)
+#   ./genesis/research/research.sh clean polis  # Remove specific repo
+#   ./genesis/research/research.sh pull      # Pull latest on all cloned repos
+#   ./genesis/research/research.sh size      # Show disk usage of research repos
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

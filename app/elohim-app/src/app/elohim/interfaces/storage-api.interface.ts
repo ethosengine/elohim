@@ -31,7 +31,6 @@ import type {
   ContentMasteryView,
   ContentStewardshipView,
   ContentWithTagsView,
-  CreateContentInputView,
   PathView,
   PathWithDetailsView,
   RelationshipView,
@@ -113,12 +112,6 @@ export interface IStorageApi {
   /** List content items with optional filters. */
   getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]>;
 
-  /** Create a new content node. Returns the created item with tags. */
-  createContent(input: CreateContentInputView): Observable<ContentWithTagsView>;
-
-  /** Partially update a content node (PATCH). Returns the updated item with tags. */
-  updateContent(id: string, patch: UpdateContentPatch): Observable<ContentWithTagsView>;
-
   /** Get a single learning path by ID, with full details. */
   getPath(id: string): Observable<PathWithDetailsView | null>;
 
@@ -136,9 +129,6 @@ export interface IStorageApi {
 
   /** Get stewardship data for a content piece. */
   getStewardship(contentId: string): Observable<ContentStewardshipView | null>;
-
-  /** Delete a content relationship by ID. */
-  deleteRelationship(id: string): Observable<void>;
 }
 
 /**

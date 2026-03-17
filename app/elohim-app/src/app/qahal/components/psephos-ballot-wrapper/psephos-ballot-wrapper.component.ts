@@ -98,7 +98,7 @@ interface BallotRecognition {
         <p class="mechanism-badge">{{ mechanism() }}</p>
         <app-psephos-ballot
           [ballot]="ballot()"
-          (recognized)="onRecognized($event)" />
+          (recognized)="onRecognized($any($event))" />
       </div>
     }
   `,

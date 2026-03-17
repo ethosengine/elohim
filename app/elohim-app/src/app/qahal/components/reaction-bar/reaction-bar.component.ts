@@ -92,10 +92,10 @@ import type {
           <h3>A moment of reflection</h3>
           <p>{{ mediationContext.mediationConfig.constitutionalReasoning }}</p>
           <div class="mediation-actions">
-            @if (mediationContext.mediationConfig.alternativeReactions?.length) {
+            @if (mediationContext.mediationConfig.suggestedAlternatives?.length) {
               <p>Consider expressing this differently:</p>
               @for (
-                alt of mediationContext.mediationConfig.alternativeReactions;
+                alt of mediationContext.mediationConfig.suggestedAlternatives;
                 track alt
               ) {
                 <button

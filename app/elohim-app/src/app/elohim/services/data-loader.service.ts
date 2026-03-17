@@ -1787,12 +1787,12 @@ export class DataLoaderService {
   private transformChallengeView(view: ChallengeView): ChallengeRecord {
     return {
       id: view.id,
-      entityType: 'content',
-      entityId: view.contentId,
-      challenger: { agentId: view.challengerPresenceId, displayName: '', standing: '' },
-      grounds: view.reason,
-      description: view.reason,
-      status: view.status,
+      entityType: view.entityType,
+      entityId: view.entityId,
+      challenger: { agentId: view.challengerId, displayName: '', standing: '' },
+      grounds: view.groundsPrimary,
+      description: view.groundsPrimary,
+      status: view.state,
       filedAt: view.createdAt,
     };
   }

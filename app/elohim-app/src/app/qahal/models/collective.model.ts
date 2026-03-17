@@ -38,7 +38,5 @@ export const PARTICIPATION_INTIMACY_LEVELS = [
 
 export type ParticipationIntimacyLevel = (typeof PARTICIPATION_INTIMACY_LEVELS)[number];
 
-/** Consent states for participation */
-export const CONSENT_STATES = ['pending', 'consented', 'withdrawn'] as const;
-
-export type ConsentState = (typeof CONSENT_STATES)[number];
+// ConsentState is re-exported from @app/elohim/models/human-consent.model (via protocol-core)
+// to avoid duplicate export through qahal/models/index.ts

@@ -314,6 +314,12 @@ export class GovernanceService {
       title: submission.title,
       body: `${submission.description}\n\n**Rationale:** ${submission.rationale}`,
       votingAnonymous: false,
+      votingMechanism: submission.proposalType,
+      scoreMin: null,
+      scoreMax: null,
+      dotsPerVoter: null,
+      quorumPercentage: null,
+      passageThreshold: null,
     };
 
     return from(this.governanceApi.createProposal(input)).pipe(

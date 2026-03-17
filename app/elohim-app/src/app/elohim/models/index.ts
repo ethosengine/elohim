@@ -52,7 +52,8 @@ export * from './open-graph.model';
 export * from './verifiable-credential.model';
 
 // Gated Response - Gate evaluation extraction for mutation responses
-export { GatedResponse, isGatedResponse, extractGateFromResponse } from './gated-response.model';
+export { isGatedResponse, extractGateFromResponse } from './gated-response.model';
+export type { GatedResponse } from './gated-response.model';
 
 // Zome Wire Types - Centralized Holochain zome response types
 export * from './zome-wire-types';

@@ -617,7 +617,7 @@ export interface DeliberativeOutcome {
   consensusItems?: ConsensusItem[];
 
   /** Opinion clusters (Polis-style) */
-  clusters?: OpinionCluster[];
+  clusters?: ResearchOpinionCluster[];
 }
 
 /**
@@ -655,9 +655,10 @@ export interface ConsensusItem {
 }
 
 /**
- * An opinion cluster from Polis-style analysis.
+ * An opinion cluster from Polis-style analysis (research context).
+ * Named ResearchOpinionCluster to distinguish from governance-deliberation's OpinionCluster.
  */
-export interface OpinionCluster {
+export interface ResearchOpinionCluster {
   /** Cluster ID */
   id: string;
 
