@@ -13,7 +13,7 @@ set -euo pipefail
 #   ./genesis/research/research.sh size      # Show disk usage of research repos
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MANIFEST="$SCRIPT_DIR/research-manifest.json"
 
 if ! command -v jq &>/dev/null; then
