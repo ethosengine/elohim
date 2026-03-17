@@ -126,12 +126,7 @@ async function main() {
     console.log(`\n(Showing first 50 errors. ${errors} total files with errors.)`);
   }
 
-  // Exit 0 for now — errors are expected until content type divergence is resolved
-  // Change to `process.exit(errors > 0 ? 1 : 0)` after Task 6
-  console.log(
-    '\nNote: Non-zero errors expected until content type divergence is resolved (Task 6).',
-  );
-  process.exit(0);
+  process.exit(errors > 0 ? 1 : 0);
 }
 
 main().catch((err) => {

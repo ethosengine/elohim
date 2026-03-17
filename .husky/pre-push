@@ -12,6 +12,8 @@
 #   steward/node/            → cargo fmt + clippy + tests
 #   app/elohim-library/      → tsc type-check + vitest tests
 #   genesis/                 → schema validation + tests
+#   schema-validate          → protocol schema seed validation (genesis/ or schema changes)
+#   schema-dna               → DNA conformance check (holochain/ or schema changes)
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -88,6 +90,14 @@ if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
 fi
 if echo "$CHANGED" | grep -q "^genesis/"; then
   PROJECTS="$PROJECTS genesis"
+fi
+# Schema validation when genesis seed data or schema definitions change
+if echo "$CHANGED" | grep -q "^genesis/\|^elohim/sdk/schemas/"; then
+  PROJECTS="$PROJECTS schema-validate"
+fi
+# DNA conformance check when holochain constants or schema enums change
+if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
+  PROJECTS="$PROJECTS schema-dna"
 fi
 # Any Jenkinsfile change triggers orchestrator lint
 if echo "$CHANGED" | grep -q "Jenkinsfile"; then
@@ -173,6 +183,14 @@ run_gate() {
         pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
         rc=$?
         ;;
+      schema-validate)
+        pnpm run schema:validate 2>&1
+        rc=$?
+        ;;
+      schema-dna)
+        pnpm run schema:check-dna 2>&1
+        rc=$?
+        ;;
       genesis-a2o)
         pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
@@ -247,6 +265,8 @@ for PROJECT in $PROJECTS; do
     elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
     steward-node)     PROJECT_DIR="steward/node" ;;
     genesis)          PROJECT_DIR="genesis/seeder" ;;
+    schema-validate)  PROJECT_DIR="." ;;
+    schema-dna)       PROJECT_DIR="." ;;
     genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
     orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
     *)                PROJECT_DIR="$PROJECT" ;;
