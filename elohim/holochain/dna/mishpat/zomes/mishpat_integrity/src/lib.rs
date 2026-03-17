@@ -293,6 +293,30 @@ pub struct StatementVote {
 
 pub const STATEMENT_VOTES: [&str; 3] = ["agree", "disagree", "pass"];
 
+// =============================================================================
+// Anchor Entry (for link indexing)
+// =============================================================================
+
+/// Generic string anchor for creating deterministic link bases.
+///
+/// Used by coordinator zome functions to index entries by ID, status, type,
+/// entity, etc. without requiring a separate anchor DNA.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct StringAnchor {
+    pub anchor_type: String,
+    pub anchor_value: String,
+}
+
+impl StringAnchor {
+    pub fn new(anchor_type: &str, anchor_value: &str) -> Self {
+        Self {
+            anchor_type: anchor_type.to_string(),
+            anchor_value: anchor_value.to_string(),
+        }
+    }
+}
+
 // ============================================================
 // ENTRY TYPES ENUM
 // ============================================================
@@ -310,6 +334,7 @@ pub enum EntryTypes {
     ProposalVote(ProposalVote),
     OpinionStatement(OpinionStatement),
     StatementVote(StatementVote),
+    StringAnchor(StringAnchor),
 }
 
 // ============================================================
@@ -412,6 +437,7 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         EntryTypes::ProposalVote(vote) => validate_proposal_vote(vote),
         EntryTypes::OpinionStatement(statement) => validate_opinion_statement(statement),
         EntryTypes::StatementVote(vote) => validate_statement_vote(vote),
+        EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
