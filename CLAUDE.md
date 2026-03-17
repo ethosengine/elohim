@@ -159,7 +159,7 @@ Before proposing design approaches for ANY feature involving data entities (tabl
 
 **The skill forces you to answer (5 categories: A/A2/B/B2/C):**
 1. Is this entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)?
-2. Does a DHT entry type ALREADY EXIST? (Lamad DNA is at 83/~100 — do NOT create new types without checking headroom.)
+2. Does a DHT entry type ALREADY EXIST? (Lamad DNA is at ~73/~100, Mishpat DNA is at 11/~100 — do NOT create new types without checking headroom.)
 3. Is identity content-derived (CID), agent-composite, or slug (must justify)?
 4. What coordinator function creates it? What signal projects it? (Answer BEFORE designing the HTTP route.)
 
@@ -200,7 +200,8 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 |----------|-------------|---------|
 | App | `Jenkinsfile` (root) | Auto via orchestrator |
 | Edge | `elohim/holochain/Jenkinsfile` | Auto via orchestrator |
-| DNA | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
+| DNA (Lamad) | `elohim/holochain/dna/Jenkinsfile` | Auto via orchestrator |
+| DNA (Mishpat) | `elohim/holochain/dna/mishpat/Jenkinsfile` | Auto via orchestrator |
 | Genesis | `genesis/Jenkinsfile` | Auto via orchestrator |
 | Sophia | `sophia/Jenkinsfile` | Auto via orchestrator |
 | Steward | `steward/Jenkinsfile` | Manual only |

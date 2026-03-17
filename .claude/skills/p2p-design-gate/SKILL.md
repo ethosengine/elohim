@@ -32,13 +32,13 @@ The Holochain DHT is a **notary, not a database**. Hard constraints shape every 
 
 | Constraint | Limit | Current State |
 |---|---|---|
-| Entry types per DNA | ~100 | Lamad: **83** (near ceiling), Imagodei: 28, Infrastructure: 6 |
+| Entry types per DNA | ~100 | Lamad: **~73** (freed by mishpat split), Mishpat: **11**, Imagodei: 28, Infrastructure: 6 |
 | Total DHT entries | ~3000 before degradation | Designed for 100s-1000s |
 | Entry size | <1KB target | Proofs only: who (agent key), what (content hash), when (timestamp) |
 | Query capability | None — link traversal only | No SQL, no pagination, no filtering |
 | Gossip latency | 200-2000ms | Unacceptable for real-time reads |
 
-**Before proposing ANY new DHT entry type**: Check if the DNA has headroom. Lamad at 83/~100 means you likely need to use an EXISTING entry type, not create one. Most entities that need notarization already have entry types — the gap is usually the missing `dht_anchor_hash` in the storage projection, not a missing entry type.
+**Before proposing ANY new DHT entry type**: Check if the DNA has headroom. Lamad at ~73/~100 means you have some breathing room after the mishpat split, but still check existing entry types first. Mishpat (governance) is at 11/~100 with room for growth. Most entities that need notarization already have entry types, not create one. Most entities that need notarization already have entry types — the gap is usually the missing `dht_anchor_hash` in the storage projection, not a missing entry type.
 
 ## Step 1: Entity Classification Decision Tree
 
@@ -117,7 +117,7 @@ Does the community need to witness/verify this data?
           YES → NOTARIZED (Category A)
           NO  → Is it a relationship/attribute of an existing entry?
                   YES → DERIVED (Category A2 — use Link, not new entry type)
-                  NO  → Is there DNA headroom? (Lamad: 83/~100)
+                  NO  → Is there DNA headroom? (Lamad: ~73/~100, Mishpat: 11/~100)
                           YES → NOTARIZED (Category A — create entry type)
                           NO  → STOP. Refactor existing types or split DNA.
   NO  → Does this data belong to a single agent privately?
@@ -219,7 +219,7 @@ These are known regressions — design choices that have caused real bugs or arc
 | Standalone table for agent state | Agent preferences/bookmarks/drafts in a shared table leak private data and create P2P sync conflicts. | Private source-chain entry with local storage projection. No shared table. |
 | Three address formats left undefined | The same entity referenced by CID in one place, UUID in another, and slug in a third. Conversion bugs everywhere. | Declare one canonical address format per entity. Document it. All other formats are display aliases resolved at the edge. |
 | Missing source-of-truth declaration | A table exists but nobody documented whether Holochain or SQLite is authoritative. Bugs appear when they disagree. | Every table's migration or schema file includes a comment: `-- Source of truth: DHT` or `-- Source of truth: local (operational)`. |
-| Creating new entry type when one already exists | Lamad DNA is at 83/~100 entry types. Adding another wastes scarce capacity and fragments the data model. | Check existing entry types first. Use Links (Category A2) for relationships. Only create new types if nothing fits and DNA has headroom. |
+| Creating new entry type when one already exists | Lamad DNA is at ~73/~100, Mishpat at 11/~100. Adding another wastes scarce capacity and fragments the data model. | Check existing entry types first. Use Links (Category A2) for relationships. Only create new types if nothing fits and DNA has headroom. |
 | Putting granular data on the DHT | Every quiz answer, scroll event, or preference on the DHT bloats gossip and exceeds the ~3000 entry budget. | Agent-scoped with attestation (Category B2): raw data stays private, signed proof of outcome is notarized. |
 
 ---
