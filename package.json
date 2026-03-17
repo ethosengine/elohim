@@ -24,6 +24,8 @@
     }
   },
   "devDependencies": {
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "husky": "^9.1.7"
   },
   "scripts": {
@@ -38,6 +40,7 @@
     "storage-client:build": "pnpm --filter @elohim/storage-client build",
     "seed": "pnpm --filter holochain-seeder seed",
     "a2o:test": "pnpm --filter @elohim/a2o test",
-    "a2o:lint": "pnpm --filter @elohim/a2o lint"
+    "a2o:lint": "pnpm --filter @elohim/a2o lint",
+    "schema:check-dna": "node elohim/sdk/schemas/scripts/check-dna.mjs"
   }
 }
