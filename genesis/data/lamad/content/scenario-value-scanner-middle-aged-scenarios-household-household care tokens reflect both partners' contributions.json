@@ -6,7 +6,7 @@
   "title": "Household care tokens reflect both partners' contributions",
   "description": "Household care tokens reflect both partners' contributions",
   "content": "Scenario: Household care tokens reflect both partners' contributions\n    Given Robert and Jennifer both contribute substantial household labor\n    And they coordinate care for parents and support for children\n    When household_elohim calculates care tokens\n    Then both partners' contributions should be valued appropriately\n    And household labor should be recognized economically\n    And care coordination should be valued alongside direct care\n    And emotional labor should be made visible and valued\n    And both partners should see their care work recognized\n    And household care economy should operate on equity principles\n    And token allocation should support rather than strain partnership\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household care tokens reflect both partners' contributions",

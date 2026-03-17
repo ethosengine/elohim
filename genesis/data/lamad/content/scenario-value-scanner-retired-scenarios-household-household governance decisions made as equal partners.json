@@ -6,7 +6,7 @@
   "title": "Household governance decisions made as equal partners",
   "description": "Household governance decisions made as equal partners",
   "content": "Scenario: Household governance decisions made as equal partners\n    Given Frank and his wife are equal partners in household\n    And both contribute care labor and have voice in decisions\n    When household decisions are made\n    Then the household_elohim should support collaborative decision-making\n    And neither partner should dominate household governance\n    And both partners' preferences and needs should have equal weight\n    And retirement should enable true partnership, not hierarchy\n    And household decisions should serve both partners' flourishing\n    And equitable partnership should be structurally supported\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household governance decisions made as equal partners",

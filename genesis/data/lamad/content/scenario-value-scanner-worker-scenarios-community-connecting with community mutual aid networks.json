@@ -6,7 +6,7 @@
   "title": "Connecting with community mutual aid networks",
   "description": "Connecting with community mutual aid networks",
   "content": "Scenario: Connecting with community mutual aid networks\n    Given workers need mutual aid during economic precarity\n    And community has mutual aid organizing\n    When I participate in mutual aid networks\n    Then the protocol should connect me to appropriate networks\n    And facilitate giving and receiving support\n    And recognize that mutual aid is care economy practice\n    And support building community resilience beyond market systems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Connecting with community mutual aid networks",

@@ -6,7 +6,7 @@
   "title": "Appeal contributes to constitutional evolution",
   "description": "Appeal contributes to constitutional evolution",
   "content": "Scenario: Appeal contributes to constitutional evolution\n    Given my appeal revealed a fundamental gap in the constitutional framework\n    And the Constitutional Council identified this as a recurring issue\n    When the council documents recommendations for protocol improvement\n    Then my case becomes input for the next 7-year Constitutional Convention\n    And My lived experience of feeling violated despite life-saving intervention\n    And This helps shape how care and autonomy are balanced at constitutional level\n    And I can see the long-term impact of my appeal beyond my individual case\n    And My suffering wasn't wasted—it made the system better for everyone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-individual",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal contributes to constitutional evolution",

@@ -6,7 +6,7 @@
   "title": "Democratic food system becomes recognized industry sector alternative",
   "description": "Democratic food system becomes recognized industry sector alternative",
   "content": "Scenario: Democratic food system becomes recognized industry sector alternative\n    Given food industry is dominated by corporate extraction model\n    And alternative models are marginalized as niche or idealistic\n    When democratic food network reaches scale and proves viability\n    Then \"democratic food system\" becomes recognized industry category\n    And industry conferences, publications, and research treat it as serious alternative\n    And investment flows toward democratic food enterprises\n    And policy makers design regulations supporting democratic food system\n    And industry_sector_elohim advocates for democratic food system recognition and support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic food system becomes recognized industry sector alternative",

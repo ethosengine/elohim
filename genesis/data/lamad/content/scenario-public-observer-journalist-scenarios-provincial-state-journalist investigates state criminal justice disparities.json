@@ -6,7 +6,7 @@
   "title": "Journalist investigates state criminal justice disparities",
   "description": "Journalist investigates state criminal justice disparities",
   "content": "Scenario: Journalist investigates state criminal justice disparities\n    Given the journalist covers criminal justice policy\n    And data suggests racial disparities in enforcement\n    When the Observer analyzes statewide criminal justice data\n    Then the journalist sees Black residents arrested at 4x rate for same offenses\n    And documents sentencing disparities for similar crimes\n    And tracks outcomes showing selective enforcement patterns\n    And identifies counties with extreme disparities\n    And publishes investigation exposing systemic racism\n    And pattern recognition reveals injustice at scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates state criminal justice disparities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

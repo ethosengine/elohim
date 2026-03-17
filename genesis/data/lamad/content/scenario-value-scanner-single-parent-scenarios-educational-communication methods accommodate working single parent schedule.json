@@ -6,7 +6,7 @@
   "title": "Communication methods accommodate working single parent schedule",
   "description": "Communication methods accommodate working single parent schedule",
   "content": "Scenario: Communication methods accommodate working single parent schedule\n    Given Maria cannot answer phone calls during work hours\n    And she manages communications for three children across different schools\n    When schools communicate with parents\n    Then the educational_elohim should coordinate school communications efficiently\n    And schools should use methods accessible to working parents (email, portal, evening calls)\n    And Maria should not miss critical information due to daytime-only communication\n    And communication should be consolidated and efficient for time-constrained parents\n    And schools should respect that single working parents have limited availability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Communication methods accommodate working single parent schedule",

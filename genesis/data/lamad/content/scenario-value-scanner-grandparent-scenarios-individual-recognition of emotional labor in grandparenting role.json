@@ -6,7 +6,7 @@
   "title": "Recognition of emotional labor in grandparenting role",
   "description": "Recognition of emotional labor in grandparenting role",
   "content": "Scenario: Recognition of emotional labor in grandparenting role\n    Given Margaret provides not just practical care but emotional support\n    And she navigates complex family dynamics with wisdom\n    When the personal_agent tracks Margaret's care contributions\n    Then it should recognize emotional labor as work\n    And it should value relationship maintenance and family harmony\n    And it should acknowledge the sophistication of intergenerational care\n    And it should quantify not just hours but quality of care\n    And emotional labor should be visible and valued\n    And Margaret's wisdom and relationship work should be recognized\n    And the full dimension of grandparenting care should be appreciated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of emotional labor in grandparenting role",

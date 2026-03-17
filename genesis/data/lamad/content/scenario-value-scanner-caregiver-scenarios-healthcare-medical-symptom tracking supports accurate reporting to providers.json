@@ -6,7 +6,7 @@
   "title": "Symptom tracking supports accurate reporting to providers",
   "description": "Symptom tracking supports accurate reporting to providers",
   "content": "Scenario: Symptom tracking supports accurate reporting to providers\n    Given David's Alzheimer's symptoms fluctuate and progress\n    And accurate symptom reporting is essential for care\n    When the healthcare_elohim tracks symptoms\n    Then it should maintain detailed symptom logs\n    And it should identify patterns and changes over time\n    And it should prepare symptom summaries for appointments\n    And provider understanding should be improved by detailed tracking\n    And caregiver observation should enhance medical accuracy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Symptom tracking supports accurate reporting to providers",

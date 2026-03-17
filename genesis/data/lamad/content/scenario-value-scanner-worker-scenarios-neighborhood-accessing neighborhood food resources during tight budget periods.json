@@ -6,7 +6,7 @@
   "title": "Accessing neighborhood food resources during tight budget periods",
   "description": "Accessing neighborhood food resources during tight budget periods",
   "content": "Scenario: Accessing neighborhood food resources during tight budget periods\n    Given neighborhood has community gardens, food co-ops, or meal programs\n    And my budget is extremely tight some periods\n    When I need food support\n    Then the protocol should connect me to neighborhood food resources\n    And help me access support with dignity based on my care contributions\n    And recognize that my work serves community (I am not taking charity)\n    And facilitate reciprocal care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing neighborhood food resources during tight budget periods",

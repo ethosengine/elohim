@@ -6,7 +6,7 @@
   "title": "Neighborhood safety and child supervision cooperation",
   "description": "Neighborhood safety and child supervision cooperation",
   "content": "Scenario: Neighborhood safety and child supervision cooperation\n    Given parents worry about children's neighborhood safety\n    And collective supervision is more effective than isolation\n    When the neighborhood_elohim coordinates safety cooperation\n    Then it should enable coordinated supervision of playing children\n    And it should help parents watch out for all neighborhood kids\n    And collective care should be recognized and valued\n    And neighborhood should become safer through cooperation\n    And children should have freedom within community care\n    And the system should enable collective responsibility for children\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood safety and child supervision cooperation",

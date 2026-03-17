@@ -6,7 +6,7 @@
   "title": "Right to disconnect maintained with full accessibility",
   "description": "Right to disconnect maintained with full accessibility",
   "content": "Scenario: Right to disconnect maintained with full accessibility\n    Given Alex has been using the Value Scanner\n    And constitutional constraints apply to all users equally\n    When Alex chooses to disconnect from the system\n    Then disconnection process must be fully accessible\n    And Alex should receive complete data export in accessible formats\n    And no manipulative retention patterns should be employed\n    And Alex's right to not participate must be absolute\n    And data portability should work with assistive technologies\n    And exit should be as accessible as entry\n    And Alex's autonomy includes the right to leave\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to disconnect maintained with full accessibility",

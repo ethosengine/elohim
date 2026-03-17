@@ -6,7 +6,7 @@
   "title": "Participating in community decision-making about care economy governance",
   "description": "Participating in community decision-making about care economy governance",
   "content": "Scenario: Participating in community decision-making about care economy governance\n    Given community care economy has governance decisions to make\n    And I am community member with stake in how care economy operates\n    When community discusses care economy policies or practices\n    Then the community_elohim enables my participation in governance\n    And validates my voice as community member regardless of crisis status\n    And helps me contribute to governance discussions within my capacity\n    And ensures vulnerable people's perspectives shape care economy\n    And my personal_agent surfaces governance opportunities\n    And recognizes governance participation as valuable civic contribution\n    And supports inclusive community decision-making\n    And celebrates community ownership of care economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in community decision-making about care economy governance",

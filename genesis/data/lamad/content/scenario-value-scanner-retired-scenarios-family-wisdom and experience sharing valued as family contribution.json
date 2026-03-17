@@ -6,7 +6,7 @@
   "title": "Wisdom and experience sharing valued as family contribution",
   "description": "Wisdom and experience sharing valued as family contribution",
   "content": "Scenario: Wisdom and experience sharing valued as family contribution\n    Given Frank has 70 years of life experience and decades of construction expertise\n    And his knowledge is valuable family resource\n    When family_elohim tracks knowledge sharing\n    Then Frank's guidance to adult children should be recognized\n    And teaching grandchildren life and practical skills should be valued\n    And sharing construction knowledge should be quantified\n    And wisdom transmission should count as care contribution\n    And family should experience Frank as source of valuable knowledge\n    And his expertise should be actively utilized, not patronized\n    And knowledge sharing should be reciprocal across generations\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Wisdom and experience sharing valued as family contribution",

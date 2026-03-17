@@ -6,7 +6,7 @@
   "title": "Teaching adult children care economy principles through modeling",
   "description": "Teaching adult children care economy principles through modeling",
   "content": "Scenario: Teaching adult children care economy principles through modeling\n    Given Frank's adult children are watching his care contributions\n    And he's modeling post-employment care economy participation\n    When family_elohim surfaces care patterns\n    Then it should help Frank teach care economy to next generation\n    And adult children should see that contribution continues through retirement\n    And they should learn that care flows across generations\n    And Frank's example should prepare them for their own aging\n    And care reciprocity should be transmitted generationally\n    And family care culture should strengthen through visible modeling\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching adult children care economy principles through modeling",

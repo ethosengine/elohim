@@ -6,7 +6,7 @@
   "title": "Professional development aligned with personal values",
   "description": "Professional development aligned with personal values",
   "content": "Scenario: Professional development aligned with personal values\n    Given Aisha is building her career\n    And she wants work aligned with her values\n    When Aisha makes professional development decisions\n    Then the personal_agent should help her assess value alignment\n    And it should highlight opportunities matching her principles\n    And it should flag when work conflicts with core values\n    And professional growth should support personal integrity\n    And the system should help her build career consistent with values\n    And work should serve her flourishing, not just employment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Professional development aligned with personal values",

@@ -6,7 +6,7 @@
   "title": "Multi-store comparison for budget optimization",
   "description": "Multi-store comparison for budget optimization",
   "content": "Scenario: Multi-store comparison for budget optimization\n    Given Aisha's limited budget requires strategic shopping\n    And different stores offer different value propositions\n    When Aisha compares shopping options\n    Then the personal_agent should analyze prices across stores\n    And it should consider transportation costs in calculations\n    And it should identify where spending more saves money long-term\n    And recommendations should optimize total value, not just price\n    And the system should help her find efficiency frontiers\n    And decision support should build financial literacy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Multi-store comparison for budget optimization",

@@ -6,7 +6,7 @@
   "title": "Journalist compares city policies to neighboring municipalities",
   "description": "Journalist compares city policies to neighboring municipalities",
   "content": "Scenario: Journalist compares city policies to neighboring municipalities\n    Given city council debates new approach to homelessness\n    And politicians claim no alternatives exist\n    When the Observer provides comparative policy analysis\n    Then the journalist sees 3 nearby cities using housing-first approach\n    And reviews outcome data showing reduced homelessness\n    And finds cost comparison showing housing cheaper than criminalization\n    And interviews officials in cities with successful programs\n    And publishes story presenting evidence-based alternatives\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist compares city policies to neighboring municipalities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

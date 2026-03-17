@@ -6,7 +6,7 @@
   "title": "Coordinating with international counterparts on AI governance",
   "description": "Coordinating with international counterparts on AI governance",
   "content": "Scenario: Coordinating with international counterparts on AI governance\n    Given AI governance is global challenge\n    And national policies affect each other\n    When I work with international policy makers\n    Then we share: legislative approaches and evidence\n    And we coordinate: to resist regulatory arbitrage\n    And we establish: democratic governance norms\n    And we resist: race-to-bottom dynamics\n    And we protect: protocol sovereignty internationally\n    And we support: global democratic AI development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating with international counterparts on AI governance",

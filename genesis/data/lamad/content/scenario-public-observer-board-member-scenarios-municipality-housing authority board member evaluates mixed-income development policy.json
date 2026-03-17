@@ -6,7 +6,7 @@
   "title": "Housing authority board member evaluates mixed-income development policy",
   "description": "Housing authority board member evaluates mixed-income development policy",
   "content": "Scenario: Housing authority board member evaluates mixed-income development policy\n    Given authority considers policy requiring mixed-income units in new developments\n    And staff presents complex financing and legal considerations\n    And board member wants to make informed decision but has limited affordable housing expertise\n    When the board member uses Observer accessible expertise\n    Then they receive plain-language explanation of mixed-income development models\n    And see examples from peer housing authorities with outcomes data\n    And access key trade-offs between requiring affordability and reducing development\n    And get questions to ask staff about implementation and enforcement\n    And accessible expertise enables informed policy judgment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Housing authority board member evaluates mixed-income development policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

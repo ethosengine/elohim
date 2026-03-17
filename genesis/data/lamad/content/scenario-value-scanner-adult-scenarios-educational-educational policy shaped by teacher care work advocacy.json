@@ -6,7 +6,7 @@
   "title": "Educational policy shaped by teacher care work advocacy",
   "description": "Educational policy shaped by teacher care work advocacy",
   "content": "Scenario: Educational policy shaped by teacher care work advocacy\n    Given Sarah has deep knowledge of educational needs from professional experience\n    And education policy affects her capacity to care for students\n    When educational policy decisions are made\n    Then Sarah's care contributions should give her voice\n    And teacher advocacy should be strengthened by care economy data\n    And policy should reflect actual educator experiences\n    And care economy should empower teacher voice in education governance\n    And those who do care work should shape care work policy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational policy shaped by teacher care work advocacy",

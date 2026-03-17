@@ -6,7 +6,7 @@
   "title": "Protecting disability community from institutional harm",
   "description": "Protecting disability community from institutional harm",
   "content": "Scenario: Protecting disability community from institutional harm\n    Given institutions often harm disabled people systematically\n    And Alex advocates against institutional ableism\n    When Alex works to protect disability community from harm\n    Then this protective advocacy should be recognized as care work\n    And the community_elohim should track Alex's watchdog activities\n    And preventing harm is as valuable as providing support\n    And Alex's work defending community rights should accumulate tokens\n    And the protocol should value both defensive and generative care work\n    And Alex's advocacy prevents suffering at scale\n    And community protection should be appropriately compensated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting disability community from institutional harm",

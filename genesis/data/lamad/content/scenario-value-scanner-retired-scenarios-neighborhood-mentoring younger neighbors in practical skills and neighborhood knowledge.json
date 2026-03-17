@@ -6,7 +6,7 @@
   "title": "Mentoring younger neighbors in practical skills and neighborhood knowledge",
   "description": "Mentoring younger neighbors in practical skills and neighborhood knowledge",
   "content": "Scenario: Mentoring younger neighbors in practical skills and neighborhood knowledge\n    Given Frank has construction expertise and decades of neighborhood knowledge\n    And younger neighbors are establishing themselves in the community\n    When the neighborhood_elohim facilitates mentoring\n    Then it should connect Frank to younger neighbors seeking skills\n    And coordinate skill-sharing for home repairs and maintenance\n    And facilitate neighborhood history and culture transmission\n    And recognize teaching and mentoring as care contributions\n    And build intergenerational neighborhood relationships\n    And value Frank's role in acculturating new residents\n    And strengthen neighborhood cohesion through knowledge sharing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mentoring younger neighbors in practical skills and neighborhood knowledge",

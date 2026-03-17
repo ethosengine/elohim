@@ -6,7 +6,7 @@
   "title": "Personal growth trajectory becomes visible and owned",
   "description": "Personal growth trajectory becomes visible and owned",
   "content": "Scenario: Personal growth trajectory becomes visible and owned\n    Given Emma has demonstrated supply chain optimization genius over 6 months\n    And the REA system has documented her 23% waste reduction\n    When Emma views her growth trajectory dashboard\n    Then she sees her optimization pattern recognition abilities documented\n    And she sees skill tokens accumulating toward higher roles\n    And she discovers teaching opportunities based on her expertise\n    And she can pursue cross-training based on witnessed interests\n    And her development path is self-determined, not management-assigned\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal growth trajectory becomes visible and owned",

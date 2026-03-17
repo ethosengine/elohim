@@ -6,7 +6,7 @@
   "title": "Household maintenance sustained despite overwhelming care demands",
   "description": "Household maintenance sustained despite overwhelming care demands",
   "content": "Scenario: Household maintenance sustained despite overwhelming care demands\n    Given James is overwhelmed with caregiving responsibilities\n    And routine household maintenance is difficult to maintain\n    When household maintenance needs arise\n    Then the household_elohim should connect to community support\n    And neighbors should be able to assist with household tasks\n    And care economy should enable mutual aid for household maintenance\n    And James should access help without depleting limited finances\n    And household should remain functional despite care intensity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household maintenance sustained despite overwhelming care demands",

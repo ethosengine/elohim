@@ -6,7 +6,7 @@
   "title": "Teaching that care work creates economic value",
   "description": "Teaching that care work creates economic value",
   "content": "Scenario: Teaching that care work creates economic value\n    Given traditional economics makes care work invisible\n    And Emma is forming foundational economic understanding\n    When Emma performs care labor through scanner decisions\n    Then the system should explicitly teach care creates value\n    And her personal_agent should say \"Your stewardship helped your family\"\n    And care contributions should be valued concretely\n    And she should learn caring for others is economically valuable\n    And care economy framework should be established as baseline\n    And she should understand care before being exposed to extraction economics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching that care work creates economic value",

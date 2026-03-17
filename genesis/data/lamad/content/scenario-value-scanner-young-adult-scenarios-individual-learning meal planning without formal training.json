@@ -6,7 +6,7 @@
   "title": "Learning meal planning without formal training",
   "description": "Learning meal planning without formal training",
   "content": "Scenario: Learning meal planning without formal training\n    Given Aisha has minimal cooking experience\n    And she wants to eat nutritiously on a tight budget\n    When Aisha requests meal planning assistance\n    Then the personal_agent should suggest recipes based on her skill level\n    And recommendations should optimize nutrition per dollar\n    And the system should consider ingredients she already has\n    And the agent should teach cooking skills progressively\n    And meal plans should fit her time constraints\n    And the interface should feel like a patient teacher, not a critic\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning meal planning without formal training",

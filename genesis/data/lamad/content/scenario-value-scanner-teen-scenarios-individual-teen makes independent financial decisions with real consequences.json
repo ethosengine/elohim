@@ -6,7 +6,7 @@
   "title": "Teen makes independent financial decisions with real consequences",
   "description": "Teen makes independent financial decisions with real consequences",
   "content": "Scenario: Teen makes independent financial decisions with real consequences\n    Given Jasmine is shopping with money from her part-time job\n    And she is saving for college expenses\n    And she has set a monthly budget of $150 for discretionary spending\n    When Jasmine considers purchasing a $60 jacket\n    Then her personal_agent should provide decision support without controlling her choice\n    And the agent should surface relevant information: \"This is 40% of your monthly discretionary budget\"\n    And the agent should connect to her goals: \"You're saving $200/month for college\"\n    And Jasmine should retain full authority to make the decision\n    And the choice should have real economic consequences\n    And the system should support learning from mistakes without catastrophic outcomes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen makes independent financial decisions with real consequences",

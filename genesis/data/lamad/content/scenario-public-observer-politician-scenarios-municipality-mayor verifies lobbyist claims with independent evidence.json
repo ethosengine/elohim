@@ -6,7 +6,7 @@
   "title": "Mayor verifies lobbyist claims with independent evidence",
   "description": "Mayor verifies lobbyist claims with independent evidence",
   "content": "Scenario: Mayor verifies lobbyist claims with independent evidence\n    Given business lobbyists claim regulations will kill jobs\n    And present alarming economic projections\n    When the Observer fact-checks lobbying claims\n    Then they see similar regulations in comparable cities\n    And review actual economic impacts versus predicted disasters\n    And identify which lobbyist projections proved accurate historically\n    And evaluate claims against track record\n    And resist manipulation through evidence-based analysis\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mayor verifies lobbyist claims with independent evidence",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

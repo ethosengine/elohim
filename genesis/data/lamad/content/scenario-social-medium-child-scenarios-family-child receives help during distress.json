@@ -6,7 +6,7 @@
   "title": "Child receives help during distress",
   "description": "Child receives help during distress",
   "content": "Scenario: Child receives help during distress\n    Given Emma is upset about something that happened at school\n    When she creates a contribution expressing her distress\n    And the guardian agent detects emotional crisis indicators\n    Then her parents are immediately notified with sensitivity\n    And age-appropriate support resources are surfaced\n    And family members can provide comfort and guidance\n    And if needed, connection to counseling resources is offered\n    And Emma experiences the system as safe space to express feelings\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-child-scenarios-family",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child receives help during distress",

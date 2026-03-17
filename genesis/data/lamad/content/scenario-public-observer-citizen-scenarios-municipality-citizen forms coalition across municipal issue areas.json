@@ -6,7 +6,7 @@
   "title": "Citizen forms coalition across municipal issue areas",
   "description": "Citizen forms coalition across municipal issue areas",
   "content": "Scenario: Citizen forms coalition across municipal issue areas\n    Given 230 families are losing time to bus delays\n    And 47 teachers are concerned about school overcrowding\n    And both issues stem from municipal transportation budget\n    When the Observer detects the pattern connection\n    Then citizens see the larger civic context\n    And can coordinate with teachers and other affected groups\n    And build more powerful coalition across stakeholder types\n    And isolated concerns become coordinated advocacy\n    And cross-issue patterns surface organically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen forms coalition across municipal issue areas",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

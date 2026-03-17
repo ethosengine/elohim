@@ -6,7 +6,7 @@
   "title": "Acknowledging limits of technical solutions to political problems",
   "description": "Acknowledging limits of technical solutions to political problems",
   "content": "Scenario: Acknowledging limits of technical solutions to political problems\n    Given some delegates hope technology will solve governance challenges\n    And I must clarify what technology can and cannot do\n    When I testify about technical limits\n    Then I explain: technology enables but doesn't replace democratic choice\n    And I clarify: that AI cannot resolve fundamental values conflicts\n    And I acknowledge: many governance problems are political not technical\n    And I resist: techno-solutionism and engineering hubris\n    And I honor: that democracy is about human judgment not optimization\n    And I demonstrate: epistemic humility about technology's role\n    And I serve: realistic understanding of technical possibilities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Acknowledging limits of technical solutions to political problems",

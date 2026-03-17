@@ -6,7 +6,7 @@
   "title": "Protecting individual autonomy under employment pressure",
   "description": "Protecting individual autonomy under employment pressure",
   "content": "Scenario: Protecting individual autonomy under employment pressure\n    Given my employer demands maximum flexibility\n    And employment pressure threatens my autonomy\n    When I need to maintain boundaries for self-care\n    Then my personal_agent should help me recognize when boundaries are violated\n    And support me in protecting essential personal time\n    And remind me that I have rights beyond being a labor unit\n    And provide language for asserting my needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting individual autonomy under employment pressure",

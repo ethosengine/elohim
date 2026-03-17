@@ -6,7 +6,7 @@
   "title": "Displaced person's abuser attempts to locate her",
   "description": "Displaced person's abuser attempts to locate her",
   "content": "Scenario: Displaced person's abuser attempts to locate her\n    Given Maria's abuser is trying to find her new location\n    When he attempts to contact her through the Elohim network\n    And he tries to contact her friends to get information\n    Then all his messages are blocked before reaching Maria\n    And her friends' connections don't leak location information\n    And the protection agent alerts relevant support networks\n    And Maria's sanctuary protocol remains secure\n    And she is protected without constant fear and vigilance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-community",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Displaced person's abuser attempts to locate her",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

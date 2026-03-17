@@ -6,7 +6,7 @@
   "title": "Coordinating household care labor in retirement",
   "description": "Coordinating household care labor in retirement",
   "content": "Scenario: Coordinating household care labor in retirement\n    Given Frank and his wife both have time freedom from employment\n    And household labor needs to be distributed equitably\n    And traditional gender patterns may persist despite retirement\n    When the household_elohim monitors labor distribution\n    Then it should track household tasks performed by each partner\n    And it should identify unfair distributions early\n    And it should surface imbalances: \"Frank's wife handles 75% of meal preparation\"\n    And both partners should receive prompts about equity\n    And adjustments should be negotiated from data, not resentment\n    And retirement should enable more equitable household partnerships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating household care labor in retirement",

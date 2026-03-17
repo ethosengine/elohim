@@ -6,7 +6,7 @@
   "title": "Preregistration of hypotheses to prevent cherry-picking results",
   "description": "Preregistration of hypotheses to prevent cherry-picking results",
   "content": "Scenario: Preregistration of hypotheses to prevent cherry-picking results\n    Given I want my research to be scientifically credible\n    And I know publication bias favors positive findings\n    When I design my regional study\n    Then I preregister: hypotheses before seeing the data\n    And I commit: to reporting all results not just flattering ones\n    And I plan: analysis methods in advance to prevent p-hacking\n    And I document: any deviations from preregistered plan with justification\n    And I publish: null results and failures alongside successes\n    And My methodological rigor maintains: scientific integrity over advocacy\n    And Credibility comes from: honesty about what works and what doesn't\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preregistration of hypotheses to prevent cherry-picking results",

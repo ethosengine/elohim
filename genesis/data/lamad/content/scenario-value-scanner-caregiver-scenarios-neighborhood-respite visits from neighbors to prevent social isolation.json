@@ -6,7 +6,7 @@
   "title": "Respite visits from neighbors to prevent social isolation",
   "description": "Respite visits from neighbors to prevent social isolation",
   "content": "Scenario: Respite visits from neighbors to prevent social isolation\n    Given James is profoundly socially isolated by caregiving\n    And he desperately needs human connection\n    When neighbors provide respite visits\n    Then the neighborhood_elohim should coordinate visiting schedules\n    And neighbors could stay with David briefly while James takes walk\n    And they could provide social connection for both James and David\n    And brief respite periods should be regular, not just emergency\n    And neighborhood should actively prevent caregiver isolation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Respite visits from neighbors to prevent social isolation",

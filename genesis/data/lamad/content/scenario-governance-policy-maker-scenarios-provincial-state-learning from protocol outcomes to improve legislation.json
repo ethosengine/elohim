@@ -6,7 +6,7 @@
   "title": "Learning from protocol outcomes to improve legislation",
   "description": "Learning from protocol outcomes to improve legislation",
   "content": "Scenario: Learning from protocol outcomes to improve legislation\n    Given Constitutional Convention passed adolescent autonomy amendment\n    And this reflects accumulated precedents and appeals\n    When I translate constitutional evolution into state law\n    Then I craft: legislation operationalizing the amendment\n    And I update: state family law to reflect constitutional principle\n    And I modify: education policy honoring developing autonomy\n    And constitutional evolution: informs statutory law\n    And I demonstrate: how different democratic forms work together\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning from protocol outcomes to improve legislation",

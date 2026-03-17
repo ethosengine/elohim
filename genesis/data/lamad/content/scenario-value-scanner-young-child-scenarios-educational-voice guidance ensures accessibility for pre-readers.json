@@ -6,7 +6,7 @@
   "title": "Voice guidance ensures accessibility for pre-readers",
   "description": "Voice guidance ensures accessibility for pre-readers",
   "content": "Scenario: Voice guidance ensures accessibility for pre-readers\n    Given Tommy is 5 and may have limited reading ability\n    And accessibility is required for equitable education\n    When Tommy uses the educational features of the scanner\n    Then voice guidance should be available throughout\n    And visual feedback should be primary\n    And no reading ability should be required for core functionality\n    And audio should be warm, encouraging, and developmentally appropriate\n    And the system should be accessible to all children regardless of reading level\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Voice guidance ensures accessibility for pre-readers",

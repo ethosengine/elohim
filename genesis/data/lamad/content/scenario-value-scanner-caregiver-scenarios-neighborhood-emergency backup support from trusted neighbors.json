@@ -6,7 +6,7 @@
   "title": "Emergency backup support from trusted neighbors",
   "description": "Emergency backup support from trusted neighbors",
   "content": "Scenario: Emergency backup support from trusted neighbors\n    Given caregiving emergencies occur unexpectedly\n    And James might need urgent help with David\n    When the neighborhood_elohim coordinates emergency support\n    Then it should identify trusted neighbors for backup\n    And it should ensure neighbors are trained for basic support\n    And emergency contacts should be readily available\n    And neighborhood should provide safety net for crisis\n    And James should have local emergency backup beyond 911\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency backup support from trusted neighbors",

@@ -6,7 +6,7 @@
   "title": "Operator exits 70-hour work weeks for sustainable life balance",
   "description": "Operator exits 70-hour work weeks for sustainable life balance",
   "content": "Scenario: Operator exits 70-hour work weeks for sustainable life balance\n    Given franchise operation demanded constant presence and crushing time commitment\n    And James sacrificed family time, health, and personal life to business survival\n    When conversion enables his exit or transition to reasonable steward role\n    Then 70-hour weeks end, replaced by balanced schedule if staying or complete exit\n    And family relationships can heal after years of absence and stress\n    And personal health improves through reduced stress and reasonable hours\n    And life beyond business becomes possible for first time in years\n    And workplace_elohim ensures transition protects his wellbeing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Operator exits 70-hour work weeks for sustainable life balance",

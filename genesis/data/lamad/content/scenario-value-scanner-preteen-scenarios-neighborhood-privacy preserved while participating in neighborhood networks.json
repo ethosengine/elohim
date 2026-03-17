@@ -6,7 +6,7 @@
   "title": "Privacy preserved while participating in neighborhood networks",
   "description": "Privacy preserved while participating in neighborhood networks",
   "content": "Scenario: Privacy preserved while participating in neighborhood networks\n    Given Marcus's household circumstances are sensitive\n    And participation in neighborhood networks requires some visibility\n    When Marcus's data contributes to neighborhood coordination\n    Then his specific situation must remain private\n    And only anonymized aggregate data should be used\n    And neighborhood support should flow without stigmatizing exposure\n    And his dignity should be protected while receiving benefits\n    And privacy should be balanced with community participation\n    And the protocol should enable solidarity without surveillance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy preserved while participating in neighborhood networks",

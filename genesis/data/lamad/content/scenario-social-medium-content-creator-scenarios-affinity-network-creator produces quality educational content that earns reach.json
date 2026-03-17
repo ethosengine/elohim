@@ -6,7 +6,7 @@
   "title": "Creator produces quality educational content that earns reach",
   "description": "Creator produces quality educational content that earns reach",
   "content": "Scenario: Creator produces quality educational content that earns reach\n    Given Jordan creates a video explaining climate feedback loops\n    And the content includes verified scientific sources\n    And it's accessible to general audience without oversimplification\n    When Jordan contributes the content to climate education affinity network\n    Then the verification agent validates the scientific claims\n    And the content is offered to climate education communities\n    And educators and learners can review and appreciate the content\n    And genuine appreciation causes the content to spread to related networks\n    And Jordan receives community support for valuable educational work\n    And reach is earned through demonstrated value, not algorithms\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:content_creator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creator produces quality educational content that earns reach",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

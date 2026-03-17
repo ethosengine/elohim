@@ -6,7 +6,7 @@
   "title": "Community oversight ensures environmental stewardship and sustainability",
   "description": "Community oversight ensures environmental stewardship and sustainability",
   "content": "Scenario: Community oversight ensures environmental stewardship and sustainability\n    Given private ownership may prioritize short-term profit over environmental health\n    And community bears environmental impacts of farming practices\n    When community has governance voice in farm environmental practices\n    Then sustainable and regenerative agriculture is prioritized through community input\n    And environmental practices are transparent and accountable to community\n    And water quality, soil health, and biodiversity are protected as community values\n    And farm environmental stewardship benefits entire community ecosystem\n    And community_elohim monitors environmental practices and community accountability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community oversight ensures environmental stewardship and sustainability",

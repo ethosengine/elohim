@@ -6,7 +6,7 @@
   "title": "Building identity around care rather than consumption",
   "description": "Building identity around care rather than consumption",
   "content": "Scenario: Building identity around care rather than consumption\n    Given Tommy has made multiple care contributions over time\n    And the system has recognized his caring actions\n    When Tommy reflects on his scanner usage\n    Then he should experience himself as a valued contributor\n    And his identity should be forming around care for others\n    And he should understand that invisible work is actually valuable\n    And he should not be conditioned toward consumer identity\n    And care economy principles should be internalized through experience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building identity around care rather than consumption",

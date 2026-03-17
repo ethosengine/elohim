@@ -6,7 +6,7 @@
   "title": "Local food systems participation through necessity and community",
   "description": "Local food systems participation through necessity and community",
   "content": "Scenario: Local food systems participation through necessity and community\n    Given Maria seeks affordable food through farmers markets, co-ops, and bulk buying\n    And she participates in local food economy when economically viable\n    When food sourcing patterns are analyzed\n    Then the bioregional_elohim should recognize her local food participation\n    And it should value community-based food systems engagement\n    And her food choices should be seen as supporting regional resilience\n    And economic cooperation should be honored as bioregional participation\n    And Maria should see her food practices as locally sustaining\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local food systems participation through necessity and community",

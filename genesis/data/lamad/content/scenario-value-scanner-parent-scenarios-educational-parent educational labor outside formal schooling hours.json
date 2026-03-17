@@ -6,7 +6,7 @@
   "title": "Parent educational labor outside formal schooling hours",
   "description": "Parent educational labor outside formal schooling hours",
   "content": "Scenario: Parent educational labor outside formal schooling hours\n    Given Sarah teaches Tommy and Emma during evenings and weekends\n    And homework support, life skills, critical thinking happen at home\n    When the educational_elohim tracks Sarah's teaching time\n    Then it should quantify hours spent on educational labor\n    And it should recognize teaching homework as skilled instructional work\n    And it should value informal education alongside formal instruction\n    And Sarah's non-school teaching should accumulate care tokens\n    And the system should make invisible educational labor visible\n    And parent teaching should be recognized as professional-grade work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent educational labor outside formal schooling hours",

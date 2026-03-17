@@ -6,7 +6,7 @@
   "title": "Receiving performance feedback with dignity",
   "description": "Receiving performance feedback with dignity",
   "content": "Scenario: Receiving performance feedback with dignity\n    Given Jordan's supervisor conducts annual performance reviews\n    And feedback helps employees grow professionally\n    When Jordan has their performance review\n    Then feedback is delivered respectfully and constructively\n    And strengths are celebrated authentically (not patronizingly)\n    And growth areas are identified with specific, achievable goals\n    And the personal_agent helps Jordan understand and process feedback\n    And Jordan's performance is evaluated fairly by actual job standards\n    And Jordan experiences professional growth through honest feedback\n    And Jordan is treated as a real employee, not a perpetual trainee\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Receiving performance feedback with dignity",

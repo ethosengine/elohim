@@ -6,7 +6,7 @@
   "title": "Volunteer labor addressing municipal housing needs quantified",
   "description": "Volunteer labor addressing municipal housing needs quantified",
   "content": "Scenario: Volunteer labor addressing municipal housing needs quantified\n    Given Frank volunteers 20 hours/week with Habitat for Humanity\n    And Habitat builds affordable housing the municipality fails to provide\n    And his volunteer work substitutes for municipal housing policy\n    When the municipal_elohim tracks housing care economy\n    Then Frank's volunteer construction work should be quantified\n    And aggregate volunteer labor should be calculated municipality-wide\n    And data should reveal that volunteers provide housing infrastructure\n    And municipal housing policy should recognize volunteer contributions\n    And Frank's work should demonstrate need for municipal investment\n    And volunteers should be understood as filling municipal policy gaps\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Volunteer labor addressing municipal housing needs quantified",

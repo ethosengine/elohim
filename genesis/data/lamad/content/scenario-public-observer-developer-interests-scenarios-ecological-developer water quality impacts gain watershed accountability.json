@@ -6,7 +6,7 @@
   "title": "Developer water quality impacts gain watershed accountability",
   "description": "Developer water quality impacts gain watershed accountability",
   "content": "Scenario: Developer water quality impacts gain watershed accountability\n    Given a developer's projects increase impervious surface and runoff\n    And environmental review addressed only immediate site impacts\n    When the Observer analyzes watershed-scale water quality impacts\n    Then analysis shows: cumulative development degraded stream quality\n    And downstream communities face flooding and pollution impacts\n    And watershed perspective reveals impacts ignored in site-level review\n    And developer contribution to cumulative harm becomes visible\n    And watershed accountability demands comprehensive impact assessment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer water quality impacts gain watershed accountability",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

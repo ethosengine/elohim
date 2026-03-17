@@ -4,7 +4,7 @@
   "title": "Vulnerable people are protected",
   "description": "by systems that cannot be corrupted or captured by institutional power",
   "content": "by systems that cannot be corrupted or captured by institutional power",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/vision/concept-vulnerable-people-protected.json",
   "tags": [
     "vision",
@@ -22,14 +22,15 @@
     "section": "vision",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.001396",
   "updatedAt": "2025-12-24T03:05:25.894Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

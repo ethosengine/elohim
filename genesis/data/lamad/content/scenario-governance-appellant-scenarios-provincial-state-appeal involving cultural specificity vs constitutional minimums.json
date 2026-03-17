@@ -6,7 +6,7 @@
   "title": "Appeal involving cultural specificity vs constitutional minimums",
   "description": "Appeal involving cultural specificity vs constitutional minimums",
   "content": "Scenario: Appeal involving cultural specificity vs constitutional minimums\n    Given my community has cultural practices that differ from regional norms\n    And an agent decision applied regional default rather than local calibration\n    When I appeal based on cultural context\n    Then Regional Constitutional Council evaluates legitimate cultural diversity\n    And They distinguish between cultural variation and constitutional violations\n    And They examine if my community had ability to calibrate protocol appropriately\n    And They consider if agent should have recognized cultural context\n    And They balance universal human dignity with cultural specificity\n    And The precedent clarifies how constitutional minimums apply across cultures\n    And My appeal protects cultural diversity within constitutional framework\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal involving cultural specificity vs constitutional minimums",

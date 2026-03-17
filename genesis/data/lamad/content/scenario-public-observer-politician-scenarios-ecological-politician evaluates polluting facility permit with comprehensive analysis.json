@@ -6,7 +6,7 @@
   "title": "Politician evaluates polluting facility permit with comprehensive analysis",
   "description": "Politician evaluates polluting facility permit with comprehensive analysis",
   "content": "Scenario: Politician evaluates polluting facility permit with comprehensive analysis\n    Given company applies for permit to operate polluting facility\n    And promises economic benefits and claims minimal environmental impact\n    When the Observer analyzes facility proposal and company track record\n    Then they see company's violation history at other locations\n    And understand health impacts on nearby residential populations\n    And identify existing pollution burden in target neighborhood\n    And review economic claims against actual job creation in similar facilities\n    And make informed decision balancing economics with environmental protection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician evaluates polluting facility permit with comprehensive analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

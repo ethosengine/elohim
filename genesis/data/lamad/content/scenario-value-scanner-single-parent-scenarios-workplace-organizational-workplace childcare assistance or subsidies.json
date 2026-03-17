@@ -6,7 +6,7 @@
   "title": "Workplace childcare assistance or subsidies",
   "description": "Workplace childcare assistance or subsidies",
   "content": "Scenario: Workplace childcare assistance or subsidies\n    Given Maria pays substantial portion of income for childcare\n    And childcare costs are major burden on single-parent households\n    When Maria balances childcare needs with employment\n    Then workplace should provide childcare assistance or subsidies\n    And employer-supported childcare should reduce financial burden\n    And assistance should recognize that single parents bear full childcare costs alone\n    And workplace support should enable employment sustainability\n    And Maria should receive help with care costs that make work possible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace childcare assistance or subsidies",

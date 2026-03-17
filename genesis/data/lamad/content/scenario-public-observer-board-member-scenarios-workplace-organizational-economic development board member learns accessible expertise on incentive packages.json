@@ -6,7 +6,7 @@
   "title": "Economic development board member learns accessible expertise on incentive packages",
   "description": "Economic development board member learns accessible expertise on incentive packages",
   "content": "Scenario: Economic development board member learns accessible expertise on incentive packages\n    Given business proposes expansion with request for $5M in tax incentives\n    And staff recommendation supports incentives emphasizing job creation promises\n    And board member has no economic development expertise but must vote responsibly\n    When the board member uses Observer accessible expertise\n    Then they receive plain-language explanation of incentive types and impacts\n    And see cost-benefit analysis comparing incentive cost to projected tax revenue\n    And access track record of business's job creation in other locations\n    And get key questions to ask about job quality, accountability, and alternatives\n    And accessible expertise enables informed judgment on incentive proposal\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Economic development board member learns accessible expertise on incentive packages",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

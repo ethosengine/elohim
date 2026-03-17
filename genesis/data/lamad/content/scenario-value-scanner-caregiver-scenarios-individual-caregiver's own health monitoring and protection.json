@@ -6,7 +6,7 @@
   "title": "Caregiver's own health monitoring and protection",
   "description": "Caregiver's own health monitoring and protection",
   "content": "Scenario: Caregiver's own health monitoring and protection\n    Given James neglects his own health amid caregiving\n    And caregiver health decline creates cascading crisis\n    When the personal_agent monitors James's health\n    Then it should ensure he attends his own medical appointments\n    And it should prompt him to take prescribed medications\n    And it should recognize when his health is declining\n    And it should insist on self-care when necessary\n    And James's health should be protected as essential infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver's own health monitoring and protection",

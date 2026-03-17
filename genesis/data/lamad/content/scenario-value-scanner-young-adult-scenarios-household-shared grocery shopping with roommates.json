@@ -6,7 +6,7 @@
   "title": "Shared grocery shopping with roommates",
   "description": "Shared grocery shopping with roommates",
   "content": "Scenario: Shared grocery shopping with roommates\n    Given Aisha and her roommates share food costs\n    And they have different dietary preferences\n    When they use the Value Scanner for shared shopping\n    Then the household_elohim should track individual contributions\n    And it should manage the shared household budget\n    And it should accommodate different preferences within budget\n    And care tokens should reflect each person's shopping labor\n    And the system should prevent household conflicts over resources\n    And equitable cost-sharing should be transparent\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Shared grocery shopping with roommates",

@@ -6,7 +6,7 @@
   "title": "Building neighborhood relationships across demographic differences",
   "description": "Building neighborhood relationships across demographic differences",
   "content": "Scenario: Building neighborhood relationships across demographic differences\n    Given Kenji's neighborhood includes diverse ages, incomes, and backgrounds\n    And care economy requires bridging difference\n    When Kenji builds relationships with non-student neighbors\n    Then the neighborhood_elohim should recognize cross-demographic care work\n    And it should value relationships with elderly neighbors, families, workers\n    And it should show how diverse relationships strengthen neighborhood\n    And bridging work should be recognized as care contribution\n    And the system should foster inclusive neighborhood community\n    And students should learn to build community across difference\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building neighborhood relationships across demographic differences",

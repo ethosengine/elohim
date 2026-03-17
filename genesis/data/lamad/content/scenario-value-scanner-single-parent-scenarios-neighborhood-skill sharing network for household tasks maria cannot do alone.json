@@ -6,7 +6,7 @@
   "title": "Skill sharing network for household tasks Maria cannot do alone",
   "description": "Skill sharing network for household tasks Maria cannot do alone",
   "content": "Scenario: Skill sharing network for household tasks Maria cannot do alone\n    Given some household tasks are difficult or impossible for one person\n    And Maria cannot afford to hire professionals for everything\n    When Maria needs help with household tasks requiring multiple people or specialized skills\n    Then the neighborhood_elohim should coordinate skill sharing network\n    And neighbors should exchange help based on different capabilities\n    And Maria should access household help through reciprocal labor exchange\n    And skill sharing should enable household maintenance without money or partner\n    And neighborhood cooperation should solve single-parent capability gaps\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Skill sharing network for household tasks Maria cannot do alone",

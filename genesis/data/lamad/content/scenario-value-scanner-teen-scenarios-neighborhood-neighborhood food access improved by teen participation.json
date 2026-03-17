@@ -6,7 +6,7 @@
   "title": "Neighborhood food access improved by teen participation",
   "description": "Neighborhood food access improved by teen participation",
   "content": "Scenario: Neighborhood food access improved by teen participation\n    Given Jasmine has knowledge of good deals and food sources\n    And she is mobile and has time flexibility\n    When she shares food access information through neighborhood networks\n    Then the neighborhood_elohim should aggregate and distribute her knowledge\n    And other neighbors should benefit from her market research\n    And her contributions to collective food literacy should be recognized\n    And neighborhood food security should improve through shared intelligence\n    And Jasmine should learn that her knowledge is valuable to the community\n    And information sharing should be recognized as care contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood food access improved by teen participation",

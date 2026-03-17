@@ -6,7 +6,7 @@
   "title": "Learning new technology to stay connected",
   "description": "Learning new technology to stay connected",
   "content": "Scenario: Learning new technology to stay connected\n    Given Margaret needs technology skills for modern life\n    And digital divide affects seniors disproportionately\n    When the educational_elohim provides technology education\n    Then senior-appropriate technology training should be available\n    And teaching should be patient and non-patronizing\n    And Margaret should learn at her own pace\n    And technology should be taught as tool for connection and autonomy\n    And digital literacy should be senior right, not privilege\n    And education should prevent technology-based isolation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning new technology to stay connected",

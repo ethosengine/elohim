@@ -4,7 +4,7 @@
   "title": "Activist builds cross-border solidarity network",
   "description": "labor activists in 15 countries face similar corporate exploitation; they want to coordinate against multinational corporation practices; they form a global labor solidarity network... (10 steps total)",
   "content": "Given labor activists in 15 countries face similar corporate exploitation\nAnd they want to coordinate against multinational corporation practices\nWhen they form a global labor solidarity network\nAnd they establish protocols respecting different legal contexts\nAnd translation agents enable communication across 12 languages\nThen the global network creates shared understanding of corporate tactics\nAnd each national group maintains autonomy over local strategy\nAnd pattern recognition surfaces successful resistance campaigns\nAnd coordination happens through verified trust relationships\nAnd legal risks are minimized through jurisdictional awareness",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "social_medium",
@@ -35,7 +35,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-social-medium-activist-global",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.259Z",
@@ -43,7 +44,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

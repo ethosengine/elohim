@@ -6,7 +6,7 @@
   "title": "Parental oversight protects young child while honoring agency",
   "description": "Parental oversight protects young child while honoring agency",
   "content": "Scenario: Parental oversight protects young child while honoring agency\n    Given Tommy has genuine autonomy in the scanner\n    And he is only 5 years old\n    When Tommy makes selections\n    Then parental oversight should be supreme\n    And Sarah should have full visibility into Tommy's scanner usage\n    And Sarah should control what data is recorded\n    And Tommy's agency should be preserved within parental boundaries\n    And the balance should protect both safety and autonomy\n    And Sarah should not experience anxiety about granting Tommy freedom\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parental oversight protects young child while honoring agency",

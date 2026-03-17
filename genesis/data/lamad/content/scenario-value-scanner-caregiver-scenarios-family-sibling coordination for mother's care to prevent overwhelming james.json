@@ -6,7 +6,7 @@
   "title": "Sibling coordination for mother's care to prevent overwhelming James",
   "description": "Sibling coordination for mother's care to prevent overwhelming James",
   "content": "Scenario: Sibling coordination for mother's care to prevent overwhelming James\n    Given James's siblings also have responsibility for their mother\n    And James is already overwhelmed with David's care\n    When the family_elohim tracks sibling care contributions\n    Then it should ensure siblings share mother's care equitably\n    And it should prevent care from defaulting entirely to James\n    And it should coordinate among siblings for fair distribution\n    And James's dual burden should not excuse siblings from contributing\n    And family care should be distributed based on capacity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sibling coordination for mother's care to prevent overwhelming James",

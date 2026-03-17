@@ -6,7 +6,7 @@
   "title": "Neighborhood memorial preparation supports anticipatory grief",
   "description": "Neighborhood memorial preparation supports anticipatory grief",
   "content": "Scenario: Neighborhood memorial preparation supports anticipatory grief\n    Given David's condition is progressive and terminal\n    And James experiences anticipatory grief constantly\n    When the neighborhood_elohim recognizes grief support needs\n    Then it should connect James to grief support resources\n    And neighbors should be prepared to support through eventual loss\n    And anticipatory grief should be recognized and honored\n    And neighborhood should plan to support James through progressive loss\n    And care relationships should extend through grief and beyond\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood memorial preparation supports anticipatory grief",

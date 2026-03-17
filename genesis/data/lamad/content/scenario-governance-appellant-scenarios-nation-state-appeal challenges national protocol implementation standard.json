@@ -6,7 +6,7 @@
   "title": "Appeal challenges national protocol implementation standard",
   "description": "Appeal challenges national protocol implementation standard",
   "content": "Scenario: Appeal challenges national protocol implementation standard\n    Given agent decisions nationwide follow certain implementation standard\n    And I believe this standard violates constitutional principles\n    When I appeal to national level challenging the standard itself\n    Then National Constitutional Council evaluates the implementation against constitution\n    And They examine if nationwide practice has drifted from constitutional alignment\n    And They consider impact on millions if standard is changed\n    And They balance consistency benefits with constitutional correction need\n    And They may order national recalibration of agent behavior\n    And My individual appeal triggers systemic constitutional review\n    And Protocol governance remains accountable to constitutional principles at scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal challenges national protocol implementation standard",

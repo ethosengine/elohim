@@ -6,7 +6,7 @@
   "title": "Navigating neighborhood safety concerns as vulnerable person",
   "description": "Navigating neighborhood safety concerns as vulnerable person",
   "content": "Scenario: Navigating neighborhood safety concerns as vulnerable person\n    Given I have heightened safety concerns due to domestic violence\n    And I am learning a new neighborhood's safety landscape\n    When I assess and navigate neighborhood safety\n    Then the Value Scanner helps me identify safe routes and spaces\n    And surfaces information about neighborhood safety patterns\n    And connects me to neighbors who can provide safety support\n    And helps me teach children neighborhood safety practices\n    And tracks safety concerns and incidents\n    And my personal_agent alerts me to potential safety issues\n    And recognizes safety navigation as constant cognitive labor\n    And validates that my vigilance is appropriate\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Navigating neighborhood safety concerns as vulnerable person",

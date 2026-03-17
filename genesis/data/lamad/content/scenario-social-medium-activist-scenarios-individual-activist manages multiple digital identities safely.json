@@ -6,7 +6,7 @@
   "title": "Activist manages multiple digital identities safely",
   "description": "Activist manages multiple digital identities safely",
   "content": "Scenario: Activist manages multiple digital identities safely\n    Given the activist works on both local neighborhood issues and sensitive human rights cases\n    When they create separate personas for different organizing contexts\n    Then each persona has independent privacy settings\n    And connections between personas are cryptographically isolated\n    And the activist can switch contexts without cross-contamination\n    And each persona's contributions earn reach independently\n    And protection protocols apply to all personas\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-individual",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist manages multiple digital identities safely",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

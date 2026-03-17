@@ -6,7 +6,7 @@
   "title": "Bioregional belonging includes disabled people as full participants",
   "description": "Bioregional belonging includes disabled people as full participants",
   "content": "Scenario: Bioregional belonging includes disabled people as full participants\n    Given disabled people are often excluded from community belonging\n    And bioregional identity requires full inclusion of all residents\n    When bioregional community is defined\n    Then the bioregional_elohim should include disabled people as essential members\n    And Alex should be welcomed as full bioregional participant\n    And disability should be recognized as part of human diversity in ecosystem\n    And bioregional care economy should serve disabled members\n    And Alex's contributions should be valued within bioregional context\n    And the protocol should embody that everyone belongs to place\n    And disabled people's relationship to land and ecosystem should be honored\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional belonging includes disabled people as full participants",

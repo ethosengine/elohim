@@ -6,7 +6,7 @@
   "title": "Appealing resource allocation within family unit",
   "description": "Appealing resource allocation within family unit",
   "content": "Scenario: Appealing resource allocation within family unit\n    Given Family Elohim allocated household resources in a way I believe is unfair\n    And I feel my needs were deprioritized compared to other family members\n    When I appeal the resource allocation decision\n    Then the agent must justify how it balanced competing family member needs\n    And The Constitutional Council evaluates if constitutional principles were followed\n    And They consider cultural context of family resource sharing\n    And They examine if I had meaningful input into the decision process\n    And The appeal can result in modified allocation or preference updates\n    And Family members can collaboratively set allocation principles going forward\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-family",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appealing resource allocation within family unit",

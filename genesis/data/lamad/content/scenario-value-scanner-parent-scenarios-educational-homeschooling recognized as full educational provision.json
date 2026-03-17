@@ -6,7 +6,7 @@
   "title": "Homeschooling recognized as full educational provision",
   "description": "Homeschooling recognized as full educational provision",
   "content": "Scenario: Homeschooling recognized as full educational provision\n    Given some parents provide complete education at home\n    And homeschooling is intensive educational labor\n    When the educational_elohim tracks homeschooling work\n    Then it should recognize full-time teaching by parents\n    And homeschooling should accumulate substantial care tokens\n    And the system should value parent-provided education fully\n    And homeschooling parents should have economic support for educational work\n    And care economy should recognize diverse educational approaches\n    And parent teaching should be valued regardless of institutional setting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Homeschooling recognized as full educational provision",

@@ -6,7 +6,7 @@
   "title": "Investor redirects capital from extractive corporations to democratic community businesses",
   "description": "Investor redirects capital from extractive corporations to democratic community businesses",
   "content": "Scenario: Investor redirects capital from extractive corporations to democratic community businesses\n    Given Patricia has $60K in index funds funding corporate extraction\n    And she morally opposes enterprises her capital funds but lacked alternatives\n    When community investment pool offers values-aligned local alternative\n    Then she moves $10K from stock market to community investment in Maria's Kitchen conversion\n    And capital directly funds worker ownership, not corporate extraction\n    And investment aligns with values: worker dignity, community wealth, environmental stewardship\n    And financial returns are fair (5% annually) while social returns are massive\n    And community_elohim facilitates investment pool management and transparent reporting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Investor redirects capital from extractive corporations to democratic community businesses",

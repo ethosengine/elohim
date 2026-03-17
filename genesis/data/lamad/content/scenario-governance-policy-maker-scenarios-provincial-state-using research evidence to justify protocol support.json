@@ -6,7 +6,7 @@
   "title": "Using research evidence to justify protocol support",
   "description": "Using research evidence to justify protocol support",
   "content": "Scenario: Using research evidence to justify protocol support\n    Given I need to defend protocol against skeptical colleagues\n    And Dr. Chen's research provides rigorous evaluation\n    When I cite evidence in committee hearings\n    Then I present: data showing reduced loneliness and improved wellbeing\n    And I provide: evidence about successful crisis response\n    And I demonstrate: marginalized community access patterns\n    And I show: comparison with communities without protocol\n    And I address: limitations and challenges honestly\n    And evidence base: supports informed policy choice\n    And I maintain: scientific credibility through honest assessment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Using research evidence to justify protocol support",

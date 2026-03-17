@@ -6,7 +6,7 @@
   "title": "Seasonal labor challenges are addressed through democratic planning",
   "description": "Seasonal labor challenges are addressed through democratic planning",
   "content": "Scenario: Seasonal labor challenges are addressed through democratic planning\n    Given agricultural work is inherently seasonal creating income volatility\n    And farmworkers traditionally face periods of unemployment and poverty\n    When democratic governance addresses seasonal labor democratically\n    Then year-round base income is guaranteed through diversified farm activities\n    And off-season work includes equipment maintenance, planning, and training\n    And EAE network coordination provides cross-employment opportunities during slow periods\n    And income stability improves farmworker financial security dramatically\n    And workplace_elohim coordinates seasonal labor solutions across network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Seasonal labor challenges are addressed through democratic planning",

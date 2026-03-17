@@ -6,7 +6,7 @@
   "title": "Organizer coordinates parent-teacher coalition for class size reduction",
   "description": "Organizer coordinates parent-teacher coalition for class size reduction",
   "content": "Scenario: Organizer coordinates parent-teacher coalition for class size reduction\n    Given teachers union supports smaller class sizes\n    And parents see crowded classrooms affecting their children\n    When the organizer builds coalition using Observer coordination tools\n    Then teachers and parents access shared data on class size impacts\n    And coordinate testimony combining professional and family perspectives\n    And track which board members support class size reduction\n    And organize joint mobilization for board meeting\n    And teacher expertise combines with parent power for policy change\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer coordinates parent-teacher coalition for class size reduction",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Connection to place through decades of residence",
   "description": "Connection to place through decades of residence",
   "content": "Scenario: Connection to place through decades of residence\n    Given Helen has lived in same bioregion for 82 years\n    And deep place-based knowledge develops over lifetime\n    When bioregional governance makes land use decisions\n    Then Helen's intimate knowledge of place should inform planning\n    And longtime residents should have standing in ecological governance\n    And her connection to land should be valued in decision-making\n    And the protocol should elevate voices of those with deep place-knowledge\n    And bioregional stewardship should prioritize those who've observed place over time\n    And Helen's decades of residence should give her ecological authority\n    And land use should consider those who remember land's history\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Connection to place through decades of residence",

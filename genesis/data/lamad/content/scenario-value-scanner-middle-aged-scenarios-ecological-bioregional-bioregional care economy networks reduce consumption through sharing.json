@@ -6,7 +6,7 @@
   "title": "Bioregional care economy networks reduce consumption through sharing",
   "description": "Bioregional care economy networks reduce consumption through sharing",
   "content": "Scenario: Bioregional care economy networks reduce consumption through sharing\n    Given many resources are underutilized in individual households\n    And sharing reduces consumption while building care networks\n    And bioregional resilience requires resource cooperation\n    When bioregional_elohim facilitates resource sharing\n    Then it should connect Robert to bioregional sharing networks\n    And support participation in tool libraries, car sharing, and resource exchange\n    And recognize that sharing reduces ecological impact and builds care economy\n    And track ecological benefits of sharing: \"Tool sharing prevented 8 redundant purchases\"\n    And demonstrate that care economy and ecological sustainability are aligned\n    And build bioregional resilience through sharing economy\n    And reduce consumption through care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional care economy networks reduce consumption through sharing",

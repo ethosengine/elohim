@@ -6,7 +6,7 @@
   "title": "Navigating family expectations about availability",
   "description": "Navigating family expectations about availability",
   "content": "Scenario: Navigating family expectations about availability\n    Given family members may not understand my work constraints\n    When family expects more availability than I can provide\n    Then the protocol should help me communicate my limitations\n    And provide evidence of my actual time and energy constraints\n    And support me in setting realistic boundaries\n    And help family understand that my constraints reflect employment structure not lack of care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-family",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Navigating family expectations about availability",

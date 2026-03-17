@@ -6,7 +6,7 @@
   "title": "Journalist develops whistleblower source in state agency",
   "description": "Journalist develops whistleblower source in state agency",
   "content": "Scenario: Journalist develops whistleblower source in state agency\n    Given a state employee witnesses fraud in contract process\n    And fears career retaliation for exposing misconduct\n    When the Observer provides secure protected channel\n    Then the whistleblower shares evidence of fraudulent contracts\n    And journalist investigates without exposing source\n    And verifies claims through additional reporting and records\n    And publishes investigation leading to official inquiry\n    And source protection enables accountability journalism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist develops whistleblower source in state agency",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

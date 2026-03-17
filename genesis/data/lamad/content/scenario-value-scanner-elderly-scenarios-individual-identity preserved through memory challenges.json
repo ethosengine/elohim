@@ -6,7 +6,7 @@
   "title": "Identity preserved through memory challenges",
   "description": "Identity preserved through memory challenges",
   "content": "Scenario: Identity preserved through memory challenges\n    Given Helen's dementia causes increasing memory difficulties\n    And her sense of self needs support and continuity\n    When her personal_agent interacts with her over time\n    Then it should help maintain her identity continuity\n    And it should reference her history: \"You worked as a teacher for 30 years\"\n    And it should support her self-concept despite cognitive changes\n    And it should remind her of relationships and accomplishments\n    And her personhood should remain intact even as memory fades\n    And the protocol should serve the human being she remains\n    And dignity should be preserved regardless of cognitive capacity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identity preserved through memory challenges",

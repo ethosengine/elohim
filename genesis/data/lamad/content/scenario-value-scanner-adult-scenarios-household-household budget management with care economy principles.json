@@ -6,7 +6,7 @@
   "title": "Household budget management with care economy principles",
   "description": "Household budget management with care economy principles",
   "content": "Scenario: Household budget management with care economy principles\n    Given household operates on $65k/year budget\n    And resources must cover housing, food, children's needs, healthcare, saving\n    When Sarah makes purchasing decisions\n    Then the household_elohim should track spending against budget\n    And it should integrate financial constraints with family needs\n    And it should help Sarah and partner make informed trade-offs\n    And budget should reflect care priorities, not just consumption\n    And financial management should serve household flourishing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household budget management with care economy principles",

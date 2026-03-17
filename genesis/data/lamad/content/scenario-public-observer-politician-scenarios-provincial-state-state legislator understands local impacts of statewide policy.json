@@ -6,7 +6,7 @@
   "title": "State legislator understands local impacts of statewide policy",
   "description": "State legislator understands local impacts of statewide policy",
   "content": "Scenario: State legislator understands local impacts of statewide policy\n    Given the politician represents specific legislative district\n    And considers statewide legislation\n    When the Observer analyzes district-specific impacts\n    Then they see how legislation affects their constituents specifically\n    And identify trade-offs between district and statewide interests\n    And understand which constituent communities benefit versus harmed\n    And explain vote to constituents with local impact data\n    And balance representation of district versus state interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "State legislator understands local impacts of statewide policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

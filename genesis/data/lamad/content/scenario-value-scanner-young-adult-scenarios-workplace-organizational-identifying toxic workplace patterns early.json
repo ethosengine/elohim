@@ -6,7 +6,7 @@
   "title": "Identifying toxic workplace patterns early",
   "description": "Identifying toxic workplace patterns early",
   "content": "Scenario: Identifying toxic workplace patterns early\n    Given Aisha is inexperienced with workplace dynamics\n    And toxic workplaces can be normalizing\n    When the workplace_elohim monitors organizational patterns\n    Then it should flag exploitative practices\n    And it should identify when workplace violates care principles\n    And it should help her recognize red flags\n    And the system should protect her from normalizing abuse\n    And she should learn what healthy workplace care looks like\n    And early warning should enable protective action\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identifying toxic workplace patterns early",

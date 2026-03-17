@@ -6,7 +6,7 @@
   "title": "Farm financial transparency builds trust and informed decision-making",
   "description": "Farm financial transparency builds trust and informed decision-making",
   "content": "Scenario: Farm financial transparency builds trust and informed decision-making\n    Given farmworkers previously had no visibility into farm finances\n    And lack of transparency created distrust and uninformed compensation discussions\n    When democratic governance requires financial transparency\n    Then farmworkers see complete financial picture: revenue, costs, margins, investments\n    And compensation decisions are informed by transparent profit distribution\n    And financial education is provided helping workers understand farm economics\n    And trust builds through transparency replacing suspicion from opacity\n    And workplace_elohim provides financial transparency dashboards for democratic governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farm financial transparency builds trust and informed decision-making",

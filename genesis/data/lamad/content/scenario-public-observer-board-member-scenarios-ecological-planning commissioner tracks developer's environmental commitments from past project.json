@@ -6,7 +6,7 @@
   "title": "Planning commissioner tracks developer's environmental commitments from past project",
   "description": "Planning commissioner tracks developer's environmental commitments from past project",
   "content": "Scenario: Planning commissioner tracks developer's environmental commitments from past project\n    Given same developer seeking approval for new project\n    And past project approved with environmental mitigation commitments\n    And commissioner wants to know if developer followed through on previous promises\n    When the commissioner uses Observer implementation tracking\n    Then they see developer's past project mitigation commitments versus implementation\n    And discover tree planting and habitat restoration commitments not fully delivered\n    And find stormwater management systems performing below promised levels\n    And access documentation showing enforcement gaps by municipality\n    And impact tracking reveals developer's track record diverged from promises\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning commissioner tracks developer's environmental commitments from past project",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

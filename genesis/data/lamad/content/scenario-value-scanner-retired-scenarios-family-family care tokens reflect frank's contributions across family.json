@@ -6,7 +6,7 @@
   "title": "Family care tokens reflect Frank's contributions across family",
   "description": "Family care tokens reflect Frank's contributions across family",
   "content": "Scenario: Family care tokens reflect Frank's contributions across family\n    Given care flows in multiple directions across the family\n    And Frank provides grandchild care, elder support, and adult child guidance\n    When family_elohim calculates family care tokens\n    Then it should track care across all three generations\n    And recognize Frank's care for grandchildren and mother-in-law\n    And value his support for adult children\n    And accumulate tokens representing Frank's family contributions\n    And these tokens should create claims on future family support\n    And the complex web of family care reciprocity should be visible\n    And Frank should see his place in lifecycle care flows\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care tokens reflect Frank's contributions across family",

@@ -6,7 +6,7 @@
   "title": "Financial literacy education grounded in real practice",
   "description": "Financial literacy education grounded in real practice",
   "content": "Scenario: Financial literacy education grounded in real practice\n    Given Jasmine manages real budgets and makes real economic decisions\n    And school provides financial literacy education\n    When educational_elohim integrates school learning with lived experience\n    Then abstract financial concepts should connect to her real practice\n    And she should learn budgeting through managing actual household budget\n    And understand compound interest through her real college savings\n    And learn financial planning by making real financial plans\n    And develop sophisticated financial capability through practice, not just theory\n    And integrate formal education with applied learning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Financial literacy education grounded in real practice",

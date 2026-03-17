@@ -6,7 +6,7 @@
   "title": "Neighborhood emergency response and resilience",
   "description": "Neighborhood emergency response and resilience",
   "content": "Scenario: Neighborhood emergency response and resilience\n    Given Margaret is often home during the day\n    And she has nursing background and crisis response experience\n    When neighborhood emergencies occur\n    Then Margaret should be part of emergency response network\n    And her skills and availability should be known to neighbors\n    And the neighborhood should be more resilient due to her presence\n    And her contributions to collective safety should be tracked\n    And emergency preparedness should be enhanced by retiree participation\n    And Margaret's professional background should serve neighborhood\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood emergency response and resilience",

@@ -6,7 +6,7 @@
   "title": "Manager demonstrates ChickenMax democratic model to curious community",
   "description": "Manager demonstrates ChickenMax democratic model to curious community",
   "content": "Scenario: Manager demonstrates ChickenMax democratic model to curious community\n    Given community members are curious about worker ownership\n    And Marcus has visible coordinator role in community institution\n    When community members ask about democratic business model\n    Then Marcus explains transformation from corporate extraction to worker ownership\n    And Marcus emphasizes workers govern, he coordinates with their consent\n    And Marcus's transparency about coordinator vs. owner role educates community\n    And community sees democratic governance as viable alternative\n    And other small businesses consider conversion after seeing example\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager demonstrates ChickenMax democratic model to curious community",

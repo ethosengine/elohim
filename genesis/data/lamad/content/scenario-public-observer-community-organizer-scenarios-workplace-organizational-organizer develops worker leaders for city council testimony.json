@@ -6,7 +6,7 @@
   "title": "Organizer develops worker leaders for city council testimony",
   "description": "Organizer develops worker leaders for city council testimony",
   "content": "Scenario: Organizer develops worker leaders for city council testimony\n    Given restaurant workers face wage theft and unsafe conditions\n    And most have never engaged in civic advocacy\n    When the organizer supports leadership development via Observer\n    Then workers receive accessible data on wage theft patterns\n    And get testimony framework they can personalize with their stories\n    And see labor protection policies from other cities\n    And practice addressing council member questions\n    And workers become powerful advocates for their own interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer develops worker leaders for city council testimony",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

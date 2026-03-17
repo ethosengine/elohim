@@ -6,7 +6,7 @@
   "title": "Repair and reuse culture born of necessity",
   "description": "Repair and reuse culture born of necessity",
   "content": "Scenario: Repair and reuse culture born of necessity\n    Given Maria cannot afford to replace items frequently\n    And she repairs, maintains, and extends the life of possessions\n    When household consumption patterns are tracked\n    Then the bioregional_elohim should quantify her repair and reuse practices\n    And it should celebrate her circular economy participation\n    And her repair culture should be valued as waste reduction\n    And economic necessity should be reframed as environmental leadership\n    And Maria should see herself as exemplifying sustainable consumption\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Repair and reuse culture born of necessity",

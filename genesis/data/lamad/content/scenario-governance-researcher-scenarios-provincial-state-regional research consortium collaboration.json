@@ -6,7 +6,7 @@
   "title": "Regional research consortium collaboration",
   "description": "Regional research consortium collaboration",
   "content": "Scenario: Regional research consortium collaboration\n    Given I am part of network studying protocol across multiple regions\n    And we coordinate methods to enable comparison\n    When we conduct parallel studies with shared protocols\n    Then we can: pool data to increase statistical power\n    And we enable: replication across different contexts\n    And we identify: universal patterns vs context-specific findings\n    And we learn: from each other's methodological innovations\n    And we create: cumulative knowledge building across research community\n    And My regional work contributes to: global understanding of democratic AI governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Regional research consortium collaboration",

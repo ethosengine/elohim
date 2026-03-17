@@ -6,7 +6,7 @@
   "title": "Practical neighborhood support for isolated caregiver",
   "description": "Practical neighborhood support for isolated caregiver",
   "content": "Scenario: Practical neighborhood support for isolated caregiver\n    Given James cannot easily leave David alone\n    And small practical tasks become difficult\n    When neighbors offer practical support\n    Then the neighborhood_elohim should coordinate helpful offers\n    And neighbors could pick up groceries or prescriptions\n    And they could help with yard work or home maintenance\n    And they could check in and provide human connection\n    And practical support should reduce James's isolation\n    And neighborhood mutual aid should serve caregivers actively\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Practical neighborhood support for isolated caregiver",

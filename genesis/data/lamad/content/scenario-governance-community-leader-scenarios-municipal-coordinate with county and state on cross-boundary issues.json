@@ -6,7 +6,7 @@
   "title": "Coordinate with county and state on cross-boundary issues",
   "description": "Coordinate with county and state on cross-boundary issues",
   "content": "Scenario: Coordinate with county and state on cross-boundary issues\n    Given Riverside is part of larger regional ecosystem\n    And watershed management crosses municipal boundaries\n    When Jamal works on water allocation issues\n    Then he coordinates with upstream and downstream municipalities\n    And Municipal Elohim shares data with regional agents\n    And multi-municipal deliberative assembly convenes\n    And solution serves multiple jurisdictions\n    And municipal leaders demonstrate lateral coordination\n    And subsidiarity enables appropriate-scale problem solving\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipal",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinate with county and state on cross-boundary issues",

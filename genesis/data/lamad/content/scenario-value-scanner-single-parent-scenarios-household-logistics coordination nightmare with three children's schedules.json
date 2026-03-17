@@ -6,7 +6,7 @@
   "title": "Logistics coordination nightmare with three children's schedules",
   "description": "Logistics coordination nightmare with three children's schedules",
   "content": "Scenario: Logistics coordination nightmare with three children's schedules\n    Given Maria coordinates school, after-school care, activities, appointments for three children\n    And she manages this alone while working full-time\n    When daily logistics need coordination\n    Then the household_elohim should integrate all schedules\n    And it should identify conflicts before they become crises\n    And it should suggest solutions for impossible timing situations\n    And it should coordinate with other parents for pickup/dropoff sharing\n    And Maria should have AI co-parent for logistical complexity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Logistics coordination nightmare with three children's schedules",

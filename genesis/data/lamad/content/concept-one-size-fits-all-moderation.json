@@ -4,7 +4,7 @@
   "title": "One-size-fits-all moderation",
   "description": "fails to respect diverse community values and contexts",
   "content": "fails to respect diverse community values and contexts",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/crisis-digital/concept-one-size-fits-all-moderation.json",
   "tags": [
     "crisis",
@@ -21,14 +21,15 @@
     "section": "crisis-digital",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.001082",
   "updatedAt": "2025-12-24T03:05:25.879Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

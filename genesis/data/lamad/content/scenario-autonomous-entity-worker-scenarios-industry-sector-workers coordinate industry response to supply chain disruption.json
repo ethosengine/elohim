@@ -6,7 +6,7 @@
   "title": "Workers coordinate industry response to supply chain disruption",
   "description": "Workers coordinate industry response to supply chain disruption",
   "content": "Scenario: Workers coordinate industry response to supply chain disruption\n    Given tomato blight affects regional supply from Johnson Farm\n    And individual entities would struggle with ingredient shortage\n    When industry_sector_elohim detects the disruption\n    Then sector workers coordinate menu adjustments across all entities\n    And workers share alternative supplier relationships\n    And entities with surplus inventory support those with shortages\n    And sector responds collectively to minimize customer impact\n    And coordinated resilience prevents business failures and worker layoffs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers coordinate industry response to supply chain disruption",

@@ -6,7 +6,7 @@
   "title": "Building neighborhood connections that might endure beyond crisis",
   "description": "Building neighborhood connections that might endure beyond crisis",
   "content": "Scenario: Building neighborhood connections that might endure beyond crisis\n    Given I might move to permanent housing in this neighborhood or elsewhere\n    And relationships I build now could become long-term community\n    When I invest in neighborhood relationships\n    Then the Value Scanner helps me identify connections worth developing\n    And supports authentic relationship-building despite uncertainty\n    And validates that building community is valuable regardless of housing permanence\n    And helps me maintain connections if I move within neighborhood\n    And facilitates staying connected if I move to different neighborhood\n    And my personal_agent tracks meaningful neighborhood relationships\n    And recognizes community-building as important social infrastructure work\n    And celebrates relationships that provide support and belonging\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building neighborhood connections that might endure beyond crisis",

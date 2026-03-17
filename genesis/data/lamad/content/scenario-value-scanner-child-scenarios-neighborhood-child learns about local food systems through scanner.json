@@ -6,7 +6,7 @@
   "title": "Child learns about local food systems through scanner",
   "description": "Child learns about local food systems through scanner",
   "content": "Scenario: Child learns about local food systems through scanner\n    Given Emma's neighborhood has local farmers and producers\n    And the Value Scanner highlights local sourcing\n    When Emma scans locally-produced items\n    Then her personal_agent should explain local food systems\n    And the agent should say \"This was grown by farmers just 20 miles away\"\n    And Emma should learn about supply chains at concrete level\n    And she should understand connection between her food and local land\n    And regional care economies should be made visible\n    And she should develop sense of place-based economic relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child learns about local food systems through scanner",

@@ -6,7 +6,7 @@
   "title": "Board member monitors discipline disparities and pushes for equity",
   "description": "Board member monitors discipline disparities and pushes for equity",
   "content": "Scenario: Board member monitors discipline disparities and pushes for equity\n    Given the politician committed to equitable school climate\n    When the Observer tracks discipline outcomes by demographics\n    Then they see Black students suspended at 3x rate of white students\n    And learn similar behaviors result in different consequences by race\n    And identify which schools have restorative practices versus zero-tolerance\n    And compare district patterns to best-practice districts\n    And champion policy reform for equitable discipline\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member monitors discipline disparities and pushes for equity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

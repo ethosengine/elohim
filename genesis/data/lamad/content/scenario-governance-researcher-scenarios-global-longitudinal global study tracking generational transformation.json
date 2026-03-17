@@ -6,7 +6,7 @@
   "title": "Longitudinal global study tracking generational transformation",
   "description": "Longitudinal global study tracking generational transformation",
   "content": "Scenario: Longitudinal global study tracking generational transformation\n    Given I study whether protocol transforms civic culture across generations\n    And Tommy's generation is growing up with democratic AI governance\n    When I track generational cohorts over 20-30 years\n    Then I examine: civic capacities (constitutional literacy, deliberation skills)\n    And I assess: political participation and democratic engagement\n    And I measure: relationship to AI and technology\n    And I explore: whether growing up with protocol creates different citizenship\n    And I analyze: intergenerational transmission of democratic culture\n    And I investigate: whether protocol's effects compound across generations\n    And My research captures: civilizational transformation over human timescales\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Longitudinal global study tracking generational transformation",

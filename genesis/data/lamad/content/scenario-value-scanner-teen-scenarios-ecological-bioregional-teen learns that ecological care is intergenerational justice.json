@@ -6,7 +6,7 @@
   "title": "Teen learns that ecological care is intergenerational justice",
   "description": "Teen learns that ecological care is intergenerational justice",
   "content": "Scenario: Teen learns that ecological care is intergenerational justice\n    Given current consumption patterns affect future generations\n    And Jasmine's choices impact the world her future children will inherit\n    When bioregional_elohim frames ecological decisions\n    Then it should connect her choices to intergenerational impact\n    And help her understand ecological care as care for future people\n    And recognize that environmental stewardship is care work across time\n    And build her sense of responsibility to future generations\n    And demonstrate that care economy extends forward in time\n    And support her generation's commitment to leaving a livable world\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns that ecological care is intergenerational justice",

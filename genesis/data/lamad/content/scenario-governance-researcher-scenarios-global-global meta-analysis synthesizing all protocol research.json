@@ -6,7 +6,7 @@
   "title": "Global meta-analysis synthesizing all protocol research",
   "description": "Global meta-analysis synthesizing all protocol research",
   "content": "Scenario: Global meta-analysis synthesizing all protocol research\n    Given hundreds of researchers have studied protocol worldwide\n    And I want to synthesize cumulative knowledge\n    When I conduct systematic review and meta-analysis\n    Then I identify: all rigorous studies meeting quality criteria\n    And I synthesize: findings across diverse contexts and methods\n    And I assess: overall evidence about effectiveness and limitations\n    And I examine: publication bias and selective reporting\n    And I identify: gaps in knowledge requiring further research\n    And I provide: comprehensive evidence base for global policy\n    And My meta-analysis serves: evidence-based democratic deliberation at planetary scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Global meta-analysis synthesizing all protocol research",

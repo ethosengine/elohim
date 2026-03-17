@@ -6,7 +6,7 @@
   "title": "Conducting ethnographic research in Riverside community",
   "description": "Conducting ethnographic research in Riverside community",
   "content": "Scenario: Conducting ethnographic research in Riverside community\n    Given I have selected Riverside (population 45,000) for intensive case study\n    And I have secured ethical approval and community consent\n    When I begin multi-month observation of protocol implementation\n    Then I can attend Constitutional Council meetings as observer\n    And I can interview appellants like Marcus about their appeal experience\n    And I can participate in community deliberations about protocol\n    And I can track resource flows and wellbeing indicators\n    And I can document challenges and successes as they emerge\n    And The community retains ownership of data about themselves\n    And My research serves community improvement not just academic publication\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Conducting ethnographic research in Riverside community",

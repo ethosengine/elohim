@@ -6,7 +6,7 @@
   "title": "Organizer documents opportunity gap for education equity campaign",
   "description": "Organizer documents opportunity gap for education equity campaign",
   "content": "Scenario: Organizer documents opportunity gap for education equity campaign\n    Given gifted programs concentrate in predominantly white schools\n    And advanced placement courses lack availability in low-income schools\n    When the Observer provides education equity data\n    Then the organizer sees enrichment program distribution across district\n    And maps demographic patterns showing systematic disparities\n    And calculates opportunity gaps affecting thousands of students\n    And identifies organizing base of affected families\n    And educational inequality becomes documented basis for organizing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer documents opportunity gap for education equity campaign",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

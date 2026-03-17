@@ -6,7 +6,7 @@
   "title": "Participating in meal planning decisions",
   "description": "Participating in meal planning decisions",
   "content": "Scenario: Participating in meal planning decisions\n    Given the household plans weekly meals together\n    And each housemate has food preferences and dietary needs\n    When the household holds their weekly meal planning meeting\n    Then Jordan's personal_agent presents meal options visually\n    And Jordan can express preferences using simple voting (thumbs up/down)\n    And the support worker facilitates but doesn't override Jordan's choices\n    And Jordan's food preferences are honored in the meal plan\n    And Jordan participates as an equal household member\n    And the household_elohim coordinates fair preference balancing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in meal planning decisions",

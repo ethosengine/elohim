@@ -6,7 +6,7 @@
   "title": "Owner transitions identity from sole owner to community elder",
   "description": "Owner transitions identity from sole owner to community elder",
   "content": "Scenario: Owner transitions identity from sole owner to community elder\n    Given Rosa's identity was tied to business ownership\n    And exit could mean loss of meaning and social isolation\n    When EAE offers transition support\n    Then Rosa receives counseling for identity transition\n    And Rosa explores new roles: advisor, retiree, community elder\n    And Rosa's expertise is valued through consulting compensation\n    And transition is honored as life stage, not failure\n    And Rosa discovers purpose beyond ownership burden\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner transitions identity from sole owner to community elder",

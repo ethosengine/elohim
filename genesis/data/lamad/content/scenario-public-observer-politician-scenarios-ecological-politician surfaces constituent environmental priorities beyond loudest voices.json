@@ -6,7 +6,7 @@
   "title": "Politician surfaces constituent environmental priorities beyond loudest voices",
   "description": "Politician surfaces constituent environmental priorities beyond loudest voices",
   "content": "Scenario: Politician surfaces constituent environmental priorities beyond loudest voices\n    Given the politician hears from passionate environmental activists\n    But uncertain whether priorities reflect broader community\n    When the Observer aggregates constituent environmental sentiment\n    Then they see working families prioritize air quality and park access\n    And learn parents care about safe outdoor spaces for children\n    And identify senior concerns about extreme heat vulnerability\n    And understand environmental priorities across diverse constituents\n    And align policy with community environmental needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician surfaces constituent environmental priorities beyond loudest voices",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Integrating protocol with national court system",
   "description": "Integrating protocol with national court system",
   "content": "Scenario: Integrating protocol with national court system\n    Given judicial system must work with protocol governance\n    And judges need training and procedural guidance\n    When I work with judicial branch on integration\n    Then I support: judicial education about agent reasoning\n    And I establish: evidentiary standards for agent testimony\n    And I create: appeal pathways for council-court conflicts\n    And I ensure: due process protections maintained\n    And I respect: judicial independence\n    And I enable: protocol to function within legal framework\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Integrating protocol with national court system",

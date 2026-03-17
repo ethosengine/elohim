@@ -6,7 +6,7 @@
   "title": "Community environmental projects and collective action",
   "description": "Community environmental projects and collective action",
   "content": "Scenario: Community environmental projects and collective action\n    Given ecological challenges require collective response\n    And Sarah participates in community environmental initiatives\n    When the ecological_elohim tracks Sarah's environmental activism\n    Then it should recognize organizing as ecological care work\n    And it should value her participation in community environmental projects\n    And activism labor should accumulate care tokens\n    And the system should support parent environmental advocacy\n    And Sarah's work to build sustainable community should be recognized\n    And collective ecological action should be valued as care contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community environmental projects and collective action",

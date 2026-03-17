@@ -6,7 +6,7 @@
   "title": "Teaching food sovereignty through kitchen skills",
   "description": "Teaching food sovereignty through kitchen skills",
   "content": "Scenario: Teaching food sovereignty through kitchen skills\n    Given Margaret knows how to cook from scratch and make nutritious meals\n    And kitchen skills support food sovereignty and health\n    When Margaret teaches grandchildren cooking and food preparation\n    Then the bioregional_elohim should recognize cooking as care work\n    And it should value food sovereignty education\n    And it should track kitchen skills transmission\n    And cooking should accumulate care tokens\n    And Margaret's teaching should support family and community food security\n    And traditional food knowledge should be preserved and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching food sovereignty through kitchen skills",

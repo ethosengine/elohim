@@ -6,7 +6,7 @@
   "title": "Building personal identity and self-expression",
   "description": "Building personal identity and self-expression",
   "content": "Scenario: Building personal identity and self-expression\n    Given Jordan is developing their sense of self\n    And Jordan has interests, values, and preferences\n    When Jordan uses the personal profile feature\n    Then the interface helps Jordan express who they are\n    And Jordan can select interests from visual options (music, sports, art)\n    And Jordan can share what matters to them using simple language support\n    And the system celebrates Jordan's unique identity\n    And Jordan's self-expression is honored, not corrected to fit norms\n    And Jordan experiences being seen as a full person\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building personal identity and self-expression",

@@ -6,7 +6,7 @@
   "title": "Neighborhood technology support for overwhelmed caregiver",
   "description": "Neighborhood technology support for overwhelmed caregiver",
   "content": "Scenario: Neighborhood technology support for overwhelmed caregiver\n    Given James manages complex care coordination systems\n    And technology problems become overwhelming when also caregiving\n    When the neighborhood_elohim identifies tech-skilled neighbors\n    Then neighbors should help with technology issues\n    And they should support James with care coordination tech\n    And technical support should reduce burden, not increase it\n    And neighborhood should include practical technology assistance\n    And James should access help when systems become overwhelming\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood technology support for overwhelmed caregiver",

@@ -6,7 +6,7 @@
   "title": "Grappling with universal dignity across cultural differences",
   "description": "Grappling with universal dignity across cultural differences",
   "content": "Scenario: Grappling with universal dignity across cultural differences\n    Given appeal involves tension between cultural practice and constitutional principle\n    And I must judge what's universal versus culturally specific\n    When we deliberate on cultural relativism versus human dignity\n    Then we engage: deeply with different cultural perspectives\n    And we distinguish: genuine diversity from rights violations\n    And we examine: if constitutional framework has cultural bias\n    And we consider: if subsidiarity allows variation in this domain\n    And we establish: precedent protecting pluralism within dignity bounds\n    And we avoid: both cultural imperialism and harmful relativism\n    And we demonstrate: wisdom citizens bring to profound questions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Grappling with universal dignity across cultural differences",

@@ -6,7 +6,7 @@
   "title": "Farmworker recruitment and retention improve through ownership opportunity",
   "description": "Farmworker recruitment and retention improve through ownership opportunity",
   "content": "Scenario: Farmworker recruitment and retention improve through ownership opportunity\n    Given agricultural labor traditionally has high turnover due to low pay and poor conditions\n    And farm struggled to retain skilled workers who left for better opportunities\n    When democratic ownership offers farmworkers equity stake and voice\n    Then recruitment improves as workers seek dignified agricultural employment\n    And retention increases dramatically (90%+ vs. previous 40% annual retention)\n    And institutional expertise accumulates through stable workforce\n    And farm benefits from long-term worker commitment and skill development\n    And workplace_elohim tracks retention improvements and workforce stability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farmworker recruitment and retention improve through ownership opportunity",

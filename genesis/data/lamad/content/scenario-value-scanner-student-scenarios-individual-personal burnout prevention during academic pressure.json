@@ -6,7 +6,7 @@
   "title": "Personal burnout prevention during academic pressure",
   "description": "Personal burnout prevention during academic pressure",
   "content": "Scenario: Personal burnout prevention during academic pressure\n    Given Kenji faces intense academic demands during midterms and finals\n    And he also must maintain work hours to pay for expenses\n    When the personal_agent detects unsustainable stress patterns\n    Then it should flag burnout risk explicitly\n    And it should say \"You've slept 4 hours three nights in a row. This is dangerous.\"\n    And it should help him identify what must give to protect health\n    And it should connect him to campus mental health resources if needed\n    And crisis intervention should prioritize his survival\n    And the system should validate that breaking under these demands is not failure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal burnout prevention during academic pressure",

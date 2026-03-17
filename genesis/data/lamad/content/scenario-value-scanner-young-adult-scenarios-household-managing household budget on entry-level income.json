@@ -6,7 +6,7 @@
   "title": "Managing household budget on entry-level income",
   "description": "Managing household budget on entry-level income",
   "content": "Scenario: Managing household budget on entry-level income\n    Given Aisha's income is $38,000 annually\n    And rent consumes a large portion of her budget\n    When Aisha allocates household resources\n    Then the personal_agent should help optimize spending\n    And it should identify where to invest versus economize\n    And it should suggest cost-saving strategies appropriate to her situation\n    And budget tools should account for her income constraints\n    And the system should help her achieve sustainability within limits\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing household budget on entry-level income",

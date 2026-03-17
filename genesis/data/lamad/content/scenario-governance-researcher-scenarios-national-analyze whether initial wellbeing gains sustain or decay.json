@@ -6,7 +6,7 @@
   "title": "Analyze whether initial wellbeing gains sustain or decay",
   "description": "Analyze whether initial wellbeing gains sustain or decay",
   "content": "Scenario: Analyze whether initial wellbeing gains sustain or decay\n    Given early studies showed 8% life satisfaction improvement\n    And question is whether gains persist long-term\n    When James examines 10-year trajectory\n    Then he finds initial gains sustain through Year 5\n    And he observes additional gains accumulating in Years 6-10\n    And he discovers trust compounds over time\n    And he identifies that sustained benefit requires continued democratic participation\n    And longitudinal perspective distinguishes honeymoon effects from stable transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Analyze whether initial wellbeing gains sustain or decay",

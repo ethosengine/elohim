@@ -6,7 +6,7 @@
   "title": "Journalist investigates regulatory capture of environmental agency",
   "description": "Journalist investigates regulatory capture of environmental agency",
   "content": "Scenario: Journalist investigates regulatory capture of environmental agency\n    Given environmental regulations are weakly enforced\n    And the journalist suspects industry influence over regulators\n    When the Observer tracks regulatory agency decisions and relationships\n    Then the journalist sees violation fines reduced 78% in 3 years\n    And documents revolving door between industry and agency leadership\n    And identifies campaign contributions from regulated industries\n    And shows pattern of violations detected but not penalized\n    And publishes investigation exposing regulatory capture\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates regulatory capture of environmental agency",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

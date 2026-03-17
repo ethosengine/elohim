@@ -6,7 +6,7 @@
   "title": "Managing fixed income with dignity and sophistication",
   "description": "Managing fixed income with dignity and sophistication",
   "content": "Scenario: Managing fixed income with dignity and sophistication\n    Given Margaret has a $150/week grocery budget\n    And her income is fixed and cannot be increased through employment\n    When Margaret plans her shopping\n    Then her personal_agent should provide sophisticated budgeting tools\n    And it should identify sales and optimize value per dollar\n    And it should track spending across weeks for pattern analysis\n    And it should suggest resource optimization without stigma\n    And it should help her maintain quality of life within constraints\n    And the framing should be dignity-preserving, not scarcity-shaming\n    And Margaret should experience agency, not deprivation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing fixed income with dignity and sophistication",

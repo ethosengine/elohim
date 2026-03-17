@@ -6,7 +6,7 @@
   "title": "Adult learns to recognize and value her own care contributions",
   "description": "Adult learns to recognize and value her own care contributions",
   "content": "Scenario: Adult learns to recognize and value her own care contributions\n    Given Sarah has internalized that parenting is \"not working\"\n    And society devalues the care labor she performs\n    When Sarah uses the Value Scanner over time\n    Then she should develop new understanding of her contributions\n    And she should see meal planning, emotional labor, household coordination as valuable work\n    And quantified care contributions should shift her self-concept\n    And she should gain language to articulate her care work to others\n    And cultural transformation should begin with Sarah's own understanding\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adult learns to recognize and value her own care contributions",

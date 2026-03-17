@@ -6,7 +6,7 @@
   "title": "Urban food deserts as ecological and economic justice issue",
   "description": "Urban food deserts as ecological and economic justice issue",
   "content": "Scenario: Urban food deserts as ecological and economic justice issue\n    Given Marcus may live in urban food desert\n    And food access connects to land use and economic systems\n    When Marcus experiences difficulty accessing fresh food\n    Then he should understand food deserts as systemic failure\n    And the personal_agent should explain how urban planning affects food access\n    And he should learn that food justice requires ecological and economic change\n    And his lived experience should inform political consciousness\n    And care economy should include bioregional food sovereignty\n    And his struggles should fuel commitment to food system transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Urban food deserts as ecological and economic justice issue",

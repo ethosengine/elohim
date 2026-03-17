@@ -6,7 +6,7 @@
   "title": "Board member builds coalition for increased education funding",
   "description": "Board member builds coalition for increased education funding",
   "content": "Scenario: Board member builds coalition for increased education funding\n    Given the politician seeks voter approval for tax levy\n    And needs broad community support\n    When the Observer identifies coalition potential\n    Then they see parents care about class sizes and programs\n    And identify business leaders concerned about workforce preparation\n    And connect with community organizations serving families\n    And facilitate coalition across diverse stakeholder groups\n    And build campaign for education investment with broad base\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member builds coalition for increased education funding",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Manager coordinates community programs while workers govern priorities",
   "description": "Manager coordinates community programs while workers govern priorities",
   "content": "Scenario: Manager coordinates community programs while workers govern priorities\n    Given workers democratically decided to implement senior meal program\n    And operational coordination is needed for program execution\n    When Marcus coordinates senior meal program logistics\n    Then Marcus ensures meals meet quality and dietary requirements\n    And Marcus coordinates with senior center on scheduling and delivery\n    And Marcus tracks program metrics (meals served, costs, feedback)\n    But workers determine program scope, pricing, and continuation\n    And community_elohim ensures program serves community without exploiting workers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager coordinates community programs while workers govern priorities",

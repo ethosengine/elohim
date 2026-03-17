@@ -6,7 +6,7 @@
   "title": "Journalist grounds state education policy in local school impacts",
   "description": "Journalist grounds state education policy in local school impacts",
   "content": "Scenario: Journalist grounds state education policy in local school impacts\n    Given state legislature debates education funding formula\n    And the journalist covers state education policy\n    When the Observer shows local impacts across specific districts\n    Then the journalist sees how formula change affects 230 individual schools\n    And identifies which communities gain or lose funding\n    And contacts affected teachers, parents, and students in specific districts\n    And publishes story connecting state policy to lived local experiences\n    And policy journalism serves communities not just political class\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist grounds state education policy in local school impacts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

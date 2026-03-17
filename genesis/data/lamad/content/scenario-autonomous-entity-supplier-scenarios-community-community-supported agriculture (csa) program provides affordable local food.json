@@ -6,7 +6,7 @@
   "title": "Community-supported agriculture (CSA) program provides affordable local food",
   "description": "Community-supported agriculture (CSA) program provides affordable local food",
   "content": "Scenario: Community-supported agriculture (CSA) program provides affordable local food\n    Given fresh, organic produce is often unaffordable for low-income community members\n    And food access inequality creates health disparities\n    When democratic farm implements sliding-scale CSA program\n    Then weekly produce boxes are affordable across income levels\n    And payment flexibility (sliding scale, work-trade, subsidized) ensures access\n    And direct farm-to-community distribution reduces costs increasing affordability\n    And food access improves while supporting fair farmworker wages\n    And community_elohim manages CSA program ensuring equitable food access\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community-supported agriculture (CSA) program provides affordable local food",

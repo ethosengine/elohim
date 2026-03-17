@@ -6,7 +6,7 @@
   "title": "Developer luxury housing accelerates school gentrification",
   "description": "Developer luxury housing accelerates school gentrification",
   "content": "Scenario: Developer luxury housing accelerates school gentrification\n    Given a developer builds high-end housing in gentrifying neighborhood\n    And displacement impacts working-class families\n    When the Observer analyzes school enrollment changes\n    Then analysis shows: low-income student enrollment dropped 40%\n    And school demographics shifted from 70% to 35% students of color\n    And affordable family housing converted to luxury units\n    And development accelerated displacement affecting educational equity\n    And gentrification impacts on schools become visible and challengeable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer luxury housing accelerates school gentrification",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

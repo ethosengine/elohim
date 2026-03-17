@@ -6,7 +6,7 @@
   "title": "Personal agent serves as thinking partner for overwhelming decisions",
   "description": "Personal agent serves as thinking partner for overwhelming decisions",
   "content": "Scenario: Personal agent serves as thinking partner for overwhelming decisions\n    Given Maria faces countless decisions daily with no co-parent to consult\n    And she manages children's needs, household economics, work schedule, and logistics alone\n    When Maria needs to make a complex decision\n    Then her personal_agent should function as cognitive co-parent\n    And it should help her think through decisions systematically\n    And it should surface important factors she might miss in exhaustion\n    And it should track patterns and provide analysis\n    And it should support her sovereignty without imposing its own agenda\n    And Maria should have the thinking partnership that coupled parents get from each other\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent serves as thinking partner for overwhelming decisions",

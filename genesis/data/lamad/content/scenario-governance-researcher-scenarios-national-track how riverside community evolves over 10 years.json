@@ -6,7 +6,7 @@
   "title": "Track how Riverside community evolves over 10 years",
   "description": "Track how Riverside community evolves over 10 years",
   "content": "Scenario: Track how Riverside community evolves over 10 years\n    Given Riverside adopted protocol in Year 1 of study\n    When James returns annually to measure changes\n    Then he tracks wellbeing indicators over full decade\n    And he documents how trust builds incrementally not instantaneously\n    And he observes how civic participation increases over time\n    And he identifies challenges that emerge only after years of operation\n    And he captures transformation that short-term studies miss\n    And longitudinal design reveals cumulative effects\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Track how Riverside community evolves over 10 years",

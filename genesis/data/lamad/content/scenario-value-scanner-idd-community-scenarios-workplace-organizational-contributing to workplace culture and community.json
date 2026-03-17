@@ -6,7 +6,7 @@
   "title": "Contributing to workplace culture and community",
   "description": "Contributing to workplace culture and community",
   "content": "Scenario: Contributing to workplace culture and community\n    Given Jordan brings joy and positivity to the workplace\n    And Jordan's presence affects workplace atmosphere\n    When Jordan greets patrons and helps create welcoming environment\n    Then Jordan's emotional labor and care contribution is recognized\n    And the Value Scanner records Jordan's culture-building work\n    And Jordan accumulates care tokens for workplace care contributions\n    And colleagues appreciate Jordan's positive impact\n    And Jordan's unique contributions to workplace are celebrated\n    And Jordan experiences being valued for authentic self\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Contributing to workplace culture and community",

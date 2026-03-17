@@ -6,7 +6,7 @@
   "title": "Responsible developer demonstrates quality job creation",
   "description": "Responsible developer demonstrates quality job creation",
   "content": "Scenario: Responsible developer demonstrates quality job creation\n    Given a responsible developer prioritizes workforce development\n    And creates genuine employment opportunities for local residents\n    When the Observer documents employment track record\n    Then analysis shows: 85% of jobs went to local residents\n    And median wage is $24/hour with benefits\n    And developer provides apprenticeship programs for construction trades\n    And permanent jobs offer career advancement opportunities\n    And quality employment becomes competitive advantage for approvals\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer demonstrates quality job creation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

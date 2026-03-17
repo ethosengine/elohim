@@ -6,7 +6,7 @@
   "title": "Access appeal interface during high emotional distress",
   "description": "Access appeal interface during high emotional distress",
   "content": "Scenario: Access appeal interface during high emotional distress\n    Given Marcus is experiencing mental health crisis\n    And Marcus wants to appeal the agent's intervention\n    When Marcus accesses the appeal interface\n    Then the interface uses simple language requiring no legal expertise\n    And the interface requires only: complaint description and desired outcome\n    And the interface supports voice input for those unable to type\n    And the interface provides language translation automatically\n    And the interface works on any device Marcus has available\n    And the interface saves progress if Marcus needs to step away\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-individual-family",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Access appeal interface during high emotional distress",

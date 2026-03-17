@@ -6,7 +6,7 @@
   "title": "Planning personal development despite time constraints",
   "description": "Planning personal development despite time constraints",
   "content": "Scenario: Planning personal development despite time constraints\n    Given I have skills and interests beyond my current job\n    And employment leaves minimal time for personal development\n    When I want to learn new skills or pursue interests\n    Then the protocol should help me find micro-opportunities\n    And connect me to accessible learning resources\n    And recognize that my growth and flourishing matter\n    And support me in maintaining identity beyond worker role\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning personal development despite time constraints",

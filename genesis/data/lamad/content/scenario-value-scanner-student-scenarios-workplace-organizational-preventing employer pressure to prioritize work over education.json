@@ -6,7 +6,7 @@
   "title": "Preventing employer pressure to prioritize work over education",
   "description": "Preventing employer pressure to prioritize work over education",
   "content": "Scenario: Preventing employer pressure to prioritize work over education\n    Given some employers pressure students to work more hours\n    And employer interests can conflict with student educational needs\n    When employer requests Kenji increase hours or skip classes for work\n    Then the workplace_elohim should help Kenji maintain boundaries\n    And it should validate his right to prioritize education\n    And it should provide language for declining inappropriate requests\n    And it should recognize that education is his primary work\n    And the system should support students resisting employer overreach\n    And Kenji should have agency to protect his educational investment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preventing employer pressure to prioritize work over education",

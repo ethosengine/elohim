@@ -6,7 +6,7 @@
   "title": "Personal agent recognizes parent as individual beyond caregiving role",
   "description": "Personal agent recognizes parent as individual beyond caregiving role",
   "content": "Scenario: Personal agent recognizes parent as individual beyond caregiving role\n    Given Sarah has been performing intensive care labor all day\n    And she has attended to children's needs, household needs, and work needs\n    When Sarah's personal_agent assesses her daily patterns\n    Then the agent should recognize Sarah as a person with individual needs\n    And the agent should prompt \"When did you last do something just for yourself?\"\n    And the system should validate that self-care enables care for others\n    And Sarah should be reminded that she exists beyond her caregiving roles\n    And individual identity should be actively preserved\n    And the agent should protect space for Sarah's autonomous personhood\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent recognizes parent as individual beyond caregiving role",

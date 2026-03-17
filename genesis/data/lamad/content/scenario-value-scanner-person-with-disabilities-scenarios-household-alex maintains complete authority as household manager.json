@@ -6,7 +6,7 @@
   "title": "Alex maintains complete authority as household manager",
   "description": "Alex maintains complete authority as household manager",
   "content": "Scenario: Alex maintains complete authority as household manager\n    Given Alex coordinates support workers for physical assistance\n    And some might assume support workers are in charge\n    When household decisions need to be made\n    Then Alex should have absolute authority over all household choices\n    And support workers should provide services Alex directs\n    And the household_elohim should structure Alex as employer/coordinator\n    And Alex's autonomy should be protected systematically\n    And the relationship should be professional partnership, not caretaking\n    And Alex should never be treated as passive recipient of care\n    And the protocol should embody Alex's household sovereignty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex maintains complete authority as household manager",

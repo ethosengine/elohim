@@ -6,7 +6,7 @@
   "title": "Organizer builds cross-neighborhood budget justice coalition",
   "description": "Organizer builds cross-neighborhood budget justice coalition",
   "content": "Scenario: Organizer builds cross-neighborhood budget justice coalition\n    Given parents care about after-school programs being cut\n    And seniors need meal delivery services maintained\n    And workers depend on subsidized transit\n    When the organizer uses Observer to identify alignment\n    Then they see all three groups affected by same budget priorities\n    And facilitate coordination across five neighborhoods\n    And maintain shared information base on budget impacts\n    And coordinate 100 residents for budget hearing testimony\n    And diverse communities unite around shared municipal interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer builds cross-neighborhood budget justice coalition",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Democratic food service supply chain coordination outcompetes franchise purchasing",
   "description": "Democratic food service supply chain coordination outcompetes franchise purchasing",
   "content": "Scenario: Democratic food service supply chain coordination outcompetes franchise purchasing\n    Given franchise mandatory purchasing extracts through 30% markup on supplies\n    And individual democratic locations lack volume purchasing power\n    When EAE network coordinates purchasing across converted franchise locations\n    Then volume purchasing power matches or exceeds franchise corporate leverage\n    And democratic coordination eliminates markup (suppliers paid fairly, buyers pay less)\n    And supply chain becomes transparent partnership, not extractive mandate\n    And food service sector learns democratic coordination provides efficiency without extraction\n    And industry_sector_elohim coordinates democratic supply chain across network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic food service supply chain coordination outcompetes franchise purchasing",

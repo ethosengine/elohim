@@ -6,7 +6,7 @@
   "title": "Politician monitors municipal employment practices as major employer",
   "description": "Politician monitors municipal employment practices as major employer",
   "content": "Scenario: Politician monitors municipal employment practices as major employer\n    Given the politician has authority over city or state employment\n    And serves as model employer in jurisdiction\n    When the Observer analyzes public sector employment patterns\n    Then they see whether public wages meet living wage standards\n    And identify disparities in public sector compensation by role\n    And understand whether public employment offers quality jobs\n    And learn contractor and subcontractor wage and labor practices\n    And ensure public sector models worker-centered employment practices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician monitors municipal employment practices as major employer",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

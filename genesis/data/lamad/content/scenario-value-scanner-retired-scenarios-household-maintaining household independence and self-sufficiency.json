@@ -6,7 +6,7 @@
   "title": "Maintaining household independence and self-sufficiency",
   "description": "Maintaining household independence and self-sufficiency",
   "content": "Scenario: Maintaining household independence and self-sufficiency\n    Given Frank and his wife value their independence\n    And they want to age in place as long as possible\n    When the household_elohim supports independence\n    Then it should help household maintain self-sufficiency\n    And it should optimize resources for maximum autonomy\n    And it should coordinate with family without creating dependence\n    And it should surface when external support is truly needed\n    And household should experience agency and dignity in aging\n    And independence should be supported as long as safe and sustainable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining household independence and self-sufficiency",

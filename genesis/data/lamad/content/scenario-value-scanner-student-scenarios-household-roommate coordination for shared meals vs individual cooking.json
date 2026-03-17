@@ -6,7 +6,7 @@
   "title": "Roommate coordination for shared meals vs individual cooking",
   "description": "Roommate coordination for shared meals vs individual cooking",
   "content": "Scenario: Roommate coordination for shared meals vs individual cooking\n    Given some meals are shared and some are individual\n    And coordination requires planning around different schedules\n    When the household_elohim manages meal coordination\n    Then it should track who's eating shared meals vs cooking separately\n    And it should help schedule shared dinners when roommates are available\n    And it should recognize Kenji's labor preparing shared meals\n    And it should calculate fair cost sharing for shared food\n    And the system should make coordination easy rather than burdensome\n    And shared meals should build household community\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Roommate coordination for shared meals vs individual cooking",

@@ -6,7 +6,7 @@
   "title": "Customer becomes community investor supporting democratic conversions",
   "description": "Customer becomes community investor supporting democratic conversions",
   "content": "Scenario: Customer becomes community investor supporting democratic conversions\n    Given Ms. Johnson has modest savings wanting to support community values-aligned\n    And community investment opportunities in democratic businesses exist\n    When she learns neighbors invested in Maria's Kitchen conversion\n    Then she considers investing in next democratic conversion (Rosa's Auto Repair)\n    And investment would provide fair return (5% annually) plus social benefit\n    And her capital would enable worker ownership and community wealth\n    And customer role can expand to investor role if desired\n    And community_elohim manages community investment accessible to customers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer becomes community investor supporting democratic conversions",

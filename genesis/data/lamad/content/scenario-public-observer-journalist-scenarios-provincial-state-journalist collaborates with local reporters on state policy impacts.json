@@ -6,7 +6,7 @@
   "title": "Journalist collaborates with local reporters on state policy impacts",
   "description": "Journalist collaborates with local reporters on state policy impacts",
   "content": "Scenario: Journalist collaborates with local reporters on state policy impacts\n    Given state budget cuts affect services across all communities\n    And the journalist coordinates with local reporters statewide\n    When the Observer provides shared state surveillance infrastructure\n    Then all journalists access same comprehensive state policy data\n    And local reporters show impacts in their specific communities\n    And state reporter synthesizes statewide pattern\n    And collaborative investigation publishes simultaneously across outlets\n    And state policy accountability serves whole state not just capital\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist collaborates with local reporters on state policy impacts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

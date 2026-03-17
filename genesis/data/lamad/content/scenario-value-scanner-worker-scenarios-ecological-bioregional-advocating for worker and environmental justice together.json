@@ -6,7 +6,7 @@
   "title": "Advocating for worker and environmental justice together",
   "description": "Advocating for worker and environmental justice together",
   "content": "Scenario: Advocating for worker and environmental justice together\n    Given worker exploitation and environmental exploitation are connected\n    When I organize for worker dignity and fair compensation\n    Then the protocol should help me connect labor justice to ecological justice\n    And recognize that care economy serves both human and ecological flourishing\n    And support advocacy that addresses both worker conditions and environmental sustainability\n    And build movements connecting labor rights and environmental protection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for worker and environmental justice together",

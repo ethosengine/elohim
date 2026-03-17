@@ -6,7 +6,7 @@
   "title": "Contributing to community through volunteer work",
   "description": "Contributing to community through volunteer work",
   "content": "Scenario: Contributing to community through volunteer work\n    Given the local food bank needs volunteers\n    And Jordan wants to help community members in need\n    When Jordan volunteers at the food bank\n    Then tasks are adapted to Jordan's capabilities (sorting, carrying)\n    And volunteer coordinators provide clear, accessible instructions\n    And Jordan's work genuinely contributes to food bank operations\n    And Jordan accumulates care tokens for volunteer service\n    And Jordan is recognized as a valued volunteer, not as someone being helped\n    And Jordan experiences being a community care provider\n    And Jordan's contributions are celebrated authentically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Contributing to community through volunteer work",

@@ -6,7 +6,7 @@
   "title": "Integrating protocol with existing city governance",
   "description": "Integrating protocol with existing city governance",
   "content": "Scenario: Integrating protocol with existing city governance\n    Given city council still passes ordinances and makes policy\n    And Elohim Protocol augments rather than replaces government\n    When I coordinate protocol with traditional civic structures\n    Then Community Elohim: provides information for council decisions\n    And city council: maintains authority over policy\n    And planning commission: still reviews developments (with agent input)\n    And existing institutions: work alongside protocol\n    And I clarify: boundaries and responsibilities\n    And we avoid: conflicts between agent decisions and local law\n    And integration strengthens: both democratic governance and AI support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Integrating protocol with existing city governance",

@@ -6,7 +6,7 @@
   "title": "State legislator tracks accountability for legislative commitments",
   "description": "State legislator tracks accountability for legislative commitments",
   "content": "Scenario: State legislator tracks accountability for legislative commitments\n    Given the politician co-sponsored criminal justice reform bill\n    And committed to reducing incarceration rates\n    When the Observer monitors policy implementation\n    Then they see whether state agencies implement legislative intent\n    And track incarceration trends after legislation passage\n    And identify bureaucratic resistance to reform\n    And receive alerts when outcomes diverge from expectations\n    And intervene to ensure legislation achieves intended impact\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "State legislator tracks accountability for legislative commitments",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

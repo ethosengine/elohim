@@ -6,7 +6,7 @@
   "title": "Household privacy protected from external surveillance",
   "description": "Household privacy protected from external surveillance",
   "content": "Scenario: Household privacy protected from external surveillance\n    Given household care economy generates detailed living pattern data\n    And this data reveals intimate household dynamics\n    When household data is collected\n    Then it must remain under household members' control\n    And no external entities should access household data without consent\n    And community organizations should only see what's shared\n    And family should respect household privacy boundaries\n    And healthcare providers should only access consented information\n    And household privacy should be absolutely protected\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household privacy protected from external surveillance",

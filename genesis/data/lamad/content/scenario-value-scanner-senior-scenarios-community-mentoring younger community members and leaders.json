@@ -6,7 +6,7 @@
   "title": "Mentoring younger community members and leaders",
   "description": "Mentoring younger community members and leaders",
   "content": "Scenario: Mentoring younger community members and leaders\n    Given Margaret has professional experience and life wisdom\n    And younger adults benefit from mentoring\n    When the community_elohim facilitates mentoring connections\n    Then Margaret should be connected to mentees\n    And her knowledge should be passed to next generation\n    And the mentoring labor should be tracked as care contribution\n    And intergenerational knowledge transmission should be valued\n    And Margaret's experience should serve community capacity-building\n    And younger leaders should benefit from senior guidance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mentoring younger community members and leaders",

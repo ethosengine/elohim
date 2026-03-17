@@ -6,7 +6,7 @@
   "title": "Community opportunities surfaced based on teen's care patterns",
   "description": "Community opportunities surfaced based on teen's care patterns",
   "content": "Scenario: Community opportunities surfaced based on teen's care patterns\n    Given Jasmine has demonstrated leadership through her care contributions\n    And the community is recruiting for youth advisory board\n    When the community_elohim analyzes needs and capabilities\n    Then it should surface the opportunity to Jasmine\n    And explain why she's a good match: \"Your care contributions demonstrate the leadership they're seeking\"\n    And connect her care work to civic opportunities\n    And help her see pathways from care contribution to community leadership\n    And demonstrate that care economy participation opens doors\n    And recognize her capabilities rather than just her potential\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community opportunities surfaced based on teen's care patterns",

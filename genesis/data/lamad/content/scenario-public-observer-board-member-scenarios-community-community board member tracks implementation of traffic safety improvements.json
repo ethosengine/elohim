@@ -6,7 +6,7 @@
   "title": "Community board member tracks implementation of traffic safety improvements",
   "description": "Community board member tracks implementation of traffic safety improvements",
   "content": "Scenario: Community board member tracks implementation of traffic safety improvements\n    Given city committed to traffic calming measures after neighborhood advocacy\n    And board member wants to ensure promises are implemented\n    And community members ask whether improvements are actually happening\n    When the board member uses Observer implementation tracking\n    Then they see timeline of committed improvements versus actual installation\n    And discover only partial implementation despite full funding\n    And access traffic incident data showing ongoing safety concerns\n    And find other neighborhoods received promised improvements faster\n    And impact tracking holds city accountable to community commitments\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community board member tracks implementation of traffic safety improvements",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

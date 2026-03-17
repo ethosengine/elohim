@@ -6,7 +6,7 @@
   "title": "Food waste prevention driven by economic necessity",
   "description": "Food waste prevention driven by economic necessity",
   "content": "Scenario: Food waste prevention driven by economic necessity\n    Given Maria cannot afford to waste food on $175/week grocery budget\n    And she carefully plans meals, uses leftovers, and minimizes spoilage\n    When household food waste is tracked\n    Then the bioregional_elohim should quantify her minimal food waste\n    And it should recognize that she achieves what environmental advocates aim for\n    And her food waste prevention should be valued as ecological contribution\n    And economic necessity should be honored as environmental effectiveness\n    And Maria should be recognized as food sustainability leader\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food waste prevention driven by economic necessity",

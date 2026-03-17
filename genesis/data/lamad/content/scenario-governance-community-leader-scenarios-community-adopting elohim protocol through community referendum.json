@@ -6,7 +6,7 @@
   "title": "Adopting Elohim Protocol through community referendum",
   "description": "Adopting Elohim Protocol through community referendum",
   "content": "Scenario: Adopting Elohim Protocol through community referendum\n    Given Riverside is considering protocol adoption\n    And I am responsible for democratic decision-making process\n    When we conduct community deliberation and vote\n    Then we provide: 6 months of education and pilot testing\n    And we ensure: residents understand what they're choosing\n    And we hold: town halls, demonstrations, Q&A sessions\n    And we offer: transparent information about benefits and risks\n    And we conduct: referendum with 65% approval threshold\n    And we respect: community sovereignty to accept or reject\n    And adoption becomes: democratic mandate not top-down imposition\n    And I am accountable: for implementation serving community values\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adopting Elohim Protocol through community referendum",

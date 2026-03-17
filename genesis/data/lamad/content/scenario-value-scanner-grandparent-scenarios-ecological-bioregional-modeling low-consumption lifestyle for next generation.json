@@ -6,7 +6,7 @@
   "title": "Modeling low-consumption lifestyle for next generation",
   "description": "Modeling low-consumption lifestyle for next generation",
   "content": "Scenario: Modeling low-consumption lifestyle for next generation\n    Given Margaret lives simply on retirement income\n    And her low-consumption lifestyle has low environmental impact\n    When the bioregional_elohim tracks consumption patterns\n    Then it should recognize Margaret's low-impact lifestyle as ecological contribution\n    And it should value simple living as environmental stewardship\n    And it should show grandchildren that fulfillment doesn't require high consumption\n    And low-impact living should be recognized as climate action\n    And Margaret's lifestyle should model sustainable living\n    And intergenerational value transmission should support sustainability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Modeling low-consumption lifestyle for next generation",

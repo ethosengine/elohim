@@ -6,7 +6,7 @@
   "title": "Exercising financial autonomy despite constrained resources",
   "description": "Exercising financial autonomy despite constrained resources",
   "content": "Scenario: Exercising financial autonomy despite constrained resources\n    Given I am managing an extremely limited budget\n    And I have temporary assistance and unreliable child support\n    When I make spending decisions for my household\n    Then the Value Scanner supports MY financial choices\n    And does not impose external judgments about \"proper\" spending\n    And helps me track and optimize within my constraints\n    And recognizes that I understand my children's needs\n    And provides decision support without taking over decisions\n    And validates that my resource management under crisis is sophisticated work\n    And my personal_agent suggests options without prescribing choices\n    And my financial sovereignty is respected\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Exercising financial autonomy despite constrained resources",

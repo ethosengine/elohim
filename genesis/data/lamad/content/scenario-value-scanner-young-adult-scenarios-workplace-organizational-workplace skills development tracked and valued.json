@@ -6,7 +6,7 @@
   "title": "Workplace skills development tracked and valued",
   "description": "Workplace skills development tracked and valued",
   "content": "Scenario: Workplace skills development tracked and valued\n    Given Aisha is building professional capabilities\n    And skill development benefits both her and employer\n    When the workplace_elohim tracks her skill growth\n    Then it should recognize learning as valuable labor\n    And it should help her advocate for development opportunities\n    And it should track skills acquired for her career benefit\n    And professional growth should be visible and valued\n    And the system should ensure development serves her long-term interests\n    And skill building should be recognized as mutual investment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace skills development tracked and valued",

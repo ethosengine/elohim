@@ -6,7 +6,7 @@
   "title": "City celebrates democratic conversions as municipal economic development success",
   "description": "City celebrates democratic conversions as municipal economic development success",
   "content": "Scenario: City celebrates democratic conversions as municipal economic development success\n    Given economic development announcements typically celebrate corporate recruitment\n    And democratic conversions deserve equal municipal recognition\n    When Rosa's conversion and others reach significant milestones\n    Then mayor and city council publicly celebrate worker ownership transitions\n    And municipal communications highlight democratic economy as development strategy\n    And public celebration builds community awareness and political support\n    And recognition encourages other small business owners to consider conversion\n    And municipality_elohim coordinates celebration events amplifying democratic economy visibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "City celebrates democratic conversions as municipal economic development success",

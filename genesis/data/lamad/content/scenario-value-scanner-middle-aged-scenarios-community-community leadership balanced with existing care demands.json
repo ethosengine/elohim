@@ -6,7 +6,7 @@
   "title": "Community leadership balanced with existing care demands",
   "description": "Community leadership balanced with existing care demands",
   "content": "Scenario: Community leadership balanced with existing care demands\n    Given Robert has capacity for community contribution\n    And community leadership opportunities are abundant\n    And he also carries substantial family and work responsibilities\n    When community_elohim coordinates his community participation\n    Then it should help him balance community leadership with other demands\n    And prevent over-commitment that would overwhelm him\n    And surface when community demands exceed healthy boundaries\n    And support him in choosing leadership roles that match his capacity\n    And recognize that sustainable participation requires limits\n    And prevent community from exploiting his sense of responsibility\n    And support meaningful contribution without burnout\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community leadership balanced with existing care demands",

@@ -6,7 +6,7 @@
   "title": "Protecting Alex from neighborhood discrimination",
   "description": "Protecting Alex from neighborhood discrimination",
   "content": "Scenario: Protecting Alex from neighborhood discrimination\n    Given Alex may face discrimination or harassment from neighbors\n    And ableism is pervasive in society\n    When discrimination occurs\n    Then the neighborhood_elohim should help Alex document incidents\n    And it should connect Alex to legal resources and advocacy support\n    And it should facilitate collective response from supportive neighbors\n    And Alex should have tools to protect themselves\n    And the protocol should recognize that neighborhoods can be hostile\n    And safety resources should be readily available\n    And Alex's right to live without discrimination should be defended\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting Alex from neighborhood discrimination",

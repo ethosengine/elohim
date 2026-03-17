@@ -6,7 +6,7 @@
   "title": "Moral and ethical development through care responsibility",
   "description": "Moral and ethical development through care responsibility",
   "content": "Scenario: Moral and ethical development through care responsibility\n    Given Marcus makes decisions affecting others' wellbeing\n    And he balances competing needs with limited resources\n    When Marcus exercises moral reasoning\n    Then he should be developing sophisticated ethical thinking\n    And he should understand fairness, reciprocity, and justice\n    And moral development should accelerate through real responsibility\n    And care ethics should be learned through practice\n    And his moral maturation should advance beyond typical age expectations\n    And care economy should support healthy moral development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Moral and ethical development through care responsibility",

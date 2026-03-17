@@ -6,7 +6,7 @@
   "title": "Care contributions during family visits",
   "description": "Care contributions during family visits",
   "content": "Scenario: Care contributions during family visits\n    Given Aisha visits her family home periodically\n    And she provides substantial care labor during visits\n    When Aisha cooks, shops, and helps with household tasks\n    Then the family_elohim should track her visit contributions\n    And cooking, shopping, and household help should all be valued\n    And her care work should be visible to the family\n    And recognition should validate her adult contributions\n    And family visits should be understood as care labor, not just leisure\n    And care tokens should reflect the value she provides\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Care contributions during family visits",

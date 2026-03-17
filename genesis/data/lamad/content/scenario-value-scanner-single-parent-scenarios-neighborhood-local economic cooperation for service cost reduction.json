@@ -6,7 +6,7 @@
   "title": "Local economic cooperation for service cost reduction",
   "description": "Local economic cooperation for service cost reduction",
   "content": "Scenario: Local economic cooperation for service cost reduction\n    Given Maria struggles to afford household services on limited income\n    And neighbors might coordinate for collective cost reduction\n    When neighborhood members need similar services\n    Then the neighborhood_elohim should coordinate group contracting\n    And collective service hiring should reduce costs for all participants\n    And Maria should access affordable household services through cooperation\n    And neighborhood economic coordination should address resource constraints\n    And single parents should benefit from collective bargaining power\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local economic cooperation for service cost reduction",

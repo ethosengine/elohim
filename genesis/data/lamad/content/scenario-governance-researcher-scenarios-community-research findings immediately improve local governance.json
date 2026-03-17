@@ -6,7 +6,7 @@
   "title": "Research findings immediately improve local governance",
   "description": "Research findings immediately improve local governance",
   "content": "Scenario: Research findings immediately improve local governance\n    Given my research identified that Constitutional Council deliberations improve with certain information tools\n    And I shared findings with Mayor Jamal and council members\n    When community decides to implement recommended improvements\n    Then research serves practical improvement not just academic knowledge\n    And Rapid feedback loop connects insight to implementation\n    And Community sees research benefiting them directly\n    And Researcher-community trust strengthens through mutual value\n    And Knowledge serves flourishing not just publication\n    And Research demonstrates: scholarship in service of democracy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Research findings immediately improve local governance",

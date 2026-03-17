@@ -6,7 +6,7 @@
   "title": "Household routines maintained for cognitive support",
   "description": "Household routines maintained for cognitive support",
   "content": "Scenario: Household routines maintained for cognitive support\n    Given Helen's dementia makes routine important for functioning\n    And familiar patterns help her maintain independence\n    When the household_elohim supports daily routines\n    Then her established patterns should be preserved\n    And reminders should support her existing habits\n    And changes should be minimized to reduce confusion\n    And her personal_agent should say \"Time for your morning tea, like always\"\n    And routine should provide cognitive scaffolding\n    And household familiarity should support her capability\n    And the protocol should recognize that routine enables autonomy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household routines maintained for cognitive support",

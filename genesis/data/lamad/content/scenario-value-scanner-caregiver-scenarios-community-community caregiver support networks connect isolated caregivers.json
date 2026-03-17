@@ -6,7 +6,7 @@
   "title": "Community caregiver support networks connect isolated caregivers",
   "description": "Community caregiver support networks connect isolated caregivers",
   "content": "Scenario: Community caregiver support networks connect isolated caregivers\n    Given James is profoundly isolated by intensive caregiving\n    And connection to other caregivers is essential for survival\n    When the community_elohim connects caregivers\n    Then James should access support groups for Alzheimer's caregivers\n    And he should connect with other sandwich generation caregivers\n    And he should find LGBTQ+ caregiver community if desired\n    And support networks should provide practical advice and emotional support\n    And community should actively prevent caregiver isolation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community caregiver support networks connect isolated caregivers",

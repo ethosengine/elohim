@@ -6,7 +6,7 @@
   "title": "Neighborhood businesses learn accessibility from Alex",
   "description": "Neighborhood businesses learn accessibility from Alex",
   "content": "Scenario: Neighborhood businesses learn accessibility from Alex\n    Given local businesses often lack accessibility awareness\n    And Alex's feedback could improve business accessibility\n    When Alex interacts with neighborhood businesses\n    Then the neighborhood_elohim should facilitate Alex providing accessibility feedback\n    And businesses should receive Alex's expertise as valuable service\n    And improvements should be tracked and celebrated\n    And Alex should be compensated for consultation when appropriate\n    And accessible businesses benefit from disability community patronage\n    And the neighborhood should become more accessible through Alex's guidance\n    And Alex's care work includes making local economy accessible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood businesses learn accessibility from Alex",

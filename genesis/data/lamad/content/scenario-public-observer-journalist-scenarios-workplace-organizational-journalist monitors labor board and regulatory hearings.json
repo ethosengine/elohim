@@ -6,7 +6,7 @@
   "title": "Journalist monitors labor board and regulatory hearings",
   "description": "Journalist monitors labor board and regulatory hearings",
   "content": "Scenario: Journalist monitors labor board and regulatory hearings\n    Given the journalist covers labor and employment\n    And must track labor board, wage enforcement, OSHA, and related agencies\n    When the Observer monitors all labor regulatory agencies\n    Then the journalist reviews all violation cases and enforcement actions\n    And receives alerts for significant labor violations\n    And tracks patterns in enforcement and employer violations\n    And comprehensive labor accountability coverage becomes sustainable\n    And worker exploitation cannot hide in regulatory obscurity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist monitors labor board and regulatory hearings",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Board member evaluates superintendent performance with outcome data",
   "description": "Board member evaluates superintendent performance with outcome data",
   "content": "Scenario: Board member evaluates superintendent performance with outcome data\n    Given board conducts annual superintendent evaluation\n    And superintendent's self-evaluation emphasizes accomplishments and progress\n    And board wants objective assessment of district performance during tenure\n    When the board member uses Observer accountability tracking\n    Then they receive longitudinal data on student outcomes since superintendent started\n    And see progress on board priorities and strategic plan goals\n    And access comparison of district performance trajectory to similar districts\n    And discover some promised improvements didn't materialize or regressed\n    And objective data helps board evaluate performance beyond self-reporting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member evaluates superintendent performance with outcome data",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Child's creative work spreads through earned reach",
   "description": "Child's creative work spreads through earned reach",
   "content": "Scenario: Child's creative work spreads through earned reach\n    Given Emma creates a manga story about environmental conservation\n    And she shares it in her manga artists community\n    When other young artists appreciate and share her work\n    And the story demonstrates both artistic skill and positive values\n    Then the work travels through network based on genuine appreciation\n    And it reaches other youth environmental and art communities\n    And Emma experiences validation for quality contribution\n    And she learns that good work naturally finds its audience\n    And no algorithmic manipulation or viral exploitation occurs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child's creative work spreads through earned reach",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

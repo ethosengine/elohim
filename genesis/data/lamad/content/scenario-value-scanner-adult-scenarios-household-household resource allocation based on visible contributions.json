@@ -6,7 +6,7 @@
   "title": "Household resource allocation based on visible contributions",
   "description": "Household resource allocation based on visible contributions",
   "content": "Scenario: Household resource allocation based on visible contributions\n    Given Sarah and partner make joint financial decisions\n    And both contribute care labor to household\n    When household resources are allocated\n    Then the household_elohim should present both partners' contributions\n    And care labor should be valued alongside paid employment\n    And Sarah's unpaid care work should carry equal weight to partner's income\n    And resource decisions should reflect all contributions, not just money\n    And household economics should recognize care creates value\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household resource allocation based on visible contributions",

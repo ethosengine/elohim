@@ -6,7 +6,7 @@
   "title": "State legislator surfaces constituent priorities across diverse district",
   "description": "State legislator surfaces constituent priorities across diverse district",
   "content": "Scenario: State legislator surfaces constituent priorities across diverse district\n    Given the politician represents 200,000 residents across urban and rural areas\n    And hears disproportionately from organized lobbying campaigns\n    When the Observer aggregates constituent intelligence\n    Then they see healthcare affordability is top concern across demographics\n    And identify rural transportation barriers affecting economic opportunity\n    And learn working families struggle with childcare costs statewide\n    And understand constituent priorities beyond lobbying group demands\n    And align legislative agenda with actual community needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "State legislator surfaces constituent priorities across diverse district",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

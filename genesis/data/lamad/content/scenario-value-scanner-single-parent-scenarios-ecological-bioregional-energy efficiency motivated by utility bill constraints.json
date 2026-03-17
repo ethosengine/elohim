@@ -6,7 +6,7 @@
   "title": "Energy efficiency motivated by utility bill constraints",
   "description": "Energy efficiency motivated by utility bill constraints",
   "content": "Scenario: Energy efficiency motivated by utility bill constraints\n    Given Maria carefully manages utility costs on tight budget\n    And she minimizes energy use to keep bills affordable\n    When household energy consumption is tracked\n    Then the bioregional_elohim should recognize her low energy footprint\n    And it should celebrate her energy efficiency as climate contribution\n    And her utility management should be valued as environmental stewardship\n    And economic necessity should be reframed as climate leadership\n    And Maria should see her household as energy efficiency exemplar\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Energy efficiency motivated by utility bill constraints",

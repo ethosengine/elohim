@@ -6,7 +6,7 @@
   "title": "Developer lobbying relationships become transparent",
   "description": "Developer lobbying relationships become transparent",
   "content": "Scenario: Developer lobbying relationships become transparent\n    Given a developer lobbies state legislature for favorable policy\n    And makes campaign donations to key committee members\n    When the Observer tracks lobbying and political relationships\n    Then constituents see: $250K in donations to housing committee members\n    And identify correlation between donations and votes on developer-friendly bills\n    And the developer faces accountability for political influence\n    And legislators face scrutiny about who they serve\n    And transparent relationships create pressure for merit-based policy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer lobbying relationships become transparent",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

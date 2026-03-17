@@ -6,7 +6,7 @@
   "title": "Family resource allocation reflects all members' contributions",
   "description": "Family resource allocation reflects all members' contributions",
   "content": "Scenario: Family resource allocation reflects all members' contributions\n    Given family makes decisions about major resource allocation\n    And multiple members contribute in different ways\n    When family decisions are made\n    Then all members' care contributions should be considered\n    And Sarah's care work should give her legitimate standing\n    And children's contributions should be recognized appropriately\n    And resource decisions should reflect visible care patterns\n    And family economics should honor care creates value\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family resource allocation reflects all members' contributions",

@@ -6,7 +6,7 @@
   "title": "Privacy protection for parent's personal life",
   "description": "Privacy protection for parent's personal life",
   "content": "Scenario: Privacy protection for parent's personal life\n    Given Sarah's care work generates extensive data\n    And she has full privacy rights as an individual\n    When care economy data is collected\n    Then Sarah must have complete control over her personal information\n    And no third party access should be permitted without explicit consent\n    And her parenting patterns should not be monetized\n    And the system should protect her from surveillance capitalism\n    And privacy should be default, not opt-in\n    And Sarah's dignity should be protected through data sovereignty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy protection for parent's personal life",

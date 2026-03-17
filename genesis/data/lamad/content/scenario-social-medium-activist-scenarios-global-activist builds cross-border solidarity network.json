@@ -6,7 +6,7 @@
   "title": "Activist builds cross-border solidarity network",
   "description": "Activist builds cross-border solidarity network",
   "content": "Scenario: Activist builds cross-border solidarity network\n    Given labor activists in 15 countries face similar corporate exploitation\n    And they want to coordinate against multinational corporation practices\n    When they form a global labor solidarity network\n    And they establish protocols respecting different legal contexts\n    And translation agents enable communication across 12 languages\n    Then the global network creates shared understanding of corporate tactics\n    And each national group maintains autonomy over local strategy\n    And pattern recognition surfaces successful resistance campaigns\n    And coordination happens through verified trust relationships\n    And legal risks are minimized through jurisdictional awareness\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-global",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist builds cross-border solidarity network",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

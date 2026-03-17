@@ -6,7 +6,7 @@
   "title": "Flexible scheduling enables caregiving and employment simultaneously",
   "description": "Flexible scheduling enables caregiving and employment simultaneously",
   "content": "Scenario: Flexible scheduling enables caregiving and employment simultaneously\n    Given James's caregiving demands vary unpredictably\n    And rigid schedules would make employment impossible\n    When James negotiates work arrangements\n    Then the workplace_elohim should advocate for flexibility\n    And scheduling should accommodate caregiving emergencies\n    And James should be able to work around care demands\n    And flexibility should be policy, not just employer goodwill\n    And workplace should recognize caregivers need scheduling flexibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Flexible scheduling enables caregiving and employment simultaneously",

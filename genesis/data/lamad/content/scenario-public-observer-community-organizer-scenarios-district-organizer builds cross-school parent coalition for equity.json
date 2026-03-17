@@ -6,7 +6,7 @@
   "title": "Organizer builds cross-school parent coalition for equity",
   "description": "Organizer builds cross-school parent coalition for equity",
   "content": "Scenario: Organizer builds cross-school parent coalition for equity\n    Given parents at five underfunded schools face similar challenges\n    And most parents don't know the pattern is district-wide\n    When the organizer uses Observer to document resource inequities\n    Then they show per-pupil spending gaps across schools\n    And map distribution of enrichment programs and experienced teachers\n    And connect parents from different schools around shared interests\n    And facilitate coalition demanding equitable resource formula\n    And individual school struggles become district equity campaign\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer builds cross-school parent coalition for equity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

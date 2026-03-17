@@ -6,7 +6,7 @@
   "title": "Household food planning for specialized care needs",
   "description": "Household food planning for specialized care needs",
   "content": "Scenario: Household food planning for specialized care needs\n    Given David requires special nutrition for Alzheimer's care\n    And James must manage David's changing appetite and needs\n    And household food budget is constrained\n    When James plans household meals\n    Then the household_elohim should support specialized meal planning\n    And it should track David's nutritional requirements\n    And it should help James meet care needs within budget\n    And it should ensure James's own nutrition isn't neglected\n    And household food planning should serve both members\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household food planning for specialized care needs",

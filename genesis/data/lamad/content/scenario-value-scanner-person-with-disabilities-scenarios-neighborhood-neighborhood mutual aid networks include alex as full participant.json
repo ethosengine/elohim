@@ -6,7 +6,7 @@
   "title": "Neighborhood mutual aid networks include Alex as full participant",
   "description": "Neighborhood mutual aid networks include Alex as full participant",
   "content": "Scenario: Neighborhood mutual aid networks include Alex as full participant\n    Given Alex participates in neighborhood mutual aid\n    And Alex both gives and receives support\n    When neighborhood care flows are tracked\n    Then Alex should be recognized as mutual aid contributor\n    And Alex provides support to neighbors (advice, connection, skills)\n    And Alex receives support from neighbors (physical assistance, rides, help)\n    And reciprocity should be visible and valued\n    And the neighborhood_elohim should track care flows in multiple directions\n    And Alex should experience genuine mutuality, not charity\n    And interdependence should be normalized as neighborhood practice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood mutual aid networks include Alex as full participant",

@@ -6,7 +6,7 @@
   "title": "Teen learns family economic realities through transparency",
   "description": "Teen learns family economic realities through transparency",
   "content": "Scenario: Teen learns family economic realities through transparency\n    Given Jasmine is preparing for adult independence\n    And understanding family economics is essential preparation\n    When the family_elohim provides family economic information\n    Then Jasmine should have age-appropriate access to family financial realities\n    And understand household income, expenses, and budget constraints\n    And learn how the family makes financial tradeoffs\n    And develop realistic expectations about adult economic life\n    And understand the economic value of household labor\n    And learn that all families engage in care economy, whether they use that language or not\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns family economic realities through transparency",

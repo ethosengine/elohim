@@ -6,7 +6,7 @@
   "title": "Transition from family household to independent household",
   "description": "Transition from family household to independent household",
   "content": "Scenario: Transition from family household to independent household\n    Given Aisha recently moved out of her family home\n    And she's adapting to independent household management\n    When Aisha establishes her household practices\n    Then the system should recognize this is a major transition\n    And it should help her adapt family practices to solo living\n    And it should provide continuity from family care economy patterns\n    And the personal_agent should acknowledge the learning curve\n    And support should smooth the jarring transition to full responsibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transition from family household to independent household",

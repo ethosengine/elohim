@@ -6,7 +6,7 @@
   "title": "Care token accumulation for self-care and household contributions",
   "description": "Care token accumulation for self-care and household contributions",
   "content": "Scenario: Care token accumulation for self-care and household contributions\n    Given Kenji prepares nutritious meals for himself\n    And he manages his space, does laundry, and maintains basic self-care\n    When the Value Scanner tracks Kenji's individual care contributions\n    Then it should accumulate care tokens for self-care labor\n    And it should recognize that caring for himself is care economy work\n    And it should track his development of adult life skills\n    And self-maintenance should be valued, not invisible\n    And the system should make visible the work of sustaining himself\n    And Kenji should see that taking care of himself is productive\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Care token accumulation for self-care and household contributions",

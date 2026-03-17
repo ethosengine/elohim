@@ -6,7 +6,7 @@
   "title": "Mentoring and leadership valued as care contribution",
   "description": "Mentoring and leadership valued as care contribution",
   "content": "Scenario: Mentoring and leadership valued as care contribution\n    Given Robert mentors junior employees and provides leadership\n    And workplace mentoring is care work\n    And his leadership develops others' capabilities\n    When workplace_elohim recognizes workplace care contributions\n    Then it should value Robert's mentoring as care economy participation\n    And track his contributions: mentoring relationships, team development, organizational leadership\n    And recognize that developing others is care for people and organization\n    And demonstrate that leadership is care work\n    And value workplace care contributions in care token economy\n    And build understanding that all work includes care dimensions\n    And integrate workplace care with broader care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mentoring and leadership valued as care contribution",

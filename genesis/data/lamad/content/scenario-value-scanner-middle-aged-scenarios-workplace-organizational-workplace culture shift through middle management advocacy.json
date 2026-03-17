@@ -6,7 +6,7 @@
   "title": "Workplace culture shift through middle management advocacy",
   "description": "Workplace culture shift through middle management advocacy",
   "content": "Scenario: Workplace culture shift through middle management advocacy\n    Given Robert has influence as mid-level manager\n    And workplace culture often penalizes care responsibilities\n    And middle managers can model care-friendly leadership\n    When workplace_elohim supports culture change\n    Then it should help Robert model care economy principles in his management\n    And support him in being transparent about his care responsibilities\n    And help him advocate for team members' care needs\n    And build workplace culture where care is normalized rather than hidden\n    And demonstrate that managers can lead cultural transformation\n    And create workplace environment where caregiving is supported\n    And leverage his position for systemic culture change\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace culture shift through middle management advocacy",

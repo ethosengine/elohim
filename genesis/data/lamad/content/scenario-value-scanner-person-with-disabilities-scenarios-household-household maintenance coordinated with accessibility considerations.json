@@ -6,7 +6,7 @@
   "title": "Household maintenance coordinated with accessibility considerations",
   "description": "Household maintenance coordinated with accessibility considerations",
   "content": "Scenario: Household maintenance coordinated with accessibility considerations\n    Given Alex's household requires regular maintenance\n    And some maintenance tasks are physically inaccessible to Alex\n    When household maintenance needs arise\n    Then the household_elohim should help Alex coordinate necessary services\n    And it should identify which tasks need external assistance\n    And it should help Alex hire appropriate service providers\n    And Alex should maintain authority over what work is done and how\n    And service providers should respect Alex's expertise about their own home\n    And coordination should be efficient and dignity-preserving\n    And Alex should be able to maintain their home independently with appropriate support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household maintenance coordinated with accessibility considerations",

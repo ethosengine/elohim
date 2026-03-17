@@ -6,7 +6,7 @@
   "title": "Volunteer work accessibility for aging participants",
   "description": "Volunteer work accessibility for aging participants",
   "content": "Scenario: Volunteer work accessibility for aging participants\n    Given Frank is 70 and managing age-related physical changes\n    And he wants to continue contributing through volunteer work\n    When the community_elohim coordinates accessibility\n    Then it should match Frank to work appropriate for his capabilities\n    And surface modifications that enable continued participation\n    And recognize when physical limitations require adaptation\n    And help transition to less physically demanding roles if needed\n    And protect Frank's safety while maximizing contribution\n    And enable continued meaningful participation throughout aging\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Volunteer work accessibility for aging participants",

@@ -6,7 +6,7 @@
   "title": "Workplace skills as transferable care economy capabilities",
   "description": "Workplace skills as transferable care economy capabilities",
   "content": "Scenario: Workplace skills as transferable care economy capabilities\n    Given Kenji develops skills through work (customer service, teamwork, reliability)\n    And these capabilities serve him throughout life\n    When the workplace_elohim documents Kenji's skill development\n    Then it should recognize customer service as care economy skill\n    And it should value teamwork, communication, and problem-solving\n    And it should translate work skills to care economy capabilities\n    And it should help Kenji articulate skills for future opportunities\n    And the system should recognize all work as capability development\n    And Kenji should understand his part-time work as building life skills\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace skills as transferable care economy capabilities",

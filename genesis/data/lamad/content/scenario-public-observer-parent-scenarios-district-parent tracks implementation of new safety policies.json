@@ -6,7 +6,7 @@
   "title": "Parent tracks implementation of new safety policies",
   "description": "Parent tracks implementation of new safety policies",
   "content": "Scenario: Parent tracks implementation of new safety policies\n    Given the school board passed new student safety protocols\n    And promised implementation at all schools by September\n    When September arrives and the parent's school lacks the protocols\n    Then the Observer alerts parent about implementation failure\n    And shows which schools have implemented vs which haven't\n    And reveals pattern of under-resourced schools being deprioritized\n    And parent can demand accountability for child safety commitments\n    And policy passage doesn't mean policy implementation without tracking\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent tracks implementation of new safety policies",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

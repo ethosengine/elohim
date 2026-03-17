@@ -6,7 +6,7 @@
   "title": "Family care tokens reflect Maria's role as sole active parent",
   "description": "Family care tokens reflect Maria's role as sole active parent",
   "content": "Scenario: Family care tokens reflect Maria's role as sole active parent\n    Given Maria provides all active parenting for three children\n    And she's performing care work of two parents alone\n    When family care tokens are calculated\n    Then Maria's tokens should reflect solo parenting of multiple children\n    And the protocol should recognize she's providing all emotional support, guidance, and presence\n    And her care contributions should be valued higher than partnered parents\n    And quantified solo parenting work should validate her superhuman efforts\n    And society should see undeniable proof that single parents deserve extraordinary support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care tokens reflect Maria's role as sole active parent",

@@ -6,7 +6,7 @@
   "title": "Workers become recognized community leaders through democratic participation",
   "description": "Workers become recognized community leaders through democratic participation",
   "content": "Scenario: Workers become recognized community leaders through democratic participation\n    Given Maria has been worker-owner for two years\n    And she participates actively in community institutions\n    When community organizations seek board members\n    Then Maria is invited to serve on neighborhood council\n    And Maria represents both ChickenMax and broader worker interests\n    And Maria's democratic governance experience transfers to civic participation\n    And workers transform from exploited employees to community leaders\n    And democratic workplace becomes training ground for civic democracy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers become recognized community leaders through democratic participation",

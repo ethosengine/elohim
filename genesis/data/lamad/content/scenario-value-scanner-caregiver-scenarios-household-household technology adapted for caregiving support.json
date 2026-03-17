@@ -6,7 +6,7 @@
   "title": "Household technology adapted for caregiving support",
   "description": "Household technology adapted for caregiving support",
   "content": "Scenario: Household technology adapted for caregiving support\n    Given James uses technology for care coordination\n    And household needs assistive technology for David\n    When household technology is configured\n    Then the household_elohim should support care technology integration\n    And it should help James use monitoring and safety technology\n    And it should ensure technology serves caregiving needs\n    And assistive devices should be coordinated through household system\n    And technology should reduce burden, not increase complexity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household technology adapted for caregiving support",

@@ -6,7 +6,7 @@
   "title": "Walking and public transit use reduces carbon footprint",
   "description": "Walking and public transit use reduces carbon footprint",
   "content": "Scenario: Walking and public transit use reduces carbon footprint\n    Given Margaret can no longer afford car ownership\n    And walking/transit use serves ecological goals\n    When the bioregional_elohim tracks transportation patterns\n    Then Margaret's low-carbon mobility should be recognized\n    And walking should be valued as ecological choice\n    And public transit use should be supported and facilitated\n    And her mobility patterns should serve bioregional sustainability\n    And car-free living should be honored as ecological stewardship\n    And economic constraint should be reframed as ecological virtue\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Walking and public transit use reduces carbon footprint",

@@ -6,7 +6,7 @@
   "title": "Addressing implementation challenges pragmatically",
   "description": "Addressing implementation challenges pragmatically",
   "content": "Scenario: Addressing implementation challenges pragmatically\n    Given Riverside faces practical problems with protocol\n    And elderly residents struggle with technology\n    When I work to solve accessibility issues\n    Then we maintain: human service windows for tech-reluctant residents\n    And we offer: paper-based alternatives to digital interfaces\n    And we run: continuous education programs\n    And we provide: in-person support and assistance\n    And we ensure: no resident excluded due to tech barriers\n    And we adapt: implementation to community reality\n    And protocol serves: everyone not just tech-savvy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Addressing implementation challenges pragmatically",

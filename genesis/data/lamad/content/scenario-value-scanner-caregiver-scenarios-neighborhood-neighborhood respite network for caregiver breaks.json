@@ -6,7 +6,7 @@
   "title": "Neighborhood respite network for caregiver breaks",
   "description": "Neighborhood respite network for caregiver breaks",
   "content": "Scenario: Neighborhood respite network for caregiver breaks\n    Given James needs regular breaks or he will burn out\n    And formal respite care is expensive and hard to access\n    When the neighborhood_elohim organizes respite network\n    Then it should coordinate neighbors willing to provide respite\n    And it should schedule regular respite periods for James\n    And neighbors should be trained for basic Alzheimer's care\n    And respite should be reliable and consistent\n    And neighborhood should provide systematic respite support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood respite network for caregiver breaks",

@@ -6,7 +6,7 @@
   "title": "Earning increased autonomy through demonstrated stewardship",
   "description": "Earning increased autonomy through demonstrated stewardship",
   "content": "Scenario: Earning increased autonomy through demonstrated stewardship\n    Given Emma has shown good judgment over time\n    And parents can adjust boundaries through family_elohim\n    When Emma's decision patterns demonstrate capability\n    Then Sarah should be prompted to expand Emma's freedom\n    And specific areas for increased autonomy should be suggested\n    And Emma should understand connection between responsibility and freedom\n    And the family should have clear process for granting trust\n    And autonomy should be earned through demonstrated care\n    And family governance should respond to growing capability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Earning increased autonomy through demonstrated stewardship",

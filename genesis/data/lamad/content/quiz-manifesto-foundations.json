@@ -350,7 +350,7 @@
       }
     }
   ],
-  "contentFormat": "sophia",
+  "contentFormat": "interactive",
   "tags": [
     "assessment",
     "manifesto",
@@ -365,7 +365,8 @@
     "attestationId": "manifesto-foundations",
     "difficulty": "medium",
     "questionCount": 5,
-    "migratedAt": "2026-01-24T00:00:00.000Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z",
+    "originalContentFormat": "sophia"
   },
   "createdAt": "2025-12-26T00:00:00Z",
   "updatedAt": "2026-01-24T00:00:00.000Z",

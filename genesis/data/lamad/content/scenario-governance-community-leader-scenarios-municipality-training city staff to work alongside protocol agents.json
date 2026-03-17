@@ -6,7 +6,7 @@
   "title": "Training city staff to work alongside protocol agents",
   "description": "Training city staff to work alongside protocol agents",
   "content": "Scenario: Training city staff to work alongside protocol agents\n    Given city employees need to understand protocol to do their jobs\n    And they may feel threatened by AI systems\n    When I coordinate staff training and cultural adaptation\n    Then we explain: how protocol augments not replaces their work\n    And we provide: training on working with agent information\n    And we clarify: that professional judgment remains valued\n    And we ensure: staff see agents as tools not replacements\n    And we maintain: good jobs with dignity for city workers\n    And we demonstrate: that democratic AI can strengthen not undermine labor\n    And implementation respects: people doing the work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipality",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Training city staff to work alongside protocol agents",

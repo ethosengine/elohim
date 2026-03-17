@@ -6,7 +6,7 @@
   "title": "Bioregional food knowledge and local food traditions",
   "description": "Bioregional food knowledge and local food traditions",
   "content": "Scenario: Bioregional food knowledge and local food traditions\n    Given Margaret knows local food traditions and seasonal patterns\n    And bioregional food culture strengthens local systems\n    When the bioregional_elohim supports food culture\n    Then Margaret's knowledge of local foods should be valued\n    And traditional food practices should be preserved and shared\n    And local food culture should be taught to younger generations\n    And bioregional identity should be strengthened through food\n    And Margaret's cultural food knowledge should serve community\n    And food traditions should connect people to place\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional food knowledge and local food traditions",

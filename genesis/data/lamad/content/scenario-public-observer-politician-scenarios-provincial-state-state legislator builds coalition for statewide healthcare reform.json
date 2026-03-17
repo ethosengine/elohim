@@ -6,7 +6,7 @@
   "title": "State legislator builds coalition for statewide healthcare reform",
   "description": "State legislator builds coalition for statewide healthcare reform",
   "content": "Scenario: State legislator builds coalition for statewide healthcare reform\n    Given the politician champions Medicaid expansion\n    And needs bipartisan support for passage\n    When the Observer identifies coalition building opportunities\n    Then they see rural hospitals support expansion for financial survival\n    And identify business groups concerned about employee healthcare costs\n    And connect with faith organizations serving uninsured populations\n    And map which legislators have constituent pressure for expansion\n    And build diverse coalition across partisan and geographic divides\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "State legislator builds coalition for statewide healthcare reform",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

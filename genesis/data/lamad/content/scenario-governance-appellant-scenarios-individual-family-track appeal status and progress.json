@@ -6,7 +6,7 @@
   "title": "Track appeal status and progress",
   "description": "Track appeal status and progress",
   "content": "Scenario: Track appeal status and progress\n    Given Marcus has submitted an appeal\n    When Marcus checks his appeal status\n    Then he sees current review stage clearly displayed\n    And he sees estimated timeline for each stage\n    And he receives notifications at key milestones\n    And he can compare his case to similar anonymized appeals\n    And he can access precedent cases involving mental health interventions\n    And the tracking interface is accessible on all his devices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-individual-family",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Track appeal status and progress",

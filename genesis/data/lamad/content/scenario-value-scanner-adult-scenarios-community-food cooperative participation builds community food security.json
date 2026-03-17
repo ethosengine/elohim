@@ -6,7 +6,7 @@
   "title": "Food cooperative participation builds community food security",
   "description": "Food cooperative participation builds community food security",
   "content": "Scenario: Food cooperative participation builds community food security\n    Given Sarah participates in community food cooperative\n    And she contributes labor to collective food purchasing\n    When food cooperative operates\n    Then the community_elohim should track Sarah's contributions\n    And it should coordinate cooperative logistics\n    And it should connect Sarah to other food security advocates\n    And cooperative should reduce costs for all members\n    And community food security should be built through care economy\n    And Sarah's contributions should be recognized and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food cooperative participation builds community food security",

@@ -6,7 +6,7 @@
   "title": "Recognition that parenting skills are professional-grade capabilities",
   "description": "Recognition that parenting skills are professional-grade capabilities",
   "content": "Scenario: Recognition that parenting skills are professional-grade capabilities\n    Given Sarah performs developmental psychology, nutritional science, financial management\n    And she coordinates logistics, resolves conflicts, and does long-term strategic planning\n    When the system assesses Sarah's capabilities\n    Then it should recognize parenting as professional-grade work\n    And her skills should be valued as marketable expertise\n    And the system should translate parenting skills to professional context\n    And Sarah should understand she's performing sophisticated labor\n    And her care tokens could translate to professional credit\n    And parenting should be recognized as skilled professional work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition that parenting skills are professional-grade capabilities",

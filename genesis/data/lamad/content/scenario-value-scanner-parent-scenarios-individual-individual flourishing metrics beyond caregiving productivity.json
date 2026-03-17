@@ -6,7 +6,7 @@
   "title": "Individual flourishing metrics beyond caregiving productivity",
   "description": "Individual flourishing metrics beyond caregiving productivity",
   "content": "Scenario: Individual flourishing metrics beyond caregiving productivity\n    Given Sarah's value extends far beyond care productivity\n    And she is a complete person deserving of flourishing\n    When the system measures Sarah's well-being\n    Then it should track her joy, rest, creative expression, and growth\n    And it should measure whether she's experiencing life beyond caregiving\n    And it should flag if she has no non-caregiving identity markers\n    And individual flourishing should be valued as essential\n    And Sarah should be supported in being whole, not just productive\n    And the care economy should enable her complete humanity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual flourishing metrics beyond caregiving productivity",

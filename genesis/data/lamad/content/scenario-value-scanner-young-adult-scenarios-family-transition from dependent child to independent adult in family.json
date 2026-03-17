@@ -6,7 +6,7 @@
   "title": "Transition from dependent child to independent adult in family",
   "description": "Transition from dependent child to independent adult in family",
   "content": "Scenario: Transition from dependent child to independent adult in family\n    Given Aisha was recently a dependent family member\n    And she's now an independent adult\n    When Aisha participates in family governance\n    Then her voice should carry equal weight to other adults\n    And she should participate in family decisions as a peer\n    And her care contributions should be recognized as adult care work\n    And the family_elohim should reflect her changed status\n    And family relationships should adapt to her independence\n    And she should be valued as capable adult contributor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transition from dependent child to independent adult in family",

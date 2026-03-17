@@ -6,7 +6,7 @@
   "title": "Waste reduction as household care contribution",
   "description": "Waste reduction as household care contribution",
   "content": "Scenario: Waste reduction as household care contribution\n    Given Sarah manages household waste and recycling\n    And reducing waste requires planning and effort\n    When the ecological_elohim tracks waste reduction work\n    Then it should recognize waste management as care labor\n    And it should value Sarah's composting, recycling, waste minimization\n    And it should quantify environmental benefit of her work\n    And waste reduction should accumulate care tokens\n    And the system should make invisible ecological labor visible\n    And Sarah's environmental care work should be recognized\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Waste reduction as household care contribution",

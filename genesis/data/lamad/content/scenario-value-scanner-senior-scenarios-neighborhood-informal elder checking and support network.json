@@ -6,7 +6,7 @@
   "title": "Informal elder checking and support network",
   "description": "Informal elder checking and support network",
   "content": "Scenario: Informal elder checking and support network\n    Given multiple seniors live in the neighborhood\n    And Margaret is in the \"younger\" senior cohort\n    When the neighborhood_elohim coordinates elder support\n    Then Margaret should help check on older neighbors\n    And she should receive checking from younger neighbors\n    And gradual transitions in care needs should be supported\n    And no senior should be isolated or unseen\n    And neighborhood should notice if something is wrong\n    And informal care networks should prevent crisis\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Informal elder checking and support network",

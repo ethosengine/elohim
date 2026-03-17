@@ -6,7 +6,7 @@
   "title": "Food service training and certification evolves to include democratic governance",
   "description": "Food service training and certification evolves to include democratic governance",
   "content": "Scenario: Food service training and certification evolves to include democratic governance\n    Given industry training focuses on franchise compliance and hierarchical management\n    And democratic operations require different skills (facilitation, collaboration, transparency)\n    When democratic food service network reaches scale\n    Then industry training programs add democratic governance and worker ownership modules\n    And certification standards recognize cooperative business competencies\n    And culinary schools and hospitality programs teach democratic operation\n    And sector workforce development supports democratic model proliferation\n    And industry_sector_elohim develops democratic food service training curriculum\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food service training and certification evolves to include democratic governance",

@@ -4,7 +4,7 @@
   "title": "For Developers",
   "description": "Build on distributed protocols. Implement privacy by default. Design for consent. Document power structures.",
   "content": "Build on distributed protocols. Implement privacy by default. Design for consent. Document power structures.",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/path-forward/concept-path-forward-developers.json",
   "tags": [
     "path-forward",
@@ -22,14 +22,15 @@
     "section": "path-forward",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.002628",
   "updatedAt": "2025-12-24T03:05:25.879Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

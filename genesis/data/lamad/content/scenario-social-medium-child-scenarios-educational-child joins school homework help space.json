@@ -6,7 +6,7 @@
   "title": "Child joins school homework help space",
   "description": "Child joins school homework help space",
   "content": "Scenario: Child joins school homework help space\n    Given Emma's school has a homework help space on the Elohim network\n    And the space is moderated by teachers and parent volunteers\n    When Emma joins the space through her school connection\n    Then she gains access to homework help from peers and mentors\n    And all participants are verified members of the school community\n    And the moderation agent maintains supportive atmosphere\n    And predatory behavior is structurally impossible\n    And Emma can ask questions and help classmates\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-child-scenarios-educational",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child joins school homework help space",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

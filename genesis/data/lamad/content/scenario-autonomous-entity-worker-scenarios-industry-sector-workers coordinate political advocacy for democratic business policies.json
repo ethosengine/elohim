@@ -6,7 +6,7 @@
   "title": "Workers coordinate political advocacy for democratic business policies",
   "description": "Workers coordinate political advocacy for democratic business policies",
   "content": "Scenario: Workers coordinate political advocacy for democratic business policies\n    Given municipal government is considering economic development policies\n    And workers want policies supporting democratic ownership\n    When sector workers organize advocacy campaign\n    Then workers from multiple EAE entities testify at city council\n    And workers present data on democratic business benefits\n    And workers advocate for procurement preferences and tax incentives\n    And coordinated worker voice influences policy more than isolated entities\n    And sector political power protects and expands democratic economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers coordinate political advocacy for democratic business policies",

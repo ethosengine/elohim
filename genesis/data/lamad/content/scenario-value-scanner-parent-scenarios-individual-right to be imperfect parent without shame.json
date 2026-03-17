@@ -6,7 +6,7 @@
   "title": "Right to be imperfect parent without shame",
   "description": "Right to be imperfect parent without shame",
   "content": "Scenario: Right to be imperfect parent without shame\n    Given Sarah cannot possibly meet all demands perfectly\n    And parenting culture enforces impossible standards\n    When Sarah makes suboptimal choices under constraint\n    Then the personal_agent should never shame or guilt\n    And it should validate \"You're doing your best with available resources\"\n    And it should recognize that good-enough parenting is actually good\n    And perfectionism should be rejected as harmful\n    And Sarah should be supported in sustainable imperfection\n    And the system should counteract toxic parenting culture\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to be imperfect parent without shame",

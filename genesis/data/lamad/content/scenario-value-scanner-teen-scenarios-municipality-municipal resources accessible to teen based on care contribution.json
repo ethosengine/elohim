@@ -6,7 +6,7 @@
   "title": "Municipal resources accessible to teen based on care contribution",
   "description": "Municipal resources accessible to teen based on care contribution",
   "content": "Scenario: Municipal resources accessible to teen based on care contribution\n    Given the municipality offers public services and resources\n    And Jasmine has demonstrated substantial care economy participation\n    When she seeks to access municipal programs\n    Then her care contributions should qualify her for access\n    And municipal_elohim should recognize her as a legitimate community member\n    And she should access libraries, recreation facilities, and public programs independently\n    And municipal services should be teen-accessible without parental mediation\n    And public resources should serve all ages based on contribution and need\n    And she should experience being a valued member of the city\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal resources accessible to teen based on care contribution",

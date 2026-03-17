@@ -6,7 +6,7 @@
   "title": "Neighborhood environmental stewardship",
   "description": "Neighborhood environmental stewardship",
   "content": "Scenario: Neighborhood environmental stewardship\n    Given Kenji is studying environmental science\n    And neighborhoods are environmental governance units\n    When Kenji participates in neighborhood environmental care\n    Then the neighborhood_elohim should recognize his stewardship work\n    And it should value his participation in neighborhood cleanup\n    And it should recognize his knowledge contributions about sustainability\n    And environmental care should accumulate care tokens\n    And the system should connect academic learning to neighborhood action\n    And students should contribute environmental expertise to neighborhoods\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood environmental stewardship",

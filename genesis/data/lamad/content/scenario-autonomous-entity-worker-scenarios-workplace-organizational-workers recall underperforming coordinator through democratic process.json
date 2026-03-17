@@ -6,7 +6,7 @@
   "title": "Workers recall underperforming coordinator through democratic process",
   "description": "Workers recall underperforming coordinator through democratic process",
   "content": "Scenario: Workers recall underperforming coordinator through democratic process\n    Given Marcus transitioned from manager to democratic coordinator\n    And workers have expressed concerns about his facilitation effectiveness\n    When workers initiate a recall process\n    Then workplace_elohim facilitates a fair evaluation process\n    And Marcus receives specific feedback on coordination failures\n    And workers vote on recall with 2/3 supermajority required\n    And if recalled, Marcus transitions gracefully with support for next role\n    And democratic accountability prevents hierarchical abuse\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers recall underperforming coordinator through democratic process",

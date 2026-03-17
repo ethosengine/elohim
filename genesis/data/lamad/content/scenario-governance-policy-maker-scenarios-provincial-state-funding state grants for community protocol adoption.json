@@ -6,7 +6,7 @@
   "title": "Funding state grants for community protocol adoption",
   "description": "Funding state grants for community protocol adoption",
   "content": "Scenario: Funding state grants for community protocol adoption\n    Given poor communities cannot afford protocol infrastructure\n    And equitable access requires public investment\n    When I secure state budget allocation for protocol support\n    Then I fund: grants for community nodes and maintenance\n    And I support: accessibility enhancements and education\n    And I provide: technical assistance for implementation\n    And I ensure: sliding scale and cross-subsidization\n    And I treat: protocol as democracy infrastructure deserving investment\n    And I prevent: digital divide excluding marginalized communities\n    And public funding: enables universal access to democratic governance tools\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Funding state grants for community protocol adoption",

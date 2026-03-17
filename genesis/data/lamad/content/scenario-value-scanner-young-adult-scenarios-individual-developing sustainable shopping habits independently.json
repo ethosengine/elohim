@@ -6,7 +6,7 @@
   "title": "Developing sustainable shopping habits independently",
   "description": "Developing sustainable shopping habits independently",
   "content": "Scenario: Developing sustainable shopping habits independently\n    Given Aisha is establishing her adult shopping patterns\n    And she wants to reduce food waste\n    When Aisha scans items at the store\n    Then the personal_agent should track purchase patterns\n    And it should identify what she consistently uses versus what spoils\n    And it should suggest sustainable alternatives\n    And the system should help her build efficient shopping habits\n    And waste reduction analytics should inform future decisions\n    And Aisha should develop adult competence through practice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developing sustainable shopping habits independently",

@@ -6,7 +6,7 @@
   "title": "Retired residents as civic engagement resource for municipal governance",
   "description": "Retired residents as civic engagement resource for municipal governance",
   "content": "Scenario: Retired residents as civic engagement resource for municipal governance\n    Given Frank has time freedom enabling substantial civic participation\n    And many retired residents can attend daytime meetings and hearings\n    When the municipal_elohim coordinates civic engagement\n    Then it should recognize retired residents as civic participation resource\n    And facilitate their attendance at municipal meetings and hearings\n    And coordinate testimony and advocacy utilizing their availability\n    And recognize civic engagement as care contribution\n    And retired residents should be understood as democracy infrastructure\n    And Frank should participate meaningfully in municipal governance\n    And elder voice should shape municipal policy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Retired residents as civic engagement resource for municipal governance",

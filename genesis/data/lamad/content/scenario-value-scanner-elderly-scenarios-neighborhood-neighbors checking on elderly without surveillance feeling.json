@@ -6,7 +6,7 @@
   "title": "Neighbors checking on elderly without surveillance feeling",
   "description": "Neighbors checking on elderly without surveillance feeling",
   "content": "Scenario: Neighbors checking on elderly without surveillance feeling\n    Given Helen lives alone and neighbors are concerned\n    And informal neighborhood care networks exist\n    When neighbors check on Helen's wellbeing\n    Then the neighborhood_elohim should coordinate wellness checks\n    And neighbors should be guided to check naturally: \"Saw you haven't been out\"\n    And Helen should experience concern, not surveillance\n    And her privacy should be respected\n    And neighborhood care should feel organic, not institutional\n    And connection should preserve dignity\n    And the protocol should facilitate genuine community care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighbors checking on elderly without surveillance feeling",

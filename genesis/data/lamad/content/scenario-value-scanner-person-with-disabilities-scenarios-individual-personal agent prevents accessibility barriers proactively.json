@@ -6,7 +6,7 @@
   "title": "Personal agent prevents accessibility barriers proactively",
   "description": "Personal agent prevents accessibility barriers proactively",
   "content": "Scenario: Personal agent prevents accessibility barriers proactively\n    Given Alex encounters accessibility barriers constantly\n    And the personal_agent monitors Alex's environment\n    When Alex plans activities or purchases\n    Then the agent should identify accessibility barriers in advance\n    And it should provide information about accommodations available\n    And it should suggest accessible alternatives when needed\n    And it should help Alex advocate for improved accessibility\n    And barrier documentation should support systems change advocacy\n    And Alex should experience fewer surprises and obstacles\n    And the protocol should reduce disability-related stress\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent prevents accessibility barriers proactively",

@@ -6,7 +6,7 @@
   "title": "Journalist investigates playground neglect in underserved neighborhood",
   "description": "Journalist investigates playground neglect in underserved neighborhood",
   "content": "Scenario: Journalist investigates playground neglect in underserved neighborhood\n    Given residents complain about dangerous playground conditions\n    And the journalist needs context on maintenance patterns\n    When the Observer provides hyperlocal infrastructure data\n    Then the journalist sees playground hasn't been maintained in 5 years\n    And compares to monthly maintenance in affluent neighborhoods\n    And documents injury reports and resident complaints ignored\n    And tracks city budget showing maintenance disparities\n    And publishes accountability story on infrastructure racism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates playground neglect in underserved neighborhood",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

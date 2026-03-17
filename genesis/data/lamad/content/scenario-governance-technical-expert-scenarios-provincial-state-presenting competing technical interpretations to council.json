@@ -6,7 +6,7 @@
   "title": "Presenting competing technical interpretations to council",
   "description": "Presenting competing technical interpretations to council",
   "content": "Scenario: Presenting competing technical interpretations to council\n    Given technical experts disagree about transparency method adequacy\n    And council needs to understand the disagreement\n    When I present both my view and Dr. Chen's alternative\n    Then I explain: his argument fairly and completely\n    And I articulate: where we agree and where we differ\n    And I present: his evidence alongside mine\n    And I avoid: dismissing his perspective unfairly\n    And I let: council judge which interpretation is more constitutionally aligned\n    And I demonstrate: intellectual humility and respect for disagreement\n    And council sees: that expertise involves uncertainty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Presenting competing technical interpretations to council",

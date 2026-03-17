@@ -6,7 +6,7 @@
   "title": "Bioregional investment coordination supports local sustainable supply chains",
   "description": "Bioregional investment coordination supports local sustainable supply chains",
   "content": "Scenario: Bioregional investment coordination supports local sustainable supply chains\n    Given sustainable supply chains require coordination across bioregion\n    And Patricia's investment in Maria's Kitchen connects to Johnson Farm investment\n    When investment pool coordinates bioregional supply chain development\n    Then farm-to-restaurant supply chains are financed as integrated systems\n    And bioregional food miles decrease through local sourcing infrastructure\n    And investment supports entire sustainable supply chain, not isolated enterprises\n    And ecological benefits compound through bioregional coordination\n    And bioregional_elohim coordinates supply chain investment across bioregion\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional investment coordination supports local sustainable supply chains",

@@ -6,7 +6,7 @@
   "title": "Learning connection between budget constraints and farm labor",
   "description": "Learning connection between budget constraints and farm labor",
   "content": "Scenario: Learning connection between budget constraints and farm labor\n    Given Marcus experiences severe budget constraints\n    And cheap food often reflects exploited farm labor\n    When Marcus chooses affordable foods\n    Then the personal_agent should help him understand pricing\n    And it should explain that low prices often mean low wages for workers\n    And it should build empathy for farm workers' care labor\n    And Marcus should understand his scarcity connects to their scarcity\n    And economic justice awareness should develop\n    And care economy should include care for food system workers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning connection between budget constraints and farm labor",

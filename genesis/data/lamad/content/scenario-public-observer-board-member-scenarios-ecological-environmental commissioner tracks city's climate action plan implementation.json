@@ -6,7 +6,7 @@
   "title": "Environmental commissioner tracks city's climate action plan implementation",
   "description": "Environmental commissioner tracks city's climate action plan implementation",
   "content": "Scenario: Environmental commissioner tracks city's climate action plan implementation\n    Given city adopted climate action plan with specific reduction targets and timelines\n    And annual progress reports from staff emphasize achievements\n    And commissioner wants objective assessment of whether city is on track\n    When the commissioner uses Observer accountability tracking\n    Then they see actual emissions reductions versus plan targets over time\n    And discover city is not on track to meet 2030 goals\n    And find some action items completed while highest-impact measures delayed\n    And access comparison showing peer cities making faster progress\n    And accountability tracking reveals gap between plan commitments and implementation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental commissioner tracks city's climate action plan implementation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

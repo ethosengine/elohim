@@ -6,7 +6,7 @@
   "title": "Making invisible household labor distribution visible to partner",
   "description": "Making invisible household labor distribution visible to partner",
   "content": "Scenario: Making invisible household labor distribution visible to partner\n    Given Sarah performs 75% of household care labor\n    And her partner believes he \"helps around the house\"\n    When the household_elohim generates labor distribution report\n    Then it should show precise breakdown of who does what\n    And it should quantify \"Sarah: 75%, Partner: 25%\"\n    And the data should be undeniable and specific\n    And the partner should see his contribution is not equitable\n    And visibility should enable reality-based conversation\n    And the system should make invisible labor undeniably visible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Making invisible household labor distribution visible to partner",

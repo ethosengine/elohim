@@ -6,7 +6,7 @@
   "title": "Reciprocal care flows between Margaret and adult children",
   "description": "Reciprocal care flows between Margaret and adult children",
   "content": "Scenario: Reciprocal care flows between Margaret and adult children\n    Given Margaret provides childcare for her daughter's family\n    And her daughter provides technology help and transportation\n    When the family_elohim coordinates these reciprocal care exchanges\n    Then all care flows should be tracked in both directions\n    And Margaret gives care (grandchildren); daughter gives care (support)\n    And reciprocity should be visible to prevent imbalance\n    And both generations' contributions should be valued\n    And the relationship should feel equitable, not one-sided\n    And multigenerational care patterns should be sustainable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reciprocal care flows between Margaret and adult children",

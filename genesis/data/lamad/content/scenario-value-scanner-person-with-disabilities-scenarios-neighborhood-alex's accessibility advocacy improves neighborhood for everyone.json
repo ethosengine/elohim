@@ -6,7 +6,7 @@
   "title": "Alex's accessibility advocacy improves neighborhood for everyone",
   "description": "Alex's accessibility advocacy improves neighborhood for everyone",
   "content": "Scenario: Alex's accessibility advocacy improves neighborhood for everyone\n    Given Alex documents accessibility barriers in the neighborhood\n    And improved accessibility benefits elderly residents, parents with strollers, delivery workers\n    When the neighborhood_elohim tracks Alex's advocacy contributions\n    Then Alex's work identifying barriers should accumulate care tokens\n    And advocacy for curb cuts, accessible entrances, better lighting benefits whole neighborhood\n    And Alex's contributions should be recognized as care work for community\n    And the protocol should make visible how disability advocacy serves everyone\n    And Alex should be seen as neighborhood improver, not complainer\n    And care economy should value Alex's expertise about accessibility\n    And neighborhood should understand Alex's work as gift to all residents\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex's accessibility advocacy improves neighborhood for everyone",

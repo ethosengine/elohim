@@ -6,7 +6,7 @@
   "title": "Teaching repair and maintenance reduces waste and consumption",
   "description": "Teaching repair and maintenance reduces waste and consumption",
   "content": "Scenario: Teaching repair and maintenance reduces waste and consumption\n    Given Frank knows how to repair buildings, equipment, and systems\n    And repair culture counters disposability and resource extraction\n    When the bioregional_elohim coordinates repair knowledge sharing\n    Then it should facilitate Frank teaching repair skills\n    And help community members learn to maintain their homes\n    And recognize repair education as ecological care contribution\n    And reduce consumption through extended equipment lifespan\n    And build bioregional self-sufficiency through skill transmission\n    And Frank's knowledge should serve waste reduction and resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching repair and maintenance reduces waste and consumption",

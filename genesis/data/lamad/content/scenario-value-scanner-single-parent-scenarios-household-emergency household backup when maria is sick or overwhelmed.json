@@ -6,7 +6,7 @@
   "title": "Emergency household backup when Maria is sick or overwhelmed",
   "description": "Emergency household backup when Maria is sick or overwhelmed",
   "content": "Scenario: Emergency household backup when Maria is sick or overwhelmed\n    Given Maria has no co-parent to tag in during crisis\n    And she must parent even when sick or exhausted\n    When Maria faces personal emergency or is at breaking point\n    Then the household_elohim should detect crisis situation\n    And it should activate emergency backup networks\n    And it should connect to neighbors who can provide temporary support\n    And it should help coordinate emergency meal provision or childcare\n    And Maria should have safety net for the inevitable times she cannot function alone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency household backup when Maria is sick or overwhelmed",

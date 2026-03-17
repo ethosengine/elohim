@@ -6,7 +6,7 @@
   "title": "School board member distinguishes authentic parent concern from coordinated campaign",
   "description": "School board member distinguishes authentic parent concern from coordinated campaign",
   "content": "Scenario: School board member distinguishes authentic parent concern from coordinated campaign\n    Given the politician receives mass emails opposing curriculum\n    And messages claim widespread parent outrage\n    When the Observer analyzes campaign origins\n    Then they see template messages from national advocacy organization\n    And identify 15 local parents among 300 emails\n    And distinguish coordinated political campaign from genuine community concern\n    And understand actual parent sentiment in district\n    And resist manipulation by outside political organizations\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "School board member distinguishes authentic parent concern from coordinated campaign",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

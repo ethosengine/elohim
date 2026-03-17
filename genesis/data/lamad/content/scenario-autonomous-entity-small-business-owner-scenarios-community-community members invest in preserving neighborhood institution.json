@@ -6,7 +6,7 @@
   "title": "Community members invest in preserving neighborhood institution",
   "description": "Community members invest in preserving neighborhood institution",
   "content": "Scenario: Community members invest in preserving neighborhood institution\n    Given neighbors value Rosa's Auto but have no ownership pathway\n    And community members want to support local businesses beyond patronage\n    When community investment pool enables neighborhood participation\n    Then neighbors invest modest amounts ($2K-$10K) in acquisition financing\n    And investors receive fair return (5% annually) plus social benefit\n    And investment enables Rosa's dignified exit while protecting workers\n    And community gains democratic governance voice in institution they supported\n    And community_elohim manages investment relationships transparently\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community members invest in preserving neighborhood institution",

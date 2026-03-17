@@ -6,7 +6,7 @@
   "title": "Politician navigates development pressure with environmental accountability",
   "description": "Politician navigates development pressure with environmental accountability",
   "content": "Scenario: Politician navigates development pressure with environmental accountability\n    Given developer proposes project with environmental impacts\n    And campaign contributions create perception of conflict\n    When the Observer documents environmental impacts and relationships\n    Then they see project's environmental footprint objectively analyzed\n    And identify developer's environmental track record\n    And understand campaign finance relationships made publicly visible\n    And review community environmental concerns systematically\n    And make transparent decision accountable to environmental and community interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician navigates development pressure with environmental accountability",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

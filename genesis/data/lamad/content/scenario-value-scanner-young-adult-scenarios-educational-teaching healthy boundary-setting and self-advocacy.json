@@ -6,7 +6,7 @@
   "title": "Teaching healthy boundary-setting and self-advocacy",
   "description": "Teaching healthy boundary-setting and self-advocacy",
   "content": "Scenario: Teaching healthy boundary-setting and self-advocacy\n    Given Aisha needs to learn professional and personal boundaries\n    And boundary-setting is rarely taught explicitly\n    When the personal_agent provides guidance\n    Then it should teach how to set healthy boundaries\n    And it should model self-advocacy language and approaches\n    And it should help her recognize when boundaries are needed\n    And the system should educate about sustainable capacity management\n    And she should learn that boundaries enable sustainable care\n    And self-advocacy should be taught as essential life skill\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching healthy boundary-setting and self-advocacy",

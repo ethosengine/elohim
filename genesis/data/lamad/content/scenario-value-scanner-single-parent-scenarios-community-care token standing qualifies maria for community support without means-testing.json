@@ -6,7 +6,7 @@
   "title": "Care token standing qualifies Maria for community support without means-testing",
   "description": "Care token standing qualifies Maria for community support without means-testing",
   "content": "Scenario: Care token standing qualifies Maria for community support without means-testing\n    Given Maria has accumulated substantial care tokens from solo parenting work\n    And she needs access to community resources due to resource constraints\n    When Maria seeks community support\n    Then her care contributions should qualify her for support with dignity\n    And support should be based on demonstrated care work, not proving neediness\n    And Maria should access resources as care economy participant, not charity recipient\n    And community support should recognize her contributions, not pity her circumstances\n    And care economy should frame assistance as reciprocity, not welfare\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Care token standing qualifies Maria for community support without means-testing",

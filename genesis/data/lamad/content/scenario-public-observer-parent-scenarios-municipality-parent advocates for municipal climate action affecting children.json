@@ -6,7 +6,7 @@
   "title": "Parent advocates for municipal climate action affecting children",
   "description": "Parent advocates for municipal climate action affecting children",
   "content": "Scenario: Parent advocates for municipal climate action affecting children\n    Given extreme heat days close schools and cancel outdoor activities\n    And the parent worries about children's future climate impacts\n    When the parent reviews municipal climate adaptation plans\n    Then they see schools lack air conditioning for heat waves\n    And learn city has no strategy for protecting children's health\n    And understand children are most vulnerable to climate impacts\n    And connect with other parents concerned about children's futures\n    And municipal climate policy centers children's wellbeing and safety\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent advocates for municipal climate action affecting children",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

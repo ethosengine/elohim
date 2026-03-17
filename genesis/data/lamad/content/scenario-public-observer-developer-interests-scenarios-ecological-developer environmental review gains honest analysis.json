@@ -6,7 +6,7 @@
   "title": "Developer environmental review gains honest analysis",
   "description": "Developer environmental review gains honest analysis",
   "content": "Scenario: Developer environmental review gains honest analysis\n    Given a developer's environmental impact report claims minimal impacts\n    And used consultant known for developer-friendly assessments\n    When the Observer provides independent environmental analysis\n    Then comparison shows: wetland impacts understated by 60%\n    And habitat loss affects threatened species not mentioned\n    And stormwater runoff calculations omit downstream impacts\n    And independent assessment reveals actual environmental costs\n    And rubber-stamp reviews face evidence-based scrutiny\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer environmental review gains honest analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

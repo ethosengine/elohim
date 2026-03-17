@@ -6,7 +6,7 @@
   "title": "Facing superintelligent agent reasoning complexity",
   "description": "Facing superintelligent agent reasoning complexity",
   "content": "Scenario: Facing superintelligent agent reasoning complexity\n    Given an appeal involves agent reasoning approaching comprehension limits\n    And I struggle to understand what I'm judging\n    When we confront superintelligence governance question\n    Then we honestly acknowledge: limits of our understanding\n    And we hear: technical experts explain what can and cannot be grasped\n    And we evaluate: if cryptographic proof suffices when reasoning is opaque\n    And we grapple: with governing intelligence that exceeds ours\n    And we may establish: capability limits until explainability improves\n    And we preserve: democratic oversight even at AI capability frontiers\n    And we accept: uncertainty about whether this is truly possible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Facing superintelligent agent reasoning complexity",

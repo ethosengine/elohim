@@ -6,7 +6,7 @@
   "title": "Local food access points expand through community distribution partnerships",
   "description": "Local food access points expand through community distribution partnerships",
   "content": "Scenario: Local food access points expand through community distribution partnerships\n    Given farmers markets and farm visits are not accessible to all community members\n    And transportation and schedule barriers limit food access\n    When democratic farm partners with community organizations for distribution\n    Then produce is delivered to senior centers, community centers, and schools\n    And distribution partnerships increase food access for mobility-limited residents\n    And community institutions become food access points supporting local agriculture\n    And equitable distribution ensures farm benefits entire community\n    And community_elohim coordinates community distribution partnerships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local food access points expand through community distribution partnerships",

@@ -6,7 +6,7 @@
   "title": "Community care economy connects Aisha to opportunity",
   "description": "Community care economy connects Aisha to opportunity",
   "content": "Scenario: Community care economy connects Aisha to opportunity\n    Given Aisha is building her adult life\n    And community networks provide opportunities\n    When Aisha participates actively in community care\n    Then the community_elohim should surface relevant opportunities\n    And it should connect her to job leads, housing, or collaborations\n    And her care contributions should give her access to community resources\n    And the system should recognize that care builds networks\n    And community care economy should create opportunity pathways\n    And participation should tangibly improve her life prospects\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community care economy connects Aisha to opportunity",

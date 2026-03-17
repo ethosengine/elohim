@@ -6,7 +6,7 @@
   "title": "Activist connects local environmental struggle to regional climate justice",
   "description": "Activist connects local environmental struggle to regional climate justice",
   "content": "Scenario: Activist connects local environmental struggle to regional climate justice\n    Given the activist fights pollution in their neighborhood\n    When the Observer reveals regional climate adaptation patterns\n    Then the activist sees climate resilience investments favor wealthy areas\n    And flood vulnerability concentrates in communities of color\n    And urban heat island effects exacerbate environmental injustice\n    And local environmental fight connects to climate justice movement\n    And climate policy must address environmental equity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist connects local environmental struggle to regional climate justice",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

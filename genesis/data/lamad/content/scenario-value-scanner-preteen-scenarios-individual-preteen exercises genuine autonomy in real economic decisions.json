@@ -6,7 +6,7 @@
   "title": "Preteen exercises genuine autonomy in real economic decisions",
   "description": "Preteen exercises genuine autonomy in real economic decisions",
   "content": "Scenario: Preteen exercises genuine autonomy in real economic decisions\n    Given Marcus has $75 budget for weekly groceries\n    And the budget is not hypothetical but actual family resource constraint\n    When Marcus uses the Value Scanner to plan weekly shopping\n    Then he should have full autonomy within budget boundaries\n    And his personal_agent should provide adult-level decision support\n    And the interface should treat him as capable, not as a child\n    And his choices should have real consequences for family survival\n    And the system should recognize he's not practicing but performing\n    And autonomy should be genuine, not simulated learning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preteen exercises genuine autonomy in real economic decisions",

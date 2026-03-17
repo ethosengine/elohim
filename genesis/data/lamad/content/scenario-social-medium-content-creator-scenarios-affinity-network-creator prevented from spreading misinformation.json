@@ -6,7 +6,7 @@
   "title": "Creator prevented from spreading misinformation",
   "description": "Creator prevented from spreading misinformation",
   "content": "Scenario: Creator prevented from spreading misinformation\n    Given Jordan creates content making unsupported health claims\n    And the claims contradict scientific consensus\n    When Jordan attempts to contribute the content\n    Then the verification agent surfaces counter-evidence\n    And Jordan sees the evidence gaps before distribution\n    And Jordan can revise with better sources or accept limited reach\n    And if posted without revision, reach is limited to personal connections\n    And communities are protected from health misinformation\n    And Jordan learns that evidence standards enable trust and reach\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:content_creator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creator prevented from spreading misinformation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

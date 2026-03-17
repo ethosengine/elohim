@@ -6,7 +6,7 @@
   "title": "Teen understands education itself as care work",
   "description": "Teen understands education itself as care work",
   "content": "Scenario: Teen understands education itself as care work\n    Given Jasmine invests time and effort in her education\n    And education develops capability to serve future flourishing\n    When educational_elohim frames her learning\n    Then education should be understood as care work for her future self\n    And investment in capability building should be recognized as care labor\n    And she should learn that education serves collective as well as individual good\n    And understand that her developing capabilities will serve community needs\n    And see education as part of care economy, not separate from it\n    And internalize that learning is valuable beyond market return\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen understands education itself as care work",

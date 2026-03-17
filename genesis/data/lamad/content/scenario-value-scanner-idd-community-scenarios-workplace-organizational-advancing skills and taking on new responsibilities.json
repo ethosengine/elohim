@@ -6,7 +6,7 @@
   "title": "Advancing skills and taking on new responsibilities",
   "description": "Advancing skills and taking on new responsibilities",
   "content": "Scenario: Advancing skills and taking on new responsibilities\n    Given Jordan has mastered the shelving duties\n    And Jordan wants to learn more advanced library tasks\n    When Jordan expresses interest in additional responsibilities\n    Then supervisors take Jordan's career growth seriously\n    And the library provides training for new tasks\n    And Jordan's capacity for growth is assumed, not denied\n    And Jordan can take on cataloging support with proper training\n    And Jordan's career advancement is supported like any employee\n    And Jordan experiences professional development and growth\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advancing skills and taking on new responsibilities",

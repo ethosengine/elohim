@@ -6,7 +6,7 @@
   "title": "Preparing family for Frank's eventual increased care needs",
   "description": "Preparing family for Frank's eventual increased care needs",
   "content": "Scenario: Preparing family for Frank's eventual increased care needs\n    Given Frank is currently more provider than receiver\n    And his care needs will likely increase in next 10-20 years\n    When family_elohim supports care planning\n    Then it should help Frank discuss future care needs with family\n    And prepare adult children for eventual role reversal\n    And surface: \"Frank's contributions now create legitimate claims later\"\n    And facilitate planning conversations that preserve Frank's dignity\n    And help family anticipate and prepare for increasing needs\n    And ensure Frank experiences agency in planning his aging\n    And care reciprocity across time should be made explicit\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preparing family for Frank's eventual increased care needs",

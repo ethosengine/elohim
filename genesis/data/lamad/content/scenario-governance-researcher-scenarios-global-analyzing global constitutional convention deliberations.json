@@ -6,7 +6,7 @@
   "title": "Analyzing Global Constitutional Convention deliberations",
   "description": "Analyzing Global Constitutional Convention deliberations",
   "content": "Scenario: Analyzing Global Constitutional Convention deliberations\n    Given 10,000 randomly-selected global citizens convene every 7 years\n    And this is unprecedented experiment in planetary democracy\n    When I study the Global Constitutional Convention process\n    Then I examine: how citizens from radically different contexts deliberate together\n    And I analyze: what enables agreement despite profound disagreement\n    And I assess: quality of translation and cross-cultural understanding\n    And I explore: how amendments emerge from global collective wisdom\n    And I identify: power dynamics (Global North vs South, wealthy vs poor)\n    And I investigate: whether global sortition can produce legitimate law\n    And My research reveals: possibilities and limits of planetary democratic governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Analyzing Global Constitutional Convention deliberations",

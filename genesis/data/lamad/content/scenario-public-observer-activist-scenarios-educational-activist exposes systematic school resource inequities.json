@@ -6,7 +6,7 @@
   "title": "Activist exposes systematic school resource inequities",
   "description": "Activist exposes systematic school resource inequities",
   "content": "Scenario: Activist exposes systematic school resource inequities\n    Given the activist campaigns for education equity\n    And suspects systematic under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the activist sees experienced teachers concentrate in white affluent schools\n    And gifted programs and AP courses cluster in privileged areas\n    And facility quality and maintenance vary by neighborhood\n    And per-student spending disparities reach thousands of dollars\n    And segregation pattern becomes legally actionable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist exposes systematic school resource inequities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

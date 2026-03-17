@@ -6,7 +6,7 @@
   "title": "Visibility of aggregate retired resident contributions transforms perception",
   "description": "Visibility of aggregate retired resident contributions transforms perception",
   "content": "Scenario: Visibility of aggregate retired resident contributions transforms perception\n    Given Frank is one of many retired residents contributing substantial volunteer labor\n    And aggregate impact is significant but invisible in traditional metrics\n    When the community_elohim surfaces aggregate data\n    Then it should quantify total volunteer labor from retired residents\n    And calculate combined market value (potentially millions annually)\n    And demonstrate that retired residents are massive community asset\n    And counter narrative of elders as economic burden\n    And transform community understanding of retirement contributions\n    And support policy that recognizes and values retired resident participation\n    And Frank should see himself as part of powerful community infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Visibility of aggregate retired resident contributions transforms perception",

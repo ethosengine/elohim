@@ -6,7 +6,7 @@
   "title": "Manager chooses to exit gracefully with dignity and support",
   "description": "Manager chooses to exit gracefully with dignity and support",
   "content": "Scenario: Manager chooses to exit gracefully with dignity and support\n    Given Marcus decides democratic coordination isn't the right fit for him\n    And corporate would have fired him or demanded resignation\n    When he communicates his intention to exit\n    Then workers appreciate his honest self-assessment\n    And he receives six months severance with glowing reference\n    And workplace_elohim facilitates transition support and knowledge transfer\n    And he leaves with dignity and community gratitude for attempting transition\n    And exit support demonstrates democratic values in practice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager chooses to exit gracefully with dignity and support",

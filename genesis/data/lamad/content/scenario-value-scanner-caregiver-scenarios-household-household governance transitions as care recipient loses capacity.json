@@ -6,7 +6,7 @@
   "title": "Household governance transitions as care recipient loses capacity",
   "description": "Household governance transitions as care recipient loses capacity",
   "content": "Scenario: Household governance transitions as care recipient loses capacity\n    Given David participated in household decisions before diagnosis\n    And his decision-making capability is now declining\n    When the household_elohim tracks governance participation\n    Then it should recognize David's changing capacity sensitively\n    And it should adjust his governance role appropriately\n    And it should preserve David's dignity despite declining capability\n    And it should support James in taking on decisions David once made\n    And governance transition should be respectful and gradual\n    And David should maintain maximum autonomy possible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household governance transitions as care recipient loses capacity",

@@ -6,7 +6,7 @@
   "title": "Contributing to community care economy even while in crisis",
   "description": "Contributing to community care economy even while in crisis",
   "content": "Scenario: Contributing to community care economy even while in crisis\n    Given I am receiving support and have limited capacity\n    And I still have skills, knowledge, and care to offer\n    When opportunities arise to contribute to community\n    Then the Value Scanner surfaces contribution opportunities matching my capacity\n    And recognizes even small contributions as valuable\n    And facilitates contributions that don't overwhelm my limited resources\n    And tracks my care economy participation comprehensively\n    And validates that I am contributor as well as recipient\n    And my personal_agent suggests contributions I can manage\n    And ensures my contributions are recognized with care tokens\n    And supports reciprocity without exploiting vulnerable people\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Contributing to community care economy even while in crisis",

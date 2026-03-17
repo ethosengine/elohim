@@ -6,7 +6,7 @@
   "title": "Maintaining personal flourishing under care responsibilities",
   "description": "Maintaining personal flourishing under care responsibilities",
   "content": "Scenario: Maintaining personal flourishing under care responsibilities\n    Given Sarah has been prioritizing everyone else's needs\n    And her personal_agent monitors her well-being patterns\n    And Sarah's nutrition, exercise, and social connection are declining\n    When two weeks pass without self-care\n    Then the personal_agent should recognize unsustainable sacrifice\n    And it should prompt \"You've prioritized everyone else's needs for two weeks—what would support your flourishing?\"\n    And it should frame self-care as essential stewardship, not selfishness\n    And it should recognize that care for self enables care for others\n    And Sarah should receive support in maintaining her own capacity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining personal flourishing under care responsibilities",

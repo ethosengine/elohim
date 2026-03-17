@@ -6,7 +6,7 @@
   "title": "Community care tokens enable resource access based on contribution",
   "description": "Community care tokens enable resource access based on contribution",
   "content": "Scenario: Community care tokens enable resource access based on contribution\n    Given Sarah has accumulated care tokens through community participation\n    And community resources are allocated based on care contributions\n    When Sarah needs community support\n    Then her care tokens should give her access to resources\n    And community mutual aid should be available\n    And support should be based on demonstrated contribution\n    And care economy should function as community resource system\n    And Sarah's care work should have tangible value\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community care tokens enable resource access based on contribution",

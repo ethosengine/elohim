@@ -6,7 +6,7 @@
   "title": "Workers collectively negotiate with suppliers for better terms",
   "description": "Workers collectively negotiate with suppliers for better terms",
   "content": "Scenario: Workers collectively negotiate with suppliers for better terms\n    Given individual EAE entities have limited purchasing power\n    And workers want fair prices and quality ingredients\n    When sector workers coordinate procurement\n    Then industry_sector_elohim aggregates demand across food entities\n    And workers collectively negotiate with Johnson Farm for volume pricing\n    And sector workers secure better prices than individual entities could\n    And all participating entities benefit from collective bargaining\n    And sector purchasing power rivals corporate chains without exploitation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers collectively negotiate with suppliers for better terms",

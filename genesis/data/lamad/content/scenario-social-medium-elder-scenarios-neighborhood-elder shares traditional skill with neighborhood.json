@@ -6,7 +6,7 @@
   "title": "Elder shares traditional skill with neighborhood",
   "description": "Elder shares traditional skill with neighborhood",
   "content": "Scenario: Elder shares traditional skill with neighborhood\n    Given Rose is an expert seamstress with 60 years experience\n    When she offers to teach mending and sewing skills\n    And she creates a contribution proposing weekly sewing circles\n    Then the contribution reaches her neighborhood\n    And community members interested in learning can respond\n    And a neighborhood sewing circle forms with Rose as mentor\n    And Rose experiences being valued for her knowledge\n    And traditional skills are preserved and transmitted\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder shares traditional skill with neighborhood",

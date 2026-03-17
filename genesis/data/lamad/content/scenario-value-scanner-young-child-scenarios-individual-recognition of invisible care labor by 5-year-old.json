@@ -6,7 +6,7 @@
   "title": "Recognition of invisible care labor by 5-year-old",
   "description": "Recognition of invisible care labor by 5-year-old",
   "content": "Scenario: Recognition of invisible care labor by 5-year-old\n    Given Tommy has chosen strawberries for his sister Emma\n    And the care contribution has been recorded\n    When the transaction is complete\n    Then Tommy's care work should be made visible to the family\n    And his personal_agent should provide warm recognition\n    And the agent should say \"You helped. Your care matters. You made Emma happy.\"\n    And the recognition should feel like love, not data extraction\n    And care tokens should be allocated to reflect his contribution\n    And no transactional language should be used\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of invisible care labor by 5-year-old",

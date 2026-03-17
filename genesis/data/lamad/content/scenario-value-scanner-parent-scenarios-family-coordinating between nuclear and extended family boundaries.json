@@ -6,7 +6,7 @@
   "title": "Coordinating between nuclear and extended family boundaries",
   "description": "Coordinating between nuclear and extended family boundaries",
   "content": "Scenario: Coordinating between nuclear and extended family boundaries\n    Given Sarah's household has its own governance\n    And extended family has legitimate interests in children\n    When boundaries between household and extended family are negotiated\n    Then the family_elohim should help navigate appropriate boundaries\n    And it should support Sarah's household autonomy\n    And it should also recognize extended family relationships\n    And boundary negotiations should be care-informed\n    And the system should prevent both isolation and intrusion\n    And healthy multigenerational boundaries should be maintained\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating between nuclear and extended family boundaries",

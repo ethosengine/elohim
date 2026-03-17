@@ -6,7 +6,7 @@
   "title": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
   "description": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
   "content": "Scenario: Mandatory franchise purchasing is replaced by democratic supplier relationships\n    Given franchise agreement required purchasing from corporate-approved vendors at markup\n    And local suppliers offering better quality and prices were prohibited\n    When purchasing autonomy is restored through franchise termination\n    Then workers establish direct relationships with Johnson Farm and local distributors\n    And supply costs decrease 30% through eliminating corporate markup\n    And quality improves through local sourcing and worker choice\n    And supplier relationships become partnerships, not corporate-mandated transactions\n    And workplace_elohim coordinates supply chain across EAE network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mandatory franchise purchasing is replaced by democratic supplier relationships",

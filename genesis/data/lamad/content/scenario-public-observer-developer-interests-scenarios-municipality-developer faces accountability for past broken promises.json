@@ -6,7 +6,7 @@
   "title": "Developer faces accountability for past broken promises",
   "description": "Developer faces accountability for past broken promises",
   "content": "Scenario: Developer faces accountability for past broken promises\n    Given a developer claimed \"200 jobs\" in previous project\n    But Observer tracking shows only 12 permanent jobs materialized\n    When the developer proposes new project with similar claims\n    Then planning commission sees documented gap between promises and delivery\n    And community members access track record evidence\n    And developer must explain past failures or adjust projections\n    And accountability creates pressure for honest projections\n    And extractive practices face uncomfortable transparency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer faces accountability for past broken promises",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

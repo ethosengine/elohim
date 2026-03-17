@@ -4,7 +4,7 @@
   "title": "Addressing protocol-tax law integration questions",
   "description": "protocol creates novel economic relationships; tax implications are unclear; I work with revenue department on clarification... (10 steps total)",
   "content": "Given protocol creates novel economic relationships\nAnd tax implications are unclear\nWhen I work with revenue department on clarification\nThen we determine: tax treatment of care tokens\nAnd we address: property tax implications of resource sharing\nAnd we clarify: whether mutual aid counts for social safety net\nAnd we create: certainty enabling protocol to function\nAnd we avoid: creating impossible tax burdens\nAnd we ensure: tax policy doesn't undermine protocol benefits\nAnd legal clarity: supports implementation",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "governance",
@@ -36,7 +36,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-governance-policy-maker-provincial-state",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.232Z",

@@ -6,7 +6,7 @@
   "title": "Community celebrates conversion success as neighborhood economic development",
   "description": "Community celebrates conversion success as neighborhood economic development",
   "content": "Scenario: Community celebrates conversion success as neighborhood economic development\n    Given economic development announcements typically celebrate corporate recruitment\n    And franchise conversions deserve equal celebration as community wealth-building\n    When conversions demonstrate success through measurable community benefits\n    Then neighborhood organizations and local media celebrate democratic ownership\n    And community events honor workers' ownership and James's conversion choice\n    And public celebration builds awareness and political support for democratic economy\n    And success story encourages other franchise operators and business owners to consider conversion\n    And community_elohim coordinates celebration events amplifying democratic economy visibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community celebrates conversion success as neighborhood economic development",

@@ -6,7 +6,7 @@
   "title": "Regional food security through care economy participation",
   "description": "Regional food security through care economy participation",
   "content": "Scenario: Regional food security through care economy participation\n    Given Maria participates in food cooperatives and bulk buying networks\n    And these networks build local food security and resilience\n    When bioregional food systems are assessed\n    Then the bioregional_elohim should recognize her contribution to food security\n    And it should value community food cooperation as regional resilience\n    And her participation should be seen as strengthening local food systems\n    And food economy cooperation should be honored as bioregional stewardship\n    And Maria should see herself as contributing to regional food sovereignty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Regional food security through care economy participation",

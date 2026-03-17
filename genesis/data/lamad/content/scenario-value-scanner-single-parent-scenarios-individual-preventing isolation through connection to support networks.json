@@ -6,7 +6,7 @@
   "title": "Preventing isolation through connection to support networks",
   "description": "Preventing isolation through connection to support networks",
   "content": "Scenario: Preventing isolation through connection to support networks\n    Given solo parenting is profoundly isolating\n    And Maria has no co-parent for adult connection and support\n    When the personal_agent monitors Maria's social connections\n    Then it should detect isolation and loneliness\n    And it should help her connect to other single parents\n    And it should facilitate community support without requiring more labor from her\n    And it should treat social connection as essential, not optional\n    And Maria should have pathways out of isolation despite time constraints\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preventing isolation through connection to support networks",

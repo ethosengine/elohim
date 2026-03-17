@@ -6,7 +6,7 @@
   "title": "Local board member identifies when community issues require higher-level action",
   "description": "Local board member identifies when community issues require higher-level action",
   "content": "Scenario: Local board member identifies when community issues require higher-level action\n    Given neighborhood board addresses various community concerns\n    And some issues are within board authority while others require city or district action\n    And board wants to be effective by focusing advocacy appropriately\n    When the board member uses Observer governance layer analysis\n    Then they see which issues are addressable at community level\n    And identify which concerns require municipality or district decisions\n    And access guidance on advocacy strategies for different governance levels\n    And connect to relevant board members at higher governance layers\n    And clear governance mapping makes advocacy more strategic and effective\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local board member identifies when community issues require higher-level action",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

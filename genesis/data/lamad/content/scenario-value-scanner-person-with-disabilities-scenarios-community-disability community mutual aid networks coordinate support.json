@@ -6,7 +6,7 @@
   "title": "Disability community mutual aid networks coordinate support",
   "description": "Disability community mutual aid networks coordinate support",
   "content": "Scenario: Disability community mutual aid networks coordinate support\n    Given disabled people practice mutual aid extensively\n    And peer support networks are essential for survival and flourishing\n    When the community_elohim tracks disability community care flows\n    Then mutual aid within disability community should be highly valued\n    And Alex's participation in peer networks should accumulate tokens\n    And care should be recognized as flowing in multiple directions\n    And disability mutual aid should be seen as care economy infrastructure\n    And the protocol should honor interdependence as community practice\n    And peer support should be valued as essential care work\n    And disabled people's care for each other should be made visible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Disability community mutual aid networks coordinate support",

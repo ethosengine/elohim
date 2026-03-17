@@ -6,7 +6,7 @@
   "title": "Teen coordinates with neighbors for mutual benefit",
   "description": "Teen coordinates with neighbors for mutual benefit",
   "content": "Scenario: Teen coordinates with neighbors for mutual benefit\n    Given Jasmine's neighbor Mrs. Rodriguez is elderly and has limited mobility\n    And Jasmine regularly does grocery shopping\n    When Jasmine offers to shop for Mrs. Rodriguez\n    Then the neighborhood_elohim should facilitate the coordination\n    And track Jasmine's care contribution to neighborhood care economy\n    And enable Mrs. Rodriguez to reciprocate through care tokens or other care\n    And build neighborhood bonds through visible care exchange\n    And demonstrate that care economy operates across age groups\n    And recognize that Jasmine's care work has real value to neighborhood wellbeing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen coordinates with neighbors for mutual benefit",

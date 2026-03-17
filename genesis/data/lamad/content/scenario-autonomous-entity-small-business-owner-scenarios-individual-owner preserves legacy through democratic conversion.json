@@ -6,7 +6,7 @@
   "title": "Owner preserves legacy through democratic conversion",
   "description": "Owner preserves legacy through democratic conversion",
   "content": "Scenario: Owner preserves legacy through democratic conversion\n    Given Rosa built community institution over 15 years\n    And selling to corporate chain would destroy what she created\n    When Rosa chooses EAE conversion over extractive sale\n    Then her legacy becomes democratic institution serving neighborhood\n    And her trust relationships are institutionalized, not erased\n    And she becomes founder who chose community over individual wealth\n    And legacy is preserved beyond her personal involvement\n    And community honors her wisdom in transition choice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner preserves legacy through democratic conversion",

@@ -6,7 +6,7 @@
   "title": "Journalist develops whistleblower source on contract fraud",
   "description": "Journalist develops whistleblower source on contract fraud",
   "content": "Scenario: Journalist develops whistleblower source on contract fraud\n    Given a city employee witnesses fraudulent contracting\n    And fears retaliation for speaking to press\n    When the Observer provides secure anonymous channel\n    Then the whistleblower shares documents through protected system\n    And journalist receives evidence of no-bid contracts to connected firms\n    And investigates without exposing source identity\n    And publishes investigation based on documents and additional reporting\n    And source protection enables accountability journalism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist develops whistleblower source on contract fraud",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

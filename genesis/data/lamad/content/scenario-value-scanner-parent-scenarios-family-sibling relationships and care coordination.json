@@ -6,7 +6,7 @@
   "title": "Sibling relationships and care coordination",
   "description": "Sibling relationships and care coordination",
   "content": "Scenario: Sibling relationships and care coordination\n    Given Sarah's siblings also have care responsibilities\n    And they coordinate care for aging parents\n    When the family_elohim tracks sibling care contributions\n    Then it should show who is doing what for parents\n    And it should prevent care labor from falling unequally on one sibling\n    And it should enable equitable distribution of elder care\n    And sibling relationships should be based on fair care sharing\n    And the system should prevent family dynamics where one child does everything\n    And care economy should create accountability among siblings\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sibling relationships and care coordination",

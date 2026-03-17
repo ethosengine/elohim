@@ -6,7 +6,7 @@
   "title": "Customer gains optional participation pathway in stakeholder processes",
   "description": "Customer gains optional participation pathway in stakeholder processes",
   "content": "Scenario: Customer gains optional participation pathway in stakeholder processes\n    Given corporate businesses treat customers as transaction data, not community members\n    And Ms. Johnson wants deeper engagement but had no pathway\n    When democratic governance offers optional customer stakeholder participation\n    Then she's invited to stakeholder meetings providing input on community programs\n    And her suggestion (senior meal program) is seriously considered and implemented\n    And participation is optional—she can remain simple customer or engage more deeply\n    And voice is advisory not controlling (workers maintain final decision authority)\n    And community_elohim facilitates stakeholder participation while protecting worker autonomy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer gains optional participation pathway in stakeholder processes",

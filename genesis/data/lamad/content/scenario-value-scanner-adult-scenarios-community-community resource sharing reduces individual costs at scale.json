@@ -6,7 +6,7 @@
   "title": "Community resource sharing reduces individual costs at scale",
   "description": "Community resource sharing reduces individual costs at scale",
   "content": "Scenario: Community resource sharing reduces individual costs at scale\n    Given community members have complementary needs and resources\n    And collective action can reduce costs significantly\n    When community organizes resource sharing\n    Then the community_elohim should coordinate tool libraries\n    And it should facilitate skill sharing networks\n    And it should organize bulk purchasing cooperatives\n    And community members should benefit economically from cooperation\n    And care economy should provide material benefits, not just recognition\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community resource sharing reduces individual costs at scale",

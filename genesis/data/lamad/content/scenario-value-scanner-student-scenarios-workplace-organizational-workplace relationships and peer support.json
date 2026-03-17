@@ -6,7 +6,7 @@
   "title": "Workplace relationships and peer support",
   "description": "Workplace relationships and peer support",
   "content": "Scenario: Workplace relationships and peer support\n    Given Kenji works with other employees, many also students\n    And workplace can be site of mutual support or competition\n    When the workplace_elohim tracks workplace relationships\n    Then it should recognize peer support among coworkers as care work\n    And it should value helping coworkers, sharing shifts, covering emergencies\n    And it should accumulate care tokens for workplace mutual aid\n    And worker solidarity should be understood as care economy\n    And the system should foster cooperative rather than competitive workplace culture\n    And Kenji should build care relationships with fellow workers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace relationships and peer support",

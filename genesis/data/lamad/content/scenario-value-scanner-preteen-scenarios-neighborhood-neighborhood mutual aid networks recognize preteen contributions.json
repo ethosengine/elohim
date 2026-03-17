@@ -6,7 +6,7 @@
   "title": "Neighborhood mutual aid networks recognize preteen contributions",
   "description": "Neighborhood mutual aid networks recognize preteen contributions",
   "content": "Scenario: Neighborhood mutual aid networks recognize preteen contributions\n    Given Marcus's family both needs and provides care\n    And neighborhood mutual aid operates on reciprocity\n    When neighborhood care networks are coordinated\n    Then Marcus's household labor should be visible to mutual aid networks\n    And his contributions should qualify family for receiving support\n    And the framing should be reciprocal care, not charity\n    And Marcus gives care (household management); community gives care (support)\n    And the neighborhood_elohim should coordinate these exchanges\n    And dignity should be preserved through reciprocity framework\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood mutual aid networks recognize preteen contributions",

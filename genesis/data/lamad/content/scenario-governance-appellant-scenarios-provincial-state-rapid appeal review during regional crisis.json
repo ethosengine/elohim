@@ -6,7 +6,7 @@
   "title": "Rapid appeal review during regional crisis",
   "description": "Rapid appeal review during regional crisis",
   "content": "Scenario: Rapid appeal review during regional crisis\n    Given a regional crisis requires many urgent agent decisions\n    And I need to appeal a crisis-related decision quickly\n    When Regional Constitutional Council convenes emergency session\n    Then they balance speed with deliberation quality\n    And They evaluate if emergency protocols were properly invoked\n    And They examine if crisis urgency justified departures from normal process\n    And They provide expedited review (48-72 hours) while maintaining rigor\n    And They create precedent for crisis governance\n    And My appeal ensures democratic accountability even under emergency conditions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Rapid appeal review during regional crisis",

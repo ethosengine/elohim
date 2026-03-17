@@ -6,7 +6,7 @@
   "title": "Family support coordinated without undermining Alex's independence",
   "description": "Family support coordinated without undermining Alex's independence",
   "content": "Scenario: Family support coordinated without undermining Alex's independence\n    Given Alex sometimes needs support from family members\n    And family might conflate providing support with having authority\n    When family provides assistance to Alex\n    Then support should flow with full respect for Alex's autonomy\n    And family should provide help Alex requests, not help they think Alex needs\n    And Alex should maintain decision-making authority\n    And the family_elohim should structure relationships to protect Alex's agency\n    And offering help should never imply Alex is incapable\n    And interdependence should be normalized, not pathologized\n    And family support should strengthen, not undermine, Alex's independence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family support coordinated without undermining Alex's independence",

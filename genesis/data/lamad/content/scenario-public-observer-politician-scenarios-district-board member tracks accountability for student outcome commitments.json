@@ -6,7 +6,7 @@
   "title": "Board member tracks accountability for student outcome commitments",
   "description": "Board member tracks accountability for student outcome commitments",
   "content": "Scenario: Board member tracks accountability for student outcome commitments\n    Given the politician pledged to improve reading proficiency\n    And committed to closing achievement gaps\n    When the Observer monitors outcome tracking\n    Then they see reading proficiency trends by school and demographic\n    And identify which interventions work versus ineffective programs\n    And receive alerts when metrics decline\n    And understand whether district implements promised reforms\n    And maintain accountability for student outcome commitments\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member tracks accountability for student outcome commitments",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

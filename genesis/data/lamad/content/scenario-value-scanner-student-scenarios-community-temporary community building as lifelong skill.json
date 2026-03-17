@@ -6,7 +6,7 @@
   "title": "Temporary community building as lifelong skill",
   "description": "Temporary community building as lifelong skill",
   "content": "Scenario: Temporary community building as lifelong skill\n    Given Kenji's college community is temporary\n    And he will leave after graduation\n    When the personal_agent reflects on community participation\n    Then it should help Kenji see community building as transferable skill\n    And it should validate that temporary communities are still real\n    And it should teach him that community is built through care relationships\n    And the agent should help him understand he'll build community wherever he goes\n    And the system should frame student community as practice for lifelong participation\n    And Kenji should learn that community is created, not just inherited\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Temporary community building as lifelong skill",

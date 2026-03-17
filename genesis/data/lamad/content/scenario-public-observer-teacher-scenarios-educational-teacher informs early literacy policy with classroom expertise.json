@@ -6,7 +6,7 @@
   "title": "Teacher informs early literacy policy with classroom expertise",
   "description": "Teacher informs early literacy policy with classroom expertise",
   "content": "Scenario: Teacher informs early literacy policy with classroom expertise\n    Given state mandates specific reading instruction approach\n    And approach contradicts teacher professional knowledge and research\n    When teachers document reading instruction reality through Observer\n    Then teachers show mandated approach doesn't work for all students\n    And provide evidence on effective literacy practices for diverse learners\n    And document student reading outcomes under different approaches\n    And coordinate with literacy researchers and reading specialists\n    And reading policy becomes informed by professional expertise not ideology\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher informs early literacy policy with classroom expertise",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

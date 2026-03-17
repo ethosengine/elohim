@@ -6,7 +6,7 @@
   "title": "Household resource sharing to extend budget",
   "description": "Household resource sharing to extend budget",
   "content": "Scenario: Household resource sharing to extend budget\n    Given Margaret's fixed income requires resource optimization\n    And household expenses can be reduced through sharing\n    When the household_elohim identifies sharing opportunities\n    Then it should connect Margaret to tool libraries\n    And it should facilitate bulk buying cooperatives\n    And it should suggest neighborhood resource sharing\n    And it should help reduce household costs through community\n    And Margaret's budget should stretch further through cooperation\n    And resource sharing should feel like community, not charity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household resource sharing to extend budget",

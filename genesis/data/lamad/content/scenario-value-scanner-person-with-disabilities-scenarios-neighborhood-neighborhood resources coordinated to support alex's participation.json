@@ -6,7 +6,7 @@
   "title": "Neighborhood resources coordinated to support Alex's participation",
   "description": "Neighborhood resources coordinated to support Alex's participation",
   "content": "Scenario: Neighborhood resources coordinated to support Alex's participation\n    Given Alex may need specific support to participate in neighborhood activities\n    And neighborhood has resources that could help\n    When Alex wants to engage in neighborhood events or projects\n    Then the neighborhood_elohim should coordinate needed support\n    And neighbors might provide transportation, physical assistance, or other help\n    And support should be reciprocal within mutual aid framework\n    And Alex should not experience this as charity or burden\n    And resource coordination should enable participation\n    And the protocol should facilitate Alex's full neighborhood engagement\n    And access barriers should be solved collectively, not individually\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood resources coordinated to support Alex's participation",

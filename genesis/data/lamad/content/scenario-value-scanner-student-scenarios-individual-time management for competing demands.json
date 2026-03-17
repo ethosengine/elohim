@@ -6,7 +6,7 @@
   "title": "Time management for competing demands",
   "description": "Time management for competing demands",
   "content": "Scenario: Time management for competing demands\n    Given Kenji must balance 15 hours work, full academic load, and household responsibilities\n    And time is his most constrained resource\n    When the personal_agent helps Kenji manage his schedule\n    Then it should teach realistic time budgeting\n    And it should help him prioritize among competing demands\n    And it should recognize time spent on care work as real constraint\n    And the agent should validate that he cannot do everything\n    And it should help him make conscious trade-offs\n    And Kenji should learn sustainable pacing for long-term success\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Time management for competing demands",

@@ -6,7 +6,7 @@
   "title": "Reciprocal care between Margaret and Robert as they age",
   "description": "Reciprocal care between Margaret and Robert as they age",
   "content": "Scenario: Reciprocal care between Margaret and Robert as they age\n    Given Margaret and Robert are both aging\n    And they will increasingly need to care for each other\n    When the household_elohim tracks household care patterns\n    Then it should recognize reciprocal care between partners\n    And it should show how they support each other's well-being\n    And it should value care they provide to each other\n    And household care economy should include partner care\n    And both should accumulate care tokens for caring for each other\n    And the system should support their aging together with dignity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reciprocal care between Margaret and Robert as they age",

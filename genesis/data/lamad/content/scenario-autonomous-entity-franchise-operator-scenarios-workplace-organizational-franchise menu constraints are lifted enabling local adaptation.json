@@ -6,7 +6,7 @@
   "title": "Franchise menu constraints are lifted enabling local adaptation",
   "description": "Franchise menu constraints are lifted enabling local adaptation",
   "content": "Scenario: Franchise menu constraints are lifted enabling local adaptation\n    Given corporate mandated standardized menu prohibiting innovation\n    And community requested options (vegan, healthier choices) were impossible to offer\n    When menu control transfers to democratic worker governance\n    Then workers add menu items responding to neighborhood preferences\n    And seasonal offerings use Johnson Farm's available produce\n    And cultural preferences of diverse community are reflected in menu\n    And innovation serves local needs rather than distant corporate standardization\n    And workplace_elohim tracks customer satisfaction with democratized menu\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise menu constraints are lifted enabling local adaptation",

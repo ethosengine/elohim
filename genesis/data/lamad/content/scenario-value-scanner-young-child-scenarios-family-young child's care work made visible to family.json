@@ -6,7 +6,7 @@
   "title": "Young child's care work made visible to family",
   "description": "Young child's care work made visible to family",
   "content": "Scenario: Young child's care work made visible to family\n    Given Tommy has chosen strawberries for his sister Emma\n    And the care contribution has been recorded by personal_agent\n    When the family_elohim processes the contribution\n    Then Tommy's care work should be visible on the family dashboard\n    And parent Sarah should receive specific prompts\n    And the prompt should say \"Tommy chose strawberries for Emma\"\n    And the care contribution should be attributed to Tommy by name\n    And family care tokens should reflect his contribution\n    And the visibility should enable parental recognition\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Young child's care work made visible to family",

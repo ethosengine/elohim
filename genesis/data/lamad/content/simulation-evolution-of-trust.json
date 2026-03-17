@@ -10,7 +10,7 @@
     "entryPoint": "index.html",
     "fallbackUrl": "https://ncase.me/trust/"
   },
-  "contentFormat": "html5-app",
+  "contentFormat": "interactive",
   "sourcePath": "docs/content/fct/evolution-of-trust",
   "tags": [
     "game-theory",
@@ -58,7 +58,8 @@
       "simulation",
       "interactive"
     ],
-    "originalContentType": "simulation"
+    "originalContentType": "simulation",
+    "originalContentFormat": "html5-app"
   },
   "reach": "commons",
   "trustScore": 1,

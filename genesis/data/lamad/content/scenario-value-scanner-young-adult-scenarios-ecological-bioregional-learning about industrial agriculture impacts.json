@@ -6,7 +6,7 @@
   "title": "Learning about industrial agriculture impacts",
   "description": "Learning about industrial agriculture impacts",
   "content": "Scenario: Learning about industrial agriculture impacts\n    Given industrial agriculture has severe environmental costs\n    And Aisha consumes products of agricultural systems\n    When the personal_agent teaches about food systems\n    Then it should explain industrial agriculture's impacts\n    And it should highlight alternatives like regenerative agriculture\n    And it should help her support better food systems\n    And agricultural literacy should inform purchasing\n    And she should understand systemic environmental issues\n    And food system education should enable values-aligned choices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning about industrial agriculture impacts",

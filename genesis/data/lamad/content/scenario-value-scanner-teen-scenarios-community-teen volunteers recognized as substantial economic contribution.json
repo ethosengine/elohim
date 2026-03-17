@@ -6,7 +6,7 @@
   "title": "Teen volunteers recognized as substantial economic contribution",
   "description": "Teen volunteers recognized as substantial economic contribution",
   "content": "Scenario: Teen volunteers recognized as substantial economic contribution\n    Given Jasmine volunteers 4 hours per week at community center\n    And this is 16 hours per month of skilled labor\n    When her volunteer work is tracked by community_elohim\n    Then it should be valued at appropriate care economy rates\n    And if professional childcare costs $15/hour, her care work should be valued accordingly\n    And her contribution of $240/month worth of care labor should be visible\n    And community institutions should recognize their dependence on her labor\n    And she should accumulate care tokens reflecting this substantial contribution\n    And the invisibility of teen volunteer labor should be corrected\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen volunteers recognized as substantial economic contribution",

@@ -6,7 +6,7 @@
   "title": "Protecting protocol sovereignty from state overreach",
   "description": "Protecting protocol sovereignty from state overreach",
   "content": "Scenario: Protecting protocol sovereignty from state overreach\n    Given state government attempts regulation compromising protocol\n    And I believe this violates community sovereignty\n    When I advocate for protecting local autonomy\n    Then I testify: at state legislative hearings\n    And I coalition: with other community leaders\n    And I present: evidence that regulation would harm local governance\n    And I defend: subsidiarity principle and community choice\n    And I resist: one-size-fits-all mandates from higher layers\n    And I maintain: that communities adopted protocol voluntarily\n    And I protect: democratic self-governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting protocol sovereignty from state overreach",

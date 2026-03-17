@@ -6,7 +6,7 @@
   "title": "Waste reduction and circular economy practices tracked",
   "description": "Waste reduction and circular economy practices tracked",
   "content": "Scenario: Waste reduction and circular economy practices tracked\n    Given Jasmine practices waste reduction and composting\n    And she chooses products with minimal packaging\n    When bioregional_elohim tracks her waste and resource patterns\n    Then it should recognize waste reduction as bioregional care work\n    And calculate diversion from landfill and resource conservation\n    And value her participation in circular economy practices\n    And connect individual waste choices to bioregional resource flows\n    And demonstrate that waste reduction is care for ecosystem health\n    And support transition from linear to circular economic thinking\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Waste reduction and circular economy practices tracked",

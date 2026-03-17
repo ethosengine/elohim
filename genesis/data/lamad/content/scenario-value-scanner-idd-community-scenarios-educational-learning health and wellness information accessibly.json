@@ -6,7 +6,7 @@
   "title": "Learning health and wellness information accessibly",
   "description": "Learning health and wellness information accessibly",
   "content": "Scenario: Learning health and wellness information accessibly\n    Given Jordan wants to understand their own health better\n    And health literacy supports self-advocacy\n    When Jordan uses health education resources\n    Then the personal_agent provides health information in simple language\n    And medical concepts are explained with pictures and examples\n    And Jordan can ask questions and explore topics at their pace\n    And Jordan's health knowledge increases over time\n    And Jordan becomes better able to participate in health decisions\n    And Jordan's informed health participation is supported through accessible education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning health and wellness information accessibly",

@@ -6,7 +6,7 @@
   "title": "Neighborhood walking companionship for caregiver well-being",
   "description": "Neighborhood walking companionship for caregiver well-being",
   "content": "Scenario: Neighborhood walking companionship for caregiver well-being\n    Given James needs exercise and fresh air for his own health\n    And he cannot leave David alone for walks\n    When neighbors offer companionship\n    Then the neighborhood_elohim should coordinate walking support\n    And neighbors could stay with David while James walks\n    And they could accompany James and David together\n    And regular walks should be protected for James's well-being\n    And neighborhood should actively support caregiver health\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood walking companionship for caregiver well-being",

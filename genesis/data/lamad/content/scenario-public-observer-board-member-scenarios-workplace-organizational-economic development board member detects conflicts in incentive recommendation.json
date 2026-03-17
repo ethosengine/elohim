@@ -6,7 +6,7 @@
   "title": "Economic development board member detects conflicts in incentive recommendation",
   "description": "Economic development board member detects conflicts in incentive recommendation",
   "content": "Scenario: Economic development board member detects conflicts in incentive recommendation\n    Given staff recommends tax incentives for company relocating to municipality\n    And presentation emphasizes economic benefits and competitive pressure\n    And board will vote on multi-year incentive package at next meeting\n    When the board member uses Observer capture protection analysis\n    Then they discover company executives donated to city officials who appoint board\n    And see consultant hired to evaluate deal previously worked for the company\n    And find incentive terms more generous than peer municipalities offered similar companies\n    And access independent economic analysis showing marginal public benefit\n    And capture protection makes conflicts of interest and manipulation visible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Economic development board member detects conflicts in incentive recommendation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

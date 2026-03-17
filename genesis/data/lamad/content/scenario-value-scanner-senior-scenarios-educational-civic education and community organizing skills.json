@@ -6,7 +6,7 @@
   "title": "Civic education and community organizing skills",
   "description": "Civic education and community organizing skills",
   "content": "Scenario: Civic education and community organizing skills\n    Given Margaret participates in civic life and advocacy\n    And organizing skills enhance civic effectiveness\n    When the educational_elohim provides civic education\n    Then Margaret should access community organizing training\n    And education should empower political participation\n    And skills for advocacy and policy influence should be taught\n    And civic literacy should strengthen senior voice in governance\n    And education should support senior political power\n    And organizing should be understood as learnable skill\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Civic education and community organizing skills",

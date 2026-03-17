@@ -6,7 +6,7 @@
   "title": "Elder shares cultural knowledge across generations",
   "description": "Elder shares cultural knowledge across generations",
   "content": "Scenario: Elder shares cultural knowledge across generations\n    Given Rose is second-generation Italian American\n    And she knows traditional recipes and cultural practices\n    When she joins a cultural preservation affinity network\n    And she documents her grandmother's recipes with stories\n    Then her contributions reach others interested in Italian American heritage\n    And younger generations learn traditional knowledge\n    And her cultural memory is preserved for future generations\n    And Rose experiences pride in cultural contribution\n    And intergenerational cultural transmission succeeds\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder shares cultural knowledge across generations",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

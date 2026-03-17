@@ -6,7 +6,7 @@
   "title": "Managing self-care with unpredictable work schedule",
   "description": "Managing self-care with unpredictable work schedule",
   "content": "Scenario: Managing self-care with unpredictable work schedule\n    Given my work schedule changes weekly with different shift patterns\n    And I need to maintain basic nutrition and rest\n    When my personal_agent detects schedule changes\n    Then it should adapt my meal planning to available time slots\n    And suggest efficient meal prep strategies for my schedule\n    And protect time blocks for essential self-care\n    And remind me that my well-being matters despite work demands\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing self-care with unpredictable work schedule",

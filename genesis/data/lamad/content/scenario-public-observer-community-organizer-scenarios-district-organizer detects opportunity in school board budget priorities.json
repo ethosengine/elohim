@@ -6,7 +6,7 @@
   "title": "Organizer detects opportunity in school board budget priorities",
   "description": "Organizer detects opportunity in school board budget priorities",
   "content": "Scenario: Organizer detects opportunity in school board budget priorities\n    Given school board will vote on budget reallocation next month\n    And proposal shifts resources away from Title I schools\n    When the Observer surfaces the organizing opportunity\n    Then the organizer sees equity impact analysis by school\n    And identifies which parent communities are affected\n    And gets breakdown of resource distribution changes\n    And receives alert early enough to organize parent response\n    And district budget becomes organizing opportunity for equity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer detects opportunity in school board budget priorities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

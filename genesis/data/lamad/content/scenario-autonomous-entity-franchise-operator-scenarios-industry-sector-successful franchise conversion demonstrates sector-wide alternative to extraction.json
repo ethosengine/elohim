@@ -6,7 +6,7 @@
   "title": "Successful franchise conversion demonstrates sector-wide alternative to extraction",
   "description": "Successful franchise conversion demonstrates sector-wide alternative to extraction",
   "content": "Scenario: Successful franchise conversion demonstrates sector-wide alternative to extraction\n    Given franchise model dominates food service through extraction and control\n    And industry assumes extraction is necessary for operational efficiency\n    When James's conversions prove democratic operation outperforms franchise\n    Then food service sector sees concrete evidence of viable alternative\n    And higher worker wages, better quality, and lower prices coexist through eliminating extraction\n    And industry narrative shifts from \"franchise is only scalable model\" to \"democratic is superior\"\n    And other franchise operators observe and consider conversion\n    And industry_sector_elohim documents superior performance metrics for advocacy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Successful franchise conversion demonstrates sector-wide alternative to extraction",

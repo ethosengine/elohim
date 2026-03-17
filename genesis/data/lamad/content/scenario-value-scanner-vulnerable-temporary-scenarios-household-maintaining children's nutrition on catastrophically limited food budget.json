@@ -6,7 +6,7 @@
   "title": "Maintaining children's nutrition on catastrophically limited food budget",
   "description": "Maintaining children's nutrition on catastrophically limited food budget",
   "content": "Scenario: Maintaining children's nutrition on catastrophically limited food budget\n    Given I have approximately $X per week for groceries\n    And I need to provide nutritious meals for growing children\n    When I plan household meals and shopping\n    Then the Value Scanner helps me maximize nutrition within extreme constraints\n    And surfaces local food assistance programs and resources\n    And provides meal planning that works with my cooking capacity and time\n    And helps me navigate food pantries and assistance with dignity\n    And tracks children's nutritional needs and preferences\n    And my personal_agent suggests creative solutions for healthy eating on no money\n    And recognizes my food provision as sophisticated care economy work\n    And validates that feeding children well under these constraints is remarkable achievement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining children's nutrition on catastrophically limited food budget",

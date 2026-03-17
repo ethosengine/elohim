@@ -6,7 +6,7 @@
   "title": "Understanding water usage in food production",
   "description": "Understanding water usage in food production",
   "content": "Scenario: Understanding water usage in food production\n    Given food production uses significant water resources\n    And water scarcity is increasing\n    When the bioregional_elohim displays environmental data\n    Then it should include water usage in impact assessment\n    And it should explain water costs of different foods\n    And it should help her choose lower water-impact options\n    And bioregional water context should inform recommendations\n    And she should understand food-water connections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Understanding water usage in food production",

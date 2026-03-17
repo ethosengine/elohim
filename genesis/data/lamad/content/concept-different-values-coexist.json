@@ -4,7 +4,7 @@
   "title": "Different values coexist",
   "description": "without forcing conformity through graduated intimacy and consent boundaries",
   "content": "without forcing conformity through graduated intimacy and consent boundaries",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/vision/concept-different-values-coexist.json",
   "tags": [
     "vision",
@@ -22,14 +22,15 @@
     "section": "vision",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.001546",
   "updatedAt": "2025-12-24T03:05:25.851Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

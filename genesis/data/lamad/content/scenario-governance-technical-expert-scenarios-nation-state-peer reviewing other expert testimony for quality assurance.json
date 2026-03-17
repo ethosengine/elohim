@@ -6,7 +6,7 @@
   "title": "Peer reviewing other expert testimony for quality assurance",
   "description": "Peer reviewing other expert testimony for quality assurance",
   "content": "Scenario: Peer reviewing other expert testimony for quality assurance\n    Given multiple experts advise National Council\n    And peer review prevents individual capture or error\n    When I review fellow expert's testimony\n    Then I assess: technical accuracy and completeness\n    And I identify: bias or conflicts of interest\n    And I check: if alternative interpretations exist\n    And I verify: adherence to testimony guidelines\n    And I provide: constructive critique\n    And I accept: critique of my own testimony\n    And peer review: maintains expertise quality and independence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Peer reviewing other expert testimony for quality assurance",

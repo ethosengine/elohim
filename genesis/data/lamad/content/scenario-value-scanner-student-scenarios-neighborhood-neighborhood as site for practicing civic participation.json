@@ -6,7 +6,7 @@
   "title": "Neighborhood as site for practicing civic participation",
   "description": "Neighborhood as site for practicing civic participation",
   "content": "Scenario: Neighborhood as site for practicing civic participation\n    Given Kenji is learning how democratic participation works\n    And neighborhood is most accessible governance layer\n    When Kenji participates in neighborhood meetings or decisions\n    Then the neighborhood_elohim should recognize civic participation as care work\n    And it should accumulate care tokens for attending meetings, voting on issues\n    And it should teach him that democracy requires participation labor\n    And civic work should be valued as care economy contribution\n    And the system should build habits of democratic participation\n    And students should practice civic engagement at neighborhood scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood as site for practicing civic participation",

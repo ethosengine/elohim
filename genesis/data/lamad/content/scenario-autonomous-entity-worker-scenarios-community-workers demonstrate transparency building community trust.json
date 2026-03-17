@@ -6,7 +6,7 @@
   "title": "Workers demonstrate transparency building community trust",
   "description": "Workers demonstrate transparency building community trust",
   "content": "Scenario: Workers demonstrate transparency building community trust\n    Given community members want to understand democratic business model\n    And workers value transparency about operations and values\n    When workers publish quarterly community impact report\n    Then report shows wages paid to workers ($72K quarterly)\n    And report documents community programs funded ($3K senior meals)\n    And report shares environmental benefits (1,200 lbs local produce)\n    And report includes challenges and learnings honestly\n    And community_elohim makes report accessible and understandable\n    And transparency builds community trust and support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers demonstrate transparency building community trust",

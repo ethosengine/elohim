@@ -6,7 +6,7 @@
   "title": "Community networks provide backup support for care crises",
   "description": "Community networks provide backup support for care crises",
   "content": "Scenario: Community networks provide backup support for care crises\n    Given Robert manages complex care demands that could face crisis\n    And care crises happen: parent hospitalization, child emergency, personal illness\n    And community networks could provide emergency support\n    When community_elohim builds crisis resilience\n    Then it should connect Robert to community members who could help in crisis\n    And identify backup support for his various care responsibilities\n    And ensure he's not isolated when crisis hits\n    And recognize that his care contributions create reciprocal crisis support\n    And build community resilience through mutual aid networks\n    And demonstrate that care economy participation provides safety net\n    And prevent care crisis from becoming catastrophic\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community networks provide backup support for care crises",

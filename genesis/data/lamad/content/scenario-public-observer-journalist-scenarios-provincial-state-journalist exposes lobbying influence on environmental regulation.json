@@ -6,7 +6,7 @@
   "title": "Journalist exposes lobbying influence on environmental regulation",
   "description": "Journalist exposes lobbying influence on environmental regulation",
   "content": "Scenario: Journalist exposes lobbying influence on environmental regulation\n    Given state considers weakening pollution regulations\n    And the journalist investigates who benefits\n    When the Observer tracks lobbying activity and legislative relationships\n    Then the journalist sees industry lobbying expenditures of $4M\n    And documents campaign contributions to committee members\n    And identifies revolving door between industry and regulatory agency\n    And shows pattern of weakened enforcement benefiting donors\n    And publishes investigation exposing regulatory capture\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist exposes lobbying influence on environmental regulation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

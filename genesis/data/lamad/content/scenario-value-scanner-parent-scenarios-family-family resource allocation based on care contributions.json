@@ -6,7 +6,7 @@
   "title": "Family resource allocation based on care contributions",
   "description": "Family resource allocation based on care contributions",
   "content": "Scenario: Family resource allocation based on care contributions\n    Given Sarah contributes enormous care labor to family\n    And family resources are finite\n    When the family makes resource allocation decisions\n    Then Sarah's care contributions should give her standing\n    And her care tokens should influence family governance\n    And those who do care work should have voice in resource decisions\n    And family economics should reflect care economy principles\n    And Sarah should not be economically dependent despite unpaid care work\n    And the system should enable care-based family governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family resource allocation based on care contributions",

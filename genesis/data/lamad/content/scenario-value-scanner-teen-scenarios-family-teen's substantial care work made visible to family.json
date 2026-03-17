@@ -6,7 +6,7 @@
   "title": "Teen's substantial care work made visible to family",
   "description": "Teen's substantial care work made visible to family",
   "content": "Scenario: Teen's substantial care work made visible to family\n    Given Jasmine manages weekly grocery shopping for the family\n    And she coordinates dinner preparation 3 nights per week\n    And she provides childcare for Jordan after school\n    When the family_elohim processes her contributions\n    Then Jasmine's care work should be visible on the family dashboard\n    And her contributions should be quantified and valued\n    And parent Maya should see specific recognition prompts\n    And family care tokens should reflect her substantial contributions\n    And the visibility should prevent the invisibility that often surrounds teen household labor\n    And Jasmine should experience being valued as a genuine contributor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen's substantial care work made visible to family",

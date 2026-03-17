@@ -6,7 +6,7 @@
   "title": "In-law family dynamics around David's care",
   "description": "In-law family dynamics around David's care",
   "content": "Scenario: In-law family dynamics around David's care\n    Given David's parents struggle with their son's diagnosis\n    And they may have complicated feelings about James's caregiving\n    When the family_elohim navigates in-law relationships\n    Then it should recognize complex family dynamics\n    And it should support James's relationship with David's family\n    And it should help manage their grief without undermining James\n    And in-law relationships should be supportive of James's caregiving\n    And family care economy should include chosen family bonds\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "In-law family dynamics around David's care",

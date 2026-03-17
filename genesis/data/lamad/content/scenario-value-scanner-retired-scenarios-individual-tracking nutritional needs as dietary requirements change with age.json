@@ -6,7 +6,7 @@
   "title": "Tracking nutritional needs as dietary requirements change with age",
   "description": "Tracking nutritional needs as dietary requirements change with age",
   "content": "Scenario: Tracking nutritional needs as dietary requirements change with age\n    Given Frank's dietary needs are changing as he ages\n    And he needs more protein and fiber, less sodium\n    And he's managing early indicators of health conditions\n    When Frank shops for groceries on fixed budget\n    Then his personal_agent should track nutrition across time\n    And it should suggest foods appropriate for aging nutritional needs\n    And it should flag items high in sodium or added sugars\n    And it should highlight protein and fiber-rich options\n    And it should balance health needs with budget constraints\n    And nutritional guidance should feel supportive, not controlling\n    And Frank should maintain full agency over food choices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Tracking nutritional needs as dietary requirements change with age",

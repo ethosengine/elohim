@@ -6,7 +6,7 @@
   "title": "Household emergency preparedness for care crisis",
   "description": "Household emergency preparedness for care crisis",
   "content": "Scenario: Household emergency preparedness for care crisis\n    Given David's condition could deteriorate suddenly\n    And James could become ill and unable to provide care\n    When the household_elohim plans for emergencies\n    Then it should maintain emergency care plans\n    And it should identify backup caregivers\n    And it should ensure emergency contacts are current\n    And it should prepare for crisis scenarios\n    And household should have resilience planning for care emergencies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household emergency preparedness for care crisis",

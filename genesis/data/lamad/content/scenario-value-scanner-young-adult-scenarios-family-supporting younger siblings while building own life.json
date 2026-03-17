@@ -6,7 +6,7 @@
   "title": "Supporting younger siblings while building own life",
   "description": "Supporting younger siblings while building own life",
   "content": "Scenario: Supporting younger siblings while building own life\n    Given Aisha has younger teenage siblings\n    And she wants to support their development\n    When Aisha provides mentoring and help\n    Then the family_elohim should recognize sibling care\n    And her contributions should be valued appropriately\n    And siblings should learn from her young adult experience\n    And the system should coordinate cross-generational sibling support\n    And family bonds should be strengthened through visible care\n    And Aisha should model care economy participation for siblings\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Supporting younger siblings while building own life",

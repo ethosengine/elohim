@@ -6,7 +6,7 @@
   "title": "Parent discovers teacher coalition opposing same policy",
   "description": "Parent discovers teacher coalition opposing same policy",
   "content": "Scenario: Parent discovers teacher coalition opposing same policy\n    Given the district proposes eliminating planning periods for teachers\n    And the parent sees this will harm their child's education quality\n    When the Observer shows teacher union concerns about the policy\n    Then the parent understands teachers oppose it for same reasons\n    And natural parent-teacher alliance becomes visible\n    And parent and teacher testimonies reinforce each other\n    And coordinated advocacy prevents divide-and-conquer tactics\n    And district can't pit parents against teachers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent discovers teacher coalition opposing same policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

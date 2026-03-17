@@ -6,7 +6,7 @@
   "title": "Neighborhood care economy connects families across community",
   "description": "Neighborhood care economy connects families across community",
   "content": "Scenario: Neighborhood care economy connects families across community\n    Given multiple families in neighborhood participate in Value Scanner\n    And Emma's family is part of neighborhood network\n    When Emma makes care contributions through shopping\n    Then her contributions should feed into neighborhood care economy\n    And the neighborhood_elohim should track community care patterns\n    And Emma should learn care extends beyond her household\n    And she should see her family as part of larger community\n    And neighborhood-level recognition should be age-appropriate\n    And community belonging should be built through care visibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care economy connects families across community",

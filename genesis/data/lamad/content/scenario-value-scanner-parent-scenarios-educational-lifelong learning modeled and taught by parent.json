@@ -6,7 +6,7 @@
   "title": "Lifelong learning modeled and taught by parent",
   "description": "Lifelong learning modeled and taught by parent",
   "content": "Scenario: Lifelong learning modeled and taught by parent\n    Given Sarah pursues her own learning and growth\n    And she models intellectual curiosity for her children\n    When the educational_elohim tracks family learning culture\n    Then it should recognize Sarah's modeling as educational labor\n    And it should value her creation of learning-rich environment\n    And teaching children to be lifelong learners should be recognized\n    And the system should honor cultivation of learning culture\n    And Sarah's own education should be supported as part of family care\n    And the educational_elohim should recognize that parents teach through being\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Lifelong learning modeled and taught by parent",

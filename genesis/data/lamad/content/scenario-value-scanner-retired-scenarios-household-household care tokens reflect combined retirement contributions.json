@@ -6,7 +6,7 @@
   "title": "Household care tokens reflect combined retirement contributions",
   "description": "Household care tokens reflect combined retirement contributions",
   "content": "Scenario: Household care tokens reflect combined retirement contributions\n    Given household participates in care token economy\n    And both partners contribute substantial volunteer and family care\n    When household care tokens are calculated\n    Then tokens should accumulate from both partners' contributions\n    And Frank's Habitat work should be valued appropriately\n    And his wife's care contributions should be recognized\n    And household should receive care token supplements for low fixed income\n    And the scanner should be accessible regardless of economic status\n    And combined contributions should create household care economy resources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household care tokens reflect combined retirement contributions",

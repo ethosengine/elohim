@@ -6,7 +6,7 @@
   "title": "Individual grief processing supported amid ongoing loss",
   "description": "Individual grief processing supported amid ongoing loss",
   "content": "Scenario: Individual grief processing supported amid ongoing loss\n    Given James experiences anticipatory grief constantly\n    And he's losing David slowly while providing daily care\n    When the personal_agent recognizes James's grief\n    Then it should connect him to grief support resources\n    And it should acknowledge the unique pain of progressive loss\n    And it should support his emotional processing\n    And grief should be recognized as ongoing burden, not one-time event\n    And the protocol should hold space for James's devastating loss\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual grief processing supported amid ongoing loss",

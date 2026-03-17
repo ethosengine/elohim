@@ -6,7 +6,7 @@
   "title": "Household care coordination prevents caregiver burnout",
   "description": "Household care coordination prevents caregiver burnout",
   "content": "Scenario: Household care coordination prevents caregiver burnout\n    Given Helen's daughter provides substantial household support\n    And family caregiving risks burnout\n    When the household_elohim tracks care labor\n    Then it should identify when daughter's burden is unsustainable\n    And it should suggest respite care before crisis occurs\n    And it should coordinate additional support sources\n    And daughter's care work should be recognized and valued\n    And care tokens should accumulate for her labor\n    And the system should protect both Helen and her caregivers\n    And sustainable care networks should be built proactively\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household care coordination prevents caregiver burnout",

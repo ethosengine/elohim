@@ -6,7 +6,7 @@
   "title": "Neighborhood connection across economic differences",
   "description": "Neighborhood connection across economic differences",
   "content": "Scenario: Neighborhood connection across economic differences\n    Given the neighborhood includes families at different income levels\n    And economic inequality can divide communities\n    When the neighborhood_elohim coordinates care economy\n    Then it should enable connection across economic differences\n    And care tokens should provide support to lower-income families\n    And resource sharing should reduce economic barriers\n    And neighborhood cooperation should reduce inequality impacts\n    And mixed-income community should be strengthened\n    And the system should build solidarity, not division\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood connection across economic differences",

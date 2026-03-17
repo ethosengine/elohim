@@ -6,7 +6,7 @@
   "title": "Personal agent serves as cognitive partner for impossible complexity",
   "description": "Personal agent serves as cognitive partner for impossible complexity",
   "content": "Scenario: Personal agent serves as cognitive partner for impossible complexity\n    Given Sarah must coordinate Tommy's wonder-preservation with Emma's autonomy-building\n    And also manage budget, nutrition, schedules, and her work responsibilities\n    When Sarah uses her personal_agent for decision support\n    Then the agent should hold all relevant factors simultaneously\n    And it should surface conflicts: \"Tommy needs experiential learning but you have 20 minutes before work\"\n    And it should suggest realistic solutions within constraints\n    And it should reduce cognitive load dramatically\n    And Sarah should experience genuine partnership\n    And the agent should make impossible complexity manageable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent serves as cognitive partner for impossible complexity",

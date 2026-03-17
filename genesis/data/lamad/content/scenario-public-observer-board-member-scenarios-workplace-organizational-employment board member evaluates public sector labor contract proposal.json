@@ -6,7 +6,7 @@
   "title": "Employment board member evaluates public sector labor contract proposal",
   "description": "Employment board member evaluates public sector labor contract proposal",
   "content": "Scenario: Employment board member evaluates public sector labor contract proposal\n    Given board negotiates collective bargaining agreement with public employees union\n    And city staff emphasizes budget constraints and fiscal sustainability\n    And board wants to balance responsible budgeting with fair compensation\n    When the board member requests Observer labor relations analysis\n    Then they receive comparison of proposed wages to regional public sector market\n    And see employee turnover and vacancy data showing retention challenges\n    And access analysis of contract cost impact on city budget over time\n    And get examples of creative solutions from peer jurisdictions' negotiations\n    And accessible expertise helps board negotiate effectively and fairly\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Employment board member evaluates public sector labor contract proposal",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

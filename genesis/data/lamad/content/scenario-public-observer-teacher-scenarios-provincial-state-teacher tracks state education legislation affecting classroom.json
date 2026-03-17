@@ -6,7 +6,7 @@
   "title": "Teacher tracks state education legislation affecting classroom",
   "description": "Teacher tracks state education legislation affecting classroom",
   "content": "Scenario: Teacher tracks state education legislation affecting classroom\n    Given state legislature is considering education bills\n    And teachers can't track complex legislative processes while teaching\n    When the Observer monitors state education legislation\n    Then teachers receive alerts on bills affecting their work\n    And get plain-language summaries of education policy changes\n    And see projected impact on classroom teaching and learning\n    And access advocacy pathways (testimony, legislator contact, coalition)\n    And state policy becomes visible and actionable for frontline professionals\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher tracks state education legislation affecting classroom",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

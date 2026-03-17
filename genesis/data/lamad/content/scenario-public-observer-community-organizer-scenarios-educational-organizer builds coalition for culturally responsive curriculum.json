@@ -6,7 +6,7 @@
   "title": "Organizer builds coalition for culturally responsive curriculum",
   "description": "Organizer builds coalition for culturally responsive curriculum",
   "content": "Scenario: Organizer builds coalition for culturally responsive curriculum\n    Given families want curriculum reflecting their communities' histories\n    And multiple cultural groups share this interest\n    When the organizer uses Observer to facilitate coalition building\n    Then they identify parents from different backgrounds with aligned goals\n    And coordinate around shared demands for curriculum inclusion\n    And help families develop specific proposals with supporting evidence\n    And organize testimony showcasing diverse community voices\n    And coalition transforms individual requests into collective power\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer builds coalition for culturally responsive curriculum",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

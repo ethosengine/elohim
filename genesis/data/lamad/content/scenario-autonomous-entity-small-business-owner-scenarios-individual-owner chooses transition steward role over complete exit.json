@@ -6,7 +6,7 @@
   "title": "Owner chooses transition steward role over complete exit",
   "description": "Owner chooses transition steward role over complete exit",
   "content": "Scenario: Owner chooses transition steward role over complete exit\n    Given Rosa wants to support workers through conversion\n    And she has knowledge essential for smooth transition\n    When Rosa selects two-year transition steward option\n    Then Rosa earns $55K salary for coordination and knowledge transfer\n    And Rosa facilitates workers' growing governance capacity\n    And Rosa's role gradually decreases as workers gain capability\n    And after two years, Rosa exits gracefully or stays as equal participant\n    And workplace_elohim ensures steward role doesn't recreate hierarchy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner chooses transition steward role over complete exit",

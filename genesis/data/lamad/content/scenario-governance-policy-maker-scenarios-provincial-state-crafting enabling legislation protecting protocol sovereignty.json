@@ -6,7 +6,7 @@
   "title": "Crafting enabling legislation protecting protocol sovereignty",
   "description": "Crafting enabling legislation protecting protocol sovereignty",
   "content": "Scenario: Crafting enabling legislation protecting protocol sovereignty\n    Given I want to support democratic AI governance\n    And I must integrate protocol with existing state law\n    When I draft AI governance legislation\n    Then I create: legal recognition of Constitutional Council authority\n    And I establish: state funding for community protocol infrastructure\n    And I mandate: interoperability between government systems and protocol\n    And I protect: communities from corporate capture attempts\n    And I ensure: equitable access for poor communities\n    And my legislation: enables rather than controls protocol\n    And I empower: community sovereignty within legal framework\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Crafting enabling legislation protecting protocol sovereignty",

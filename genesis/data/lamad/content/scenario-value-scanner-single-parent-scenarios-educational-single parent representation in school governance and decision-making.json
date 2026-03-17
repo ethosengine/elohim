@@ -6,7 +6,7 @@
   "title": "Single parent representation in school governance and decision-making",
   "description": "Single parent representation in school governance and decision-making",
   "content": "Scenario: Single parent representation in school governance and decision-making\n    Given single parents have specific needs and perspectives\n    And they are often underrepresented in school governance due to time constraints\n    When schools form parent councils or governance bodies\n    Then the educational_elohim should facilitate single parent participation\n    And schools should make governance accessible to time-constrained parents\n    And single parent voices should inform school policies\n    And Maria should be able to contribute to school governance despite constraints\n    And educational policy should reflect single-parent family realities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Single parent representation in school governance and decision-making",

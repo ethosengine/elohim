@@ -6,7 +6,7 @@
   "title": "Accessibility features support diverse learning needs",
   "description": "Accessibility features support diverse learning needs",
   "content": "Scenario: Accessibility features support diverse learning needs\n    Given Emma may have varied learning needs\n    And accessibility is required for equitable education\n    When Emma uses educational features of the scanner\n    Then multiple modalities should be available (visual, audio, text)\n    And reading support should be provided as needed\n    And math scaffolding should be accessible\n    And voice guidance should be option\n    And interface should serve children with diverse abilities\n    And educational access should be universal\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessibility features support diverse learning needs",

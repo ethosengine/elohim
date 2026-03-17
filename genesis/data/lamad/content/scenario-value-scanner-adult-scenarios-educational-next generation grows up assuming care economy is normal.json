@@ -6,7 +6,7 @@
   "title": "Next generation grows up assuming care economy is normal",
   "description": "Next generation grows up assuming care economy is normal",
   "content": "Scenario: Next generation grows up assuming care economy is normal\n    Given Sarah is teaching value literacy to many children\n    And children form baseline expectations from early experience\n    When children who learn care economy reach adulthood\n    Then they should assume care work creates value\n    And they should expect care to be visible and recognized\n    And they should see care economy as normal, not alternative\n    And Sarah's teaching should transform next generation's economic understanding\n    And cultural transformation should happen through education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Next generation grows up assuming care economy is normal",

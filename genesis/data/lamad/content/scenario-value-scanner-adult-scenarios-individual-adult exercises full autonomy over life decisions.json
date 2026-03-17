@@ -6,7 +6,7 @@
   "title": "Adult exercises full autonomy over life decisions",
   "description": "Adult exercises full autonomy over life decisions",
   "content": "Scenario: Adult exercises full autonomy over life decisions\n    Given Sarah has competing demands on her time and resources\n    And she must balance professional work, parenting, partnership, and self-care\n    When Sarah makes decisions about resource allocation\n    Then she should have complete autonomy over her choices\n    And her personal_agent should provide decision support without manipulation\n    And she should maintain full decision-making authority\n    And the protocol should serve her values, not impose external priorities\n    And her agency should be respected as a competent adult\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adult exercises full autonomy over life decisions",

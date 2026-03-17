@@ -6,7 +6,7 @@
   "title": "Learning essential neighborhood resources while in crisis",
   "description": "Learning essential neighborhood resources while in crisis",
   "content": "Scenario: Learning essential neighborhood resources while in crisis\n    Given I have just moved to this neighborhood in crisis circumstances\n    And I need to quickly learn where essential services are located\n    When I explore my new neighborhood\n    Then the Value Scanner maps critical local resources\n    And identifies nearest food assistance, medical care, schools, childcare\n    And surfaces public transportation routes and walkability\n    And locates free/low-cost resources for children (parks, libraries, activities)\n    And provides information about neighborhood safety and character\n    And my personal_agent creates personalized neighborhood resource guide\n    And updates information as I discover new resources\n    And helps me build neighborhood knowledge efficiently\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning essential neighborhood resources while in crisis",

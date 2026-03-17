@@ -6,7 +6,7 @@
   "title": "Citizen receives time-efficient community meeting summary",
   "description": "Citizen receives time-efficient community meeting summary",
   "content": "Scenario: Citizen receives time-efficient community meeting summary\n    Given a neighborhood council meeting occurred last night\n    And the citizen has indicated interest in local amenities\n    When the citizen checks their morning brief\n    Then they see a 3-minute summary of key decisions\n    And they see plain-language explanations of policy changes\n    And they are notified only about decisions affecting their stated interests\n    And they can submit async feedback on decisions\n    And their time commitment is under 15 minutes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen receives time-efficient community meeting summary",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

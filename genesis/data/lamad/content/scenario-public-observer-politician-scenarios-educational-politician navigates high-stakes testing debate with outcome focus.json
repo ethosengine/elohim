@@ -6,7 +6,7 @@
   "title": "Politician navigates high-stakes testing debate with outcome focus",
   "description": "Politician navigates high-stakes testing debate with outcome focus",
   "content": "Scenario: Politician navigates high-stakes testing debate with outcome focus\n    Given testing requirements create political controversy\n    And both supporters and critics make competing claims\n    When the Observer analyzes testing data and educational impacts\n    Then they see how much instructional time testing consumes\n    And understand what testing reveals versus distorts about learning\n    And identify schools where testing drives harmful practices\n    And review alternative assessment models in other states\n    And balance accountability needs with teaching and learning quality\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician navigates high-stakes testing debate with outcome focus",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

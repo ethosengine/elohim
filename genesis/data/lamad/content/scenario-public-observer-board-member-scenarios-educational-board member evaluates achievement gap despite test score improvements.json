@@ -6,7 +6,7 @@
   "title": "Board member evaluates achievement gap despite test score improvements",
   "description": "Board member evaluates achievement gap despite test score improvements",
   "content": "Scenario: Board member evaluates achievement gap despite test score improvements\n    Given superintendent presents improving test scores as evidence of success\n    And board wants to understand if all students are benefiting from improvements\n    And media reports question equity of district's progress\n    When the board member uses Observer educational equity analysis\n    Then they receive achievement data disaggregated by race, income, and language\n    And see average scores improved but gaps between groups widened\n    And access analysis showing advanced course access concentrated in affluent schools\n    And discover resource distribution favoring already-high-performing schools\n    And equity analysis reveals which students are and aren't being served well\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member evaluates achievement gap despite test score improvements",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

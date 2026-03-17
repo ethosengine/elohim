@@ -4,7 +4,7 @@
   "title": "Coordinating interstate recognition of protocol decisions",
   "description": "protocol operates across state boundaries; consistency is needed for coordination; I work on interstate compact for protocol recognition... (9 steps total)",
   "content": "Given protocol operates across state boundaries\nAnd consistency is needed for coordination\nWhen I work on interstate compact for protocol recognition\nThen we establish: mutual recognition of council decisions across states\nAnd we create: conflict resolution mechanisms for disputes\nAnd we maintain: state sovereignty and variation\nAnd we enable: coordination without centralization\nAnd we show: federalism working for AI governance\nAnd states cooperate: while preserving local autonomy",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "governance",
@@ -36,7 +36,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-governance-policy-maker-provincial-state",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.232Z",

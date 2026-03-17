@@ -6,7 +6,7 @@
   "title": "Politician tracks accountability for education reform implementation",
   "description": "Politician tracks accountability for education reform implementation",
   "content": "Scenario: Politician tracks accountability for education reform implementation\n    Given the politician championed reading improvement initiative\n    And allocated funding for evidence-based interventions\n    When the Observer monitors implementation and outcomes\n    Then they see which schools implement reforms with fidelity\n    And track reading proficiency changes after intervention\n    And identify schools where implementation stalled or failed\n    And understand barriers to effective implementation\n    And intervene to ensure funding translates to student outcomes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician tracks accountability for education reform implementation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

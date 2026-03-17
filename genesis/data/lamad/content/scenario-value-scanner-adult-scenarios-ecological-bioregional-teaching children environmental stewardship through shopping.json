@@ -6,7 +6,7 @@
   "title": "Teaching children environmental stewardship through shopping",
   "description": "Teaching children environmental stewardship through shopping",
   "content": "Scenario: Teaching children environmental stewardship through shopping\n    Given Sarah is raising Tommy (5) and Emma (8)\n    And she wants them to learn ecological care\n    When Sarah uses the Value Scanner with children\n    Then the bioregional_elohim should provide age-appropriate environmental education\n    And Tommy should learn concrete care for food (not abstract sustainability)\n    And Emma should learn connections between care for people and planet\n    And shopping should be teaching moment for ecological stewardship\n    And children should internalize environmental care as care work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching children environmental stewardship through shopping",

@@ -6,7 +6,7 @@
   "title": "Creator documents community history through elder interviews",
   "description": "Creator documents community history through elder interviews",
   "content": "Scenario: Creator documents community history through elder interviews\n    Given Sam is creating an oral history project for Riverside neighborhood\n    When Sam interviews Rose about neighborhood changes over 50 years\n    And creates content preserving her memories and insights\n    Then the content is shared with the Riverside community\n    And community members add their own memories and context\n    And Rose receives recognition for her knowledge contribution\n    And community history is preserved for future generations\n    And the content earns reach to similar history preservation projects\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:content_creator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-content-creator-scenarios-community",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creator documents community history through elder interviews",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Farmer cooperation replaces competition through democratic coordination",
   "description": "Farmer cooperation replaces competition through democratic coordination",
   "content": "Scenario: Farmer cooperation replaces competition through democratic coordination\n    Given farmers traditionally compete for corporate contracts driving prices down\n    And competition prevented coordination benefiting all farmers\n    When democratic network enables farmer cooperation\n    Then Tom and neighboring farms coordinate complementary production\n    And crop specialization (one farm tomatoes, another greens, another roots) provides diversity\n    And revenue is shared fairly based on contribution\n    And farmers share equipment, labor, and expertise\n    And industry_sector_elohim facilitates farmer network coordination and fair value distribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farmer cooperation replaces competition through democratic coordination",

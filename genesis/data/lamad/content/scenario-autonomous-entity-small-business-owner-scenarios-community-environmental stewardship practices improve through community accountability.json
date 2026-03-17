@@ -6,7 +6,7 @@
   "title": "Environmental stewardship practices improve through community accountability",
   "description": "Environmental stewardship practices improve through community accountability",
   "content": "Scenario: Environmental stewardship practices improve through community accountability\n    Given individual ownership limited environmental investment\n    And community bears environmental impacts of business operations\n    When democratic governance with community input prioritizes sustainability\n    Then auto shop invests in proper waste disposal and recycling\n    And hazardous materials (oil, antifreeze, batteries) are handled responsibly\n    And workers implement environmental improvements community values\n    And transparency about environmental practices builds community trust\n    And community_elohim documents environmental stewardship for neighborhood benefit\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental stewardship practices improve through community accountability",

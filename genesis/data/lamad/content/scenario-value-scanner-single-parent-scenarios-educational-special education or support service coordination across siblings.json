@@ -6,7 +6,7 @@
   "title": "Special education or support service coordination across siblings",
   "description": "Special education or support service coordination across siblings",
   "content": "Scenario: Special education or support service coordination across siblings\n    Given one or more of Maria's children may need educational support services\n    And she must coordinate any special needs alone across multiple children\n    When children require special education services or support\n    Then the educational_elohim should help Maria coordinate across children and schools\n    And schools should recognize she's managing support needs without co-parent\n    And scheduling of meetings and services should accommodate her work constraints\n    And single parents should receive extra support for complex special education navigation\n    And Maria should be able to advocate effectively for children's needs despite time limitations\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Special education or support service coordination across siblings",

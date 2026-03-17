@@ -6,7 +6,7 @@
   "title": "Recognition that grandparenting is care work, not leisure activity",
   "description": "Recognition that grandparenting is care work, not leisure activity",
   "content": "Scenario: Recognition that grandparenting is care work, not leisure activity\n    Given traditional culture frames grandparenting as \"fun\" and \"spoiling\"\n    And Margaret's labor is often invisible as work\n    When the personal_agent characterizes Margaret's activities\n    Then it should frame grandparenting as sophisticated care labor\n    And it should recognize developmental care, emotional support, practical childcare\n    And it should distinguish between leisure time with grandkids and care work\n    And it should make visible that Margaret is providing essential services\n    And the narrative should shift from \"babysitting\" to care provision\n    And Margaret's work should be taken seriously as economic contribution\n    And her care labor should be recognized as valuable work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition that grandparenting is care work, not leisure activity",

@@ -6,7 +6,7 @@
   "title": "Neighborhood representation and voice for retirees",
   "description": "Neighborhood representation and voice for retirees",
   "content": "Scenario: Neighborhood representation and voice for retirees\n    Given Margaret has time to attend neighborhood meetings\n    And retired residents have important perspective and needs\n    When neighborhood governance decisions are made\n    Then Margaret's participation and voice should be valued\n    And retired residents' interests should be represented\n    And her care contributions should give her standing in decisions\n    And neighborhood should benefit from elder wisdom and participation\n    And Margaret should help shape neighborhood policies and priorities\n    And all age groups should be represented in neighborhood governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood representation and voice for retirees",

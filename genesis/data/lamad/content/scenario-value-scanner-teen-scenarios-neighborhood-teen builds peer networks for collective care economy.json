@@ -6,7 +6,7 @@
   "title": "Teen builds peer networks for collective care economy",
   "description": "Teen builds peer networks for collective care economy",
   "content": "Scenario: Teen builds peer networks for collective care economy\n    Given Jasmine has friends and peers in the neighborhood\n    And they are all learning care economy practices\n    When Jasmine coordinates with peers for mutual support\n    Then the neighborhood_elohim should facilitate peer-to-peer care\n    And teens should be able to exchange care tokens without adult mediation\n    And peer networks should operate horizontally as valid care economy\n    And collective buying, skill sharing, and mutual aid should be supported\n    And Jasmine should learn that care economy works at her generation's scale\n    And peer care networks should build social capital and community resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen builds peer networks for collective care economy",

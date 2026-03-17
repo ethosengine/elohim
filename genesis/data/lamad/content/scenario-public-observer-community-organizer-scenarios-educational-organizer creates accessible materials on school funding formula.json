@@ -6,7 +6,7 @@
   "title": "Organizer creates accessible materials on school funding formula",
   "description": "Organizer creates accessible materials on school funding formula",
   "content": "Scenario: Organizer creates accessible materials on school funding formula\n    Given parents don't understand why their school has fewer resources\n    And school funding formula is complex and opaque\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of funding sources\n    And see visual comparison of per-pupil spending across schools\n    And get breakdown of how formula creates inequities\n    And access talking points for advocating for funding changes\n    And technical education finance becomes accessible community knowledge\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer creates accessible materials on school funding formula",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

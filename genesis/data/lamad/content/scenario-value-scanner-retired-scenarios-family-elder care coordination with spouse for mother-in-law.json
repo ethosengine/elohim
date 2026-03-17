@@ -6,7 +6,7 @@
   "title": "Elder care coordination with spouse for mother-in-law",
   "description": "Elder care coordination with spouse for mother-in-law",
   "content": "Scenario: Elder care coordination with spouse for mother-in-law\n    Given Frank and his wife help maintain Frank's mother-in-law's home\n    And they provide transportation and advocacy support\n    And elder care is substantial and skilled labor\n    When family_elohim tracks elder care contributions\n    Then Frank's home maintenance support should be recognized\n    And transportation and medical advocacy should be valued\n    And his construction skills applied to elder care should be quantified\n    And care burden should be monitored for sustainability\n    And family should see Frank's elder care contributions\n    And his care work should accumulate family care tokens\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder care coordination with spouse for mother-in-law",

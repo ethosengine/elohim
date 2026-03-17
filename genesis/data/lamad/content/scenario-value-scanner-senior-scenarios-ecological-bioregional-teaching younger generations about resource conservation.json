@@ -6,7 +6,7 @@
   "title": "Teaching younger generations about resource conservation",
   "description": "Teaching younger generations about resource conservation",
   "content": "Scenario: Teaching younger generations about resource conservation\n    Given Margaret has decades of conservation knowledge\n    And younger generations need sustainable living skills\n    When the bioregional_elohim coordinates knowledge sharing\n    Then Margaret should teach conservation practices\n    And her knowledge should be transmitted to younger people\n    And teaching should be recognized as ecological care contribution\n    And intergenerational knowledge transfer should strengthen sustainability\n    And senior wisdom should inform bioregional practices\n    And ecological education should flow from elder experience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching younger generations about resource conservation",

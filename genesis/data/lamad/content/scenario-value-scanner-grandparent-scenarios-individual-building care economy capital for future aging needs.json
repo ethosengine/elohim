@@ -6,7 +6,7 @@
   "title": "Building care economy capital for future aging needs",
   "description": "Building care economy capital for future aging needs",
   "content": "Scenario: Building care economy capital for future aging needs\n    Given Margaret is watching her mother navigate advanced aging\n    And Margaret recognizes she will need care in 10-20 years\n    When Margaret makes care contributions now\n    Then care tokens should accumulate to her individual account\n    And these tokens should represent future care economy resources\n    And the system should help her build reciprocal relationships\n    And she should be preparing for her own increasing care needs\n    And current contributions should create future security\n    And Margaret should experience agency in planning her own aging\n    And care economy capital should provide retirement resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building care economy capital for future aging needs",

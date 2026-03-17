@@ -6,7 +6,7 @@
   "title": "Manager accesses fair compensation without guilt of extraction",
   "description": "Manager accesses fair compensation without guilt of extraction",
   "content": "Scenario: Manager accesses fair compensation without guilt of extraction\n    Given Marcus earned $65K as corporate manager implementing exploitation\n    And he knew he was paid partly for willingness to harm workers\n    When he becomes democratic coordinator earning $72K\n    Then his compensation reflects genuine coordination expertise\n    And workers democratically approved his salary as fair\n    And he earns more than under corporate while feeling morally justified\n    And he no longer carries guilt of being paid to extract from colleagues\n    And workplace_elohim ensures compensation transparency prevents exploitation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager accesses fair compensation without guilt of extraction",

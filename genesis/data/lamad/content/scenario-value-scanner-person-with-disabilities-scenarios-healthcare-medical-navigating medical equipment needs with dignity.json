@@ -6,7 +6,7 @@
   "title": "Navigating medical equipment needs with dignity",
   "description": "Navigating medical equipment needs with dignity",
   "content": "Scenario: Navigating medical equipment needs with dignity\n    Given Alex requires various medical equipment and devices\n    And equipment access is often bureaucratic and dehumanizing\n    When Alex needs medical equipment\n    Then the personal_agent should help Alex navigate equipment systems\n    And it should track equipment needs and maintenance schedules\n    And it should help Alex advocate for appropriate equipment\n    And it should document when insurance denies necessary equipment\n    And Alex should maintain dignity throughout equipment acquisition\n    And the protocol should reduce bureaucratic burden\n    And equipment should be framed as essential tools, not medical devices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Navigating medical equipment needs with dignity",

@@ -4,7 +4,7 @@
   "title": "Redemptive Security Model",
   "description": "Rather than blocking threats, these agents understand and heal root causes driving adversarial behavior—economic desperation, ideological extremism, trauma responses. Every attack becomes an opportunity for healing and integration, making the distributed network antifragile.",
   "content": "Rather than blocking threats, these agents understand and heal root causes driving adversarial behavior—economic desperation, ideological extremism, trauma responses. Every attack becomes an opportunity for healing and integration, making the distributed network antifragile.",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/elohim-host/concept-redemptive-security-model.json",
   "tags": [
     "security",
@@ -23,14 +23,15 @@
     "section": "elohim-host",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.001903",
   "updatedAt": "2025-12-24T03:05:25.880Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

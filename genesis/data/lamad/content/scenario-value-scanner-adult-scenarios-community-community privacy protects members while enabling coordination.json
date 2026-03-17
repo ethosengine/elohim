@@ -6,7 +6,7 @@
   "title": "Community privacy protects members while enabling coordination",
   "description": "Community privacy protects members while enabling coordination",
   "content": "Scenario: Community privacy protects members while enabling coordination\n    Given community care economy involves data about many people\n    And privacy must be protected rigorously\n    When community care patterns are tracked\n    Then the community_elohim should only share aggregated data\n    And individual household details should remain private\n    And Sarah should control what community sees about her family\n    And community coordination should not require privacy sacrifice\n    And data should serve community well-being, not surveillance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community privacy protects members while enabling coordination",

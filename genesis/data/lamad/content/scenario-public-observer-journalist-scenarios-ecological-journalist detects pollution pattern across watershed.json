@@ -6,7 +6,7 @@
   "title": "Journalist detects pollution pattern across watershed",
   "description": "Journalist detects pollution pattern across watershed",
   "content": "Scenario: Journalist detects pollution pattern across watershed\n    Given the journalist investigates water quality concerns\n    And pollution affects communities across watershed\n    When the Observer tracks environmental data across jurisdictions\n    Then the journalist sees contamination pattern from industrial facility upstream\n    And maps affected communities downstream across state lines\n    And documents regulatory agencies failing to coordinate enforcement\n    And shows company violated permits in multiple states\n    And publishes regional investigation forcing coordinated response\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist detects pollution pattern across watershed",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

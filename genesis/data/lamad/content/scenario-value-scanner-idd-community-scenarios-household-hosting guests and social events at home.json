@@ -6,7 +6,7 @@
   "title": "Hosting guests and social events at home",
   "description": "Hosting guests and social events at home",
   "content": "Scenario: Hosting guests and social events at home\n    Given Jordan wants to invite friends to the group home\n    And the household has policies about guests\n    When Jordan plans a small gathering\n    Then the personal_agent helps Jordan coordinate with housemates\n    And the interface shows the guest policy in simple language\n    And Jordan can request guest approval using the household system\n    And housemates discuss and approve Jordan's gathering\n    And Jordan experiences autonomy in their home social life\n    And the household supports Jordan's social connections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Hosting guests and social events at home",

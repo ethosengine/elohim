@@ -6,7 +6,7 @@
   "title": "Bioregional food systems supported by teen participation",
   "description": "Bioregional food systems supported by teen participation",
   "content": "Scenario: Bioregional food systems supported by teen participation\n    Given Jasmine's bioregion has local farms and food producers\n    And supporting local agriculture strengthens bioregional resilience\n    When she chooses local food through the Value Scanner\n    Then bioregional_elohim should track support for local food systems\n    And recognize that her purchases sustain regional agriculture\n    And show how local food choices support bioregional economy\n    And connect her consumption to farmer livelihoods and land stewardship\n    And help her understand food system as part of bioregional care economy\n    And demonstrate that her choices affect ecosystem and economy together\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional food systems supported by teen participation",

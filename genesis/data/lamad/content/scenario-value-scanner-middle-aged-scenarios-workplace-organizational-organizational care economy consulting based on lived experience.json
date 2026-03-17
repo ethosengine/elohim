@@ -6,7 +6,7 @@
   "title": "Organizational care economy consulting based on lived experience",
   "description": "Organizational care economy consulting based on lived experience",
   "content": "Scenario: Organizational care economy consulting based on lived experience\n    Given Robert has decades of experience managing work and care\n    And organizations need care economy expertise\n    And his experience qualifies him as organizational consultant\n    When workplace_elohim recognizes his consulting capability\n    Then it should surface opportunities to consult on care economy workplace transformation\n    And help him translate lived experience into organizational development\n    And recognize his expertise about what supports working caregivers\n    And support him in offering care economy consulting services\n    And value his consulting as professional contribution and care economy advancement\n    And build care economy profession from lived experience\n    And channel his wisdom toward organizational transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizational care economy consulting based on lived experience",

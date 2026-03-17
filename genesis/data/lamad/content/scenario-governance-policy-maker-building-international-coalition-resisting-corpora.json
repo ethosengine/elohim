@@ -4,7 +4,7 @@
   "title": "Building international coalition resisting corporate capture",
   "description": "corporations lobby internationally for favorable regulation; they use different nations to triangulate pressure; I coordinate with international policy maker allies... (10 steps total)",
   "content": "Given corporations lobby internationally for favorable regulation\nAnd they use different nations to triangulate pressure\nWhen I coordinate with international policy maker allies\nThen we share: intelligence about lobbying tactics\nAnd we coordinate: resistance to capture attempts\nAnd we establish: transparency requirements for global lobbying\nAnd we support: each other under corporate pressure\nAnd we create: race-to-top rather than race-to-bottom\nAnd we demonstrate: democratic solidarity across nations\nAnd we protect: protocol sovereignty through collective action",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "governance",
@@ -36,7 +36,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-governance-policy-maker-global",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.232Z",

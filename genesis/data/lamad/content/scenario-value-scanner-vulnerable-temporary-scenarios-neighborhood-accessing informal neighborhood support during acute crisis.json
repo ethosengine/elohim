@@ -6,7 +6,7 @@
   "title": "Accessing informal neighborhood support during acute crisis",
   "description": "Accessing informal neighborhood support during acute crisis",
   "content": "Scenario: Accessing informal neighborhood support during acute crisis\n    Given I am experiencing acute crisis (no food, utility shutoff, safety emergency)\n    And I need immediate neighborhood-level support\n    When crisis requires rapid local response\n    Then the Value Scanner connects me to immediate neighborhood resources\n    And identifies neighbors who've offered emergency support\n    And facilitates rapid requests for help through care economy network\n    And helps me access emergency assistance without shame\n    And validates that asking for crisis help is appropriate\n    And my personal_agent surfaces most appropriate immediate resources\n    And recognizes that everyone experiences crises requiring community support\n    And ensures rapid connection to neighborhood mutual aid\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing informal neighborhood support during acute crisis",

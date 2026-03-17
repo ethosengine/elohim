@@ -6,7 +6,7 @@
   "title": "Grappling with superintelligence governance at convention",
   "description": "Grappling with superintelligence governance at convention",
   "content": "Scenario: Grappling with superintelligence governance at convention\n    Given agents are approaching human comprehension limits\n    And we must decide how to govern what we barely understand\n    When we deliberate on superintelligence constitutional framework\n    Then Dr. Chen presents: research on sortition governance limitations\n    And Dr. Okonkwo explains: what can and cannot be technically verified\n    And we hear: diverse perspectives on trust and oversight\n    And we confront: possibility democratic oversight might become theater\n    And we grapple: with existential uncertainty about governance\n    And we may establish: capability limits until problems are solved\n    And we insist: on human dignity and democratic voice even in uncertainty\n    And we demonstrate: humble wisdom in face of profound questions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Grappling with superintelligence governance at convention",

@@ -6,7 +6,7 @@
   "title": "Pension board member prepares for decision on emerging market investments",
   "description": "Pension board member prepares for decision on emerging market investments",
   "content": "Scenario: Pension board member prepares for decision on emerging market investments\n    Given investment staff recommends increasing allocation to emerging markets\n    And recommendation includes complex analysis of risk-adjusted returns\n    And board member wants to make informed fiduciary decision but lacks investment expertise\n    When the board member uses Observer decision support\n    Then they receive executive summary of emerging market investment considerations\n    And see performance and volatility data from peer pension funds' allocations\n    And access key questions to ask investment staff about risk management\n    And understand how proposed allocation fits pension fund's overall strategy\n    And accessible expertise enables informed fiduciary judgment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Pension board member prepares for decision on emerging market investments",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

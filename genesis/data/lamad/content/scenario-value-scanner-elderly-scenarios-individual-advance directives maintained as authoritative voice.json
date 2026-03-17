@@ -6,7 +6,7 @@
   "title": "Advance directives maintained as authoritative voice",
   "description": "Advance directives maintained as authoritative voice",
   "content": "Scenario: Advance directives maintained as authoritative voice\n    Given Helen is planning for potential loss of capacity\n    And she has specific values about end-of-life care\n    When Helen configures her advance directives in the system\n    Then her personal_agent should hold and communicate her wishes\n    And her values should remain authoritative even if she loses speech\n    And medical providers should receive clear advance directive information\n    And family should have access to Helen's documented preferences\n    And her agency over her own death should be preserved\n    And the protocol should ensure her voice guides care when she cannot speak\n    And dignity should be maintained throughout end-of-life process\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advance directives maintained as authoritative voice",

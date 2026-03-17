@@ -6,7 +6,7 @@
   "title": "Displaced person receives support from domestic violence network",
   "description": "Displaced person receives support from domestic violence network",
   "content": "Scenario: Displaced person receives support from domestic violence network\n    Given Maria is recovering from domestic violence trauma\n    When she joins a domestic violence survivor support affinity network\n    And the network provides peer support and resources\n    Then she connects with others who understand her experience\n    And she receives practical support for rebuilding her life\n    And the network helps her access legal aid and counseling\n    And she finds strength and healing through community support\n    And her safety is maintained through privacy protections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-community",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Displaced person receives support from domestic violence network",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

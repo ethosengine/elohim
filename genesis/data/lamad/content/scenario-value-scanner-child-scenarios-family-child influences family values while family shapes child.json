@@ -6,7 +6,7 @@
   "title": "Child influences family values while family shapes child",
   "description": "Child influences family values while family shapes child",
   "content": "Scenario: Child influences family values while family shapes child\n    Given Emma is forming her own values at age 8\n    And family values still primarily guide her\n    When Emma suggests trying new products or priorities\n    Then the family_elohim should track her value proposals\n    And Sarah should receive prompts to consider Emma's input\n    And Emma's voice should genuinely influence family decisions\n    And bidirectional value formation should occur\n    And Emma should experience being heard in family governance\n    And family culture should evolve with children's input\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child influences family values while family shapes child",

@@ -6,7 +6,7 @@
   "title": "Adult's complex scheduling requires sophisticated coordination",
   "description": "Adult's complex scheduling requires sophisticated coordination",
   "content": "Scenario: Adult's complex scheduling requires sophisticated coordination\n    Given Sarah manages professional schedule, children's schedules, household tasks, community commitments\n    And conflicts arise constantly\n    When Sarah plans her week\n    Then the personal_agent should integrate with calendars, school systems, work tools\n    And it should identify scheduling conflicts automatically\n    And it should suggest realistic solutions within constraints\n    And it should coordinate across family members' needs\n    And scheduling should support Sarah's effectiveness, not overwhelm her\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adult's complex scheduling requires sophisticated coordination",

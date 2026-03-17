@@ -6,7 +6,7 @@
   "title": "Educational resources for parents teaching value literacy",
   "description": "Educational resources for parents teaching value literacy",
   "content": "Scenario: Educational resources for parents teaching value literacy\n    Given Sarah wants to teach value literacy effectively\n    And she needs pedagogical support for home education\n    When Sarah accesses educational resources\n    Then the educational_elohim should provide parent education materials\n    And resources should be developmentally appropriate for different ages\n    And guidance should help Sarah teach Tommy differently than Emma\n    And Sarah should have tools to be effective value literacy educator\n    And parent education should be supported systematically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational resources for parents teaching value literacy",

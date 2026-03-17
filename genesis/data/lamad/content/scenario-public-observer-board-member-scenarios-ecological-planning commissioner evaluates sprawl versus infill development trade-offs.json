@@ -6,7 +6,7 @@
   "title": "Planning commissioner evaluates sprawl versus infill development trade-offs",
   "description": "Planning commissioner evaluates sprawl versus infill development trade-offs",
   "content": "Scenario: Planning commissioner evaluates sprawl versus infill development trade-offs\n    Given commission faces pressure to approve suburban expansion development\n    And developers argue expansion provides affordable housing opportunities\n    And environmentalists advocate for urban infill to reduce sprawl\n    When the commissioner requests Observer growth pattern analysis\n    Then they receive comparison of infrastructure costs for sprawl versus infill\n    And see environmental impacts analysis including habitat, emissions, and water use\n    And access true affordability analysis accounting for transportation costs\n    And understand fiscal impacts on municipality over time\n    And accessible expertise helps commissioner evaluate complex growth trade-offs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning commissioner evaluates sprawl versus infill development trade-offs",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

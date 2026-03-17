@@ -6,7 +6,7 @@
   "title": "Commissioning independent research on protocol effectiveness",
   "description": "Commissioning independent research on protocol effectiveness",
   "content": "Scenario: Commissioning independent research on protocol effectiveness\n    Given I need evidence for policy evaluation\n    And research must be independent to be credible\n    When I establish national research program\n    Then I fund: rigorous evaluation by independent researchers\n    And I require: open access publication\n    And I support: longitudinal studies tracking long-term outcomes\n    And I enable: replication and peer review\n    And I demand: honest reporting including null results\n    And evidence base: supports informed democratic choice\n    And public funding: serves public knowledge\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Commissioning independent research on protocol effectiveness",

@@ -6,7 +6,7 @@
   "title": "Budget crisis triggers appropriate intervention",
   "description": "Budget crisis triggers appropriate intervention",
   "content": "Scenario: Budget crisis triggers appropriate intervention\n    Given Marcus manages $75 weekly budget\n    And unexpected expenses could create crisis\n    When budget becomes unsustainable\n    Then the family_elohim should alert Sarah immediately\n    And it should connect family to emergency resources\n    And crisis intervention should preserve Marcus's dignity\n    And the system should prevent budget failure from becoming catastrophic\n    And support should be framed through care economy, not charity\n    And Marcus should not feel responsible for systemic poverty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Budget crisis triggers appropriate intervention",

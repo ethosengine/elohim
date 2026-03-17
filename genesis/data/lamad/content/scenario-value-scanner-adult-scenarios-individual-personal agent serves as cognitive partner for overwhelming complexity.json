@@ -6,7 +6,7 @@
   "title": "Personal agent serves as cognitive partner for overwhelming complexity",
   "description": "Personal agent serves as cognitive partner for overwhelming complexity",
   "content": "Scenario: Personal agent serves as cognitive partner for overwhelming complexity\n    Given Sarah is managing multiple care contexts simultaneously\n    And Sarah is planning Tuesday evening meals\n    And she must coordinate children's developmental needs, budget, allergies, schedule, and community obligations\n    When Sarah opens the Value Scanner\n    Then her personal_agent should present integrated complexity overview\n    And the agent should surface conflicts before they become crises\n    And it should suggest solutions balancing competing needs\n    And it should track factors Sarah can't hold simultaneously\n    And Sarah should experience genuine cognitive partnership\n    And the agent should reduce mental load, not add to it\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent serves as cognitive partner for overwhelming complexity",

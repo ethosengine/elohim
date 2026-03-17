@@ -6,7 +6,7 @@
   "title": "Relationship with parent shifts toward adult partnership",
   "description": "Relationship with parent shifts toward adult partnership",
   "content": "Scenario: Relationship with parent shifts toward adult partnership\n    Given Jasmine has demonstrated substantial capability\n    And she contributes meaningfully to household functioning\n    When parent Maya interacts with Jasmine through the care economy\n    Then the family_elohim should reflect their evolving relationship\n    And Maya should receive prompts that honor Jasmine's growing autonomy\n    And support Maya in trusting Jasmine's judgment\n    And recognize when Jasmine needs support versus when she's capable\n    And facilitate the gradual transition from parent-child to adult-adult relationship\n    And help Maya learn to be available for support without controlling\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Relationship with parent shifts toward adult partnership",

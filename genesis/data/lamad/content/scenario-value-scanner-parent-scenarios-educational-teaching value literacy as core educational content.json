@@ -6,7 +6,7 @@
   "title": "Teaching value literacy as core educational content",
   "description": "Teaching value literacy as core educational content",
   "content": "Scenario: Teaching value literacy as core educational content\n    Given Sarah is raising Tommy and Emma in care economy framework\n    And she teaches them to recognize and value care work\n    When the educational_elohim tracks value literacy education\n    Then it should recognize this as essential educational content\n    And teaching care economy principles should be valued as academic instruction\n    And Sarah's value literacy teaching should accumulate care tokens\n    And preparing children for care-based economy should be educational priority\n    And the system should support parents teaching alternative economic values\n    And value literacy should be recognized as critical life skill\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching value literacy as core educational content",

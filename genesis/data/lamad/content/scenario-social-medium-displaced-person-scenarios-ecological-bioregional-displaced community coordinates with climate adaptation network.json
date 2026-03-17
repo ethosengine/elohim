@@ -6,7 +6,7 @@
   "title": "Displaced community coordinates with climate adaptation network",
   "description": "Displaced community coordinates with climate adaptation network",
   "content": "Scenario: Displaced community coordinates with climate adaptation network\n    Given multiple coastal communities face similar climate displacement\n    When they form a climate displacement affinity network\n    And they share strategies for community preservation\n    Then communities learn from each other's experiences\n    And successful resettlement patterns are documented and shared\n    And coordinated advocacy for climate displacement support emerges\n    And the network coordinates with climate justice activists\n    And systemic support for climate migrants is organized\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Displaced community coordinates with climate adaptation network",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

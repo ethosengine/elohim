@@ -6,7 +6,7 @@
   "title": "Democratic distribution cooperative emerges providing logistics without extraction",
   "description": "Democratic distribution cooperative emerges providing logistics without extraction",
   "content": "Scenario: Democratic distribution cooperative emerges providing logistics without extraction\n    Given some distribution infrastructure is useful (aggregation, transportation, storage)\n    And corporate distributors provide this but extract massively beyond cost\n    When democratic network creates worker-owned distribution cooperative\n    Then logistics services are provided at cost-recovery, not profit maximization\n    And distribution workers gain ownership and democratic governance\n    And necessary functions are preserved without extraction\n    And democratic cooperative proves distribution infrastructure can be democratically operated\n    And industry_sector_elohim coordinates democratic distribution cooperative development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic distribution cooperative emerges providing logistics without extraction",

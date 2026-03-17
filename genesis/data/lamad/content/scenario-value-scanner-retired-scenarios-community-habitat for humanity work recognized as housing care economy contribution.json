@@ -6,7 +6,7 @@
   "title": "Habitat for Humanity work recognized as housing care economy contribution",
   "description": "Habitat for Humanity work recognized as housing care economy contribution",
   "content": "Scenario: Habitat for Humanity work recognized as housing care economy contribution\n    Given Frank's volunteer work builds housing for families in need\n    And his construction expertise enables affordable housing\n    When the community_elohim tracks housing care economy\n    Then Frank's work should be recognized as addressing housing crisis\n    And building homes should be valued as community care contribution\n    And his labor should be connected to housing outcomes (families housed)\n    And community should see that Frank's work creates housing that policy fails to provide\n    And volunteer construction should be understood as care economy infrastructure\n    And Frank should experience his work as meaningful community contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Habitat for Humanity work recognized as housing care economy contribution",

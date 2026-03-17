@@ -6,7 +6,7 @@
   "title": "Medication management supported across multiple providers",
   "description": "Medication management supported across multiple providers",
   "content": "Scenario: Medication management supported across multiple providers\n    Given David takes multiple medications from different specialists\n    And medication interactions could be dangerous\n    When the healthcare_elohim tracks David's medications\n    Then it should maintain comprehensive medication list\n    And it should identify potential interactions across providers\n    And it should alert James to medication concerns\n    And medication timing and administration should be tracked\n    And medical complexity should be managed systematically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Medication management supported across multiple providers",

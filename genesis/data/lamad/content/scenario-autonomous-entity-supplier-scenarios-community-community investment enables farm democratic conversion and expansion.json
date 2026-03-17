@@ -6,7 +6,7 @@
   "title": "Community investment enables farm democratic conversion and expansion",
   "description": "Community investment enables farm democratic conversion and expansion",
   "content": "Scenario: Community investment enables farm democratic conversion and expansion\n    Given Tom wants to convert farm to worker ownership but farmworkers lack capital\n    And community members want to support local agriculture but lack pathway\n    When community investment pool funds farm acquisition and expansion\n    Then neighbors invest $2K-$20K each in democratic farm conversion\n    And investors receive fair return (5% annually) plus food security benefit\n    And farm gains capital for sustainable infrastructure and expansion\n    And community builds ownership stake in local food production\n    And community_elohim manages community investment in farm democratization\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community investment enables farm democratic conversion and expansion",

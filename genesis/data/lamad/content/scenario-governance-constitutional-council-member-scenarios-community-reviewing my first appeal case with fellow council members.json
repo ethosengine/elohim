@@ -6,7 +6,7 @@
   "title": "Reviewing my first appeal case with fellow council members",
   "description": "Reviewing my first appeal case with fellow council members",
   "content": "Scenario: Reviewing my first appeal case with fellow council members\n    Given Marcus appealed his Family Elohim's mental health intervention decision\n    And I am reviewing this case with my diverse council\n    When we deliberate on whether the agent followed constitutional bounds\n    Then I bring: my nurse perspective on mental health and care\n    And retired teacher brings: education and developmental insights\n    And construction worker brings: working-class resource constraint understanding\n    And grad student brings: research and analytical skills\n    And business owner brings: economic and practical judgment\n    And together we form: collective wisdom greater than any individual\n    And we ask: \"Did this demonstrate love as committed action?\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reviewing my first appeal case with fellow council members",

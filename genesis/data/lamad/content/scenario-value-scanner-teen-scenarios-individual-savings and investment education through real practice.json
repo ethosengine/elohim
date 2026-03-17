@@ -6,7 +6,7 @@
   "title": "Savings and investment education through real practice",
   "description": "Savings and investment education through real practice",
   "content": "Scenario: Savings and investment education through real practice\n    Given Jasmine is saving for college and future goals\n    And she has accumulated $2,400 in savings from work\n    When she explores investment options through her personal_agent\n    Then the agent should provide age-appropriate investment education\n    And explain concepts like compound interest, risk, diversification\n    And connect to her specific goals and timeline\n    And help her understand long-term financial planning\n    And provide resources for learning about different investment vehicles\n    And support her building adult financial capability\n    And never pressure her toward specific investment products\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Savings and investment education through real practice",

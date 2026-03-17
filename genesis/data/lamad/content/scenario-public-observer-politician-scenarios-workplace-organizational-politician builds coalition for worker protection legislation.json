@@ -6,7 +6,7 @@
   "title": "Politician builds coalition for worker protection legislation",
   "description": "Politician builds coalition for worker protection legislation",
   "content": "Scenario: Politician builds coalition for worker protection legislation\n    Given the politician champions paid sick leave requirement\n    And needs support from diverse constituencies\n    When the Observer identifies coalition building opportunities\n    Then they see public health advocates support disease prevention\n    And identify parent groups concerned about sick children and work\n    And connect with faith communities serving working families\n    And facilitate coalition across worker rights and community health interests\n    And build broad-based support for worker protections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician builds coalition for worker protection legislation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

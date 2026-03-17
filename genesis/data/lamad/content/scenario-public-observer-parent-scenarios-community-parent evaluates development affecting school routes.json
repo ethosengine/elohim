@@ -6,7 +6,7 @@
   "title": "Parent evaluates development affecting school routes",
   "description": "Parent evaluates development affecting school routes",
   "content": "Scenario: Parent evaluates development affecting school routes\n    Given a developer proposes construction near their child's school\n    And claims it will \"benefit the community\"\n    When the parent reviews Observer analysis\n    Then they see traffic impacts on school walking routes\n    And understand safety implications for children's commutes\n    And view how construction timing affects school access\n    And can challenge developer claims with child-safety data\n    And parent concerns are grounded in evidence not just fear\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent evaluates development affecting school routes",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

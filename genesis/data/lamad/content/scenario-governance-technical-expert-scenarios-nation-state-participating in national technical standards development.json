@@ -6,7 +6,7 @@
   "title": "Participating in national technical standards development",
   "description": "Participating in national technical standards development",
   "content": "Scenario: Participating in national technical standards development\n    Given national protocol standards need technical specification\n    And I serve on standards development committee\n    When I help craft technical requirements\n    Then I ensure: standards serve constitutional principles\n    And I verify: specifications are implementable\n    And I check: for security vulnerabilities in standards\n    And I collaborate: with diverse technical experts\n    And I submit: standards to National Constitutional Council for approval\n    And I demonstrate: technical development serving democratic governance\n    And citizens authorize: technical changes through council oversight\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in national technical standards development",

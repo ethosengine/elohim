@@ -6,7 +6,7 @@
   "title": "Sustainable agriculture becomes economically viable through fair pricing",
   "description": "Sustainable agriculture becomes economically viable through fair pricing",
   "content": "Scenario: Sustainable agriculture becomes economically viable through fair pricing\n    Given corporate food system makes sustainable farming nearly impossible financially\n    And Tom wanted to practice regenerative agriculture but margins were too thin\n    When democratic network pays premium for sustainable practices\n    Then organic and regenerative farming become profitable, not costly burden\n    And environmental stewardship is valued through higher prices, not punished through market\n    And sustainable practices spread as economic viability is proven\n    And food system transformation includes ecological regeneration\n    And industry_sector_elohim tracks sustainability premium impacts on farming practices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sustainable agriculture becomes economically viable through fair pricing",

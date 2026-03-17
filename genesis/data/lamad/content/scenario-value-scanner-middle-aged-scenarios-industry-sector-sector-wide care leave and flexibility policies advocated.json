@@ -6,7 +6,7 @@
   "title": "Sector-wide care leave and flexibility policies advocated",
   "description": "Sector-wide care leave and flexibility policies advocated",
   "content": "Scenario: Sector-wide care leave and flexibility policies advocated\n    Given individual companies can be limited in policy innovation\n    And sector-wide policy creates competitive equity\n    And Robert's experience qualifies him to advocate\n    When industry_elohim supports sector policy advocacy\n    Then it should connect Robert to sector policy development processes\n    And help him advocate for industry-wide care leave standards\n    And support proposals for sector flexibility norms\n    And provide evidence about competitive advantage of care-friendly sectors\n    And build industry policy that supports all workers' care needs\n    And prevent individual companies from being penalized for care-friendly practices\n    And advance care economy at scale through sector transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sector-wide care leave and flexibility policies advocated",

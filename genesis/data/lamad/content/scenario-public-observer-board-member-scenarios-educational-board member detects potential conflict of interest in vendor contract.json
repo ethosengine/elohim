@@ -6,7 +6,7 @@
   "title": "Board member detects potential conflict of interest in vendor contract",
   "description": "Board member detects potential conflict of interest in vendor contract",
   "content": "Scenario: Board member detects potential conflict of interest in vendor contract\n    Given district staff recommends multi-million dollar contract with education technology vendor\n    And superintendent emphasizes vendor's qualifications and student benefit claims\n    And board will vote on contract at next meeting\n    When the board member uses Observer capture protection analysis\n    Then they discover vendor hired former district administrator as consultant\n    And see vendor's student outcome claims not supported by independent research\n    And find contract terms more favorable to vendor than peer district contracts\n    And access alternative vendors with better evidence and more standard terms\n    And capture protection makes relationships and manipulation tactics visible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member detects potential conflict of interest in vendor contract",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Participating in national media discourse on AI governance",
   "description": "Participating in national media discourse on AI governance",
   "content": "Scenario: Participating in national media discourse on AI governance\n    Given public understanding shapes political will\n    And my voice carries weight as committee chair\n    When I engage in public education\n    Then I explain: why democratic AI governance matters\n    And I describe: how protocol works and what's at stake\n    And I acknowledge: uncertainties and limitations\n    And I present: alternatives honestly (corporate control, heavy regulation, protocol)\n    And I make: case for democratic choice\n    And I avoid: partisan framing or ideological advocacy\n    And I serve: informed democratic deliberation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in national media discourse on AI governance",

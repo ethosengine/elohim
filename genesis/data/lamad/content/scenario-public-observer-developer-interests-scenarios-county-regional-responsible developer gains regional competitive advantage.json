@@ -6,7 +6,7 @@
   "title": "Responsible developer gains regional competitive advantage",
   "description": "Responsible developer gains regional competitive advantage",
   "content": "Scenario: Responsible developer gains regional competitive advantage\n    Given a responsible developer consistently delivers promised benefits\n    And has positive track record across multiple jurisdictions\n    When the Observer makes regional reputation visible\n    Then the developer shows: projects in four counties all met commitments\n    And community feedback is consistently positive\n    And environmental standards were exceeded not just met\n    And regional reputation creates access to better opportunities\n    And integrity pays dividends across jurisdictional boundaries\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer gains regional competitive advantage",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

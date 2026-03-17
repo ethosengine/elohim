@@ -6,7 +6,7 @@
   "title": "Neighborhood youth gain apprenticeship and ownership pathways",
   "description": "Neighborhood youth gain apprenticeship and ownership pathways",
   "content": "Scenario: Neighborhood youth gain apprenticeship and ownership pathways\n    Given community lacks skilled trades training and economic opportunity for youth\n    And Rosa's expertise could benefit next generation but individual ownership prevents scaling\n    When democratic governance creates youth apprenticeship program\n    Then neighborhood youth learn auto repair skills with paid training\n    And apprentices can become worker-owners after demonstrating competency\n    And economic opportunity stays in community, not extracting to corporate chains\n    And intergenerational knowledge transfer strengthens community resilience\n    And community_elohim documents youth pathways from apprenticeship to ownership\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood youth gain apprenticeship and ownership pathways",

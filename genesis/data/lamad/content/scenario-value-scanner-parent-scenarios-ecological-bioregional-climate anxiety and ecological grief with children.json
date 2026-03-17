@@ -6,7 +6,7 @@
   "title": "Climate anxiety and ecological grief with children",
   "description": "Climate anxiety and ecological grief with children",
   "content": "Scenario: Climate anxiety and ecological grief with children\n    Given children are aware of environmental crisis\n    And Tommy and Emma may experience climate anxiety\n    When Sarah supports children's ecological emotions\n    Then the personal_agent should recognize this as emotional care work\n    And it should help Sarah process her own climate grief\n    And it should provide resources for talking with children about climate\n    And supporting children's environmental feelings should be valued\n    And the system should recognize emotional dimension of ecological parenting\n    And Sarah's work navigating climate crisis with children should be supported\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Climate anxiety and ecological grief with children",

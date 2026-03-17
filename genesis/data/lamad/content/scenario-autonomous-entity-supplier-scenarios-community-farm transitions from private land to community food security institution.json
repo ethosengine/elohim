@@ -6,7 +6,7 @@
   "title": "Farm transitions from private land to community food security institution",
   "description": "Farm transitions from private land to community food security institution",
   "content": "Scenario: Farm transitions from private land to community food security institution\n    Given Johnson Farm was Tom's private property serving his individual livelihood\n    And community depended on farm but had no governance participation\n    When farm converts to democratic ownership with community investment\n    Then community investors gain stake in local food production\n    And farm governance includes community voice alongside farmworker control\n    And food security becomes community priority, not just individual profit\n    And farmland is protected from development through community commitment\n    And community_elohim facilitates community participation in farm governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farm transitions from private land to community food security institution",

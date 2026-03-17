@@ -6,7 +6,7 @@
   "title": "Citizen evaluates development proposal affecting neighborhood",
   "description": "Citizen evaluates development proposal affecting neighborhood",
   "content": "Scenario: Citizen evaluates development proposal affecting neighborhood\n    Given a developer proposes new construction in their neighborhood\n    And claims it will \"bring community benefits\"\n    When the citizen reviews the Observer analysis\n    Then they see actual value flows (who benefits, who pays)\n    And view the developer's track record from past projects\n    And understand infrastructure impacts (traffic, services, green space)\n    And can challenge claims with evidence not just emotion\n    And make informed decisions about supporting or opposing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen evaluates development proposal affecting neighborhood",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

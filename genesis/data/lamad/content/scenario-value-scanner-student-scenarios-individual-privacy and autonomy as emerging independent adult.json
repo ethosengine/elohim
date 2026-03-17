@@ -6,7 +6,7 @@
   "title": "Privacy and autonomy as emerging independent adult",
   "description": "Privacy and autonomy as emerging independent adult",
   "content": "Scenario: Privacy and autonomy as emerging independent adult\n    Given Kenji is establishing adult independence\n    And he has full rights to privacy in his personal life\n    When care economy data is collected about Kenji\n    Then he must have complete control over all personal information\n    And no data should be shared with family or school without his consent\n    And his adult autonomy should be respected completely\n    And privacy should be default, not something he must request\n    And the system should support his development of adult boundaries\n    And Kenji's data sovereignty should be absolute\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy and autonomy as emerging independent adult",

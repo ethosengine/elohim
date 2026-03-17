@@ -6,7 +6,7 @@
   "title": "Parent coordinates district-wide program cut opposition",
   "description": "Parent coordinates district-wide program cut opposition",
   "content": "Scenario: Parent coordinates district-wide program cut opposition\n    Given the district plans to eliminate music programs to save money\n    And the parent's child participates in the school band\n    When the Observer connects parents across all affected schools\n    Then 230 parents from 8 schools join coordinated advocacy\n    And coalition presents unified data on music program benefits\n    And shows alternative cost-saving options that preserve programs\n    And district-wide parent power prevents divide-and-conquer\n    And music programs are preserved through collective action\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent coordinates district-wide program cut opposition",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Neighborhood care exchange coordinates mutual support",
   "description": "Neighborhood care exchange coordinates mutual support",
   "content": "Scenario: Neighborhood care exchange coordinates mutual support\n    Given Robert has skills and resources to share\n    And he also needs support managing his care demands\n    And neighbors have complementary needs and capacities\n    When neighborhood_elohim coordinates care exchange\n    Then it should match Robert's capacities with neighborhood needs\n    And connect him to neighbors who can provide support\n    And recognize his contributions: lawn care help for elderly neighbor, professional mentoring\n    And surface opportunities: \"Maria can provide backup childcare when your grandchild visits\"\n    And build reciprocal relationships based on mutual care\n    And demonstrate that neighborhood functions through care exchange\n    And strengthen local social capital\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care exchange coordinates mutual support",

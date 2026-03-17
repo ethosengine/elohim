@@ -6,7 +6,7 @@
   "title": "Recognizing when workplace demands become unsustainable",
   "description": "Recognizing when workplace demands become unsustainable",
   "content": "Scenario: Recognizing when workplace demands become unsustainable\n    Given Aisha faces intense workplace expectations\n    And she often works long hours\n    When the personal_agent monitors her workplace patterns\n    Then it should flag when demands are unsustainable\n    And it should recognize that she's worked through lunch repeatedly\n    And it should identify when work-life balance is failing\n    And the system should help her see overwork clearly\n    And she should be supported in setting boundaries\n    And workplace care economy should prevent exploitation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognizing when workplace demands become unsustainable",

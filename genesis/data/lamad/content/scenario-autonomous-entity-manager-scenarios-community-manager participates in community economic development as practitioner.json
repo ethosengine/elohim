@@ -6,7 +6,7 @@
   "title": "Manager participates in community economic development as practitioner",
   "description": "Manager participates in community economic development as practitioner",
   "content": "Scenario: Manager participates in community economic development as practitioner\n    Given municipality seeks input on economic development strategies\n    And Marcus has practical experience with democratic business model\n    When community economic development planning occurs\n    Then Marcus shares operational insights about democratic coordination\n    And Marcus explains how eliminating extraction enabled higher wages and community programs\n    And Marcus advocates for policies supporting democratic business conversions\n    And Marcus participates as community member with expertise, not as business representative\n    And community_elohim connects his testimony to broader movement for economic democracy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager participates in community economic development as practitioner",

@@ -6,7 +6,7 @@
   "title": "Mental health and emotional support in student community",
   "description": "Mental health and emotional support in student community",
   "content": "Scenario: Mental health and emotional support in student community\n    Given students face high stress, anxiety, and mental health challenges\n    And formal mental health services are often inadequate\n    When students provide emotional support to peers\n    Then the community_elohim should recognize emotional labor as care work\n    And it should value listening, validating, and supporting peers in crisis\n    And it should accumulate care tokens for emotional care work\n    And mental health support should be understood as community care\n    And the system should validate peer emotional support as real work\n    And student community should be recognized as mental health resource\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mental health and emotional support in student community",

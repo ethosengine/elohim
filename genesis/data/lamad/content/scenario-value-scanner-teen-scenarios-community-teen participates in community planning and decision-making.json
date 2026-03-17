@@ -6,7 +6,7 @@
   "title": "Teen participates in community planning and decision-making",
   "description": "Teen participates in community planning and decision-making",
   "content": "Scenario: Teen participates in community planning and decision-making\n    Given the community is planning a new youth recreation facility\n    And Jasmine has relevant knowledge as a current user of community spaces\n    When the community_elohim facilitates community input\n    Then Jasmine's voice should be actively solicited\n    And her input should carry weight in planning decisions\n    And her care contributions should give her standing in the conversation\n    And community planners should engage her as a legitimate stakeholder\n    And she should learn that civic participation is her right and responsibility\n    And youth voice should shape systems designed for collective flourishing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen participates in community planning and decision-making",

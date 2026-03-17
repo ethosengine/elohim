@@ -6,7 +6,7 @@
   "title": "Household maintenance prevents costly emergencies",
   "description": "Household maintenance prevents costly emergencies",
   "content": "Scenario: Household maintenance prevents costly emergencies\n    Given Aisha is learning household maintenance\n    And prevention is cheaper than emergency repairs\n    When the personal_agent tracks household maintenance\n    Then it should provide preventive maintenance schedules\n    And it should flag issues before they become emergencies\n    And it should educate about maintenance tasks Aisha might not know\n    And the system should protect her from expensive neglect\n    And household competence should include preventive thinking\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household maintenance prevents costly emergencies",

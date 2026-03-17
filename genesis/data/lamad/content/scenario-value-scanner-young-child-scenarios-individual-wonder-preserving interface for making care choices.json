@@ -6,7 +6,7 @@
   "title": "Wonder-preserving interface for making care choices",
   "description": "Wonder-preserving interface for making care choices",
   "content": "Scenario: Wonder-preserving interface for making care choices\n    Given Tommy is using the Value Scanner for the first time\n    And the interface is optimized for ages 5-7\n    When Tommy opens the scanner application\n    Then the interface should display large, colorful icons\n    And the personal_agent should use warm, encouraging voice guidance\n    And no text requiring reading ability should be mandatory\n    And the interface should preserve the magic of choice-making\n    And no gamification or point systems should be present\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Wonder-preserving interface for making care choices",

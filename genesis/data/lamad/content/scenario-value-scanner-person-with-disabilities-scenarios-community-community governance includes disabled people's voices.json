@@ -6,7 +6,7 @@
   "title": "Community governance includes disabled people's voices",
   "description": "Community governance includes disabled people's voices",
   "content": "Scenario: Community governance includes disabled people's voices\n    Given community decisions often exclude disabled people\n    And \"Nothing about us without us\" is disability rights principle\n    When community governance decisions are made\n    Then the community_elohim should ensure disabled people's participation\n    And Alex should be included in relevant decision-making processes\n    And accessibility should be standard for all governance activities\n    And disabled people's expertise should shape community policy\n    And the protocol should structurally include disabled voices\n    And community should practice disability justice in governance\n    And Alex's participation should be valued, not tokenized\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community governance includes disabled people's voices",

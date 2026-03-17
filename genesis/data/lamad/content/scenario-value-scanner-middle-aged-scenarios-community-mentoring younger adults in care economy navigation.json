@@ -6,7 +6,7 @@
   "title": "Mentoring younger adults in care economy navigation",
   "description": "Mentoring younger adults in care economy navigation",
   "content": "Scenario: Mentoring younger adults in care economy navigation\n    Given Robert has learned to navigate work-care balance over decades\n    And younger adults are earlier in their journey\n    And his experience could help others avoid struggles\n    When community_elohim coordinates mentoring\n    Then it should connect Robert with younger adults seeking guidance\n    And recognize his mentoring as valuable care contribution\n    And support him in sharing knowledge about care economy practices\n    And help younger generation learn from his experience\n    And value his mentoring in community care tokens\n    And prevent him from being exploited for free emotional labor\n    And build intergenerational knowledge transfer\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Mentoring younger adults in care economy navigation",

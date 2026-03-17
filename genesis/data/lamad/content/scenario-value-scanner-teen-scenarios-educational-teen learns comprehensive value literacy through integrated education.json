@@ -6,7 +6,7 @@
   "title": "Teen learns comprehensive value literacy through integrated education",
   "description": "Teen learns comprehensive value literacy through integrated education",
   "content": "Scenario: Teen learns comprehensive value literacy through integrated education\n    Given Jasmine is learning economics in school\n    And she practices care economy through Value Scanner daily\n    When her educational_elohim integrates these learning contexts\n    Then she should understand both market economics and care economics\n    And learn how care creates value beyond market exchange\n    And develop sophisticated analysis of invisible labor\n    And understand household economics, care work recognition, and community participation\n    And build foundation for adult economic capability\n    And recognize limitations of market-only economic thinking\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns comprehensive value literacy through integrated education",

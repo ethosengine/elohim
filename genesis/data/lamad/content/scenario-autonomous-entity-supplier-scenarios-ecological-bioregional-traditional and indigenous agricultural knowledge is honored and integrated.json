@@ -6,7 +6,7 @@
   "title": "Traditional and indigenous agricultural knowledge is honored and integrated",
   "description": "Traditional and indigenous agricultural knowledge is honored and integrated",
   "content": "Scenario: Traditional and indigenous agricultural knowledge is honored and integrated\n    Given industrial agriculture dismissed traditional ecological knowledge\n    And indigenous and traditional practices often embody sustainable wisdom\n    When democratic bioregional network values diverse agricultural knowledge\n    Then indigenous crop varieties and cultivation methods are preserved and used\n    And traditional ecological knowledge informs climate adaptation and biodiversity\n    And elder farmers and indigenous practitioners share wisdom with network\n    And agricultural knowledge diversity strengthens bioregional resilience\n    And bioregional_elohim documents and preserves traditional agricultural knowledge\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Traditional and indigenous agricultural knowledge is honored and integrated",

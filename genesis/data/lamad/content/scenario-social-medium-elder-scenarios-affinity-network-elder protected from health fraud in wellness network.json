@@ -6,7 +6,7 @@
   "title": "Elder protected from health fraud in wellness network",
   "description": "Elder protected from health fraud in wellness network",
   "content": "Scenario: Elder protected from health fraud in wellness network\n    Given Rose participates in a seniors wellness affinity network\n    When a scammer tries to promote miracle cure products\n    And they attempt to contact network members with fraudulent claims\n    Then the guardian agent detects the scam pattern\n    And the fraudulent messages are blocked before reaching Rose\n    And legitimate health information continues to flow\n    And wellness discussions remain safe and evidence-based\n    And Rose and peers are protected while maintaining autonomy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder protected from health fraud in wellness network",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

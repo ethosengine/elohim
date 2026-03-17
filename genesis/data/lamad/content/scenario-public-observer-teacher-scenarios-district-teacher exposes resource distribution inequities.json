@@ -6,7 +6,7 @@
   "title": "Teacher exposes resource distribution inequities",
   "description": "Teacher exposes resource distribution inequities",
   "content": "Scenario: Teacher exposes resource distribution inequities\n    Given some schools have abundant materials while others lack basics\n    And district claims equitable allocation\n    When teachers document resources across schools through Observer\n    Then data reveals wealthy-area schools get $800/student discretionary\n    And high-poverty schools get $200/student discretionary\n    And teachers coordinate with parents in under-resourced schools\n    And bring evidence of systematic inequity to board\n    And resource distribution becomes equity accountability issue\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher exposes resource distribution inequities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

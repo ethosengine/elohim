@@ -6,7 +6,7 @@
   "title": "Local food systems supported through care economy purchases",
   "description": "Local food systems supported through care economy purchases",
   "content": "Scenario: Local food systems supported through care economy purchases\n    Given Sarah's bioregion has local food producers\n    And supporting local agriculture has environmental and community benefits\n    When Sarah makes food purchasing decisions\n    Then the bioregional_elohim should highlight local options\n    And it should show environmental benefits of local food\n    And it should facilitate connections to local producers\n    And Sarah's purchases should support bioregional food security\n    And care economy should strengthen local food systems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local food systems supported through care economy purchases",

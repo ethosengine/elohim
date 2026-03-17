@@ -6,7 +6,7 @@
   "title": "Teacher grounds curriculum debate in professional knowledge",
   "description": "Teacher grounds curriculum debate in professional knowledge",
   "content": "Scenario: Teacher grounds curriculum debate in professional knowledge\n    Given the school board debates curriculum approaches\n    And discussion is dominated by political ideology not educational evidence\n    When teachers contribute professional expertise through Observer\n    Then board receives aggregated teacher insights on effective curriculum\n    And teachers provide research evidence on curriculum approaches\n    And share classroom examples of what actually works for students\n    And connect curriculum to actual student learning outcomes\n    And education policy discussion becomes evidence-based and professional\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher grounds curriculum debate in professional knowledge",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Elder coordinates neighborhood elder check-in system",
   "description": "Elder coordinates neighborhood elder check-in system",
   "content": "Scenario: Elder coordinates neighborhood elder check-in system\n    Given several elders in the neighborhood live alone\n    And Rose wants to ensure everyone has daily connection\n    When Rose proposes a daily elder check-in system\n    And volunteers agree to participate in rotation\n    Then the coordination agent helps organize the schedule\n    And each elder receives daily contact from neighbors\n    And any concerns are immediately surfaced to family and community\n    And Rose experiences agency in building community care\n    And isolation is prevented through systematic connection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder coordinates neighborhood elder check-in system",

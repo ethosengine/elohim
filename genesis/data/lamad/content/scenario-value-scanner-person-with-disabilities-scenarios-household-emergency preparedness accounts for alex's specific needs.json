@@ -6,7 +6,7 @@
   "title": "Emergency preparedness accounts for Alex's specific needs",
   "description": "Emergency preparedness accounts for Alex's specific needs",
   "content": "Scenario: Emergency preparedness accounts for Alex's specific needs\n    Given Alex has disability-related emergency considerations\n    And emergencies require rapid response\n    When the household_elohim plans for emergency scenarios\n    Then emergency plans should account for Alex's mobility limitations\n    And evacuation plans should be accessible to Alex\n    And medical equipment needs should be factored into emergency supplies\n    And support worker backup plans should be established\n    And Alex should have accessible emergency communication methods\n    And emergency preparedness should reduce Alex's vulnerability\n    And planning should be proactive, not reactive\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency preparedness accounts for Alex's specific needs",

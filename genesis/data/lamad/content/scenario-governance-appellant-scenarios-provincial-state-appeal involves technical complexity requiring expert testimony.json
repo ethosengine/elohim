@@ -6,7 +6,7 @@
   "title": "Appeal involves technical complexity requiring expert testimony",
   "description": "Appeal involves technical complexity requiring expert testimony",
   "content": "Scenario: Appeal involves technical complexity requiring expert testimony\n    Given my appeal concerns cryptographic verification of agent reasoning\n    And I question whether the agent actually followed claimed constitutional principles\n    When Technical Expert Dr. Amara Okonkwo testifies to the Constitutional Council\n    Then she explains the cryptographic proof in accessible language\n    And She clarifies what confidence levels mean and their limitations\n    And She acknowledges uncertainties in the technical analysis\n    And She presents competing interpretations when experts disagree\n    And She informs but doesn't dictate the council's judgment\n    And The council weighs technical information alongside human wisdom\n    And I understand the technical basis of the decision through her explanation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal involves technical complexity requiring expert testimony",

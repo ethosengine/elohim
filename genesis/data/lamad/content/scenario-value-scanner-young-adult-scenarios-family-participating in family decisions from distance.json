@@ -6,7 +6,7 @@
   "title": "Participating in family decisions from distance",
   "description": "Participating in family decisions from distance",
   "content": "Scenario: Participating in family decisions from distance\n    Given Aisha is geographically distant from family\n    And important family decisions need her input\n    When the family makes significant decisions\n    Then the family_elohim should facilitate remote participation\n    And Aisha's input should be solicited appropriately\n    And her adult perspective should be valued\n    And technology should enable genuine participation\n    And distance shouldn't exclude her from family governance\n    And her independent status should give her legitimate voice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in family decisions from distance",

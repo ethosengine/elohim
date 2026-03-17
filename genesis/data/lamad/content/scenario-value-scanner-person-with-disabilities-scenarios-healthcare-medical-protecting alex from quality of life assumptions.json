@@ -6,7 +6,7 @@
   "title": "Protecting Alex from quality of life assumptions",
   "description": "Protecting Alex from quality of life assumptions",
   "content": "Scenario: Protecting Alex from quality of life assumptions\n    Given medical providers often make negative assumptions about disabled people's quality of life\n    And these assumptions can lead to withheld or substandard care\n    When providers discuss treatment options\n    Then the personal_agent should help Alex challenge quality of life assumptions\n    And it should assert that Alex's life is valuable and worth full treatment\n    And it should document when providers suggest limiting care based on disability\n    And Alex should receive same standard of care as non-disabled patients\n    And the protocol should recognize that quality of life bias is discrimination\n    And Alex's right to full medical care should be defended\n    And assumptions about disability should never limit treatment options\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting Alex from quality of life assumptions",

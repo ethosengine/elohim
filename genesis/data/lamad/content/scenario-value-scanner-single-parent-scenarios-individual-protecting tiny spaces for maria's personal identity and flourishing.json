@@ -6,7 +6,7 @@
   "title": "Protecting tiny spaces for Maria's personal identity and flourishing",
   "description": "Protecting tiny spaces for Maria's personal identity and flourishing",
   "content": "Scenario: Protecting tiny spaces for Maria's personal identity and flourishing\n    Given Maria's life is consumed by parenting and work demands\n    And she has almost no time or energy for herself\n    When the personal_agent monitors Maria's well-being\n    Then it should identify and protect small moments for personal care\n    And it should remind Maria that she exists beyond her parenting role\n    And it should help her maintain individual identity despite overwhelming demands\n    And it should advocate for her personal needs, not just children's needs\n    And Maria should be supported in being a person, not just a parent\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting tiny spaces for Maria's personal identity and flourishing",

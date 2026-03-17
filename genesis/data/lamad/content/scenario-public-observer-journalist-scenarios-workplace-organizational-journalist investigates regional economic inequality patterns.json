@@ -6,7 +6,7 @@
   "title": "Journalist investigates regional economic inequality patterns",
   "description": "Journalist investigates regional economic inequality patterns",
   "content": "Scenario: Journalist investigates regional economic inequality patterns\n    Given the journalist covers regional economy\n    And economic growth statistics mask inequality\n    When the Observer analyzes economic data by demographics and geography\n    Then the journalist sees wage growth concentrated in top income brackets\n    And documents working-class wage stagnation despite economic growth claims\n    And shows poverty increasing in communities of color despite job growth\n    And identifies industries paying poverty wages receiving subsidies\n    And publishes investigation exposing economic inequality\n    And pattern recognition reveals who benefits from \"strong economy\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates regional economic inequality patterns",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

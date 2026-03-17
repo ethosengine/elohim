@@ -6,7 +6,7 @@
   "title": "Displaced community coordinates managed retreat",
   "description": "Displaced community coordinates managed retreat",
   "content": "Scenario: Displaced community coordinates managed retreat\n    Given the coastal community is planning managed retreat over 10 years\n    When the community uses Elohim to coordinate the transition\n    And they make collective decisions about timing and destination\n    Then families can coordinate moves to stay near each other\n    And community assets are managed collectively during transition\n    And mutual aid supports families through the displacement\n    And the community maintains agency and cohesion through the crisis\n    And managed retreat happens with dignity rather than chaos\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Displaced community coordinates managed retreat",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

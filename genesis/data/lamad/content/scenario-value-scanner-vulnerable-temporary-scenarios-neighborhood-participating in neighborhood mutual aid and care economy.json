@@ -6,7 +6,7 @@
   "title": "Participating in neighborhood mutual aid and care economy",
   "description": "Participating in neighborhood mutual aid and care economy",
   "content": "Scenario: Participating in neighborhood mutual aid and care economy\n    Given my neighborhood has informal mutual aid networks\n    And I can contribute even while receiving support\n    When I engage with neighborhood care economy\n    Then the Value Scanner connects me to local mutual aid networks\n    And makes visible my contributions (childcare exchanges, skill sharing, information sharing)\n    And facilitates reciprocal care relationships in neighborhood\n    And tracks my care economy participation with care tokens\n    And validates that I have valuable contributions despite crisis\n    And my personal_agent identifies opportunities to contribute\n    And recognizes mutual aid participation as community-building work\n    And supports reciprocal relationships, not one-way charity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in neighborhood mutual aid and care economy",

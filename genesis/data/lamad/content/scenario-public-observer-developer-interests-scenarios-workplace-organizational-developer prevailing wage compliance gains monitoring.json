@@ -6,7 +6,7 @@
   "title": "Developer prevailing wage compliance gains monitoring",
   "description": "Developer prevailing wage compliance gains monitoring",
   "content": "Scenario: Developer prevailing wage compliance gains monitoring\n    Given a developer receives public subsidy requiring prevailing wage\n    And claims compliance with wage requirements\n    When the Observer monitors wage compliance\n    Then analysis shows: certified payroll reports show prevailing wage\n    But worker interviews reveal unpaid overtime and deductions\n    And actual take-home pay is below prevailing wage requirements\n    And compliance on paper differs from worker reality\n    And enforcement mechanisms need worker-centered monitoring\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer prevailing wage compliance gains monitoring",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

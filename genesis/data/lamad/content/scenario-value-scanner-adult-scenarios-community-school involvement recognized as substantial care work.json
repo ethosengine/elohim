@@ -6,7 +6,7 @@
   "title": "School involvement recognized as substantial care work",
   "description": "School involvement recognized as substantial care work",
   "content": "Scenario: School involvement recognized as substantial care work\n    Given Sarah is actively involved in her children's school\n    And she volunteers in classrooms, organizes events, advocates for policies\n    When community care contributions are tracked\n    Then the community_elohim should quantify Sarah's school involvement\n    And volunteer hours should be valued as care work\n    And parent advocacy should be recognized as community contribution\n    And school participation should give Sarah voice in educational governance\n    And care for education should be visible and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "School involvement recognized as substantial care work",

@@ -6,7 +6,7 @@
   "title": "Family cultural recognition of caregiving as sacred work",
   "description": "Family cultural recognition of caregiving as sacred work",
   "content": "Scenario: Family cultural recognition of caregiving as sacred work\n    Given some cultural traditions honor caregiving as sacred\n    And family culture may recognize James's care work meaningfully\n    When the family_elohim tracks cultural care values\n    Then it should recognize cultural frameworks that honor caregiving\n    And it should support family cultural practices around care\n    And cultural recognition should supplement economic recognition\n    And diverse family cultures should be respected and valued\n    And care economy should align with family cultural values\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family cultural recognition of caregiving as sacred work",

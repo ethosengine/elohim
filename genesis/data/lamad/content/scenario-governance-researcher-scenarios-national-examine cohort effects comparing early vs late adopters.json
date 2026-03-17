@@ -6,7 +6,7 @@
   "title": "Examine cohort effects comparing early vs late adopters",
   "description": "Examine cohort effects comparing early vs late adopters",
   "content": "Scenario: Examine cohort effects comparing early vs late adopters\n    Given communities adopted protocol at different times across decade\n    When James compares adoption cohorts\n    Then he finds early adopters benefit from learning community support\n    And he discovers later adopters benefit from improved protocol versions\n    And he identifies that community context matters more than timing\n    And cohort analysis illuminates adoption dynamics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Examine cohort effects comparing early vs late adopters",

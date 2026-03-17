@@ -6,7 +6,7 @@
   "title": "Teen participates in neighborhood safety and social cohesion",
   "description": "Teen participates in neighborhood safety and social cohesion",
   "content": "Scenario: Teen participates in neighborhood safety and social cohesion\n    Given Jasmine is present in the neighborhood frequently\n    And neighborhood safety depends on collective awareness\n    When Jasmine contributes to neighborhood social cohesion\n    Then her participation in neighborhood events should be tracked\n    And her relationships with neighbors across age groups should be valued\n    And her presence and engagement should contribute to perceived safety\n    And the neighborhood_elohim should recognize social capital building as care work\n    And Jasmine should understand that community safety is collective care labor\n    And her generation should be seen as contributors to neighborhood wellbeing, not problems to manage\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen participates in neighborhood safety and social cohesion",

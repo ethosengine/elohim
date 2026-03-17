@@ -6,7 +6,7 @@
   "title": "Advocating for industry training and skill development",
   "description": "Advocating for industry training and skill development",
   "content": "Scenario: Advocating for industry training and skill development\n    Given food service work involves significant skill but is undervalued\n    When workers advocate for professional development and advancement paths\n    Then the protocol should support advocacy for industry training programs\n    And help workers demand investment in skill development\n    And push for career pathways and mobility within industry\n    And challenge perception of food service as unskilled disposable labor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for industry training and skill development",

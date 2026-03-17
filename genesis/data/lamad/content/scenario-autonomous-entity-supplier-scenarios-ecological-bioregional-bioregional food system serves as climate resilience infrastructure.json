@@ -6,7 +6,7 @@
   "title": "Bioregional food system serves as climate resilience infrastructure",
   "description": "Bioregional food system serves as climate resilience infrastructure",
   "content": "Scenario: Bioregional food system serves as climate resilience infrastructure\n    Given climate disruption threatens food security through crop failures and supply chain breakdown\n    And communities need resilient local food production capacity\n    When democratic bioregional farm network provides distributed food security\n    Then climate shocks are absorbed through network coordination\n    And crop failures at individual farms don't create community food insecurity\n    And bioregional food sovereignty provides climate resilience\n    And food security is protected as climate changes through democratic coordination\n    And bioregional_elohim coordinates climate resilience and food security planning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional food system serves as climate resilience infrastructure",

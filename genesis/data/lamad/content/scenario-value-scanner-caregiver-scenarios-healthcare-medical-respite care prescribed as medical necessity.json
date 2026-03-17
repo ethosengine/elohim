@@ -6,7 +6,7 @@
   "title": "Respite care prescribed as medical necessity",
   "description": "Respite care prescribed as medical necessity",
   "content": "Scenario: Respite care prescribed as medical necessity\n    Given caregiver burnout threatens James's ability to provide care\n    And respite is essential for sustainable caregiving\n    When the healthcare_elohim advocates for respite\n    Then respite care should be prescribed as medical necessity\n    And insurance should cover respite like other medical care\n    And providers should understand caregiver burnout is medical concern\n    And James's health should be recognized as essential care infrastructure\n    And healthcare system should support caregiver sustainability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Respite care prescribed as medical necessity",

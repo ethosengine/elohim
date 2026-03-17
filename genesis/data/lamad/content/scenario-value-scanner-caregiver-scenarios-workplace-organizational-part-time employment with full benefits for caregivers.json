@@ -6,7 +6,7 @@
   "title": "Part-time employment with full benefits for caregivers",
   "description": "Part-time employment with full benefits for caregivers",
   "content": "Scenario: Part-time employment with full benefits for caregivers\n    Given James can only work part-time due to caregiving\n    And loss of benefits creates devastating vulnerability\n    When the workplace_elohim advocates for benefits policy\n    Then part-time caregiver employees should access benefits\n    And healthcare coverage should not require full-time employment\n    And benefits should recognize caregiving as legitimate constraint\n    And workplace should not force caregivers to choose between care and benefits\n    And employment protection should include part-time caregivers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Part-time employment with full benefits for caregivers",

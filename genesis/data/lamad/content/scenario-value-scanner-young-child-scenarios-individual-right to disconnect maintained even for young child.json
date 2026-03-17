@@ -6,7 +6,7 @@
   "title": "Right to disconnect maintained even for young child",
   "description": "Right to disconnect maintained even for young child",
   "content": "Scenario: Right to disconnect maintained even for young child\n    Given Tommy has been using the Value Scanner\n    And constitutional constraints apply at all layers\n    When Tommy or his parents choose to disconnect\n    Then the system must honor the disconnection immediately\n    And no data retention beyond legal requirements should occur\n    And Tommy's right to not participate must be respected\n    And no manipulative patterns to retain usage should be employed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to disconnect maintained even for young child",

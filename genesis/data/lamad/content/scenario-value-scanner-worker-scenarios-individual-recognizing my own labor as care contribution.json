@@ -6,7 +6,7 @@
   "title": "Recognizing my own labor as care contribution",
   "description": "Recognizing my own labor as care contribution",
   "content": "Scenario: Recognizing my own labor as care contribution\n    Given I work 50+ hours per week as a line cook\n    And I prepare food for hundreds of people daily\n    When I view my work through the care economy lens\n    Then the protocol should recognize my labor as care work\n    And accumulate care tokens reflecting my contribution to community nourishment\n    And show me that my work has dignity and social value\n    And reframe my relationship to labor from pure exploitation to meaningful contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognizing my own labor as care contribution",

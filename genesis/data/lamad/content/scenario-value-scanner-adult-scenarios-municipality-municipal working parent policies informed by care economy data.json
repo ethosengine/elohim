@@ -6,7 +6,7 @@
   "title": "Municipal working parent policies informed by care economy data",
   "description": "Municipal working parent policies informed by care economy data",
   "content": "Scenario: Municipal working parent policies informed by care economy data\n    Given Sarah balances full-time work with parenting\n    And municipal policy affects working parents' capacity to care\n    When municipal employment policies are considered\n    Then care economy data should show working parents' time constraints\n    And policy should recognize workers' care responsibilities\n    And municipal employers should adopt family-friendly policies\n    And Sarah's advocacy should be strengthened by care economy evidence\n    And municipal policy should support work-life integration\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal working parent policies informed by care economy data",

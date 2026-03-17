@@ -6,7 +6,7 @@
   "title": "Activist coordinates rapid response across network",
   "description": "Activist coordinates rapid response across network",
   "content": "Scenario: Activist coordinates rapid response across network\n    Given Indigenous land defenders face immediate threat of eviction\n    And the situation requires urgent solidarity action\n    When the land defenders' community issues call for support\n    And the call is verified through network trust relationships\n    Then rapid response protocol activates across affinity network\n    And each community determines its capacity to respond\n    And coordination happens in real-time across time zones\n    And actions are culturally appropriate and locally determined\n    And the network mobilizes pressure while preventing burnout\n    And the land defenders receive coordinated solidarity support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist coordinates rapid response across network",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

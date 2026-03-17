@@ -6,7 +6,7 @@
   "title": "Farmworker voice prevents owner burnout and distributes responsibility",
   "description": "Farmworker voice prevents owner burnout and distributes responsibility",
   "content": "Scenario: Farmworker voice prevents owner burnout and distributes responsibility\n    Given Tom carried full farm responsibility alone causing stress and burnout\n    And sole proprietorship meant he couldn't take breaks without farm crisis\n    When democratic governance distributes responsibility across worker-owners\n    Then Tom (if staying as cooperative member) is freed from sole responsibility burden\n    And farmworkers collectively manage farm reducing individual stress\n    And vacation and health breaks become possible for all including Tom\n    And democratic distribution of responsibility enables sustainable work-life balance\n    And workplace_elohim ensures responsibility distribution is equitable and sustainable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farmworker voice prevents owner burnout and distributes responsibility",

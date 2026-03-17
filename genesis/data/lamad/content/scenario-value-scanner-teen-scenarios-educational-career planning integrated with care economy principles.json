@@ -6,7 +6,7 @@
   "title": "Career planning integrated with care economy principles",
   "description": "Career planning integrated with care economy principles",
   "content": "Scenario: Career planning integrated with care economy principles\n    Given Jasmine is exploring career pathways\n    And her personal_agent serves as career counselor\n    When she researches potential careers\n    Then the agent should help her analyze careers through care economy lens\n    And surface how different careers contribute to collective flourishing\n    And explore: \"How does this work serve others? What care does it provide?\"\n    And connect her care economy values to career choices\n    And help her identify careers aligned with her demonstrated care patterns\n    And support her finding work that is meaningful, not just remunerative\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Career planning integrated with care economy principles",

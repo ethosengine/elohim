@@ -6,7 +6,7 @@
   "title": "Seasonal bioregional coordination provides year-round local food supply",
   "description": "Seasonal bioregional coordination provides year-round local food supply",
   "content": "Scenario: Seasonal bioregional coordination provides year-round local food supply\n    Given individual farms have limited seasonal production windows\n    And year-round local food requires bioregional coordination across climate zones\n    When democratic farms coordinate seasonal production bioregionally\n    Then farms in different microclimates provide sequential seasonal supply\n    And storage and preservation extend local food availability\n    And bioregional network reduces dependence on distant, fossil-fuel-intensive supply chains\n    And food miles decrease dramatically through bioregional coordination\n    And bioregional_elohim coordinates seasonal planning and distribution logistics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Seasonal bioregional coordination provides year-round local food supply",

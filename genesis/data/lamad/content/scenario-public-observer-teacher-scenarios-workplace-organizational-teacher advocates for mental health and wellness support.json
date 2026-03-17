@@ -6,7 +6,7 @@
   "title": "Teacher advocates for mental health and wellness support",
   "description": "Teacher advocates for mental health and wellness support",
   "content": "Scenario: Teacher advocates for mental health and wellness support\n    Given teaching is emotionally demanding work with high burnout\n    And district provides minimal employee mental health support\n    When teachers document wellness needs and impacts through Observer\n    Then data shows 68% of teachers experience burnout symptoms\n    And 82% say job stress affects personal life and health\n    And teachers identify needed supports (counseling, reasonable workload, respect)\n    And union negotiates wellness provisions in contract\n    And teacher wellbeing becomes labor rights priority\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher advocates for mental health and wellness support",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

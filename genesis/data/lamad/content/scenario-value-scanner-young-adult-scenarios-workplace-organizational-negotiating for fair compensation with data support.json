@@ -6,7 +6,7 @@
   "title": "Negotiating for fair compensation with data support",
   "description": "Negotiating for fair compensation with data support",
   "content": "Scenario: Negotiating for fair compensation with data support\n    Given Aisha deserves fair pay for her labor\n    And she lacks negotiation experience\n    When Aisha prepares for salary negotiation\n    Then the workplace_elohim should provide supporting data\n    And it should show market rates for her role\n    And it should quantify value of her contributions\n    And it should provide negotiation strategy guidance\n    And the system should empower her advocacy\n    And care economy principles should support fair compensation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Negotiating for fair compensation with data support",

@@ -6,7 +6,7 @@
   "title": "Integration with school curriculum where beneficial",
   "description": "Integration with school curriculum where beneficial",
   "content": "Scenario: Integration with school curriculum where beneficial\n    Given Marcus's real-world learning is substantial\n    And school integration could recognize his capabilities\n    When Marcus grants permission for school integration\n    Then the Value Scanner could share relevant learning data\n    And schools could award credit for applied learning\n    And his care contributions could supplement traditional coursework\n    And integration should benefit Marcus academically\n    And his consent and privacy should be absolute requirements\n    And school recognition should honor his real-world competence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Integration with school curriculum where beneficial",

@@ -6,7 +6,7 @@
   "title": "Advocating for children's educational needs when institutional responses are inadequate",
   "description": "Advocating for children's educational needs when institutional responses are inadequate",
   "content": "Scenario: Advocating for children's educational needs when institutional responses are inadequate\n    Given school is not providing appropriate support for my children\n    And I need to advocate more forcefully for services\n    When school fails to meet children's educational needs\n    Then the Value Scanner helps me understand escalation options\n    And provides resources on children's educational rights\n    And connects me to educational advocacy organizations\n    And helps me document inadequate services for advocacy purposes\n    And my personal_agent drafts advocacy communications\n    And recognizes forceful advocacy as necessary parenting work\n    And validates that schools should serve all children appropriately\n    And supports me in demanding what my children deserve\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for children's educational needs when institutional responses are inadequate",

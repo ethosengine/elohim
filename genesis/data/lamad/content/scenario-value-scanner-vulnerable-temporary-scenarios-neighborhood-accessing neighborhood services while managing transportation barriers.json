@@ -6,7 +6,7 @@
   "title": "Accessing neighborhood services while managing transportation barriers",
   "description": "Accessing neighborhood services while managing transportation barriers",
   "content": "Scenario: Accessing neighborhood services while managing transportation barriers\n    Given I don't have reliable transportation\n    And many neighborhood resources require travel\n    When I need to access services across the neighborhood\n    Then the Value Scanner optimizes my travel for efficiency\n    And identifies services accessible by walking or public transit\n    And helps me batch errands to minimize trips\n    And surfaces transportation assistance programs\n    And coordinates with neighbors for ride-sharing when appropriate\n    And my personal_agent plans routes considering my constraints\n    And recognizes transportation navigation as significant invisible labor\n    And validates that lack of transportation makes everything harder\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing neighborhood services while managing transportation barriers",

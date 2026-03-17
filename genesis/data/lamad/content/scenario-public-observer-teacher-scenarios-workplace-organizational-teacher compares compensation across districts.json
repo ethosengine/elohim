@@ -6,7 +6,7 @@
   "title": "Teacher compares compensation across districts",
   "description": "Teacher compares compensation across districts",
   "content": "Scenario: Teacher compares compensation across districts\n    Given teacher salaries vary significantly across nearby districts\n    And teachers lack comparative compensation information\n    When the Observer analyzes teacher compensation regionally\n    Then teachers see their district pays $8,000 below regional average\n    And understand total compensation including benefits and workload\n    And learn which districts have better contracts and why\n    And use evidence in contract negotiations and recruitment crisis advocacy\n    And compensation transparency drives labor market awareness\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher compares compensation across districts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

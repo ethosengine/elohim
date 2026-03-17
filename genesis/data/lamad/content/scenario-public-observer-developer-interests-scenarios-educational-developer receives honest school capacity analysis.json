@@ -6,7 +6,7 @@
   "title": "Developer receives honest school capacity analysis",
   "description": "Developer receives honest school capacity analysis",
   "content": "Scenario: Developer receives honest school capacity analysis\n    Given a developer proposes 300-unit residential development\n    And claims it will bring tax revenue benefiting schools\n    When the Observer provides independent school impact analysis\n    Then the developer sees: project will generate 180 school-age children\n    And local elementary school is already at 95% capacity\n    And district needs $12M to expand capacity for projected enrollment\n    And property tax revenue is $800K/year but school costs are $1.5M/year\n    And honest analysis reveals net burden on school system\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer receives honest school capacity analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

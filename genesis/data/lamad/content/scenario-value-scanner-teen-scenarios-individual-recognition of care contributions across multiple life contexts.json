@@ -6,7 +6,7 @@
   "title": "Recognition of care contributions across multiple life contexts",
   "description": "Recognition of care contributions across multiple life contexts",
   "content": "Scenario: Recognition of care contributions across multiple life contexts\n    Given Jasmine contributes care work in multiple domains\n    And she works 15 hours/week at her part-time job\n    And she does substantial household labor\n    And she volunteers 4 hours/week at community center\n    When her personal_agent aggregates her care contributions\n    Then all contexts should be recognized: household, paid work, volunteering, civic engagement\n    And care tokens should reflect her substantial contributions\n    And her work should be made visible as genuine economic participation\n    And she should see herself as a productive member of society\n    And her care contributions should give her standing in care economy discussions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of care contributions across multiple life contexts",

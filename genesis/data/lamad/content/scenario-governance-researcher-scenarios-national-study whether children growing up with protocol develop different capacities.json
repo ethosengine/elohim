@@ -6,7 +6,7 @@
   "title": "Study whether children growing up with protocol develop different capacities",
   "description": "Study whether children growing up with protocol develop different capacities",
   "content": "Scenario: Study whether children growing up with protocol develop different capacities\n    Given Tommy was 12 when Riverside adopted protocol\n    And James tracks cohort of adolescents through development\n    When James compares protocol-exposed youth to control group\n    Then he measures civic engagement, constitutional literacy, and deliberative skills\n    And he finds protocol-exposed youth have stronger democratic capacities\n    And he documents different relationship to AI than parents' generation\n    And he examines whether effects persist into young adulthood\n    And generational analysis reveals transformative potential\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Study whether children growing up with protocol develop different capacities",

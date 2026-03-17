@@ -6,7 +6,7 @@
   "title": "Municipal public transit serves retired residents without car access",
   "description": "Municipal public transit serves retired residents without car access",
   "content": "Scenario: Municipal public transit serves retired residents without car access\n    Given Frank may not be able to afford car ownership\n    And he relies on public transit and walking\n    When the municipal_elohim coordinates transportation\n    Then public transit should serve Frank's mobility needs effectively\n    And routes and schedules should accommodate non-employment patterns\n    And transit should enable access to medical, social, and civic destinations\n    And affordable transit should support continued community participation\n    And Frank should maintain mobility and independence through public infrastructure\n    And municipal transportation should serve residents across lifespan\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal public transit serves retired residents without car access",

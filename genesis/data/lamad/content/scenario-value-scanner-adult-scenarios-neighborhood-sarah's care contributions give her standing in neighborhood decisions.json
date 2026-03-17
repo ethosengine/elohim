@@ -6,7 +6,7 @@
   "title": "Sarah's care contributions give her standing in neighborhood decisions",
   "description": "Sarah's care contributions give her standing in neighborhood decisions",
   "content": "Scenario: Sarah's care contributions give her standing in neighborhood decisions\n    Given Sarah participates actively in neighborhood care economy\n    And she contributes to collective well-being\n    When neighborhood governance decisions are made\n    Then Sarah's care contributions should be visible and valued\n    And her accumulated care work should give her voice\n    And neighborhood leadership should reflect actual contributions\n    And care economy participation should create legitimate standing\n    And neighborhood democracy should be based on demonstrated care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sarah's care contributions give her standing in neighborhood decisions",

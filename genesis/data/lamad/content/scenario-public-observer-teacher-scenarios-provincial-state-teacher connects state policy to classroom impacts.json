@@ -6,7 +6,7 @@
   "title": "Teacher connects state policy to classroom impacts",
   "description": "Teacher connects state policy to classroom impacts",
   "content": "Scenario: Teacher connects state policy to classroom impacts\n    Given state cut education budget by $400M this year\n    And politicians claim \"no impact on classroom instruction\"\n    When teachers document actual classroom impacts through Observer\n    Then statewide data shows 1,200 teaching positions eliminated\n    And class sizes increased average 3 students per class\n    And art/music/counseling programs cut in 40% of districts\n    And teachers connect budget abstraction to learning reality\n    And teacher evidence exposes political rhetoric vs classroom truth\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher connects state policy to classroom impacts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Managing real scarcity without shame or stigma",
   "description": "Managing real scarcity without shame or stigma",
   "content": "Scenario: Managing real scarcity without shame or stigma\n    Given Marcus's family has limited economic resources\n    And $75/week must feed two people adequately\n    When Marcus shops under tight budget constraints\n    Then the personal_agent should help him maximize value with dignity\n    And budget tools should be presented as capability support, not poverty markers\n    And the system should never make him feel ashamed of constraints\n    And resourcefulness should be framed as valuable skill, not deprivation\n    And his capability to manage scarcity should be recognized as sophisticated\n    And no patronizing language about \"limited budgets\" should be used\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing real scarcity without shame or stigma",

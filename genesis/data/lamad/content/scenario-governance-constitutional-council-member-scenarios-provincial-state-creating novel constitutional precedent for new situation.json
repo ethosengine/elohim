@@ -6,7 +6,7 @@
   "title": "Creating novel constitutional precedent for new situation",
   "description": "Creating novel constitutional precedent for new situation",
   "content": "Scenario: Creating novel constitutional precedent for new situation\n    Given an appeal presents situation never before encountered\n    And existing precedents don't clearly apply\n    When we engage in deep constitutional interpretation\n    Then we examine: fundamental principles and their application\n    And we consider: multiple interpretations and their implications\n    And we consult: technical experts about possibilities\n    And we study: similar cases from other regions for insight\n    And we deliberate: for extended time given novelty and stakes\n    And we craft: new precedent with careful reasoning\n    And we document: our constitutional analysis thoroughly\n    And we create: guidance for future similar cases\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creating novel constitutional precedent for new situation",

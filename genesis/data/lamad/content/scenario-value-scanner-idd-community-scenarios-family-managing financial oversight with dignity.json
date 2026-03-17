@@ -6,7 +6,7 @@
   "title": "Managing financial oversight with dignity",
   "description": "Managing financial oversight with dignity",
   "content": "Scenario: Managing financial oversight with dignity\n    Given Jordan's parents have financial guardianship\n    And Jordan is learning money management skills\n    When Jordan makes purchases with their allowance\n    Then the personal_agent helps Jordan track spending\n    And parents can monitor for safety without controlling every choice\n    And Jordan has autonomy within appropriate boundaries\n    And the family_elohim balances oversight with independence\n    And Jordan's financial learning is supported, not prevented\n    And Jordan experiences growing financial autonomy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-family",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing financial oversight with dignity",

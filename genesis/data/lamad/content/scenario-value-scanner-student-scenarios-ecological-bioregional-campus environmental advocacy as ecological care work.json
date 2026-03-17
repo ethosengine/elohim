@@ -6,7 +6,7 @@
   "title": "Campus environmental advocacy as ecological care work",
   "description": "Campus environmental advocacy as ecological care work",
   "content": "Scenario: Campus environmental advocacy as ecological care work\n    Given Kenji's college has environmental impact and policies\n    And students can advocate for institutional sustainability\n    When Kenji participates in campus environmental organizing\n    Then the bioregional_elohim should recognize advocacy as ecological care work\n    And it should accumulate care tokens for environmental activism\n    And it should value organizing for institutional change\n    And it should recognize that systemic change requires collective action\n    And the system should support student environmental advocacy\n    And campus organizing should be understood as ecological care economy work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Campus environmental advocacy as ecological care work",

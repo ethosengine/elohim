@@ -6,7 +6,7 @@
   "title": "Balancing ecological impact with household budget constraints",
   "description": "Balancing ecological impact with household budget constraints",
   "content": "Scenario: Balancing ecological impact with household budget constraints\n    Given Sarah wants to make environmentally responsible choices\n    And household budget is $65k/year with tight food budget\n    When Sarah makes purchasing decisions\n    Then the bioregional_elohim should present ecological impact information\n    And it should integrate cost, nutrition, and environmental factors\n    And it should help Sarah make best choices within budget constraints\n    And ecological care should not be only available to wealthy\n    And affordable options should be environmentally informed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing ecological impact with household budget constraints",

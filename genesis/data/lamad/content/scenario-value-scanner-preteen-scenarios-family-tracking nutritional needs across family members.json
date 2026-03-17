@@ -6,7 +6,7 @@
   "title": "Tracking nutritional needs across family members",
   "description": "Tracking nutritional needs across family members",
   "content": "Scenario: Tracking nutritional needs across family members\n    Given Marcus is responsible for feeding himself and Keisha\n    And Keisha has specific dietary needs and preferences\n    When Marcus plans meals and shops\n    Then the personal_agent should track both their nutritional requirements\n    And it should alert Marcus to Keisha's needs: \"Keisha needs more iron this week\"\n    And it should help him find affordable foods that meet her requirements\n    And age-appropriate nutrition for both should be maintained\n    And Marcus should have tools to ensure Keisha's healthy development\n    And nutritional tracking should prevent inadequate diet\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Tracking nutritional needs across family members",

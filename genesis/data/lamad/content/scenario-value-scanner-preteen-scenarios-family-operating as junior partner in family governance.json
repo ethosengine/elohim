@@ -6,7 +6,7 @@
   "title": "Operating as junior partner in family governance",
   "description": "Operating as junior partner in family governance",
   "content": "Scenario: Operating as junior partner in family governance\n    Given Marcus makes real decisions about family resources\n    And Sarah maintains ultimate parental authority\n    When family governance decisions are made\n    Then Marcus should be treated as junior partner, not dependent\n    And his judgment should be increasingly trusted\n    And the family_elohim should coordinate their partnership\n    And Marcus's autonomy should grow with demonstrated capability\n    And Sarah should maintain oversight without micromanaging\n    And the balance should reflect his developmental stage\n    And partnership model should prevent both parentification and infantilization\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Operating as junior partner in family governance",

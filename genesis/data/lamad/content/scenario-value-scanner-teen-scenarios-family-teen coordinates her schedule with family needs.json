@@ -6,7 +6,7 @@
   "title": "Teen coordinates her schedule with family needs",
   "description": "Teen coordinates her schedule with family needs",
   "content": "Scenario: Teen coordinates her schedule with family needs\n    Given Jasmine works part-time with variable hours\n    And the family has commitments that require coordination\n    And Jordan needs after-school supervision\n    When Jasmine's work schedule is set\n    Then her personal_agent should communicate with family_elohim\n    And flag potential conflicts: \"Jordan needs supervision Tuesday 3-6pm\"\n    And help Jasmine balance her work commitments with family responsibilities\n    And recognize her care contributions when she adjusts her schedule for family\n    And support the family in coordinating across multiple schedules\n    And demonstrate that family functioning requires mutual care and flexibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen coordinates her schedule with family needs",

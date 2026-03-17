@@ -6,7 +6,7 @@
   "title": "Creator documents elder wisdom for cultural preservation",
   "description": "Creator documents elder wisdom for cultural preservation",
   "content": "Scenario: Creator documents elder wisdom for cultural preservation\n    Given Jordan collaborates with elder traditional knowledge keepers\n    When Jordan creates content documenting traditional ecological knowledge\n    And the elders approve the content and its use\n    Then the content is shared with appropriate cultural communities\n    And attribution and respect for knowledge sources is maintained\n    And younger generations learn traditional wisdom\n    And the elders receive recognition and value for their knowledge\n    And cultural preservation happens through respectful documentation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:content_creator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creator documents elder wisdom for cultural preservation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

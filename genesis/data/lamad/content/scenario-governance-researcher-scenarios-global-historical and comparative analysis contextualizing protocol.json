@@ -6,7 +6,7 @@
   "title": "Historical and comparative analysis contextualizing protocol",
   "description": "Historical and comparative analysis contextualizing protocol",
   "content": "Scenario: Historical and comparative analysis contextualizing protocol\n    Given I want to understand what's genuinely novel vs reinventing wheels\n    And I study governance history and comparative political theory\n    When I contextualize Elohim Protocol in historical perspective\n    Then I compare: to Athenian democracy's sortition practices\n    And I examine: medieval communes' participatory governance\n    And I analyze: modern citizens' assemblies and deliberative innovations\n    And I explore: attempts to govern non-human powerful systems (corporations, markets)\n    And I identify: what ancient wisdom applies and what's unprecedented\n    And I assess: whether humanity has governed comparable complexity before\n    And My historical analysis reveals: patterns and lessons across millennia\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Historical and comparative analysis contextualizing protocol",

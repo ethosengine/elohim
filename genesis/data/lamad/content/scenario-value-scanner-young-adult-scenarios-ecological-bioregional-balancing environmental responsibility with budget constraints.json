@@ -6,7 +6,7 @@
   "title": "Balancing environmental responsibility with budget constraints",
   "description": "Balancing environmental responsibility with budget constraints",
   "content": "Scenario: Balancing environmental responsibility with budget constraints\n    Given Aisha has limited financial resources\n    And sustainable options often cost more\n    When Aisha makes purchasing decisions\n    Then the personal_agent should help navigate trade-offs\n    And it should identify affordable sustainable choices\n    And it should explain when spending more reduces environmental impact\n    And it should validate doing her best within constraints\n    And the system should never shame financial limitations\n    And environmental responsibility should be accessible at all income levels\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing environmental responsibility with budget constraints",

@@ -6,7 +6,7 @@
   "title": "City procurement policies begin prioritizing democratic businesses",
   "description": "City procurement policies begin prioritizing democratic businesses",
   "content": "Scenario: City procurement policies begin prioritizing democratic businesses\n    Given municipality purchases vehicles and services from private vendors\n    And public procurement can support democratic economy development\n    When Rosa's Auto bids for city fleet maintenance contracts\n    Then municipal procurement gives preference to worker-owned businesses\n    And democratic enterprises compete successfully for public contracts\n    And taxpayer money supports living wages and community wealth, not corporate extraction\n    And procurement policy changes demonstrate municipal commitment to economic democracy\n    And municipality_elohim tracks procurement impacts on democratic business viability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "City procurement policies begin prioritizing democratic businesses",

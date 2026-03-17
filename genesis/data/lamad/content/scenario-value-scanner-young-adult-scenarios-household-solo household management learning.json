@@ -6,7 +6,7 @@
   "title": "Solo household management learning",
   "description": "Solo household management learning",
   "content": "Scenario: Solo household management learning\n    Given Aisha lives alone in her first apartment\n    And household and individual layers largely overlap\n    When Aisha manages household resources\n    Then the personal_agent should help her establish routines\n    And it should track household maintenance tasks\n    And it should help her build sustainable practices\n    And household management should feel achievable, not overwhelming\n    And the system should scaffold her household competence development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Solo household management learning",

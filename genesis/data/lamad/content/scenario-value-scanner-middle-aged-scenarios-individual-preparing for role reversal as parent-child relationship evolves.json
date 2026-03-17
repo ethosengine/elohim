@@ -6,7 +6,7 @@
   "title": "Preparing for role reversal as parent-child relationship evolves",
   "description": "Preparing for role reversal as parent-child relationship evolves",
   "content": "Scenario: Preparing for role reversal as parent-child relationship evolves\n    Given Robert's parents increasingly need his care\n    And he remembers them caring for him as a child\n    And he recognizes his children will someday care for him\n    When Robert reflects on lifecycle care patterns\n    Then his personal_agent should help him navigate the emotional complexity\n    And surface the reciprocity: \"Your parents cared for you, you care for them, your children will care for you\"\n    And support him in maintaining his parents' dignity as he assumes care responsibilities\n    And help him model dignified care receiving for his children\n    And recognize that role reversal is natural lifecycle transition\n    And validate the grief and complexity of watching parents age\n    And prepare him for his own eventual care needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preparing for role reversal as parent-child relationship evolves",

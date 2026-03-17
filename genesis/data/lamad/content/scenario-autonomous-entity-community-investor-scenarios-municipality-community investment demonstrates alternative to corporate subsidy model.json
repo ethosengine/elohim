@@ -6,7 +6,7 @@
   "title": "Community investment demonstrates alternative to corporate subsidy model",
   "description": "Community investment demonstrates alternative to corporate subsidy model",
   "content": "Scenario: Community investment demonstrates alternative to corporate subsidy model\n    Given municipal economic development typically subsidizes corporate expansion\n    And Patricia's taxes funded corporate subsidies with minimal community benefit\n    When community investment proves superior economic development strategy\n    Then her $10K investment creates more jobs and better wages than equivalent corporate subsidy\n    And no public money is required—private capital supports democratic conversions\n    And municipal officials observe community investment effectiveness\n    And economic development strategy shifts toward supporting democratic ownership\n    And municipality_elohim documents community investment outcomes for policy advocacy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community investment demonstrates alternative to corporate subsidy model",

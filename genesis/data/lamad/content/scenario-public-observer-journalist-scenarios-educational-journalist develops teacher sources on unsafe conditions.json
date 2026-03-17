@@ -6,7 +6,7 @@
   "title": "Journalist develops teacher sources on unsafe conditions",
   "description": "Journalist develops teacher sources on unsafe conditions",
   "content": "Scenario: Journalist develops teacher sources on unsafe conditions\n    Given teachers report unsafe building conditions\n    And fear retaliation for speaking publicly\n    When the Observer provides secure anonymous channel\n    Then teachers share evidence of mold, failing HVAC, and structural issues\n    And journalist investigates without exposing individual sources\n    And verifies claims through building inspection records\n    And documents district knowledge and inaction\n    And publishes investigation forcing accountability\n    And source protection enables teachers to speak truth\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist develops teacher sources on unsafe conditions",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

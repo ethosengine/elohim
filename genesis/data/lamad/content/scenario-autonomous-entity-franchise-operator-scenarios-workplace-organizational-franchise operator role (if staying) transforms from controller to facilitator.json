@@ -6,7 +6,7 @@
   "title": "Franchise operator role (if staying) transforms from controller to facilitator",
   "description": "Franchise operator role (if staying) transforms from controller to facilitator",
   "content": "Scenario: Franchise operator role (if staying) transforms from controller to facilitator\n    Given James controlled workers because franchise corporate controlled him\n    And hierarchical enforcement was required by franchise agreement\n    When James stays as transition steward facilitating democratic conversion\n    Then his role shifts from implementing corporate mandates to supporting worker autonomy\n    And operational expertise becomes consultation, not commands\n    And workers request his input because it's valuable, not because he's boss\n    And franchise termination liberates him to serve rather than control\n    And workplace_elohim ensures steward role doesn't recreate hierarchy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise operator role (if staying) transforms from controller to facilitator",

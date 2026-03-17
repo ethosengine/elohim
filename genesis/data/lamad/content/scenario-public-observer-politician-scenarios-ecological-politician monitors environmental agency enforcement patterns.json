@@ -6,7 +6,7 @@
   "title": "Politician monitors environmental agency enforcement patterns",
   "description": "Politician monitors environmental agency enforcement patterns",
   "content": "Scenario: Politician monitors environmental agency enforcement patterns\n    Given the politician has oversight of environmental regulators\n    And community groups report lax enforcement\n    When the Observer tracks environmental compliance and enforcement\n    Then they see violation patterns by facility and location\n    And identify enforcement disparities by neighborhood demographics\n    And understand whether penalties effectively deter violations\n    And learn which facilities are repeat violators\n    And demand stronger enforcement protecting community health\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician monitors environmental agency enforcement patterns",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

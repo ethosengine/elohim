@@ -6,7 +6,7 @@
   "title": "Operator confronts honest accounting of value creation",
   "description": "Operator confronts honest accounting of value creation",
   "content": "Scenario: Operator confronts honest accounting of value creation\n    Given James believed he \"built\" the business through risk and management\n    And honest accounting reveals distributed value creation\n    When conversion process makes contributions visible through REA documentation\n    Then James sees workers created operational value through daily labor (Maria's training, Emma's optimization)\n    And corporate created systems value but extracted far more than systems were worth\n    And his coordination and risk-bearing were real but not sole value creation\n    And humbling recognition enables fair distribution replacing mythologized ownership\n    And workplace_elohim provides transparent value creation documentation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Operator confronts honest accounting of value creation",

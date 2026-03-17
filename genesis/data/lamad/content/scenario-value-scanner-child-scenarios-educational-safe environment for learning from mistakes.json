@@ -6,7 +6,7 @@
   "title": "Safe environment for learning from mistakes",
   "description": "Safe environment for learning from mistakes",
   "content": "Scenario: Safe environment for learning from mistakes\n    Given Emma is practicing value literacy\n    And mistakes are essential to learning\n    When Emma makes a choice that doesn't work out well\n    Then the experience should be treated as learning opportunity\n    And her personal_agent should guide reflection: \"How did that work out?\"\n    And no shame or punishment should be attached to mistakes\n    And consequences should be educational, not harmful\n    And judgment should be built through safe practice\n    And error should be normalized as part of learning process\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Safe environment for learning from mistakes",

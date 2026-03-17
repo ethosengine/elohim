@@ -6,7 +6,7 @@
   "title": "Sick leave adequate for sole parent who must parent while ill",
   "description": "Sick leave adequate for sole parent who must parent while ill",
   "content": "Scenario: Sick leave adequate for sole parent who must parent while ill\n    Given Maria still parents three children even when sick\n    And she has no co-parent to take over when she's unwell\n    When Maria needs sick leave\n    Then workplace should provide adequate paid sick leave\n    And leave should cover both her own illness and children's illnesses\n    And sick leave should not be punitive or risk her job security\n    And policies should recognize single parents need more sick leave than partnered workers\n    And Maria should be able to recover and care for sick children without financial penalty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sick leave adequate for sole parent who must parent while ill",

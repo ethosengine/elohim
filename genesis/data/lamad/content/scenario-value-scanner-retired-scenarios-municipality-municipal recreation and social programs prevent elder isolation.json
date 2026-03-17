@@ -6,7 +6,7 @@
   "title": "Municipal recreation and social programs prevent elder isolation",
   "description": "Municipal recreation and social programs prevent elder isolation",
   "content": "Scenario: Municipal recreation and social programs prevent elder isolation\n    Given Frank needs social connection to maintain wellbeing\n    And isolation increases with age without intentional connection\n    When the municipal_elohim coordinates social infrastructure\n    Then it should provide programs connecting retired residents\n    And senior centers should be framed as community hubs, not warehouses\n    And programs should facilitate continued contribution and purpose\n    And Frank should access social connection through municipal infrastructure\n    And elder isolation should be prevented through public programs\n    And municipal policy should recognize social connection as health infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal recreation and social programs prevent elder isolation",

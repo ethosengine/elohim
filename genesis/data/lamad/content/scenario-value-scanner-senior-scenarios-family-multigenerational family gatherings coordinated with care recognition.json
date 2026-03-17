@@ -6,7 +6,7 @@
   "title": "Multigenerational family gatherings coordinated with care recognition",
   "description": "Multigenerational family gatherings coordinated with care recognition",
   "content": "Scenario: Multigenerational family gatherings coordinated with care recognition\n    Given Margaret often hosts or coordinates family gatherings\n    And these gatherings require significant labor\n    When Margaret organizes family events\n    Then the planning, preparation, and hosting labor should be tracked\n    And other family members should see the work involved\n    And equitable distribution of hosting burden should be encouraged\n    And Margaret's contributions should be recognized and appreciated\n    And family gatherings should not depend on her invisible labor\n    And care work that makes family connection possible should be valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Multigenerational family gatherings coordinated with care recognition",

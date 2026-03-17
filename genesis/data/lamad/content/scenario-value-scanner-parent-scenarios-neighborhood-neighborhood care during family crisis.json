@@ -6,7 +6,7 @@
   "title": "Neighborhood care during family crisis",
   "description": "Neighborhood care during family crisis",
   "content": "Scenario: Neighborhood care during family crisis\n    Given families sometimes face crisis (illness, job loss, emergency)\n    And neighbors can provide crucial support during crisis\n    When a neighborhood family faces crisis\n    Then the neighborhood_elohim should coordinate mutual aid\n    And it should identify who has capacity to help\n    And it should organize meal trains, childcare, practical support\n    And crisis care should be specially recognized and valued\n    And neighborhood resilience should be built through mutual aid\n    And the system should enable rapid community response\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care during family crisis",

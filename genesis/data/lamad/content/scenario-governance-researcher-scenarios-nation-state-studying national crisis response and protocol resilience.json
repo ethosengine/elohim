@@ -6,7 +6,7 @@
   "title": "Studying national crisis response and protocol resilience",
   "description": "Studying national crisis response and protocol resilience",
   "content": "Scenario: Studying national crisis response and protocol resilience\n    Given nation experienced major crisis (pandemic, economic collapse, climate disaster)\n    And protocol governance was tested under extreme conditions\n    When I analyze how protocol functioned during and after crisis\n    Then I examine: whether emergency coordination maintained democratic oversight\n    And I assess: whether crisis pressures led to authoritarian drift\n    And I measure: community resilience with protocol vs without\n    And I explore: how Constitutional Councils balanced urgency with deliberation\n    And I identify: protocol vulnerabilities revealed under stress\n    And I analyze: recovery trajectories and institutional learning\n    And My research reveals: whether democratic AI governance is resilient or fragile\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Studying national crisis response and protocol resilience",

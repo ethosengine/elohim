@@ -6,7 +6,7 @@
   "title": "Neighborhood emergency preparedness builds resilience",
   "description": "Neighborhood emergency preparedness builds resilience",
   "content": "Scenario: Neighborhood emergency preparedness builds resilience\n    Given emergencies and crises happen\n    And neighborhoods with strong connections respond better to crisis\n    And Robert has professional skills useful in emergencies\n    When neighborhood_elohim supports emergency preparedness\n    Then it should coordinate neighborhood emergency planning\n    And map neighborhood skills and resources\n    And recognize Robert's management and coordination capabilities\n    And connect neighbors who can support each other in crisis\n    And build neighborhood resilience through known relationships\n    And ensure isolated residents are included in emergency networks\n    And demonstrate that care economy creates crisis resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood emergency preparedness builds resilience",

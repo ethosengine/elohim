@@ -6,7 +6,7 @@
   "title": "Regenerative consumption replaces extractive consumption patterns",
   "description": "Regenerative consumption replaces extractive consumption patterns",
   "content": "Scenario: Regenerative consumption replaces extractive consumption patterns\n    Given traditional consumption extracts from ecological systems\n    And Sarah wants to shift to regenerative practices\n    When Sarah makes consumption choices over time\n    Then the bioregional_elohim should guide toward regenerative options\n    And it should educate about regenerative agriculture principles\n    And Sarah's consumption should support ecological health\n    And care economy should enable shift from extraction to regeneration\n    And household consumption should contribute to ecosystem restoration\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Regenerative consumption replaces extractive consumption patterns",

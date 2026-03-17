@@ -6,7 +6,7 @@
   "title": "Workplace emotional labor while managing parenting stress",
   "description": "Workplace emotional labor while managing parenting stress",
   "content": "Scenario: Workplace emotional labor while managing parenting stress\n    Given Sarah performs emotional labor with students and colleagues\n    And she's also managing intense parenting emotional demands\n    When the workplace_elohim tracks total emotional labor\n    Then it should recognize dual emotional work burden\n    And it should flag when emotional demands are unsustainable\n    And it should recognize that parents carry compounded emotional labor\n    And the system should help Sarah manage total emotional load\n    And workplace should understand parents' emotional labor reality\n    And Sarah's complete emotional work should be visible and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace emotional labor while managing parenting stress",

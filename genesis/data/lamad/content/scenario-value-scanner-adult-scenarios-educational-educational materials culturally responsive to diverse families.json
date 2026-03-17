@@ -6,7 +6,7 @@
   "title": "Educational materials culturally responsive to diverse families",
   "description": "Educational materials culturally responsive to diverse families",
   "content": "Scenario: Educational materials culturally responsive to diverse families\n    Given Sarah teaches students from diverse cultural backgrounds\n    And her own children are learning family cultural values\n    When educational materials are designed\n    Then the educational_elohim should provide culturally diverse resources\n    And materials should respect different care economy traditions\n    And Sarah should be able to adapt to cultural contexts\n    And value literacy should be taught in culturally responsive ways\n    And diverse approaches to care should be honored in education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational materials culturally responsive to diverse families",

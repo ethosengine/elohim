@@ -6,7 +6,7 @@
   "title": "Student generation as agents of ecological transformation",
   "description": "Student generation as agents of ecological transformation",
   "content": "Scenario: Student generation as agents of ecological transformation\n    Given Kenji's generation will inherit climate crisis and ecological breakdown\n    And students are developing patterns that will shape future\n    When the bioregional_elohim recognizes generational context\n    Then it should validate student ecological anxiety and grief\n    And it should empower students as agents of ecological transformation\n    And it should support collective action for systemic change\n    And it should recognize that care economy is ecological imperative\n    And the system should foster student leadership in ecological care\n    And Kenji's generation should be empowered to build ecological care economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Student generation as agents of ecological transformation",

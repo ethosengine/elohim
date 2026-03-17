@@ -6,7 +6,7 @@
   "title": "Household labor distribution made visible",
   "description": "Household labor distribution made visible",
   "content": "Scenario: Household labor distribution made visible\n    Given Aisha does most of the cooking\n    And her roommate does most of the cleaning\n    When household care contributions are tracked\n    Then the household_elohim should make all labor visible\n    And it should show time invested by each person\n    And it should recognize different forms of household care\n    And invisible work should receive equal recognition\n    And the system should prevent exploitation through transparency\n    And household equity should be data-informed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household labor distribution made visible",

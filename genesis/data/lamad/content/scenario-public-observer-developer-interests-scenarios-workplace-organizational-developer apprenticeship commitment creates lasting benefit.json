@@ -6,7 +6,7 @@
   "title": "Developer apprenticeship commitment creates lasting benefit",
   "description": "Developer apprenticeship commitment creates lasting benefit",
   "content": "Scenario: Developer apprenticeship commitment creates lasting benefit\n    Given a responsible developer commits to workforce development\n    And partners with unions and training programs\n    When the Observer tracks workforce development outcomes\n    Then analysis shows: 35 apprentices trained across three projects\n    And 28 completed programs and gained journey-level employment\n    And investment in workforce development creates lasting community benefit\n    And genuine partnerships distinguish from token training gestures\n    And workforce development commitment creates positive legacy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer apprenticeship commitment creates lasting benefit",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

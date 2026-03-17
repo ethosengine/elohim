@@ -6,7 +6,7 @@
   "title": "Global precedent for existential constitutional questions",
   "description": "Global precedent for existential constitutional questions",
   "content": "Scenario: Global precedent for existential constitutional questions\n    Given an appeal raises question about superintelligence governance\n    And the question is whether humans can oversee reasoning they can't understand\n    When the case reaches global Constitutional Council\n    Then the council convenes emergency global deliberation\n    And experts like Amara explain technical constraints\n    And appellants explain dignity concerns about being governed by incomprehensible systems\n    And the council establishes global precedent on explainability requirements\n    And the precedent applies to all jurisdictions implementing protocol\n    And human dignity is preserved even as AI capabilities grow\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Global precedent for existential constitutional questions",

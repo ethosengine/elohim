@@ -6,7 +6,7 @@
   "title": "Appeal precedent cited in research on democratic AI governance",
   "description": "Appeal precedent cited in research on democratic AI governance",
   "content": "Scenario: Appeal precedent cited in research on democratic AI governance\n    Given my appeal created important regional precedent\n    And Dr. James Chen is researching constitutional council effectiveness\n    When he analyzes appeal patterns and outcomes\n    Then my case (anonymized) becomes research data\n    And The precedent illustrates how sortition governance works\n    And Research findings feed back into protocol improvement\n    And My appeal contributes to global understanding of democratic AI governance\n    And Individual justice and systemic learning happen together\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal precedent cited in research on democratic AI governance",

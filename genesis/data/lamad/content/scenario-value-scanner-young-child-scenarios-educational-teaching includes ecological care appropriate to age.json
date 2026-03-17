@@ -6,7 +6,7 @@
   "title": "Teaching includes ecological care appropriate to age",
   "description": "Teaching includes ecological care appropriate to age",
   "content": "Scenario: Teaching includes ecological care appropriate to age\n    Given care economy extends beyond human relationships\n    And environmental stewardship is part of value literacy\n    When Tommy learns about care through the scanner\n    Then ecological care should be introduced at concrete level\n    And Tommy should learn \"Taking care of our food\" (not abstract sustainability)\n    And connections between care for people and care for environment should begin\n    And age-appropriate environmental consciousness should develop\n    And foundations for ecological stewardship should be laid\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching includes ecological care appropriate to age",

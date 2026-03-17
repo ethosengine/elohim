@@ -6,7 +6,7 @@
   "title": "Seasonal eating aligned with bioregional food production",
   "description": "Seasonal eating aligned with bioregional food production",
   "content": "Scenario: Seasonal eating aligned with bioregional food production\n    Given Sarah's bioregion has seasonal food availability\n    And seasonal eating reduces environmental impact and cost\n    When Sarah plans meals\n    Then the bioregional_elohim should suggest seasonal options\n    And it should educate about bioregional growing patterns\n    And it should help Sarah align purchases with local seasons\n    And seasonal eating should be framed as care for place\n    And bioregional awareness should shape consumption patterns\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Seasonal eating aligned with bioregional food production",

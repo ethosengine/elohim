@@ -6,7 +6,7 @@
   "title": "Recognizing workplace emotional labor",
   "description": "Recognizing workplace emotional labor",
   "content": "Scenario: Recognizing workplace emotional labor\n    Given Aisha performs emotional labor at work\n    And emotional labor is typically unrecognized\n    When the workplace_elohim tracks her contributions\n    Then emotional labor should be valued explicitly\n    And relationship maintenance, conflict resolution, and care for colleagues should count\n    And the full scope of her work should be visible\n    And invisible emotional work should be recognized\n    And workplace care economy should value all forms of labor\n    And she should understand emotional labor as legitimate work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognizing workplace emotional labor",

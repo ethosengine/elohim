@@ -6,7 +6,7 @@
   "title": "Workplace culture education reduces ableism",
   "description": "Workplace culture education reduces ableism",
   "content": "Scenario: Workplace culture education reduces ableism\n    Given workplace culture often reflects ableist assumptions\n    And coworkers may lack disability awareness\n    When the workplace_elohim detects cultural issues\n    Then it should help Alex identify patterns of workplace ableism\n    And it should provide Alex tools to educate coworkers when Alex chooses\n    And it should support Alex in advocating for cultural change\n    And workplace should be prompted toward disability inclusion training\n    And Alex should be compensated if providing disability education\n    And the protocol should recognize that cultural change is ongoing work\n    And Alex should not bear sole responsibility for workplace education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace culture education reduces ableism",

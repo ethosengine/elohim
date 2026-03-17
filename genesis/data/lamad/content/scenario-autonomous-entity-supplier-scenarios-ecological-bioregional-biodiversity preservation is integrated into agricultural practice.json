@@ -6,7 +6,7 @@
   "title": "Biodiversity preservation is integrated into agricultural practice",
   "description": "Biodiversity preservation is integrated into agricultural practice",
   "content": "Scenario: Biodiversity preservation is integrated into agricultural practice\n    Given industrial agriculture destroys biodiversity through monoculture and chemicals\n    And biodiversity loss threatens ecosystem resilience and pollination\n    When democratic farms prioritize biodiversity as ecological value\n    Then pollinator habitat is planted and protected across farms\n    And hedgerows and field margins support wildlife and beneficial insects\n    And native plant species are incorporated into farm landscapes\n    And biodiversity increases measurably through democratic agricultural stewardship\n    And bioregional_elohim tracks biodiversity indicators across farm network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Biodiversity preservation is integrated into agricultural practice",

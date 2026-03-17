@@ -6,7 +6,7 @@
   "title": "Professional development access despite caregiving constraints",
   "description": "Professional development access despite caregiving constraints",
   "content": "Scenario: Professional development access despite caregiving constraints\n    Given James wants to maintain professional skills\n    And caregiving prevents traditional professional development\n    When professional development is offered\n    Then the workplace_elohim should advocate for accessible formats\n    And training should be available remotely and asynchronously\n    And caregivers should not be excluded from advancement opportunities\n    And professional growth should be possible during caregiving years\n    And workplace should provide flexible development paths\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Professional development access despite caregiving constraints",

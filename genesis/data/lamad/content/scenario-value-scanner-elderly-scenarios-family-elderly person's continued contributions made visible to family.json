@@ -6,7 +6,7 @@
   "title": "Elderly person's continued contributions made visible to family",
   "description": "Elderly person's continued contributions made visible to family",
   "content": "Scenario: Elderly person's continued contributions made visible to family\n    Given Helen shares family stories with great-grandchildren\n    And she provides wisdom from 82 years of experience\n    When Helen contributes to family flourishing\n    Then her contributions should be visible in care economy tracking\n    And family should see that Helen still gives, not just receives\n    And care tokens should reflect her mentoring and wisdom sharing\n    And reciprocity should be visible even when care flows are asymmetric\n    And Helen should experience herself as valued contributor, not burden\n    And younger generations should learn that elders have worth\n    And the protocol should make visible what market economics erases\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elderly person's continued contributions made visible to family",

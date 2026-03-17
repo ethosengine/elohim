@@ -6,7 +6,7 @@
   "title": "Child blocked from exposure to harmful content",
   "description": "Child blocked from exposure to harmful content",
   "content": "Scenario: Child blocked from exposure to harmful content\n    Given Emma's uncle shares a news article about violence\n    And the content is appropriate for adults but not children\n    When the article is contributed to the family space\n    Then the guardian agent evaluates age-appropriateness\n    And Emma's view is automatically filtered or summarized\n    And her parents can choose to discuss the topic with her directly\n    And Emma never sees graphic or traumatizing content\n    And family communication continues without disruption\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-child-scenarios-family",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child blocked from exposure to harmful content",

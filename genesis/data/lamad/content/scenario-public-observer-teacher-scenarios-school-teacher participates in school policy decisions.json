@@ -6,7 +6,7 @@
   "title": "Teacher participates in school policy decisions",
   "description": "Teacher participates in school policy decisions",
   "content": "Scenario: Teacher participates in school policy decisions\n    Given the school site council is revising discipline policy\n    And teachers have frontline knowledge about what works\n    When the Observer facilitates teacher input on policy options\n    Then teachers share evidence-based practices anonymously\n    And successful approaches from other schools are surfaced\n    And student outcome data informs policy design\n    And final policy reflects teacher professional expertise\n    And school governance becomes genuinely participatory\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-school",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher participates in school policy decisions",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

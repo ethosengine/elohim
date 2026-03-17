@@ -6,7 +6,7 @@
   "title": "Municipal Constitutional Council handles city-level appeals",
   "description": "Municipal Constitutional Council handles city-level appeals",
   "content": "Scenario: Municipal Constitutional Council handles city-level appeals\n    Given some appeals affect multiple neighborhoods or city as whole\n    And community-layer councils referred case to municipal level\n    When Municipal Constitutional Council reviews the appeal\n    Then I provide: city-wide context for their deliberation\n    And they evaluate: if decision aligns with city's constitutional interpretation\n    And they consider: effects across all Riverside neighborhoods\n    And they create: municipal-level precedent\n    And they may recommend: city council policy action\n    And I implement: their recommendations respecting their authority\n    And municipal governance: maintains democratic accountability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipality",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal Constitutional Council handles city-level appeals",

@@ -6,7 +6,7 @@
   "title": "Teen's worker rights protected through municipal care economy",
   "description": "Teen's worker rights protected through municipal care economy",
   "content": "Scenario: Teen's worker rights protected through municipal care economy\n    Given Jasmine works part-time in retail\n    And municipal labor regulations apply to her employment\n    When municipal_elohim monitors workplace conditions\n    Then it should track whether young workers are fairly treated\n    And flag systematic exploitation of teen labor\n    And surface if employers violate youth labor laws\n    And aggregate data about teen working conditions\n    And inform municipal labor policy enforcement\n    And protect young workers through care economy transparency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen's worker rights protected through municipal care economy",

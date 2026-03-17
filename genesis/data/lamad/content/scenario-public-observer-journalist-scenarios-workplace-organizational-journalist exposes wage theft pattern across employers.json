@@ -6,7 +6,7 @@
   "title": "Journalist exposes wage theft pattern across employers",
   "description": "Journalist exposes wage theft pattern across employers",
   "content": "Scenario: Journalist exposes wage theft pattern across employers\n    Given workers report unpaid wages and overtime violations\n    And the journalist investigates wage theft\n    When the Observer analyzes wage violation enforcement data\n    Then the journalist sees systematic wage theft across multiple employers\n    And identifies industries with concentrated violations\n    And documents millions in stolen wages and minimal enforcement\n    And shows workers of color disproportionately affected\n    And publishes investigation exposing wage theft epidemic\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist exposes wage theft pattern across employers",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

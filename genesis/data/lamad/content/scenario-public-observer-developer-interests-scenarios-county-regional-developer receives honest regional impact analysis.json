@@ -6,7 +6,7 @@
   "title": "Developer receives honest regional impact analysis",
   "description": "Developer receives honest regional impact analysis",
   "content": "Scenario: Developer receives honest regional impact analysis\n    Given a developer claims project creates regional economic benefit\n    But analysis omits regional infrastructure burden\n    When the Observer provides regional cost-benefit assessment\n    Then the developer sees: promised jobs mostly go to workers from outside region\n    And traffic impacts affect three counties' transportation networks\n    And environmental impacts span watershed affecting six municipalities\n    And honest regional accounting reveals actual trade-offs\n    And local extraction versus regional benefit becomes clear\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer receives honest regional impact analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

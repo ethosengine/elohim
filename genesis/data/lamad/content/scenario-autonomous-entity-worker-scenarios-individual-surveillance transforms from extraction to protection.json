@@ -6,7 +6,7 @@
   "title": "Surveillance transforms from extraction to protection",
   "description": "Surveillance transforms from extraction to protection",
   "content": "Scenario: Surveillance transforms from extraction to protection\n    Given workplace cameras previously monitored workers for corporate benefit\n    And cameras now operate as witness infrastructure under worker control\n    When a customer harasses Maria during her shift\n    And the incident is captured on camera\n    Then the footage is immediately available to Maria\n    And Maria can democratically propose banning the customer\n    And management cannot delete or modify the footage\n    And the footage cannot be used for speedup or discipline without worker consent\n    And Maria's dignity is architecturally protected\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Surveillance transforms from extraction to protection",

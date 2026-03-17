@@ -6,7 +6,7 @@
   "title": "Policy advocacy improves accessibility for entire community",
   "description": "Policy advocacy improves accessibility for entire community",
   "content": "Scenario: Policy advocacy improves accessibility for entire community\n    Given Alex advocates for accessibility improvements in public spaces\n    And better accessibility benefits everyone, not just disabled people\n    When community accessibility improves due to Alex's advocacy\n    Then these improvements should be attributed to Alex's care work\n    And the community_elohim should track policy changes Alex influences\n    And curb cuts, accessible transit, universal design benefit whole community\n    And Alex should be recognized as community improver at scale\n    And care tokens should reflect population-level impact\n    And the protocol should make undeniable Alex's gift to community\n    And cultural narrative should shift from burden to contributor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Policy advocacy improves accessibility for entire community",

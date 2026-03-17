@@ -6,7 +6,7 @@
   "title": "Worker controls their own REA (Resource-Event-Agent) profile data",
   "description": "Worker controls their own REA (Resource-Event-Agent) profile data",
   "content": "Scenario: Worker controls their own REA (Resource-Event-Agent) profile data\n    Given Maria has worked at ChickenMax for 8 years\n    And her REA profile documents her contributions across multiple dimensions\n    When Maria requests to view her complete REA profile\n    Then she sees her documented expertise (847 perfect fryer batches, 47 hours training given)\n    And she sees her care work (comforting customers, mentoring colleagues)\n    And she sees her efficiency improvements ($3,400 waste eliminated)\n    And she controls what portions of her profile to share externally\n    And she can export her profile if she changes jobs\n    And no corporate entity can access her data without her consent\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Worker controls their own REA (Resource-Event-Agent) profile data",

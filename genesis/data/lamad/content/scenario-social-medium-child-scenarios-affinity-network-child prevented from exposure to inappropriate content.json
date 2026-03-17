@@ -6,7 +6,7 @@
   "title": "Child prevented from exposure to inappropriate content",
   "description": "Child prevented from exposure to inappropriate content",
   "content": "Scenario: Child prevented from exposure to inappropriate content\n    Given Emma participates in the manga community\n    When an older teen posts art with mature themes\n    And the content is not appropriate for younger members\n    Then the guardian agent prevents Emma from seeing the mature content\n    And the moderator is notified to evaluate the post\n    And age-appropriate content guidelines are reinforced\n    And Emma's experience remains safe and appropriate to her development\n    And the older teen receives guidance about age-appropriate spaces\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child prevented from exposure to inappropriate content",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

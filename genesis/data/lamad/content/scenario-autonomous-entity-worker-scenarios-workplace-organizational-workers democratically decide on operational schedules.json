@@ -6,7 +6,7 @@
   "title": "Workers democratically decide on operational schedules",
   "description": "Workers democratically decide on operational schedules",
   "content": "Scenario: Workers democratically decide on operational schedules\n    Given scheduling was previously dictated by management\n    And workers had no input on shift assignments\n    When the democratic workplace holds a scheduling governance session\n    Then Maria proposes a schedule balancing operational needs with worker life needs\n    And DeShawn suggests modifications for his college class schedule\n    And workers vote on the proposed schedule with governance weight based on seniority and contribution\n    And the approved schedule is implemented immediately\n    And no manager can override the democratic decision\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers democratically decide on operational schedules",

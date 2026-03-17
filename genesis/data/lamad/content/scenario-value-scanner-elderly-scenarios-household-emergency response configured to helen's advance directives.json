@@ -6,7 +6,7 @@
   "title": "Emergency response configured to Helen's advance directives",
   "description": "Emergency response configured to Helen's advance directives",
   "content": "Scenario: Emergency response configured to Helen's advance directives\n    Given emergency situations may occur in Helen's household\n    And Helen has specific wishes about medical intervention\n    When emergency protocols are configured\n    Then her advance directives should guide emergency response\n    And emergency contacts should understand her wishes\n    And the household_elohim should communicate her preferences to responders\n    And her values should be respected even in crisis\n    And emergency systems should serve her autonomy, not override it\n    And her voice should remain authoritative about her own care\n    And the protocol should ensure her wishes guide all household emergency response\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency response configured to Helen's advance directives",

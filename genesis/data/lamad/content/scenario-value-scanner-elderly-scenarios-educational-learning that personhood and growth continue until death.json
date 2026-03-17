@@ -6,7 +6,7 @@
   "title": "Learning that personhood and growth continue until death",
   "description": "Learning that personhood and growth continue until death",
   "content": "Scenario: Learning that personhood and growth continue until death\n    Given culture often treats elderly as finished developing\n    And Helen continues to learn and grow at 82\n    When Helen engages with educational opportunities\n    Then the protocol should affirm that learning never ends\n    And growth should be supported at all ages\n    And Helen should experience ongoing development\n    And new capabilities should be acknowledged and celebrated\n    And education should reject notion that personhood ends with productivity decline\n    And the protocol should model that humans grow throughout life\n    And Helen should learn that she remains person until death\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning that personhood and growth continue until death",

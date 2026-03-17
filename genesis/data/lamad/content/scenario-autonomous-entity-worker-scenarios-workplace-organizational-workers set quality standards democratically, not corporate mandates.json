@@ -6,7 +6,7 @@
   "title": "Workers set quality standards democratically, not corporate mandates",
   "description": "Workers set quality standards democratically, not corporate mandates",
   "content": "Scenario: Workers set quality standards democratically, not corporate mandates\n    Given corporate enforced speed metrics that eroded quality\n    And workers value quality and customer satisfaction over transaction speed\n    When workers establish their own quality standards\n    Then worker council defines quality metrics emphasizing care and excellence\n    And workers reject corporate-style speedup pressure\n    And customer feedback is incorporated through democratic review\n    And workers balance efficiency with dignity and quality\n    And workplace_elohim ensures standards maintain business sustainability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers set quality standards democratically, not corporate mandates",

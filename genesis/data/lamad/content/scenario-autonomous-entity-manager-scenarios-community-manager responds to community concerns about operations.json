@@ -6,7 +6,7 @@
   "title": "Manager responds to community concerns about operations",
   "description": "Manager responds to community concerns about operations",
   "content": "Scenario: Manager responds to community concerns about operations\n    Given community member complains about noise from early morning deliveries\n    And legitimate community concern requires operational adjustment\n    When Marcus receives the complaint\n    Then Marcus investigates the noise issue objectively\n    And Marcus proposes delivery schedule modification to worker council\n    And workers deliberate balancing operational needs with community impact\n    And workers vote on delivery schedule change\n    And Marcus implements worker decision and communicates to community\n    And community_elohim facilitates community-worker dialogue\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager responds to community concerns about operations",

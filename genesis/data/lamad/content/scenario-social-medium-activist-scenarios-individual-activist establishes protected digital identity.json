@@ -6,7 +6,7 @@
   "title": "Activist establishes protected digital identity",
   "description": "Activist establishes protected digital identity",
   "content": "Scenario: Activist establishes protected digital identity\n    Given the activist is setting up their personal node\n    When they configure their activist identity with privacy controls\n    And they designate trusted sanctuary institutions for backup\n    And they enable multi-factor authentication with biometric verification\n    Then their identity is cryptographically secured on their personal node\n    And their data is encrypted end-to-end\n    And sanctuary protocols are established with designated institutions\n    And the system confirms digital sovereignty is established\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-individual",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist establishes protected digital identity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

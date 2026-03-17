@@ -6,7 +6,7 @@
   "title": "Participating in peer-led educational workshops",
   "description": "Participating in peer-led educational workshops",
   "content": "Scenario: Participating in peer-led educational workshops\n    Given IDD community members teach each other valuable skills\n    And peer education is powerful and relatable\n    When Jordan attends a peer-led workshop on public transportation\n    Then the peer educator teaches from lived experience\n    And instruction is naturally accessible (IDD peer teaching IDD peer)\n    And Jordan learns strategies that actually work in practice\n    And Jordan accumulates care tokens for participating in peer learning community\n    And the peer educator accumulates tokens for teaching contribution\n    And Jordan experiences IDD community as source of knowledge and support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in peer-led educational workshops",

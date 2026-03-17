@@ -6,7 +6,7 @@
   "title": "Developer negotiates regional community benefits agreement",
   "description": "Developer negotiates regional community benefits agreement",
   "content": "Scenario: Developer negotiates regional community benefits agreement\n    Given a developer's project has significant regional impacts\n    And multiple communities demand input and benefits\n    When the Observer facilitates regional benefit negotiations\n    Then the developer engages stakeholders from all affected jurisdictions\n    And negotiates benefits addressing regional not just local impacts\n    And commits to workforce development benefiting regional residents\n    And Observer tracks delivery across jurisdictional boundaries\n    And regional accountability prevents divide-and-conquer tactics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer negotiates regional community benefits agreement",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

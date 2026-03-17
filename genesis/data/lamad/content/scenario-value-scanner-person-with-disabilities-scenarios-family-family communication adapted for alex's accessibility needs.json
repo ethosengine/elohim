@@ -6,7 +6,7 @@
   "title": "Family communication adapted for Alex's accessibility needs",
   "description": "Family communication adapted for Alex's accessibility needs",
   "content": "Scenario: Family communication adapted for Alex's accessibility needs\n    Given family uses various communication methods\n    And some methods may not be accessible to Alex\n    When family communicates\n    Then the family_elohim should ensure Alex can participate fully\n    And family should use accessible communication formats\n    And Alex should not be excluded by inaccessible technology choices\n    And family should be prompted to accommodate Alex's needs\n    And accessibility should be automatic, not requested each time\n    And Alex should have equal access to all family communication\n    And the system should reduce Alex's communication barriers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family communication adapted for Alex's accessibility needs",

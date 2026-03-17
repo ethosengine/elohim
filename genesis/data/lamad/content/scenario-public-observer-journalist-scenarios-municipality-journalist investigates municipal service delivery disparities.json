@@ -6,7 +6,7 @@
   "title": "Journalist investigates municipal service delivery disparities",
   "description": "Journalist investigates municipal service delivery disparities",
   "content": "Scenario: Journalist investigates municipal service delivery disparities\n    Given residents in certain neighborhoods report neglected infrastructure\n    And the journalist suspects systematic discrimination\n    When the Observer analyzes municipal operations by neighborhood\n    Then the journalist sees pothole repairs average 2 days in white areas\n    And same repairs take 47 days in Black neighborhoods\n    And code enforcement targets rental properties in immigrant communities\n    And documents service quality correlating with neighborhood race and income\n    And publishes investigation exposing structural racism in city operations\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates municipal service delivery disparities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

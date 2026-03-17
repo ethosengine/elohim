@@ -6,7 +6,7 @@
   "title": "Teacher advocates for professional development reform",
   "description": "Teacher advocates for professional development reform",
   "content": "Scenario: Teacher advocates for professional development reform\n    Given state mandates professional development hours annually\n    But current PD is generic and unhelpful for actual teaching\n    When teachers provide evidence on PD effectiveness through Observer\n    Then aggregated data shows teachers rate 80% of PD as not useful\n    And teachers propose evidence-based PD reform based on what actually helps\n    And document successful PD models from other states\n    And coordinate with education researchers and reform advocates\n    And state professional development policy respects teacher expertise\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher advocates for professional development reform",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

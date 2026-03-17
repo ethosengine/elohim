@@ -6,7 +6,7 @@
   "title": "Balancing care contributions with household needs",
   "description": "Balancing care contributions with household needs",
   "content": "Scenario: Balancing care contributions with household needs\n    Given Margaret provides extensive care outside her household\n    And household tasks still require attention\n    When the household_elohim monitors Margaret's overall care burden\n    Then it should track time spent on external care commitments\n    And it should ensure household needs aren't neglected\n    And it should flag if Margaret's care burden becomes overwhelming\n    And it should suggest balance between giving and self-care\n    And Margaret's own household should remain a priority\n    And burnout prevention should be built into system\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing care contributions with household needs",

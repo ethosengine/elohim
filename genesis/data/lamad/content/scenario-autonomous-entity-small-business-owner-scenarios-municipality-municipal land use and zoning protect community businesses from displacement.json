@@ -6,7 +6,7 @@
   "title": "Municipal land use and zoning protect community businesses from displacement",
   "description": "Municipal land use and zoning protect community businesses from displacement",
   "content": "Scenario: Municipal land use and zoning protect community businesses from displacement\n    Given commercial real estate speculation threatens community institutions\n    And Rosa's Auto could face displacement through rising rents or property sale\n    When democratic ownership is recognized as community benefit\n    Then zoning policies prioritize long-term community business tenancy\n    And city explores community land trusts for commercial space\n    And democratic businesses receive preference in publicly-owned commercial properties\n    And land use policy protects against speculation displacing community institutions\n    And municipality_elohim advocates for commercial anti-displacement policies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal land use and zoning protect community businesses from displacement",

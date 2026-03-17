@@ -6,7 +6,7 @@
   "title": "Deliberating fundamental constitutional tension",
   "description": "Deliberating fundamental constitutional tension",
   "content": "Scenario: Deliberating fundamental constitutional tension\n    Given an appeal reveals tension between care and privacy at constitutional level\n    And regional councils have reached conflicting interpretations\n    When we deliberate on national constitutional question\n    Then we ask: \"Does mental health intervention ever justify privacy breach constitutionally?\"\n    And we examine: not just case application but principle itself\n    And we consider: implications for millions of future cases\n    And we consult: technical experts, researchers, community leaders\n    And we deliberate: over multiple sessions spanning weeks\n    And we craft: comprehensive opinion with deep reasoning\n    And we create: national precedent guiding all lower councils\n    And we shape: constitutional understanding for generation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Deliberating fundamental constitutional tension",

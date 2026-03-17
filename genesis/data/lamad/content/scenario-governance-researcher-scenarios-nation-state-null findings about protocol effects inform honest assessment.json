@@ -6,7 +6,7 @@
   "title": "Null findings about protocol effects inform honest assessment",
   "description": "Null findings about protocol effects inform honest assessment",
   "content": "Scenario: Null findings about protocol effects inform honest assessment\n    Given my analysis found protocol didn't improve outcomes in certain domains\n    And publication bias favors positive results\n    When I publish findings showing limitations and failures\n    Then I report: honestly about what doesn't work\n    And I provide: evidence challenging protocol advocates' claims\n    And I maintain: scientific integrity over ideological commitment\n    And I enable: realistic expectations and targeted improvements\n    And I contribute: to honest democratic deliberation about governance alternatives\n    And My credibility comes from: willingness to report unflattering truths\n    And Science serves democracy by: providing reliable knowledge not propaganda\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Null findings about protocol effects inform honest assessment",

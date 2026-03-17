@@ -6,7 +6,7 @@
   "title": "Municipal data and transparency support informed civic participation",
   "description": "Municipal data and transparency support informed civic participation",
   "content": "Scenario: Municipal data and transparency support informed civic participation\n    Given Robert participates in municipal governance\n    And effective participation requires access to information\n    And municipal data is often hard to access or understand\n    When municipal_elohim provides municipal data access\n    Then it should surface relevant municipal data for Robert's interests\n    And help him understand municipal budgets, demographics, and service utilization\n    And provide analysis tools for municipal information\n    And support informed civic participation through data transparency\n    And demonstrate that democratic governance requires accessible information\n    And build municipal transparency that enables resident engagement\n    And empower residents to participate meaningfully in governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal data and transparency support informed civic participation",

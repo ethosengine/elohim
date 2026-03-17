@@ -6,7 +6,7 @@
   "title": "Managing professional identity alongside parent identity",
   "description": "Managing professional identity alongside parent identity",
   "content": "Scenario: Managing professional identity alongside parent identity\n    Given Sarah is both teacher and mother\n    And these identities sometimes conflict or compete\n    When Sarah navigates professional and parenting identities\n    Then the personal_agent should help her integrate both roles\n    And it should recognize she is complete person with multiple identities\n    And it should support her wholeness across contexts\n    And the system should help her maintain both professional and parent identity\n    And neither role should consume total identity\n    And Sarah should be supported in being both teacher and mother\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing professional identity alongside parent identity",

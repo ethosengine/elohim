@@ -6,7 +6,7 @@
   "title": "Addressing existential AI risk through democratic governance",
   "description": "Addressing existential AI risk through democratic governance",
   "content": "Scenario: Addressing existential AI risk through democratic governance\n    Given superintelligent AI poses existential threat\n    And democratic oversight might mitigate this risk\n    When I participate in global existential risk discussions\n    Then I argue: constitutional accountability reduces AI risk\n    And I present: evidence that sortition prevents elite capture\n    And I promote: transparency enabling global democratic oversight\n    And I support: recourse mechanisms providing adaptation\n    And I advocate: for protocol's distributed architecture increasing resilience\n    And I acknowledge: uncertainties about whether this suffices\n    And I work: toward governance frameworks for humanity's survival\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Addressing existential AI risk through democratic governance",

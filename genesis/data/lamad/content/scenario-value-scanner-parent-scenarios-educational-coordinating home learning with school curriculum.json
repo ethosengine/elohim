@@ -6,7 +6,7 @@
   "title": "Coordinating home learning with school curriculum",
   "description": "Coordinating home learning with school curriculum",
   "content": "Scenario: Coordinating home learning with school curriculum\n    Given Emma is learning math at school\n    And Sarah reinforces and extends learning at home\n    When the educational_elohim coordinates home and school\n    Then it should share relevant learning information between contexts\n    And it should help Sarah support Emma's school learning\n    And it should recognize Sarah's home teaching as essential to school success\n    And home and school should be integrated educational environment\n    And the system should facilitate coordination between parents and teachers\n    And Sarah's educational labor should be visible to Emma's school\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating home learning with school curriculum",

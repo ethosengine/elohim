@@ -6,7 +6,7 @@
   "title": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
   "description": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
   "content": "Scenario: Farm owner transitions from sole proprietor to worker cooperative facilitator\n    Given Tom has owned and operated Johnson Farm individually for 20 years\n    And farmworkers have been employees without ownership or governance voice\n    When Tom considers converting farm to worker-owned cooperative\n    Then he sees how democratic restaurant conversions empowered workers\n    And EAE network offers acquisition support for farm democratic conversion\n    And Tom can transition from sole owner to cooperative member or honored exit\n    And farmworkers gain ownership pathway transforming agricultural labor\n    And workplace_elohim facilitates farm conversion following restaurant model\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farm owner transitions from sole proprietor to worker cooperative facilitator",

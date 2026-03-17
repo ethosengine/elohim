@@ -6,7 +6,7 @@
   "title": "Ecological care contributions recognized in care token economy",
   "description": "Ecological care contributions recognized in care token economy",
   "content": "Scenario: Ecological care contributions recognized in care token economy\n    Given Sarah makes environmentally conscious choices\n    And ecological care is care work that benefits everyone\n    When Sarah's care contributions are tracked\n    Then environmental care choices should generate care tokens\n    And Sarah should be recognized for ecological stewardship\n    And care for planet should be valued alongside care for people\n    And care tokens should incentivize environmental care\n    And ecological care should be integrated into care economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological care contributions recognized in care token economy",

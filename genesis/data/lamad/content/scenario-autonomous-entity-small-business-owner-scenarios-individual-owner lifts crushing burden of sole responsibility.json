@@ -6,7 +6,7 @@
   "title": "Owner lifts crushing burden of sole responsibility",
   "description": "Owner lifts crushing burden of sole responsibility",
   "content": "Scenario: Owner lifts crushing burden of sole responsibility\n    Given Rosa carries weight of three employees' livelihoods alone\n    And she cannot vacation, get sick, or take breaks without business crisis\n    When EAE acquisition completes\n    Then Rosa is freed from sole responsibility for business survival\n    And employees are protected and elevated to co-owners\n    And Rosa can exit completely or stay as transition steward\n    And crushing weight of individual ownership is distributed democratically\n    And workplace_elohim ensures transition protects all parties\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner lifts crushing burden of sole responsibility",

@@ -6,7 +6,7 @@
   "title": "Personal agent helps prevent expensive mistakes",
   "description": "Personal agent helps prevent expensive mistakes",
   "content": "Scenario: Personal agent helps prevent expensive mistakes\n    Given Aisha bought too much fresh produce last week\n    And the produce spoiled before she could use it\n    When the personal_agent analyzes her shopping patterns\n    Then it should identify the waste pattern\n    And it should suggest buying smaller quantities\n    And it should recommend frozen alternatives when appropriate\n    And the feedback should be constructive, not judgmental\n    And Aisha should learn from the mistake without shame\n    And the system should help her optimize future purchases\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent helps prevent expensive mistakes",

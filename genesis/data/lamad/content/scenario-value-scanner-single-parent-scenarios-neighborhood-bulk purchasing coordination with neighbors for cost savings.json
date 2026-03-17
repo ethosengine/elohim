@@ -6,7 +6,7 @@
   "title": "Bulk purchasing coordination with neighbors for cost savings",
   "description": "Bulk purchasing coordination with neighbors for cost savings",
   "content": "Scenario: Bulk purchasing coordination with neighbors for cost savings\n    Given Maria operates on severe budget constraints\n    And bulk purchasing saves money but requires coordination\n    When neighbors organize bulk buying cooperatives\n    Then the neighborhood_elohim should coordinate collective purchasing\n    And it should help Maria access wholesale prices through group orders\n    And it should facilitate cost-sharing and distribution logistics\n    And bulk buying should reduce Maria's grocery costs meaningfully\n    And neighborhood economic cooperation should help single-parent resource constraints\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bulk purchasing coordination with neighbors for cost savings",

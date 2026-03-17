@@ -6,7 +6,7 @@
   "title": "Family grief support as David's condition progresses",
   "description": "Family grief support as David's condition progresses",
   "content": "Scenario: Family grief support as David's condition progresses\n    Given entire family grieves David's decline\n    And James's grief is compounded by providing daily care\n    When the family_elohim recognizes collective family grief\n    Then it should connect family to grief support resources\n    And it should acknowledge progressive loss affects everyone\n    And it should coordinate family emotional support for each other\n    And James should receive family support, not just provide care\n    And family should process grief together while supporting James\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family grief support as David's condition progresses",

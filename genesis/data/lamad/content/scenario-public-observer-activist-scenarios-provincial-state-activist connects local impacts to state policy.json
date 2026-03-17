@@ -6,7 +6,7 @@
   "title": "Activist connects local impacts to state policy",
   "description": "Activist connects local impacts to state policy",
   "content": "Scenario: Activist connects local impacts to state policy\n    Given state education funding formula harms the activist's district\n    And needs to build pressure for reform\n    When the Observer calculates local impacts of state policy\n    Then the activist shows how formula shortchanges their district by $4M\n    And documents impacts on class sizes and programs\n    And connects families affected by funding gaps\n    And state policy debate becomes grounded in local reality\n    And abstract policy becomes personal stakes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist connects local impacts to state policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

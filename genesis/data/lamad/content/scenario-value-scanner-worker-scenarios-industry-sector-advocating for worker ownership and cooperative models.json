@@ -6,7 +6,7 @@
   "title": "Advocating for worker ownership and cooperative models",
   "description": "Advocating for worker ownership and cooperative models",
   "content": "Scenario: Advocating for worker ownership and cooperative models\n    Given current ownership structures extract from workers\n    When workers want to explore alternative ownership models\n    Then the protocol should provide information about worker cooperatives\n    And connect workers interested in cooperative organizing\n    And support transition toward worker ownership in food service\n    And build examples of care-economy-aligned food business models\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for worker ownership and cooperative models",

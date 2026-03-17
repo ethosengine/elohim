@@ -6,7 +6,7 @@
   "title": "Turnover decreases dramatically as workers gain ownership and dignity",
   "description": "Turnover decreases dramatically as workers gain ownership and dignity",
   "content": "Scenario: Turnover decreases dramatically as workers gain ownership and dignity\n    Given franchise locations experienced 150% annual turnover due to low wages and poor conditions\n    And constant turnover harmed service quality and training efficiency\n    When conversion provides ownership, living wages, and democratic voice\n    Then worker retention improves to 90%+ (turnover drops to 10% annually)\n    And institutional knowledge accumulates instead of constantly draining\n    And training investments pay off through worker longevity\n    And customer relationships deepen through consistent staffing\n    And workplace_elohim documents retention improvements and cost savings\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Turnover decreases dramatically as workers gain ownership and dignity",

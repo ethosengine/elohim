@@ -6,7 +6,7 @@
   "title": "Documenting community-specific calibration process",
   "description": "Documenting community-specific calibration process",
   "content": "Scenario: Documenting community-specific calibration process\n    Given Riverside calibrated privacy thresholds higher than protocol default\n    And this reflected community values and history\n    When I document how community calibration happened\n    Then I capture: deliberation process that led to calibration decision\n    And I analyze: how community exercised sovereignty within constitutional bounds\n    And I examine: role of community leader in facilitating values discussion\n    And I track: whether calibration actually served community better\n    And I study: how local diversity strengthens rather than fragments protocol\n    And My research demonstrates: subsidiarity in practice\n    And Findings support: community autonomy as democratic AI principle\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Documenting community-specific calibration process",

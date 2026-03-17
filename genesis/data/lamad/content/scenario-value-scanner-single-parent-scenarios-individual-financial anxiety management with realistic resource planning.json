@@ -6,7 +6,7 @@
   "title": "Financial anxiety management with realistic resource planning",
   "description": "Financial anxiety management with realistic resource planning",
   "content": "Scenario: Financial anxiety management with realistic resource planning\n    Given Maria constantly calculates whether she can afford necessities\n    And financial stress pervades every decision\n    When Maria faces financial decisions\n    Then the personal_agent should provide clear financial analysis\n    And it should help her see trade-offs and options\n    And it should reduce anxiety through better planning and visibility\n    And it should help her make informed choices within severe constraints\n    And Maria should feel more financial agency despite limited resources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Financial anxiety management with realistic resource planning",

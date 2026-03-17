@@ -6,7 +6,7 @@
   "title": "Creating precedent for global crisis coordination",
   "description": "Creating precedent for global crisis coordination",
   "content": "Scenario: Creating precedent for global crisis coordination\n    Given convention addresses how protocol handles planetary emergencies\n    And we must balance speed with democratic legitimacy\n    When we deliberate crisis governance framework\n    Then we establish: emergency protocols maintaining accountability\n    And we specify: what constitutes legitimate crisis triggering special powers\n    And we create: rapid review processes for crisis decisions\n    And we ensure: democratic oversight even under urgency\n    And we prevent: crisis from becoming excuse for authoritarian drift\n    And we establish: how humanity governs together under existential threat\n    And we demonstrate: democracy can be both deliberative and responsive\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creating precedent for global crisis coordination",

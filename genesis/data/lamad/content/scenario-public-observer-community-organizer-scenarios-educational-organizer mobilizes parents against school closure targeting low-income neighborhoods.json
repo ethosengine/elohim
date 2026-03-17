@@ -6,7 +6,7 @@
   "title": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
   "description": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
   "content": "Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods\n    Given district proposes closing three schools in working-class areas\n    And claims it's necessary for \"efficiency\"\n    When the organizer uses Observer to analyze closure impacts\n    Then they show closures increase commute times for low-income families\n    And demonstrate stable enrollment contradicting district claims\n    And calculate cost of closure to affected communities\n    And organize parents to demand community-based solutions\n    And education organizing prevents harm to vulnerable students\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

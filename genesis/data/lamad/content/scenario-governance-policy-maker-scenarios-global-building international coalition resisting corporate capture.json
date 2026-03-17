@@ -6,7 +6,7 @@
   "title": "Building international coalition resisting corporate capture",
   "description": "Building international coalition resisting corporate capture",
   "content": "Scenario: Building international coalition resisting corporate capture\n    Given corporations lobby internationally for favorable regulation\n    And they use different nations to triangulate pressure\n    When I coordinate with international policy maker allies\n    Then we share: intelligence about lobbying tactics\n    And we coordinate: resistance to capture attempts\n    And we establish: transparency requirements for global lobbying\n    And we support: each other under corporate pressure\n    And we create: race-to-top rather than race-to-bottom\n    And we demonstrate: democratic solidarity across nations\n    And we protect: protocol sovereignty through collective action\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building international coalition resisting corporate capture",

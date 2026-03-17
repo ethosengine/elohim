@@ -6,7 +6,7 @@
   "title": "Workers adapt operations to serve community cultural needs",
   "description": "Workers adapt operations to serve community cultural needs",
   "content": "Scenario: Workers adapt operations to serve community cultural needs\n    Given neighborhood has significant Latino population\n    And community expresses interest in traditional menu items\n    When workers receive customer feedback through community_elohim\n    Then workers investigate culturally appropriate menu additions\n    And workers consult community members on authentic recipes\n    And workers democratically vote to expand menu with Latino dishes\n    And workers hire bilingual staff to serve community better\n    And business becomes more deeply embedded in community culture\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers adapt operations to serve community cultural needs",

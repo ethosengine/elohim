@@ -6,7 +6,7 @@
   "title": "Emergency response coordinated through neighborhood networks",
   "description": "Emergency response coordinated through neighborhood networks",
   "content": "Scenario: Emergency response coordinated through neighborhood networks\n    Given emergencies may occur when Helen is alone\n    And rapid response requires nearby support\n    When emergency alert is triggered\n    Then the neighborhood_elohim should contact nearby neighbors immediately\n    And neighbors should be briefed on Helen's health conditions\n    And her advance directives should guide neighbor response\n    And network should be activated before or alongside 911\n    And Helen should feel safe knowing neighbors will respond\n    And the protocol should leverage proximity for emergency care\n    And neighborhood networks should provide safety infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency response coordinated through neighborhood networks",

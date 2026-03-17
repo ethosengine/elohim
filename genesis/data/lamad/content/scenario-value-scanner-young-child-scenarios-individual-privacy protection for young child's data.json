@@ -6,7 +6,7 @@
   "title": "Privacy protection for young child's data",
   "description": "Privacy protection for young child's data",
   "content": "Scenario: Privacy protection for young child's data\n    Given Tommy's care contributions are being tracked\n    And Tommy cannot consent to data sharing\n    When Tommy's care data is recorded\n    Then all data must stay encrypted on family devices\n    And no behavioral profiling for commercial purposes should occur\n    And no third-party access should be permitted\n    And Tommy's wonder must never be monetized\n    And parental controls must govern all data visibility\n    And anonymization must occur before any community aggregation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy protection for young child's data",

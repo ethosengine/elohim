@@ -6,7 +6,7 @@
   "title": "Connecting disabled people to resources and support",
   "description": "Connecting disabled people to resources and support",
   "content": "Scenario: Connecting disabled people to resources and support\n    Given Alex has expertise about disability resources and systems\n    And many disabled people struggle to navigate complex systems\n    When Alex helps other disabled people access resources\n    Then this navigation support should be recognized as care work\n    And the community_elohim should track Alex's peer support\n    And connecting people to resources should accumulate care tokens\n    And Alex's expertise reduces others' suffering and struggle\n    And peer navigation is sophisticated skilled labor\n    And the protocol should value disability community mutual aid\n    And Alex's support enables others' flourishing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Connecting disabled people to resources and support",

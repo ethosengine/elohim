@@ -6,7 +6,7 @@
   "title": "Income replacement through care economy when employment impossible",
   "description": "Income replacement through care economy when employment impossible",
   "content": "Scenario: Income replacement through care economy when employment impossible\n    Given James's income dropped from $80k to $40k due to caregiving\n    And he may eventually be unable to work at all\n    When employment becomes impossible\n    Then the workplace_elohim should document care work value\n    And care token accumulation should provide income replacement\n    And care economy should recognize professional-grade family care\n    And James should have economic support if employment ends\n    And care contributions should provide economic standing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Income replacement through care economy when employment impossible",

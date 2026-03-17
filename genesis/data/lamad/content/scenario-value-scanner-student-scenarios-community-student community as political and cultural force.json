@@ -6,7 +6,7 @@
   "title": "Student community as political and cultural force",
   "description": "Student community as political and cultural force",
   "content": "Scenario: Student community as political and cultural force\n    Given students are networked, idealistic, and trend-setting\n    And student movements have historically created cultural change\n    When student community adopts care economy practices\n    Then the community_elohim should recognize students as change agents\n    And it should support spread of care economy culture among students\n    And it should help students see themselves as building alternative economy\n    And student community should be recognized as site for cultural transformation\n    And the system should empower students as care economy pioneers\n    And student adoption could spread care economy to broader generation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Student community as political and cultural force",

@@ -4,7 +4,7 @@
   "title": "Human creativity flourishes",
   "description": "without algorithmic manipulation or artificial scarcity",
   "content": "without algorithmic manipulation or artificial scarcity",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/vision/concept-human-creativity-flourishes.json",
   "tags": [
     "vision",
@@ -22,14 +22,15 @@
     "section": "vision",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.001474",
   "updatedAt": "2025-12-24T03:05:25.878Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

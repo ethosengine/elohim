@@ -6,7 +6,7 @@
   "title": "Farm protects green space and agricultural land from development pressure",
   "description": "Farm protects green space and agricultural land from development pressure",
   "content": "Scenario: Farm protects green space and agricultural land from development pressure\n    Given farmland faces constant development pressure for housing or commercial use\n    And community loses agricultural land, green space, and food production capacity\n    When democratic ownership with community investment protects farmland\n    Then community investment ensures land remains in agricultural use\n    And development pressure is resisted through collective commitment\n    And green space is preserved for ecological, aesthetic, and food security benefits\n    And community gains protected agricultural land as permanent institution\n    And community_elohim coordinates land protection and community land trust options\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farm protects green space and agricultural land from development pressure",

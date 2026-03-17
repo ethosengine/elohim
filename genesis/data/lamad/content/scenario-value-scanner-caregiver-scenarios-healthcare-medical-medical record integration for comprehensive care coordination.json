@@ -6,7 +6,7 @@
   "title": "Medical record integration for comprehensive care coordination",
   "description": "Medical record integration for comprehensive care coordination",
   "content": "Scenario: Medical record integration for comprehensive care coordination\n    Given David's medical information is scattered across providers\n    And comprehensive view is essential for good care\n    When the healthcare_elohim accesses medical records\n    Then it should integrate information across healthcare systems\n    And James should have complete medical picture\n    And providers should receive comprehensive information\n    And medical record fragmentation should be addressed\n    And care coordination should be supported by integrated data\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Medical record integration for comprehensive care coordination",

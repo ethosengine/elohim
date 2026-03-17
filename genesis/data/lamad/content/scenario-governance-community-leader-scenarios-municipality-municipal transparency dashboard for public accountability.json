@@ -6,7 +6,7 @@
   "title": "Municipal transparency dashboard for public accountability",
   "description": "Municipal transparency dashboard for public accountability",
   "content": "Scenario: Municipal transparency dashboard for public accountability\n    Given residents deserve visibility into city governance\n    And I am accountable through democratic elections\n    When we provide municipal transparency dashboard\n    Then residents see: resource flows across neighborhoods\n    And they access: appeal patterns and council decisions\n    And they view: city budget allocation and outcomes\n    And they compare: promised benefits with actual results\n    And they hold me accountable: with evidence not just rhetoric\n    And transparency strengthens: democratic governance\n    And I cannot hide: behind \"algorithm decided\" or \"trust me\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipality",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal transparency dashboard for public accountability",

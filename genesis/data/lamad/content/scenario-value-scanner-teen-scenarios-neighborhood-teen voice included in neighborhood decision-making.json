@@ -6,7 +6,7 @@
   "title": "Teen voice included in neighborhood decision-making",
   "description": "Teen voice included in neighborhood decision-making",
   "content": "Scenario: Teen voice included in neighborhood decision-making\n    Given the neighborhood is making decisions about shared spaces\n    And Jasmine uses neighborhood facilities and public spaces\n    When neighborhood_elohim facilitates decision processes\n    Then Jasmine's input should be solicited and valued\n    And youth voice should be recognized as legitimate in neighborhood governance\n    And her care contributions should give her standing in community decisions\n    And she should not be dismissed due to age\n    And the neighborhood should model inclusive governance that values all members\n    And Jasmine should learn that she has legitimate voice in shaping her community\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen voice included in neighborhood decision-making",

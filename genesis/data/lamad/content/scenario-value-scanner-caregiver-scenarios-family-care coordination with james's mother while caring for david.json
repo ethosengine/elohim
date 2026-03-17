@@ -6,7 +6,7 @@
   "title": "Care coordination with James's mother while caring for David",
   "description": "Care coordination with James's mother while caring for David",
   "content": "Scenario: Care coordination with James's mother while caring for David\n    Given James's mother (76) needs increasing support\n    And James is already overwhelmed caring for David\n    When James coordinates care for his mother\n    Then the family_elohim should help him manage both relationships\n    And it should recognize he cannot provide intensive care in both directions\n    And it should help coordinate additional support for his mother\n    And it should prevent James from collapsing under dual burden\n    And family care should be sustainable across multiple recipients\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Care coordination with James's mother while caring for David",

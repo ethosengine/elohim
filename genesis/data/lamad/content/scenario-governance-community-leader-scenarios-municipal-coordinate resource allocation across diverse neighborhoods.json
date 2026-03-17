@@ -6,7 +6,7 @@
   "title": "Coordinate resource allocation across diverse neighborhoods",
   "description": "Coordinate resource allocation across diverse neighborhoods",
   "content": "Scenario: Coordinate resource allocation across diverse neighborhoods\n    Given downtown needs economic development support\n    And residential areas prioritize environmental protection\n    And outskirts need infrastructure investment\n    When Municipal Elohim analyzes resource allocation\n    Then agent shows resource flows and gaps across neighborhoods\n    And agent identifies conflicts and synergies\n    And Jamal facilitates city council deliberation with agent data\n    And city council makes democratic allocation decisions\n    And protocol enables informed democratic choice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipal",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinate resource allocation across diverse neighborhoods",

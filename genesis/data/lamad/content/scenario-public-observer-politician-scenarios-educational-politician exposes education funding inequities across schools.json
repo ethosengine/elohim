@@ -6,7 +6,7 @@
   "title": "Politician exposes education funding inequities across schools",
   "description": "Politician exposes education funding inequities across schools",
   "content": "Scenario: Politician exposes education funding inequities across schools\n    Given the politician suspects resource distribution creates outcome gaps\n    When the Observer analyzes education funding patterns\n    Then they see experienced teachers concentrated in affluent schools\n    And identify per-student spending disparities within districts\n    And understand how funding formulas create systematic inequities\n    And calculate impact of equitable funding on underserved schools\n    And champion funding reforms with evidence of current harms\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician exposes education funding inequities across schools",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

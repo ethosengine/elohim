@@ -761,7 +761,7 @@
       }
     }
   ],
-  "contentFormat": "sophia",
+  "contentFormat": "interactive",
   "tags": [
     "assessment",
     "discovery",
@@ -791,7 +791,8 @@
         "purpose"
       ]
     },
-    "migratedAt": "2026-02-24T00:00:00.000Z"
+    "migratedAt": "2026-02-24T00:00:00.000Z",
+    "originalContentFormat": "sophia"
   },
   "createdAt": "2025-11-28T00:09:03.479960",
   "updatedAt": "2026-02-24T00:00:00.000Z",

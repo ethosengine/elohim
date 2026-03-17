@@ -6,7 +6,7 @@
   "title": "Owner experiences relief from impossible competitive pressures",
   "description": "Owner experiences relief from impossible competitive pressures",
   "content": "Scenario: Owner experiences relief from impossible competitive pressures\n    Given Rosa cannot compete with corporate chains on price alone\n    And she faces slow death by competition or worker exploitation\n    When business converts to EAE network\n    Then competitive pressure eases through distributed ownership eliminating extraction\n    And network provides volume purchasing power Rosa never had\n    And democratic governance enables innovation chains cannot match\n    And Rosa experiences relief from impossible economic trap\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner experiences relief from impossible competitive pressures",

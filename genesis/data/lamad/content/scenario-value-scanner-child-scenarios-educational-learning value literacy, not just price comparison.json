@@ -6,7 +6,7 @@
   "title": "Learning value literacy, not just price comparison",
   "description": "Learning value literacy, not just price comparison",
   "content": "Scenario: Learning value literacy, not just price comparison\n    Given Emma is building complex understanding of value\n    And value extends far beyond simple price\n    When Emma uses the Value Scanner for education\n    Then she should learn to see multiple value dimensions\n    And nutritional value should be explored\n    And environmental impact should be age-appropriately introduced\n    And care labor embedded in production should be made visible\n    And community benefit should be considered\n    And she should learn to read complexity, not just price tags\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning value literacy, not just price comparison",

@@ -6,7 +6,7 @@
   "title": "Developing social skills through structured learning",
   "description": "Developing social skills through structured learning",
   "content": "Scenario: Developing social skills through structured learning\n    Given Jordan wants to improve conversation skills\n    And social skills education can support relationship building\n    When Jordan participates in social skills group\n    Then the group uses accessible teaching methods (role-play, video modeling)\n    And Jordan practices skills with peer learners\n    And successes are celebrated and challenges are normalized\n    And Jordan's social confidence grows through practice\n    And improved skills enhance Jordan's community participation\n    And Jordan experiences personal growth and capability development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developing social skills through structured learning",

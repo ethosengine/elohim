@@ -6,7 +6,7 @@
   "title": "Workers coordinate sector response to corporate competitive pressure",
   "description": "Workers coordinate sector response to corporate competitive pressure",
   "content": "Scenario: Workers coordinate sector response to corporate competitive pressure\n    Given a corporate chain attempts to undercut EAE entities on price\n    And individual entities cannot match corporate predatory pricing alone\n    When workers detect the competitive threat\n    Then industry_sector_elohim alerts all sector workers\n    And workers coordinate response emphasizing quality and values\n    And workers develop public narrative about democratic vs. extractive business\n    And sector pools marketing resources to compete collectively\n    And coordinated response succeeds where isolated entities would fail\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers coordinate sector response to corporate competitive pressure",

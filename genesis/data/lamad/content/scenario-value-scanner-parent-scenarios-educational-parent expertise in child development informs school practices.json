@@ -6,7 +6,7 @@
   "title": "Parent expertise in child development informs school practices",
   "description": "Parent expertise in child development informs school practices",
   "content": "Scenario: Parent expertise in child development informs school practices\n    Given Sarah has professional teaching expertise\n    And she knows her children's developmental needs intimately\n    When Sarah engages with children's schools\n    Then her expertise should be recognized and valued\n    And teachers should consult Sarah's knowledge of Tommy and Emma\n    And parent-teacher relationships should be expert collaboration\n    And Sarah's observations should inform educational planning\n    And the system should position parents as expert partners\n    And parent knowledge should shape school practices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent expertise in child development informs school practices",

@@ -6,7 +6,7 @@
   "title": "Advising on global technical standards with cultural sensitivity",
   "description": "Advising on global technical standards with cultural sensitivity",
   "content": "Scenario: Advising on global technical standards with cultural sensitivity\n    Given global protocol needs technical standards\n    And different cultures have different technical capacities\n    When I help develop culturally-sensitive technical requirements\n    Then I ensure: standards work with varying infrastructure\n    And I avoid: assuming Global North technical context\n    And I support: diverse implementation approaches\n    And I enable: low-resource communities to participate\n    And I collaborate: with Global South technical experts\n    And I resist: digital colonialism in technical design\n    And I demonstrate: that technical standards can honor diversity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advising on global technical standards with cultural sensitivity",

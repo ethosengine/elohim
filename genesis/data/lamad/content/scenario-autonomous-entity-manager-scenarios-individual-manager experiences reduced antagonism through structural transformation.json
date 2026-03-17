@@ -6,7 +6,7 @@
   "title": "Manager experiences reduced antagonism through structural transformation",
   "description": "Manager experiences reduced antagonism through structural transformation",
   "content": "Scenario: Manager experiences reduced antagonism through structural transformation\n    Given Marcus lived in constant tension between workers and corporate\n    And workers saw him as enemy implementing exploitation\n    When structure changes from extraction to democratic coordination\n    Then worker antagonism dissipates as he stops enforcing extraction\n    And conflicts become collaborative problem-solving, not power struggles\n    And DeShawn's questions become genuine inquiry, not veiled resistance\n    And Marcus experiences relief from structural antagonism\n    And his relationships with workers transform from adversarial to collaborative\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager experiences reduced antagonism through structural transformation",

@@ -6,7 +6,7 @@
   "title": "Educational resources accessible based on care contributions",
   "description": "Educational resources accessible based on care contributions",
   "content": "Scenario: Educational resources accessible based on care contributions\n    Given Jasmine has accumulated care tokens through contributions\n    And the community offers educational programs and tutoring\n    When she seeks additional educational support\n    Then her care tokens should be convertible to educational access\n    And she should be able to use care economy participation to access learning resources\n    And educational opportunities should not be limited to those who can pay market rates\n    And her demonstrated contribution should give her standing to access education\n    And care economy should support educational equity\n    And reduce barriers to educational access for contributing community members\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational resources accessible based on care contributions",

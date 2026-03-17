@@ -6,7 +6,7 @@
   "title": "Address climate refugee resettlement at municipal scale",
   "description": "Address climate refugee resettlement at municipal scale",
   "content": "Scenario: Address climate refugee resettlement at municipal scale\n    Given climate refugees are arriving faster than housing can accommodate\n    And Municipal Elohim coordinates capacity mapping\n    When Jamal works with agent on integration strategy\n    Then agent matches refugee skills to job availability\n    And agent suggests phased integration by neighborhood\n    And agent monitors integration outcomes for adjustment\n    And Jamal ensures community voice in resettlement decisions\n    And integration succeeds better than without coordination\n    And Riverside demonstrates scalable humanitarian response\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipal",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Address climate refugee resettlement at municipal scale",

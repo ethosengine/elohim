@@ -6,7 +6,7 @@
   "title": "Cultural representation challenges ableist narratives",
   "description": "Cultural representation challenges ableist narratives",
   "content": "Scenario: Cultural representation challenges ableist narratives\n    Given media representation of disability is often harmful\n    And Alex works to improve disability representation\n    When Alex engages in cultural advocacy (media, arts, education)\n    Then representation work should be recognized as care labor\n    And the community_elohim should value cultural transformation efforts\n    And challenging ableist narratives benefits entire disabled community\n    And Alex's cultural work should accumulate care tokens\n    And the protocol should recognize that culture shapes material conditions\n    And representation advocacy is sophisticated intellectual labor\n    And Alex's contributions shift what community believes about disability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Cultural representation challenges ableist narratives",

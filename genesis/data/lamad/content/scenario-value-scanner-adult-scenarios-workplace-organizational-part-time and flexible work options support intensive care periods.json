@@ -6,7 +6,7 @@
   "title": "Part-time and flexible work options support intensive care periods",
   "description": "Part-time and flexible work options support intensive care periods",
   "content": "Scenario: Part-time and flexible work options support intensive care periods\n    Given Sarah may need reduced hours during intensive care periods\n    And full-time work may be unsustainable at some life stages\n    When Sarah's care responsibilities increase\n    Then workplace should offer part-time and flexible work options\n    And reduced hours should not mean career penalty\n    And the workplace_elohim should coordinate schedule adjustments\n    And Sarah should be able to modulate work commitment based on care needs\n    And career paths should accommodate care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Part-time and flexible work options support intensive care periods",

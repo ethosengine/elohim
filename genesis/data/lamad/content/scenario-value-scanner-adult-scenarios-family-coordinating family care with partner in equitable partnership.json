@@ -6,7 +6,7 @@
   "title": "Coordinating family care with partner in equitable partnership",
   "description": "Coordinating family care with partner in equitable partnership",
   "content": "Scenario: Coordinating family care with partner in equitable partnership\n    Given Sarah and partner share parenting responsibilities\n    And they're raising children together\n    When family care labor is distributed\n    Then the family_elohim should track both partners' contributions\n    And labor should be distributed equitably\n    And neither partner should bear unfair burden\n    And children should see modeled equitable partnership\n    And family governance should be genuinely shared\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating family care with partner in equitable partnership",

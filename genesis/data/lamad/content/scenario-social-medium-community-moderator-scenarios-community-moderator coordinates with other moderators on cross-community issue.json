@@ -6,7 +6,7 @@
   "title": "Moderator coordinates with other moderators on cross-community issue",
   "description": "Moderator coordinates with other moderators on cross-community issue",
   "content": "Scenario: Moderator coordinates with other moderators on cross-community issue\n    Given a coordinated harassment campaign targets multiple communities\n    And the pattern detection agent identifies the coordinated nature\n    When Alex and moderators from affected communities are alerted\n    Then they can coordinate response while respecting local autonomy\n    And each community handles the issue according to their standards\n    And patterns are shared to protect other communities\n    And the coordinated attack is neutralized through cooperation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:community_moderator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-community-moderator-scenarios-community",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Moderator coordinates with other moderators on cross-community issue",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

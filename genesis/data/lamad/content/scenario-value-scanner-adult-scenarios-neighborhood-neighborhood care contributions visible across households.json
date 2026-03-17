@@ -6,7 +6,7 @@
   "title": "Neighborhood care contributions visible across households",
   "description": "Neighborhood care contributions visible across households",
   "content": "Scenario: Neighborhood care contributions visible across households\n    Given Sarah contributes to neighborhood care economy\n    And neighbors also contribute in various ways\n    When neighborhood care patterns are tracked\n    Then the neighborhood_elohim should make contributions visible\n    And it should show who's contributing what\n    And it should identify imbalances in participation\n    And it should prompt recognition of neighbors' care work\n    And visibility should enable fair neighborhood participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care contributions visible across households",

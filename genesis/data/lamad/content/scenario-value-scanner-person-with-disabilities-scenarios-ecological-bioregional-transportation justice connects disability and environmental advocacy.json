@@ -6,7 +6,7 @@
   "title": "Transportation justice connects disability and environmental advocacy",
   "description": "Transportation justice connects disability and environmental advocacy",
   "content": "Scenario: Transportation justice connects disability and environmental advocacy\n    Given accessible public transit reduces both carbon emissions and disability barriers\n    And transportation is both disability rights and environmental issue\n    When transportation systems are reformed\n    Then the bioregional_elohim should advocate for accessible sustainable transit\n    And Alex's transit needs should align with environmental goals\n    And accessible transit should be framed as climate solution\n    And disability advocates and environmentalists should work together\n    And the protocol should facilitate transportation justice coalitions\n    And Alex's advocacy for accessible transit serves both causes\n    And sustainable transportation must include disability access\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transportation justice connects disability and environmental advocacy",

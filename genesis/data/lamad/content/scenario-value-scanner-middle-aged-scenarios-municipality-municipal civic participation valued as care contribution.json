@@ -6,7 +6,7 @@
   "title": "Municipal civic participation valued as care contribution",
   "description": "Municipal civic participation valued as care contribution",
   "content": "Scenario: Municipal civic participation valued as care contribution\n    Given Robert serves on municipal boards and commissions\n    And civic participation is care for community\n    And his service benefits all residents\n    When municipal_elohim tracks civic participation\n    Then it should recognize his municipal service as care contribution\n    And value civic participation in care token economy\n    And track his contributions: planning commission, park board, aging advisory committee\n    And demonstrate that governance participation is care work\n    And recognize that his civic service strengthens municipal care economy\n    And build culture where civic participation is valued as contribution\n    And support sustainable civic engagement without exploitation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal civic participation valued as care contribution",

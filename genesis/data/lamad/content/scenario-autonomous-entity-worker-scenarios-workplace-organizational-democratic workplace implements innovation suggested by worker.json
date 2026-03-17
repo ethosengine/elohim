@@ -6,7 +6,7 @@
   "title": "Democratic workplace implements innovation suggested by worker",
   "description": "Democratic workplace implements innovation suggested by worker",
   "content": "Scenario: Democratic workplace implements innovation suggested by worker\n    Given Emma has identified a workflow optimization\n    And corporate system previously prohibited worker-initiated changes\n    When Emma proposes the optimization at worker council meeting\n    Then workers deliberate on implementation feasibility\n    And workers vote to pilot Emma's optimization for two weeks\n    And results are measured and shared transparently\n    And if successful, Emma's innovation is permanently adopted\n    And Emma receives recognition and compensation for the contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic workplace implements innovation suggested by worker",

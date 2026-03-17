@@ -6,7 +6,7 @@
   "title": "Coordinating complex household schedules across family members",
   "description": "Coordinating complex household schedules across family members",
   "content": "Scenario: Coordinating complex household schedules across family members\n    Given Sarah manages her work schedule, children's schools, household tasks, appointments\n    And partner has separate work schedule and obligations\n    When household activities need coordination\n    Then the household_elohim should integrate all family calendars\n    And it should identify conflicts across household members\n    And it should suggest solutions that work for everyone\n    And schedule coordination should reduce stress, not increase it\n    And household operations should run smoothly through effective coordination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating complex household schedules across family members",

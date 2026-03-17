@@ -6,7 +6,7 @@
   "title": "Manager balances operational efficiency with community relationship priorities",
   "description": "Manager balances operational efficiency with community relationship priorities",
   "content": "Scenario: Manager balances operational efficiency with community relationship priorities\n    Given workers prioritize customer relationships over transaction speed\n    And corporate model measured Marcus on speed metrics\n    When Marcus coordinates daily operations\n    Then Marcus optimizes for customer satisfaction and care, not just speed\n    And Marcus measures success by community feedback and relationship depth\n    And Marcus rejects corporate-style speedup pressure\n    And operational coordination serves worker-defined values\n    And community experiences genuine care, not performative corporate \"service\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager balances operational efficiency with community relationship priorities",

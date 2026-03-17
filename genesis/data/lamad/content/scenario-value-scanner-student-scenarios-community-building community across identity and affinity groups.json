@@ -6,7 +6,7 @@
   "title": "Building community across identity and affinity groups",
   "description": "Building community across identity and affinity groups",
   "content": "Scenario: Building community across identity and affinity groups\n    Given student community includes diverse identity groups\n    And Kenji might participate in environmental student org, cultural groups, academic communities\n    When Kenji bridges across different student communities\n    Then the community_elohim should recognize bridge-building as care work\n    And it should value work connecting different student networks\n    And it should show how diverse relationships strengthen overall community\n    And coalition building should accumulate care tokens\n    And the system should foster inclusive, interconnected community\n    And students should learn to build community across difference\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building community across identity and affinity groups",

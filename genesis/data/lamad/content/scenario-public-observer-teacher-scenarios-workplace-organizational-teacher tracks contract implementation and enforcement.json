@@ -6,7 +6,7 @@
   "title": "Teacher tracks contract implementation and enforcement",
   "description": "Teacher tracks contract implementation and enforcement",
   "content": "Scenario: Teacher tracks contract implementation and enforcement\n    Given union contract includes working condition provisions\n    But contract enforcement is inconsistent across schools\n    When the Observer monitors contract implementation\n    Then teachers document where contract is violated (planning time, class sizes, duties)\n    And patterns show which administrators ignore contract provisions\n    And union identifies systemic enforcement gaps vs isolated violations\n    And brings accountability data to district and grievance process\n    And contract becomes enforceable through transparency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher tracks contract implementation and enforcement",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

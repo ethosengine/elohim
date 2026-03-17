@@ -6,7 +6,7 @@
   "title": "Journalist exposes misclassification of workers as contractors",
   "description": "Journalist exposes misclassification of workers as contractors",
   "content": "Scenario: Journalist exposes misclassification of workers as contractors\n    Given gig economy companies classify workers as independent contractors\n    And the journalist investigates worker classification\n    When the Observer analyzes employment patterns and labor violations\n    Then the journalist sees workers have employer control without worker rights\n    And documents workers denied minimum wage, overtime, and benefits\n    And shows companies avoid taxes through misclassification\n    And identifies regulatory agencies failing to enforce classification rules\n    And publishes investigation on worker exploitation through misclassification\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist exposes misclassification of workers as contractors",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

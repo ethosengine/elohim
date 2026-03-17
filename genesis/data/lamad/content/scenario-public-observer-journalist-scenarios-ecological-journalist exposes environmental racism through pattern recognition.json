@@ -6,7 +6,7 @@
   "title": "Journalist exposes environmental racism through pattern recognition",
   "description": "Journalist exposes environmental racism through pattern recognition",
   "content": "Scenario: Journalist exposes environmental racism through pattern recognition\n    Given pollution facilities cluster in certain communities\n    And the journalist investigates environmental justice\n    When the Observer analyzes environmental permit patterns\n    Then the journalist sees industrial permits concentrate in communities of color\n    And maps proximity of pollution sources to schools and residences\n    And documents health outcome disparities by neighborhood demographics\n    And shows pattern persists across decades of permitting decisions\n    And publishes investigation exposing systematic environmental racism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist exposes environmental racism through pattern recognition",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

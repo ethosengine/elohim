@@ -6,7 +6,7 @@
   "title": "Customer trust relationships institutionalize through democratic governance",
   "description": "Customer trust relationships institutionalize through democratic governance",
   "content": "Scenario: Customer trust relationships institutionalize through democratic governance\n    Given customers bring cars to Rosa because of 15 years of personal trust\n    And trust was built through honest work, fair pricing, and community care\n    When ownership transitions from individual to democratic\n    Then customer histories are documented (with privacy protection)\n    And workers inherit trust relationships through Rosa's introduction\n    And customers learn their support now benefits worker-owners, not distant capital\n    And democratic governance creates transparency deepening trust\n    And community_elohim ensures trust institutionalizes beyond individual owner\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer trust relationships institutionalize through democratic governance",

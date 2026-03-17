@@ -6,7 +6,7 @@
   "title": "Building neural pathways for care-based economic thinking",
   "description": "Building neural pathways for care-based economic thinking",
   "content": "Scenario: Building neural pathways for care-based economic thinking\n    Given Emma's brain is highly plastic during ages 8-10\n    And repeated patterns shape lifelong thinking\n    When Emma makes value decisions consistently\n    Then she should internalize that resources are for stewardship\n    And she should learn that choices affect others' flourishing\n    And she should understand that care creates value\n    And neural pathways around care economy thinking should form\n    And these patterns should serve her entire life\n    And she should develop alternative to extraction-based economics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building neural pathways for care-based economic thinking",

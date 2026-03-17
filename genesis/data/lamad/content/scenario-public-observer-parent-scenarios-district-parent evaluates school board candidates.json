@@ -6,7 +6,7 @@
   "title": "Parent evaluates school board candidates",
   "description": "Parent evaluates school board candidates",
   "content": "Scenario: Parent evaluates school board candidates\n    Given three candidates are running for school board seats\n    And the parent has limited time to research before the election\n    When the parent reviews Observer's candidate analysis\n    Then they see each candidate's voting record on key issues\n    And view candidates' positions on class sizes and program funding\n    And understand which candidates prioritize student needs vs politics\n    And can make informed voting decision in 15 minutes\n    And democracy extends to education governance elections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent evaluates school board candidates",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

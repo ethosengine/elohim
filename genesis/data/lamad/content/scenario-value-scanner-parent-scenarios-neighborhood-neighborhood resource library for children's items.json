@@ -6,7 +6,7 @@
   "title": "Neighborhood resource library for children's items",
   "description": "Neighborhood resource library for children's items",
   "content": "Scenario: Neighborhood resource library for children's items\n    Given children outgrow clothing, toys, and equipment rapidly\n    And buying everything new is expensive and wasteful\n    When the neighborhood_elohim coordinates resource sharing\n    Then it should enable lending libraries for children's items\n    And it should track who has what available to share\n    And it should facilitate borrowing rather than buying\n    And resource sharing should be recognized as care contribution\n    And neighborhood sustainability should reduce family expenses\n    And the system should enable circular economy for child-rearing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood resource library for children's items",

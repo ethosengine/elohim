@@ -6,7 +6,7 @@
   "title": "Local material sourcing reduces transportation impact",
   "description": "Local material sourcing reduces transportation impact",
   "content": "Scenario: Local material sourcing reduces transportation impact\n    Given Frank's construction work requires materials\n    And material transportation has significant carbon footprint\n    When the bioregional_elohim coordinates material sourcing\n    Then it should facilitate use of locally-sourced materials\n    And connect Frank to local salvage and reclaimed material sources\n    And reduce transportation impact through bioregional supply chains\n    And recognize local sourcing as ecological care contribution\n    And strengthen bioregional material economies\n    And Frank's work should demonstrate local material viability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local material sourcing reduces transportation impact",

@@ -6,7 +6,7 @@
   "title": "Development of conscious values and identity around care",
   "description": "Development of conscious values and identity around care",
   "content": "Scenario: Development of conscious values and identity around care\n    Given Marcus is forming conscious values and identity\n    And he is developing abstract thinking capacity\n    When Marcus makes repeated care decisions over time\n    Then he should be developing identity as capable caregiver\n    And his values around family responsibility should be consciously forming\n    And the system should support healthy identity development\n    And he should see himself as person who takes care of his family\n    And care economy principles should shape his developing worldview\n    And his self-concept should be as contributor, not burden\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Development of conscious values and identity around care",

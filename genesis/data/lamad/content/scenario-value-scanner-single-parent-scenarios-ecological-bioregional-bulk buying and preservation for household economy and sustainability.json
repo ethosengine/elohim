@@ -6,7 +6,7 @@
   "title": "Bulk buying and preservation for household economy and sustainability",
   "description": "Bulk buying and preservation for household economy and sustainability",
   "content": "Scenario: Bulk buying and preservation for household economy and sustainability\n    Given Maria buys in bulk when possible to reduce costs\n    And she preserves food to extend usability and reduce waste\n    When household food practices are assessed\n    Then the bioregional_elohim should recognize bulk buying and preservation as sustainable\n    And it should value her food stewardship practices\n    And her economic strategies should be seen as environmental best practices\n    And preservation skills should be honored as ecological knowledge\n    And Maria should be recognized for traditional sustainability practices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bulk buying and preservation for household economy and sustainability",

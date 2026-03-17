@@ -6,7 +6,7 @@
   "title": "Global data infrastructure with privacy and sovereignty protection",
   "description": "Global data infrastructure with privacy and sovereignty protection",
   "content": "Scenario: Global data infrastructure with privacy and sovereignty protection\n    Given I need access to data across nations for research\n    And I must respect privacy, sovereignty, and data justice\n    When global research infrastructure is designed\n    Then I work with: federated data systems respecting national sovereignty\n    And I use: differential privacy protecting individual anonymity\n    And I ensure: community data ownership and benefit sharing\n    And I implement: ethical review and consent protocols\n    And I advocate: for open access to research findings\n    And I practice: data justice not data colonialism\n    And My methodology demonstrates: how to study globally while respecting locally\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Global data infrastructure with privacy and sovereignty protection",

@@ -6,7 +6,7 @@
   "title": "Household downsizing and simplification support",
   "description": "Household downsizing and simplification support",
   "content": "Scenario: Household downsizing and simplification support\n    Given Margaret is transitioning to retirement household patterns\n    And she may need to simplify or downsize\n    When Margaret considers household changes\n    Then the household_elohim should provide decision support\n    And it should help evaluate different living arrangements\n    And it should calculate cost implications of changes\n    And it should preserve Margaret's autonomy in decisions\n    And practical information should support her choices\n    And the system should help her age in place if she wishes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household downsizing and simplification support",

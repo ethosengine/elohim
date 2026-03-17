@@ -6,7 +6,7 @@
   "title": "Operator chooses dignified exit over continued extraction role",
   "description": "Operator chooses dignified exit over continued extraction role",
   "content": "Scenario: Operator chooses dignified exit over continued extraction role\n    Given James is exhausted from 70-hour weeks and moral injury of implementing exploitation\n    And complete exit is valid choice deserving support\n    When James decides to exit rather than stay as transition steward\n    Then he receives acquisition payment plus six months consulting compensation\n    And workers appreciate his choice to enable democratic ownership\n    And exit is graceful with community gratitude, not corporate-style termination\n    And he leaves with dignity, financial security, and moral peace\n    And workplace_elohim facilitates knowledge transfer during dignified exit\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Operator chooses dignified exit over continued extraction role",

@@ -6,7 +6,7 @@
   "title": "My healthcare amendment proposal passes convention",
   "description": "My healthcare amendment proposal passes convention",
   "content": "Scenario: My healthcare amendment proposal passes convention\n    Given my nursing experience revealed healthcare as dignity issue\n    And I proposed amendment recognizing healthcare as constitutional right\n    When convention deliberates my proposal\n    Then delegates hear: my testimony about dignity in healthcare\n    And they discuss: healthcare across diverse economic contexts\n    And they debate: what healthcare dignity requires constitutionally\n    And they refine: language to work across cultures and nations\n    And they vote: and my amendment passes\n    And I have: shaped constitution for human-AI partnership\n    And I know: ordinary nurse from small town helped write law for humanity\n    And I embody: democratic possibility that anyone can govern\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "My healthcare amendment proposal passes convention",

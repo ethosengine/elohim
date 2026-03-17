@@ -6,7 +6,7 @@
   "title": "Industry compensation models value care contributions",
   "description": "Industry compensation models value care contributions",
   "content": "Scenario: Industry compensation models value care contributions\n    Given traditional compensation often ignores care skills and contributions\n    And compensation models shape industry practice\n    And Robert's care skills enhance his professional value\n    When industry_elohim advocates for compensation reform\n    Then it should help Robert advocate for compensation that values care skills\n    And support industry recognition of care work as professional asset\n    And help develop compensation frameworks that include care economy metrics\n    And build industry norms where care skills command market value\n    And prevent care responsibilities from being compensation penalty\n    And advance fair compensation through industry standards\n    And demonstrate that care economy principles transform compensation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Industry compensation models value care contributions",

@@ -6,7 +6,7 @@
   "title": "Neighborhood shopping patterns affect local product availability",
   "description": "Neighborhood shopping patterns affect local product availability",
   "content": "Scenario: Neighborhood shopping patterns affect local product availability\n    Given Emma shops at local grocery store\n    And the store stocks products based on community demand\n    When Emma consistently chooses certain products\n    Then she should learn her choices influence what stores carry\n    And her personal_agent should explain \"When families buy local produce, stores stock more of it\"\n    And Emma should understand demand shapes supply at community level\n    And she should see connection between individual choice and collective power\n    And economic literacy should include understanding market dynamics\n    And she should learn communities shape local economies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood shopping patterns affect local product availability",

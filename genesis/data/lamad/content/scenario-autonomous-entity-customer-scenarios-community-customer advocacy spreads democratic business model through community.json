@@ -6,7 +6,7 @@
   "title": "Customer advocacy spreads democratic business model through community",
   "description": "Customer advocacy spreads democratic business model through community",
   "content": "Scenario: Customer advocacy spreads democratic business model through community\n    Given Ms. Johnson experiences benefits of democratic business personally\n    And neighbors don't know democratic alternatives exist\n    When satisfied customers share experiences and advocate for democratic businesses\n    Then she tells neighbors about worker ownership and improved quality\n    And brings isolated elders to senior meal program\n    And word-of-mouth advocacy builds customer base for democratic businesses\n    And community awareness of economic democracy grows through customer stories\n    And community_elohim supports customer advocacy and community education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer advocacy spreads democratic business model through community",

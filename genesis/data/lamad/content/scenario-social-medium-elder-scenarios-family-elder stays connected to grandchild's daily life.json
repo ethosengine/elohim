@@ -6,7 +6,7 @@
   "title": "Elder stays connected to grandchild's daily life",
   "description": "Elder stays connected to grandchild's daily life",
   "content": "Scenario: Elder stays connected to grandchild's daily life\n    Given Emma shares her school activities and achievements\n    When Emma posts about her science fair project\n    And she shares photos of her display\n    Then Rose sees Emma's contribution in family stream\n    And Rose can respond with encouragement and pride\n    And Emma feels her grandmother's support despite distance\n    And the family bond strengthens through regular positive interaction\n    And Rose remains engaged with grandchildren's lives\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-family",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder stays connected to grandchild's daily life",

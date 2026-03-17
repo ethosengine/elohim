@@ -6,7 +6,7 @@
   "title": "Balancing technical expert advice with my human judgment",
   "description": "Balancing technical expert advice with my human judgment",
   "content": "Scenario: Balancing technical expert advice with my human judgment\n    Given Marcus's case involves complex pattern detection algorithms\n    And I don't understand the technical details\n    When technical expert Dr. Okonkwo explains the agent's reasoning\n    Then she translates: cryptographic proofs into accessible language\n    And she clarifies: what confidence levels mean and their limitations\n    And she acknowledges: uncertainties and competing interpretations\n    And she informs: but doesn't tell us what decision is right\n    And I weigh: her technical knowledge alongside my human wisdom\n    And I judge: whether constitutional principles were honored\n    And I respect: expertise without surrendering my judgment authority\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing technical expert advice with my human judgment",

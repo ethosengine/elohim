@@ -6,7 +6,7 @@
   "title": "Bioregional climate resilience increases through democratic economy investment",
   "description": "Bioregional climate resilience increases through democratic economy investment",
   "content": "Scenario: Bioregional climate resilience increases through democratic economy investment\n    Given climate disruption threatens communities and ecosystems\n    And Patricia wants investment supporting adaptation and resilience\n    When community investment prioritizes climate-resilient enterprises\n    Then democratic farms implement drought-resistant crops and water conservation\n    And local food systems reduce vulnerability to supply chain disruptions\n    And bioregional economic resilience strengthens through democratic coordination\n    And investment builds climate adaptation capacity\n    And bioregional_elohim coordinates climate resilience investment and planning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional climate resilience increases through democratic economy investment",

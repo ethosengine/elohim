@@ -6,7 +6,7 @@
   "title": "Teacher exposes planning time inequities across schools",
   "description": "Teacher exposes planning time inequities across schools",
   "content": "Scenario: Teacher exposes planning time inequities across schools\n    Given some schools provide adequate planning time while others don't\n    And teachers don't know if their conditions are typical or problematic\n    When the Observer documents planning time across district\n    Then teachers see stark disparities (30 min vs 90 min daily planning)\n    And identify which principals prioritize teacher planning time\n    And understand patterns (wealthy schools get more planning time)\n    And coordinate advocacy for district-wide planning time standards\n    And working conditions comparison drives equity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher exposes planning time inequities across schools",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

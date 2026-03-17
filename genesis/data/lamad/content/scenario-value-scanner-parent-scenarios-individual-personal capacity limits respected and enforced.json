@@ -6,7 +6,7 @@
   "title": "Personal capacity limits respected and enforced",
   "description": "Personal capacity limits respected and enforced",
   "content": "Scenario: Personal capacity limits respected and enforced\n    Given Sarah has finite energy, time, and emotional capacity\n    And demands regularly exceed her available resources\n    When Sarah approaches capacity limits\n    Then the personal_agent should help her identify what to drop\n    And it should validate saying no to non-essential demands\n    And it should recognize that she cannot do everything\n    And capacity constraints should be treated as real boundaries\n    And the system should support sustainable pacing\n    And Sarah should learn that limitations are human, not failure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal capacity limits respected and enforced",

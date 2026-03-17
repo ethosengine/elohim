@@ -6,7 +6,7 @@
   "title": "Soil health improvements are documented and knowledge is shared",
   "description": "Soil health improvements are documented and knowledge is shared",
   "content": "Scenario: Soil health improvements are documented and knowledge is shared\n    Given soil degradation is systemic problem in industrial agriculture\n    And regenerative soil building requires knowledge and long-term commitment\n    When democratic farms document and share soil health practices\n    Then soil testing shows organic matter increases and biological activity improvements\n    And successful practices are shared across bioregional farm network\n    And soil health knowledge accumulates and spreads through democratic coordination\n    And bioregional soil regeneration accelerates through collective learning\n    And bioregional_elohim manages soil health documentation and knowledge sharing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Soil health improvements are documented and knowledge is shared",

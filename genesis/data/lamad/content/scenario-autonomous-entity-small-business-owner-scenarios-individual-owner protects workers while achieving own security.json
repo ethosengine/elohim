@@ -6,7 +6,7 @@
   "title": "Owner protects workers while achieving own security",
   "description": "Owner protects workers while achieving own security",
   "content": "Scenario: Owner protects workers while achieving own security\n    Given Rosa could sell to buyer who would fire workers and cut quality\n    And she refuses to betray workers despite financial pressure\n    When EAE acquisition enables both worker protection and owner security\n    Then workers gain ownership, higher wages, and governance voice\n    And Rosa achieves financial security without worker exploitation\n    And false choice between owner security and worker dignity is resolved\n    And Rosa's ethical commitments are honored, not punished\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner protects workers while achieving own security",

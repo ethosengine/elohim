@@ -6,7 +6,7 @@
   "title": "Parent challenges harmful discipline policies",
   "description": "Parent challenges harmful discipline policies",
   "content": "Scenario: Parent challenges harmful discipline policies\n    Given the school implements zero-tolerance discipline policy\n    And the parent's child has been suspended for minor incident\n    When the parent reviews Observer's discipline data\n    Then they see suspension rates and disparate racial impacts\n    And learn about restorative justice alternatives\n    And discover other parents whose children face similar treatment\n    And understand policy alternatives from other districts\n    And parent coalition advocates for evidence-based discipline reform\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent challenges harmful discipline policies",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

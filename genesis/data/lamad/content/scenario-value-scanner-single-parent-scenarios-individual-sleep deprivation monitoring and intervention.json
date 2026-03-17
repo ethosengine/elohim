@@ -6,7 +6,7 @@
   "title": "Sleep deprivation monitoring and intervention",
   "description": "Sleep deprivation monitoring and intervention",
   "content": "Scenario: Sleep deprivation monitoring and intervention\n    Given Maria wakes at 5am and collapses near midnight daily\n    And chronic sleep deprivation damages health and capacity\n    When the personal_agent tracks Maria's sleep patterns\n    Then it should monitor for dangerous sleep deprivation\n    And it should advocate for more rest when possible\n    And it should help her find efficiency that creates sleep time\n    And it should alert her when sleep deprivation threatens her health\n    And Maria should have support for this basic but often impossible need\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sleep deprivation monitoring and intervention",

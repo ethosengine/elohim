@@ -6,7 +6,7 @@
   "title": "Journalist detects gentrification pattern across neighborhoods",
   "description": "Journalist detects gentrification pattern across neighborhoods",
   "content": "Scenario: Journalist detects gentrification pattern across neighborhoods\n    Given individual rent increases in scattered buildings\n    And the journalist suspects coordinated displacement\n    When the Observer tracks evictions and rent increases across community\n    Then the journalist sees systematic pattern of displacement\n    And identifies corporate landlord acquiring properties neighborhood-wide\n    And documents residents being priced out block by block\n    And connects individual stories to structural pattern\n    And publishes investigation exposing organized gentrification\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist detects gentrification pattern across neighborhoods",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

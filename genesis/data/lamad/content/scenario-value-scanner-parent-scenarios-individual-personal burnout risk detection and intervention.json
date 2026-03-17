@@ -6,7 +6,7 @@
   "title": "Personal burnout risk detection and intervention",
   "description": "Personal burnout risk detection and intervention",
   "content": "Scenario: Personal burnout risk detection and intervention\n    Given Sarah has been operating at unsustainable intensity\n    And she wakes at 5:30am and works until 10pm daily\n    When the personal_agent detects burnout patterns\n    Then it should flag the unsustainability explicitly\n    And it should say \"This pace will break you. You need support.\"\n    And it should connect her to respite resources\n    And it should help her identify what must give\n    And crisis intervention should be immediate and clear\n    And the system should prioritize her survival over perfection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal burnout risk detection and intervention",

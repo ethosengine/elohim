@@ -6,7 +6,7 @@
   "title": "Shifting from dependent to junior contributor role",
   "description": "Shifting from dependent to junior contributor role",
   "content": "Scenario: Shifting from dependent to junior contributor role\n    Given Emma has increasing capability at age 8\n    And her family role is evolving\n    When Emma makes care contributions through the scanner\n    Then she should be recognized as junior contributor, not just helper\n    And her voice in family decisions should carry real weight\n    And the family_elohim should track her growing capability\n    And Sarah should be supported in granting appropriate autonomy\n    And Emma should experience increasing responsibility\n    And family dynamics should reflect her developmental transition\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Shifting from dependent to junior contributor role",

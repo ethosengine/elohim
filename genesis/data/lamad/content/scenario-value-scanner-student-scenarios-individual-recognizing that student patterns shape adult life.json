@@ -6,7 +6,7 @@
   "title": "Recognizing that student patterns shape adult life",
   "description": "Recognizing that student patterns shape adult life",
   "content": "Scenario: Recognizing that student patterns shape adult life\n    Given Kenji is forming habits and patterns that will persist\n    And his college years are when adult identity and practices solidify\n    When the personal_agent reflects on Kenji's pattern development\n    Then it should help him see that current choices shape future self\n    And it should validate that learning care economy now matters lifelong\n    And it should recognize this developmental phase as formative\n    And the agent should support intentional pattern-building\n    And the system should help Kenji become the adult he wants to be\n    And student years should be recognized as foundation-laying time\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognizing that student patterns shape adult life",

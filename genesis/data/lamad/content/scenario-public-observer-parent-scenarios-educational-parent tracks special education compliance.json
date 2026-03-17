@@ -6,7 +6,7 @@
   "title": "Parent tracks special education compliance",
   "description": "Parent tracks special education compliance",
   "content": "Scenario: Parent tracks special education compliance\n    Given the parent's child has IEP for learning disability\n    And required support services aren't being provided\n    When the parent reviews Observer's special education tracking\n    Then they see federal law mandates these services\n    And understand district is violating child's legal rights\n    And learn process for filing compliance complaint\n    And connect with other special education parents\n    And district cannot quietly violate disability rights\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent tracks special education compliance",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

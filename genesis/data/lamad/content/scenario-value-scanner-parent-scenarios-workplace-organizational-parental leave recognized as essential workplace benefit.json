@@ -6,7 +6,7 @@
   "title": "Parental leave recognized as essential workplace benefit",
   "description": "Parental leave recognized as essential workplace benefit",
   "content": "Scenario: Parental leave recognized as essential workplace benefit\n    Given parents need time for infant care, adoption, family crisis\n    And parental leave is essential for child well-being\n    When the workplace_elohim assesses workplace policies\n    Then it should flag inadequate parental leave as care economy violation\n    And it should help Sarah advocate for better leave policies\n    And the system should recognize parental leave as basic necessity\n    And workplace should provide substantial paid parental leave\n    And care economy principles should require workplace support for new parents\n    And Sarah should have support for advocating for family leave\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parental leave recognized as essential workplace benefit",

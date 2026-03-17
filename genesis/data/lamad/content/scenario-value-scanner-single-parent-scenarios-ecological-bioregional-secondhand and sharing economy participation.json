@@ -6,7 +6,7 @@
   "title": "Secondhand and sharing economy participation",
   "description": "Secondhand and sharing economy participation",
   "content": "Scenario: Secondhand and sharing economy participation\n    Given Maria purchases secondhand when possible to reduce costs\n    And she participates in sharing networks to avoid unnecessary purchases\n    When household acquisition patterns are analyzed\n    Then the bioregional_elohim should recognize her secondhand economy participation\n    And it should value sharing networks as resource efficiency\n    And her practices should be celebrated as circular economy leadership\n    And economic constraint should be honored as environmental wisdom\n    And Maria should be recognized as sustainability practitioner\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Secondhand and sharing economy participation",

@@ -6,7 +6,7 @@
   "title": "Environmental care literacy appropriate to concrete operations",
   "description": "Environmental care literacy appropriate to concrete operations",
   "content": "Scenario: Environmental care literacy appropriate to concrete operations\n    Given care economy extends to ecological relationships\n    And Emma can understand concrete environmental concepts\n    When Emma learns about environmental impact through scanner\n    Then ecological care should be presented at age-appropriate level\n    And the agent should say \"This packaging can be recycled\" (concrete)\n    And abstract sustainability concepts should be avoided\n    And connections between caring for people and planet should begin\n    And Emma should develop environmental consciousness\n    And ecological stewardship foundations should be laid for future development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental care literacy appropriate to concrete operations",

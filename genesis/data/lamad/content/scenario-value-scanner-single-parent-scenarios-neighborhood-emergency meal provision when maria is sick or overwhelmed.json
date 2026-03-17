@@ -6,7 +6,7 @@
   "title": "Emergency meal provision when Maria is sick or overwhelmed",
   "description": "Emergency meal provision when Maria is sick or overwhelmed",
   "content": "Scenario: Emergency meal provision when Maria is sick or overwhelmed\n    Given Maria has no co-parent to cook when she's sick or at breaking point\n    And she still must feed three children regardless of her state\n    When Maria faces health crisis or exhaustion emergency\n    Then the neighborhood_elohim should activate meal provision network\n    And neighbors should be able to provide emergency meal support\n    And Maria should receive help based on her care economy standing, not charity\n    And emergency support should be dignified and reciprocal\n    And neighborhood should serve as backup for solo parent crisis\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency meal provision when Maria is sick or overwhelmed",

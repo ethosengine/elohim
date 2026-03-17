@@ -6,7 +6,7 @@
   "title": "Municipal emergency preparedness utilizes retired residents' availability",
   "description": "Municipal emergency preparedness utilizes retired residents' availability",
   "content": "Scenario: Municipal emergency preparedness utilizes retired residents' availability\n    Given Frank has daytime availability and construction skills\n    And municipalities need emergency response capacity\n    When the municipal_elohim coordinates emergency preparedness\n    Then it should include retired residents in emergency planning\n    And utilize their skills and availability for emergency response\n    And coordinate community-level resilience with municipal systems\n    And recognize retired residents as municipal emergency resource\n    And Frank should contribute meaningfully to collective safety\n    And municipal preparedness should leverage care economy networks\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal emergency preparedness utilizes retired residents' availability",

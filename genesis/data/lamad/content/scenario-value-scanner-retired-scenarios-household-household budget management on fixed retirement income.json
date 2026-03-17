@@ -6,7 +6,7 @@
   "title": "Household budget management on fixed retirement income",
   "description": "Household budget management on fixed retirement income",
   "content": "Scenario: Household budget management on fixed retirement income\n    Given household operates on $28k/year fixed income\n    And income cannot be increased through employment\n    And resources must cover housing, food, healthcare, and participation\n    When Frank and his wife make household financial decisions\n    Then the household_elohim should track spending against fixed budget\n    And it should identify optimization opportunities without stigma\n    And it should integrate financial constraints with care contribution goals\n    And it should help both partners make informed trade-offs\n    And budget should reflect care priorities and community participation\n    And financial management should maintain dignity and agency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household budget management on fixed retirement income",

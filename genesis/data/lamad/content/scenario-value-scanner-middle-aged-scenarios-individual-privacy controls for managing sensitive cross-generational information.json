@@ -6,7 +6,7 @@
   "title": "Privacy controls for managing sensitive cross-generational information",
   "description": "Privacy controls for managing sensitive cross-generational information",
   "content": "Scenario: Privacy controls for managing sensitive cross-generational information\n    Given Robert manages his parents' sensitive health and financial data\n    And he coordinates care with his siblings\n    And he supports his adult children while respecting their privacy\n    When Robert configures privacy settings\n    Then he should have granular control over information flows\n    And his parents' health data should be protected\n    And his children's information should remain private\n    And family care coordination should share only relevant data\n    And his workplace should not access family health information\n    And community governance should see his care contributions without sensitive details\n    And privacy boundaries should protect all parties' dignity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy controls for managing sensitive cross-generational information",

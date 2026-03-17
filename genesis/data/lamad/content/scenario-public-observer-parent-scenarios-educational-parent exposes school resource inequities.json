@@ -6,7 +6,7 @@
   "title": "Parent exposes school resource inequities",
   "description": "Parent exposes school resource inequities",
   "content": "Scenario: Parent exposes school resource inequities\n    Given the parent suspects their child's school gets fewer resources\n    And neighboring school seems to have more programs and facilities\n    When the parent reviews Observer's district equity analysis\n    Then they see per-student spending varies by thousands of dollars\n    And westside schools have gifted programs and experienced teachers\n    And their child's school lacks arts, music, and advanced courses\n    And systematic inequity pattern becomes documented evidence\n    And parent advocacy shifts to structural equity demands\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent exposes school resource inequities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

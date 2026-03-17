@@ -6,7 +6,7 @@
   "title": "Child learns community economic power through collective action",
   "description": "Child learns community economic power through collective action",
   "content": "Scenario: Child learns community economic power through collective action\n    Given neighborhood families make coordinated choices\n    And Emma participates in community economic patterns\n    When Emma sees collective neighborhood impact\n    Then she should learn about community economic agency\n    And her personal_agent should explain collective power age-appropriately\n    And the agent should say \"When families choose together, stores listen\"\n    And she should understand communities can shape markets\n    And care economy includes collective organizing dimension\n    And she should learn early about community economic power\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child learns community economic power through collective action",

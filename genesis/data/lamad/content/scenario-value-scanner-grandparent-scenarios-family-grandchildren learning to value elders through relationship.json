@@ -6,7 +6,7 @@
   "title": "Grandchildren learning to value elders through relationship",
   "description": "Grandchildren learning to value elders through relationship",
   "content": "Scenario: Grandchildren learning to value elders through relationship\n    Given Margaret's care work builds deep bonds with grandchildren\n    And she teaches them to respect and value older adults\n    When Tommy and Emma interact with Margaret over years\n    Then the family_elohim should track relationship development\n    And it should recognize Margaret's role in shaping their attitudes toward elders\n    And children should learn that aging doesn't diminish worth\n    And they should see Margaret as capable, wise, and valuable\n    And this learning will matter when Margaret needs care herself\n    And next generation is being prepared to value and care for elders\n    And intergenerational relationships should be mutually enriching\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Grandchildren learning to value elders through relationship",

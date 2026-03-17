@@ -6,7 +6,7 @@
   "title": "Workers access transparent financial information previously hidden by corporate",
   "description": "Workers access transparent financial information previously hidden by corporate",
   "content": "Scenario: Workers access transparent financial information previously hidden by corporate\n    Given corporate kept financial information opaque to workers\n    And workers now have complete financial transparency\n    When workers access the financial dashboard\n    Then they see real-time revenue, costs, and profit\n    And they see exactly how much was previously extracted by franchise fees\n    And they see supplier costs and markup comparisons\n    And they see complete compensation breakdown for all workers\n    And they can audit any financial transaction\n    And workplace_elohim ensures financial literacy support for all workers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers access transparent financial information previously hidden by corporate",

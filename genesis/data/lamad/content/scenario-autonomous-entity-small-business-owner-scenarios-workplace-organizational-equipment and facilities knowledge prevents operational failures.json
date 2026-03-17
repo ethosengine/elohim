@@ -6,7 +6,7 @@
   "title": "Equipment and facilities knowledge prevents operational failures",
   "description": "Equipment and facilities knowledge prevents operational failures",
   "content": "Scenario: Equipment and facilities knowledge prevents operational failures\n    Given Rosa knows every quirk of equipment and building systems\n    And this tacit knowledge prevents costly breakdowns and delays\n    When facilities knowledge transfer is prioritized\n    Then Rosa documents equipment maintenance schedules and troubleshooting\n    And workers learn which compressor sounds indicate problems\n    And building system knowledge (electrical, plumbing, HVAC) is shared\n    And maintenance protocols are established preventing future failures\n    And institutional knowledge replaces individual expertise\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Equipment and facilities knowledge prevents operational failures",

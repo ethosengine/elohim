@@ -6,7 +6,7 @@
   "title": "Extended family contributions distributed equitably",
   "description": "Extended family contributions distributed equitably",
   "content": "Scenario: Extended family contributions distributed equitably\n    Given James carries enormous family care burden\n    And other family members could provide some support\n    When the family_elohim analyzes family care distribution\n    Then it should identify who is doing what\n    And it should make visible that James is carrying most burden\n    And it should prevent care from falling entirely on one person\n    And it should enable equitable distribution negotiations\n    And family care should be shared fairly, not concentrated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Extended family contributions distributed equitably",

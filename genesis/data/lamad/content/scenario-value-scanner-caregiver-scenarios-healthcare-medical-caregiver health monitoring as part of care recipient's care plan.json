@@ -6,7 +6,7 @@
   "title": "Caregiver health monitoring as part of care recipient's care plan",
   "description": "Caregiver health monitoring as part of care recipient's care plan",
   "content": "Scenario: Caregiver health monitoring as part of care recipient's care plan\n    Given James's health directly affects his ability to care for David\n    And caregiver health collapse creates patient crisis\n    When the healthcare_elohim monitors caregiver health\n    Then James's health should be tracked as part of care plan\n    And providers should ask about caregiver well-being\n    And caregiver health problems should trigger intervention\n    And James should be required to attend his own medical appointments\n    And healthcare system should recognize caregiver health as patient health infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver health monitoring as part of care recipient's care plan",

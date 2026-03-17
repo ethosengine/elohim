@@ -6,7 +6,7 @@
   "title": "Developer school partnership creates genuine community benefit",
   "description": "Developer school partnership creates genuine community benefit",
   "content": "Scenario: Developer school partnership creates genuine community benefit\n    Given a responsible developer wants to genuinely support education\n    And recognizes development affects school community\n    When the Observer facilitates school-developer partnership\n    Then the developer commits: after-school program space in community building\n    And provides scholarship fund for district students\n    And employs district graduates in construction and property management\n    And partnership creates lasting educational community benefit\n    And genuine engagement distinguishes from token gestures\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer school partnership creates genuine community benefit",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

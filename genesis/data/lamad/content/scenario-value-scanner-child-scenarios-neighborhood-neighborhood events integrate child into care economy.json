@@ -6,7 +6,7 @@
   "title": "Neighborhood events integrate child into care economy",
   "description": "Neighborhood events integrate child into care economy",
   "content": "Scenario: Neighborhood events integrate child into care economy\n    Given the neighborhood holds community gatherings or shared resources\n    And Emma participates in neighborhood activities\n    When Emma attends community events\n    Then her care contributions should carry across contexts\n    And neighborhood_elohim should coordinate recognition\n    And Emma should experience community as extension of family\n    And she should learn care economy scales beyond household\n    And community belonging should be built through participation\n    And she should see herself as valued neighborhood member\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood events integrate child into care economy",

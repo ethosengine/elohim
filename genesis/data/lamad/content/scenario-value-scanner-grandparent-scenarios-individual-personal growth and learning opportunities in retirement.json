@@ -6,7 +6,7 @@
   "title": "Personal growth and learning opportunities in retirement",
   "description": "Personal growth and learning opportunities in retirement",
   "content": "Scenario: Personal growth and learning opportunities in retirement\n    Given Margaret is in early retirement with decades of life ahead\n    And she values continued learning and development\n    When the personal_agent tracks Margaret's activities\n    Then it should encourage and support continued education\n    And it should suggest learning opportunities aligned with her interests\n    And it should recognize that retirement is not the end of growth\n    And it should help her balance caregiving with personal development\n    And Margaret should experience retirement as liberation for new pursuits\n    And the system should affirm her capacity for continued growth and contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal growth and learning opportunities in retirement",

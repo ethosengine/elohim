@@ -6,7 +6,7 @@
   "title": "Addressing protocol-tax law integration questions",
   "description": "Addressing protocol-tax law integration questions",
   "content": "Scenario: Addressing protocol-tax law integration questions\n    Given protocol creates novel economic relationships\n    And tax implications are unclear\n    When I work with revenue department on clarification\n    Then we determine: tax treatment of care tokens\n    And we address: property tax implications of resource sharing\n    And we clarify: whether mutual aid counts for social safety net\n    And we create: certainty enabling protocol to function\n    And we avoid: creating impossible tax burdens\n    And we ensure: tax policy doesn't undermine protocol benefits\n    And legal clarity: supports implementation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Addressing protocol-tax law integration questions",

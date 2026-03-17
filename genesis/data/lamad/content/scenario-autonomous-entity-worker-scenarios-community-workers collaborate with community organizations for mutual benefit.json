@@ -6,7 +6,7 @@
   "title": "Workers collaborate with community organizations for mutual benefit",
   "description": "Workers collaborate with community organizations for mutual benefit",
   "content": "Scenario: Workers collaborate with community organizations for mutual benefit\n    Given local youth program needs employment opportunities\n    And ChickenMax needs additional staff during busy periods\n    When workers discuss partnership with youth program\n    Then workers create paid internship program for neighborhood youth\n    And workers provide mentorship and skill development\n    And workers hire successful interns as permanent staff\n    And community_elohim tracks youth development outcomes\n    And community wealth circulates through youth employment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers collaborate with community organizations for mutual benefit",

@@ -6,7 +6,7 @@
   "title": "Family care tokens acknowledge teen's economic contribution",
   "description": "Family care tokens acknowledge teen's economic contribution",
   "content": "Scenario: Family care tokens acknowledge teen's economic contribution\n    Given the family participates in care token economy\n    And Jasmine contributes substantial household labor, childcare, and coordination\n    When family care tokens are calculated\n    Then Jasmine's contributions should be valued appropriately\n    And her care work should be recognized as genuine economic contribution\n    And tokens should accumulate to her individual account within the family system\n    And she should have voice in how family care tokens are used\n    And her standing in family economic decisions should reflect her contribution\n    And the token system should make visible what traditional economics renders invisible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care tokens acknowledge teen's economic contribution",

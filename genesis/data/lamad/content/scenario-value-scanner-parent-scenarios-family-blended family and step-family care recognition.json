@@ -6,7 +6,7 @@
   "title": "Blended family and step-family care recognition",
   "description": "Blended family and step-family care recognition",
   "content": "Scenario: Blended family and step-family care recognition\n    Given many families include step-parents and half-siblings\n    And Sarah may have step-family relationships\n    When the family_elohim tracks blended family care\n    Then it should recognize care across non-biological relationships\n    And step-parent care should be valued equally\n    And half-sibling care should be recognized\n    And diverse family structures should be fully supported\n    And care economy should serve all family configurations\n    And the system should not privilege nuclear biological family\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Blended family and step-family care recognition",

@@ -6,7 +6,7 @@
   "title": "Balancing speed and deliberation quality under time pressure",
   "description": "Balancing speed and deliberation quality under time pressure",
   "content": "Scenario: Balancing speed and deliberation quality under time pressure\n    Given regional crisis creates many urgent appeals\n    And we must review decisions quickly\n    When we convene emergency sessions for crisis appeals\n    Then we maintain: deliberation quality despite urgency\n    And we evaluate: if emergency protocols were properly invoked\n    And we examine: if crisis justified departures from normal process\n    And we provide: expedited review within 48-72 hours\n    And we avoid: rubber-stamping under pressure\n    And we create: precedent for crisis governance\n    And we ensure: democratic accountability even in emergencies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing speed and deliberation quality under time pressure",

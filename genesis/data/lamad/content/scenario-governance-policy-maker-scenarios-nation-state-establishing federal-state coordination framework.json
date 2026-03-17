@@ -6,7 +6,7 @@
   "title": "Establishing federal-state coordination framework",
   "description": "Establishing federal-state coordination framework",
   "content": "Scenario: Establishing federal-state coordination framework\n    Given protocol operates at multiple layers\n    And coordination is needed without centralization\n    When I create federal-state cooperation legislation\n    Then I establish: funding programs respecting state sovereignty\n    And I create: interstate coordination mechanisms\n    And I specify: federal role as support not control\n    And I protect: community and state autonomy\n    And I enable: national coherence with local diversity\n    And I demonstrate: federalism working for AI governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Establishing federal-state coordination framework",

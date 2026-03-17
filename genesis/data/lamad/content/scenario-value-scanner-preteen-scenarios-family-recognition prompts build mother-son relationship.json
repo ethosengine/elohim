@@ -6,7 +6,7 @@
   "title": "Recognition prompts build mother-son relationship",
   "description": "Recognition prompts build mother-son relationship",
   "content": "Scenario: Recognition prompts build mother-son relationship\n    Given Sarah has limited time with Marcus\n    And their relationship could be strained by her absence and his burden\n    When the family_elohim generates recognition prompts\n    Then prompts should facilitate positive connection moments\n    And Sarah should be given specific appreciations to express\n    And Marcus should receive recognition from Sarah, not just system\n    And their relationship should be strengthened by care visibility\n    And prompts should create opportunities for bonding\n    And love should be communicated despite difficult circumstances\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition prompts build mother-son relationship",

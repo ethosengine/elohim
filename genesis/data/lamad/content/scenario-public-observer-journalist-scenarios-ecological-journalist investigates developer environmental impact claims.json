@@ -6,7 +6,7 @@
   "title": "Journalist investigates developer environmental impact claims",
   "description": "Journalist investigates developer environmental impact claims",
   "content": "Scenario: Journalist investigates developer environmental impact claims\n    Given a major development project claims environmental sustainability\n    And the journalist evaluates environmental impact claims\n    When the Observer analyzes developer's environmental track record\n    Then the journalist finds developer's past projects harmed ecosystems\n    And verifies sustainability claims contradict actual development plans\n    And identifies wetland destruction despite mitigation promises\n    And shows developer has outstanding violations in other states\n    And publishes investigation challenging project approval\n    And instant research exposes developer deception\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates developer environmental impact claims",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

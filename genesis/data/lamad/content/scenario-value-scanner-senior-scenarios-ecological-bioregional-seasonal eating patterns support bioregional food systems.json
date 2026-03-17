@@ -6,7 +6,7 @@
   "title": "Seasonal eating patterns support bioregional food systems",
   "description": "Seasonal eating patterns support bioregional food systems",
   "content": "Scenario: Seasonal eating patterns support bioregional food systems\n    Given Margaret shops for seasonal produce\n    And seasonal eating reduces food miles and supports local agriculture\n    When the bioregional_elohim tracks food choices\n    Then seasonal eating patterns should be recognized\n    And Margaret's choices should support bioregional food systems\n    And local, seasonal food should be prioritized in recommendations\n    And eating with seasons should be encouraged and facilitated\n    And bioregional awareness should develop through practice\n    And Margaret's food choices should strengthen local food economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Seasonal eating patterns support bioregional food systems",

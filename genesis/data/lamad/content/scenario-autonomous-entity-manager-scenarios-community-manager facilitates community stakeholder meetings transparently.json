@@ -6,7 +6,7 @@
   "title": "Manager facilitates community stakeholder meetings transparently",
   "description": "Manager facilitates community stakeholder meetings transparently",
   "content": "Scenario: Manager facilitates community stakeholder meetings transparently\n    Given community investors and customers want to provide input\n    And workers want community perspective while maintaining autonomy\n    When annual stakeholder meeting occurs\n    Then Marcus facilitates meeting ensuring all voices are heard\n    And Marcus presents operational updates transparently\n    And Marcus helps translate community input into actionable worker proposals\n    But Marcus doesn't filter or control community input\n    And workers make final decisions on community suggestions\n    And community_elohim ensures facilitation doesn't manipulate outcomes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager facilitates community stakeholder meetings transparently",

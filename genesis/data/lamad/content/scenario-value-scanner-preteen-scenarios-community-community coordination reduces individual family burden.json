@@ -6,7 +6,7 @@
   "title": "Community coordination reduces individual family burden",
   "description": "Community coordination reduces individual family burden",
   "content": "Scenario: Community coordination reduces individual family burden\n    Given Marcus carries heavy household responsibility\n    And community coordination could reduce this burden\n    When the community_elohim identifies systemic solutions\n    Then it should propose community-level responses to individual struggles\n    And collective action should be suggested: cooperatives, sharing networks, bulk buying\n    And Marcus's individual burden should decrease through community organization\n    And the protocol should demonstrate that care economy reduces isolation\n    And community should exist to coordinate care across families\n    And systemic support should replace individual heroics where possible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community coordination reduces individual family burden",

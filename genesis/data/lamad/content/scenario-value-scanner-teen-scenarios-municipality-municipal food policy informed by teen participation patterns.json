@@ -6,7 +6,7 @@
   "title": "Municipal food policy informed by teen participation patterns",
   "description": "Municipal food policy informed by teen participation patterns",
   "content": "Scenario: Municipal food policy informed by teen participation patterns\n    Given Jasmine uses Value Scanner for food purchasing across the municipality\n    And aggregate data shows youth food access patterns\n    When municipal_elohim analyzes food security and access\n    Then it should surface insights about how teens access food\n    And identify food deserts affecting youth\n    And show impact of local food policy on teen nutrition\n    And inform municipal food policy with data about youth participation\n    And support evidence-based policy for food security\n    And recognize that teen food access matters to public health\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal food policy informed by teen participation patterns",

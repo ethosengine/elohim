@@ -6,7 +6,7 @@
   "title": "Household energy and resource use optimization",
   "description": "Household energy and resource use optimization",
   "content": "Scenario: Household energy and resource use optimization\n    Given Sarah manages household energy and resource consumption\n    And reducing usage requires conscious effort and planning\n    When the ecological_elohim tracks resource management\n    Then it should recognize Sarah's work to minimize consumption\n    And it should value conservation as care labor\n    And it should quantify environmental benefit of reduced usage\n    And resource management should accumulate care tokens\n    And the system should recognize ecological household management\n    And Sarah's environmental care work should be visible and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household energy and resource use optimization",

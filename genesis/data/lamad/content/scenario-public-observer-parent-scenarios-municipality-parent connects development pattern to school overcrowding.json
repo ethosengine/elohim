@@ -6,7 +6,7 @@
   "title": "Parent connects development pattern to school overcrowding",
   "description": "Parent connects development pattern to school overcrowding",
   "content": "Scenario: Parent connects development pattern to school overcrowding\n    Given the parent's child attends chronically overcrowded school\n    And wonders why enrollment keeps increasing\n    When the parent reviews Observer's municipal development history\n    Then they see 5 major residential developments approved in 3 years\n    And learn developers paid minimal school impact fees\n    And understand city approved housing without ensuring school capacity\n    And systematic pattern of municipal decisions harming education becomes visible\n    And parent advocacy targets growth management policies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent connects development pattern to school overcrowding",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Tracking changing nutritional needs for health management",
   "description": "Tracking changing nutritional needs for health management",
   "content": "Scenario: Tracking changing nutritional needs for health management\n    Given Margaret is managing early-stage diabetes\n    And she needs more protein and calcium, less sodium\n    And medications affect her appetite and digestion\n    When Margaret shops for groceries\n    Then her personal_agent should track nutrition across time\n    And it should suggest foods appropriate for her health conditions\n    And it should flag items high in sodium or sugar\n    And it should highlight protein and calcium-rich options\n    And it should help her balance health needs with budget constraints\n    And nutritional guidance should feel supportive, not controlling\n    And Margaret should maintain agency over food choices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Tracking changing nutritional needs for health management",

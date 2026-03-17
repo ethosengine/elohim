@@ -6,7 +6,7 @@
   "title": "Neighborhood repairs and maintenance using construction skills",
   "description": "Neighborhood repairs and maintenance using construction skills",
   "content": "Scenario: Neighborhood repairs and maintenance using construction skills\n    Given Frank has construction expertise\n    And neighborhoods need ongoing maintenance and repairs\n    And Frank's time freedom enables contribution\n    When the neighborhood_elohim coordinates maintenance needs\n    Then it should connect Frank's skills to neighborhood repair opportunities\n    And coordinate small repair projects utilizing his expertise\n    And recognize his skilled labor as valuable contribution\n    And facilitate tool sharing and material coordination\n    And quantify the market value of construction skills applied\n    And enable Frank to contribute meaningfully to neighborhood quality\n    And his skills should serve collective neighborhood benefit\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood repairs and maintenance using construction skills",

@@ -6,7 +6,7 @@
   "title": "Corporate quality standards are exceeded through worker ownership and pride",
   "description": "Corporate quality standards are exceeded through worker ownership and pride",
   "content": "Scenario: Corporate quality standards are exceeded through worker ownership and pride\n    Given franchise corporate claimed standardization ensured quality\n    And workers had no stake in quality beyond avoiding discipline\n    When democratic ownership gives workers direct stake in quality outcomes\n    Then food quality improves because workers care about product they own\n    And customer service excellence emerges from genuine worker engagement\n    And cleanliness and maintenance improve through ownership pride\n    And quality exceeds previous franchise corporate standards\n    And workplace_elohim documents quality improvements post-conversion\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Corporate quality standards are exceeded through worker ownership and pride",

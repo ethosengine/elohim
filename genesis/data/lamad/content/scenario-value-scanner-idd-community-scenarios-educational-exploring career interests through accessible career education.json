@@ -6,7 +6,7 @@
   "title": "Exploring career interests through accessible career education",
   "description": "Exploring career interests through accessible career education",
   "content": "Scenario: Exploring career interests through accessible career education\n    Given Jordan might want to explore other career options\n    And career exploration supports life planning\n    When Jordan uses career exploration resources\n    Then the personal_agent shows career options with pictures and simple descriptions\n    And Jordan can learn about different jobs through videos and stories\n    And Jordan can explore interests without pressure to commit\n    And the educational_elohim provides information about training pathways\n    And Jordan's career dreams are taken seriously, not dismissed\n    And Jordan experiences hope and possibility through education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Exploring career interests through accessible career education",

@@ -6,7 +6,7 @@
   "title": "Foraging and wild food knowledge",
   "description": "Foraging and wild food knowledge",
   "content": "Scenario: Foraging and wild food knowledge\n    Given Margaret may know local wild and foraged foods\n    And foraging connects people to bioregion and reduces food costs\n    When the bioregional_elohim coordinates wild food knowledge\n    Then Margaret's foraging knowledge should be recognized\n    And safe foraging practices should be shared\n    And wild food resources should be sustainably utilized\n    And bioregional food diversity should be enhanced\n    And Margaret's knowledge should strengthen food security\n    And connection to land should be deepened through foraging\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Foraging and wild food knowledge",

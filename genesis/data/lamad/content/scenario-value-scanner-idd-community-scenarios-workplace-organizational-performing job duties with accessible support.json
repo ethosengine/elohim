@@ -6,7 +6,7 @@
   "title": "Performing job duties with accessible support",
   "description": "Performing job duties with accessible support",
   "content": "Scenario: Performing job duties with accessible support\n    Given Jordan is responsible for shelving returned books\n    And the library has organized the system for accessibility\n    When Jordan completes their shelving tasks\n    Then the personal_agent provides visual sorting guidance if needed\n    And the shelving system uses color-coding and clear labels\n    And Jordan can complete most tasks independently\n    And supervisors provide support for complex situations\n    And Jordan's work directly helps library patrons find books\n    And Jordan accumulates care tokens for library care contribution\n    And Jordan experiences competence and work satisfaction\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Performing job duties with accessible support",

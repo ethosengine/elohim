@@ -6,7 +6,7 @@
   "title": "Early childhood education policies inform pedagogical approach",
   "description": "Early childhood education policies inform pedagogical approach",
   "content": "Scenario: Early childhood education policies inform pedagogical approach\n    Given educational governance includes early childhood development research\n    And evidence-based practices exist for ages 5-7\n    When the personal_agent's pedagogy is configured\n    Then it should incorporate developmental psychology research\n    And it should follow evidence-based early learning principles\n    And it should respect limits of cognitive development at age 5\n    And it should support optimal development trajectories\n    And educational policy should shape how Tommy is taught\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Early childhood education policies inform pedagogical approach",

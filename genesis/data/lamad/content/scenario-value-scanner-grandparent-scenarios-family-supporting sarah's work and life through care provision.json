@@ -6,7 +6,7 @@
   "title": "Supporting Sarah's work and life through care provision",
   "description": "Supporting Sarah's work and life through care provision",
   "content": "Scenario: Supporting Sarah's work and life through care provision\n    Given Margaret's childcare enables Sarah to work and thrive\n    And this support is essential to Sarah's economic security\n    When the family_elohim tracks how care enables flourishing\n    Then it should show that Margaret's care supports Sarah's career\n    And it should recognize care as infrastructure for Sarah's life\n    And it should make visible that Margaret enables Sarah's economic participation\n    And multigenerational care should enable all generations to thrive\n    And Margaret's contribution to Sarah's flourishing should be recognized\n    And care economy should show how generations support each other\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Supporting Sarah's work and life through care provision",

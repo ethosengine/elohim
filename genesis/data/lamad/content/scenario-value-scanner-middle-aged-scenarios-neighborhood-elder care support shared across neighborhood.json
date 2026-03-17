@@ -6,7 +6,7 @@
   "title": "Elder care support shared across neighborhood",
   "description": "Elder care support shared across neighborhood",
   "content": "Scenario: Elder care support shared across neighborhood\n    Given Robert's parents visit regularly and will eventually need local care\n    And several neighbors are also managing elder care\n    When neighborhood_elohim coordinates elder care support\n    Then it should connect neighbors managing similar challenges\n    And facilitate sharing of resources, knowledge, and respite\n    And surface: \"Three neighbors use the same home health agency—could coordinate for better rates\"\n    And build neighborhood capacity to support aging residents\n    And prevent isolation for those managing elder care\n    And create mutual support network for common challenges\n    And strengthen neighborhood through shared caregiving\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder care support shared across neighborhood",

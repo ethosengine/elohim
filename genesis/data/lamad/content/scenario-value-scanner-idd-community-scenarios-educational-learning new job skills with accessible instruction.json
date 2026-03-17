@@ -6,7 +6,7 @@
   "title": "Learning new job skills with accessible instruction",
   "description": "Learning new job skills with accessible instruction",
   "content": "Scenario: Learning new job skills with accessible instruction\n    Given Jordan wants to learn library cataloging skills\n    And the library offers training for this task\n    When Jordan participates in the training\n    Then instruction is provided in cognitively accessible format\n    And the trainer uses simple language, visual aids, and step-by-step guidance\n    And Jordan can practice skills with patient repetition\n    And mistakes are treated as learning opportunities, not failures\n    And Jordan's progress is celebrated at each milestone\n    And Jordan accumulates care tokens for skill development contribution\n    And Jordan experiences growth and increasing capability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning new job skills with accessible instruction",

@@ -6,7 +6,7 @@
   "title": "State development policy outcomes versus promises",
   "description": "State development policy outcomes versus promises",
   "content": "Scenario: State development policy outcomes versus promises\n    Given state legislature passed developer-backed \"affordable housing\" law\n    And promised it would increase affordable housing supply\n    When the Observer tracks actual outcomes three years later\n    Then analysis shows: luxury housing increased 40%\n    And affordable housing decreased 8%\n    And displacement accelerated in gentrifying neighborhoods\n    And policy delivered opposite of promised outcomes\n    And evidence supports policy reform not developer rhetoric\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "State development policy outcomes versus promises",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

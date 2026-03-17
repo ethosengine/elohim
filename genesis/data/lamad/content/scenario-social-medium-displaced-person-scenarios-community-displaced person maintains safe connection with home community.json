@@ -6,7 +6,7 @@
   "title": "Displaced person maintains safe connection with home community",
   "description": "Displaced person maintains safe connection with home community",
   "content": "Scenario: Displaced person maintains safe connection with home community\n    Given Maria left her hometown to escape an abusive partner\n    And she wants to stay connected with friends and family back home\n    When Maria configures her privacy settings for selective visibility\n    And she marks her abuser and his associates as blocked\n    Then she can communicate with trusted home community members\n    And her new location is never revealed to blocked individuals\n    And her abuser cannot find or contact her through the system\n    And she maintains important relationships while staying safe\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-community",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Displaced person maintains safe connection with home community",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

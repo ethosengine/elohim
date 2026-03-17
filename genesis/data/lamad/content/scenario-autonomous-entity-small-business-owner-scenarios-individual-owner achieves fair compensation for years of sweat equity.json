@@ -6,7 +6,7 @@
   "title": "Owner achieves fair compensation for years of sweat equity",
   "description": "Owner achieves fair compensation for years of sweat equity",
   "content": "Scenario: Owner achieves fair compensation for years of sweat equity\n    Given Rosa built business through 15 years of underpaid 60-hour weeks\n    And business is worth $200K but no ethical buyer exists\n    When EAE offers $180K acquisition\n    Then Rosa receives payment reflecting equipment value, customer base, and sweat equity\n    And payment comes from community investment pool, not worker exploitation\n    And Rosa can pay debts, fund retirement, achieve financial breathing room\n    And fair value is recognized without requiring community institution destruction\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner achieves fair compensation for years of sweat equity",

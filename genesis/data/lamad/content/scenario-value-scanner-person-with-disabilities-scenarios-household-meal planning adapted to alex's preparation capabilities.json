@@ -6,7 +6,7 @@
   "title": "Meal planning adapted to Alex's preparation capabilities",
   "description": "Meal planning adapted to Alex's preparation capabilities",
   "content": "Scenario: Meal planning adapted to Alex's preparation capabilities\n    Given Alex has specific constraints around meal preparation\n    And some physical tasks are difficult or impossible without assistance\n    When Alex plans weekly meals\n    Then the household_elohim should suggest meals within Alex's capabilities\n    And it should account for what Alex can prepare independently\n    And it should coordinate support worker assistance for complex prep\n    And nutritional needs should be met within preparation constraints\n    And meal planning should feel empowering, not limiting\n    And Alex should maintain choice over their food and nutrition\n    And adaptations should expand options, not restrict them\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Meal planning adapted to Alex's preparation capabilities",

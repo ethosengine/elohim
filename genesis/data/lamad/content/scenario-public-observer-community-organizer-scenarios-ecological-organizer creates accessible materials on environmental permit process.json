@@ -6,7 +6,7 @@
   "title": "Organizer creates accessible materials on environmental permit process",
   "description": "Organizer creates accessible materials on environmental permit process",
   "content": "Scenario: Organizer creates accessible materials on environmental permit process\n    Given residents want to oppose toxic facility\n    But permit process is technical and intimidating\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of permit requirements\n    And get templates for submitting public comments\n    And see examples of successful community opposition\n    And access data residents can cite in testimony\n    And complex regulatory process becomes accessible to community\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer creates accessible materials on environmental permit process",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

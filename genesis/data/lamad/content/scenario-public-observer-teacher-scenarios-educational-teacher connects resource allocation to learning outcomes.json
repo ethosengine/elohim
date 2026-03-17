@@ -6,7 +6,7 @@
   "title": "Teacher connects resource allocation to learning outcomes",
   "description": "Teacher connects resource allocation to learning outcomes",
   "content": "Scenario: Teacher connects resource allocation to learning outcomes\n    Given district allocates resources based on administrative priorities\n    And claims all schools receive equitable support\n    When teachers document resource-outcome patterns through Observer\n    Then teachers show schools with counselors have better student wellbeing\n    And smaller class sizes correlate with better learning outcomes\n    And arts programs predict higher engagement and graduation rates\n    And teacher professional judgment is validated by student outcome data\n    And resource allocation becomes student-centered not administratively convenient\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher connects resource allocation to learning outcomes",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

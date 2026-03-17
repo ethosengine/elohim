@@ -6,7 +6,7 @@
   "title": "Career trajectory protection despite reduced hours",
   "description": "Career trajectory protection despite reduced hours",
   "content": "Scenario: Career trajectory protection despite reduced hours\n    Given James's career has been derailed by caregiving\n    And years of part-time work affects future employment\n    When the workplace_elohim tracks career impact\n    Then caregiving years should be recognized as valuable experience\n    And James's skills should be valued despite reduced hours\n    And career gaps should be explained as caregiving, not lack of ambition\n    And future employers should understand caregiver career patterns\n    And workplace should not permanently penalize caregiving years\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Career trajectory protection despite reduced hours",

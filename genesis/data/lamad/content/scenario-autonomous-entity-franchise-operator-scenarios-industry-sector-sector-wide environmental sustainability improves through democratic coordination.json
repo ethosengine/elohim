@@ -6,7 +6,7 @@
   "title": "Sector-wide environmental sustainability improves through democratic coordination",
   "description": "Sector-wide environmental sustainability improves through democratic coordination",
   "content": "Scenario: Sector-wide environmental sustainability improves through democratic coordination\n    Given franchise model externalizes environmental costs for profit maximization\n    And individual locations lack power to demand sustainable supply chains\n    When democratic network coordinates for environmental stewardship sector-wide\n    Then local sourcing increases, reducing food miles and supporting regenerative agriculture\n    And waste reduction practices spread through network sharing best practices\n    And sustainable packaging becomes standard through coordinated purchasing\n    And environmental accountability increases through democratic governance transparency\n    And industry_sector_elohim tracks sector environmental improvements from democratic coordination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sector-wide environmental sustainability improves through democratic coordination",

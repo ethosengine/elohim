@@ -6,7 +6,7 @@
   "title": "Planning commissioner evaluates large residential development proposal",
   "description": "Planning commissioner evaluates large residential development proposal",
   "content": "Scenario: Planning commissioner evaluates large residential development proposal\n    Given developer proposes 500-unit development with affordable housing component\n    And staff recommendation supports approval citing housing needs\n    And developer presentation emphasizes economic benefits and community amenities\n    When the planning commissioner requests Observer independent analysis\n    Then they receive comparison of promised versus delivered benefits from developer's past projects\n    And see affordable housing calculation showing units actually affordable to local residents\n    And access traffic, school, and infrastructure impact analysis\n    And discover developer donated $5000 to commissioner's recent campaign\n    And independent analysis reveals information staff presentation omitted\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning commissioner evaluates large residential development proposal",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

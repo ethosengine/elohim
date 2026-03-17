@@ -6,7 +6,7 @@
   "title": "Family member appeals on behalf of vulnerable member",
   "description": "Family member appeals on behalf of vulnerable member",
   "content": "Scenario: Family member appeals on behalf of vulnerable member\n    Given my elderly parent cannot file appeal themselves due to cognitive limitations\n    And I believe Family Elohim's decision doesn't serve their best interests\n    When I file an appeal as their representative\n    Then I must demonstrate my authority to represent them\n    And The appeal process ensures I'm serving their interests not mine\n    And The Constitutional Council evaluates if the agent properly considered vulnerability\n    And They examine if dignity was preserved despite cognitive limitations\n    And The appeal includes safeguards against family members exploiting representation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-family",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family member appeals on behalf of vulnerable member",

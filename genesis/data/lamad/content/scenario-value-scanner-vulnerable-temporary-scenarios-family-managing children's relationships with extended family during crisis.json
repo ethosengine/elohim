@@ -6,7 +6,7 @@
   "title": "Managing children's relationships with extended family during crisis",
   "description": "Managing children's relationships with extended family during crisis",
   "content": "Scenario: Managing children's relationships with extended family during crisis\n    Given my children have relationships with grandparents, aunts, uncles, cousins\n    And these relationships may be supportive, complicated, or harmful\n    When I coordinate children's extended family contact\n    Then the family_elohim helps me facilitate healthy family relationships\n    And supports me in limiting or supervising problematic relationships\n    And tracks children's responses to different family members\n    And helps me explain family situations to children age-appropriately\n    And coordinates family involvement in children's lives appropriately\n    And my personal_agent alerts me to concerning family dynamics\n    And recognizes my facilitation of children's family relationships as care work\n    And validates my right to protect children from harmful family dynamics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing children's relationships with extended family during crisis",

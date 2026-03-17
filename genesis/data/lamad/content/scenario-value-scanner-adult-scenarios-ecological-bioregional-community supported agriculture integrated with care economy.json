@@ -6,7 +6,7 @@
   "title": "Community supported agriculture integrated with care economy",
   "description": "Community supported agriculture integrated with care economy",
   "content": "Scenario: Community supported agriculture integrated with care economy\n    Given Sarah's bioregion has CSA (Community Supported Agriculture) programs\n    And CSA supports local farmers and environmental health\n    When Sarah considers food purchasing options\n    Then the bioregional_elohim should highlight CSA opportunities\n    And it should coordinate CSA participation with household budget\n    And it should track CSA contributions as care work\n    And Sarah should support farmers while feeding family\n    And care economy should strengthen community-farmer relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community supported agriculture integrated with care economy",

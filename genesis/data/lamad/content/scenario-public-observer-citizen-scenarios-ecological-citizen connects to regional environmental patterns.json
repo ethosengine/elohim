@@ -6,7 +6,7 @@
   "title": "Citizen connects to regional environmental patterns",
   "description": "Citizen connects to regional environmental patterns",
   "content": "Scenario: Citizen connects to regional environmental patterns\n    Given tree canopy loss is occurring in the citizen's neighborhood\n    When the Observer surfaces regional ecological data\n    Then the citizen learns this is part of citywide pattern\n    And sees which areas retain or lose environmental quality\n    And discovers other neighborhoods facing similar concerns\n    And can join broader environmental coalition\n    And local environmental concerns connect to systemic patterns\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen connects to regional environmental patterns",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -312,7 +312,7 @@
       }
     }
   ],
-  "contentFormat": "sophia",
+  "contentFormat": "interactive",
   "tags": [
     "assessment",
     "governance",
@@ -327,7 +327,8 @@
     "attestationId": "governance-foundations",
     "difficulty": "medium",
     "questionCount": 5,
-    "migratedAt": "2026-01-24T00:00:00.000Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z",
+    "originalContentFormat": "sophia"
   },
   "createdAt": "2025-11-28T00:09:03.479353",
   "updatedAt": "2026-01-24T00:00:00.000Z",

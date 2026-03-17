@@ -6,7 +6,7 @@
   "title": "Economic development board member evaluates workforce development program",
   "description": "Economic development board member evaluates workforce development program",
   "content": "Scenario: Economic development board member evaluates workforce development program\n    Given board considers funding proposal for job training program\n    And program providers present enrollment projections and success stories\n    And board wants evidence that program will effectively serve unemployed workers\n    When the board member requests Observer workforce program analysis\n    Then they receive outcome data from similar programs including job placement and wages\n    And see analysis of whether program serves populations with greatest need\n    And discover some training programs have poor employment outcomes despite good marketing\n    And access best practices from effective workforce development initiatives\n    And evidence-based analysis helps board invest in programs that actually work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Economic development board member evaluates workforce development program",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

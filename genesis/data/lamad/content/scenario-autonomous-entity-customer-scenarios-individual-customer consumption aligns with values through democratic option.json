@@ -6,7 +6,7 @@
   "title": "Customer consumption aligns with values through democratic option",
   "description": "Customer consumption aligns with values through democratic option",
   "content": "Scenario: Customer consumption aligns with values through democratic option\n    Given Ms. Johnson opposed worker exploitation but lacked alternatives\n    And corporate greenwashing made ethical consumption impossible to verify\n    When democratic business provides transparent ethical alternative\n    Then her consumption supports values: worker dignity, fair wages, environmental stewardship, community wealth\n    And alignment between values and consumption reduces moral cognitive dissonance\n    And she feels good about supporting democratic business, not guilty about corporate extraction\n    And ethical consumption becomes real choice, not marketing manipulation\n    And community_elohim helps communicate values alignment opportunities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer consumption aligns with values through democratic option",

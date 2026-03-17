@@ -6,7 +6,7 @@
   "title": "Building nutrition awareness while managing costs",
   "description": "Building nutrition awareness while managing costs",
   "content": "Scenario: Building nutrition awareness while managing costs\n    Given Aisha has been working through lunch frequently\n    And her energy levels are declining\n    When the personal_agent reviews her eating patterns\n    Then it should flag the concerning pattern\n    And it should say \"You've worked through lunch four days this week\"\n    And it should suggest quick, nutritious options within budget\n    And the agent should help her see self-care as essential, not optional\n    And recommendations should balance nutrition, cost, and time constraints\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building nutrition awareness while managing costs",

@@ -6,7 +6,7 @@
   "title": "Alex's presence shifts neighborhood culture toward inclusion",
   "description": "Alex's presence shifts neighborhood culture toward inclusion",
   "content": "Scenario: Alex's presence shifts neighborhood culture toward inclusion\n    Given neighborhoods often lack disability awareness\n    And Alex's participation educates neighbors about disability\n    When Alex engages in neighborhood activities\n    Then the neighborhood_elohim should track cultural shifts toward inclusion\n    And neighbors should learn about accessibility through relationship with Alex\n    And disability should become normalized in neighborhood culture\n    And Alex's expertise should be sought and valued\n    And the neighborhood should become more accessible over time\n    And cultural transformation should be recognized as Alex's contribution\n    And Alex's care work includes disability education through presence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex's presence shifts neighborhood culture toward inclusion",

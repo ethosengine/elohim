@@ -6,7 +6,7 @@
   "title": "Conservation board member detects greenwashing in sustainability initiative",
   "description": "Conservation board member detects greenwashing in sustainability initiative",
   "content": "Scenario: Conservation board member detects greenwashing in sustainability initiative\n    Given municipality proposes sustainability plan with ambitious climate goals\n    And plan emphasizes renewable energy targets and green building standards\n    And board wants to understand if plan will achieve meaningful emissions reductions\n    When the board member uses Observer sustainability analysis\n    Then they see plan's projected emissions reductions compared to climate science needs\n    And discover plan excludes transportation sector responsible for largest emissions\n    And find renewable energy targets rely on questionable carbon offset accounting\n    And access comparison to peer cities with more comprehensive climate action\n    And independent analysis distinguishes authentic sustainability from greenwashing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Conservation board member detects greenwashing in sustainability initiative",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

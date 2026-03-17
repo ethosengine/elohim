@@ -6,7 +6,7 @@
   "title": "Coordinating community resource sharing and mutual aid",
   "description": "Coordinating community resource sharing and mutual aid",
   "content": "Scenario: Coordinating community resource sharing and mutual aid\n    Given Margaret has organizational skills and available time\n    And community needs coordination of sharing networks\n    When the community_elohim facilitates resource coordination\n    Then Margaret should be identified as potential coordinator\n    And her labor in coordinating should be recognized and valued\n    And community resource sharing should reduce individual scarcity\n    And Margaret's organizational contributions should strengthen community\n    And her time availability should serve collective benefit\n    And coordination labor should be visible and appreciated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating community resource sharing and mutual aid",

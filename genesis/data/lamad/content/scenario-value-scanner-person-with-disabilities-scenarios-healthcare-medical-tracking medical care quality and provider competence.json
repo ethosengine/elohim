@@ -6,7 +6,7 @@
   "title": "Tracking medical care quality and provider competence",
   "description": "Tracking medical care quality and provider competence",
   "content": "Scenario: Tracking medical care quality and provider competence\n    Given medical providers vary widely in disability competence\n    And poor care from ableist providers causes harm\n    When Alex receives medical care\n    Then the personal_agent should help Alex track care quality\n    And it should document which providers respect Alex's autonomy\n    And it should identify patterns of ableist treatment\n    And Alex should be able to rate providers on disability competence\n    And quality tracking should help Alex find better providers\n    And the protocol should make provider accountability visible\n    And Alex should have data to advocate for better care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Tracking medical care quality and provider competence",

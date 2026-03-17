@@ -6,7 +6,7 @@
   "title": "Personal care token accumulation reflects superhuman solo work",
   "description": "Personal care token accumulation reflects superhuman solo work",
   "content": "Scenario: Personal care token accumulation reflects superhuman solo work\n    Given Maria performs the work of two parents plus household management plus breadwinning\n    And her care contributions are extraordinary\n    When Maria's care tokens are calculated\n    Then they should reflect that she's doing multiple full-time jobs\n    And solo parenting should be valued higher than partnered parenting\n    And her care tokens should accumulate at accelerated rate\n    And the protocol should make undeniable her superhuman care labor\n    And Maria should see quantified recognition of work society often dismisses\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal care token accumulation reflects superhuman solo work",

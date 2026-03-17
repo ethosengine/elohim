@@ -6,7 +6,7 @@
   "title": "Organizer tracks accountability for green space investment promise",
   "description": "Organizer tracks accountability for green space investment promise",
   "content": "Scenario: Organizer tracks accountability for green space investment promise\n    Given city committed to park improvements in underserved neighborhoods\n    And the organizer's coalition won the commitment through campaign\n    When the Observer tracks implementation progress\n    Then the organizer monitors park renovation timeline and budget\n    And receives alerts when spending lags or shifts to other areas\n    And documents completion showing community organizing created change\n    And has evidence to pressure officials if promises aren't kept\n    And environmental justice organizing includes accountability for implementation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer tracks accountability for green space investment promise",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Journalist monitors multiple state agencies despite limited capacity",
   "description": "Journalist monitors multiple state agencies despite limited capacity",
   "content": "Scenario: Journalist monitors multiple state agencies despite limited capacity\n    Given the journalist covers state government\n    And must track legislature, education department, environmental agency, and 8 others\n    When the Observer monitors all state agencies and legislative committees\n    Then the journalist reviews all consequential meetings and decisions\n    And receives alerts for newsworthy developments\n    And tracks legislation through committee process automatically\n    And comprehensive state surveillance becomes sustainable\n    And important policy changes don't escape coverage\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist monitors multiple state agencies despite limited capacity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

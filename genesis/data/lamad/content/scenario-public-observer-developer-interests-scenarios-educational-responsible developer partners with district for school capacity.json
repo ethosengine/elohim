@@ -6,7 +6,7 @@
   "title": "Responsible developer partners with district for school capacity",
   "description": "Responsible developer partners with district for school capacity",
   "content": "Scenario: Responsible developer partners with district for school capacity\n    Given a developer understands project will strain school capacity\n    And wants to genuinely address educational impacts\n    When the Observer facilitates developer-district partnership\n    Then the developer negotiates: $3M contribution to school expansion\n    And commits land for future school site if district needs it\n    And provides temporary modular classrooms during construction of expansion\n    And partnership creates genuine school capacity not just promises\n    And responsible development addresses community needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer partners with district for school capacity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

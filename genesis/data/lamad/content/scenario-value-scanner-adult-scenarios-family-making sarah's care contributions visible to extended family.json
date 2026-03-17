@@ -6,7 +6,7 @@
   "title": "Making Sarah's care contributions visible to extended family",
   "description": "Making Sarah's care contributions visible to extended family",
   "content": "Scenario: Making Sarah's care contributions visible to extended family\n    Given Sarah performs enormous care labor across family contexts\n    And extended family may not see the full scope\n    When family care contributions are tracked\n    Then Sarah's care for children should be quantified\n    And her care for aging parents should be visible\n    And her household coordination should be recognized\n    And extended family should see Sarah's contributions specifically\n    And visibility should enable fair family labor distribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Making Sarah's care contributions visible to extended family",

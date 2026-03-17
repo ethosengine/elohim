@@ -6,7 +6,7 @@
   "title": "Elderly person maintains choice authority despite assistance needs",
   "description": "Elderly person maintains choice authority despite assistance needs",
   "content": "Scenario: Elderly person maintains choice authority despite assistance needs\n    Given Helen's daughter assists with weekly shopping\n    And Helen requires help but retains decision-making capacity\n    When Helen uses the Value Scanner with assistance\n    Then she should still choose which foods she prefers\n    And her daughter should facilitate, not decide for her\n    And the personal_agent should say \"Helen, which apples do you want?\"\n    And Helen's preferences should be respected and recorded\n    And assistance should enhance her autonomy, not diminish it\n    And her dignity as decision-maker should be preserved\n    And the system should distinguish between needing help and losing authority\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elderly person maintains choice authority despite assistance needs",

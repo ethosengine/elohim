@@ -6,7 +6,7 @@
   "title": "Appeal of community surveillance or monitoring practices",
   "description": "Appeal of community surveillance or monitoring practices",
   "content": "Scenario: Appeal of community surveillance or monitoring practices\n    Given I believe Community Elohim monitors community members too intrusively\n    And I am concerned about surveillance overreach\n    When I appeal the monitoring practices\n    Then Constitutional Council evaluates if surveillance exceeds constitutional minimums\n    And They examine if monitoring serves legitimate care purposes\n    And They consider if less invasive methods could achieve same goals\n    And They assess if community members have visibility into what's monitored\n    And They evaluate if appeal and recourse mechanisms are working properly\n    And The appeal protects community from surveillance creep\n    And Privacy boundaries are actively defended not passively eroded\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal of community surveillance or monitoring practices",

@@ -6,7 +6,7 @@
   "title": "Journalist monitors all neighborhood meetings despite being one person",
   "description": "Journalist monitors all neighborhood meetings despite being one person",
   "content": "Scenario: Journalist monitors all neighborhood meetings despite being one person\n    Given the journalist covers 8 neighborhood associations\n    And can only attend one meeting per week physically\n    When the Observer monitors all neighborhood meetings simultaneously\n    Then the journalist reviews transcripts of all 8 weekly meetings\n    And receives alerts for newsworthy developments\n    And identifies stories across all neighborhoods efficiently\n    And comprehensive hyperlocal coverage becomes sustainable\n    And no important neighborhood decision goes unreported\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist monitors all neighborhood meetings despite being one person",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

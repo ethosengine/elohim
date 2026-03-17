@@ -6,7 +6,7 @@
   "title": "Legislator monitors state agency implementation across departments",
   "description": "Legislator monitors state agency implementation across departments",
   "content": "Scenario: Legislator monitors state agency implementation across departments\n    Given the politician passed legislation affecting multiple agencies\n    When the Observer tracks implementation statewide\n    Then they see which agencies comply with legislative intent\n    And identify bureaucratic resistance to policy changes\n    And understand regional variation in policy implementation\n    And learn where additional legislative oversight is needed\n    And ensure legislative authority translates to executive action\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Legislator monitors state agency implementation across departments",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

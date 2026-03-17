@@ -6,7 +6,7 @@
   "title": "Community celebrates successful transition as demonstration model",
   "description": "Community celebrates successful transition as demonstration model",
   "content": "Scenario: Community celebrates successful transition as demonstration model\n    Given neighborhood watched Rosa's difficult decision and graceful transition\n    And other small business owners face similar ownership burden challenges\n    When transition proves successful for all stakeholders\n    Then community honors Rosa at public celebration of democratic conversion\n    And her story becomes model encouraging other small business owners to consider conversion\n    And neighborhood gains confidence in democratic ownership as viable alternative\n    And successful transition demonstrates community can support democratic economy\n    And community_elohim shares transition story to inspire broader movement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community celebrates successful transition as demonstration model",

@@ -6,7 +6,7 @@
   "title": "Teen learns healthy work-life boundaries",
   "description": "Teen learns healthy work-life boundaries",
   "content": "Scenario: Teen learns healthy work-life boundaries\n    Given Jasmine's employer frequently requests last-minute schedule changes\n    And this disrupts her school and family commitments\n    When workplace_elohim tracks scheduling patterns\n    Then it should recognize the boundary violation\n    And help her understand that she has right to reasonable scheduling\n    And support her in negotiating better scheduling practices\n    And teach her that workers can and should set boundaries\n    And build her expectation that work should respect whole life\n    And prepare her for adult advocacy for work-life balance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns healthy work-life boundaries",

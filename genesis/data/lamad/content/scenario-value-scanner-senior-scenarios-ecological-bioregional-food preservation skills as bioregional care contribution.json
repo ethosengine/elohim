@@ -6,7 +6,7 @@
   "title": "Food preservation skills as bioregional care contribution",
   "description": "Food preservation skills as bioregional care contribution",
   "content": "Scenario: Food preservation skills as bioregional care contribution\n    Given Margaret knows how to preserve food through canning, freezing, drying\n    And food preservation reduces waste and builds food security\n    When the bioregional_elohim tracks food preservation\n    Then Margaret's preservation labor should be quantified\n    And skills should be recognized as ecological care contribution\n    And preserved food reduces reliance on industrial food systems\n    And Margaret's knowledge should be shared with community\n    And traditional preservation techniques should be valued\n    And bioregional food resilience should be strengthened by senior knowledge\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food preservation skills as bioregional care contribution",

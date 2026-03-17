@@ -6,7 +6,7 @@
   "title": "Bioregional resilience built through local care economy networks",
   "description": "Bioregional resilience built through local care economy networks",
   "content": "Scenario: Bioregional resilience built through local care economy networks\n    Given climate change increases need for local resilience\n    And Sarah's bioregion needs to build adaptive capacity\n    When bioregional care economy develops\n    Then the bioregional_elohim should coordinate local resource networks\n    And it should strengthen connections between producers and consumers\n    And it should build bioregional food security\n    And local resilience should be created through care economy practices\n    And climate adaptation should be care economy project\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional resilience built through local care economy networks",

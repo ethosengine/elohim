@@ -6,7 +6,7 @@
   "title": "Accessing neighborhood resources for children's enrichment and development",
   "description": "Accessing neighborhood resources for children's enrichment and development",
   "content": "Scenario: Accessing neighborhood resources for children's enrichment and development\n    Given my children need activities, socialization, and development opportunities\n    And money for activities is nonexistent\n    When I seek enrichment opportunities for children in neighborhood\n    Then the Value Scanner identifies free/low-cost neighborhood resources\n    And surfaces library programs, parks, recreation centers, free community events\n    And helps me access scholarship programs for children's activities\n    And connects me to neighbors who organize children's activities\n    And coordinates neighborhood childcare exchanges\n    And my personal_agent tracks children's interests and matches to opportunities\n    And recognizes resource navigation as substantial parenting labor\n    And validates that I am providing rich childhood on no money\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing neighborhood resources for children's enrichment and development",

@@ -6,7 +6,7 @@
   "title": "Neighborhood food cooperative participation on fixed income",
   "description": "Neighborhood food cooperative participation on fixed income",
   "content": "Scenario: Neighborhood food cooperative participation on fixed income\n    Given Margaret's $150/week budget could benefit from bulk buying\n    And neighbors face similar budget constraints\n    When the neighborhood_elohim identifies food cooperative opportunities\n    Then Margaret should be connected to bulk buying networks\n    And her participation should reduce her grocery costs\n    And she should contribute her time and organizational skills\n    And the cooperative should reduce individual household scarcity\n    And neighborhood coordination should make fixed incomes stretch further\n    And collective action should create better outcomes than individual effort\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood food cooperative participation on fixed income",

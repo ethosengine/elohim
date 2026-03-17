@@ -6,7 +6,7 @@
   "title": "Franchise termination negotiation succeeds through EAE network support",
   "description": "Franchise termination negotiation succeeds through EAE network support",
   "content": "Scenario: Franchise termination negotiation succeeds through EAE network support\n    Given franchise corporations resist terminations protecting extraction revenue\n    And individual operators have limited leverage against corporate legal resources\n    When EAE network coordinates multi-location conversion support\n    Then legal expertise is shared across conversions reducing costs\n    And coordinated multi-location terminations increase negotiating leverage\n    And public narrative (corporate bullying democratic workplaces) pressures franchise corporate\n    And termination succeeds protecting workers and enabling democratic ownership\n    And workplace_elohim coordinates franchise termination strategy across network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise termination negotiation succeeds through EAE network support",

@@ -6,7 +6,7 @@
   "title": "Recognition of continued contributions despite care receipt",
   "description": "Recognition of continued contributions despite care receipt",
   "content": "Scenario: Recognition of continued contributions despite care receipt\n    Given Helen receives substantial care from family and community\n    And she also contributes through mentoring and wisdom sharing\n    When Helen shares family stories with great-grandchildren\n    Then her care contribution should be recognized and valued\n    And her personal_agent should note: \"Your stories preserve our family history\"\n    And care tokens should reflect her continued giving\n    And the system should make visible that care flows both directions\n    And Helen should experience herself as valued person, not burden\n    And reciprocity should be visible even when care flows are asymmetric\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of continued contributions despite care receipt",

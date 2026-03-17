@@ -6,7 +6,7 @@
   "title": "Workers respond to community crisis with mutual aid",
   "description": "Workers respond to community crisis with mutual aid",
   "content": "Scenario: Workers respond to community crisis with mutual aid\n    Given neighborhood experiences crisis (fire, flood, or emergency)\n    And community members need food and gathering space\n    When workers learn of community crisis\n    Then workers immediately open ChickenMax for community support\n    And workers provide free meals to affected community members\n    And workers coordinate with community_elohim for broader support network\n    And workers demonstrate solidarity through material aid\n    And community reciprocates support when workers need it\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers respond to community crisis with mutual aid",

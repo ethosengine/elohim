@@ -6,7 +6,7 @@
   "title": "Knowledge of traditional medicinal and useful plants",
   "description": "Knowledge of traditional medicinal and useful plants",
   "content": "Scenario: Knowledge of traditional medicinal and useful plants\n    Given Margaret knows traditional uses of local plants\n    And she learned herbal remedies and plant knowledge from her elders\n    When the bioregional_elohim tracks traditional plant knowledge\n    Then it should recognize Margaret's ethnobotanical expertise\n    And it should value traditional medicinal plant knowledge\n    And it should facilitate transmission of plant wisdom to grandchildren\n    And traditional knowledge should be documented and preserved\n    And Margaret's expertise should contribute to bioregional health\n    And plant knowledge should be recognized as valuable care economy contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Knowledge of traditional medicinal and useful plants",

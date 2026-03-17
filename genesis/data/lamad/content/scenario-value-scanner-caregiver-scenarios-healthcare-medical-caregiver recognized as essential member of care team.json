@@ -6,7 +6,7 @@
   "title": "Caregiver recognized as essential member of care team",
   "description": "Caregiver recognized as essential member of care team",
   "content": "Scenario: Caregiver recognized as essential member of care team\n    Given James attends all medical appointments with David\n    And James knows David's condition better than providers seeing him occasionally\n    When medical providers interact with James and David\n    Then the healthcare_elohim should ensure James is recognized as care team member\n    And providers should treat James as expert on David's daily reality\n    And James's observations should be valued in medical decisions\n    And caregiver knowledge should be integrated into medical care\n    And healthcare system should partner with caregivers, not exclude them\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver recognized as essential member of care team",

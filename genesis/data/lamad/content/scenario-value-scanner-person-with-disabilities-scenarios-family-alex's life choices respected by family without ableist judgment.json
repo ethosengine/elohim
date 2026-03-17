@@ -6,7 +6,7 @@
   "title": "Alex's life choices respected by family without ableist judgment",
   "description": "Alex's life choices respected by family without ableist judgment",
   "content": "Scenario: Alex's life choices respected by family without ableist judgment\n    Given Alex makes life choices that family might not understand\n    And ableism might lead family to question Alex's decisions\n    When Alex makes choices about work, living situation, relationships, etc.\n    Then family should respect Alex's choices as they would any adult's\n    And the family_elohim should affirm Alex's right to self-determination\n    And disability should not be treated as reason to override Alex's autonomy\n    And Alex should not have to justify choices more than non-disabled siblings\n    And the protocol should protect Alex from family paternalism\n    And Alex's sovereignty should be structurally defended\n    And family should be prompted to examine their ableist assumptions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex's life choices respected by family without ableist judgment",

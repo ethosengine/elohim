@@ -6,7 +6,7 @@
   "title": "Making major life decisions under extreme stress",
   "description": "Making major life decisions under extreme stress",
   "content": "Scenario: Making major life decisions under extreme stress\n    Given I need to make important decisions about housing, employment, or children's needs\n    And I am traumatized, exhausted, and overwhelmed\n    When I need to evaluate my options\n    Then my personal_agent helps me process complex information\n    And breaks down overwhelming decisions into manageable steps\n    And provides decision support without making decisions for me\n    And helps me identify my priorities and values\n    And surfaces relevant information at the right time\n    And prevents decision paralysis without overriding my agency\n    And validates that my stress is reasonable given my circumstances\n    And trusts that I can make good decisions with appropriate support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Making major life decisions under extreme stress",

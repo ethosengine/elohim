@@ -6,7 +6,7 @@
   "title": "Community care tokens enable resource access for families",
   "description": "Community care tokens enable resource access for families",
   "content": "Scenario: Community care tokens enable resource access for families\n    Given Sarah has accumulated care tokens through parenting and civic participation\n    And community resources are allocated partially based on care economy\n    When Sarah's family needs community support\n    Then her care tokens should give standing in resource decisions\n    And the community should provide support based on her contributions\n    And care economy should enable reciprocity between family and community\n    And those who contribute care should receive care in return\n    And the system should create sustainable community mutual aid\n    And parenting contributions should translate to community support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community care tokens enable resource access for families",

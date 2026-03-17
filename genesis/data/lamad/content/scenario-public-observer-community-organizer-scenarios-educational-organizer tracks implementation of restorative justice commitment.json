@@ -6,7 +6,7 @@
   "title": "Organizer tracks implementation of restorative justice commitment",
   "description": "Organizer tracks implementation of restorative justice commitment",
   "content": "Scenario: Organizer tracks implementation of restorative justice commitment\n    Given district adopted restorative justice to reduce suspensions\n    And the organizer's coalition of parents and students won the policy\n    When the Observer tracks implementation progress\n    Then the organizer monitors training of school staff\n    And sees suspension data by school, race, and disability status\n    And identifies schools not implementing restorative practices\n    And documents where implementation succeeds and changes outcomes\n    And policy victory leads to implementation accountability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer tracks implementation of restorative justice commitment",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

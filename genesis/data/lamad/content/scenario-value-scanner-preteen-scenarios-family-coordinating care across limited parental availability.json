@@ -6,7 +6,7 @@
   "title": "Coordinating care across limited parental availability",
   "description": "Coordinating care across limited parental availability",
   "content": "Scenario: Coordinating care across limited parental availability\n    Given Sarah's work schedule limits her availability\n    And Marcus manages daily household operations\n    When coordination is needed between them\n    Then the family_elohim should facilitate asynchronous communication\n    And Sarah should be able to provide guidance during her available hours\n    And Marcus should be able to request help when needed\n    And the system should ensure Sarah stays informed despite time constraints\n    And coordination should happen efficiently without constant interruption\n    And their partnership should function despite scheduling challenges\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating care across limited parental availability",

@@ -6,7 +6,7 @@
   "title": "Neighborhood care economy builds social capital and relationships",
   "description": "Neighborhood care economy builds social capital and relationships",
   "content": "Scenario: Neighborhood care economy builds social capital and relationships\n    Given Sarah is new to neighborhood\n    And social isolation is common in modern life\n    When Sarah participates in neighborhood care economy\n    Then the neighborhood_elohim should connect her to other parents\n    And it should facilitate relationship-building through care exchanges\n    And it should help Sarah build local support network\n    And social capital should grow through care participation\n    And neighborhood should become genuine community, not just proximity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care economy builds social capital and relationships",

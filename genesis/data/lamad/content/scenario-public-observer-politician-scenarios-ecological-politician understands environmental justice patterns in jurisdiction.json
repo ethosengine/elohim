@@ -6,7 +6,7 @@
   "title": "Politician understands environmental justice patterns in jurisdiction",
   "description": "Politician understands environmental justice patterns in jurisdiction",
   "content": "Scenario: Politician understands environmental justice patterns in jurisdiction\n    Given the politician governs environmental policy at city or state level\n    And suspects environmental burdens fall disproportionately\n    When the Observer maps environmental conditions and demographics\n    Then they see pollution sources concentrated in communities of color\n    And identify park access disparities by neighborhood income\n    And understand health impact patterns from environmental exposure\n    And learn which communities bear cumulative environmental burdens\n    And champion environmental justice policies with documented inequities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician understands environmental justice patterns in jurisdiction",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

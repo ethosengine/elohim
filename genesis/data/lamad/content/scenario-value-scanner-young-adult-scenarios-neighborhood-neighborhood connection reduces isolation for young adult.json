@@ -6,7 +6,7 @@
   "title": "Neighborhood connection reduces isolation for young adult",
   "description": "Neighborhood connection reduces isolation for young adult",
   "content": "Scenario: Neighborhood connection reduces isolation for young adult\n    Given Aisha moved to a new city alone\n    And social isolation is a risk for young adults\n    When Aisha builds neighborhood care relationships\n    Then the neighborhood_elohim should facilitate meaningful connections\n    And care-based relationships should reduce loneliness\n    And practical cooperation should create authentic community\n    And the system should address isolation through care economy\n    And neighborhood bonds should provide social support\n    And belonging should emerge from reciprocal care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood connection reduces isolation for young adult",

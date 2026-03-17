@@ -6,7 +6,7 @@
   "title": "Neighborhood care economy scales to municipal level",
   "description": "Neighborhood care economy scales to municipal level",
   "content": "Scenario: Neighborhood care economy scales to municipal level\n    Given Sarah's neighborhood successfully implements care economy\n    And multiple neighborhoods could coordinate similarly\n    When neighborhood care patterns are established\n    Then the neighborhood_elohim should connect to municipal systems\n    And it should enable scaling of successful practices\n    And neighborhood should serve as building block for municipal care economy\n    And local success should inform broader policy\n    And care economy should grow from neighborhood up, not top-down\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood care economy scales to municipal level",

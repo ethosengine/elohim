@@ -6,7 +6,7 @@
   "title": "Developer environmental compliance becomes state accountability issue",
   "description": "Developer environmental compliance becomes state accountability issue",
   "content": "Scenario: Developer environmental compliance becomes state accountability issue\n    Given a developer's projects consistently violate state environmental standards\n    But receives minimal enforcement from state regulators\n    When the Observer documents violation patterns and regulatory response\n    Then analysis shows: 67 violations across 8 projects over 5 years\n    And penalties total $180K while profits exceed $40M\n    And state regulators approve new permits despite violation history\n    And regulatory capture becomes statistically undeniable\n    And developer faces pressure for genuine environmental compliance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer environmental compliance becomes state accountability issue",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

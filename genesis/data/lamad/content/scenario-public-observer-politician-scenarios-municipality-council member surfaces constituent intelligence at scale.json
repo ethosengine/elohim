@@ -6,7 +6,7 @@
   "title": "Council member surfaces constituent intelligence at scale",
   "description": "Council member surfaces constituent intelligence at scale",
   "content": "Scenario: Council member surfaces constituent intelligence at scale\n    Given the politician represents 50,000 residents\n    And only 20 constituents typically attend council meetings\n    When the Observer aggregates constituent patterns from civic engagement\n    Then the politician sees 230 families losing 90 minutes daily to bus delays\n    And identifies senior centers underutilized due to access barriers\n    And learns small businesses struggle with permit complexity\n    And hears from working parents and shift workers who can't attend meetings\n    And understands actual constituent needs beyond loudest voices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Council member surfaces constituent intelligence at scale",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

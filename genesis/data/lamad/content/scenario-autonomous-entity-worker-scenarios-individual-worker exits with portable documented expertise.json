@@ -6,7 +6,7 @@
   "title": "Worker exits with portable documented expertise",
   "description": "Worker exits with portable documented expertise",
   "content": "Scenario: Worker exits with portable documented expertise\n    Given Maria has accumulated 8 years of documented contributions\n    And she decides to leave ChickenMax for another opportunity\n    When she requests her portable REA profile\n    Then she receives cryptographically signed documentation of her expertise\n    And her profile includes training mastery, care work, and management skills\n    And she can present this profile to prospective employers\n    And her accumulated skill tokens remain valid across the EAE network\n    And her ownership tokens are converted to fair value upon exit\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Worker exits with portable documented expertise",

@@ -6,7 +6,7 @@
   "title": "Workers transition from implementing franchise extraction to democratic coordination",
   "description": "Workers transition from implementing franchise extraction to democratic coordination",
   "content": "Scenario: Workers transition from implementing franchise extraction to democratic coordination\n    Given workers were required to enforce franchise policies regardless of harm\n    And implementation of extraction created moral injury and worker resentment\n    When democratic governance replaces franchise control\n    Then workers coordinate operations based on collective wisdom, not corporate mandates\n    And schedule flexibility serves workers' family needs, not corporate efficiency demands\n    And customer service becomes genuine care, not scripted performance\n    And workplace becomes site of flourishing, not extraction enforcement\n    And workplace_elohim supports workers' growing democratic governance capacity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers transition from implementing franchise extraction to democratic coordination",

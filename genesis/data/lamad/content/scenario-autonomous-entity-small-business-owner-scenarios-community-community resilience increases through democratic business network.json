@@ -6,7 +6,7 @@
   "title": "Community resilience increases through democratic business network",
   "description": "Community resilience increases through democratic business network",
   "content": "Scenario: Community resilience increases through democratic business network\n    Given isolated businesses are vulnerable to economic shocks\n    And community resilience depends on interconnected mutual support\n    When Rosa's Auto joins EAE network of democratic community businesses\n    Then business survives economic downturns through network mutual aid\n    And workers coordinate with other democratic enterprises for mutual benefit\n    And community institutions support each other rather than competing\n    And economic shocks are absorbed collectively, not destroying individual businesses\n    And community_elohim coordinates resilience strategies across democratic network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community resilience increases through democratic business network",

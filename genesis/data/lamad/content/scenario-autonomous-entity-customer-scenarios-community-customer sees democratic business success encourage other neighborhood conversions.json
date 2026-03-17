@@ -6,7 +6,7 @@
   "title": "Customer sees democratic business success encourage other neighborhood conversions",
   "description": "Customer sees democratic business success encourage other neighborhood conversions",
   "content": "Scenario: Customer sees democratic business success encourage other neighborhood conversions\n    Given Ms. Johnson observed Maria's Kitchen conversion and success\n    And neighbors watch to see if democratic model works\n    When democratic business thrives serving community well\n    Then other small business owners (Rosa's Auto, neighborhood retail) consider conversion\n    And successful demonstration effect inspires broader democratic economy\n    And customer support proves democratic businesses are economically viable\n    And neighborhood economic transformation accelerates through cascading conversions\n    And community_elohim documents success stories encouraging further conversions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer sees democratic business success encourage other neighborhood conversions",

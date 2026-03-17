@@ -6,7 +6,7 @@
   "title": "Appeal unsuccessful but feeling heard through the process",
   "description": "Appeal unsuccessful but feeling heard through the process",
   "content": "Scenario: Appeal unsuccessful but feeling heard through the process\n    Given I filed an appeal about a life-saving intervention I felt was invasive\n    And the Constitutional Council has deliberated on my case\n    When the council affirms the agent's decision as constitutionally aligned\n    But also recommends protocol enhancements for pre-specified preferences\n    Then I receive detailed explanation of why the decision was upheld\n    And I can see how my appeal influenced protocol improvements\n    And I am offered support to update my future preferences\n    And My dissent is honored and recorded even though I didn't win\n    And I understand my voice mattered in making the system better\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-individual",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal unsuccessful but feeling heard through the process",

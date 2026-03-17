@@ -6,7 +6,7 @@
   "title": "Providing evidence to Senator Ruiz for policy development",
   "description": "Providing evidence to Senator Ruiz for policy development",
   "content": "Scenario: Providing evidence to Senator Ruiz for policy development\n    Given Senator Ruiz is drafting AI governance legislation\n    And she needs evidence about what regulatory approaches help vs harm\n    When I brief her committee on my regional research findings\n    Then I present: rigorous evaluation of protocol outcomes\n    And I explain: what factors predict successful adoption\n    And I provide: evidence about marginalized community access\n    And I offer: comparative findings about governance models\n    And I testify: honestly about limitations and uncertainties\n    And I maintain: independence by reporting truth not advocacy\n    And My research becomes: evidence base for democratic policy making\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Providing evidence to Senator Ruiz for policy development",

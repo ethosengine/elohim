@@ -6,7 +6,7 @@
   "title": "Participating in household conflict resolution",
   "description": "Participating in household conflict resolution",
   "content": "Scenario: Participating in household conflict resolution\n    Given Jordan had a disagreement with a housemate about noise\n    And the household uses restorative practices for conflicts\n    When the household facilitates a conflict resolution meeting\n    Then Jordan's personal_agent helps Jordan express their perspective\n    And the interface provides communication support (feeling words, pictures)\n    And the facilitator ensures Jordan's voice is fully heard\n    And Jordan participates in finding a solution\n    And the resolution honors Jordan's needs and boundaries\n    And Jordan learns healthy conflict resolution skills\n    And Jordan's dignity is preserved throughout the process\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in household conflict resolution",

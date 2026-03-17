@@ -6,7 +6,7 @@
   "title": "Household schedule coordination around intensive care demands",
   "description": "Household schedule coordination around intensive care demands",
   "content": "Scenario: Household schedule coordination around intensive care demands\n    Given David requires constant supervision and care\n    And James must balance caregiving with part-time work\n    When household schedules are coordinated\n    Then the household_elohim should integrate care demands with work\n    And it should identify conflicts between care and employment\n    And it should help James negotiate sustainable scheduling\n    And household operations should be possible despite constraints\n    And schedule coordination should prevent impossible demands\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household schedule coordination around intensive care demands",

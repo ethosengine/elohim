@@ -6,7 +6,7 @@
   "title": "Recognition of self-care as care work",
   "description": "Recognition of self-care as care work",
   "content": "Scenario: Recognition of self-care as care work\n    Given Aisha tends to prioritize work over personal needs\n    And burnout would undermine all her capabilities\n    When the personal_agent monitors her well-being\n    Then it should recognize self-care as legitimate care work\n    And it should flag when self-care is being neglected\n    And it should help her understand that caring for herself enables other contributions\n    And the system should validate rest and nutrition as valuable\n    And Aisha should learn that personal stewardship is foundational\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of self-care as care work",

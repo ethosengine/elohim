@@ -6,7 +6,7 @@
   "title": "Transparent boundaries that Emma can understand and learn from",
   "description": "Transparent boundaries that Emma can understand and learn from",
   "content": "Scenario: Transparent boundaries that Emma can understand and learn from\n    Given Emma operates within parental boundaries\n    And she is old enough to understand limits\n    When Emma encounters a boundary (allergen, budget, nutrition)\n    Then the boundary should be explained transparently\n    And the agent should say \"This exceeds the family budget we're working within\"\n    And Emma should see and understand the limits\n    And boundaries should be teaching tools, not just restrictions\n    And she should learn that all autonomy operates within contexts\n    And transparency should build understanding of constraint reasoning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transparent boundaries that Emma can understand and learn from",

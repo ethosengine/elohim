@@ -1265,7 +1265,7 @@
       }
     }
   ],
-  "contentFormat": "sophia",
+  "contentFormat": "interactive",
   "tags": [
     "assessment",
     "discovery",
@@ -1296,7 +1296,8 @@
         "self-enhancement"
       ]
     },
-    "migratedAt": "2026-02-24T00:00:00.000Z"
+    "migratedAt": "2026-02-24T00:00:00.000Z",
+    "originalContentFormat": "sophia"
   },
   "createdAt": "2025-11-28T00:09:03.479929",
   "updatedAt": "2026-02-24T00:00:00.000Z",

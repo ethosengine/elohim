@@ -6,7 +6,7 @@
   "title": "Building professional network and references despite isolation and crisis",
   "description": "Building professional network and references despite isolation and crisis",
   "content": "Scenario: Building professional network and references despite isolation and crisis\n    Given professional networking requires time, energy, and social capital I lack\n    And I need professional connections for employment opportunities\n    When I work to build professional network\n    Then the workplace_elohim helps me identify low-barrier networking opportunities\n    And suggests strategies for building professional connections despite constraints\n    And helps me leverage existing relationships for professional support\n    And validates that networking is harder during crisis and that's not my fault\n    And connects me to professional networks for people in similar situations\n    And my personal_agent identifies networking opportunities matching my capacity\n    And recognizes networking efforts as valuable professional development\n    And celebrates each professional connection built\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building professional network and references despite isolation and crisis",

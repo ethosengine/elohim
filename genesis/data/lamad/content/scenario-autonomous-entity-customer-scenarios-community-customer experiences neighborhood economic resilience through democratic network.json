@@ -6,7 +6,7 @@
   "title": "Customer experiences neighborhood economic resilience through democratic network",
   "description": "Customer experiences neighborhood economic resilience through democratic network",
   "content": "Scenario: Customer experiences neighborhood economic resilience through democratic network\n    Given corporate businesses close arbitrarily based on distant profit calculations\n    And neighborhood institutions disappeared despite community need\n    When democratic businesses are accountable to community not distant shareholders\n    Then businesses remain open serving community even during economic downturns\n    And worker ownership ensures commitment to neighborhood survival\n    And democratic network provides mutual aid during crises\n    And community economic resilience increases through democratic ownership\n    And community_elohim coordinates network resilience strategies\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer experiences neighborhood economic resilience through democratic network",

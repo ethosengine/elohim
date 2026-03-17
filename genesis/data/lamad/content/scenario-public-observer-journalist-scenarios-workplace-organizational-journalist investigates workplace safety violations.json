@@ -6,7 +6,7 @@
   "title": "Journalist investigates workplace safety violations",
   "description": "Journalist investigates workplace safety violations",
   "content": "Scenario: Journalist investigates workplace safety violations\n    Given workers report unsafe conditions at warehouse\n    And the journalist covers workplace safety\n    When the Observer analyzes employer's safety violation history\n    Then the journalist finds company has 47 OSHA violations in 5 years\n    And sees pattern of violations detected but minimally fined\n    And documents worker injuries and company's inadequate response\n    And shows same company violates safety rules at facilities in other states\n    And publishes investigation forcing regulatory accountability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist investigates workplace safety violations",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Stress and burnout monitoring with proactive intervention",
   "description": "Stress and burnout monitoring with proactive intervention",
   "content": "Scenario: Stress and burnout monitoring with proactive intervention\n    Given Robert carries enormous care burden across contexts\n    And middle-aged adults often experience burnout\n    And he may not recognize his own exhaustion\n    When his personal_agent monitors stress indicators\n    Then it should track signs of burnout across his activities\n    And recognize patterns: \"You've canceled personal activities 8 consecutive weeks\"\n    And flag when burden becomes unsustainable\n    And proactively surface support resources\n    And connect him to respite care, counseling, or community support\n    And validate that asking for help is strength, not weakness\n    And intervene before burnout becomes crisis\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Stress and burnout monitoring with proactive intervention",

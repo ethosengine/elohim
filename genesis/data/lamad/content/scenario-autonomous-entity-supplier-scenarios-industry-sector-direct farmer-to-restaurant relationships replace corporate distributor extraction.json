@@ -6,7 +6,7 @@
   "title": "Direct farmer-to-restaurant relationships replace corporate distributor extraction",
   "description": "Direct farmer-to-restaurant relationships replace corporate distributor extraction",
   "content": "Scenario: Direct farmer-to-restaurant relationships replace corporate distributor extraction\n    Given corporate distributors (Sysco, US Foods) extract 400-500% markup between farmer and restaurant\n    And Tom received $0.50/lb for tomatoes distributors sold for $2.50/lb\n    When EAE network enables direct relationships\n    Then Tom receives $1.50/lb for tomatoes (3x previous payment)\n    And restaurants pay $2.00/lb (20% less than through distributor)\n    And both parties benefit massively by eliminating extractive middleman\n    And corporate distributor extraction is replaced by transparent partnership\n    And industry_sector_elohim coordinates direct supply relationships across network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Direct farmer-to-restaurant relationships replace corporate distributor extraction",

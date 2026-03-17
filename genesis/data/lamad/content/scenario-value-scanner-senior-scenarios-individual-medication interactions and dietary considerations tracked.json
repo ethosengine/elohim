@@ -6,7 +6,7 @@
   "title": "Medication interactions and dietary considerations tracked",
   "description": "Medication interactions and dietary considerations tracked",
   "content": "Scenario: Medication interactions and dietary considerations tracked\n    Given Margaret takes multiple medications\n    And medications interact with certain foods\n    When Margaret shops for groceries\n    Then her personal_agent should be aware of medication interactions\n    And it should flag potentially problematic food-drug combinations\n    And it should suggest foods that support medication effectiveness\n    And medication data should remain private and encrypted\n    And the system should support her health management\n    And Margaret should feel supported in complex health navigation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Medication interactions and dietary considerations tracked",

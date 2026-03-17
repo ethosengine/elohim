@@ -6,7 +6,7 @@
   "title": "Planning across time with sophisticated coordination tools",
   "description": "Planning across time with sophisticated coordination tools",
   "content": "Scenario: Planning across time with sophisticated coordination tools\n    Given Marcus plans weekly meals for himself and Keisha\n    And he must coordinate ingredients across multiple meals\n    When Marcus uses planning features\n    Then he should have access to meal planning with nutritional analysis\n    And budget tracking should project across weeks\n    And shopping list optimization should be available\n    And inventory management should prevent waste\n    And multi-store price comparison should support best value finding\n    And planning tools should be professional-grade but accessible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning across time with sophisticated coordination tools",

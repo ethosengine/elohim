@@ -6,7 +6,7 @@
   "title": "Educational assessment measures value literacy development",
   "description": "Educational assessment measures value literacy development",
   "content": "Scenario: Educational assessment measures value literacy development\n    Given Sarah wants to know if children are learning value literacy\n    And assessment can support or undermine learning\n    When children's value literacy is assessed\n    Then the educational_elohim should measure care-based decision making\n    And assessment should observe whether children see care as valuable\n    And it should track development of care economy principles\n    And assessment should support learning, not create anxiety\n    And Sarah should see children's value literacy growth over time\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational assessment measures value literacy development",

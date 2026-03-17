@@ -6,7 +6,7 @@
   "title": "Teen learns neighborhood governance through participation",
   "description": "Teen learns neighborhood governance through participation",
   "content": "Scenario: Teen learns neighborhood governance through participation\n    Given Jasmine is preparing for adult civic engagement\n    And neighborhood is a foundational governance layer\n    When she participates in neighborhood care economy\n    Then she should learn how neighborhoods function as governance units\n    And understand how collective decisions are made\n    And practice participating in community conversations\n    And build relationships with neighbors across differences\n    And develop civic skills that will serve her adult life\n    And internalize that communities require active participation to flourish\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns neighborhood governance through participation",

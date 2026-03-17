@@ -6,7 +6,7 @@
   "title": "Protecting Alex from workplace discrimination",
   "description": "Protecting Alex from workplace discrimination",
   "content": "Scenario: Protecting Alex from workplace discrimination\n    Given workplace discrimination against disabled people is common\n    And ableism often operates subtly\n    When potential discrimination occurs\n    Then the workplace_elohim should help Alex identify discriminatory patterns\n    And it should document incidents that might constitute discrimination\n    And it should connect Alex to legal resources and advocacy support\n    And patterns across time should be made visible\n    And Alex should have tools to protect their workplace rights\n    And the protocol should recognize that workplaces can be hostile\n    And evidence collection should be systematic and thorough\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protecting Alex from workplace discrimination",

@@ -6,7 +6,7 @@
   "title": "Emergency support through student community networks",
   "description": "Emergency support through student community networks",
   "content": "Scenario: Emergency support through student community networks\n    Given Kenji faces unexpected crisis (medical emergency, financial shortfall, housing instability)\n    And formal institutions often respond too slowly\n    When student community provides emergency support\n    Then the community_elohim should coordinate rapid mutual aid\n    And it should help students pool resources for peer emergency\n    And it should recognize emergency care as high-value contribution\n    And it should track \"Maya loaned Kenji $100 for urgent medical cost\"\n    And community should function as immediate safety net\n    And student mutual aid should provide crisis intervention\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency support through student community networks",

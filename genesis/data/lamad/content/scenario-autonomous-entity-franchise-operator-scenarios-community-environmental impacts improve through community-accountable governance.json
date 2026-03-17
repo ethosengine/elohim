@@ -6,7 +6,7 @@
   "title": "Environmental impacts improve through community-accountable governance",
   "description": "Environmental impacts improve through community-accountable governance",
   "content": "Scenario: Environmental impacts improve through community-accountable governance\n    Given franchise corporate externalized environmental costs for profit maximization\n    And community bore environmental impacts (waste, pollution, resource depletion)\n    When democratic governance includes environmental stewardship accountability\n    Then waste reduction and recycling programs are implemented\n    And sustainable sourcing (local, organic, regenerative) is prioritized\n    And environmental practices are transparent to community\n    And community can hold democratic businesses accountable for environmental impacts\n    And community_elohim tracks environmental improvements from democratic governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental impacts improve through community-accountable governance",

@@ -6,7 +6,7 @@
   "title": "Developing critical thinking about consumption and marketing",
   "description": "Developing critical thinking about consumption and marketing",
   "content": "Scenario: Developing critical thinking about consumption and marketing\n    Given consumer marketing targets young adults intensively\n    And Aisha needs media literacy\n    When Aisha encounters marketing messages\n    Then the personal_agent should help her think critically\n    And it should explain marketing tactics and manipulation\n    And it should teach distinguishing needs from manufactured wants\n    And consumer education should support autonomous decision-making\n    And she should learn to resist exploitative marketing\n    And critical consumption literacy should be developed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developing critical thinking about consumption and marketing",

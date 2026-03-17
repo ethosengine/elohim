@@ -6,7 +6,7 @@
   "title": "Temporary residency patterns and neighborhood turnover",
   "description": "Temporary residency patterns and neighborhood turnover",
   "content": "Scenario: Temporary residency patterns and neighborhood turnover\n    Given student neighborhoods have high turnover\n    And institutional knowledge is lost with each cohort\n    When the neighborhood_elohim manages turnover\n    Then it should preserve neighborhood practices across student generations\n    And it should help new students learn neighborhood norms quickly\n    And it should maintain neighborhood continuity despite turnover\n    And transient residents should still build lasting neighborhood patterns\n    And the system should stabilize high-turnover neighborhoods\n    And neighborhood culture should persist beyond individual residents\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Temporary residency patterns and neighborhood turnover",

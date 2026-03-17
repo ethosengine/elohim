@@ -6,7 +6,7 @@
   "title": "Financial literacy development through care economy lens",
   "description": "Financial literacy development through care economy lens",
   "content": "Scenario: Financial literacy development through care economy lens\n    Given Kenji must manage all his finances independently\n    And he receives financial aid, earns wages, and makes all spending decisions\n    When the personal_agent teaches financial management\n    Then it should frame finances through care economy principles\n    And it should teach him to value care contributions alongside paid work\n    And it should help him understand exploitation vs. fair exchange\n    And the agent should build financial literacy integrated with care values\n    And Kenji should learn to see economy as care exchange, not just money\n    And financial capability should be built on care economy foundation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Financial literacy development through care economy lens",

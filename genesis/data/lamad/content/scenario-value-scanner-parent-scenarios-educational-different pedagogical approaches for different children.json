@@ -6,7 +6,7 @@
   "title": "Different pedagogical approaches for different children",
   "description": "Different pedagogical approaches for different children",
   "content": "Scenario: Different pedagogical approaches for different children\n    Given Tommy (5) needs wonder-preservation pedagogy\n    And Emma (8) needs autonomy-building instruction\n    When Sarah teaches her children with different approaches\n    Then the educational_elohim should recognize pedagogical sophistication\n    And it should value Sarah's ability to differentiate instruction\n    And teaching multiple children at different stages should be recognized as complex\n    And Sarah's educational expertise should be documented\n    And the system should recognize professional-grade teaching capability\n    And differentiated instruction should be valued as advanced skill\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Different pedagogical approaches for different children",

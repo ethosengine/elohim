@@ -6,7 +6,7 @@
   "title": "Citywide democratic business network emerges from successful conversions",
   "description": "Citywide democratic business network emerges from successful conversions",
   "content": "Scenario: Citywide democratic business network emerges from successful conversions\n    Given Rosa's conversion inspires other small business owners\n    And isolated democratic businesses are vulnerable\n    When multiple conversions create critical mass across municipality\n    Then democratic business network provides mutual support and coordination\n    And owners considering conversion can learn from Rosa and others\n    And network advocates collectively for supportive municipal policies\n    And citywide democratic economy infrastructure develops (shared services, coordination, advocacy)\n    And municipality_elohim facilitates network development and coordination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citywide democratic business network emerges from successful conversions",

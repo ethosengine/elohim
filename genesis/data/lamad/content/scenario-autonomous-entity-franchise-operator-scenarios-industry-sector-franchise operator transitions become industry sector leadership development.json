@@ -6,7 +6,7 @@
   "title": "Franchise operator transitions become industry sector leadership development",
   "description": "Franchise operator transitions become industry sector leadership development",
   "content": "Scenario: Franchise operator transitions become industry sector leadership development\n    Given converted operators have unique expertise in franchise-to-democratic conversion\n    And sector transformation requires knowledgeable advocates and mentors\n    When James and other converted operators share learning across industry\n    Then they become thought leaders in food service democratic transformation\n    And industry conferences feature democratic conversion case studies\n    And sector media covers democratic model as emerging alternative to franchise\n    And operators' expertise guides policy development and network expansion\n    And industry_sector_elohim amplifies converted operators' voices in sector transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise operator transitions become industry sector leadership development",

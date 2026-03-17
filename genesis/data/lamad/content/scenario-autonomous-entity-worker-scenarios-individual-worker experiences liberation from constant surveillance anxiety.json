@@ -6,7 +6,7 @@
   "title": "Worker experiences liberation from constant surveillance anxiety",
   "description": "Worker experiences liberation from constant surveillance anxiety",
   "content": "Scenario: Worker experiences liberation from constant surveillance anxiety\n    Given Maria previously worked under corporate cameras monitoring for \"time theft\"\n    And she developed stress from constant surveillance\n    When the workplace converts to democratic ownership\n    And cameras become worker-controlled witness infrastructure\n    Then Maria no longer fears being watched for compliance\n    And she experiences reduced workplace anxiety and stress\n    And her health indicators improve (lower blood pressure, better sleep)\n    And her sense of dignity and autonomy increases measurably\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Worker experiences liberation from constant surveillance anxiety",

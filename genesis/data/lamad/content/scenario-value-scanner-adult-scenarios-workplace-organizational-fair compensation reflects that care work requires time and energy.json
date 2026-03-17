@@ -6,7 +6,7 @@
   "title": "Fair compensation reflects that care work requires time and energy",
   "description": "Fair compensation reflects that care work requires time and energy",
   "content": "Scenario: Fair compensation reflects that care work requires time and energy\n    Given Sarah's care responsibilities are substantial\n    And she needs sufficient income to support household\n    When Sarah's compensation is determined\n    Then the workplace_elohim should advocate for living wages\n    And compensation should enable household flourishing, not just survival\n    And Sarah should earn enough to afford care work time\n    And wages should reflect that workers have care responsibilities\n    And fair compensation should support care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Fair compensation reflects that care work requires time and energy",

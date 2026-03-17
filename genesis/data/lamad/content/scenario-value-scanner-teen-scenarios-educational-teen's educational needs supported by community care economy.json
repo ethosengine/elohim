@@ -6,7 +6,7 @@
   "title": "Teen's educational needs supported by community care economy",
   "description": "Teen's educational needs supported by community care economy",
   "content": "Scenario: Teen's educational needs supported by community care economy\n    Given Jasmine needs school supplies, technology access, and learning resources\n    And she has contributed to community care economy\n    When educational needs arise\n    Then community care tokens should be usable for educational resources\n    And community_elohim should coordinate support for her educational success\n    And her care contributions should connect to educational opportunity\n    And barriers to education should be reduced through care economy networks\n    And community investment in her education should reflect her community contribution\n    And mutual care should extend to supporting each other's learning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen's educational needs supported by community care economy",

@@ -6,7 +6,7 @@
   "title": "Workplace relationships build professional networks",
   "description": "Workplace relationships build professional networks",
   "content": "Scenario: Workplace relationships build professional networks\n    Given Jasmine works with manager Sarah and co-workers across age ranges\n    And workplace relationships can support her future career\n    When workplace_elohim tracks her professional relationship development\n    Then it should recognize relationship building as valuable outcome of work\n    And help her understand how to develop professional references\n    And surface when relationships could support her career goals\n    And teach her to navigate workplace relationships appropriately\n    And build her professional social capital\n    And demonstrate that work creates networks, not just income\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace relationships build professional networks",

@@ -6,7 +6,7 @@
   "title": "Teaching grandchildren sustainable living practices",
   "description": "Teaching grandchildren sustainable living practices",
   "content": "Scenario: Teaching grandchildren sustainable living practices\n    Given Margaret teaches Tommy and Emma to reduce waste and value resources\n    And she models careful use of food, water, energy, materials\n    When Margaret provides ecological education\n    Then the bioregional_elohim should recognize environmental teaching\n    And it should value transmission of sustainable living practices\n    And it should track grandchildren's ecological learning\n    And environmental education should accumulate care tokens\n    And Margaret's teaching should be recognized as essential for sustainability\n    And next generation should learn resource stewardship from elders\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching grandchildren sustainable living practices",

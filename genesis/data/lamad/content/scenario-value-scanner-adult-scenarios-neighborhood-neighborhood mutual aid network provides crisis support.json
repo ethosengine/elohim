@@ -6,7 +6,7 @@
   "title": "Neighborhood mutual aid network provides crisis support",
   "description": "Neighborhood mutual aid network provides crisis support",
   "content": "Scenario: Neighborhood mutual aid network provides crisis support\n    Given Sarah or her neighbors may face crises\n    And traditional systems often fail to provide timely support\n    When a household experiences emergency\n    Then the neighborhood_elohim should activate mutual aid network\n    And neighbors with capacity should be prompted to help\n    And support should be immediate and community-based\n    And neighborhood should function as first-line safety net\n    And mutual aid should be coordinated effectively\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood mutual aid network provides crisis support",

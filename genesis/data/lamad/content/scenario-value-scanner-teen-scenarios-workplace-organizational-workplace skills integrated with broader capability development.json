@@ -6,7 +6,7 @@
   "title": "Workplace skills integrated with broader capability development",
   "description": "Workplace skills integrated with broader capability development",
   "content": "Scenario: Workplace skills integrated with broader capability development\n    Given Jasmine learns customer service, inventory management, and problem-solving at work\n    And these skills transfer to other contexts\n    When her personal_agent tracks skill development\n    Then it should recognize skills gained through work\n    And surface how workplace skills apply to other life contexts\n    And connect to educational and career planning\n    And help her see work as capability building, not just income\n    And integrate workplace learning with her overall development\n    And value skills development as part of work's worth\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace skills integrated with broader capability development",

@@ -6,7 +6,7 @@
   "title": "Demonstrating visible community benefit for reelection",
   "description": "Demonstrating visible community benefit for reelection",
   "content": "Scenario: Demonstrating visible community benefit for reelection\n    Given I face reelection and need to show protocol serves Riverside\n    And residents judge me on outcomes not philosophy\n    When I present annual protocol review to community\n    Then I show: data on wellbeing improvements (loneliness down, satisfaction up)\n    And I report: crisis response effectiveness and economic resilience\n    And I acknowledge: failures and challenges honestly\n    And I demonstrate: transparent accountability\n    And I propose: continuing with recommended calibrations\n    And residents vote: 68% to continue (not consensus but democratic)\n    And I remain accountable: through normal democratic processes\n    And evidence matters: for sustaining political support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Demonstrating visible community benefit for reelection",

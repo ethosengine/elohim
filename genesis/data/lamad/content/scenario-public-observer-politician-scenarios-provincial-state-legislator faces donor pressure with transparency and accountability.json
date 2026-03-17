@@ -6,7 +6,7 @@
   "title": "Legislator faces donor pressure with transparency and accountability",
   "description": "Legislator faces donor pressure with transparency and accountability",
   "content": "Scenario: Legislator faces donor pressure with transparency and accountability\n    Given the politician received campaign contributions from industry\n    And industry lobbyists seek favorable vote on regulation\n    When the Observer documents relationship and voting patterns\n    Then they see campaign finance connections made publicly visible\n    And understand constituents track alignment of votes with donors\n    And face accountability for voting with industry versus constituents\n    And explain votes with policy rationale not donor influence\n    And navigate pressure with transparent evidence-based decision-making\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Legislator faces donor pressure with transparency and accountability",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

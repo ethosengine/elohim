@@ -6,7 +6,7 @@
   "title": "Workplace recognizes employees' care responsibilities",
   "description": "Workplace recognizes employees' care responsibilities",
   "content": "Scenario: Workplace recognizes employees' care responsibilities\n    Given Sarah balances full-time teaching with intensive parenting\n    And her care responsibilities affect her work capacity\n    When workplace policies are designed\n    Then the workplace_elohim should make employees' care work visible\n    And Sarah's care responsibilities should be recognized, not ignored\n    And workplace should acknowledge that workers have lives beyond employment\n    And policies should support work-care integration, not create conflict\n    And care economy should inform workplace culture\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace recognizes employees' care responsibilities",

@@ -4,7 +4,7 @@
   "title": "Representation is capturable",
   "description": "Follows artificial political boundaries subject to manipulation rather than natural communities of shared values",
   "content": "Follows artificial political boundaries subject to manipulation rather than natural communities of shared values",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/crisis-political/concept-representation-capturable.json",
   "tags": [
     "crisis",
@@ -22,7 +22,8 @@
     "section": "crisis-political",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.000708",
   "updatedAt": "2025-12-24T03:05:25.893Z",

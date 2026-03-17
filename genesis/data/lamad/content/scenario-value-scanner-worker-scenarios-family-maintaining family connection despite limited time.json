@@ -6,7 +6,7 @@
   "title": "Maintaining family connection despite limited time",
   "description": "Maintaining family connection despite limited time",
   "content": "Scenario: Maintaining family connection despite limited time\n    Given my work schedule leaves minimal time for family\n    When I want to stay connected to parents and siblings\n    Then the family_elohim should help me maintain meaningful connection\n    And suggest efficient ways to participate in family care\n    And recognize that my work constraints don't diminish my care commitment\n    And coordinate around my limited availability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-family",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining family connection despite limited time",

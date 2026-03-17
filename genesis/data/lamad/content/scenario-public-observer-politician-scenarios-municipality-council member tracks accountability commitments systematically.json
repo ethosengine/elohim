@@ -6,7 +6,7 @@
   "title": "Council member tracks accountability commitments systematically",
   "description": "Council member tracks accountability commitments systematically",
   "content": "Scenario: Council member tracks accountability commitments systematically\n    Given the politician made campaign promises to constituents\n    And committed to specific actions in community meetings\n    When the Observer monitors commitment tracking\n    Then they receive alerts when deadlines approach\n    And see status of all promises made across forums\n    And get nudges to follow through on community pledges\n    And build constituent trust through documented delivery\n    And maintain integrity against overwhelming office demands\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Council member tracks accountability commitments systematically",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

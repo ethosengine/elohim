@@ -4,7 +4,7 @@
   "title": "Intergenerational Thinking",
   "description": "Both traditions emphasize decision-making that considers impact on future generations, creating sustainable systems that protect rather than exploit human vulnerability.",
   "content": "Both traditions emphasize decision-making that considers impact on future generations, creating sustainable systems that protect rather than exploit human vulnerability.",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/learning-success/concept-intergenerational-thinking.json",
   "tags": [
     "models",
@@ -22,14 +22,15 @@
     "section": "learning-success",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.002347",
   "updatedAt": "2025-12-24T03:05:25.879Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

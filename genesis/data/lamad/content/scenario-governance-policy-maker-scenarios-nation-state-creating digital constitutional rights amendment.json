@@ -6,7 +6,7 @@
   "title": "Creating Digital Constitutional Rights Amendment",
   "description": "Creating Digital Constitutional Rights Amendment",
   "content": "Scenario: Creating Digital Constitutional Rights Amendment\n    Given protocol creates new forms of governance and rights\n    And constitutional recognition would strengthen legitimacy\n    When I propose national constitutional amendment\n    Then I recognize: sortition governance as legitimate democratic form\n    And I establish: right to appeal agent decisions\n    And I protect: community sovereignty over protocol adoption\n    And I enshrine: privacy protections and dignity guarantees\n    And amendment goes through: lengthy deliberative process\n    And if passed: transforms national constitutional framework\n    And protocol gains: highest legal recognition\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creating Digital Constitutional Rights Amendment",

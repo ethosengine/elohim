@@ -6,7 +6,7 @@
   "title": "Foundation for lifetime care economy thinking established",
   "description": "Foundation for lifetime care economy thinking established",
   "content": "Scenario: Foundation for lifetime care economy thinking established\n    Given Emma is forming foundational economic beliefs ages 8-10\n    And early patterns shape lifelong thinking\n    When Emma consistently makes care-based value decisions\n    Then she should internalize resources are for stewardship\n    And she should learn choices affect others' flourishing\n    And she should understand care creates value\n    And neural pathways for care economy should form\n    And she should have alternative to consumer capitalism as baseline\n    And this generation should grow up assuming care economy is normal\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Foundation for lifetime care economy thinking established",

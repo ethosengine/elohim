@@ -6,7 +6,7 @@
   "title": "Reducing food waste with fixed income constraints",
   "description": "Reducing food waste with fixed income constraints",
   "content": "Scenario: Reducing food waste with fixed income constraints\n    Given Margaret's budget requires maximizing every dollar\n    And food waste represents meaningful lost resources\n    When Margaret plans meals and shopping\n    Then her personal_agent should help minimize waste\n    And it should suggest appropriate portion sizes for one or two people\n    And it should track perishables and suggest usage timing\n    And it should recommend preservation techniques Margaret knows from experience\n    And waste reduction should align with both budget and values\n    And Margaret's generation's knowledge of frugality should be honored\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reducing food waste with fixed income constraints",

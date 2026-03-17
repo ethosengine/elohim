@@ -6,7 +6,7 @@
   "title": "Income from employment integrated with disability benefits",
   "description": "Income from employment integrated with disability benefits",
   "content": "Scenario: Income from employment integrated with disability benefits\n    Given Alex receives both part-time employment income and disability benefits\n    And benefits coordination is complex\n    When the workplace_elohim tracks Alex's income\n    Then it should help Alex understand how employment income affects benefits\n    And it should alert Alex to earnings thresholds that impact benefits\n    And it should integrate with household economics management\n    And Alex should be able to make informed decisions about work hours\n    And the protocol should support Alex in maximizing total income\n    And benefits cliffs should be navigated carefully\n    And Alex's economic stability should be optimized across income sources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Income from employment integrated with disability benefits",

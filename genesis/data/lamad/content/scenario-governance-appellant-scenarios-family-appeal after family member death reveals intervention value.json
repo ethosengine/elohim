@@ -6,7 +6,7 @@
   "title": "Appeal after family member death reveals intervention value",
   "description": "Appeal after family member death reveals intervention value",
   "content": "Scenario: Appeal after family member death reveals intervention value\n    Given Family Elohim previously intervened in my mental health situation\n    And at the time I was angry and felt violated\n    And my brother had died by suicide with similar warning signs\n    When I reflect months later that the intervention likely saved my life\n    Then I can acknowledge the intervention was appropriate despite initial anger\n    And I can update my preferences knowing I'm glad to be alive\n    And The appeal process allowed me to be heard at my most angry moment\n    And Reconciliation with the agent happens through mutual respect\n    And The balance between care and control was negotiated not imposed\n    And This represents successful partnership between human and AI\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-family",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal after family member death reveals intervention value",

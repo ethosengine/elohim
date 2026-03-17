@@ -6,7 +6,7 @@
   "title": "Elder preserves bioregional knowledge across displacement",
   "description": "Elder preserves bioregional knowledge across displacement",
   "content": "Scenario: Elder preserves bioregional knowledge across displacement\n    Given community elders hold traditional knowledge of coastal ecology\n    And this knowledge is being lost as the community displaces\n    When elders document traditional knowledge through the network\n    And younger displaced community members learn and preserve it\n    Then bioregional ecological knowledge is preserved\n    And the knowledge can inform restoration efforts\n    And future generations maintain connection to ancestral place\n    And cultural-ecological wisdom survives displacement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:displaced_person",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder preserves bioregional knowledge across displacement",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

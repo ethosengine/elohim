@@ -6,7 +6,7 @@
   "title": "Citizen understands city budget trade-offs",
   "description": "Citizen understands city budget trade-offs",
   "content": "Scenario: Citizen understands city budget trade-offs\n    Given the city council is deciding the annual budget\n    And a 300-page budget document was released\n    When the citizen reviews the Observer summary\n    Then they see clear spending priorities in plain language\n    And understand which neighborhoods get infrastructure investment\n    And view trade-offs between services (parks vs roads vs libraries)\n    And can submit position on budget priorities in 10 minutes\n    And complex civic decisions become comprehensible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen understands city budget trade-offs",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

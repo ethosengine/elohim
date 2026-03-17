@@ -6,7 +6,7 @@
   "title": "Community provides safety net when teen faces crisis",
   "description": "Community provides safety net when teen faces crisis",
   "content": "Scenario: Community provides safety net when teen faces crisis\n    Given Jasmine encounters a family crisis or household instability\n    And she has been a consistent community contributor\n    When the crisis occurs and she needs support\n    Then the community_elohim should surface available resources\n    And her care contributions should give her standing to access support\n    And community institutions should respond to protect her wellbeing\n    And the system should preserve her autonomy and dignity\n    And demonstrate that care economy operates as mutual aid\n    And show that communities care for members who have cared for community\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community provides safety net when teen faces crisis",

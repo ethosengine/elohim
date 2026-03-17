@@ -6,7 +6,7 @@
   "title": "Household resource allocation prioritizes care sustainability",
   "description": "Household resource allocation prioritizes care sustainability",
   "content": "Scenario: Household resource allocation prioritizes care sustainability\n    Given household resources are severely limited\n    And care needs are high and increasing\n    When household resources are allocated\n    Then the household_elohim should prioritize care sustainability\n    And it should ensure James has resources for respite\n    And it should allocate funds for both David's and James's needs\n    And resource decisions should prevent caregiver burnout\n    And household economics should serve sustainable caregiving\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household resource allocation prioritizes care sustainability",

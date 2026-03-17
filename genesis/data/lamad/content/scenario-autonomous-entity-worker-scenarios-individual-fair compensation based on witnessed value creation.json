@@ -6,7 +6,7 @@
   "title": "Fair compensation based on witnessed value creation",
   "description": "Fair compensation based on witnessed value creation",
   "content": "Scenario: Fair compensation based on witnessed value creation\n    Given Maria's 8 years of invisible contributions are now documented\n    And her REA profile shows training, conflict prevention, and optimization work\n    When the democratic workplace calculates compensation\n    Then Maria receives $28/hour instead of previous $11/hour\n    And her training contributions (47 hours) are compensated\n    And her conflict resolution (12 incidents prevented) generates recognized value\n    And her efficiency gains (2.3 hours daily saved) benefit her, not just corporate\n    And transparent algorithms show exactly how her compensation is calculated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Fair compensation based on witnessed value creation",

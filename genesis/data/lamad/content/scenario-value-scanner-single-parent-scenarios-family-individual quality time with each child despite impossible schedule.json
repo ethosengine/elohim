@@ -6,7 +6,7 @@
   "title": "Individual quality time with each child despite impossible schedule",
   "description": "Individual quality time with each child despite impossible schedule",
   "content": "Scenario: Individual quality time with each child despite impossible schedule\n    Given each child needs one-on-one parent time\n    And Maria must provide all individual attention alone across three children\n    When Maria allocates time with children\n    Then the family_elohim should help her protect individual connection time\n    And it should remind her that each child needs her undivided attention sometimes\n    And it should coordinate schedules to create brief one-on-one moments\n    And it should prevent any child from being consistently neglected\n    And Maria should maintain individual relationships with each child despite constraints\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual quality time with each child despite impossible schedule",

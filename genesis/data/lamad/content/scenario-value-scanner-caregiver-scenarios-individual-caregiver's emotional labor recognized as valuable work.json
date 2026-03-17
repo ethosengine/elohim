@@ -6,7 +6,7 @@
   "title": "Caregiver's emotional labor recognized as valuable work",
   "description": "Caregiver's emotional labor recognized as valuable work",
   "content": "Scenario: Caregiver's emotional labor recognized as valuable work\n    Given James grieves David's progressive decline daily\n    And he manages profound emotional labor constantly\n    And he maintains David's dignity through devastating loss\n    When the personal_agent tracks James's emotional work\n    Then this labor should be recognized as skilled care work\n    And emotional support should be valued alongside physical care\n    And the weight of ongoing grief should be acknowledged\n    And emotional caregiving should accumulate care tokens\n    And society should see that caregiving is emotionally devastating work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver's emotional labor recognized as valuable work",

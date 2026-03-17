@@ -6,7 +6,7 @@
   "title": "Workers welcome community stakeholder input while maintaining decision autonomy",
   "description": "Workers welcome community stakeholder input while maintaining decision autonomy",
   "content": "Scenario: Workers welcome community stakeholder input while maintaining decision autonomy\n    Given community investors funded the EAE acquisition\n    And investors want input on community benefit priorities\n    When annual community stakeholder meeting occurs\n    Then investors and customers share priorities and concerns\n    And workers listen to community input respectfully\n    And workers deliberate on community suggestions democratically\n    And workers maintain final decision authority on operations\n    And community_elohim ensures investors cannot override worker governance\n    And balanced stakeholder participation serves everyone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers welcome community stakeholder input while maintaining decision autonomy",

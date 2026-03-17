@@ -6,7 +6,7 @@
   "title": "Coordinating with school for grandchildren's educational needs",
   "description": "Coordinating with school for grandchildren's educational needs",
   "content": "Scenario: Coordinating with school for grandchildren's educational needs\n    Given Margaret is involved in grandchildren's education\n    And she sometimes attends school events or communicates with teachers\n    When the educational_elohim coordinates school involvement\n    Then it should recognize Margaret's educational engagement\n    And it should facilitate communication between grandparent and school\n    And it should value her participation in children's formal education\n    And school involvement should accumulate care tokens\n    And Margaret should be recognized as part of children's educational support network\n    And grandparent participation should be welcomed and valued\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating with school for grandchildren's educational needs",

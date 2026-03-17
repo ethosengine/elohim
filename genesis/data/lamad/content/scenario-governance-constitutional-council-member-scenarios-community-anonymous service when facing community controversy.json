@@ -6,7 +6,7 @@
   "title": "Anonymous service when facing community controversy",
   "description": "Anonymous service when facing community controversy",
   "content": "Scenario: Anonymous service when facing community controversy\n    Given I am reviewing a highly controversial local case\n    And I am concerned about community pressure or retaliation\n    When I request anonymous service protections\n    Then my identity is: revealed only to verification systems\n    And I can: serve without public knowing who I am\n    And I am protected: from intimidation or capture attempts\n    And I can: deliberate freely without fear\n    And cryptographic proofs: verify I'm legitimate member without revealing identity\n    And my judgment: maintains democratic legitimacy despite anonymity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Anonymous service when facing community controversy",

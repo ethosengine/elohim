@@ -6,7 +6,7 @@
   "title": "Identifying need for constitutional amendment",
   "description": "Identifying need for constitutional amendment",
   "content": "Scenario: Identifying need for constitutional amendment\n    Given repeated appeals reveal gap in constitutional framework\n    And no interpretation can adequately address the issue\n    When we deliberate and recognize amendment is needed\n    Then we document: the fundamental gap we've identified\n    And we propose: amendment language for consideration\n    And we provide: justification grounded in accumulated appeals\n    And we submit: proposal to next Global Constitutional Convention\n    And we demonstrate: constitution remains living document\n    And we enable: constitutional evolution responsive to reality\n    And we show: how individual suffering informs systemic improvement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identifying need for constitutional amendment",

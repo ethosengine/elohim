@@ -6,7 +6,7 @@
   "title": "Individual autonomy expanding based on demonstrated capability",
   "description": "Individual autonomy expanding based on demonstrated capability",
   "content": "Scenario: Individual autonomy expanding based on demonstrated capability\n    Given Emma has shown good stewardship decisions over time\n    And parents can adjust autonomy levels in the system\n    When Emma's decision-making patterns are reviewed\n    Then her boundaries should expand to reflect capability\n    And she should earn more freedom through demonstrated judgment\n    And the system should track maturity indicators\n    And Emma should understand that autonomy grows with responsibility\n    And her increasing capability should be recognized\n    And freedom should be matched to demonstrated stewardship\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Individual autonomy expanding based on demonstrated capability",

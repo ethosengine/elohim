@@ -6,7 +6,7 @@
   "title": "Activist documents municipal service delivery inequities",
   "description": "Activist documents municipal service delivery inequities",
   "content": "Scenario: Activist documents municipal service delivery inequities\n    Given the activist advocates for environmental justice\n    And suspects systematic discrimination in service delivery\n    When the Observer analyzes municipal operations patterns\n    Then the activist sees infrastructure investment concentrated in white neighborhoods\n    And pollution permits cluster in communities of color\n    And code enforcement disparities by neighborhood\n    And systematic racism becomes statistically undeniable\n    And legal and political action gains foundation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist documents municipal service delivery inequities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Neighborhood resource sharing reduces individual household costs",
   "description": "Neighborhood resource sharing reduces individual household costs",
   "content": "Scenario: Neighborhood resource sharing reduces individual household costs\n    Given Sarah's household operates on limited budget\n    And neighbors have complementary resources and needs\n    When Sarah participates in neighborhood resource sharing\n    Then the neighborhood_elohim should coordinate bulk buying\n    And it should facilitate tool lending among neighbors\n    And it should enable childcare exchanges\n    And it should reduce costs through collective purchasing\n    And neighborhood cooperation should improve household economics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood resource sharing reduces individual household costs",

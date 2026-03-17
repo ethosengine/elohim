@@ -6,7 +6,7 @@
   "title": "Bulk buying and package reduction practices",
   "description": "Bulk buying and package reduction practices",
   "content": "Scenario: Bulk buying and package reduction practices\n    Given Margaret learned to buy bulk to reduce packaging\n    And package reduction serves both budget and ecology\n    When Margaret shops with minimal packaging\n    Then the bioregional_elohim should track packaging reduction\n    And bulk buying should be recognized as ecological practice\n    And Margaret's practices should inform community purchasing\n    And package waste should be minimized\n    And bioregional resource flows should be optimized\n    And frugality should align with ecological goals\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bulk buying and package reduction practices",

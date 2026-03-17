@@ -6,7 +6,7 @@
   "title": "Transitioning work experience to career aligned with care values",
   "description": "Transitioning work experience to career aligned with care values",
   "content": "Scenario: Transitioning work experience to career aligned with care values\n    Given Kenji's current work is survival job, not career goal\n    And he wants future work aligned with environmental care\n    When the workplace_elohim supports career development\n    Then it should help him connect current work skills to future career\n    And it should support him finding work aligned with care economy values\n    And it should recognize his environmental science education as preparing for care work\n    And it should help him transition toward meaningful career\n    And the system should support students developing care-aligned career paths\n    And Kenji's work trajectory should move toward work that serves flourishing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transitioning work experience to career aligned with care values",

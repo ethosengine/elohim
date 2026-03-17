@@ -6,7 +6,7 @@
   "title": "Activist recovers data after device seizure",
   "description": "Activist recovers data after device seizure",
   "content": "Scenario: Activist recovers data after device seizure\n    Given the activist's device was confiscated during a protest\n    And their data was pre-distributed to sanctuary institutions\n    When the activist obtains new hardware and initiates recovery\n    And they authenticate through biometric and social verification\n    And the sanctuary institutions verify the activist's safety and free will\n    Then all organizing data, contacts, and history are restored\n    And the compromised device's access is permanently revoked\n    And the activist resumes organizing with full digital sovereignty\n    And the network logs the rights violation for documentation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-individual",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist recovers data after device seizure",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

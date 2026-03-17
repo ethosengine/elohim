@@ -6,7 +6,7 @@
   "title": "Owner exits gracefully with community gratitude after transition completes",
   "description": "Owner exits gracefully with community gratitude after transition completes",
   "content": "Scenario: Owner exits gracefully with community gratitude after transition completes\n    Given Rosa has completed two-year transition steward commitment\n    And workers are confidently governing the business democratically\n    When Rosa's transition steward role concludes\n    Then workers celebrate her choice to enable democratic ownership\n    And community honors her as founder who chose workers over individual wealth\n    And Rosa exits with consulting income and profound sense of legacy preserved\n    And business continues thriving under worker governance\n    And workplace_elohim documents successful transition as model for future conversions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Owner exits gracefully with community gratitude after transition completes",

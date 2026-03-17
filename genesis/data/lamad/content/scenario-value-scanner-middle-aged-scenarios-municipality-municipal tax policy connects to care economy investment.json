@@ -6,7 +6,7 @@
   "title": "Municipal tax policy connects to care economy investment",
   "description": "Municipal tax policy connects to care economy investment",
   "content": "Scenario: Municipal tax policy connects to care economy investment\n    Given Robert pays substantial property and income taxes\n    And taxes should support care infrastructure\n    And he has voice in how tax revenue is used\n    When municipal_elohim connects taxation to care economy\n    Then it should help him understand how his taxes fund care infrastructure\n    And surface opportunities to advocate for care economy tax priorities\n    And connect him to municipal revenue and taxation policy discussions\n    And support advocacy for progressive taxation that funds care\n    And build municipal tax policy that supports care economy\n    And demonstrate that taxation is community investment in care\n    And recognize that taxpayers should shape spending priorities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal tax policy connects to care economy investment",

@@ -6,7 +6,7 @@
   "title": "Teacher decodes school board agenda in morning brief",
   "description": "Teacher decodes school board agenda in morning brief",
   "content": "Scenario: Teacher decodes school board agenda in morning brief\n    Given tonight's board meeting will vote on \"instructional efficiency optimization\"\n    And teachers have limited time to track board activities\n    When the teacher receives Observer morning brief\n    Then they learn this means increasing class sizes from 24 to 28\n    And see projected impact on teaching and individual attention\n    And get concrete advocacy pathway (testimony, email, coordination)\n    And can coordinate response with colleagues and parents during workday\n    And board jargon becomes actionable intelligence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher decodes school board agenda in morning brief",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

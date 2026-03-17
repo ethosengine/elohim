@@ -4,7 +4,7 @@
   "title": "Love as Technology",
   "description": "The radical proposition at the heart of this protocol is that love—not as sentiment but as committed action toward mutual flourishing—can be encoded into technological systems. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.",
   "content": "The radical proposition at the heart of this protocol is that love—not as sentiment but as committed action toward mutual flourishing—can be encoded into technological systems. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.",
-  "contentFormat": "plaintext",
+  "contentFormat": "markdown",
   "sourcePath": "generated/landing-page/call-to-action/concept-love-as-technology.json",
   "tags": [
     "love",
@@ -25,14 +25,15 @@
     "section": "call-to-action",
     "isLandingPageConcept": true,
     "canBeLinked": true,
-    "displayOnHomepage": true
+    "displayOnHomepage": true,
+    "originalContentFormat": "plaintext"
   },
   "createdAt": "2025-11-28T17:11:57.002774",
   "updatedAt": "2025-12-24T03:05:25.879Z",
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

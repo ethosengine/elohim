@@ -6,7 +6,7 @@
   "title": "Strategic shopping reduces transportation emissions",
   "description": "Strategic shopping reduces transportation emissions",
   "content": "Scenario: Strategic shopping reduces transportation emissions\n    Given Maria carefully plans shopping trips to maximize efficiency\n    And she coordinates purchases to minimize separate trips\n    When transportation patterns are analyzed\n    Then the bioregional_elohim should recognize her efficient transportation\n    And it should value her trip consolidation as emissions reduction\n    And her careful planning should be seen as environmental stewardship\n    And economic efficiency should be recognized as climate contribution\n    And Maria should see her behavior as environmentally valuable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Strategic shopping reduces transportation emissions",

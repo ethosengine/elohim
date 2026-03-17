@@ -6,7 +6,7 @@
   "title": "Training Constitutional Council members on technical literacy",
   "description": "Training Constitutional Council members on technical literacy",
   "content": "Scenario: Training Constitutional Council members on technical literacy\n    Given new council members need technical foundations\n    And I contribute to their 3-week training program\n    When I teach about AI systems and cryptographic verification\n    Then I provide: conceptual understanding without overwhelming detail\n    And I enable: critical engagement with technical testimony\n    And I avoid: indoctrination about \"correct\" technical approaches\n    And I develop: their capacity to question experts\n    And I empower: them to judge despite not being specialists\n    And I demonstrate: how ordinary citizens can govern complex technology\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Training Constitutional Council members on technical literacy",

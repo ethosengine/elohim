@@ -6,7 +6,7 @@
   "title": "Ecological care as spiritual and ethical practice",
   "description": "Ecological care as spiritual and ethical practice",
   "content": "Scenario: Ecological care as spiritual and ethical practice\n    Given Kenji's environmental values are deeply held\n    And ecological care connects to meaning and purpose\n    When the bioregional_elohim supports Kenji's values\n    Then it should recognize ecological stewardship as ethical practice\n    And it should validate his care for planet as meaningful\n    And it should connect ecological care to larger purpose\n    And it should support integration of values across life domains\n    And the system should honor ecological care as spiritual practice\n    And Kenji should experience planetary care as part of life meaning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological care as spiritual and ethical practice",

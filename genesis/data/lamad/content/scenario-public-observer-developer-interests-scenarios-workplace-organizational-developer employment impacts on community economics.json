@@ -6,7 +6,7 @@
   "title": "Developer employment impacts on community economics",
   "description": "Developer employment impacts on community economics",
   "content": "Scenario: Developer employment impacts on community economics\n    Given a developer's project will employ 150 construction workers\n    And claims significant economic impact on local economy\n    When the Observer analyzes actual community economic impacts\n    Then analysis shows: most workers spend earnings in home communities not locally\n    And temporary jobs create temporary spending not sustained economic benefit\n    And few local businesses benefit from construction employment\n    And honest economic analysis reveals limited community benefit\n    And employment claims need scrutiny about actual community economics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer employment impacts on community economics",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

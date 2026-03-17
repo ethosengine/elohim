@@ -6,7 +6,7 @@
   "title": "Teaching value literacy to own children through Value Scanner",
   "description": "Teaching value literacy to own children through Value Scanner",
   "content": "Scenario: Teaching value literacy to own children through Value Scanner\n    Given Sarah is raising Tommy (5) and Emma (8)\n    And she wants them to learn care economy principles\n    When Sarah uses the Value Scanner with her children\n    Then she should model value literacy through her actions\n    And Tommy should learn at developmentally appropriate level (wonder-preservation)\n    And Emma should learn at her developmental stage (guided autonomy)\n    And the educational_elohim should support Sarah's teaching\n    And children should internalize care creates value through family practice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching value literacy to own children through Value Scanner",

@@ -6,7 +6,7 @@
   "title": "Parent tracks playground repair commitments",
   "description": "Parent tracks playground repair commitments",
   "content": "Scenario: Parent tracks playground repair commitments\n    Given the community council promised playground equipment repairs in 60 days\n    And the parent reported broken equipment their child uses\n    When 60 days pass without repairs being completed\n    Then the Observer alerts the parent about the missed deadline\n    And provides evidence from the original meeting commitment\n    And facilitates coordinated follow-up with other affected parents\n    And institutional memory extends beyond administrator turnover\n    And accountability prevents promises from being forgotten\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent tracks playground repair commitments",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

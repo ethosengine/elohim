@@ -6,7 +6,7 @@
   "title": "Protect appellant rights as universal constitutional minimum",
   "description": "Protect appellant rights as universal constitutional minimum",
   "content": "Scenario: Protect appellant rights as universal constitutional minimum\n    Given authoritarian government attempts to suppress appeals\n    And the government wants agents to operate without oversight\n    When global Constitutional Council evaluates the attempt\n    Then the council reaffirms appeal rights as universal minimum\n    And the council declares that human dignity requires recourse\n    And no jurisdiction can eliminate appellant rights while claiming protocol alignment\n    And international community recognizes council authority\n    And appellants worldwide are protected by global constitutional floor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Protect appellant rights as universal constitutional minimum",

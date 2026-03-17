@@ -6,7 +6,7 @@
   "title": "Organizer generates accessible materials for citywide campaign",
   "description": "Organizer generates accessible materials for citywide campaign",
   "content": "Scenario: Organizer generates accessible materials for citywide campaign\n    Given the coalition is campaigning against developer tax breaks\n    And needs to explain complex tax increment financing to residents\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of TIF mechanics\n    And see actual dollar flows (who benefits, who pays)\n    And get talking points for testimony and media\n    And access fact-checking data to counter developer claims\n    And technical policy becomes accessible community education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:community_organizer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Organizer generates accessible materials for citywide campaign",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

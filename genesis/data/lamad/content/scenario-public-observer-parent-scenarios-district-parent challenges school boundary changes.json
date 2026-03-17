@@ -6,7 +6,7 @@
   "title": "Parent challenges school boundary changes",
   "description": "Parent challenges school boundary changes",
   "content": "Scenario: Parent challenges school boundary changes\n    Given the district proposes \"boundary realignment for efficiency\"\n    And the parent's child would be moved to a different school\n    When the parent reviews Observer's impact analysis\n    Then they see which neighborhoods are most affected\n    And understand this separates siblings between different schools\n    And view maps showing longer commutes for certain families\n    And connect with other parents facing same disruption\n    And coordinate testimony about family impacts at boundary hearing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent challenges school boundary changes",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

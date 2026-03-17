@@ -6,7 +6,7 @@
   "title": "Building relationships with neighbors despite time constraints",
   "description": "Building relationships with neighbors despite time constraints",
   "content": "Scenario: Building relationships with neighbors despite time constraints\n    Given neighborhood resilience depends on connection between residents\n    And my work schedule limits social time\n    When I have brief moments available\n    Then the protocol should help me build neighbor relationships\n    And suggest low-time ways to connect and contribute\n    And recognize that presence and greeting count as care\n    And support neighborhood social fabric even with limited participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building relationships with neighbors despite time constraints",

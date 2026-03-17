@@ -6,7 +6,7 @@
   "title": "Teacher advocates for professional development that actually helps",
   "description": "Teacher advocates for professional development that actually helps",
   "content": "Scenario: Teacher advocates for professional development that actually helps\n    Given district mandates professional development hours\n    But most PD is generic and doesn't improve teaching\n    When teachers evaluate professional development through Observer\n    Then teachers rate 75% of required PD as not useful for their teaching\n    And identify what actually helps (job-embedded coaching, subject-specific content)\n    And document time wasted on compliance PD vs productive professional learning\n    And negotiate for teacher voice in PD planning and evaluation\n    And professional development becomes professional not bureaucratic\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher advocates for professional development that actually helps",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Community transportation support for medical appointments",
   "description": "Community transportation support for medical appointments",
   "content": "Scenario: Community transportation support for medical appointments\n    Given James must coordinate multiple medical appointments\n    And transportation logistics are overwhelming\n    When the community_elohim organizes transportation support\n    Then volunteer drivers should be available for medical appointments\n    And transportation should accommodate David's cognitive needs\n    And scheduling should be reliable for multiple appointments\n    And community should reduce transportation burden\n    And medical access should not require James to manage everything alone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community transportation support for medical appointments",

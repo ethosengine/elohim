@@ -6,7 +6,7 @@
   "title": "Citizen tracks environmental commitment implementation",
   "description": "Citizen tracks environmental commitment implementation",
   "content": "Scenario: Citizen tracks environmental commitment implementation\n    Given the city adopted a climate action plan two years ago\n    And promised specific sustainability measures\n    When the citizen reviews Observer tracking\n    Then they see which commitments have been implemented\n    And which remain unfulfilled promises\n    And view progress on measurable sustainability goals\n    And can hold officials accountable for climate action\n    And long-term environmental policy gets institutional memory\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen tracks environmental commitment implementation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

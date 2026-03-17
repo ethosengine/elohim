@@ -6,7 +6,7 @@
   "title": "Journalist fact-checks employer claims during union campaign",
   "description": "Journalist fact-checks employer claims during union campaign",
   "content": "Scenario: Journalist fact-checks employer claims during union campaign\n    Given workers organize union at major retailer\n    And employer makes claims about wages and benefits\n    When the Observer provides instant fact-checking against labor data\n    Then the journalist verifies wage claim is misleading (includes management)\n    And finds actual frontline worker wages below poverty level\n    And shows benefits exclude most workers due to hour restrictions\n    And identifies employer's union-busting expenditures\n    And publishes real-time fact-check supporting informed worker vote\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist fact-checks employer claims during union campaign",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

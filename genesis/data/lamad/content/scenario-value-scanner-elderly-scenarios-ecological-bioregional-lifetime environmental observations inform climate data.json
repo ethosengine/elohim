@@ -6,7 +6,7 @@
   "title": "Lifetime environmental observations inform climate data",
   "description": "Lifetime environmental observations inform climate data",
   "content": "Scenario: Lifetime environmental observations inform climate data\n    Given Helen has observed local environmental changes over 8+ decades\n    And her memory includes baseline data from pre-industrial era\n    When Helen shares environmental observations\n    Then her knowledge should be captured for ecological archives\n    And her observations should inform local climate understanding\n    And personal experience should be valued alongside scientific data\n    And care tokens should reflect her contribution to environmental knowledge\n    And the protocol should recognize elders as environmental historians\n    And Helen's lifetime of observation should contribute to bioregional stewardship\n    And indigenous elder knowledge methods should inform data collection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Lifetime environmental observations inform climate data",

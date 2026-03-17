@@ -6,7 +6,7 @@
   "title": "Teen learns bioregional water and energy systems",
   "description": "Teen learns bioregional water and energy systems",
   "content": "Scenario: Teen learns bioregional water and energy systems\n    Given Jasmine lives in a watershed with specific water dynamics\n    And her consumption affects water and energy resources\n    When her personal_agent explains resource connections\n    Then it should teach her about local water sources and constraints\n    And show how her choices affect regional water availability\n    And explain energy systems powering her community\n    And connect individual consumption to collective resource management\n    And build understanding of herself as participant in bioregional systems\n    And develop ecological citizenship grounded in local ecosystems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns bioregional water and energy systems",

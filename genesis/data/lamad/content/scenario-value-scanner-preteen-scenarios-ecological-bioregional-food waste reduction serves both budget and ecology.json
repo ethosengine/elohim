@@ -6,7 +6,7 @@
   "title": "Food waste reduction serves both budget and ecology",
   "description": "Food waste reduction serves both budget and ecology",
   "content": "Scenario: Food waste reduction serves both budget and ecology\n    Given Marcus must maximize value from $75 budget\n    And food waste represents economic and ecological loss\n    When Marcus manages food inventory\n    Then the personal_agent should help him minimize waste\n    And it should track what gets used and what spoils\n    And it should suggest meal planning that uses ingredients completely\n    And waste reduction should serve both his budget and environment\n    And ecological stewardship should align with economic necessity\n    And care for resources should extend to caring for earth\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food waste reduction serves both budget and ecology",

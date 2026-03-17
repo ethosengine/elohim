@@ -6,7 +6,7 @@
   "title": "Caregiver burnout detection and prevention",
   "description": "Caregiver burnout detection and prevention",
   "content": "Scenario: Caregiver burnout detection and prevention\n    Given caregiver burnout is real and dangerous\n    And James is at risk of physical and emotional collapse\n    When the personal_agent monitors for burnout warning signs\n    Then it should detect declining nutrition in James\n    And it should recognize sleep deprivation patterns\n    And it should notice increasing social isolation\n    And it should identify health problems emerging\n    And it should alert James before burnout becomes crisis\n    And it should proactively connect him to respite resources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver burnout detection and prevention",

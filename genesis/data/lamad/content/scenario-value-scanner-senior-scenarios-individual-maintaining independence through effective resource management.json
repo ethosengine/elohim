@@ -6,7 +6,7 @@
   "title": "Maintaining independence through effective resource management",
   "description": "Maintaining independence through effective resource management",
   "content": "Scenario: Maintaining independence through effective resource management\n    Given Margaret values her independence\n    And she wants to avoid becoming \"a burden\"\n    When Margaret uses the Value Scanner over time\n    Then it should help her maintain self-sufficiency\n    And it should optimize her resources for maximum independence\n    And it should connect her to community resources without stigma\n    And it should make her care contributions visible\n    And Margaret should experience continued agency and autonomy\n    And the system should support her in aging on her own terms\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining independence through effective resource management",

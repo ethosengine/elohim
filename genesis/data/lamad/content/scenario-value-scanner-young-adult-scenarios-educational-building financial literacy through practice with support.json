@@ -6,7 +6,7 @@
   "title": "Building financial literacy through practice with support",
   "description": "Building financial literacy through practice with support",
   "content": "Scenario: Building financial literacy through practice with support\n    Given Aisha received minimal financial education\n    And she's learning money management with real stakes\n    When Aisha makes financial decisions in the scanner\n    Then the personal_agent should provide contextual financial education\n    And it should teach budgeting through actual practice\n    And it should explain concepts like opportunity cost\n    And it should help her understand efficiency frontiers\n    And financial literacy should build through supported real-world decisions\n    And mistakes should be learning opportunities, not catastrophes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building financial literacy through practice with support",

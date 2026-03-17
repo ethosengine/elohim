@@ -6,7 +6,7 @@
   "title": "Balancing workplace contribution with personal capacity",
   "description": "Balancing workplace contribution with personal capacity",
   "content": "Scenario: Balancing workplace contribution with personal capacity\n    Given Aisha has limited energy and time\n    And workplace demands compete with personal needs\n    When Aisha allocates her care capacity\n    Then the personal_agent should help her balance commitments\n    And it should recognize that workplace care is one of multiple obligations\n    And it should flag when work encroaches on essential personal care\n    And the system should support sustainable allocation of capacity\n    And she should learn that professional success requires personal foundation\n    And work-life balance should be actively maintained\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Balancing workplace contribution with personal capacity",

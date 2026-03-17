@@ -6,7 +6,7 @@
   "title": "Transportation choices and ecological impact",
   "description": "Transportation choices and ecological impact",
   "content": "Scenario: Transportation choices and ecological impact\n    Given Kenji walks most places due to lack of car\n    And walking has minimal ecological impact\n    When the bioregional_elohim tracks transportation\n    Then it should recognize walking as ecological care contribution\n    And it should accumulate care tokens for low-impact transportation\n    And it should show \"Walking instead of driving prevented X carbon emissions\"\n    And it should validate that poverty can align with ecological values\n    And the system should recognize low-impact mobility as care work\n    And Kenji should see his car-free life as ecological stewardship\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Transportation choices and ecological impact",

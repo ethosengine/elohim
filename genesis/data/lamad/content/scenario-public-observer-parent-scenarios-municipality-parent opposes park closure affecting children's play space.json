@@ -6,7 +6,7 @@
   "title": "Parent opposes park closure affecting children's play space",
   "description": "Parent opposes park closure affecting children's play space",
   "content": "Scenario: Parent opposes park closure affecting children's play space\n    Given the municipality proposes closing neighborhood park\n    And selling land to developer \"to increase tax revenue\"\n    When the parent reviews Observer's park access analysis\n    Then they see this eliminates closest play space for 400 children\n    And understand remaining parks are across dangerous intersections\n    And view data on child physical activity and green space access\n    And connect with pediatricians concerned about children's health\n    And parent advocacy preserves children's play infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent opposes park closure affecting children's play space",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

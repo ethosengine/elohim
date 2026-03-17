@@ -6,7 +6,7 @@
   "title": "Study long-term effects on mental health and social cohesion",
   "description": "Study long-term effects on mental health and social cohesion",
   "content": "Scenario: Study long-term effects on mental health and social cohesion\n    Given protocol aims to reduce loneliness and improve wellbeing\n    When James analyzes decade of mental health and cohesion data\n    Then he finds sustained reduction in loneliness indicators\n    And he documents improved community social networks\n    And he examines whether benefits distribute equitably\n    And he identifies mental health improvements particularly strong for isolated individuals\n    And long-term health effects justify protocol as public health intervention\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Study long-term effects on mental health and social cohesion",

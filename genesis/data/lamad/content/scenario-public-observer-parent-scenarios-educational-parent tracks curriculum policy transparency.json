@@ -6,7 +6,7 @@
   "title": "Parent tracks curriculum policy transparency",
   "description": "Parent tracks curriculum policy transparency",
   "content": "Scenario: Parent tracks curriculum policy transparency\n    Given the school board discusses curriculum changes\n    And the parent wants to understand what their child will learn\n    When the parent reviews Observer's curriculum analysis\n    Then they see specific content being added or removed\n    And understand pedagogical approaches and their evidence base\n    And view teacher professional perspectives on the curriculum\n    And can evaluate changes based on child's learning needs\n    And curriculum decisions include parent informed input\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent tracks curriculum policy transparency",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

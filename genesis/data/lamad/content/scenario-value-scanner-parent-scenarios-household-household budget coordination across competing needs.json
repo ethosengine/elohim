@@ -6,7 +6,7 @@
   "title": "Household budget coordination across competing needs",
   "description": "Household budget coordination across competing needs",
   "content": "Scenario: Household budget coordination across competing needs\n    Given the household has limited financial resources\n    And Tommy needs school supplies, Emma needs sports equipment\n    And utilities need paying and groceries need buying\n    When Sarah manages household budget\n    Then the household_elohim should coordinate across all needs\n    And it should surface conflicts and trade-offs\n    And it should help prioritize based on family values\n    And budget decisions should be transparent to both partners\n    And financial management should be recognized as skilled labor\n    And Sarah's budget work should accumulate care tokens\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household budget coordination across competing needs",

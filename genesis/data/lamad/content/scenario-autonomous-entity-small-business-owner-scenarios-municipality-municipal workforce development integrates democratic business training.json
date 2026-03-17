@@ -6,7 +6,7 @@
   "title": "Municipal workforce development integrates democratic business training",
   "description": "Municipal workforce development integrates democratic business training",
   "content": "Scenario: Municipal workforce development integrates democratic business training\n    Given city workforce programs train workers for traditional employment\n    And democratic governance requires different skills (facilitation, collaboration, shared decision-making)\n    When municipality recognizes democratic businesses need prepared workers\n    Then workforce development programs include cooperative business training\n    And workers learn democratic governance skills alongside technical skills\n    And community colleges offer worker ownership and democratic management courses\n    And municipal investment in workforce development supports democratic economy growth\n    And municipality_elohim develops democratic business curriculum for workforce programs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal workforce development integrates democratic business training",

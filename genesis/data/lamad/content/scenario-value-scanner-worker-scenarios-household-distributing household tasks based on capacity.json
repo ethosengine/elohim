@@ -6,7 +6,7 @@
   "title": "Distributing household tasks based on capacity",
   "description": "Distributing household tasks based on capacity",
   "content": "Scenario: Distributing household tasks based on capacity\n    Given different household members have different time and energy\n    And my work leaves me with minimal capacity\n    When we allocate household responsibilities\n    Then the protocol should suggest distribution based on actual capacity\n    And recognize that my 50+ hour work week limits my availability\n    And propose fair alternatives when I can't do time-intensive tasks\n    And help us find equitable arrangements\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Distributing household tasks based on capacity",

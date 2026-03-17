@@ -6,7 +6,7 @@
   "title": "Investor participates in community investment pool governance",
   "description": "Investor participates in community investment pool governance",
   "content": "Scenario: Investor participates in community investment pool governance\n    Given traditional investing gives shareholders plutocratic pseudo-democracy\n    And Patricia wants genuine participation, not capital-weighted control\n    When community investment pool has democratic governance structure\n    Then she participates in pool governance as one voice among equals\n    And investment decisions consider community benefit alongside financial returns\n    And pool priorities are set democratically by investors, workers, and community representatives\n    And governance prevents capital from dominating democratic enterprises\n    And community_elohim manages investment pool democratic governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Investor participates in community investment pool governance",

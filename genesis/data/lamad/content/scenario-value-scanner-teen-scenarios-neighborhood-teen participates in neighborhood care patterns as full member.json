@@ -6,7 +6,7 @@
   "title": "Teen participates in neighborhood care patterns as full member",
   "description": "Teen participates in neighborhood care patterns as full member",
   "content": "Scenario: Teen participates in neighborhood care patterns as full member\n    Given Jasmine's neighborhood has established care economy practices\n    And she has accumulated care contributions across contexts\n    When Jasmine engages neighborhood-level activities\n    Then she should be recognized as a full participant, not a future member\n    And her care contributions should aggregate with neighbors' contributions\n    And she should have access to neighborhood collective resources\n    And the neighborhood_elohim should recognize her as a constitutional participant\n    And her voice should matter in neighborhood decisions\n    And she should experience being a valued member of her neighborhood community\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen participates in neighborhood care patterns as full member",

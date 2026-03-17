@@ -6,7 +6,7 @@
   "title": "Educational design prevents formation of consumer identity",
   "description": "Educational design prevents formation of consumer identity",
   "content": "Scenario: Educational design prevents formation of consumer identity\n    Given consumer capitalism targets children for identity formation\n    And Tommy is highly vulnerable to conditioning\n    When Tommy learns through the Value Scanner\n    Then no gamification should train extraction thinking\n    And no points systems should create achievement addiction\n    And no rewards should condition consumption behavior\n    And identity formation should center on care, not acquisition\n    And Tommy should learn to see himself as contributor, not consumer\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Educational design prevents formation of consumer identity",

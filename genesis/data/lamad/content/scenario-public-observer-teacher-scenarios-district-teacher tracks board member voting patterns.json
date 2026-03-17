@@ -6,7 +6,7 @@
   "title": "Teacher tracks board member voting patterns",
   "description": "Teacher tracks board member voting patterns",
   "content": "Scenario: Teacher tracks board member voting patterns\n    Given teachers need to identify genuine board allies\n    And can't easily track votes across meetings\n    When the Observer tracks and analyzes board member votes\n    Then teachers see which members consistently support teaching conditions\n    And identify which members prioritize administrative recommendations over teacher input\n    And can target advocacy to persuadable members\n    And recognize true allies for coalition building\n    And board accountability becomes visible and actionable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher tracks board member voting patterns",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

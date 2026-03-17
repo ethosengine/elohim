@@ -6,7 +6,7 @@
   "title": "Neighborhood collective resources accessible to teen based on contribution",
   "description": "Neighborhood collective resources accessible to teen based on contribution",
   "content": "Scenario: Neighborhood collective resources accessible to teen based on contribution\n    Given the neighborhood has established collective resources\n    And Jasmine has accumulated substantial care contributions\n    When she needs to access neighborhood resources\n    Then her care contributions should give her standing to access shared resources\n    And she should be able to use neighborhood tool library, shared equipment, or collective resources\n    And access should be based on demonstrated participation, not age\n    And the neighborhood_elohim should recognize her as a contributor with legitimate access\n    And she should learn that care economy operates on reciprocity, not charity\n    And her care tokens should be valid currency in neighborhood exchanges\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood collective resources accessible to teen based on contribution",

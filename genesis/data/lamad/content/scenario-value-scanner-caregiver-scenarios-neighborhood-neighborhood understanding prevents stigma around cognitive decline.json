@@ -6,7 +6,7 @@
   "title": "Neighborhood understanding prevents stigma around cognitive decline",
   "description": "Neighborhood understanding prevents stigma around cognitive decline",
   "content": "Scenario: Neighborhood understanding prevents stigma around cognitive decline\n    Given David's Alzheimer's may cause concerning behaviors\n    And neighbors might not understand cognitive decline\n    When the neighborhood_elohim provides education\n    Then neighbors should understand Alzheimer's symptoms\n    And they should respond with compassion, not fear\n    And stigma around cognitive decline should be reduced\n    And David should be treated with dignity in neighborhood\n    And neighborhood should be safe and supportive for both James and David\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood understanding prevents stigma around cognitive decline",

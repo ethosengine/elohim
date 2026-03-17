@@ -6,7 +6,7 @@
   "title": "Environmental impact visible in consumption decisions",
   "description": "Environmental impact visible in consumption decisions",
   "content": "Scenario: Environmental impact visible in consumption decisions\n    Given Sarah wants to minimize environmental harm\n    And impact information is often hidden from consumers\n    When Sarah scans products\n    Then the bioregional_elohim should display environmental impact data\n    And it should show carbon footprint, water use, soil health, biodiversity effects\n    And it should make ecological costs visible alongside monetary costs\n    And Sarah should make informed choices about environmental impact\n    And visibility should enable environmentally conscious consumption\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental impact visible in consumption decisions",

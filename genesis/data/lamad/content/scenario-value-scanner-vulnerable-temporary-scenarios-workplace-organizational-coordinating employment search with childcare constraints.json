@@ -6,7 +6,7 @@
   "title": "Coordinating employment search with childcare constraints",
   "description": "Coordinating employment search with childcare constraints",
   "content": "Scenario: Coordinating employment search with childcare constraints\n    Given I can only work when childcare is available and affordable\n    And childcare availability severely limits employment options\n    When I search for employment compatible with childcare\n    Then the workplace_elohim filters opportunities by schedule and childcare compatibility\n    And identifies employers offering childcare support or flexibility\n    And helps me calculate whether employment pays enough after childcare costs\n    And coordinates employment search with childcare subsidy applications\n    And validates that childcare constraints are real barriers, not excuses\n    And my personal_agent tracks childcare availability and employment schedule compatibility\n    And recognizes that coordinating employment and childcare is complex labor\n    And ensures employment genuinely improves rather than worsens my situation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating employment search with childcare constraints",

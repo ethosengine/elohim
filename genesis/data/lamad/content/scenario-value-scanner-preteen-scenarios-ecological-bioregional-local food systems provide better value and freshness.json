@@ -6,7 +6,7 @@
   "title": "Local food systems provide better value and freshness",
   "description": "Local food systems provide better value and freshness",
   "content": "Scenario: Local food systems provide better value and freshness\n    Given Marcus shops in specific geographic region\n    And locally grown food can be cheaper and fresher\n    When Marcus compares food options\n    Then the personal_agent should identify local sources\n    And it should help him access farmers' markets and local growers\n    And it should explain benefits of shorter supply chains\n    And local food should be framed as both economic and ecological win\n    And he should learn that bioregional food systems serve his needs\n    And connection to local land and farmers should develop\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local food systems provide better value and freshness",

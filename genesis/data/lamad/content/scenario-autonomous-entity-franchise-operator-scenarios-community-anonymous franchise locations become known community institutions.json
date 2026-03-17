@@ -6,7 +6,7 @@
   "title": "Anonymous franchise locations become known community institutions",
   "description": "Anonymous franchise locations become known community institutions",
   "content": "Scenario: Anonymous franchise locations become known community institutions\n    Given ChickenMax #247, #248, #249 were corporate outposts without local identity\n    And community members saw them as extractive chains, not neighborhood businesses\n    When conversion makes locations democratically-governed community institutions\n    Then neighborhoods learn their franchise locations chose democratic ownership\n    And locations develop distinct community identities (possibly rebranding with local names)\n    And community members recognize workers as co-owners, not exploited employees\n    And institutions become sources of neighborhood pride instead of corporate extraction symbols\n    And community_elohim communicates conversion story building community ownership\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Anonymous franchise locations become known community institutions",

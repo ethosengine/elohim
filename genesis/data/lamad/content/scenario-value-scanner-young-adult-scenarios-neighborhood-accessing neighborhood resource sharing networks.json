@@ -6,7 +6,7 @@
   "title": "Accessing neighborhood resource sharing networks",
   "description": "Accessing neighborhood resource sharing networks",
   "content": "Scenario: Accessing neighborhood resource sharing networks\n    Given neighbors share tools and resources\n    And Aisha occasionally needs items she doesn't own\n    When Aisha needs to borrow something\n    Then the neighborhood_elohim should connect her to resource sharing\n    And it should facilitate tool libraries and sharing arrangements\n    And it should track care tokens for borrowing and lending\n    And the system should build neighborhood mutual aid\n    And resource sharing should reduce individual costs\n    And neighborhood cooperation should meet practical needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing neighborhood resource sharing networks",

@@ -6,7 +6,7 @@
   "title": "Right to disconnect maintained throughout system",
   "description": "Right to disconnect maintained throughout system",
   "content": "Scenario: Right to disconnect maintained throughout system\n    Given Frank participates in the Value Scanner\n    And constitutional constraints apply at all layers\n    When Frank chooses to disconnect from the system\n    Then his choice must be honored immediately and completely\n    And all data retention must follow minimal legal requirements\n    And no manipulative patterns to retain usage should be employed\n    And Frank's right to not participate must be absolute\n    And his autonomy over technology use must be respected\n    And disconnection should be simple, clear, and complete\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to disconnect maintained throughout system",

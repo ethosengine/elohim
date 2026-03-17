@@ -6,7 +6,7 @@
   "title": "Planning commissioner prepares for climate adaptation zoning update",
   "description": "Planning commissioner prepares for climate adaptation zoning update",
   "content": "Scenario: Planning commissioner prepares for climate adaptation zoning update\n    Given commission must update zoning to address climate risks like flooding and heat\n    And staff proposes complex amendments addressing sea level rise and extreme weather\n    And commissioner wants to make informed decisions on technical requirements\n    When the commissioner uses Observer decision support\n    Then they receive executive summary of climate risks and proposed zoning responses\n    And see examples of climate adaptation zoning from vulnerable communities\n    And access analysis of which properties and populations most affected by requirements\n    And get questions to ask staff about implementation feasibility and equity\n    And accessible expertise enables informed judgment on climate adaptation policy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning commissioner prepares for climate adaptation zoning update",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

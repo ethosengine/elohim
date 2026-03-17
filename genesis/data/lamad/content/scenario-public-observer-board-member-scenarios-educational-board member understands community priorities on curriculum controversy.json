@@ -6,7 +6,7 @@
   "title": "Board member understands community priorities on curriculum controversy",
   "description": "Board member understands community priorities on curriculum controversy",
   "content": "Scenario: Board member understands community priorities on curriculum controversy\n    Given board faces decision on proposed curriculum adoption\n    And board meetings dominated by organized groups advocating strong positions\n    And board wants to understand broader parent and educator perspectives\n    When the board member seeks community accountability data from Observer\n    Then they receive survey data from representative sample of district families\n    And see teacher professional judgment on curriculum separate from union position\n    And access student learning outcome data from districts using proposed curriculum\n    And understand concerns of diverse communities beyond organized advocacy\n    And community accountability helps board make decision aligned with broader interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member understands community priorities on curriculum controversy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

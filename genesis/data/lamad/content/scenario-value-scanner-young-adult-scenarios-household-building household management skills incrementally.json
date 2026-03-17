@@ -6,7 +6,7 @@
   "title": "Building household management skills incrementally",
   "description": "Building household management skills incrementally",
   "content": "Scenario: Building household management skills incrementally\n    Given Aisha has never managed a household before\n    And she's learning essential adult skills\n    When Aisha uses household management features\n    Then the personal_agent should teach skills progressively\n    And it should provide checklists for routine maintenance\n    And it should remind her of non-obvious tasks (changing air filters, etc.)\n    And education should integrate with task management\n    And Aisha should build comprehensive household competence\n    And the learning curve should feel supportive, not judgmental\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building household management skills incrementally",

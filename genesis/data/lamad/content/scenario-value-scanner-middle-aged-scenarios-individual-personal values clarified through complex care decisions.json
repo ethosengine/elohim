@@ -6,7 +6,7 @@
   "title": "Personal values clarified through complex care decisions",
   "description": "Personal values clarified through complex care decisions",
   "content": "Scenario: Personal values clarified through complex care decisions\n    Given Robert makes difficult decisions about care allocation\n    And he must choose between competing legitimate needs\n    When he faces value conflicts through his personal_agent\n    Then it should help him articulate his core values\n    And surface patterns in his decisions\n    And recognize: \"You've consistently prioritized parent care over children's wants\"\n    And support him in examining whether his choices align with his values\n    And provide space for reflection on what matters most\n    And help him develop coherent personal philosophy about care responsibilities\n    And respect his authority to define his own values\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal values clarified through complex care decisions",

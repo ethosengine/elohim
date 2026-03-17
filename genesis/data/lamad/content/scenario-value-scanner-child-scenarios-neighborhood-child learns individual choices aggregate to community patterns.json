@@ -6,7 +6,7 @@
   "title": "Child learns individual choices aggregate to community patterns",
   "description": "Child learns individual choices aggregate to community patterns",
   "content": "Scenario: Child learns individual choices aggregate to community patterns\n    Given Emma makes consistent purchasing choices\n    And other neighborhood families also use the Value Scanner\n    When Emma's personal_agent provides context about her choices\n    Then the agent should share age-appropriate community insights\n    And the agent should say \"Five other families bought this brand this week—they're all trying to eat healthier\"\n    And Emma should learn her choices are part of larger patterns\n    And she should understand individual agency connects to collective outcomes\n    And community context should expand her economic understanding\n    And she should see herself as part of care economy ecosystem\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Child learns individual choices aggregate to community patterns",

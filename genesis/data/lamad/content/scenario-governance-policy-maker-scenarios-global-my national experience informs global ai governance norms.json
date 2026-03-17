@@ -6,7 +6,7 @@
   "title": "My national experience informs global AI governance norms",
   "description": "My national experience informs global AI governance norms",
   "content": "Scenario: My national experience informs global AI governance norms\n    Given my nation has years of protocol experience\n    And other nations learn from our successes and failures\n    When I share our experience in global forums\n    Then I provide: honest assessment of what worked\n    And I acknowledge: mistakes and challenges\n    And I share: legislative approaches that helped\n    And I describe: how we resisted capture\n    And I explain: how communities maintained sovereignty\n    And my testimony: informs global democratic governance development\n    And national experience: contributes to global wisdom\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "My national experience informs global AI governance norms",

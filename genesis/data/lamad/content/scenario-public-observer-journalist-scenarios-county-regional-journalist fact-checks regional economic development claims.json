@@ -6,7 +6,7 @@
   "title": "Journalist fact-checks regional economic development claims",
   "description": "Journalist fact-checks regional economic development claims",
   "content": "Scenario: Journalist fact-checks regional economic development claims\n    Given county officials tout major economic development success\n    And claim massive job creation and tax revenue\n    When the Observer analyzes economic development outcomes\n    Then the journalist verifies jobs created are lower-wage than promised\n    And finds tax incentives cost more than revenue generated\n    And sees environmental violations and labor law violations\n    And tracks development firm's record in other regions\n    And publishes accountability story on corporate welfare\n    And instant research exposes exaggerated claims\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-county-regional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist fact-checks regional economic development claims",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

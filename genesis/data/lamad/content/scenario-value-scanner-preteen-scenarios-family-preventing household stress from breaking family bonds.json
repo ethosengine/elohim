@@ -6,7 +6,7 @@
   "title": "Preventing household stress from breaking family bonds",
   "description": "Preventing household stress from breaking family bonds",
   "content": "Scenario: Preventing household stress from breaking family bonds\n    Given Sarah is stretched thin across two jobs\n    And Marcus carries substantial household responsibility\n    When family stress levels are high\n    Then the family_elohim should monitor for relationship strain\n    And it should facilitate communication between Marcus and Sarah\n    And it should prompt Sarah to recognize Marcus's work\n    And it should connect family to support resources before crisis\n    And the protocol should prevent stress from damaging their bond\n    And care visibility should make burden manageable\n    And support should flow to prevent family breakdown\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preventing household stress from breaking family bonds",

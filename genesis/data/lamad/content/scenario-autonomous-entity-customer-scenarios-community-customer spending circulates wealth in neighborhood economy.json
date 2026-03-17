@@ -6,7 +6,7 @@
   "title": "Customer spending circulates wealth in neighborhood economy",
   "description": "Customer spending circulates wealth in neighborhood economy",
   "content": "Scenario: Customer spending circulates wealth in neighborhood economy\n    Given Ms. Johnson spends $900 annually at democratic ChickenMax/Maria's Kitchen\n    And multiply her spending by hundreds of neighborhood customers\n    When democratic ownership ensures value circulates locally instead of extracting\n    Then $540 of her spending goes to workers who spend in neighborhood\n    And $270 supports community programs benefiting neighbors\n    And $90 funds environmental stewardship protecting local health\n    And aggregate customer spending ($200K+ annually from regulars) massively benefits community\n    And community_elohim documents wealth circulation vs. previous corporate extraction\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer spending circulates wealth in neighborhood economy",

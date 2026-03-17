@@ -6,7 +6,7 @@
   "title": "Personal crisis support provides immediate dignified assistance",
   "description": "Personal crisis support provides immediate dignified assistance",
   "content": "Scenario: Personal crisis support provides immediate dignified assistance\n    Given Sarah encounters a crisis—job loss, health emergency, family breakdown\n    And she needs immediate support\n    When the personal_agent detects crisis indicators\n    Then it should connect her to appropriate resources immediately\n    And support should be dignified, not stigmatizing\n    And she should access community mutual aid networks\n    And crisis response should be effective under extreme stress\n    And the protocol should function as safety net during vulnerability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal crisis support provides immediate dignified assistance",

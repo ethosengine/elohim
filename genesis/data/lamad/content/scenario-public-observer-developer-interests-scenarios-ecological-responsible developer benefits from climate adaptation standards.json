@@ -6,7 +6,7 @@
   "title": "Responsible developer benefits from climate adaptation standards",
   "description": "Responsible developer benefits from climate adaptation standards",
   "content": "Scenario: Responsible developer benefits from climate adaptation standards\n    Given a developer invests in climate-resilient building practices\n    And exceeds flood protection and heat mitigation requirements\n    When the Observer documents climate adaptation performance\n    Then the developer shows: flood resilience investment prevented $2M damages\n    And urban heat island mitigation reduced cooling costs 30%\n    And climate adaptation creates long-term property value\n    And responsible practices gain competitive advantage as climate risks increase\n    And genuine adaptation distinguishes from minimal compliance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer benefits from climate adaptation standards",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

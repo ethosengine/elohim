@@ -6,7 +6,7 @@
   "title": "Seasonal supply coordination enables year-round democratic food service",
   "description": "Seasonal supply coordination enables year-round democratic food service",
   "content": "Scenario: Seasonal supply coordination enables year-round democratic food service\n    Given individual farms have limited seasonal production windows\n    And restaurants need year-round supply but faced corporate distribution dependence\n    When democratic farms coordinate across climate zones and seasons\n    Then network provides diverse year-round supply through farmer coordination\n    And restaurants adapt menus to seasonal availability reducing waste\n    And farmers specialize in crops suited to their land and climate\n    And seasonal coordination provides reliability without standardization\n    And industry_sector_elohim coordinates seasonal supply across bioregional network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Seasonal supply coordination enables year-round democratic food service",

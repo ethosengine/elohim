@@ -6,7 +6,7 @@
   "title": "Parent coordinates opposition to program cuts",
   "description": "Parent coordinates opposition to program cuts",
   "content": "Scenario: Parent coordinates opposition to program cuts\n    Given the board proposes eliminating elementary music programs\n    And the parent's child participates in school band\n    When the Observer connects parents across district whose children affected\n    Then 230 families from 8 schools form coordinated coalition\n    And present unified testimony on music education benefits\n    And propose alternative budget cuts that preserve student programs\n    And district-wide parent power prevents program elimination\n    And children's enrichment programs are preserved\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent coordinates opposition to program cuts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

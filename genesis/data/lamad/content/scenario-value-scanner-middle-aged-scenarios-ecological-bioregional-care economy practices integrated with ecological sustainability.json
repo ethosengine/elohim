@@ -6,7 +6,7 @@
   "title": "Care economy practices integrated with ecological sustainability",
   "description": "Care economy practices integrated with ecological sustainability",
   "content": "Scenario: Care economy practices integrated with ecological sustainability\n    Given care work requires resources: food, transportation, housing, energy\n    And care practices can be more or less ecologically sustainable\n    And sustainable care economy serves both human and ecological flourishing\n    When bioregional_elohim integrates care and ecology\n    Then it should help Robert align care practices with ecological sustainability\n    And surface opportunities: \"Local food sourcing reduces transportation impact while supporting regional care economy\"\n    And recognize that care for people and care for planet are interconnected\n    And support practices that serve both human and ecological wellbeing\n    And demonstrate that care economy must be ecologically sustainable\n    And build integrated understanding of care and ecology\n    And model for next generation that care includes ecological stewardship\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Care economy practices integrated with ecological sustainability",

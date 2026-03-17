@@ -6,7 +6,7 @@
   "title": "Before and after school care affordable and accessible for working single parents",
   "description": "Before and after school care affordable and accessible for working single parents",
   "content": "Scenario: Before and after school care affordable and accessible for working single parents\n    Given Maria works 8-5 while school runs roughly 8-3\n    And she cannot afford $400+/month per child for extended care across three children\n    When Maria needs childcare for school schedule gaps\n    Then the educational_elohim should help her access affordable before/after school care\n    And schools should provide cost-effective extended care options\n    And subsidies should be available for single-income families\n    And care should cover the full gap between school and work hours\n    And Maria should be able to maintain employment through affordable school-based care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Before and after school care affordable and accessible for working single parents",

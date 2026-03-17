@@ -6,7 +6,7 @@
   "title": "Bioregional investment reduces fossil fuel dependence across sectors",
   "description": "Bioregional investment reduces fossil fuel dependence across sectors",
   "content": "Scenario: Bioregional investment reduces fossil fuel dependence across sectors\n    Given fossil fuel dependence threatens climate stability\n    And Patricia's investments can support energy transition\n    When democratic businesses across bioregion prioritize renewable energy\n    Then local food systems eliminate long-haul transportation fossil fuel use\n    And businesses invest in renewable energy through community investment support\n    And bioregional fossil fuel consumption decreases measurably\n    And investment accelerates just energy transition\n    And bioregional_elohim tracks energy transition and coordinates renewable investment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional investment reduces fossil fuel dependence across sectors",

@@ -6,7 +6,7 @@
   "title": "Emergency work flexibility for student crises",
   "description": "Emergency work flexibility for student crises",
   "content": "Scenario: Emergency work flexibility for student crises\n    Given students face emergencies (illness, family crisis, housing instability)\n    And rigid work schedules can worsen crises\n    When Kenji experiences emergency situation\n    Then the workplace_elohim should help him communicate need for emergency time off\n    And it should advocate for employer flexibility during crisis\n    And it should recognize emergency accommodation as care economy practice\n    And employers should support workers through crises\n    And the system should help Kenji access emergency workplace support\n    And care economy workplaces respond to worker emergencies with flexibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency work flexibility for student crises",

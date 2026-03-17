@@ -6,7 +6,7 @@
   "title": "Food service workers across sector gain conversion knowledge and power",
   "description": "Food service workers across sector gain conversion knowledge and power",
   "content": "Scenario: Food service workers across sector gain conversion knowledge and power\n    Given workers at non-converted franchises observe democratic locations thriving\n    And word spreads about $18/hour wages, ownership, and democratic voice\n    When worker organizing across food service sector references democratic conversions\n    Then workers demand democratic conversion or equivalent improvements at their locations\n    And franchise operators face worker pressure to convert or match democratic conditions\n    And worker power increases sector-wide through demonstration effect\n    And sector-wide organizing becomes possible through democratic model inspiration\n    And industry_sector_elohim supports cross-location worker organizing and education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food service workers across sector gain conversion knowledge and power",

@@ -6,7 +6,7 @@
   "title": "Neighborhood childcare coordination supports working parents",
   "description": "Neighborhood childcare coordination supports working parents",
   "content": "Scenario: Neighborhood childcare coordination supports working parents\n    Given Sarah works full-time as a teacher\n    And childcare is expensive and inflexible\n    When neighborhood coordinates childcare sharing\n    Then the neighborhood_elohim should match schedules and needs\n    And it should track reciprocal childcare exchanges\n    And it should help parents like Sarah support each other\n    And childcare costs should be reduced through cooperation\n    And quality care should be accessible to working families\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood childcare coordination supports working parents",

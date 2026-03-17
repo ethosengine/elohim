@@ -6,7 +6,7 @@
   "title": "Investor discovers community connection through investment network",
   "description": "Investor discovers community connection through investment network",
   "content": "Scenario: Investor discovers community connection through investment network\n    Given stock market investing is isolating\n    And Patricia managed portfolio individually without community\n    When community investment creates investor network\n    Then she knows other neighborhood residents who invested in democratic conversions\n    And investors share motivations, coordinate for larger projects, build community wealth strategy\n    And investment becomes collective political project, not individual portfolio management\n    And community connections deepen through shared values and collaboration\n    And community_elohim facilitates investor network development and coordination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Investor discovers community connection through investment network",

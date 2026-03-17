@@ -6,7 +6,7 @@
   "title": "Building care economy leadership through accumulated experience",
   "description": "Building care economy leadership through accumulated experience",
   "content": "Scenario: Building care economy leadership through accumulated experience\n    Given Robert has decades of care economy participation\n    And he has learned what works and what doesn't\n    And his position gives him influence\n    When Robert considers care economy leadership opportunities\n    Then his personal_agent should recognize his accumulated expertise\n    And surface opportunities: community boards, policy advocacy, mentoring\n    And help him understand that his experience is valuable wisdom\n    And connect him to platforms where his voice can influence systems\n    And support him in translating personal experience into system improvement\n    And recognize that his generation can drive care economy transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building care economy leadership through accumulated experience",

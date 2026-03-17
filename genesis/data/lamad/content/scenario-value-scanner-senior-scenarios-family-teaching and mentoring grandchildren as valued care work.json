@@ -6,7 +6,7 @@
   "title": "Teaching and mentoring grandchildren as valued care work",
   "description": "Teaching and mentoring grandchildren as valued care work",
   "content": "Scenario: Teaching and mentoring grandchildren as valued care work\n    Given Margaret provides not just childcare but teaching and mentoring\n    And she's passing on knowledge, values, and skills\n    When the family_elohim tracks educational care contributions\n    Then it should recognize teaching as distinct care category\n    And it should track skill-building and mentoring activities\n    And the long-term value of grandparent teaching should be recognized\n    And Margaret's role in grandchildren's development should be visible\n    And intergenerational knowledge transmission should be valued\n    And cultural/family traditions taught by Margaret should be tracked\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching and mentoring grandchildren as valued care work",

@@ -6,7 +6,7 @@
   "title": "Activist prevents extraction by powerful institutions",
   "description": "Activist prevents extraction by powerful institutions",
   "content": "Scenario: Activist prevents extraction by powerful institutions\n    Given major foundations want to \"support\" the climate movement\n    And they offer funding that would create dependency and moderate demands\n    When the network evaluates the funding opportunity\n    Then historical patterns of movement capture surface for consideration\n    And communities who worked with these funders share experiences\n    And the network collectively evaluates risks and benefits\n    And alternative solidarity economy models are proposed\n    And the movement maintains independence while building sustainable support\n    And extractive relationships are refused through collective accountability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-activist-scenarios-global",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist prevents extraction by powerful institutions",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

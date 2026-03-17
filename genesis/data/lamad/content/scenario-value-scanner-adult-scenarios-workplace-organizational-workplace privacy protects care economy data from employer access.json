@@ -6,7 +6,7 @@
   "title": "Workplace privacy protects care economy data from employer access",
   "description": "Workplace privacy protects care economy data from employer access",
   "content": "Scenario: Workplace privacy protects care economy data from employer access\n    Given Sarah participates in care economy\n    And this generates data about her personal life\n    When workplace wants information about employees\n    Then Sarah's personal care economy data must be completely private\n    And employers should never access household care patterns\n    And the workplace_elohim should only see work-relevant information\n    And Sarah's privacy should be absolute in personal care matters\n    And workplace participation should not require personal data sacrifice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace privacy protects care economy data from employer access",

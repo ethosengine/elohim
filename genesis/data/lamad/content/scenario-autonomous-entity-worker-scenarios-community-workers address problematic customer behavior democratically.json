@@ -6,7 +6,7 @@
   "title": "Workers address problematic customer behavior democratically",
   "description": "Workers address problematic customer behavior democratically",
   "content": "Scenario: Workers address problematic customer behavior democratically\n    Given a customer has harassed DeShawn multiple times\n    And worker safety is constitutionally protected\n    When workers document harassment incidents through witness infrastructure\n    Then workers review harassment pattern democratically\n    And workers vote to ban the customer from ChickenMax\n    And community_elohim ensures decision is fair and documented\n    And community respects worker dignity protections\n    And customer harassment ceases without manager intervention\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers address problematic customer behavior democratically",

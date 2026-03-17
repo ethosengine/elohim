@@ -6,7 +6,7 @@
   "title": "Customer connects to community through democratic business gathering spaces",
   "description": "Customer connects to community through democratic business gathering spaces",
   "content": "Scenario: Customer connects to community through democratic business gathering spaces\n    Given neighborhood lacks accessible community gathering spaces\n    And Ms. Johnson experiences isolation common to many residents\n    When democratic businesses serve as community hubs beyond commercial function\n    Then she attends community events at Maria's Kitchen (harvest dinners, neighborhood meetings)\n    And meets neighbors at senior meal program building social networks\n    And participates in community organizing using business space after hours\n    And democratic business becomes social infrastructure combating isolation\n    And community_elohim coordinates community programming at democratic business spaces\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer connects to community through democratic business gathering spaces",

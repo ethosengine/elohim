@@ -6,7 +6,7 @@
   "title": "Ecosystem services from regenerative agriculture are measured and valued",
   "description": "Ecosystem services from regenerative agriculture are measured and valued",
   "content": "Scenario: Ecosystem services from regenerative agriculture are measured and valued\n    Given regenerative farms provide ecosystem services (water filtration, carbon storage, biodiversity)\n    And these services traditionally went uncompensated despite community benefit\n    When bioregional network documents and values ecosystem services\n    Then water quality improvements from agricultural practices are measured and compensated\n    And habitat provision for wildlife and pollinators is documented and valued\n    And carbon sequestration generates revenue supporting regenerative practices\n    And ecosystem service value enables regenerative agriculture to outcompete extractive industrial model\n    And bioregional_elohim measures ecosystem services and facilitates compensation mechanisms\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecosystem services from regenerative agriculture are measured and valued",

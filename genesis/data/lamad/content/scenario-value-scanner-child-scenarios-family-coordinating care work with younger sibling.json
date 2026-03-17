@@ -6,7 +6,7 @@
   "title": "Coordinating care work with younger sibling",
   "description": "Coordinating care work with younger sibling",
   "content": "Scenario: Coordinating care work with younger sibling\n    Given Emma's brother Tommy is 5 years old\n    And Emma sometimes helps Tommy make choices\n    When Emma assists Tommy in the Value Scanner\n    Then her teaching and support should be recognized as care work\n    And the family_elohim should track sibling care patterns\n    And Emma should learn that helping others is valuable contribution\n    And Tommy should benefit from Emma's greater capability\n    And cross-generational care should be made visible\n    And Emma should build identity as both care receiver and care provider\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating care work with younger sibling",

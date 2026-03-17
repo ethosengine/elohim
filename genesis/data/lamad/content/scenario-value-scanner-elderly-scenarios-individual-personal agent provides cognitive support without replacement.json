@@ -6,7 +6,7 @@
   "title": "Personal agent provides cognitive support without replacement",
   "description": "Personal agent provides cognitive support without replacement",
   "content": "Scenario: Personal agent provides cognitive support without replacement\n    Given Helen experiences memory challenges from early-stage dementia\n    And she needs reminders for medications and appointments\n    When Helen's personal_agent provides cognitive assistance\n    Then it should support her memory without replacing her agency\n    And medication reminders should be gentle: \"Helen, time for your heart medication\"\n    And appointment notifications should give adequate lead time\n    And the agent should repeat information patiently when needed\n    And support should feel like partnership, not management\n    And Helen should remain the decision-maker about her own life\n    And the agent must never make choices for Helen without explicit delegation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent provides cognitive support without replacement",

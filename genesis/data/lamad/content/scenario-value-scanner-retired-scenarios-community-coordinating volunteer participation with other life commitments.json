@@ -6,7 +6,7 @@
   "title": "Coordinating volunteer participation with other life commitments",
   "description": "Coordinating volunteer participation with other life commitments",
   "content": "Scenario: Coordinating volunteer participation with other life commitments\n    Given Frank volunteers 20 hours/week\n    And he also provides family care and participates in neighborhood governance\n    When the community_elohim coordinates his participation\n    Then it should integrate volunteer work with other commitments\n    And help Frank maintain sustainable participation level\n    And prevent volunteer burnout through overcommitment\n    And coordinate scheduling across community, family, and neighborhood\n    And support Frank in balancing diverse care contributions\n    And enable long-term sustainable volunteer engagement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating volunteer participation with other life commitments",

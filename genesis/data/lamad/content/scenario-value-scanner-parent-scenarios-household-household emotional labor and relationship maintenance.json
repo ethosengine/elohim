@@ -6,7 +6,7 @@
   "title": "Household emotional labor and relationship maintenance",
   "description": "Household emotional labor and relationship maintenance",
   "content": "Scenario: Household emotional labor and relationship maintenance\n    Given Sarah remembers birthdays, maintains family connections\n    And she manages emotional climate and resolves conflicts\n    When the household_elohim tracks emotional labor\n    Then it should recognize relationship maintenance as valuable work\n    And it should track conflict resolution, emotional support, connection-building\n    And emotional labor should be valued as heavily as physical labor\n    And Sarah's work maintaining family emotional health should be visible\n    And the partner should see this typically invisible labor\n    And household care economy should value all forms of care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household emotional labor and relationship maintenance",

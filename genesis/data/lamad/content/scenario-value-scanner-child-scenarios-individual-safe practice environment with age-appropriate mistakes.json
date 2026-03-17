@@ -6,7 +6,7 @@
   "title": "Safe practice environment with age-appropriate mistakes",
   "description": "Safe practice environment with age-appropriate mistakes",
   "content": "Scenario: Safe practice environment with age-appropriate mistakes\n    Given Emma makes a choice that doesn't align with family needs\n    And she selected a more expensive option without considering budget\n    When the family experiences the consequence\n    Then her personal_agent should guide gentle reflection\n    And the agent should ask \"How did that work out?\"\n    And Emma should learn from the mistake without shame\n    And consequences should be educational, not punitive\n    And she should build judgment through safe practice\n    And mistakes should be treated as learning opportunities\n    And the stakes should be appropriately low for her age\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Safe practice environment with age-appropriate mistakes",

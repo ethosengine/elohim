@@ -6,7 +6,7 @@
   "title": "Local and seasonal food choices recognized as bioregional care",
   "description": "Local and seasonal food choices recognized as bioregional care",
   "content": "Scenario: Local and seasonal food choices recognized as bioregional care\n    Given Jasmine is shopping for fresh produce\n    And she has option between local strawberries and imported berries\n    When bioregional_elohim provides decision support\n    Then it should highlight local, seasonal options\n    And explain bioregional benefits: \"Local strawberries support regional farmers and reduce transport emissions\"\n    And help her understand food system connections to ecosystem health\n    And recognize her choice of local food as care for bioregion\n    And track bioregional care contributions alongside other care work\n    And demonstrate that environmental stewardship is care economy participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Local and seasonal food choices recognized as bioregional care",

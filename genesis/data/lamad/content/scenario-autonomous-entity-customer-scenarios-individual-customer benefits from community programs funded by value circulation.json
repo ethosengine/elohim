@@ -6,7 +6,7 @@
   "title": "Customer benefits from community programs funded by value circulation",
   "description": "Customer benefits from community programs funded by value circulation",
   "content": "Scenario: Customer benefits from community programs funded by value circulation\n    Given corporate extraction left minimal resources for community benefit\n    And Ms. Johnson and neighbors needed community support but lacked access\n    When democratic value distribution funds community programs\n    Then senior meal program provides affordable nutritious food and social connection\n    And subsidized pricing (sliding scale) ensures access across income levels\n    And community space is available for neighborhood organizing\n    And her patronage directly supports programs benefiting her and neighbors\n    And community_elohim manages community programs funded by democratic business\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer benefits from community programs funded by value circulation",

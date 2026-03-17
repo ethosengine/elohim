@@ -6,7 +6,7 @@
   "title": "Household privacy protected amid care intimacy",
   "description": "Household privacy protected amid care intimacy",
   "content": "Scenario: Household privacy protected amid care intimacy\n    Given James provides intimate personal care for David\n    And household care generates extremely private data\n    When household care is documented\n    Then privacy must be absolutely protected\n    And David's dignity must be preserved in all data\n    And intimate care details should never be exposed\n    And household data should remain under James's control\n    And privacy protection should be comprehensive and inviolable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household privacy protected amid care intimacy",

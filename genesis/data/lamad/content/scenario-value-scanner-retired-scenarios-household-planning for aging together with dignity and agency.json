@@ -6,7 +6,7 @@
   "title": "Planning for aging together with dignity and agency",
   "description": "Planning for aging together with dignity and agency",
   "content": "Scenario: Planning for aging together with dignity and agency\n    Given Frank and his wife are both aging\n    And their capabilities and care needs will change over time\n    And they're committed to supporting each other\n    When the household_elohim supports aging planning\n    Then it should help them plan for increasing care needs together\n    And it should facilitate conversations about future care scenarios\n    And it should coordinate with family about eventual support needs\n    And it should help them maintain autonomy as long as possible\n    And planning should preserve both partners' dignity and agency\n    And they should experience aging as partners, not burdens to each other\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning for aging together with dignity and agency",

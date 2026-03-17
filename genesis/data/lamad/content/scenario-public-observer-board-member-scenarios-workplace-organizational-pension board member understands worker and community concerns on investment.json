@@ -6,7 +6,7 @@
   "title": "Pension board member understands worker and community concerns on investment",
   "description": "Pension board member understands worker and community concerns on investment",
   "content": "Scenario: Pension board member understands worker and community concerns on investment\n    Given pension fund invests in companies with controversial labor practices\n    And beneficiaries and community members raise concerns at board meeting\n    And board wants to understand stakeholder perspectives beyond who testified\n    When the board member seeks community accountability data from Observer\n    Then they receive survey data from pension beneficiaries on investment priorities\n    And see worker concerns about fund investments in companies with poor labor records\n    And access analysis of investment alignment with beneficiary values\n    And understand community impacts of fund investment decisions\n    And community accountability helps board consider stakeholder interests\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Pension board member understands worker and community concerns on investment",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

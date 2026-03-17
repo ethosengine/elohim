@@ -6,7 +6,7 @@
   "title": "Cross-cultural deliberation with radical diversity",
   "description": "Cross-cultural deliberation with radical diversity",
   "content": "Scenario: Cross-cultural deliberation with radical diversity\n    Given I am deliberating with citizens from radically different contexts\n    And we have different languages, cultures, values, lived experiences\n    When we work through constitutional questions together\n    Then we rely on: skilled translation and cultural mediation\n    And we practice: listening across profound difference\n    And we identify: shared human concerns despite diversity\n    And we navigate: disagreement with respect and curiosity\n    And we discover: unexpected common ground\n    And we honor: legitimate pluralism while seeking universal minimums\n    And we demonstrate: humanity can deliberate together on existential questions\n    And we embody: democratic hope for planetary governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Cross-cultural deliberation with radical diversity",

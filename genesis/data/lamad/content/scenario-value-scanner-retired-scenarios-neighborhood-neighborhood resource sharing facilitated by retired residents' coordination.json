@@ -6,7 +6,7 @@
   "title": "Neighborhood resource sharing facilitated by retired residents' coordination",
   "description": "Neighborhood resource sharing facilitated by retired residents' coordination",
   "content": "Scenario: Neighborhood resource sharing facilitated by retired residents' coordination\n    Given Frank has time to coordinate neighborhood resource sharing\n    And tool libraries, skill exchanges, and mutual aid require coordination\n    When the neighborhood_elohim supports resource sharing\n    Then it should enable Frank to help coordinate shared resources\n    And facilitate tool borrowing, skill trades, and favor exchanges\n    And recognize coordination labor as valuable care contribution\n    And reduce neighborhood consumption through effective sharing\n    And Frank's coordination work should build neighborhood resilience\n    And his time availability should serve collective resource efficiency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood resource sharing facilitated by retired residents' coordination",

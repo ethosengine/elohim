@@ -6,7 +6,7 @@
   "title": "Privacy control remains with Frank as autonomous adult",
   "description": "Privacy control remains with Frank as autonomous adult",
   "content": "Scenario: Privacy control remains with Frank as autonomous adult\n    Given Frank's care contribution and health data is being tracked\n    And this information is sensitive and personal\n    When Frank determines data sharing preferences\n    Then he must have complete control over all his data\n    And he should choose what's shared with family, organizations, or community\n    And he can demonstrate care value to family if he wishes\n    And he can maintain complete privacy if he prefers\n    And health data sharing must be explicitly consented\n    And volunteer coordination can share relevant information\n    And Frank's autonomy over his information must be absolute\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy control remains with Frank as autonomous adult",

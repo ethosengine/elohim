@@ -6,7 +6,7 @@
   "title": "Multigenerational care coordination across distributed family",
   "description": "Multigenerational care coordination across distributed family",
   "content": "Scenario: Multigenerational care coordination across distributed family\n    Given Robert's parents live in Florida\n    And his children attend college in different states\n    And his grandchild occasionally needs care\n    And Robert's siblings share parent care responsibilities\n    When family_elohim coordinates care across geography\n    Then it should track care needs across multiple households\n    And coordinate with Robert's siblings on parent care distribution\n    And help Robert support his children remotely\n    And manage occasional grandchild care\n    And surface conflicts across generational needs\n    And provide sophisticated coordination across distance\n    And ensure no household or person is overwhelmed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Multigenerational care coordination across distributed family",

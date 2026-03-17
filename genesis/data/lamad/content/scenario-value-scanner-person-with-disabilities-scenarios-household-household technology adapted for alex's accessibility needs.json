@@ -6,7 +6,7 @@
   "title": "Household technology adapted for Alex's accessibility needs",
   "description": "Household technology adapted for Alex's accessibility needs",
   "content": "Scenario: Household technology adapted for Alex's accessibility needs\n    Given Alex's household includes various technologies\n    And accessibility is essential for Alex's independence\n    When Alex manages household systems\n    Then all household technology should be accessible to Alex\n    And the household_elohim should integrate with accessible smart home systems\n    And Alex should be able to control environment through voice or other accessible means\n    And technology should reduce barriers, not create them\n    And universal design principles should guide all technology choices\n    And Alex should have equal or better access than non-disabled people\n    And technology should serve Alex's independence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household technology adapted for Alex's accessibility needs",

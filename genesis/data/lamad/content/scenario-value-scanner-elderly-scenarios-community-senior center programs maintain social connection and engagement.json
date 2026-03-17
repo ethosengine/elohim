@@ -6,7 +6,7 @@
   "title": "Senior center programs maintain social connection and engagement",
   "description": "Senior center programs maintain social connection and engagement",
   "content": "Scenario: Senior center programs maintain social connection and engagement\n    Given Helen participates in senior center activities\n    And social connection prevents isolation and decline\n    When Helen engages with senior center programs\n    Then the community_elohim should coordinate transportation\n    And accessibility should be ensured for all programs\n    And her participation should be recognized as community contribution\n    And programs should preserve dignity and agency\n    And senior centers should be spaces of continued growth, not warehousing\n    And the protocol should support elder engagement in community life\n    And Helen should experience valued participation, not make-work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Senior center programs maintain social connection and engagement",

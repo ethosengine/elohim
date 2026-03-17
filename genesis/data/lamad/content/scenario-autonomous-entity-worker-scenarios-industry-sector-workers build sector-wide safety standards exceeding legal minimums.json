@@ -6,7 +6,7 @@
   "title": "Workers build sector-wide safety standards exceeding legal minimums",
   "description": "Workers build sector-wide safety standards exceeding legal minimums",
   "content": "Scenario: Workers build sector-wide safety standards exceeding legal minimums\n    Given different entities have varying safety protocols\n    And workers prioritize safety over corporate-style speedup\n    When sector workers establish safety working group\n    Then workers from multiple entities share safety best practices\n    And workers collectively develop sector safety standards\n    And standards exceed legal minimums in key areas\n    And industry_sector_elohim monitors compliance across sector\n    And sector reputation for safety becomes competitive advantage\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers build sector-wide safety standards exceeding legal minimums",

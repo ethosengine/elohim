@@ -6,7 +6,7 @@
   "title": "Connecting with IDD peers for mutual support",
   "description": "Connecting with IDD peers for mutual support",
   "content": "Scenario: Connecting with IDD peers for mutual support\n    Given Jordan wants to meet other IDD community members\n    And peer connection is essential for Jordan's wellbeing\n    When Jordan uses the peer connection feature\n    Then the interface shows nearby IDD peers with similar interests\n    And profiles use accessible format (pictures, simple descriptions)\n    And Jordan can express interest in connecting\n    And the community_elohim facilitates introductions with support\n    And Jordan builds friendships with people who truly understand\n    And Jordan experiences IDD community belonging and pride\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Connecting with IDD peers for mutual support",

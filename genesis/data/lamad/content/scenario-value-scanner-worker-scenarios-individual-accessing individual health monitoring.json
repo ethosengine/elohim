@@ -6,7 +6,7 @@
   "title": "Accessing individual health monitoring",
   "description": "Accessing individual health monitoring",
   "content": "Scenario: Accessing individual health monitoring\n    Given work conditions threaten my physical and mental health\n    When my personal_agent detects warning signs\n    Such as declining nutrition, inadequate rest, or chronic stress\n    Then it should provide gentle health monitoring\n    And surface accessible healthcare resources\n    And help me understand my rights to workplace accommodations\n    And support me in prioritizing my health despite work pressure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing individual health monitoring",

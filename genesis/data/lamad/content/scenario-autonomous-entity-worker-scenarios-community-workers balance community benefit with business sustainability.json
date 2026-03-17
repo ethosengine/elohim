@@ -6,7 +6,7 @@
   "title": "Workers balance community benefit with business sustainability",
   "description": "Workers balance community benefit with business sustainability",
   "content": "Scenario: Workers balance community benefit with business sustainability\n    Given community requests subsidized meals for more low-income residents\n    And workers want to serve community while maintaining living wages\n    When workers analyze financial capacity for expanded subsidies\n    Then workers transparently share financial constraints with community\n    And workers propose sliding scale pricing for community meals\n    And community investors offer additional funding for subsidy program\n    And workers democratically approve expanded program with community support\n    And workplace_elohim ensures business sustainability is maintained\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers balance community benefit with business sustainability",

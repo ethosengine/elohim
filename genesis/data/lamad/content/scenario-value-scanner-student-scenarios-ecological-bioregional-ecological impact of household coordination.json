@@ -6,7 +6,7 @@
   "title": "Ecological impact of household coordination",
   "description": "Ecological impact of household coordination",
   "content": "Scenario: Ecological impact of household coordination\n    Given Kenji lives with three roommates\n    And household coordination can reduce ecological impact\n    When the bioregional_elohim tracks household ecological practices\n    Then it should recognize shared living as ecologically efficient\n    And it should show how cooking for four is more efficient than four cooking separately\n    And it should value household bulk buying as reducing packaging waste\n    And it should accumulate care tokens for ecological household practices\n    And the system should recognize household coordination as ecological care\n    And shared living should be valued as sustainability practice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological impact of household coordination",

@@ -6,7 +6,7 @@
   "title": "Preventing workplace stress from undermining academic success",
   "description": "Preventing workplace stress from undermining academic success",
   "content": "Scenario: Preventing workplace stress from undermining academic success\n    Given Kenji's work adds stress to already-intense academic load\n    And excessive work hours can threaten educational outcomes\n    When the workplace_elohim monitors Kenji's work-study balance\n    Then it should flag when work hours threaten academic performance\n    And it should help him identify when to reduce hours\n    And it should validate that education is his primary work right now\n    And it should support him prioritizing school over work when necessary\n    And the system should prevent work from derailing educational investment\n    And Kenji's long-term development should take precedence over immediate income\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Preventing workplace stress from undermining academic success",

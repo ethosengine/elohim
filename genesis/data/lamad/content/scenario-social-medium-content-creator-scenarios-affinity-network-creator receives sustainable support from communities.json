@@ -6,7 +6,7 @@
   "title": "Creator receives sustainable support from communities",
   "description": "Creator receives sustainable support from communities",
   "content": "Scenario: Creator receives sustainable support from communities\n    Given Jordan has consistently produced valuable climate education content\n    And multiple educational communities appreciate the work\n    When these communities decide to support Jordan's work\n    Then they can contribute to Jordan's sustainability directly\n    And support flows from communities who receive value\n    And Jordan can continue creating without platform advertising\n    And no surveillance or data extraction occurs\n    And sustainable creator economy emerges from mutual value\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:content_creator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creator receives sustainable support from communities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

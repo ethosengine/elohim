@@ -6,7 +6,7 @@
   "title": "Establishing liability framework for agent errors",
   "description": "Establishing liability framework for agent errors",
   "content": "Scenario: Establishing liability framework for agent errors\n    Given agents will make mistakes\n    And someone must address harms\n    When I create liability and accountability legislation\n    Then I establish: protocol insurance pool for errors\n    And I specify: remedies for different types of mistakes\n    And I require: immediate correction and compensation\n    And I penalize: bad-faith attempts to corrupt agents\n    And I balance: accountability with innovation\n    And framework: enables learning from mistakes\n    And responsibility: is clear without stifling development\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Establishing liability framework for agent errors",

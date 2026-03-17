@@ -6,7 +6,7 @@
   "title": "Politician builds coalition for green infrastructure investment",
   "description": "Politician builds coalition for green infrastructure investment",
   "content": "Scenario: Politician builds coalition for green infrastructure investment\n    Given the politician champions urban tree canopy expansion\n    And needs support across diverse constituencies\n    When the Observer identifies coalition building opportunities\n    Then they see environmental groups support ecological benefits\n    And identify public health advocates concerned about heat and air quality\n    And connect with neighborhood groups seeking park improvements\n    And facilitate coalition across environmental and equity interests\n    And build broad-based support for green infrastructure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician builds coalition for green infrastructure investment",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

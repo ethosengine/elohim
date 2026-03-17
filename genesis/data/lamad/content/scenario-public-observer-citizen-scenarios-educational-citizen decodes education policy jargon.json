@@ -6,7 +6,7 @@
   "title": "Citizen decodes education policy jargon",
   "description": "Citizen decodes education policy jargon",
   "content": "Scenario: Citizen decodes education policy jargon\n    Given the school board discusses \"instructional efficiency optimization\"\n    And the citizen attends or reviews the meeting\n    When the Observer translates the education-ese\n    Then the citizen learns this means cutting teaching assistants\n    And understands the impact is larger class sizes\n    And sees the real effect on children's learning\n    And can respond to actual impacts vs bureaucratic language\n    And education policy becomes accessible to non-experts\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen decodes education policy jargon",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

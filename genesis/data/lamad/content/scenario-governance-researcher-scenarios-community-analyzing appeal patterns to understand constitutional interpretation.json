@@ -6,7 +6,7 @@
   "title": "Analyzing appeal patterns to understand constitutional interpretation",
   "description": "Analyzing appeal patterns to understand constitutional interpretation",
   "content": "Scenario: Analyzing appeal patterns to understand constitutional interpretation\n    Given Riverside's Constitutional Council has reviewed 150 appeals over three years\n    And I have access to anonymized appeal data\n    When I analyze patterns in appeal types, outcomes, and reasoning\n    Then I identify: which decisions generate most appeals (adolescent autonomy)\n    And I examine: what predicts appeal success (constitutional strength, evidence quality)\n    And I track: how constitutional interpretation evolves through precedent\n    And I discover: whether marginalized communities have equal access to recourse\n    And I assess: if appeal process functions as democratic accountability mechanism\n    And My analysis reveals: how procedural justice works in practice\n    And Findings inform improvements to appeal accessibility and council training\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Analyzing appeal patterns to understand constitutional interpretation",

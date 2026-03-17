@@ -6,7 +6,7 @@
   "title": "Family financial support coordinated through care economy",
   "description": "Family financial support coordinated through care economy",
   "content": "Scenario: Family financial support coordinated through care economy\n    Given Aisha's family sometimes needs financial help\n    And Aisha wants to contribute within her means\n    When Aisha provides financial support to family\n    Then the contribution should be recognized as care work\n    And it should be coordinated through family_elohim\n    And the system should help her determine sustainable amounts\n    And family financial support should be visible care contribution\n    And her limited resources should be acknowledged\n    And financial care should strengthen rather than strain relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family financial support coordinated through care economy",

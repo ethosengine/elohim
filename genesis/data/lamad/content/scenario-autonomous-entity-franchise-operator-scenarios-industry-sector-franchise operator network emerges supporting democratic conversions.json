@@ -6,7 +6,7 @@
   "title": "Franchise operator network emerges supporting democratic conversions",
   "description": "Franchise operator network emerges supporting democratic conversions",
   "content": "Scenario: Franchise operator network emerges supporting democratic conversions\n    Given franchise operators are typically isolated competing for corporate favor\n    And isolation prevents collective action against corporate extraction\n    When James connects with other operators considering conversion\n    Then franchise operator solidarity network forms\n    And operators share conversion strategies, legal resources, and emotional support\n    And coordinated multi-operator conversions increase leverage in corporate negotiations\n    And operator-to-operator mentoring spreads democratic conversion knowledge\n    And industry_sector_elohim facilitates operator network development and coordination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise operator network emerges supporting democratic conversions",

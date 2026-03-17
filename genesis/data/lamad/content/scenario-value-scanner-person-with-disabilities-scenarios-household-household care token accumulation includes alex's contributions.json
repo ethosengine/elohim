@@ -6,7 +6,7 @@
   "title": "Household care token accumulation includes Alex's contributions",
   "description": "Household care token accumulation includes Alex's contributions",
   "content": "Scenario: Household care token accumulation includes Alex's contributions\n    Given Alex participates in care token economy\n    And Alex contributes to household through management and coordination\n    When household care tokens are calculated\n    Then Alex's household management labor should be valued appropriately\n    And Alex's cognitive work of coordinating support should count\n    And care tokens should accumulate from Alex's contributions\n    And Alex should receive care token supplements based on household income level\n    And the scanner should be accessible regardless of economic status\n    And Alex should be positioned as contributor, not just recipient\n    And economic standing should reflect Alex's actual care work\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household care token accumulation includes Alex's contributions",

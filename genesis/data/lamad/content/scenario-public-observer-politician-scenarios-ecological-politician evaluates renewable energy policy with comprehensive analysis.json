@@ -6,7 +6,7 @@
   "title": "Politician evaluates renewable energy policy with comprehensive analysis",
   "description": "Politician evaluates renewable energy policy with comprehensive analysis",
   "content": "Scenario: Politician evaluates renewable energy policy with comprehensive analysis\n    Given competing proposals for renewable energy development\n    And conflicting claims about costs and benefits\n    When the Observer analyzes renewable energy options and impacts\n    Then they see cost trajectories of different energy sources\n    And understand job creation in renewable versus fossil fuel sectors\n    And identify environmental and health benefits of clean energy\n    And review successful renewable policies in other jurisdictions\n    And make informed energy policy decisions beyond ideology\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Politician evaluates renewable energy policy with comprehensive analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

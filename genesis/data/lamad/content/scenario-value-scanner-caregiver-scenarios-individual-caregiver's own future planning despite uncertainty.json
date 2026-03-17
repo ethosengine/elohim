@@ -6,7 +6,7 @@
   "title": "Caregiver's own future planning despite uncertainty",
   "description": "Caregiver's own future planning despite uncertainty",
   "content": "Scenario: Caregiver's own future planning despite uncertainty\n    Given James faces uncertain future as David's condition progresses\n    And he needs to plan for multiple scenarios\n    When James considers his own future needs\n    Then the personal_agent should help him plan for scenarios\n    And it should recognize his vulnerability as caregiver\n    And his care token accumulation should build toward future security\n    And his own aging and care needs should be part of planning\n    And the protocol should help James prepare for his own vulnerability\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver's own future planning despite uncertainty",

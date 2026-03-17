@@ -6,7 +6,7 @@
   "title": "Learning household management skills not taught in formal education",
   "description": "Learning household management skills not taught in formal education",
   "content": "Scenario: Learning household management skills not taught in formal education\n    Given Aisha's college education didn't include life skills\n    And she needs practical household management capabilities\n    When Aisha uses the Value Scanner educational features\n    Then the personal_agent should teach grocery shopping efficiency\n    And it should provide meal planning education\n    And it should teach nutrition basics within budget constraints\n    And it should explain waste reduction strategies\n    And practical life skills should be taught through direct application\n    And education should fill gaps from formal schooling\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning household management skills not taught in formal education",

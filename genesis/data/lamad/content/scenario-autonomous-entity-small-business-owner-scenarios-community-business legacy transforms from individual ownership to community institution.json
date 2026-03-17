@@ -6,7 +6,7 @@
   "title": "Business legacy transforms from individual ownership to community institution",
   "description": "Business legacy transforms from individual ownership to community institution",
   "content": "Scenario: Business legacy transforms from individual ownership to community institution\n    Given Rosa built more than business—she created community institution\n    And neighbors trust her shop because they trust her personally\n    When conversion to democratic ownership formalizes community commitment\n    Then Rosa's 15 years of community stewardship is honored and documented\n    And sponsorships (youth soccer, school fundraisers) continue under democratic governance\n    And informal credit for struggling families becomes formalized support program\n    And community institution is preserved beyond Rosa's personal involvement\n    And legacy becomes \"founder who chose community over individual wealth\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Business legacy transforms from individual ownership to community institution",

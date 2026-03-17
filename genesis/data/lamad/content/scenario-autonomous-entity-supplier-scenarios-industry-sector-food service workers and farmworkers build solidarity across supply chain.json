@@ -6,7 +6,7 @@
   "title": "Food service workers and farmworkers build solidarity across supply chain",
   "description": "Food service workers and farmworkers build solidarity across supply chain",
   "content": "Scenario: Food service workers and farmworkers build solidarity across supply chain\n    Given workers in restaurants and farms were isolated from each other\n    And corporate structure prevented relationship building across supply chain\n    When democratic network connects food workers and farmworkers\n    Then Emma (restaurant worker) and Tom's farmworkers coordinate directly\n    And workers across supply chain recognize shared interests and values\n    And solidarity builds between urban food service and rural agriculture\n    And cross-training opportunities enable workers to learn full food system\n    And industry_sector_elohim facilitates worker connections across supply chain\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Food service workers and farmworkers build solidarity across supply chain",

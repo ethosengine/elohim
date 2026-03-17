@@ -6,7 +6,7 @@
   "title": "Professional expertise shared as valuable teaching contribution",
   "description": "Professional expertise shared as valuable teaching contribution",
   "content": "Scenario: Professional expertise shared as valuable teaching contribution\n    Given Margaret has 40+ years of nursing knowledge\n    And her expertise could benefit nursing students and community\n    When the educational_elohim identifies teaching opportunities\n    Then Margaret should be connected to mentoring and teaching roles\n    And her professional knowledge should be valued as educational resource\n    And teaching labor should be recognized and possibly compensated\n    And expertise should continue to serve community after retirement\n    And Margaret's knowledge should be transmitted to next generation\n    And professional skills should be treated as community asset\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Professional expertise shared as valuable teaching contribution",

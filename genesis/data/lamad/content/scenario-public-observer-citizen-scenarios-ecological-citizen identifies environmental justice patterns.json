@@ -6,7 +6,7 @@
   "title": "Citizen identifies environmental justice patterns",
   "description": "Citizen identifies environmental justice patterns",
   "content": "Scenario: Citizen identifies environmental justice patterns\n    Given the citizen is concerned about neighborhood air quality\n    When the Observer analyzes pollution and green space distribution\n    Then the citizen sees industrial permits cluster in low-income areas\n    And parks and trees concentrate in wealthy neighborhoods\n    And environmental burden patterns become undeniable\n    And can advocate for equitable environmental policy\n    And environmental racism becomes visible and challengeable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen identifies environmental justice patterns",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

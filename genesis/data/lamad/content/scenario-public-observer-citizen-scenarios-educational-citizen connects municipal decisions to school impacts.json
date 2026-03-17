@@ -6,7 +6,7 @@
   "title": "Citizen connects municipal decisions to school impacts",
   "description": "Citizen connects municipal decisions to school impacts",
   "content": "Scenario: Citizen connects municipal decisions to school impacts\n    Given a developer proposes 200-unit residential complex\n    And claims it will benefit the tax base\n    When the Observer calculates educational impacts\n    Then the citizen sees 180 new students projected\n    And understands infrastructure capacity constraints\n    And learns no new school facilities are planned\n    And connects municipal development to education quality\n    And cross-domain impacts become visible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen connects municipal decisions to school impacts",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

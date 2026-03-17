@@ -6,7 +6,7 @@
   "title": "Workers transition from corporate extraction to democratic ownership progressively",
   "description": "Workers transition from corporate extraction to democratic ownership progressively",
   "content": "Scenario: Workers transition from corporate extraction to democratic ownership progressively\n    Given ChickenMax has just converted to EAE ownership\n    And workers are learning democratic governance practices\n    When workers hold their first month of democratic operations\n    Then early decisions are worker-proposed, coordinator-advised, worker-approved\n    And workers gradually take on more complex governance decisions\n    And training is provided for business operations, bookkeeping, and strategy\n    And workplace_elohim facilitates learning democratic skills\n    And after 6 months, workers govern fully with coordinator in support role only\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers transition from corporate extraction to democratic ownership progressively",

@@ -6,7 +6,7 @@
   "title": "Student voice in educational governance and policy",
   "description": "Student voice in educational governance and policy",
   "content": "Scenario: Student voice in educational governance and policy\n    Given students are primary stakeholders in education\n    And educational policies directly affect student well-being\n    When students participate in educational governance\n    Then the educational_elohim should recognize advocacy as care contribution\n    And it should value student organizing for better policies\n    And it should accumulate care tokens for participating in governance\n    And student voice should be central to educational decision-making\n    And the system should amplify student participation in education policy\n    And students should govern their educational institutions democratically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Student voice in educational governance and policy",

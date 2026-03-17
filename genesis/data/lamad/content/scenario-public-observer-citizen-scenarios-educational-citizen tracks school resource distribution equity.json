@@ -6,7 +6,7 @@
   "title": "Citizen tracks school resource distribution equity",
   "description": "Citizen tracks school resource distribution equity",
   "content": "Scenario: Citizen tracks school resource distribution equity\n    Given the citizen is concerned about educational equity\n    And lives in a diverse municipality\n    When the Observer analyzes district resource patterns\n    Then the citizen sees which schools get experienced teachers\n    And views facility quality across neighborhoods\n    And identifies program access disparities (gifted, AP, arts)\n    And understands systematic resource distribution patterns\n    And educational justice concerns become evidence-based\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen tracks school resource distribution equity",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

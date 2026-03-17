@@ -6,7 +6,7 @@
   "title": "Multigenerational family care patterns include teen as contributor",
   "description": "Multigenerational family care patterns include teen as contributor",
   "content": "Scenario: Multigenerational family care patterns include teen as contributor\n    Given Jasmine's grandmother requires increasing care support\n    And the family is coordinating care across generations\n    When Jasmine contributes to grandmother's care\n    Then her care work should be tracked and valued\n    And the family_elohim should coordinate care across three generations\n    And Jasmine should learn that care flows in multiple directions\n    And her care for grandmother should build toward her understanding of lifecycle care\n    And the family should model care economy across the full lifespan\n    And Jasmine's generation should learn that elder care is shared family responsibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Multigenerational family care patterns include teen as contributor",

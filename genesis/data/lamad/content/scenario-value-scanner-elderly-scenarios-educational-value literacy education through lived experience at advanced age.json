@@ -6,7 +6,7 @@
   "title": "Value literacy education through lived experience at advanced age",
   "description": "Value literacy education through lived experience at advanced age",
   "content": "Scenario: Value literacy education through lived experience at advanced age\n    Given Helen uses Value Scanner with assistance\n    And she's learning care economy principles through practice\n    When Helen makes care-based decisions\n    Then she should be learning that her contributions still matter\n    And value literacy should be accessible at all ages\n    And care economy principles should be demonstrated through her experience\n    And she should understand that care has value regardless of age\n    And the protocol should teach through experience, not explanation\n    And Helen should internalize that she has worth beyond productivity\n    And care economy education should include all ages\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Value literacy education through lived experience at advanced age",

@@ -6,7 +6,7 @@
   "title": "Teen's civic engagement recognized as care contribution",
   "description": "Teen's civic engagement recognized as care contribution",
   "content": "Scenario: Teen's civic engagement recognized as care contribution\n    Given Jasmine participates in community service projects\n    And she attends city council meetings about youth issues\n    When her civic engagement is tracked\n    Then it should be recognized as care work for the community\n    And political participation should be valued in care economy\n    And she should learn that civic engagement is care labor\n    And her generation should understand that democracy requires active care work\n    And community_elohim should make visible that youth civic participation matters\n    And her care tokens should reflect her contribution to democratic governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen's civic engagement recognized as care contribution",

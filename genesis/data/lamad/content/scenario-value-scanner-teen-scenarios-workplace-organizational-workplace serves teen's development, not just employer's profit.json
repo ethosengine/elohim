@@ -6,7 +6,7 @@
   "title": "Workplace serves teen's development, not just employer's profit",
   "description": "Workplace serves teen's development, not just employer's profit",
   "content": "Scenario: Workplace serves teen's development, not just employer's profit\n    Given Jasmine's work should contribute to her flourishing\n    And employment should support her transition to adulthood\n    When workplace_elohim evaluates the work relationship\n    Then it should assess whether work supports her development\n    And flag if work interferes with education or wellbeing\n    And recognize if employer is investing in her skill development\n    And identify if work experience is building her career capability\n    And advocate that employment should serve mutual benefit\n    And help her understand that healthy employment supports worker flourishing\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace serves teen's development, not just employer's profit",

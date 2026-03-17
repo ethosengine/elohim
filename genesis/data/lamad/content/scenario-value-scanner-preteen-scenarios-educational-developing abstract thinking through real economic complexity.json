@@ -6,7 +6,7 @@
   "title": "Developing abstract thinking through real economic complexity",
   "description": "Developing abstract thinking through real economic complexity",
   "content": "Scenario: Developing abstract thinking through real economic complexity\n    Given Marcus is in developmental phase of emerging abstract thought\n    And he manages genuinely complex resource coordination\n    When Marcus plans meals and budgets across time\n    Then he should be developing advanced cognitive capabilities\n    And abstract concepts like opportunity cost should be learned through application\n    And systems thinking should develop through real experience\n    And the personal_agent should support abstract reasoning development\n    And complex adult work should accelerate cognitive maturation\n    And educational scaffolding should support his emerging abstraction\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developing abstract thinking through real economic complexity",

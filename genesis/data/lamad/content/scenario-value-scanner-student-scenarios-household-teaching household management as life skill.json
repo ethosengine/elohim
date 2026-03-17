@@ -6,7 +6,7 @@
   "title": "Teaching household management as life skill",
   "description": "Teaching household management as life skill",
   "content": "Scenario: Teaching household management as life skill\n    Given Kenji is learning to coordinate shared living\n    And household management is essential adult capability\n    When the personal_agent supports Kenji's household skill development\n    Then it should teach him to negotiate responsibilities fairly\n    And it should help him communicate needs and boundaries\n    And it should build his capability in conflict resolution\n    And it should recognize household coordination as professional-grade skill\n    And the agent should frame this as valuable life learning\n    And Kenji should develop skills that serve all future shared living\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching household management as life skill",

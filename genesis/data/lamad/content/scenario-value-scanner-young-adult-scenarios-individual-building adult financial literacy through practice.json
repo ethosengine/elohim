@@ -6,7 +6,7 @@
   "title": "Building adult financial literacy through practice",
   "description": "Building adult financial literacy through practice",
   "content": "Scenario: Building adult financial literacy through practice\n    Given Aisha received no practical finance education in school\n    And she's learning by doing with real consequences\n    When Aisha makes financial decisions in the scanner\n    Then the personal_agent should provide contextual education\n    And it should explain trade-offs in accessible language\n    And it should help her understand opportunity costs\n    And education should integrate seamlessly with decision-making\n    And Aisha should build financial competence through supported practice\n    And the system should prevent catastrophic mistakes while enabling learning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building adult financial literacy through practice",

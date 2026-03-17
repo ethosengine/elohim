@@ -6,7 +6,7 @@
   "title": "Personal nutrition maintained despite overwhelming demands",
   "description": "Personal nutrition maintained despite overwhelming demands",
   "content": "Scenario: Personal nutrition maintained despite overwhelming demands\n    Given James often skips meals while caring for David\n    And his nutrition suffers under caregiving pressure\n    When the personal_agent monitors James's eating patterns\n    Then it should recognize inadequate nutrition\n    And it should prompt meal planning that includes James\n    And it should ensure James maintains basic nutrition\n    And his well-being should be prioritized alongside David's\n    And the protocol should prevent James's health decline\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal nutrition maintained despite overwhelming demands",

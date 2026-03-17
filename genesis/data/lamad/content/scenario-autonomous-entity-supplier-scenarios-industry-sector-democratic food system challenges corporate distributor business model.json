@@ -6,7 +6,7 @@
   "title": "Democratic food system challenges corporate distributor business model",
   "description": "Democratic food system challenges corporate distributor business model",
   "content": "Scenario: Democratic food system challenges corporate distributor business model\n    Given corporate distributors depend on opacity and extraction for profit\n    And their value proposition (convenience, consistency) doesn't justify 400% markup\n    When democratic network demonstrates distribution without extraction\n    Then corporate distributors face competitive threat from transparent alternative\n    And necessary distribution functions (logistics, aggregation) are provided at cost-recovery pricing\n    And extractive markup is proven unnecessary for functioning supply chain\n    And food industry learns distribution can be democratic cooperative, not profit-maximizing corporation\n    And industry_sector_elohim documents cost comparison between extractive and democratic distribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Democratic food system challenges corporate distributor business model",

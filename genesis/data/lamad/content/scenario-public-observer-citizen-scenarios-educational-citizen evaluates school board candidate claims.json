@@ -6,7 +6,7 @@
   "title": "Citizen evaluates school board candidate claims",
   "description": "Citizen evaluates school board candidate claims",
   "content": "Scenario: Citizen evaluates school board candidate claims\n    Given a school board candidate promises to improve education quality\n    And the election is approaching\n    When the citizen reviews Observer analysis\n    Then they see the candidate's specific policy positions\n    And view comparisons to successful districts' approaches\n    And understand likely impacts of proposed policies\n    And can evaluate campaign promises against evidence\n    And informed voting becomes accessible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:citizen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-citizen-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Citizen evaluates school board candidate claims",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

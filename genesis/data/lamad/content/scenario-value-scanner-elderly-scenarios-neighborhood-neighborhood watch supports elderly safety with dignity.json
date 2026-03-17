@@ -6,7 +6,7 @@
   "title": "Neighborhood watch supports elderly safety with dignity",
   "description": "Neighborhood watch supports elderly safety with dignity",
   "content": "Scenario: Neighborhood watch supports elderly safety with dignity\n    Given Helen is vulnerable to scams and exploitation\n    And neighborhood watch includes elder protection\n    When potential threats are identified\n    Then the neighborhood_elohim should alert Helen and support network\n    And protection should be provided without infantilizing\n    And Helen should be informed: \"Neighbors are seeing scam calls in the area\"\n    And her autonomy should be preserved while providing protection\n    And neighborhood should look out for vulnerable members\n    And safety should be communal responsibility\n    And the protocol should enable neighborhood care without surveillance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood watch supports elderly safety with dignity",

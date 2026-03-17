@@ -6,7 +6,7 @@
   "title": "Manager's expertise is valued without requiring worker subordination",
   "description": "Manager's expertise is valued without requiring worker subordination",
   "content": "Scenario: Manager's expertise is valued without requiring worker subordination\n    Given Marcus has genuine operational expertise from years of experience\n    And corporate role required worker subordination to exercise that expertise\n    When Marcus transitions to democratic coordinator\n    Then his scheduling knowledge becomes proposals, not commands\n    And his operations expertise is valued through consultation, not authority\n    And workers request his input because it's helpful, not because it's mandated\n    And his compensation ($72K) reflects expertise without extraction premium\n    And his purpose comes from service, not domination\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager's expertise is valued without requiring worker subordination",

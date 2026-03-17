@@ -6,7 +6,7 @@
   "title": "Municipal transit and urban planning responsive to teen needs",
   "description": "Municipal transit and urban planning responsive to teen needs",
   "content": "Scenario: Municipal transit and urban planning responsive to teen needs\n    Given Jasmine relies on public transit and walkable neighborhoods\n    And urban planning decisions affect her daily mobility\n    When the municipality makes transit and planning decisions\n    Then youth input should be actively solicited through municipal_elohim\n    And Jasmine's lived experience should inform planning\n    And teen mobility needs should shape transit routing and scheduling\n    And safe walking and biking infrastructure should reflect youth usage patterns\n    And municipal planning should recognize teens as legitimate urban space users\n    And age-friendly cities should include teen-friendly design\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal transit and urban planning responsive to teen needs",

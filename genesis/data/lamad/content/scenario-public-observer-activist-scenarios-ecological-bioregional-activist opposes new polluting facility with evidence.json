@@ -6,7 +6,7 @@
   "title": "Activist opposes new polluting facility with evidence",
   "description": "Activist opposes new polluting facility with evidence",
   "content": "Scenario: Activist opposes new polluting facility with evidence\n    Given a company applies for permit to build polluting facility\n    And claims it will have minimal environmental impact\n    When the Observer analyzes company's environmental track record\n    Then the activist shows violations at their other facilities\n    And calculates health impacts on nearby residents\n    And demonstrates existing pollution burden in target neighborhood\n    And organizes affected community for testimony\n    And corporate claims meet community evidence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist opposes new polluting facility with evidence",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

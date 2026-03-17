@@ -6,7 +6,7 @@
   "title": "Producing comprehensive written opinion for landmark case",
   "description": "Producing comprehensive written opinion for landmark case",
   "content": "Scenario: Producing comprehensive written opinion for landmark case\n    Given our case has major national implications\n    And it will be studied for generations\n    When we craft our written opinion\n    Then we explain: constitutional reasoning in accessible language\n    And we address: major arguments and counterarguments\n    And we examine: long-term implications of our interpretation\n    And we include: dissenting opinions with their reasoning\n    And we document: our deliberation process and considerations\n    And we create: precedent that serves legal clarity and public education\n    And we demonstrate: how citizen governance produces constitutional law\n    And we fulfill: responsibility to those affected by our judgment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Producing comprehensive written opinion for landmark case",

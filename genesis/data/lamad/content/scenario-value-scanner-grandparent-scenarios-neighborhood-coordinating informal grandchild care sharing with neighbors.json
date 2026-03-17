@@ -6,7 +6,7 @@
   "title": "Coordinating informal grandchild care sharing with neighbors",
   "description": "Coordinating informal grandchild care sharing with neighbors",
   "content": "Scenario: Coordinating informal grandchild care sharing with neighbors\n    Given Margaret cares for her grandchildren regularly\n    And other neighborhood grandparents also provide childcare\n    When Margaret coordinates with other grandparents\n    Then the neighborhood_elohim should facilitate care coordination\n    And it should help grandparents share resources and support\n    And it should enable mutual aid among neighborhood grandparents\n    And grandparents should form care networks for collective benefit\n    And neighborhood care economy should strengthen through elder collaboration\n    And Margaret should connect with other grandparents in similar roles\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating informal grandchild care sharing with neighbors",

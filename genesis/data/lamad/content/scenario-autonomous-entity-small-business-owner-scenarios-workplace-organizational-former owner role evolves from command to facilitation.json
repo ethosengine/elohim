@@ -6,7 +6,7 @@
   "title": "Former owner role evolves from command to facilitation",
   "description": "Former owner role evolves from command to facilitation",
   "content": "Scenario: Former owner role evolves from command to facilitation\n    Given Rosa was sole decision-maker carrying full responsibility\n    And transition steward role requires fundamentally different skills\n    When Rosa begins facilitating rather than commanding\n    Then her proposals become suggestions workers can accept or modify\n    And her expertise is valued through consultation, not authority\n    And conflicts are resolved through democratic process, not owner decree\n    And workers request her input because it's helpful, not because it's mandated\n    And workplace_elohim ensures boundaries prevent hierarchical creep\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Former owner role evolves from command to facilitation",

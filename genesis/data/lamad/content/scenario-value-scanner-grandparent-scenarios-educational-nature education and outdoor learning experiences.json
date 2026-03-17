@@ -6,7 +6,7 @@
   "title": "Nature education and outdoor learning experiences",
   "description": "Nature education and outdoor learning experiences",
   "content": "Scenario: Nature education and outdoor learning experiences\n    Given Margaret takes grandchildren on nature walks and outdoor activities\n    And they learn about plants, animals, seasons, and environment\n    When the educational_elohim tracks outdoor learning\n    Then it should recognize nature education as valuable teaching\n    And it should value outdoor experiences as developmental care\n    And it should track environmental learning and wonder cultivation\n    And nature education should accumulate care tokens\n    And Margaret's outdoor teaching should be recognized and supported\n    And experiential learning should complement classroom education\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Nature education and outdoor learning experiences",

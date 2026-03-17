@@ -6,7 +6,7 @@
   "title": "Developer faces accountability for greenwashing",
   "description": "Developer faces accountability for greenwashing",
   "content": "Scenario: Developer faces accountability for greenwashing\n    Given a developer claims \"sustainable development\" in marketing materials\n    But environmental review shows minimal actual sustainability\n    When the Observer compares sustainability claims to actual practices\n    Then analysis reveals: LEED certification was \"certified\" not \"platinum\"\n    And green features are minimal required by code not additional commitment\n    And environmental impact study understated habitat destruction\n    And sustainability marketing exceeds actual environmental performance\n    And greenwashing faces uncomfortable transparency\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer faces accountability for greenwashing",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

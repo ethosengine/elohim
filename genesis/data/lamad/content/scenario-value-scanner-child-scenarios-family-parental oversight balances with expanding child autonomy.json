@@ -6,7 +6,7 @@
   "title": "Parental oversight balances with expanding child autonomy",
   "description": "Parental oversight balances with expanding child autonomy",
   "content": "Scenario: Parental oversight balances with expanding child autonomy\n    Given Emma has more freedom than Tommy\n    And she still needs parental guidance at age 8\n    When Emma makes independent scanner decisions\n    Then Sarah should have full visibility into Emma's choices\n    And Sarah should maintain ultimate authority\n    And Emma's autonomy should be genuine within parental bounds\n    And the balance should protect both safety and capability development\n    And Sarah should be supported in letting go appropriately\n    And trust should grow as Emma demonstrates judgment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parental oversight balances with expanding child autonomy",

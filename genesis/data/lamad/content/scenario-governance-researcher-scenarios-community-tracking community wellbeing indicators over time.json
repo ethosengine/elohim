@@ -6,7 +6,7 @@
   "title": "Tracking community wellbeing indicators over time",
   "description": "Tracking community wellbeing indicators over time",
   "content": "Scenario: Tracking community wellbeing indicators over time\n    Given Riverside adopted Elohim Protocol three years ago\n    And I am measuring community outcomes longitudinally\n    When I analyze wellbeing data before and after adoption\n    Then I examine: loneliness rates (down 12%), life satisfaction (up 8%)\n    And I track: crisis response effectiveness, economic resilience\n    And I monitor: social cohesion, trust in institutions, civic participation\n    And I conduct: comparison with similar communities without protocol\n    And I use: difference-in-differences analysis to isolate protocol effects\n    And I distinguish: what's protocol impact vs what's secular trend\n    And I provide: evidence about whether democratic AI governance works\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Tracking community wellbeing indicators over time",

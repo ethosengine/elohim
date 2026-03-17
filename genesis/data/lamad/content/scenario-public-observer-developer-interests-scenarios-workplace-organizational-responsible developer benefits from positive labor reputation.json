@@ -6,7 +6,7 @@
   "title": "Responsible developer benefits from positive labor reputation",
   "description": "Responsible developer benefits from positive labor reputation",
   "content": "Scenario: Responsible developer benefits from positive labor reputation\n    Given a responsible developer treats workers well consistently\n    And has track record of fair wages, safe conditions, and respect\n    When the Observer makes labor reputation visible\n    Then the developer shows: zero labor violations across 12 projects\n    And worker testimonials describe positive treatment and fair practices\n    And unions support developer's projects because of good labor relations\n    And positive labor reputation creates advantages in competitive approvals\n    And responsible employment practices strengthen business success\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer benefits from positive labor reputation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

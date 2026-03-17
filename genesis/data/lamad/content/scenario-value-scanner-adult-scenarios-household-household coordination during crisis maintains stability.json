@@ -6,7 +6,7 @@
   "title": "Household coordination during crisis maintains stability",
   "description": "Household coordination during crisis maintains stability",
   "content": "Scenario: Household coordination during crisis maintains stability\n    Given household faces crisis—job loss, illness, emergency\n    And normal operations are disrupted\n    When the household_elohim detects crisis conditions\n    Then it should shift to crisis support mode\n    And it should help household prioritize essential functions\n    And it should connect household to emergency resources\n    And it should maintain household stability under stress\n    And the protocol should serve as household safety net\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household coordination during crisis maintains stability",

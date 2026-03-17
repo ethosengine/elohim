@@ -6,7 +6,7 @@
   "title": "Bioregional construction material knowledge and sourcing",
   "description": "Bioregional construction material knowledge and sourcing",
   "content": "Scenario: Bioregional construction material knowledge and sourcing\n    Given Frank knows regional building materials and their properties\n    And bioregional materials reduce transportation and support local economy\n    When the bioregional_elohim coordinates material knowledge\n    Then it should help Frank teach about regional construction materials\n    And facilitate use of bioregionally-appropriate building techniques\n    And recognize his knowledge of local material properties\n    And strengthen bioregional building culture and economy\n    And connect construction practices to place-based sustainability\n    And Frank's experience should inform bioregional building standards\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional construction material knowledge and sourcing",

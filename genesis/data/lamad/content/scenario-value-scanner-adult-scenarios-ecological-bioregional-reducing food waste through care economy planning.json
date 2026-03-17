@@ -6,7 +6,7 @@
   "title": "Reducing food waste through care economy planning",
   "description": "Reducing food waste through care economy planning",
   "content": "Scenario: Reducing food waste through care economy planning\n    Given household food waste has environmental and economic costs\n    And Sarah wants to minimize waste\n    When Sarah plans shopping and meals\n    Then the bioregional_elohim should help prevent overbuying\n    And it should track household consumption patterns\n    And it should suggest portions appropriate to family size\n    And food waste should be minimized through better planning\n    And care for food should include using what is purchased\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reducing food waste through care economy planning",

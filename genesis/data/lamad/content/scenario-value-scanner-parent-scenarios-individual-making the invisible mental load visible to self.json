@@ -6,7 +6,7 @@
   "title": "Making the invisible mental load visible to self",
   "description": "Making the invisible mental load visible to self",
   "content": "Scenario: Making the invisible mental load visible to self\n    Given Sarah manages complex care coordination across multiple people\n    And she tracks schedules, preferences, allergies, developmental needs, and household inventory\n    When the personal_agent monitors Sarah's cognitive labor\n    Then it should quantify the mental load she carries\n    And it should make visible the dozens of decisions she makes hourly\n    And it should show \"Today you managed 127 care-related decisions\"\n    And Sarah should see that her mental labor is real work\n    And the invisible should become undeniably visible\n    And her cognitive labor should be valued as professional-grade skill\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Making the invisible mental load visible to self",

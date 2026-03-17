@@ -6,7 +6,7 @@
   "title": "Learning disabilities and accommodations as care economy",
   "description": "Learning disabilities and accommodations as care economy",
   "content": "Scenario: Learning disabilities and accommodations as care economy\n    Given some students need educational accommodations\n    And accommodations require advocacy and coordination\n    When students access disability services\n    Then the educational_elohim should support accommodation advocacy\n    And it should recognize student labor of managing accommodations\n    And it should value disability services as institutional care work\n    And accommodation should be understood as educational care economy\n    And the system should support equitable access to education\n    And disability justice should be core to educational care economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning disabilities and accommodations as care economy",

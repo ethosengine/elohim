@@ -6,7 +6,7 @@
   "title": "Developer faces accountability for school impact promises",
   "description": "Developer faces accountability for school impact promises",
   "content": "Scenario: Developer faces accountability for school impact promises\n    Given a developer claimed previous project would \"support local schools\"\n    And implied tax revenue would benefit education\n    When the Observer tracks actual school impacts\n    Then analysis shows: enrollment increased 120 students\n    And district had to add 6 portable classrooms\n    And property tax revenue was $400K but school costs were $900K annually\n    And promised \"school support\" was marketing not actual benefit\n    And accountability creates pressure for honest impact assessment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer faces accountability for school impact promises",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

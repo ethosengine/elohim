@@ -6,7 +6,7 @@
   "title": "Investor sees capital enable dignified transitions for small business owners",
   "description": "Investor sees capital enable dignified transitions for small business owners",
   "content": "Scenario: Investor sees capital enable dignified transitions for small business owners\n    Given traditional buyers would exploit workers or destroy community institutions\n    And small business owners like Rosa faced impossible exit choices\n    When Patricia's investment enables exit-to-community conversions\n    Then Rosa achieves financial security ($180K) while protecting workers\n    And legacy is preserved as democratic community institution\n    And investor capital makes dignified transition possible\n    And community institutions are preserved through patient investment\n    And community_elohim facilitates transition financing and stakeholder support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Investor sees capital enable dignified transitions for small business owners",

@@ -6,7 +6,7 @@
   "title": "Family privacy protects Alex from unwanted disclosure",
   "description": "Family privacy protects Alex from unwanted disclosure",
   "content": "Scenario: Family privacy protects Alex from unwanted disclosure\n    Given Alex's disability status is sensitive information\n    And some family members might share Alex's private information\n    When family members access shared family systems\n    Then Alex should control what information family can access\n    And the family_elohim should prevent unauthorized disclosure\n    And Alex's medical information should never be shared without consent\n    And family should not be able to discuss Alex's private matters in shared spaces\n    And privacy violations should be prevented systematically\n    And Alex should be protected from family gossip or oversharing\n    And confidentiality should be enforced even within family\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family privacy protects Alex from unwanted disclosure",

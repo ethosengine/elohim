@@ -6,7 +6,7 @@
   "title": "Alex's disability expertise recognized as valuable family knowledge",
   "description": "Alex's disability expertise recognized as valuable family knowledge",
   "content": "Scenario: Alex's disability expertise recognized as valuable family knowledge\n    Given Alex has deep expertise about disability, accessibility, and ableism\n    And this knowledge benefits entire family\n    When family engages with disability-related topics\n    Then Alex should be recognized as the family expert\n    And family should seek Alex's guidance on accessibility matters\n    And Alex's advocacy work should be valued as contribution\n    And Alex's perspective should shape family understanding\n    And the family_elohim should position Alex as knowledge source\n    And Alex's disability experience should be treated as expertise, not deficit\n    And family should learn from Alex, not pity Alex\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex's disability expertise recognized as valuable family knowledge",

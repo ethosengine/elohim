@@ -6,7 +6,7 @@
   "title": "Supporting each other through health challenges",
   "description": "Supporting each other through health challenges",
   "content": "Scenario: Supporting each other through health challenges\n    Given one or both partners may face health crises\n    And partners provide mutual care and support\n    When the household_elohim tracks caregiving between partners\n    Then it should recognize care provided by each partner\n    And it should surface when care burden becomes unsustainable\n    And it should suggest external support when needed\n    And care between partners should be valued and visible\n    And the system should protect relationship health under care stress\n    And mutual care should strengthen rather than strain partnership\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Supporting each other through health challenges",

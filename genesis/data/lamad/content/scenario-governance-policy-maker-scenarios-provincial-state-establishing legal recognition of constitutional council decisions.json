@@ -6,7 +6,7 @@
   "title": "Establishing legal recognition of Constitutional Council decisions",
   "description": "Establishing legal recognition of Constitutional Council decisions",
   "content": "Scenario: Establishing legal recognition of Constitutional Council decisions\n    Given courts need to know how to treat council precedents\n    And government agencies must understand council authority\n    When I craft legislation recognizing council legitimacy\n    Then I establish: statutory basis for council decisions\n    And I specify: courts recognize precedents in protocol-related cases\n    And I ensure: agencies defer to council constitutional interpretation\n    And I maintain: judicial review for constitutional questions\n    And I create: legal framework for sortition governance\n    And councils gain: legitimacy within existing legal system\n    And new democratic form: integrates with traditional structures\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Establishing legal recognition of Constitutional Council decisions",

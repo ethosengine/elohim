@@ -6,7 +6,7 @@
   "title": "Traditional weather knowledge and climate adaptation",
   "description": "Traditional weather knowledge and climate adaptation",
   "content": "Scenario: Traditional weather knowledge and climate adaptation\n    Given Margaret has observed local weather patterns for decades\n    And traditional weather knowledge supports climate adaptation\n    When the bioregional_elohim tracks traditional climate knowledge\n    Then it should recognize Margaret's weather wisdom\n    And it should value traditional ecological forecasting\n    And it should document climate observation across decades\n    And Margaret's knowledge should inform community climate adaptation\n    And traditional knowledge should complement scientific understanding\n    And elder wisdom should support bioregional resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Traditional weather knowledge and climate adaptation",

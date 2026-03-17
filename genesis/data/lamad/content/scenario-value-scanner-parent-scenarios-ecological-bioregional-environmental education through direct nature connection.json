@@ -6,7 +6,7 @@
   "title": "Environmental education through direct nature connection",
   "description": "Environmental education through direct nature connection",
   "content": "Scenario: Environmental education through direct nature connection\n    Given children need connection to living world\n    And Sarah takes Tommy and Emma to parks, forests, waterways\n    When the ecological_elohim tracks nature-based education\n    Then it should recognize outdoor time as valuable educational labor\n    And it should value Sarah's work facilitating nature connection\n    And teaching through direct ecological experience should accumulate tokens\n    And the system should recognize that nature connection is parenting work\n    And environmental education should be valued alongside academic learning\n    And Sarah's effort to build children's nature relationship should be recognized\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Environmental education through direct nature connection",

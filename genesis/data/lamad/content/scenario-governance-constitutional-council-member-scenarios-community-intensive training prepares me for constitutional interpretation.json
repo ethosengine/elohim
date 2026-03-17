@@ -6,7 +6,7 @@
   "title": "Intensive training prepares me for constitutional interpretation",
   "description": "Intensive training prepares me for constitutional interpretation",
   "content": "Scenario: Intensive training prepares me for constitutional interpretation\n    Given I have accepted my Constitutional Council appointment\n    And I need to understand constitutional principles to judge agent decisions\n    When I complete 3-week training program\n    Then I learn: constitutional principles and their application\n    And I study: how agents reason and make decisions\n    And I practice: deliberation protocols and consensus building\n    And I review: historical precedents and case studies\n    And I am educated: without being indoctrinated about \"correct\" answers\n    And I develop: judgment capacity not just knowledge\n    And I feel: prepared to serve despite lack of formal expertise\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Intensive training prepares me for constitutional interpretation",

@@ -6,7 +6,7 @@
   "title": "Continuing education about rights and entitlements",
   "description": "Continuing education about rights and entitlements",
   "content": "Scenario: Continuing education about rights and entitlements\n    Given Jordan has rights as a person with disabilities\n    And knowing rights supports self-advocacy\n    When Jordan participates in rights education\n    Then Jordan learns about ADA, employment rights, housing rights\n    And information is provided in highly accessible format\n    And Jordan understands what protections they have\n    And Jordan can advocate for their rights when violations occur\n    And rights education empowers Jordan's full citizenship\n    And Jordan experiences being a person with protected rights and dignity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Continuing education about rights and entitlements",

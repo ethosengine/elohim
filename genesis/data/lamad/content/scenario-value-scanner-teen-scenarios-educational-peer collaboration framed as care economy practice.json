@@ -6,7 +6,7 @@
   "title": "Peer collaboration framed as care economy practice",
   "description": "Peer collaboration framed as care economy practice",
   "content": "Scenario: Peer collaboration framed as care economy practice\n    Given Jasmine collaborates with classmates on group projects\n    And peer learning is valuable educational practice\n    When educational_elohim tracks collaborative learning\n    Then it should frame peer collaboration as care economy\n    And recognize that students teaching each other is care work\n    And value collaborative learning as mutual care\n    And help students understand that knowledge sharing creates collective value\n    And build expectation that learning is community practice, not individual competition\n    And demonstrate care economy principles in educational contexts\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Peer collaboration framed as care economy practice",

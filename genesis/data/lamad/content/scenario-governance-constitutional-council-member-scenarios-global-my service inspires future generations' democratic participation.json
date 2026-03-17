@@ -6,7 +6,7 @@
   "title": "My service inspires future generations' democratic participation",
   "description": "My service inspires future generations' democratic participation",
   "content": "Scenario: My service inspires future generations' democratic participation\n    Given my children watched my constitutional council journey\n    And they see democracy as participation not just voting\n    When they grow up understanding governance as shared responsibility\n    Then they develop: civic capacities through my example\n    And they believe: they too can shape their world\n    And they practice: deliberation, constitutional thinking, humble judgment\n    And they inherit: democracy as living practice not dead tradition\n    And next generation: is prepared for governance challenges ahead\n    And my service: ripples through time beyond my individual contribution\n    And I know: this is how democracy perpetuates itself\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "My service inspires future generations' democratic participation",

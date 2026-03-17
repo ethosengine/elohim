@@ -6,7 +6,7 @@
   "title": "Appeal escalates to national level due to fundamental constitutional tension",
   "description": "Appeal escalates to national level due to fundamental constitutional tension",
   "content": "Scenario: Appeal escalates to national level due to fundamental constitutional tension\n    Given my case couldn't be resolved at regional level\n    And it reveals fundamental tension in constitutional principles\n    And regional councils have reached conflicting interpretations\n    When my appeal reaches National Constitutional Council\n    Then randomly-selected citizens from across the nation deliberate\n    And They serve 6-month terms given the gravity of national precedent\n    And They address question \"does mental health intervention ever justify privacy breach at constitutional level?\"\n    And They create precedent affecting millions of people\n    And They produce comprehensive written opinion with deep reasoning\n    And The national precedent guides all lower-layer councils going forward\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Appeal escalates to national level due to fundamental constitutional tension",

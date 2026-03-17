@@ -6,7 +6,7 @@
   "title": "Snow removal and sidewalk maintenance advocacy",
   "description": "Snow removal and sidewalk maintenance advocacy",
   "content": "Scenario: Snow removal and sidewalk maintenance advocacy\n    Given Alex uses a wheelchair and inaccessible sidewalks trap Alex at home\n    And snow removal is often inadequate\n    When winter weather creates accessibility barriers\n    Then Alex should be able to document sidewalk problems systematically\n    And the neighborhood_elohim should coordinate snow removal advocacy\n    And Alex's mobility needs should be recognized as legitimate priority\n    And neighbors should understand that sidewalk access is essential infrastructure\n    And collective action should demand better municipal services\n    And Alex's advocacy should improve conditions for all residents\n    And the neighborhood should support Alex's right to mobility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Snow removal and sidewalk maintenance advocacy",

@@ -6,7 +6,7 @@
   "title": "Coordinating shared meals around work schedules",
   "description": "Coordinating shared meals around work schedules",
   "content": "Scenario: Coordinating shared meals around work schedules\n    Given my roommates and I want to share meal costs and preparation\n    And my work schedule is unpredictable and changes weekly\n    When we plan shared meals\n    Then the protocol should coordinate across different schedules\n    And identify opportunities when I can participate\n    And help distribute cooking responsibilities fairly\n    And allow flexible contribution when my schedule permits\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-household",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating shared meals around work schedules",

@@ -6,7 +6,7 @@
   "title": "Bioregional crop diversity protects against climate disruption",
   "description": "Bioregional crop diversity protects against climate disruption",
   "content": "Scenario: Bioregional crop diversity protects against climate disruption\n    Given monoculture agriculture is vulnerable to climate shocks\n    And bioregional food security requires diverse production\n    When democratic farms coordinate bioregional crop diversity\n    Then multiple farms grow complementary crops reducing systemic risk\n    And crop failures at one farm are buffered by others' success\n    And regional food security is protected through diversity\n    And climate resilience increases through bioregional coordination\n    And bioregional_elohim coordinates crop diversity planning across farms\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional crop diversity protects against climate disruption",

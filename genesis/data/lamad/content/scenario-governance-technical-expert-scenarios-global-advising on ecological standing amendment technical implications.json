@@ -6,7 +6,7 @@
   "title": "Advising on ecological standing amendment technical implications",
   "description": "Advising on ecological standing amendment technical implications",
   "content": "Scenario: Advising on ecological standing amendment technical implications\n    Given delegates consider granting ecosystems constitutional personhood\n    And technical implementation is uncertain\n    When I explain how agents would implement ecological standing\n    Then I clarify: how ecosystem \"voice\" would be technically represented\n    And I explore: methods for translating ecological data into constitutional claims\n    And I assess: challenges in balancing human and ecological rights\n    And I present: what's technically possible vs what requires research\n    And I avoid: either dismissing as impossible or ignoring challenges\n    And I enable: delegates to choose values given technical reality\n    And I serve: constitutional innovation with technical honesty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advising on ecological standing amendment technical implications",

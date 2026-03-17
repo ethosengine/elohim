@@ -6,7 +6,7 @@
   "title": "Climate impact of dietary choices",
   "description": "Climate impact of dietary choices",
   "content": "Scenario: Climate impact of dietary choices\n    Given food production contributes to climate change\n    And individual choices aggregate to systemic impact\n    When Aisha evaluates food options\n    Then the bioregional_elohim should show carbon footprint\n    And it should explain climate impact of different choices\n    And it should help her make lower-impact selections\n    And climate literacy should inform dietary decisions\n    And she should understand individual contribution to climate crisis\n    And climate-conscious choices should be supported\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Climate impact of dietary choices",

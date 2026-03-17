@@ -6,7 +6,7 @@
   "title": "Recognition of unpaid care labor builds self-worth",
   "description": "Recognition of unpaid care labor builds self-worth",
   "content": "Scenario: Recognition of unpaid care labor builds self-worth\n    Given Margaret's care contributions are substantial but unpaid\n    And traditional economics labels her as \"not working\"\n    When Margaret reviews her care contribution data\n    Then she should see quantified value of her labor\n    And she should understand her economic contribution is significant\n    And she should experience herself as productive member of society\n    And the narrative of retirement as obsolescence should be countered\n    And Margaret should have data to assert her value\n    And her dignity and self-worth should be affirmed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognition of unpaid care labor builds self-worth",

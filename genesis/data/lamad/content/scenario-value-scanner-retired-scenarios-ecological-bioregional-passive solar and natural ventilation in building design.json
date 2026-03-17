@@ -6,7 +6,7 @@
   "title": "Passive solar and natural ventilation in building design",
   "description": "Passive solar and natural ventilation in building design",
   "content": "Scenario: Passive solar and natural ventilation in building design\n    Given Frank has construction experience with building orientation and design\n    And passive solar and ventilation reduce energy consumption\n    When the bioregional_elohim coordinates sustainable building\n    Then it should facilitate passive design elements in Habitat projects\n    And help Frank apply climate-appropriate building techniques\n    And recognize building design knowledge as ecological expertise\n    And quantify energy savings from passive design choices\n    And teach sustainable design principles to younger builders\n    And Frank's knowledge should serve low-energy building practices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Passive solar and natural ventilation in building design",

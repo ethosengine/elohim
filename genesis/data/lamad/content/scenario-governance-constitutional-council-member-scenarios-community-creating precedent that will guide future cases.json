@@ -6,7 +6,7 @@
   "title": "Creating precedent that will guide future cases",
   "description": "Creating precedent that will guide future cases",
   "content": "Scenario: Creating precedent that will guide future cases\n    Given our council rules on Marcus's mental health intervention appeal\n    And we affirm the agent's decision as constitutionally aligned\n    When we document our reasoning and recommendations\n    Then we explain: why privacy was balanced against care in this case\n    And we recommend: protocol enhancements for pre-specified preferences\n    And we create: precedent that future councils can reference\n    And we document: our deliberation process (anonymized)\n    And we contribute: to evolving constitutional interpretation\n    And our judgment: becomes part of public constitutional record\n    And Marcus's case: makes the protocol better for everyone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creating precedent that will guide future cases",

@@ -6,7 +6,7 @@
   "title": "Supply chain transparency from farm to table builds trust and accountability",
   "description": "Supply chain transparency from farm to table builds trust and accountability",
   "content": "Scenario: Supply chain transparency from farm to table builds trust and accountability\n    Given corporate food system is opaque making accountability impossible\n    And customers and workers don't know where food comes from or how people were treated\n    When democratic supply chain implements radical transparency\n    Then customers trace food from specific farm (Johnson Farm tomatoes) to their plate\n    And farming practices (organic, regenerative) are documented and visible\n    And farmworker wages and conditions are transparent\n    And value distribution is clear showing fair compensation throughout chain\n    And industry_sector_elohim provides supply chain transparency platform\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Supply chain transparency from farm to table builds trust and accountability",

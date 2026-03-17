@@ -6,7 +6,7 @@
   "title": "Parent's care work visible across extended family",
   "description": "Parent's care work visible across extended family",
   "content": "Scenario: Parent's care work visible across extended family\n    Given Sarah provides care to her children and aging parents\n    And she coordinates between generations\n    When the family_elohim tracks Sarah's care contributions\n    Then her work should be visible to entire extended family\n    And grandparents should see Sarah's parenting labor\n    And siblings should see her coordination work\n    And the full family should recognize her care contributions\n    And visibility should enable family-wide appreciation\n    And Sarah's labor should be valued across all family relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent's care work visible across extended family",

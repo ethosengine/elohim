@@ -6,7 +6,7 @@
   "title": "Emergency financial assistance during crisis without bureaucratic humiliation",
   "description": "Emergency financial assistance during crisis without bureaucratic humiliation",
   "content": "Scenario: Emergency financial assistance during crisis without bureaucratic humiliation\n    Given single parents face financial emergencies without partner backup\n    And traditional assistance requires invasive documentation and waiting\n    When Maria faces financial crisis—medical bill, car repair, unexpected expense\n    Then the community_elohim should coordinate rapid emergency assistance\n    And help should be available quickly based on care economy standing\n    And Maria should not have to prove desperation through bureaucratic gauntlet\n    And emergency support should preserve dignity while providing real help\n    And care economy should function as community safety net for crisis\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Emergency financial assistance during crisis without bureaucratic humiliation",

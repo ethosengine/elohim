@@ -6,7 +6,7 @@
   "title": "Understanding and claiming wage rights",
   "description": "Understanding and claiming wage rights",
   "content": "Scenario: Understanding and claiming wage rights\n    Given I am entitled to minimum wage, overtime pay, and tip protections\n    And wage theft is common in food service industry\n    When I track my hours and compensation\n    Then the workplace_elohim should help me verify I am paid correctly\n    And identify potential wage violations\n    And provide guidance on claiming unpaid wages\n    And support me in pursuing wage justice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Understanding and claiming wage rights",

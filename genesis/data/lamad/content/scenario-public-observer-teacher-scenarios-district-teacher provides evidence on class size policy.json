@@ -6,7 +6,7 @@
   "title": "Teacher provides evidence on class size policy",
   "description": "Teacher provides evidence on class size policy",
   "content": "Scenario: Teacher provides evidence on class size policy\n    Given the board is considering budget cuts increasing class sizes\n    And board claims research shows class size doesn't matter\n    When teachers coordinate evidence-based advocacy through Observer\n    Then they present district's own data showing outcomes decline as sizes increase\n    And cite research on class size effects by grade level\n    And show neighboring district has lower ratios and better results\n    And provide teacher professional judgment grounded in evidence\n    And board decision becomes informed by multiple evidence sources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher provides evidence on class size policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

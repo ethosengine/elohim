@@ -6,7 +6,7 @@
   "title": "Teen learns lifecycle of democratic participation",
   "description": "Teen learns lifecycle of democratic participation",
   "content": "Scenario: Teen learns lifecycle of democratic participation\n    Given Jasmine is years away from voting age\n    And democratic participation extends beyond voting\n    When she engages municipal governance through care economy\n    Then she should learn that civic engagement is continuous practice\n    And understand that democracy requires active participation, not just voting\n    And develop relationships with municipal institutions\n    And build civic skills through real participation in local governance\n    And internalize that she has legitimate voice in shaping her city\n    And grow into voting age already practiced in democratic engagement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns lifecycle of democratic participation",

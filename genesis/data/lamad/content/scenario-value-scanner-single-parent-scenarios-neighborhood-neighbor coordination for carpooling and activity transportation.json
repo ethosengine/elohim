@@ -6,7 +6,7 @@
   "title": "Neighbor coordination for carpooling and activity transportation",
   "description": "Neighbor coordination for carpooling and activity transportation",
   "content": "Scenario: Neighbor coordination for carpooling and activity transportation\n    Given Maria struggles with impossible logistics of three children's different schedules\n    And she has no partner to split transportation duties\n    When children need transportation to school, activities, and appointments\n    Then the neighborhood_elohim should coordinate carpooling with other families\n    And it should match families with compatible schedules and destinations\n    And it should track reciprocal transportation contributions\n    And carpooling should reduce Maria's impossible logistics burden\n    And neighborhood coordination should make solo parenting more manageable\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighbor coordination for carpooling and activity transportation",

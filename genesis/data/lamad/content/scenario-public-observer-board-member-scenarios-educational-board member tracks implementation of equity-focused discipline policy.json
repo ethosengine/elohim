@@ -6,7 +6,7 @@
   "title": "Board member tracks implementation of equity-focused discipline policy",
   "description": "Board member tracks implementation of equity-focused discipline policy",
   "content": "Scenario: Board member tracks implementation of equity-focused discipline policy\n    Given board adopted restorative justice policy to reduce suspensions two years ago\n    And superintendent reported successful implementation at board meetings\n    And community members report ongoing disparate discipline of students of color\n    When the board member uses Observer implementation tracking\n    Then they see suspension rates by school, race, and disability status over time\n    And discover overall suspensions declined but disparities remained or widened\n    And find some schools implemented restorative practices while others didn't\n    And access teacher training data showing incomplete implementation\n    And impact tracking reveals gap between board policy and actual outcomes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member tracks implementation of equity-focused discipline policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

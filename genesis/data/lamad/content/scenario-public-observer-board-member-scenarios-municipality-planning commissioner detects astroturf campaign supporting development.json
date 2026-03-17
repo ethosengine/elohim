@@ -6,7 +6,7 @@
   "title": "Planning commissioner detects astroturf campaign supporting development",
   "description": "Planning commissioner detects astroturf campaign supporting development",
   "content": "Scenario: Planning commissioner detects astroturf campaign supporting development\n    Given commission faces decision on controversial mall redevelopment\n    And receives hundreds of emails and petition signatures supporting project\n    And commission wants to understand if support is authentic community sentiment\n    When the commissioner uses Observer to analyze advocacy campaign\n    Then they discover emails use identical language suggesting coordinated campaign\n    And find petition signatures include many from outside the municipality\n    And see analysis showing campaign funded and organized by developer\n    And access authentic community sentiment data showing more mixed views\n    And capture protection helps commissioner distinguish grassroots from astroturf\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Planning commissioner detects astroturf campaign supporting development",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

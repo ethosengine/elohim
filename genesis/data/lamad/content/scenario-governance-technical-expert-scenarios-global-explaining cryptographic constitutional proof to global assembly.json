@@ -6,7 +6,7 @@
   "title": "Explaining cryptographic constitutional proof to global assembly",
   "description": "Explaining cryptographic constitutional proof to global assembly",
   "content": "Scenario: Explaining cryptographic constitutional proof to global assembly\n    Given delegates need to understand how constitutional verification works\n    And many come from contexts without technical infrastructure\n    When I explain cryptographic alignment proof accessibly\n    Then I use: universal analogies and visual demonstrations\n    And I ensure: translation into dozens of languages\n    And I check: comprehension across educational backgrounds\n    And I avoid: assuming Western technical education\n    And I honor: diverse ways of understanding verification\n    And I enable: informed global deliberation despite technical complexity\n    And I demonstrate: that anyone can understand enough to govern\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Explaining cryptographic constitutional proof to global assembly",

@@ -6,7 +6,7 @@
   "title": "Observing Constitutional Council deliberation in real-time",
   "description": "Observing Constitutional Council deliberation in real-time",
   "content": "Scenario: Observing Constitutional Council deliberation in real-time\n    Given Community Constitutional Council is reviewing Marcus's mental health appeal\n    And I have permission to observe their deliberation\n    When I document how the council works through the case\n    Then I capture: argument patterns, member interactions, uncertainty navigation\n    And I analyze: how expertise influences judgment, how dissent gets resolved\n    And I examine: quality of deliberation, constitutional reasoning depth\n    And I observe: what enables effective citizen governance\n    And I document: dynamics that retrospective analysis would miss\n    And My research reveals how sortition democracy actually works\n    And Findings feed back to improve council support and training\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Observing Constitutional Council deliberation in real-time",

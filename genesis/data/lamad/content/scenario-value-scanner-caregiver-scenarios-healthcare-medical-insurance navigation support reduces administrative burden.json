@@ -6,7 +6,7 @@
   "title": "Insurance navigation support reduces administrative burden",
   "description": "Insurance navigation support reduces administrative burden",
   "content": "Scenario: Insurance navigation support reduces administrative burden\n    Given medical insurance is byzantine and frustrating\n    And James must manage claims, authorizations, coverage\n    When the healthcare_elohim assists with insurance\n    Then it should help James navigate insurance processes\n    And it should track claims and identify problems\n    And it should assist with authorization requirements\n    And it should escalate coverage denials for appeal\n    And insurance complexity should not prevent needed care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Insurance navigation support reduces administrative burden",

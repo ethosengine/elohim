@@ -6,7 +6,7 @@
   "title": "Cross-municipal coordination with neighboring cities",
   "description": "Cross-municipal coordination with neighboring cities",
   "content": "Scenario: Cross-municipal coordination with neighboring cities\n    Given some challenges extend beyond Riverside boundaries\n    And watershed management affects multiple municipalities\n    When I coordinate with neighboring community leaders\n    Then we convene: inter-municipal deliberative assemblies\n    And agents from: different municipalities share analysis\n    And we negotiate: agreements serving all communities\n    And we respect: each municipality's sovereignty\n    And we find: synthesis through democratic deliberation\n    And lateral coordination: addresses problems that don't respect boundaries\n    And we demonstrate: governance working across jurisdictions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipality",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Cross-municipal coordination with neighboring cities",

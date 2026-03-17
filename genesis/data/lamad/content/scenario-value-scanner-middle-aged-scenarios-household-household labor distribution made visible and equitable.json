@@ -6,7 +6,7 @@
   "title": "Household labor distribution made visible and equitable",
   "description": "Household labor distribution made visible and equitable",
   "content": "Scenario: Household labor distribution made visible and equitable\n    Given Robert and Jennifer both work full-time\n    And they share household management, parent care, and child support\n    And household labor distribution can become inequitable invisibly\n    When household_elohim tracks care contributions\n    Then it should make all household labor visible\n    And surface patterns: \"Jennifer has managed 78% of parent care coordination this month\"\n    And prompt discussion when distribution becomes unbalanced\n    And help them negotiate equitable distribution\n    And recognize that both partners carry substantial care burden\n    And support them in maintaining partnership equity\n    And prevent resentment from invisible labor imbalances\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household labor distribution made visible and equitable",

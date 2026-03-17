@@ -6,7 +6,7 @@
   "title": "Adult-capable interface for sophisticated decision-making",
   "description": "Adult-capable interface for sophisticated decision-making",
   "content": "Scenario: Adult-capable interface for sophisticated decision-making\n    Given Jasmine is using the Value Scanner independently\n    And she has complex financial goals and multiple contexts to manage\n    When Jasmine opens the scanner application\n    Then the interface should provide comprehensive budgeting tools\n    And the personal_agent should offer professional-grade financial analysis\n    And multi-context care tracking should be available (school, work, family, community)\n    And sophisticated planning and analysis features should be accessible\n    And privacy controls should be granular and user-controlled\n    And the interface should treat Jasmine as the competent person she is\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adult-capable interface for sophisticated decision-making",

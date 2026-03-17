@@ -6,7 +6,7 @@
   "title": "Alex participates in family governance as full adult member",
   "description": "Alex participates in family governance as full adult member",
   "content": "Scenario: Alex participates in family governance as full adult member\n    Given Alex is an adult family member\n    And some family might still treat Alex as dependent child\n    When family decisions are made\n    Then Alex should have equal voice to other adult family members\n    And Alex's autonomy should be respected by the family_elohim\n    And Alex's opinions should carry weight appropriate to an adult\n    And infantilization patterns should be identified and countered\n    And the system should structure Alex as competent adult\n    And family should be prompted to respect Alex's sovereignty\n    And Alex's full adulthood should be systematically affirmed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex participates in family governance as full adult member",

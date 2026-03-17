@@ -6,7 +6,7 @@
   "title": "Disability culture and identity respected and affirmed",
   "description": "Disability culture and identity respected and affirmed",
   "content": "Scenario: Disability culture and identity respected and affirmed\n    Given Alex's disability is part of their identity\n    And disabled people have distinct culture and community\n    When the Value Scanner represents disability\n    Then it should use identity-first or person-first language per Alex's preference\n    And it should present disability as difference, not deficit\n    And it should connect Alex to disability community resources\n    And disability culture should be recognized as valuable\n    And Alex should see positive representation of disability\n    And the protocol should embody social model, not medical model\n    And Alex's disabled identity should be affirmed, not erased\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Disability culture and identity respected and affirmed",

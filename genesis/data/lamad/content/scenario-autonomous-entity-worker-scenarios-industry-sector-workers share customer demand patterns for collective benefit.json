@@ -6,7 +6,7 @@
   "title": "Workers share customer demand patterns for collective benefit",
   "description": "Workers share customer demand patterns for collective benefit",
   "content": "Scenario: Workers share customer demand patterns for collective benefit\n    Given Emma notices increasing demand for vegan options at ChickenMax\n    And other food entities are also seeing this trend\n    When REA systems document customer preference patterns\n    Then industry_sector_elohim aggregates sector-wide demand data\n    And workers across entities learn of vegan demand trend\n    And sector coordinates with suppliers for plant-based ingredients\n    And workers collaborate on vegan menu development\n    And sector responds to customer needs faster than corporate competitors\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:worker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workers share customer demand patterns for collective benefit",

@@ -6,7 +6,7 @@
   "title": "Community food security programs integrated with Value Scanner",
   "description": "Community food security programs integrated with Value Scanner",
   "content": "Scenario: Community food security programs integrated with Value Scanner\n    Given Marcus manages food budget under severe constraints\n    And community food security programs exist\n    When Marcus's nutritional patterns indicate need\n    Then the community_elohim should connect him to food programs\n    And integration should be seamless, not requiring separate applications\n    And his care contributions should establish eligibility\n    And programs should be framed as community care exchanges\n    And access should not require stigmatizing means testing\n    And food security should be treated as community responsibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community food security programs integrated with Value Scanner",

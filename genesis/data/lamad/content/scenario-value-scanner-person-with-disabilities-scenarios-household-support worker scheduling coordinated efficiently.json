@@ -6,7 +6,7 @@
   "title": "Support worker scheduling coordinated efficiently",
   "description": "Support worker scheduling coordinated efficiently",
   "content": "Scenario: Support worker scheduling coordinated efficiently\n    Given Alex requires assistance with specific physical tasks\n    And support workers have their own schedules\n    When Alex needs to coordinate support services\n    Then the household_elohim should help schedule support worker visits efficiently\n    And it should match Alex's needs with worker availability\n    And Alex should be able to communicate requirements clearly\n    And schedule changes should be accommodated flexibly\n    And coordination should reduce Alex's cognitive load\n    And Alex should maintain authority over when and how support is provided\n    And the system should serve Alex's independence, not create dependence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Support worker scheduling coordinated efficiently",

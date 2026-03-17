@@ -6,7 +6,7 @@
   "title": "Identifying patterns in appeals informing local policy",
   "description": "Identifying patterns in appeals informing local policy",
   "content": "Scenario: Identifying patterns in appeals informing local policy\n    Given Constitutional Council has reviewed many Riverside appeals\n    And I observe recurring themes and tensions\n    When I analyze patterns for community improvement\n    Then I see: many adolescent autonomy conflicts emerging\n    And I notice: recurring privacy threshold concerns\n    And I identify: business loan criteria creating frustration\n    And I bring: patterns to city council for policy response\n    And we consider: community-specific protocol calibration\n    And we propose: local ordinance updates if needed\n    And appeals inform: democratic policy making\n    And feedback loop: connects individual recourse to systemic improvement\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identifying patterns in appeals informing local policy",

@@ -6,7 +6,7 @@
   "title": "Acknowledging uncertainty in technical analysis",
   "description": "Acknowledging uncertainty in technical analysis",
   "content": "Scenario: Acknowledging uncertainty in technical analysis\n    Given appellant questions agent's 85% confidence in suicide risk pattern\n    And council asks if the confidence level is reliable\n    When I provide honest uncertainty assessment\n    Then I explain: we don't have validated ground truth for this prediction type\n    And I acknowledge: the 85% might be overconfident or underconfident\n    And I clarify: what we know and what we don't know\n    And I avoid: hiding behind expert authority to eliminate uncertainty\n    And I enable: council to make decision under acknowledged uncertainty\n    And I demonstrate: that honesty about limits builds trust\n    And citizens know: when they're governing despite deep uncertainty\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Acknowledging uncertainty in technical analysis",

@@ -6,7 +6,7 @@
   "title": "Activist identifies affected community members for organizing",
   "description": "Activist identifies affected community members for organizing",
   "content": "Scenario: Activist identifies affected community members for organizing\n    Given a city policy will impact 300 residents in the neighborhood\n    And the activist needs to build organized base\n    When the Observer detects affected residents\n    Then the activist can see community impact patterns\n    And identify residents most affected by the issue\n    And facilitate grassroots testimony development\n    And build coalition grounded in lived experience\n    And transform policy analysis into community power\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist identifies affected community members for organizing",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

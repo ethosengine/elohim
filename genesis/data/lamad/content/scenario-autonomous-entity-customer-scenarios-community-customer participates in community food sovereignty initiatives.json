@@ -6,7 +6,7 @@
   "title": "Customer participates in community food sovereignty initiatives",
   "description": "Customer participates in community food sovereignty initiatives",
   "content": "Scenario: Customer participates in community food sovereignty initiatives\n    Given corporate food system homogenizes diets and ignores cultural preferences\n    And Ms. Johnson's community is diverse with varied cultural food traditions\n    When democratic businesses respond to community cultural food needs\n    Then menu includes diverse cultural options (Latino, Asian, African-American cuisines)\n    And Johnson Farm grows culturally-specific produce based on community requests\n    And food sovereignty increases through democratic responsiveness\n    And cultural food preservation becomes community priority\n    And community_elohim facilitates cultural food sovereignty programming\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer participates in community food sovereignty initiatives",

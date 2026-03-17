@@ -6,7 +6,7 @@
   "title": "Supporting Maria's boundaries against impossible external demands",
   "description": "Supporting Maria's boundaries against impossible external demands",
   "content": "Scenario: Supporting Maria's boundaries against impossible external demands\n    Given everyone wants more from Maria—employers, schools, children, family, community\n    And she has finite capacity with no partner to share load\n    When external demands are placed on Maria\n    Then the personal_agent should monitor her total commitments\n    And it should help her evaluate what she can realistically handle\n    And it should support her in saying no when necessary\n    And it should remind her that she's already doing more than humanly sustainable\n    And Maria should have AI support for boundary-setting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Supporting Maria's boundaries against impossible external demands",

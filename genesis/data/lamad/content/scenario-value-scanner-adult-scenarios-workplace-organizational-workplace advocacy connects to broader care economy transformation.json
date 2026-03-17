@@ -6,7 +6,7 @@
   "title": "Workplace advocacy connects to broader care economy transformation",
   "description": "Workplace advocacy connects to broader care economy transformation",
   "content": "Scenario: Workplace advocacy connects to broader care economy transformation\n    Given Sarah's workplace advocacy could influence other employers\n    And workplace policy changes could spread\n    When Sarah's workplace successfully implements care economy policies\n    Then the workplace_elohim should share success with other organizations\n    And effective policies should be documented and promoted\n    And Sarah's advocacy should contribute to broader transformation\n    And workplace care economy should grow from successful examples\n    And employment should shift toward care economy principles at scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace advocacy connects to broader care economy transformation",

@@ -6,7 +6,7 @@
   "title": "Participating in community ecological restoration and care",
   "description": "Participating in community ecological restoration and care",
   "content": "Scenario: Participating in community ecological restoration and care\n    Given Margaret has time and commitment for environmental stewardship\n    And community needs participants in ecological restoration\n    When Margaret participates in community environmental work\n    Then the bioregional_elohim should recognize ecological care contributions\n    And it should value restoration work, cleanup, and stewardship\n    And it should track community environmental participation\n    And ecological care should accumulate care tokens\n    And Margaret's environmental service should be recognized\n    And community ecological health should benefit from elder participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in community ecological restoration and care",

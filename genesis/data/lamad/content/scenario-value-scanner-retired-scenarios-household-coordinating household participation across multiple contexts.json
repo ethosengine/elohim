@@ -6,7 +6,7 @@
   "title": "Coordinating household participation across multiple contexts",
   "description": "Coordinating household participation across multiple contexts",
   "content": "Scenario: Coordinating household participation across multiple contexts\n    Given Frank volunteers with Habitat and serves on council\n    And his wife has her own community participation\n    And both provide family care across generations\n    When the household_elohim coordinates participation\n    Then it should integrate both partners' schedules and commitments\n    And it should prevent household overcommitment\n    And it should ensure both partners have rest and personal time\n    And it should support diverse participation that serves flourishing\n    And coordination should enable rather than constrain engagement\n    And household should function as base for community contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating household participation across multiple contexts",

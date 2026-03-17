@@ -6,7 +6,7 @@
   "title": "My judgment influences policy maker legislation",
   "description": "My judgment influences policy maker legislation",
   "content": "Scenario: My judgment influences policy maker legislation\n    Given Senator Ruiz is drafting AI governance legislation\n    And she reviews our regional council precedents for insight\n    When our constitutional reasoning informs her policy\n    Then my citizen judgment: shapes democratic law\n    And my lived experience: enriches legislative wisdom\n    And my constitutional interpretation: guides government integration\n    And sortition governance: and representative democracy work together\n    And I contribute: to democratic governance beyond my council service\n    And my voice: matters in ways I never imagined as nurse\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "My judgment influences policy maker legislation",

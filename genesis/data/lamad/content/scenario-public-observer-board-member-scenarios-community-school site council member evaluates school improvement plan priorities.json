@@ -6,7 +6,7 @@
   "title": "School site council member evaluates school improvement plan priorities",
   "description": "School site council member evaluates school improvement plan priorities",
   "content": "Scenario: School site council member evaluates school improvement plan priorities\n    Given principal proposes improvement plan focusing on technology upgrades\n    And plan must be approved by site council including parent and teacher representatives\n    And board member wants to ensure plan reflects actual community priorities\n    When the board member requests Observer community input data\n    Then they receive parent survey data showing concerns about class sizes and counseling\n    And see teacher feedback emphasizing professional development needs\n    And access student outcome data showing literacy and math support gaps\n    And discover technology upgrades not mentioned in community feedback\n    And community accountability helps council prioritize authentic local needs\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "School site council member evaluates school improvement plan priorities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

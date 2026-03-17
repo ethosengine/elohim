@@ -6,7 +6,7 @@
   "title": "Managing 14-year-old's teen complexity and emerging adulthood",
   "description": "Managing 14-year-old's teen complexity and emerging adulthood",
   "content": "Scenario: Managing 14-year-old's teen complexity and emerging adulthood\n    Given her oldest is navigating adolescence with all its challenges\n    And teens need parent as secure base while pushing for independence\n    When Maria parents her teenager\n    Then the family_elohim should provide teen development guidance\n    And it should help her maintain connection despite natural teen separation\n    And it should remind her to stay engaged even when teen seems not to want her\n    And it should help her navigate discipline, boundaries, and growing autonomy\n    And Maria should successfully parent a teen without co-parent support\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing 14-year-old's teen complexity and emerging adulthood",

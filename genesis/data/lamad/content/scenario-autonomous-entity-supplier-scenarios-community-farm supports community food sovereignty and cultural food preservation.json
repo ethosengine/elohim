@@ -6,7 +6,7 @@
   "title": "Farm supports community food sovereignty and cultural food preservation",
   "description": "Farm supports community food sovereignty and cultural food preservation",
   "content": "Scenario: Farm supports community food sovereignty and cultural food preservation\n    Given corporate food system homogenizes diets and erases cultural food traditions\n    And immigrant and indigenous communities lose access to traditional foods\n    When democratic farm responds to community cultural food needs\n    Then farm grows culturally specific crops (Latino vegetables, Asian greens, indigenous varieties)\n    And traditional food knowledge is valued and incorporated into farm planning\n    And community food sovereignty increases through local diverse production\n    And cultural food preservation becomes farm mission alongside nutrition\n    And community_elohim documents and supports cultural food sovereignty initiatives\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farm supports community food sovereignty and cultural food preservation",

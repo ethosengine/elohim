@@ -6,7 +6,7 @@
   "title": "Workplace privacy protects Alex's medical information",
   "description": "Workplace privacy protects Alex's medical information",
   "content": "Scenario: Workplace privacy protects Alex's medical information\n    Given employers should not have access to private medical information\n    And disability disclosure is often required but should be limited\n    When workplace requests disability documentation\n    Then the workplace_elohim should help Alex share minimum necessary information\n    And it should protect Alex's medical privacy rigorously\n    And detailed medical information should never be shared with managers or coworkers\n    And only accommodation needs should be disclosed, not diagnoses\n    And Alex's privacy should be protected even while requesting accommodations\n    And the protocol should guide appropriate disclosure boundaries\n    And medical information should remain confidential\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Workplace privacy protects Alex's medical information",

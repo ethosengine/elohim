@@ -6,7 +6,7 @@
   "title": "Reviewing case with significant technical complexity",
   "description": "Reviewing case with significant technical complexity",
   "content": "Scenario: Reviewing case with significant technical complexity\n    Given appeal involves cryptographic verification questions\n    And I lack technical expertise to understand the details\n    When Dr. Okonkwo provides expert testimony\n    Then she explains: in language I can understand\n    And she shows: what can and cannot be technically verified\n    And she presents: competing expert interpretations\n    And she informs: without advocating for particular outcome\n    And I ask: questions until I understand enough to judge\n    And I weigh: technical information alongside human wisdom\n    And I decide: on constitutional alignment not technical optimization\n    And I honor: the boundary between expertise and judgment\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Reviewing case with significant technical complexity",

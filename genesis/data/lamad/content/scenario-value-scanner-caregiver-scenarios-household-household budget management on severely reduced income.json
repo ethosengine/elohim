@@ -6,7 +6,7 @@
   "title": "Household budget management on severely reduced income",
   "description": "Household budget management on severely reduced income",
   "content": "Scenario: Household budget management on severely reduced income\n    Given household income dropped from $80k to ~$40k/year\n    And medical expenses have increased significantly\n    And caregiving prevents James from full-time employment\n    When James manages household finances\n    Then the household_elohim should track constrained budget carefully\n    And it should help prioritize essential expenses\n    And it should identify financial assistance resources\n    And it should recognize economic strain as care-related\n    And household should access care economy support based on need\n    And financial precarity should be addressed systematically\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household budget management on severely reduced income",

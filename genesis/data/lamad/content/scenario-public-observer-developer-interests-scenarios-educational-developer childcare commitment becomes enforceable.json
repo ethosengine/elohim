@@ -6,7 +6,7 @@
   "title": "Developer childcare commitment becomes enforceable",
   "description": "Developer childcare commitment becomes enforceable",
   "content": "Scenario: Developer childcare commitment becomes enforceable\n    Given a developer promised on-site childcare facility as community benefit\n    And families counted on childcare when development was approved\n    When the Observer tracks community benefit delivery\n    Then monitoring shows: childcare space was never built\n    And developer converted it to retail space increasing revenue\n    And families who moved to development lack promised childcare\n    And broken commitment affects working families' ability to afford housing\n    And accountability creates real consequences for unkept promises\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer childcare commitment becomes enforceable",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

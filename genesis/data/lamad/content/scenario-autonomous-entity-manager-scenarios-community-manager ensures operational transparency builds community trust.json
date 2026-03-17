@@ -6,7 +6,7 @@
   "title": "Manager ensures operational transparency builds community trust",
   "description": "Manager ensures operational transparency builds community trust",
   "content": "Scenario: Manager ensures operational transparency builds community trust\n    Given community wants to understand how democratic business actually functions\n    And operational transparency is key to community confidence\n    When Marcus prepares quarterly community report\n    Then Marcus provides honest data on operations, challenges, and successes\n    And Marcus doesn't hide operational difficulties or failures\n    And Marcus celebrates worker governance achievements transparently\n    And Marcus's operational honesty builds community trust in democratic model\n    And community_elohim ensures reporting is accurate and accessible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager ensures operational transparency builds community trust",

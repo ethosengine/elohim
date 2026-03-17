@@ -405,7 +405,7 @@
       }
     }
   ],
-  "contentFormat": "sophia",
+  "contentFormat": "interactive",
   "tags": [
     "assessment",
     "discovery",
@@ -426,7 +426,8 @@
     "category": "onboarding",
     "questionCount": 4,
     "instrumentId": "epic-domain",
-    "migratedAt": "2026-01-24T00:00:00.000Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z",
+    "originalContentFormat": "sophia"
   },
   "createdAt": "2025-11-28T21:09:48.290906",
   "updatedAt": "2026-01-22T00:00:00.000Z",

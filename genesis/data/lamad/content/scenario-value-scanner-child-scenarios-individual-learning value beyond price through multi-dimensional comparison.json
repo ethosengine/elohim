@@ -6,7 +6,7 @@
   "title": "Learning value beyond price through multi-dimensional comparison",
   "description": "Learning value beyond price through multi-dimensional comparison",
   "content": "Scenario: Learning value beyond price through multi-dimensional comparison\n    Given Emma is evaluating fair-trade chocolate\n    And she has capacity for understanding multiple value dimensions\n    When Emma scans the chocolate product\n    Then her personal_agent should show nutritional value\n    And the agent should show environmental impact\n    And the agent should explain care labor: \"The farmers who grew this were paid fairly for their care work\"\n    And the agent should show community benefit\n    And price should be one factor among many\n    And Emma should learn to read the world's complexity, not just price tags\n    And value literacy should extend beyond simple cost comparison\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning value beyond price through multi-dimensional comparison",

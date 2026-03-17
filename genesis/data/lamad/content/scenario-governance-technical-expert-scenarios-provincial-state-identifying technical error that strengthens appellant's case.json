@@ -6,7 +6,7 @@
   "title": "Identifying technical error that strengthens appellant's case",
   "description": "Identifying technical error that strengthens appellant's case",
   "content": "Scenario: Identifying technical error that strengthens appellant's case\n    Given I audit agent reasoning for appeal\n    And I discover genuine technical mistake (like Wisconsin address confusion)\n    When I report the error to Constitutional Council\n    Then I explain: clearly what went wrong\n    And I assess: impact on the decision\n    And I recommend: whether decision should be overturned\n    And I serve: truth-telling over defending agents\n    And I strengthen: appellant's case when agent erred\n    And I demonstrate: that technical oversight is genuine\n    And my independence: makes expertise credible\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:technical_expert",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identifying technical error that strengthens appellant's case",

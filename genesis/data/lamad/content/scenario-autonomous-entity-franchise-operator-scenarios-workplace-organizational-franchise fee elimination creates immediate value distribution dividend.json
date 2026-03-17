@@ -6,7 +6,7 @@
   "title": "Franchise fee elimination creates immediate value distribution dividend",
   "description": "Franchise fee elimination creates immediate value distribution dividend",
   "content": "Scenario: Franchise fee elimination creates immediate value distribution dividend\n    Given corporate extracted $30K franchise fee + $18K marketing fee per location annually\n    And mandatory purchasing added 30% markup ($50K+ annually per location)\n    When franchise termination eliminates all corporate extraction\n    Then $100K+ annually per location is freed for redistribution\n    And workers receive substantial wage increases (60% of freed value)\n    And community programs are funded (30% of freed value)\n    And sustainability investments are made (10% of freed value)\n    And workplace_elohim documents value circulation replacing extraction\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:franchise_operator",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Franchise fee elimination creates immediate value distribution dividend",

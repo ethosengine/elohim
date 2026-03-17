@@ -6,7 +6,7 @@
   "title": "Developer worker safety record affects reputation",
   "description": "Developer worker safety record affects reputation",
   "content": "Scenario: Developer worker safety record affects reputation\n    Given a responsible developer maintains excellent safety practices\n    And invests in worker protection beyond minimum requirements\n    When the Observer tracks workplace safety performance\n    Then the developer shows: zero serious injuries over 8 projects\n    And safety training exceeds industry standards\n    And workers report positive working conditions\n    And safety commitment creates positive reputation with workers and community\n    And responsible practices support recruitment and retention\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developer worker safety record affects reputation",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

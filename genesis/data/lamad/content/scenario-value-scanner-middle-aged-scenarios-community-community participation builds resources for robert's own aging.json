@@ -6,7 +6,7 @@
   "title": "Community participation builds resources for Robert's own aging",
   "description": "Community participation builds resources for Robert's own aging",
   "content": "Scenario: Community participation builds resources for Robert's own aging\n    Given Robert is preparing for his own eventual care needs\n    And community participation now builds networks for later\n    And care economy operates on long-term reciprocity\n    When community_elohim helps Robert plan for aging\n    Then it should help him see that current community participation builds future support\n    And recognize that relationships now will remain as he ages\n    And surface how care tokens accumulate toward future care\n    And support him in building community that will serve his aging\n    And demonstrate that care economy investment pays forward\n    And help him prepare for aging with dignity through community connection\n    And recognize that community care is lifecycle reciprocity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community participation builds resources for Robert's own aging",

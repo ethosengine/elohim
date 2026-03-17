@@ -6,7 +6,7 @@
   "title": "Climate adaptation strategies are developed and shared bioregionally",
   "description": "Climate adaptation strategies are developed and shared bioregionally",
   "content": "Scenario: Climate adaptation strategies are developed and shared bioregionally\n    Given climate change creates new agricultural challenges (droughts, floods, heat, pests)\n    And adaptation requires experimentation and knowledge sharing\n    When democratic farms collaborate on climate adaptation\n    Then drought-resistant varieties are tested and shared across network\n    And water conservation practices spread through successful demonstration\n    And extreme weather response strategies are coordinated bioregionally\n    And climate resilience increases through collaborative adaptation\n    And bioregional_elohim coordinates climate adaptation research and implementation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Climate adaptation strategies are developed and shared bioregionally",

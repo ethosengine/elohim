@@ -6,7 +6,7 @@
   "title": "Teen learns to value ecosystem services",
   "description": "Teen learns to value ecosystem services",
   "content": "Scenario: Teen learns to value ecosystem services\n    Given Jasmine benefits from clean water, air, and functional ecosystems\n    And ecosystem services are typically invisible in market economy\n    When bioregional_elohim explains ecosystem dependencies\n    Then it should teach her about ecosystem services she depends on\n    And show how wetlands filter water, forests stabilize climate, and pollinators enable food production\n    And help her understand that ecosystems provide care that sustains human life\n    And recognize that ecosystem health is prerequisite for all other care\n    And value ecological stewardship as foundational care work\n    And build understanding that economy depends on ecology, not the other way around\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen learns to value ecosystem services",

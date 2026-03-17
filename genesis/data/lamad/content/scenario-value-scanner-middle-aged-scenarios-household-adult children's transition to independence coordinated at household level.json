@@ -6,7 +6,7 @@
   "title": "Adult children's transition to independence coordinated at household level",
   "description": "Adult children's transition to independence coordinated at household level",
   "content": "Scenario: Adult children's transition to independence coordinated at household level\n    Given Robert and Jennifer's children are ages 19 and 22\n    And the children are establishing independence with parental support\n    And financial support needs to be coordinated between partners\n    When household_elohim tracks child support\n    Then it should make support patterns visible\n    And help Robert and Jennifer align on support philosophy\n    And surface when support exceeds household capacity\n    And track support timeline: \"Jordan has received $15k over 18 months for apartment and education\"\n    And help them negotiate appropriate levels of ongoing support\n    And prevent one partner from committing household resources unilaterally\n    And support coordinated approach to launching adult children\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Adult children's transition to independence coordinated at household level",

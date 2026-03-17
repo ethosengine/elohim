@@ -6,7 +6,7 @@
   "title": "Teen's work schedule coordinated with other life contexts",
   "description": "Teen's work schedule coordinated with other life contexts",
   "content": "Scenario: Teen's work schedule coordinated with other life contexts\n    Given Jasmine balances work, school, family responsibilities, and social life\n    And her work schedule changes weekly\n    When workplace_elohim communicates her schedule\n    Then it should coordinate with her personal_agent\n    And flag conflicts with school, family needs, or personal commitments\n    And help her negotiate schedule that allows balanced life\n    And prevent work from overwhelming other essential contexts\n    And support her learning to set healthy work boundaries\n    And demonstrate that work is one part of life, not life itself\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teen's work schedule coordinated with other life contexts",

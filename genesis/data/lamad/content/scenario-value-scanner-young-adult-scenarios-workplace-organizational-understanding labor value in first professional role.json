@@ -6,7 +6,7 @@
   "title": "Understanding labor value in first professional role",
   "description": "Understanding labor value in first professional role",
   "content": "Scenario: Understanding labor value in first professional role\n    Given Aisha is working her first full-time job\n    And she's unsure if compensation is fair\n    When the workplace_elohim analyzes her position\n    Then it should provide market rate information\n    And it should help her understand her labor's actual value\n    And it should identify if compensation is equitable\n    And the system should empower negotiation with information\n    And she should learn to advocate for fair compensation\n    And workplace care economy should make value transparent\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Understanding labor value in first professional role",

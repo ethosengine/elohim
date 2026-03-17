@@ -6,7 +6,7 @@
   "title": "Studying trust building through transparent governance",
   "description": "Studying trust building through transparent governance",
   "content": "Scenario: Studying trust building through transparent governance\n    Given trust in institutions is central question for democratic AI\n    And Riverside provides natural experiment in transparency effects\n    When I measure trust over time and mechanisms that build it\n    Then I examine: whether seeing agent reasoning increases confidence\n    And I explore: if meaningful recourse builds trust more than perfect decisions\n    And I analyze: role of local Constitutional Council in legitimacy\n    And I investigate: whether transparency enables manipulation or builds confidence\n    And I track: how trust relationships between residents and agents evolve\n    And My research tests: whether democratic governance of AI creates sustainable trust\n    And Evidence informs: design of governance systems elsewhere\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Studying trust building through transparent governance",

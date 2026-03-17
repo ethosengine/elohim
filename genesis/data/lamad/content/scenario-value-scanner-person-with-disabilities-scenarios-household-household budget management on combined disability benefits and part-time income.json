@@ -6,7 +6,7 @@
   "title": "Household budget management on combined disability benefits and part-time income",
   "description": "Household budget management on combined disability benefits and part-time income",
   "content": "Scenario: Household budget management on combined disability benefits and part-time income\n    Given Alex's household operates on $35k/year\n    And income comes from part-time employment and disability benefits\n    When Alex manages household budget\n    Then the household_elohim should track spending against limited resources\n    And it should help Alex prioritize essential expenses\n    And disability-related costs (equipment, support services, medical) should be factored in\n    And Alex should be able to make informed financial decisions\n    And budget tools should respect Alex's competence in managing money\n    And the system should support Alex's financial autonomy\n    And resource constraints should be managed with dignity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household budget management on combined disability benefits and part-time income",

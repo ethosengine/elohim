@@ -6,7 +6,7 @@
   "title": "Household governance adapts to changing life stage needs",
   "description": "Household governance adapts to changing life stage needs",
   "content": "Scenario: Household governance adapts to changing life stage needs\n    Given Robert and Jennifer's care responsibilities are evolving\n    And children are moving toward independence\n    And parents are requiring increasing care\n    And they approach their own pre-retirement years\n    When household_elohim supports governance evolution\n    Then it should help them adapt to changing circumstances\n    And recognize shifts: \"Child support demands are decreasing while parent care is increasing\"\n    And support planning for next life stage transitions\n    And help them reimagine household as children leave\n    And prepare for increased elder care coordination\n    And support them in navigating lifecycle transitions together\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household governance adapts to changing life stage needs",

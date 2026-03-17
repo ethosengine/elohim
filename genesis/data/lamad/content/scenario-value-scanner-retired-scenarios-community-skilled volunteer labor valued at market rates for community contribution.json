@@ -6,7 +6,7 @@
   "title": "Skilled volunteer labor valued at market rates for community contribution",
   "description": "Skilled volunteer labor valued at market rates for community contribution",
   "content": "Scenario: Skilled volunteer labor valued at market rates for community contribution\n    Given Frank volunteers 20 hours/week with Habitat for Humanity\n    And he provides skilled construction labor\n    And this work has clear market value (~$40/hour for skilled trades)\n    When the community_elohim tracks volunteer contributions\n    Then Frank's volunteer labor should be quantified specifically\n    And market value should be calculated (~$20k/year contribution)\n    And his skilled labor should be recognized as substantial community asset\n    And community care tokens should accumulate from volunteer work\n    And Frank should see quantified value of his contribution\n    And the narrative of retired as \"not contributing\" should be countered\n    And community should recognize his volunteer work as real economic value\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Skilled volunteer labor valued at market rates for community contribution",

@@ -6,7 +6,7 @@
   "title": "Buying quality that lasts reduces ecological impact",
   "description": "Buying quality that lasts reduces ecological impact",
   "content": "Scenario: Buying quality that lasts reduces ecological impact\n    Given Margaret learned to buy fewer, better things\n    And durability reduces waste and resource extraction\n    When Margaret makes purchasing decisions\n    Then her personal_agent should support quality-over-quantity choices\n    And the bioregional_elohim should track durability practices\n    And buying quality should be recognized as ecological stewardship\n    And Margaret's knowledge of durability should inform others\n    And consumption patterns should favor longevity\n    And throwaway culture should be countered by senior wisdom\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Buying quality that lasts reduces ecological impact",

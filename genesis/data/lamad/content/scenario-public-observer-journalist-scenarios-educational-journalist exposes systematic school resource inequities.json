@@ -6,7 +6,7 @@
   "title": "Journalist exposes systematic school resource inequities",
   "description": "Journalist exposes systematic school resource inequities",
   "content": "Scenario: Journalist exposes systematic school resource inequities\n    Given the journalist investigates education equity\n    And suspects under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the journalist sees experienced teachers concentrate in white affluent schools\n    And documents gifted programs and AP courses cluster by race and class\n    And finds per-student spending disparities of thousands of dollars\n    And shows facility quality varies dramatically by neighborhood\n    And publishes investigation exposing structural educational racism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist exposes systematic school resource inequities",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

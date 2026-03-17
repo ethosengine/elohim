@@ -6,7 +6,7 @@
   "title": "Intergenerational ecological responsibility and future generations",
   "description": "Intergenerational ecological responsibility and future generations",
   "content": "Scenario: Intergenerational ecological responsibility and future generations\n    Given Sarah is raising children who will face climate consequences\n    And current generation's choices affect future generations\n    When the ecological_elohim assesses intergenerational care\n    Then it should recognize Sarah's work preparing children for climate future\n    And it should value her teaching of environmental responsibility\n    And raising environmentally conscious children should be recognized as service to future\n    And the system should honor intergenerational ecological care\n    And Sarah's parenting should be valued as investment in planetary future\n    And care for future generations should be fundamental care economy principle\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Intergenerational ecological responsibility and future generations",

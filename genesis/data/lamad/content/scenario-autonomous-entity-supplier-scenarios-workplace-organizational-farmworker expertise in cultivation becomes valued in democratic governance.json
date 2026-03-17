@@ -6,7 +6,7 @@
   "title": "Farmworker expertise in cultivation becomes valued in democratic governance",
   "description": "Farmworker expertise in cultivation becomes valued in democratic governance",
   "content": "Scenario: Farmworker expertise in cultivation becomes valued in democratic governance\n    Given farmworkers have deep knowledge of soil, crops, and seasonal patterns\n    And hierarchical structure meant their expertise was undervalued or ignored\n    When democratic governance gives farmworkers decision-making voice\n    Then cultivation decisions incorporate workers' hands-on expertise\n    And crop selection reflects workers' knowledge of land and climate\n    And planting and harvesting schedules balance productivity with worker wellbeing\n    And farmworker wisdom shapes farm operations through democratic participation\n    And workplace_elohim documents farmworker knowledge and decision contributions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Farmworker expertise in cultivation becomes valued in democratic governance",

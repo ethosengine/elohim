@@ -6,7 +6,7 @@
   "title": "Legislator evaluates major bill with comprehensive impact analysis",
   "description": "Legislator evaluates major bill with comprehensive impact analysis",
   "content": "Scenario: Legislator evaluates major bill with comprehensive impact analysis\n    Given education reform legislation has 200 pages\n    And supporters present optimistic outcomes while opponents predict disaster\n    When the Observer provides evidence-based impact analysis\n    Then they see how similar legislation performed in other states\n    And understand fiscal impacts on districts with different demographics\n    And identify which students benefit versus harmed by changes\n    And review educator and parent perspectives from constituent communities\n    And make informed vote beyond partisan talking points\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:politician",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Legislator evaluates major bill with comprehensive impact analysis",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

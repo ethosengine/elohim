@@ -6,7 +6,7 @@
   "title": "Contributing to community education about care work",
   "description": "Contributing to community education about care work",
   "content": "Scenario: Contributing to community education about care work\n    Given many people don't recognize labor as care contribution\n    When I want to help community understand care economy\n    Then the protocol should help me share my perspective as a worker\n    And support education about care work embedded in all labor\n    And facilitate community consciousness-raising\n    And build movement toward care-economy-aligned economics\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-community",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Contributing to community education about care work",

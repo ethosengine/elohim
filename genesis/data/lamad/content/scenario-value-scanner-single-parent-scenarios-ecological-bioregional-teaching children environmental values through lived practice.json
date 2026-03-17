@@ -6,7 +6,7 @@
   "title": "Teaching children environmental values through lived practice",
   "description": "Teaching children environmental values through lived practice",
   "content": "Scenario: Teaching children environmental values through lived practice\n    Given Maria's children witness thrift, waste prevention, and resource care daily\n    And they learn sustainability through household necessity\n    When children's environmental education is assessed\n    Then the bioregional_elohim should recognize that Maria teaches sustainability through practice\n    And it should value lived environmental education over abstract lessons\n    And her children should be developing deep sustainability values\n    And household practices should be honored as effective environmental socialization\n    And Maria should be recognized as teaching next generation environmental stewardship\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teaching children environmental values through lived practice",

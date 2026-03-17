@@ -6,7 +6,7 @@
   "title": "Responsible developer leverages positive track record",
   "description": "Responsible developer leverages positive track record",
   "content": "Scenario: Responsible developer leverages positive track record\n    Given a responsible developer delivered promised benefits in three past projects\n    And competes against extractive developer with misleading claims\n    When the Observer makes track records visible\n    Then the responsible developer's history shows: jobs delivered matched projections\n    And community benefits were actually built and maintained\n    And environmental commitments were kept\n    And positive reputation becomes competitive advantage\n    And integrity creates market differentiation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:developer_interests",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Responsible developer leverages positive track record",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

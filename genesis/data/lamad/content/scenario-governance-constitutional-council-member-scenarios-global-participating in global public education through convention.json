@@ -6,7 +6,7 @@
   "title": "Participating in global public education through convention",
   "description": "Participating in global public education through convention",
   "content": "Scenario: Participating in global public education through convention\n    Given convention proceedings are globally broadcast and accessible\n    And billions of people watch our deliberations\n    When I participate in constitutional debate\n    Then public sees: ordinary citizens grappling with profound questions\n    And they witness: democratic deliberation across radical diversity\n    And they learn: about constitutional governance of AI\n    And they understand: sortition democracy in action\n    And they feel: connected to global democratic project\n    And my participation: educates humanity about self-governance\n    And I demonstrate: that democracy is not just for elites\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in global public education through convention",

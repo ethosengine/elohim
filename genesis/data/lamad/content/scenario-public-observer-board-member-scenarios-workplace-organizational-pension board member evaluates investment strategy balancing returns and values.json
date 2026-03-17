@@ -6,7 +6,7 @@
   "title": "Pension board member evaluates investment strategy balancing returns and values",
   "description": "Pension board member evaluates investment strategy balancing returns and values",
   "content": "Scenario: Pension board member evaluates investment strategy balancing returns and values\n    Given pension fund considers divesting from fossil fuel investments\n    And staff analysis emphasizes fiduciary duty and projected investment returns\n    And some beneficiaries advocate for climate-conscious investing\n    When the board member requests Observer independent analysis\n    Then they receive comparison of fossil fuel versus clean energy investment performance\n    And see examples from peer pension funds that divested with outcome data\n    And access analysis of climate risk to long-term portfolio value\n    And understand fiduciary duty in context of environmental and social factors\n    And independent analysis helps board balance competing considerations\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Pension board member evaluates investment strategy balancing returns and values",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

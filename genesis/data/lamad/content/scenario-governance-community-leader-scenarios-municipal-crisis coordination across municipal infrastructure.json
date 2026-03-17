@@ -6,7 +6,7 @@
   "title": "Crisis coordination across municipal infrastructure",
   "description": "Crisis coordination across municipal infrastructure",
   "content": "Scenario: Crisis coordination across municipal infrastructure\n    Given opioid overdose cluster occurs in downtown\n    When Municipal Elohim detects crisis pattern\n    Then agent coordinates emergency services, health services, and social support\n    And agent identifies who needs help across multiple systems\n    And agent enables rapid mutual aid mobilization\n    And Jamal maintains human judgment for crisis decisions\n    And agents inform while humans decide under uncertainty\n    And coordinated response saves lives\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipal",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Crisis coordination across municipal infrastructure",

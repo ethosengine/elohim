@@ -6,7 +6,7 @@
   "title": "Construction knowledge applied to home energy efficiency improvements",
   "description": "Construction knowledge applied to home energy efficiency improvements",
   "content": "Scenario: Construction knowledge applied to home energy efficiency improvements\n    Given Frank has expertise in building systems and repairs\n    And home energy efficiency reduces environmental impact and costs\n    When the bioregional_elohim coordinates weatherization and efficiency\n    Then it should connect Frank's skills to home efficiency improvements\n    And facilitate community weatherization projects\n    And recognize efficiency work as ecological care contribution\n    And help low-income households reduce energy costs and consumption\n    And Frank's construction knowledge should serve ecological and equity goals\n    And his volunteer work should build community energy resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Construction knowledge applied to home energy efficiency improvements",

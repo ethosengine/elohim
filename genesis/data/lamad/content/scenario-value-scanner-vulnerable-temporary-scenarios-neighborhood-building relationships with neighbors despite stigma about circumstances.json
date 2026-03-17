@@ -6,7 +6,7 @@
   "title": "Building relationships with neighbors despite stigma about circumstances",
   "description": "Building relationships with neighbors despite stigma about circumstances",
   "content": "Scenario: Building relationships with neighbors despite stigma about circumstances\n    Given I am living in transitional housing or housing that's visibly \"for\" vulnerable people\n    And I worry about neighborhood stigma and judgment\n    When I interact with neighbors\n    Then the Value Scanner helps me navigate neighborhood relationships\n    And provides strategies for building connections authentically\n    And validates that I am valuable neighbor regardless of circumstances\n    And helps me decide what to disclose about my situation\n    And supports me in resisting internalized shame\n    And my personal_agent coaches me through neighbor interactions\n    And recognizes that building community while vulnerable takes courage\n    And celebrates positive neighbor connections\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building relationships with neighbors despite stigma about circumstances",

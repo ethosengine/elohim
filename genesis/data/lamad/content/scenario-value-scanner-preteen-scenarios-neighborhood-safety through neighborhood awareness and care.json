@@ -6,7 +6,7 @@
   "title": "Safety through neighborhood awareness and care",
   "description": "Safety through neighborhood awareness and care",
   "content": "Scenario: Safety through neighborhood awareness and care\n    Given Marcus is a 12-year-old shopping independently\n    And neighborhood safety is important for his autonomy\n    When Marcus moves through his neighborhood\n    Then the neighborhood_elohim should facilitate informal care networks\n    And local adults should be aware of children shopping independently\n    And community care should provide informal oversight\n    And Marcus should be safer through neighborhood relationships\n    And his independence should be supported by community awareness\n    And the protocol should build village-scale child protection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Safety through neighborhood awareness and care",

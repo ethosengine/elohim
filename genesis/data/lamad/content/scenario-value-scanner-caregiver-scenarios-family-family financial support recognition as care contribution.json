@@ -6,7 +6,7 @@
   "title": "Family financial support recognition as care contribution",
   "description": "Family financial support recognition as care contribution",
   "content": "Scenario: Family financial support recognition as care contribution\n    Given James's household income has plummeted due to caregiving\n    And family members may provide financial assistance\n    When family financial support is tracked\n    Then the family_elohim should recognize financial help as care contribution\n    And it should value financial support alongside direct care labor\n    And family members unable to provide direct care can contribute financially\n    And care economy should include multiple forms of contribution\n    And financial support should be recognized, not taken for granted\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family financial support recognition as care contribution",

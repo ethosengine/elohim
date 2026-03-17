@@ -6,7 +6,7 @@
   "title": "Creating sunset provisions and mandatory review",
   "description": "Creating sunset provisions and mandatory review",
   "content": "Scenario: Creating sunset provisions and mandatory review\n    Given laws should be evaluated not permanent\n    And I want to prevent ossification\n    When I include sunset clauses in legislation\n    Then laws expire: after 5-7 years unless renewed\n    And I force: regular review of whether laws serve purpose\n    And I create: opportunities to correct mistakes\n    And I prevent: captured legislation persisting forever\n    And democratic accountability: includes ability to reverse decisions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Creating sunset provisions and mandatory review",

@@ -6,7 +6,7 @@
   "title": "Bioregional food system reduces fossil fuel dependence dramatically",
   "description": "Bioregional food system reduces fossil fuel dependence dramatically",
   "content": "Scenario: Bioregional food system reduces fossil fuel dependence dramatically\n    Given industrial food system depends on fossil fuels (synthetic fertilizers, pesticides, transportation)\n    And energy transition requires reducing agricultural fossil fuel use\n    When democratic bioregional food system prioritizes energy sustainability\n    Then local distribution eliminates long-haul transportation energy use\n    And organic practices reduce synthetic fertilizer dependence\n    And renewable energy powers farm operations and distribution\n    And food system fossil fuel use decreases 80%+ through bioregional coordination\n    And bioregional_elohim tracks energy use and transition to renewable sources\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Bioregional food system reduces fossil fuel dependence dramatically",

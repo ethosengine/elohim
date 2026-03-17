@@ -6,7 +6,7 @@
   "title": "Activist demands equitable school funding formula",
   "description": "Activist demands equitable school funding formula",
   "content": "Scenario: Activist demands equitable school funding formula\n    Given state funding formula creates massive district disparities\n    And the activist works on statewide education justice\n    When the Observer calculates funding gaps and impacts\n    Then the activist shows low-income districts receive $3000 less per student\n    And demonstrates impact on class sizes and programs\n    And connects families in underfunded districts statewide\n    And builds coalition for funding formula reform\n    And structural inequity becomes focus of political campaign\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist demands equitable school funding formula",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

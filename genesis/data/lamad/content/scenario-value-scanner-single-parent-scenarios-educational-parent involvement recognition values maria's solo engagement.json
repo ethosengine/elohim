@@ -6,7 +6,7 @@
   "title": "Parent involvement recognition values Maria's solo engagement",
   "description": "Parent involvement recognition values Maria's solo engagement",
   "content": "Scenario: Parent involvement recognition values Maria's solo engagement\n    Given Maria manages all school engagement for three children alone\n    And partnered parents split involvement between two people\n    When schools recognize parent involvement\n    Then the educational_elohim should quantify Maria's engagement across all three children\n    And her solo involvement should be recognized as extraordinary effort\n    And schools should value her participation even if she cannot match two-parent family availability\n    And parent involvement metrics should account for family structure differences\n    And Maria should receive appropriate recognition for managing everything alone\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent involvement recognition values Maria's solo engagement",

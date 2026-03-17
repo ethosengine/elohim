@@ -6,7 +6,7 @@
   "title": "Parent advocacy for better educational policies",
   "description": "Parent advocacy for better educational policies",
   "content": "Scenario: Parent advocacy for better educational policies\n    Given Sarah understands education from both sides\n    And she advocates for family-friendly school policies\n    When Sarah participates in educational policy discussions\n    Then her dual perspective should be recognized as valuable\n    And advocacy labor should accumulate care tokens\n    And parent organizing for educational improvement should be valued\n    And Sarah's work to improve schools should be community contribution\n    And the system should recognize education advocacy as care labor\n    And parent voices should be amplified in education governance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent advocacy for better educational policies",

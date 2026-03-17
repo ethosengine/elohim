@@ -6,7 +6,7 @@
   "title": "Right to disconnect and data sovereignty maintained",
   "description": "Right to disconnect and data sovereignty maintained",
   "content": "Scenario: Right to disconnect and data sovereignty maintained\n    Given Marcus uses the system for critical household functions\n    And constitutional constraints apply at all governance layers\n    When Marcus or his family choose to disconnect\n    Then the system must honor disconnection immediately\n    And alternative methods for household management must remain viable\n    And no dependency should be created that makes disconnection harmful\n    And data sovereignty must be preserved\n    And Marcus's right to not participate must be absolute\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to disconnect and data sovereignty maintained",

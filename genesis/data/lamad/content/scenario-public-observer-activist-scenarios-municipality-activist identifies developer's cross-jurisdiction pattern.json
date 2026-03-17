@@ -6,7 +6,7 @@
   "title": "Activist identifies developer's cross-jurisdiction pattern",
   "description": "Activist identifies developer's cross-jurisdiction pattern",
   "content": "Scenario: Activist identifies developer's cross-jurisdiction pattern\n    Given a developer is proposing controversial project\n    And uses familiar tactics from other campaigns\n    When the Observer tracks developer across municipalities\n    Then the activist sees the same firm using identical playbook in 8 cities\n    And views track record of community promises vs delivery\n    And identifies political relationships and campaign donations\n    And systematic exploitation becomes undeniable\n    And activists coordinate across jurisdictions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist identifies developer's cross-jurisdiction pattern",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

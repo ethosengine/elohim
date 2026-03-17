@@ -6,7 +6,7 @@
   "title": "Presenting employment capabilities despite resume gaps and crisis circumstances",
   "description": "Presenting employment capabilities despite resume gaps and crisis circumstances",
   "content": "Scenario: Presenting employment capabilities despite resume gaps and crisis circumstances\n    Given I have gaps in my employment history due to domestic violence and crisis\n    And potential employers may discriminate based on gaps or circumstances\n    When I apply for employment opportunities\n    Then the workplace_elohim helps me present my capabilities effectively\n    And provides strategies for explaining employment gaps honestly but strategically\n    And helps me articulate transferable skills and competencies\n    And recognizes my crisis navigation as demonstrating valuable skills\n    And validates that gaps don't erase my professional capability\n    And my personal_agent helps me craft application materials\n    And tracks my employment search efforts and outcomes\n    And celebrates my courage in seeking employment during recovery\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Presenting employment capabilities despite resume gaps and crisis circumstances",

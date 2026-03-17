@@ -6,7 +6,7 @@
   "title": "Recognizing food systems care work from field to table",
   "description": "Recognizing food systems care work from field to table",
   "content": "Scenario: Recognizing food systems care work from field to table\n    Given my restaurant work is one link in food systems care chain\n    And farmers, distributors, and preparers all contribute care labor\n    When I view food systems through care economy lens\n    Then the protocol should make visible the care work in entire food chain\n    And help me understand my connection to farmers and food producers\n    And recognize that all food work is care labor serving human nourishment\n    And build consciousness about care economy in food systems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Recognizing food systems care work from field to table",

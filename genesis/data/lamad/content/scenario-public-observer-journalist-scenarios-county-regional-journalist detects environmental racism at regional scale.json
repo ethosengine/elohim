@@ -6,7 +6,7 @@
   "title": "Journalist detects environmental racism at regional scale",
   "description": "Journalist detects environmental racism at regional scale",
   "content": "Scenario: Journalist detects environmental racism at regional scale\n    Given pollution facilities cluster in certain neighborhoods\n    And the journalist investigates environmental justice\n    When the Observer analyzes regional environmental patterns\n    Then the journalist sees industrial permits concentrate in communities of color\n    And maps proximity of pollution sources to schools and residences\n    And documents health outcome disparities by neighborhood and race\n    And shows pattern across county regardless of municipal boundaries\n    And publishes investigation exposing regional environmental racism\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-county-regional",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist detects environmental racism at regional scale",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

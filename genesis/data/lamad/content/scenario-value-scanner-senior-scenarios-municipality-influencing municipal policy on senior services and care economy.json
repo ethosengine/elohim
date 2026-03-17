@@ -6,7 +6,7 @@
   "title": "Influencing municipal policy on senior services and care economy",
   "description": "Influencing municipal policy on senior services and care economy",
   "content": "Scenario: Influencing municipal policy on senior services and care economy\n    Given Margaret has lived experience of retirement and care economy\n    And municipal policy affects senior quality of life\n    When the municipality_elohim facilitates policy engagement\n    Then Margaret should be connected to policy-making processes\n    And her voice should inform municipal senior services\n    And care economy principles should be brought to municipal governance\n    And seniors should organize to shape policy\n    And Margaret's contributions should give her authority in policy discussions\n    And municipal planning should reflect senior input\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Influencing municipal policy on senior services and care economy",

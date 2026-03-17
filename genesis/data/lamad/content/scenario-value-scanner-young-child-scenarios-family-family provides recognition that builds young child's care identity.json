@@ -6,7 +6,7 @@
   "title": "Family provides recognition that builds young child's care identity",
   "description": "Family provides recognition that builds young child's care identity",
   "content": "Scenario: Family provides recognition that builds young child's care identity\n    Given Tommy has made care contributions over weeks\n    And the family_elohim has tracked patterns\n    When family recognition moments occur\n    Then Sarah should receive prompts for specific acknowledgment\n    And recognition should highlight Tommy's care work\n    And acknowledgment should feel genuine, not mechanical\n    And Tommy should internalize identity as caring family member\n    And positive reinforcement should build care-centered self-concept\n    And the family should collectively value invisible care labor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family provides recognition that builds young child's care identity",

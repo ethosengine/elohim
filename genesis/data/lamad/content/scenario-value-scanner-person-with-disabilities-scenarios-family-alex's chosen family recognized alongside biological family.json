@@ -6,7 +6,7 @@
   "title": "Alex's chosen family recognized alongside biological family",
   "description": "Alex's chosen family recognized alongside biological family",
   "content": "Scenario: Alex's chosen family recognized alongside biological family\n    Given Alex may have close relationships in disability community\n    And chosen family might be more supportive than biological family\n    When the family_elohim defines family relationships\n    Then it should include Alex's chosen family members\n    And disability community bonds should be recognized as family\n    And care flows with chosen family should be tracked and valued\n    And Alex should be able to define their own family\n    And the protocol should honor diverse family structures\n    And biological family should not be privileged over chosen family\n    And Alex's full support network should be acknowledged\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Alex's chosen family recognized alongside biological family",

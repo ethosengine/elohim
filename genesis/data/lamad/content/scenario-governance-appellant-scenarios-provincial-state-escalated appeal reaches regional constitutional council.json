@@ -6,7 +6,7 @@
   "title": "Escalated appeal reaches Regional Constitutional Council",
   "description": "Escalated appeal reaches Regional Constitutional Council",
   "content": "Scenario: Escalated appeal reaches Regional Constitutional Council\n    Given my appeal couldn't be resolved at community layer\n    And I escalated to peer agent review which affirmed the decision\n    When I request Constitutional Council review at regional level\n    Then randomly-selected citizens from across the region review my case\n    And They include Sarah Martinez, a nurse serving her 3-month term\n    And They deliberate for substantive time (2+ hours for complex cases)\n    And They have access to technical experts to explain complex aspects\n    And They create precedent that affects multiple communities in the region\n    And I receive judgment within one month of reaching this layer\n    And The decision includes detailed constitutional reasoning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Escalated appeal reaches Regional Constitutional Council",

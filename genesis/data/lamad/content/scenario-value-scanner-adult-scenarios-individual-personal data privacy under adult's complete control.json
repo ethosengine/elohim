@@ -6,7 +6,7 @@
   "title": "Personal data privacy under adult's complete control",
   "description": "Personal data privacy under adult's complete control",
   "content": "Scenario: Personal data privacy under adult's complete control\n    Given Sarah's care contributions generate detailed personal data\n    And this data reveals intimate patterns of her life\n    When Sarah's data is collected and stored\n    Then she must have complete control over all data sharing\n    And she should decide what partner sees, what children see, what community sees\n    And workplace should never access personal care economy data\n    And her privacy must be absolute unless she chooses to share\n    And she should manage family members' privacy while maintaining oversight of children\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal data privacy under adult's complete control",

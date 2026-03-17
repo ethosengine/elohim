@@ -6,7 +6,7 @@
   "title": "Extended family support coordination with maintained boundaries",
   "description": "Extended family support coordination with maintained boundaries",
   "content": "Scenario: Extended family support coordination with maintained boundaries\n    Given Maria may receive support from her own parents or siblings\n    And extended family help can be complicated by distance or family dynamics\n    When extended family contributes to children's care\n    Then the family_elohim should track and coordinate extended family involvement\n    And it should help Maria maintain boundaries around parenting authority\n    And it should recognize extended family contributions without ceding control\n    And it should prevent grandparents or others from overstepping\n    And Maria should retain parental sovereignty while accepting help\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Extended family support coordination with maintained boundaries",

@@ -6,7 +6,7 @@
   "title": "Pesticide reduction improves ecosystem and human health bioregionally",
   "description": "Pesticide reduction improves ecosystem and human health bioregionally",
   "content": "Scenario: Pesticide reduction improves ecosystem and human health bioregionally\n    Given pesticide use harms pollinators, water quality, farmworker health, and ecosystems\n    And individual farms face pest pressure requiring coordinated management\n    When democratic farms coordinate integrated pest management bioregionally\n    Then pesticide use decreases through ecological pest control methods\n    And farmworker health improves from reduced chemical exposure\n    And pollinator populations recover from pesticide reduction\n    And ecosystem health improves measurably across bioregion\n    And bioregional_elohim tracks pesticide reduction and ecosystem health indicators\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Pesticide reduction improves ecosystem and human health bioregionally",

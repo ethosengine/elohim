@@ -6,7 +6,7 @@
   "title": "Privacy controls for adult financial independence",
   "description": "Privacy controls for adult financial independence",
   "content": "Scenario: Privacy controls for adult financial independence\n    Given Aisha has full adult autonomy\n    And she wants to keep financial details private\n    When Aisha configures her privacy settings\n    Then she should have complete control over data sharing\n    And her financial information should remain private by default\n    And she should explicitly consent to any family visibility\n    And workplace should have no access to personal data\n    And privacy controls should be granular and transparent\n    And the system should respect her adult independence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Privacy controls for adult financial independence",

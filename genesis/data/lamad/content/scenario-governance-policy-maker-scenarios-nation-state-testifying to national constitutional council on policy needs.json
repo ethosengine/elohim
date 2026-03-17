@@ -6,7 +6,7 @@
   "title": "Testifying to National Constitutional Council on policy needs",
   "description": "Testifying to National Constitutional Council on policy needs",
   "content": "Scenario: Testifying to National Constitutional Council on policy needs\n    Given National Council reviewing case with policy implications\n    And they request my perspective as policy maker\n    When I testify about legislative context\n    Then I explain: existing law and its limitations\n    And I describe: policy challenges protocol helps address\n    And I clarify: how council precedent would affect legislation\n    And I don't advocate: for particular constitutional interpretation\n    And I inform: their deliberation with policy expertise\n    And I demonstrate: collaboration between sortition and representative democracy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:policy_maker",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Testifying to National Constitutional Council on policy needs",

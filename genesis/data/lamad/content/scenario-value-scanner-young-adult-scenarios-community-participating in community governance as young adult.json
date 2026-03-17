@@ -6,7 +6,7 @@
   "title": "Participating in community governance as young adult",
   "description": "Participating in community governance as young adult",
   "content": "Scenario: Participating in community governance as young adult\n    Given the community makes collective decisions\n    And Aisha is establishing her adult voice\n    When community governance processes occur\n    Then the community_elohim should facilitate her participation\n    And her voice should count in community decisions\n    And her contributions should give her legitimate standing\n    And the system should help her learn community governance\n    And young adults should be included as full community participants\n    And care economy should enable democratic participation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Participating in community governance as young adult",

@@ -6,7 +6,7 @@
   "title": "Exercising privacy rights with dignity",
   "description": "Exercising privacy rights with dignity",
   "content": "Scenario: Exercising privacy rights with dignity\n    Given Jordan deserves privacy like any adult\n    And Jordan has personal information and private moments\n    When Jordan uses privacy controls in the Value Scanner\n    Then the interface explains privacy with simple concepts and pictures\n    And Jordan can choose what information is private vs. shared\n    And the system respects Jordan's privacy choices\n    And support workers only access information when truly needed\n    And Jordan's dignity is preserved through privacy respect\n    And Jordan learns about privacy boundaries in accessible way\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Exercising privacy rights with dignity",

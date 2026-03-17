@@ -6,7 +6,7 @@
   "title": "Crisis intervention planning for medical emergencies",
   "description": "Crisis intervention planning for medical emergencies",
   "content": "Scenario: Crisis intervention planning for medical emergencies\n    Given David's condition could deteriorate suddenly\n    And medical crises require rapid coordinated response\n    When the healthcare_elohim prepares for crisis\n    Then it should maintain emergency care plan\n    And it should ensure all providers have emergency contacts\n    And it should coordinate with emergency services\n    And it should prepare James for likely crisis scenarios\n    And medical emergencies should have planned responses\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Crisis intervention planning for medical emergencies",

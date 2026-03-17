@@ -6,7 +6,7 @@
   "title": "Community accountability mechanisms ensure democratic governance serves neighborhood",
   "description": "Community accountability mechanisms ensure democratic governance serves neighborhood",
   "content": "Scenario: Community accountability mechanisms ensure democratic governance serves neighborhood\n    Given business operates in and depends on community\n    And community has legitimate interest in business practices and impacts\n    When community governance structures enable neighborhood voice\n    Then community stakeholder meetings provide input on business direction\n    And neighbors can raise concerns about environmental impacts or labor practices\n    And workers consider community feedback in democratic decision-making\n    And accountability is transparent and bidirectional (community and workers both accountable)\n    And community_elohim facilitates stakeholder participation while protecting worker autonomy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:small_business_owner",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community accountability mechanisms ensure democratic governance serves neighborhood",

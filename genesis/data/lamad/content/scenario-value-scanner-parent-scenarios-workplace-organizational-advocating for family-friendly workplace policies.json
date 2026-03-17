@@ -6,7 +6,7 @@
   "title": "Advocating for family-friendly workplace policies",
   "description": "Advocating for family-friendly workplace policies",
   "content": "Scenario: Advocating for family-friendly workplace policies\n    Given Sarah needs flexible scheduling to manage children's needs\n    And current workplace policies assume workers have no care responsibilities\n    When Sarah advocates for policy change\n    Then the workplace_elohim should provide supporting data\n    And it should show that working parents need flexibility\n    And it should help Sarah make evidence-based case for change\n    And advocacy labor should accumulate care tokens\n    And the system should amplify parent voices in workplace governance\n    And workplace should adopt policies that enable sustainable parenting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for family-friendly workplace policies",

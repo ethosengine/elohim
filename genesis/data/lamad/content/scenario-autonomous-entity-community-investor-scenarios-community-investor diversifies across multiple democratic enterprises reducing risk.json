@@ -6,7 +6,7 @@
   "title": "Investor diversifies across multiple democratic enterprises reducing risk",
   "description": "Investor diversifies across multiple democratic enterprises reducing risk",
   "content": "Scenario: Investor diversifies across multiple democratic enterprises reducing risk\n    Given individual business investment is high-risk\n    And Patricia needs diversification for financial security\n    When community investment pool spreads capital across multiple conversions\n    Then her $10K in pool supports Maria's Kitchen, Rosa's Auto, and neighborhood retail\n    And portfolio diversification reduces single-business failure risk\n    And democratic network mutual support further reduces risk\n    And risk management is transparent and community-governed\n    And community_elohim coordinates portfolio diversification and risk management\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:community_investor",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Investor diversifies across multiple democratic enterprises reducing risk",

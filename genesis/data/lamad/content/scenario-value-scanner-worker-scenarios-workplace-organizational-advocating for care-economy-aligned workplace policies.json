@@ -6,7 +6,7 @@
   "title": "Advocating for care-economy-aligned workplace policies",
   "description": "Advocating for care-economy-aligned workplace policies",
   "content": "Scenario: Advocating for care-economy-aligned workplace policies\n    Given my workplace treats me as labor unit without care needs\n    When I want to advocate for care-supportive policies\n    Then the protocol should help me propose specific policies\n    Such as paid sick leave, predictable scheduling, living wages, meal provisions\n    And provide evidence for why these policies support workers' flourishing\n    And help me communicate needs to management\n    And support pushing for workplace transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Advocating for care-economy-aligned workplace policies",

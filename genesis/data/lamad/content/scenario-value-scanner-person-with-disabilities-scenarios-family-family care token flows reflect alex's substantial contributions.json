@@ -6,7 +6,7 @@
   "title": "Family care token flows reflect Alex's substantial contributions",
   "description": "Family care token flows reflect Alex's substantial contributions",
   "content": "Scenario: Family care token flows reflect Alex's substantial contributions\n    Given Alex contributes significantly to family care economy\n    And traditional family roles often render disabled people's contributions invisible\n    When family care tokens are calculated\n    Then Alex's emotional labor should accumulate tokens appropriately\n    And Alex's advocacy improving accessibility benefits whole family\n    And Alex's peer support to other disabled family members should be valued\n    And care tokens should flow to Alex for contributions, not just from Alex as recipient\n    And family economics should recognize Alex's care work explicitly\n    And the data should challenge family narratives of Alex as burden\n    And Alex's economic standing within family should reflect actual contributions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care token flows reflect Alex's substantial contributions",

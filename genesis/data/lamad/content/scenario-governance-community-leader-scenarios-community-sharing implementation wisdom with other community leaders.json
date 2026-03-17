@@ -6,7 +6,7 @@
   "title": "Sharing implementation wisdom with other community leaders",
   "description": "Sharing implementation wisdom with other community leaders",
   "content": "Scenario: Sharing implementation wisdom with other community leaders\n    Given I have three years experience implementing protocol in Riverside\n    And other mayors considering adoption seek my advice\n    When I share honest assessment of benefits and challenges\n    Then I describe: what worked (community calibration, Constitutional Council)\n    And I acknowledge: what struggled (elderly accessibility, some controversy)\n    And I explain: factors predicting success (community buy-in, resources, patience)\n    And I provide: practical implementation guidance\n    And I offer: not utopia but better than what we had\n    And I emphasize: communities control adoption speed and approach\n    And peer network: enables learning across communities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sharing implementation wisdom with other community leaders",

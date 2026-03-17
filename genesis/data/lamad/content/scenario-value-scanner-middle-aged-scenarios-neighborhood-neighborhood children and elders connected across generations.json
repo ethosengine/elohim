@@ -6,7 +6,7 @@
   "title": "Neighborhood children and elders connected across generations",
   "description": "Neighborhood children and elders connected across generations",
   "content": "Scenario: Neighborhood children and elders connected across generations\n    Given Robert's grandchild occasionally visits\n    And neighborhood has elderly residents and young families\n    And intergenerational connection benefits everyone\n    When neighborhood_elohim facilitates intergenerational connection\n    Then it should coordinate intergenerational activities\n    And connect Robert's visiting grandchild with neighborhood children\n    And facilitate connections between neighborhood elders and families\n    And build multigenerational neighborhood care networks\n    And reduce isolation for elderly residents\n    And provide care and enrichment for children\n    And demonstrate that neighborhoods thrive through age diversity\n    And strengthen community through intergenerational care\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood children and elders connected across generations",

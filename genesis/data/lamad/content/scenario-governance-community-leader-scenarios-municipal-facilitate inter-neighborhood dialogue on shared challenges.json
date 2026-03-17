@@ -6,7 +6,7 @@
   "title": "Facilitate inter-neighborhood dialogue on shared challenges",
   "description": "Facilitate inter-neighborhood dialogue on shared challenges",
   "content": "Scenario: Facilitate inter-neighborhood dialogue on shared challenges\n    Given neighborhoods have conflicting priorities\n    And downtown wants nightlife economy\n    And residential areas want noise reduction\n    When Municipal Elohim identifies the conflict\n    Then Jamal convenes inter-neighborhood deliberative assembly\n    And assembly uses Polis-style clustering to find common ground\n    And assembly develops solution: nightlife district with sound barriers\n    And neighborhoods collaborate rather than compete\n    And municipal scale enables solutions impossible at neighborhood level\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipal",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Facilitate inter-neighborhood dialogue on shared challenges",

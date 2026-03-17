@@ -6,7 +6,7 @@
   "title": "Activist exposes wage theft and labor violations",
   "description": "Activist exposes wage theft and labor violations",
   "content": "Scenario: Activist exposes wage theft and labor violations\n    Given workers report widespread wage theft\n    And enforcement seems inadequate\n    When the Observer tracks labor violations and enforcement\n    Then the activist documents thousands of violations annually\n    And shows penalties are minimal and rarely collected\n    And identifies which employers are repeat offenders\n    And exposes regulatory capture of labor enforcement\n    And worker protection becomes political accountability issue\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:activist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Activist exposes wage theft and labor violations",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

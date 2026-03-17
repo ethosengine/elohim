@@ -6,7 +6,7 @@
   "title": "Coordinating household schedule around grandparenting commitments",
   "description": "Coordinating household schedule around grandparenting commitments",
   "content": "Scenario: Coordinating household schedule around grandparenting commitments\n    Given Margaret provides childcare three days per week\n    And this affects household availability and flexibility\n    When the household plans activities and commitments\n    Then the household_elohim should coordinate around care schedule\n    And it should recognize grandparenting as household commitment\n    And it should help both partners plan around care days\n    And household decisions should account for care obligations\n    And Margaret's care work should be treated as serious commitment\n    And the household should operate as team around grandparenting\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating household schedule around grandparenting commitments",

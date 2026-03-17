@@ -6,7 +6,7 @@
   "title": "School site council member advocates for resources from district",
   "description": "School site council member advocates for resources from district",
   "content": "Scenario: School site council member advocates for resources from district\n    Given school has aging facilities and overcrowded classrooms\n    And site council wants district to prioritize school for capital improvements\n    And needs to present compelling case competing with other schools\n    When the council member uses Observer to prepare advocacy\n    Then they receive documentation of facility conditions and capacity issues\n    And see comparison to other district schools showing relative needs\n    And access student outcome data linking conditions to learning impacts\n    And get examples of how district allocated capital funds in past\n    And evidence-based advocacy connects community needs to district decisions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-community",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "School site council member advocates for resources from district",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

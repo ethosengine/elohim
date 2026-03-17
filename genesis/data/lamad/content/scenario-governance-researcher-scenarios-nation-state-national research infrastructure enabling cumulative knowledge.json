@@ -6,7 +6,7 @@
   "title": "National research infrastructure enabling cumulative knowledge",
   "description": "National research infrastructure enabling cumulative knowledge",
   "content": "Scenario: National research infrastructure enabling cumulative knowledge\n    Given sustainable research requires ongoing data access and funding\n    And I advocate for long-term research infrastructure\n    When national research program is established with public funding\n    Then independent researchers gain: anonymized data access with privacy protection\n    And longitudinal tracking becomes: possible across decades\n    And replication and extension: of findings is enabled\n    And peer review and quality control: maintain scientific standards\n    And research independence from: protocol developers is preserved\n    And Knowledge accumulates: rather than being rediscovered each generation\n    And Democratic AI governance becomes: evidence-based rather than ideological\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "National research infrastructure enabling cumulative knowledge",

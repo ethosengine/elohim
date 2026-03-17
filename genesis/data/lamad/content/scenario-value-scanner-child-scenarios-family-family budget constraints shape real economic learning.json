@@ -6,7 +6,7 @@
   "title": "Family budget constraints shape real economic learning",
   "description": "Family budget constraints shape real economic learning",
   "content": "Scenario: Family budget constraints shape real economic learning\n    Given the family income is $40,000/year\n    And Emma is learning genuine resource constraint\n    When Emma makes purchasing decisions\n    Then her personal_agent should provide real budget information\n    And the agent should say \"We have $30 left for groceries this week\"\n    And Emma should experience actual financial limits\n    And her choices should have real impact on family resources\n    And she should learn stewardship through authentic constraint\n    And economic education should reflect family's actual circumstances\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:child",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-child-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family budget constraints shape real economic learning",

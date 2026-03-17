@@ -6,7 +6,7 @@
   "title": "National media coverage of landmark appeal",
   "description": "National media coverage of landmark appeal",
   "content": "Scenario: National media coverage of landmark appeal\n    Given my appeal involves constitutional question of widespread public interest\n    And National Constitutional Council ruling will affect millions\n    When my case receives national media attention\n    Then my privacy is protected (anonymized coverage if I choose)\n    And Public education about constitutional governance happens through my case\n    And Democratic discourse is enriched by constitutional deliberation\n    And Citizens understand Elohim Protocol governance through real example\n    And My appeal contributes to public constitutional literacy\n    And Transparency serves democratic accountability without violating dignity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "National media coverage of landmark appeal",

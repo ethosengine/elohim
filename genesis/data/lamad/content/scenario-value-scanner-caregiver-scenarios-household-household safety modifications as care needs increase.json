@@ -6,7 +6,7 @@
   "title": "Household safety modifications as care needs increase",
   "description": "Household safety modifications as care needs increase",
   "content": "Scenario: Household safety modifications as care needs increase\n    Given David requires increasing safety monitoring\n    And household needs modifications for safe caregiving\n    When household safety is assessed\n    Then the household_elohim should identify needed modifications\n    And it should connect James to resources for safety equipment\n    And it should help finance modifications through care economy\n    And household should be adaptable to progressive care needs\n    And safety should be maintained as capability declines\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household safety modifications as care needs increase",

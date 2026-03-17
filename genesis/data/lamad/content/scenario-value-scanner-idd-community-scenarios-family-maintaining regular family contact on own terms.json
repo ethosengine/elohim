@@ -6,7 +6,7 @@
   "title": "Maintaining regular family contact on own terms",
   "description": "Maintaining regular family contact on own terms",
   "content": "Scenario: Maintaining regular family contact on own terms\n    Given Jordan's parents want to stay connected\n    And Jordan values family relationships\n    When Jordan decides how often to communicate with family\n    Then the personal_agent helps Jordan set communication preferences\n    And the interface shows simple options (daily calls, weekly visits, etc.)\n    And Jordan's communication preferences are communicated to family\n    And the family_elohim helps family honor Jordan's boundaries\n    And Jordan experiences autonomy over family connection frequency\n    And Jordan's adult status is respected through choice\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-family",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining regular family contact on own terms",

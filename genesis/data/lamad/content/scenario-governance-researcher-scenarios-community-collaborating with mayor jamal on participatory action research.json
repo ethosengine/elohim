@@ -6,7 +6,7 @@
   "title": "Collaborating with Mayor Jamal on participatory action research",
   "description": "Collaborating with Mayor Jamal on participatory action research",
   "content": "Scenario: Collaborating with Mayor Jamal on participatory action research\n    Given I want research to serve community not just extract data\n    And Mayor Jamal wants evidence to improve local governance\n    When we co-design research questions and methods\n    Then community priorities shape what we study\n    And Local residents participate in data collection\n    And We jointly interpret findings considering context I might miss\n    And Research addresses actual needs not just academic curiosity\n    And Riverside learns from comparative findings across communities\n    And Results improve local implementation immediately\n    And Research relationship respects community autonomy and knowledge\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Collaborating with Mayor Jamal on participatory action research",

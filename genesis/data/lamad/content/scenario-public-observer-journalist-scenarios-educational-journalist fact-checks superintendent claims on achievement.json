@@ -6,7 +6,7 @@
   "title": "Journalist fact-checks superintendent claims on achievement",
   "description": "Journalist fact-checks superintendent claims on achievement",
   "content": "Scenario: Journalist fact-checks superintendent claims on achievement\n    Given the superintendent presents glowing achievement data\n    And the journalist provides accountability coverage\n    When the Observer analyzes district outcome data\n    Then the journalist verifies overall test score increase (true)\n    And finds achievement gap between white and Black students widened\n    And shows gains concentrated in already-high-performing schools\n    And identifies selective data presentation masking inequity\n    And publishes fact-check revealing hidden disparities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist fact-checks superintendent claims on achievement",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

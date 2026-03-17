@@ -6,7 +6,7 @@
   "title": "Maintaining family cultural practices across distance",
   "description": "Maintaining family cultural practices across distance",
   "content": "Scenario: Maintaining family cultural practices across distance\n    Given Aisha's family has specific cultural traditions\n    And she wants to maintain cultural connection\n    When Aisha participates in family cultural practices\n    Then the family_elohim should support cultural continuity\n    And it should help coordinate cultural events across distance\n    And it should recognize cultural care work she performs\n    And family cultural values should shape her care economy participation\n    And distance shouldn't prevent cultural transmission\n    And her cultural identity should be maintained through family care bonds\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Maintaining family cultural practices across distance",

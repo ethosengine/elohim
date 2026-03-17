@@ -6,7 +6,7 @@
   "title": "Coordinating Margaret's mother's care among siblings",
   "description": "Coordinating Margaret's mother's care among siblings",
   "content": "Scenario: Coordinating Margaret's mother's care among siblings\n    Given Margaret has siblings who also have responsibilities to their mother\n    And Margaret currently does most hands-on care\n    When the family_elohim coordinates elder care among siblings\n    Then all siblings' contributions should be visible\n    And disparities in care burden should be evident\n    And fair distribution conversations should be supported by data\n    And Margaret should not bear disproportionate burden invisibly\n    And sibling care economy should operate on transparency\n    And family equity should be maintained across distance and circumstance\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:senior",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-senior-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating Margaret's mother's care among siblings",

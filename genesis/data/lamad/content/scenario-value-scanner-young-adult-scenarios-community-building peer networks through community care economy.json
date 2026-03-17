@@ -6,7 +6,7 @@
   "title": "Building peer networks through community care economy",
   "description": "Building peer networks through community care economy",
   "content": "Scenario: Building peer networks through community care economy\n    Given Aisha's friendships increasingly involve care dimensions\n    And peer support is crucial for young adults\n    When Aisha connects with peers through care economy\n    Then the community_elohim should facilitate peer networks\n    And it should coordinate resource sharing among young adults\n    And it should enable care token exchanges between peers\n    And peer mutual aid should be systematized\n    And friendships should be strengthened through practical care\n    And community should support young adult peer networks\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building peer networks through community care economy",

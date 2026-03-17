@@ -6,7 +6,7 @@
   "title": "Career development balanced with peak care responsibilities",
   "description": "Career development balanced with peak care responsibilities",
   "content": "Scenario: Career development balanced with peak care responsibilities\n    Given Robert has substantial professional responsibilities\n    And his care demands are also at peak levels\n    And he has opportunities for career advancement\n    When Robert considers professional development opportunities\n    Then his personal_agent should help him assess realistic capacity\n    And analyze: \"This promotion would add 10 hours weekly with your parents needing increased care\"\n    And support him in making career decisions that honor his full life context\n    And help him recognize that care responsibilities are legitimate constraints on career\n    And surface when career advancement would create unsustainable burden\n    And validate that choosing care over career advancement is reasonable\n    And ensure he doesn't sacrifice relationships for professional success\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Career development balanced with peak care responsibilities",

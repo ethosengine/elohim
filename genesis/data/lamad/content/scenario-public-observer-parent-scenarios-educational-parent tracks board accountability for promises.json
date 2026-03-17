@@ -6,7 +6,7 @@
   "title": "Parent tracks board accountability for promises",
   "description": "Parent tracks board accountability for promises",
   "content": "Scenario: Parent tracks board accountability for promises\n    Given the school board promised to address transportation by Q2\n    And the parent's child still has unreliable dangerous bus service\n    When three months pass without action on the commitment\n    Then the Observer alerts parent about broken promise\n    And provides exact quote from February board meeting\n    And shows which board members made the commitment\n    And parent raises specific accountability question publicly\n    And board commitments to families persist despite turnover\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent tracks board accountability for promises",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

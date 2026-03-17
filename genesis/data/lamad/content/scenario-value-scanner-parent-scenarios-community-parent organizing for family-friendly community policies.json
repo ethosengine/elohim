@@ -6,7 +6,7 @@
   "title": "Parent organizing for family-friendly community policies",
   "description": "Parent organizing for family-friendly community policies",
   "content": "Scenario: Parent organizing for family-friendly community policies\n    Given community policies affect families' quality of life\n    And Sarah wants better parks, libraries, family resources\n    When parents organize for policy change\n    Then the community_elohim should facilitate collective advocacy\n    And it should coordinate parent political power\n    And organizing labor should accumulate care tokens\n    And Sarah's advocacy should be recognized as community contribution\n    And parent collective action should be amplified by care economy\n    And the system should translate care work into political power\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent organizing for family-friendly community policies",

@@ -6,7 +6,7 @@
   "title": "Discovering compatible parents in neighborhood",
   "description": "Discovering compatible parents in neighborhood",
   "content": "Scenario: Discovering compatible parents in neighborhood\n    Given Sarah needs connection to other parents\n    And compatible values and needs matter for effective support\n    When the neighborhood_elohim analyzes parent compatibility\n    Then it should identify parents with similar-aged children\n    And it should match based on compatible care values\n    And it should connect parents who could provide mutual support\n    And Sarah should be introduced to potential parent network\n    And the system should break down isolation\n    And neighborhood parent community should be facilitated\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Discovering compatible parents in neighborhood",

@@ -4,7 +4,7 @@
   "title": "Creating Digital Constitutional Rights Amendment",
   "description": "protocol creates new forms of governance and rights; constitutional recognition would strengthen legitimacy; I propose national constitutional amendment... (10 steps total)",
   "content": "Given protocol creates new forms of governance and rights\nAnd constitutional recognition would strengthen legitimacy\nWhen I propose national constitutional amendment\nThen I recognize: sortition governance as legitimate democratic form\nAnd I establish: right to appeal agent decisions\nAnd I protect: community sovereignty over protocol adoption\nAnd I enshrine: privacy protections and dignity guarantees\nAnd amendment goes through: lengthy deliberative process\nAnd if passed: transforms national constitutional framework\nAnd protocol gains: highest legal recognition",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "governance",
@@ -36,7 +36,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-governance-policy-maker-nation-state",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.232Z",

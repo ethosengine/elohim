@@ -6,7 +6,7 @@
   "title": "Elder protected from Medicare scam",
   "description": "Elder protected from Medicare scam",
   "content": "Scenario: Elder protected from Medicare scam\n    Given scammers are running fake Medicare enrollment campaigns\n    When a scammer tries to contact Rose about \"urgent\" Medicare changes\n    And the message requests personal information and payment\n    Then the guardian agent identifies the scam pattern\n    And the fraudulent message never reaches Rose\n    And Rose is protected without awareness of the threat\n    And legitimate Medicare communications work normally\n    And her real healthcare connections remain intact\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder protected from Medicare scam",

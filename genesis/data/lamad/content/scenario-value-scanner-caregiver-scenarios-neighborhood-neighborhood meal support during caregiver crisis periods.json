@@ -6,7 +6,7 @@
   "title": "Neighborhood meal support during caregiver crisis periods",
   "description": "Neighborhood meal support during caregiver crisis periods",
   "content": "Scenario: Neighborhood meal support during caregiver crisis periods\n    Given caregiving intensity varies with David's condition\n    And James may have periods of extreme overwhelm\n    When the neighborhood_elohim detects crisis conditions\n    Then it should coordinate meal support from neighbors\n    And meal delivery should be appropriate for David's dietary needs\n    And food support should be dignified, not stigmatizing\n    And neighborhood should provide practical crisis support\n    And James should access help during overwhelming periods\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood meal support during caregiver crisis periods",

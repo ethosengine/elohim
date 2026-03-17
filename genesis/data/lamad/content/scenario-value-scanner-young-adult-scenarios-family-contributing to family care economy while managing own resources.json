@@ -6,7 +6,7 @@
   "title": "Contributing to family care economy while managing own resources",
   "description": "Contributing to family care economy while managing own resources",
   "content": "Scenario: Contributing to family care economy while managing own resources\n    Given Aisha has limited financial resources\n    And she wants to support her family\n    When Aisha decides what care to contribute\n    Then the system should help her balance competing obligations\n    And it should recognize that her care capacity is limited\n    And it should validate both family support and self-care\n    And the family_elohim should not create unsustainable demands\n    And Aisha should maintain boundaries while remaining connected\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Contributing to family care economy while managing own resources",

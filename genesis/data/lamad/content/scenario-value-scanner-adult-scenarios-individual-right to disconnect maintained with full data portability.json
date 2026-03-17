@@ -6,7 +6,7 @@
   "title": "Right to disconnect maintained with full data portability",
   "description": "Right to disconnect maintained with full data portability",
   "content": "Scenario: Right to disconnect maintained with full data portability\n    Given Sarah has been using the Value Scanner\n    And constitutional constraints apply at all layers\n    When Sarah chooses to disconnect from the system\n    Then the system must honor disconnection immediately\n    And she should receive complete data export of all her information\n    And no manipulative retention patterns should be employed\n    And her right to not participate must be absolute\n    And data portability should enable switching to alternative systems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Right to disconnect maintained with full data portability",

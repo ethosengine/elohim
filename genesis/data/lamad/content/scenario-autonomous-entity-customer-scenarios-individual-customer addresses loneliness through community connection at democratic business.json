@@ -6,7 +6,7 @@
   "title": "Customer addresses loneliness through community connection at democratic business",
   "description": "Customer addresses loneliness through community connection at democratic business",
   "content": "Scenario: Customer addresses loneliness through community connection at democratic business\n    Given Ms. Johnson is recently widowed experiencing social isolation\n    And corporate design optimizes transaction speed, discouraging lingering and connection\n    When democratic business welcomes community connection\n    Then space is comfortable for lingering and conversation\n    And workers have time to talk, genuinely caring about her wellbeing\n    And regular customers become acquaintances building social network\n    And business serves social needs beyond food provision\n    And community_elohim identifies isolated customers and facilitates community connection\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:customer",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Customer addresses loneliness through community connection at democratic business",

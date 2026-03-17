@@ -6,7 +6,7 @@
   "title": "Personal agent serves Frank's autonomy without infantilizing",
   "description": "Personal agent serves Frank's autonomy without infantilizing",
   "content": "Scenario: Personal agent serves Frank's autonomy without infantilizing\n    Given Frank is a capable adult with 70 years of life experience\n    And he has decades of construction expertise\n    And the interface uses AI assistance\n    When the personal_agent interacts with Frank\n    Then it must preserve his full autonomy and dignity\n    And it must never be patronizing or infantilizing\n    And it must respect his expertise and judgment\n    And it must provide information and options, not directives\n    And it must acknowledge his skills and competence\n    And the relationship should be respectful partnership\n    And Frank should feel empowered and respected, never managed\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Personal agent serves Frank's autonomy without infantilizing",

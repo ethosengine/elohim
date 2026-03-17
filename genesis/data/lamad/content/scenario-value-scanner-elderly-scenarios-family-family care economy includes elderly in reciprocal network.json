@@ -6,7 +6,7 @@
   "title": "Family care economy includes elderly in reciprocal network",
   "description": "Family care economy includes elderly in reciprocal network",
   "content": "Scenario: Family care economy includes elderly in reciprocal network\n    Given the family participates in care token economy\n    And Helen both receives and gives care\n    When family care tokens are calculated\n    Then Helen's contributions should be valued alongside her care receipt\n    And her lifetime of family care should be visible\n    And current care she receives should be framed as reciprocity\n    And family care economy should show mutual support, not one-way dependency\n    And Helen should have standing in family based on accumulated contributions\n    And the protocol should demonstrate that care flows throughout entire lifespan\n    And family economics should value elders as continuing participants\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care economy includes elderly in reciprocal network",

@@ -6,7 +6,7 @@
   "title": "Connection to land through understanding food origins",
   "description": "Connection to land through understanding food origins",
   "content": "Scenario: Connection to land through understanding food origins\n    Given Marcus eats food grown in soil by farmers\n    And connection to land is part of ecological literacy\n    When Marcus learns about his food sources\n    Then the personal_agent should teach bioregional geography\n    And it should help him understand local agricultural landscape\n    And it should build relationship between Marcus and the land feeding him\n    And he should develop sense of place and bioregional identity\n    And care economy should include care for ecological systems\n    And stewardship should extend beyond human relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Connection to land through understanding food origins",

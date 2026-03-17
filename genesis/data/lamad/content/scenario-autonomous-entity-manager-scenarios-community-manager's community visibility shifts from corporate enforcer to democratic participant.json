@@ -6,7 +6,7 @@
   "title": "Manager's community visibility shifts from corporate enforcer to democratic participant",
   "description": "Manager's community visibility shifts from corporate enforcer to democratic participant",
   "content": "Scenario: Manager's community visibility shifts from corporate enforcer to democratic participant\n    Given Marcus was previously invisible corporate manager\n    And community only saw corporate brand, not individual manager\n    When democratic conversion makes governance visible\n    Then community knows Marcus as democratic coordinator, not owner or boss\n    And community sees him at stakeholder meetings, farmers markets, neighborhood events\n    And community recognizes him as community member serving institution\n    And his role transformation from extraction to service becomes community narrative\n    And community_elohim helps tell story of individual and structural transformation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager's community visibility shifts from corporate enforcer to democratic participant",

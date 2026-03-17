@@ -6,7 +6,7 @@
   "title": "School fee and activity cost assistance for single-income families",
   "description": "School fee and activity cost assistance for single-income families",
   "content": "Scenario: School fee and activity cost assistance for single-income families\n    Given Maria's single income must support household of four\n    And she struggles to afford school fees, field trips, sports, and activities\n    When schools require fees or activity payments\n    Then the educational_elohim should connect Maria to fee assistance programs\n    And schools should provide cost support without stigmatizing single-parent families\n    And all children should access educational opportunities regardless of single-parent economics\n    And fee assistance should be available and accessible\n    And Maria's children should participate fully without financial exclusion\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "School fee and activity cost assistance for single-income families",

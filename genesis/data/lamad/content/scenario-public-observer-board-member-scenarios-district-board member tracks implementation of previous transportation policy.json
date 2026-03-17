@@ -6,7 +6,7 @@
   "title": "Board member tracks implementation of previous transportation policy",
   "description": "Board member tracks implementation of previous transportation policy",
   "content": "Scenario: Board member tracks implementation of previous transportation policy\n    Given board voted two years ago to optimize bus routes for efficiency\n    And transportation director promised improved reliability and cost savings\n    And parents increasingly complain about late buses and long routes\n    When the board member checks Observer implementation tracking\n    Then they see on-time performance has actually declined since policy change\n    And discover cost savings didn't materialize as promised\n    And find low-income neighborhoods disproportionately affected by route changes\n    And access parent feedback data showing systematic reliability problems\n    And impact tracking reveals staff promises diverged from actual outcomes\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:board_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-board-member-scenarios-district",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Board member tracks implementation of previous transportation policy",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

@@ -6,7 +6,7 @@
   "title": "Family care legacy planning as David's condition progresses",
   "description": "Family care legacy planning as David's condition progresses",
   "content": "Scenario: Family care legacy planning as David's condition progresses\n    Given David's condition will continue to worsen\n    And James may eventually need institutional care support\n    When family plans for David's future care\n    Then the family_elohim should facilitate family care planning\n    And it should help family discuss difficult future scenarios\n    And it should coordinate family resources for potential needs\n    And family should plan together for multiple care scenarios\n    And care legacy planning should involve whole family\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family care legacy planning as David's condition progresses",

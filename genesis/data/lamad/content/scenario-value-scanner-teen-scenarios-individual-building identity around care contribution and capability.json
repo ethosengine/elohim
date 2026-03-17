@@ -6,7 +6,7 @@
   "title": "Building identity around care contribution and capability",
   "description": "Building identity around care contribution and capability",
   "content": "Scenario: Building identity around care contribution and capability\n    Given Jasmine has made substantial care contributions over months\n    And she balances multiple demanding contexts successfully\n    When she reflects on her Value Scanner usage and care economy participation\n    Then she should experience herself as a capable, contributing adult\n    And her identity should be forming around care for others and community\n    And she should understand that her work has genuine economic value\n    And she should expect to be taken seriously in economic conversations\n    And she should internalize that care economy principles are normal\n    And her self-concept should reflect her actual capability and contribution\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building identity around care contribution and capability",

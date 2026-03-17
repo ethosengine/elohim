@@ -6,7 +6,7 @@
   "title": "Developmentally appropriate autonomy with emergency assistance",
   "description": "Developmentally appropriate autonomy with emergency assistance",
   "content": "Scenario: Developmentally appropriate autonomy with emergency assistance\n    Given Marcus has substantial independence\n    And he is still only 12 years old\n    When Marcus uses the Value Scanner\n    Then he should have freedom to make real decisions\n    And emergency assistance options should be clearly visible\n    And the personal_agent should watch for stress exceeding healthy bounds\n    And crisis situations should trigger connection to adult support\n    And intervention should preserve his dignity and autonomy\n    And the goal should be supporting capability, not taking over\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Developmentally appropriate autonomy with emergency assistance",

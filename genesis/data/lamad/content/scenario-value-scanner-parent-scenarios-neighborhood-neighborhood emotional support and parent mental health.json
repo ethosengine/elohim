@@ -6,7 +6,7 @@
   "title": "Neighborhood emotional support and parent mental health",
   "description": "Neighborhood emotional support and parent mental health",
   "content": "Scenario: Neighborhood emotional support and parent mental health\n    Given parenting is emotionally intense and often isolating\n    And Sarah needs connection to parents who understand\n    When the neighborhood_elohim facilitates parent support\n    Then it should enable parent peer support groups\n    And it should provide spaces for parents to share struggles\n    And emotional support should be recognized as care labor\n    And receiving support should not be stigmatized\n    And parent mental health should be community priority\n    And the system should reduce parenting isolation\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood emotional support and parent mental health",

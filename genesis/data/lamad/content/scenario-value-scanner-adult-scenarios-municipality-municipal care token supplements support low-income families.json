@@ -6,7 +6,7 @@
   "title": "Municipal care token supplements support low-income families",
   "description": "Municipal care token supplements support low-income families",
   "content": "Scenario: Municipal care token supplements support low-income families\n    Given Sarah's household income is $65k/year\n    And many families have less economic resources\n    When municipal care economy operates\n    Then care token supplements should be available based on income\n    And the Value Scanner should be accessible regardless of ability to pay\n    And municipal subsidies should ensure universal access\n    And care economy should function as economic support system\n    And access should be dignified and universal\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Municipal care token supplements support low-income families",

@@ -6,7 +6,7 @@
   "title": "Parent-teacher conferences scheduled for working single parent availability",
   "description": "Parent-teacher conferences scheduled for working single parent availability",
   "content": "Scenario: Parent-teacher conferences scheduled for working single parent availability\n    Given Maria must attend conferences for three children across different schools\n    And she has no co-parent to split attendance or attend in her place\n    When schools schedule parent-teacher conferences\n    Then the educational_elohim should coordinate scheduling across multiple schools\n    And schools should offer evening or flexible timing for working single parents\n    And Maria should not have to take multiple work days for conferences\n    And scheduling should recognize single parents cannot \"send the other parent\"\n    And educational engagement should be accessible to working solo parents\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent-teacher conferences scheduled for working single parent availability",

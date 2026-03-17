@@ -6,7 +6,7 @@
   "title": "Coordinating multiple specialists while maintaining integrated care",
   "description": "Coordinating multiple specialists while maintaining integrated care",
   "content": "Scenario: Coordinating multiple specialists while maintaining integrated care\n    Given Alex sees multiple medical specialists\n    And specialists often don't communicate with each other\n    When Alex navigates specialist care\n    Then the personal_agent should help Alex coordinate across providers\n    And it should maintain integrated medical history across specialties\n    And it should help Alex communicate between providers\n    And it should identify care gaps or contradictions\n    And Alex should experience coherent care despite system fragmentation\n    And the protocol should serve as Alex's medical coordination hub\n    And integrated perspective should be maintained by Alex, not system\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating multiple specialists while maintaining integrated care",

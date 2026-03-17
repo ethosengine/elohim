@@ -6,7 +6,7 @@
   "title": "Teacher documents unpaid overtime and workload",
   "description": "Teacher documents unpaid overtime and workload",
   "content": "Scenario: Teacher documents unpaid overtime and workload\n    Given teachers work far beyond contracted hours\n    And administration claims workload is reasonable\n    When teachers track actual working hours through Observer\n    Then aggregated data shows teachers average 52 hours weekly vs 40 contracted\n    And 12 hours weekly of unpaid overtime is documented\n    And workload breakdown reveals what consumes time (grading, paperwork, meetings)\n    And union uses evidence in contract negotiations for compensation or reduction\n    And working conditions transparency creates accountability pressure\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:teacher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Teacher documents unpaid overtime and workload",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

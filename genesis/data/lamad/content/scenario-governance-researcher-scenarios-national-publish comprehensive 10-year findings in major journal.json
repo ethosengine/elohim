@@ -6,7 +6,7 @@
   "title": "Publish comprehensive 10-year findings in major journal",
   "description": "Publish comprehensive 10-year findings in major journal",
   "content": "Scenario: Publish comprehensive 10-year findings in major journal\n    Given James has completed decade-long study\n    When he prepares comprehensive research report\n    Then he documents methodology with full transparency\n    And he presents both positive findings and disappointments\n    And he acknowledges uncertainties and limitations\n    And he makes full dataset available for replication\n    And he publishes open access in multiple formats\n    And he contributes definitive evidence about democratic AI governance at scale\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-national",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Publish comprehensive 10-year findings in major journal",

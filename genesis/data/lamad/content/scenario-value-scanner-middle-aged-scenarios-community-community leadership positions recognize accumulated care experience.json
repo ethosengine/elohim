@@ -6,7 +6,7 @@
   "title": "Community leadership positions recognize accumulated care experience",
   "description": "Community leadership positions recognize accumulated care experience",
   "content": "Scenario: Community leadership positions recognize accumulated care experience\n    Given Robert has decades of care economy participation\n    And he has demonstrated capability through managing complex responsibilities\n    And community needs experienced leadership\n    When community_elohim identifies leadership opportunities\n    Then it should recognize Robert's accumulated care contributions as leadership qualification\n    And surface opportunities: community boards, policy advisory roles, initiative leadership\n    And connect his care experience to governance credibility\n    And help him understand that his lived experience is valuable wisdom\n    And match leadership opportunities to his capacity and interests\n    And prevent exploitation of middle-aged adults' sense of responsibility\n    And support meaningful community contribution without burnout\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community leadership positions recognize accumulated care experience",

@@ -6,7 +6,7 @@
   "title": "Parent emotional labor in supporting children's learning",
   "description": "Parent emotional labor in supporting children's learning",
   "content": "Scenario: Parent emotional labor in supporting children's learning\n    Given Sarah manages Tommy's frustration with difficult tasks\n    And she builds Emma's confidence and motivation\n    When the educational_elohim tracks educational emotional labor\n    Then it should recognize emotional support as teaching work\n    And it should value Sarah's work maintaining children's love of learning\n    And emotional scaffolding should be recognized as pedagogical skill\n    And the full scope of educational work should be visible\n    And the system should value affective dimensions of teaching\n    And parent emotional labor should be recognized as essential to learning\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-educational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent emotional labor in supporting children's learning",

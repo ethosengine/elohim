@@ -6,7 +6,7 @@
   "title": "Parenting skills recognized as professional capabilities",
   "description": "Parenting skills recognized as professional capabilities",
   "content": "Scenario: Parenting skills recognized as professional capabilities\n    Given Sarah has professional-grade skills from parenting\n    And she manages complex logistics, conflict resolution, developmental psychology\n    When the workplace_elohim assesses Sarah's capabilities\n    Then it should recognize parenting skills as professional assets\n    And it should translate care skills to workplace context\n    And Sarah's parenting should enhance her professional value\n    And the system should make invisible skills visible to employers\n    And parenting experience should be recognized as professional development\n    And care work should be valued as capability-building\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parenting skills recognized as professional capabilities",

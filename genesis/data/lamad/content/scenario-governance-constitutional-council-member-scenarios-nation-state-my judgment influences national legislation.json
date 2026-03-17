@@ -6,7 +6,7 @@
   "title": "My judgment influences national legislation",
   "description": "My judgment influences national legislation",
   "content": "Scenario: My judgment influences national legislation\n    Given Senator Ruiz drafts national AI governance legislation\n    And she cites our national council precedents\n    When my constitutional reasoning shapes democratic law\n    Then my nurse-mother perspective: enriches national policy\n    And my citizen judgment: guides representative government\n    And sortition and elected democracy: work as partners\n    And my unlikely voice: matters at highest levels of governance\n    And I understand: democratic participation as transformation\n    And I have become: constitutional architect for my nation\n    And I know: ordinary people can govern extraordinary complexity\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:constitutional_council_member",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "My judgment influences national legislation",

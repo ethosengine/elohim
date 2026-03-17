@@ -6,7 +6,7 @@
   "title": "Identifying implementation challenges through participant observation",
   "description": "Identifying implementation challenges through participant observation",
   "content": "Scenario: Identifying implementation challenges through participant observation\n    Given I am embedded in Riverside for six months\n    And I observe daily reality of protocol implementation\n    When I encounter challenges residents and leaders face\n    Then I document: elderly residents struggling with technology\n    And I note: three Constitutional Council decisions that residents opposed\n    And I observe: recurring tension around adolescent autonomy\n    And I identify: gaps between theory and practice\n    And I analyze: what enables some communities to thrive while others struggle\n    And My research reveals: practical wisdom about implementation\n    And Findings help other communities avoid pitfalls Riverside encountered\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:researcher",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-researcher-scenarios-community",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Identifying implementation challenges through participant observation",

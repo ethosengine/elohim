@@ -6,7 +6,7 @@
   "title": "Making personal choices with accessible interface",
   "description": "Making personal choices with accessible interface",
   "content": "Scenario: Making personal choices with accessible interface\n    Given Jordan wants to choose their outfit for a community event\n    When Jordan opens the Value Scanner wardrobe feature\n    Then the interface displays clothing options with large pictures\n    And each option uses simple labels (\"Blue shirt\", \"Red sweater\")\n    And the interface uses step-by-step guidance (\"First pick a shirt\")\n    And Jordan can make their own choice without support worker intervention\n    And the system celebrates Jordan's choice with positive feedback\n    And Jordan's preference is recorded for future suggestions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-idd-community-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Making personal choices with accessible interface",

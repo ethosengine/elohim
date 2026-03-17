@@ -6,7 +6,7 @@
   "title": "Learning adult family care from parents' modeling",
   "description": "Learning adult family care from parents' modeling",
   "content": "Scenario: Learning adult family care from parents' modeling\n    Given Aisha's parents demonstrate care economy practices\n    And she's learning adult family participation\n    When Aisha observes family care patterns\n    Then the family_elohim should make parental care work visible\n    And Aisha should learn what adult family care looks like\n    And intergenerational knowledge transfer should occur\n    And she should understand family care as lifelong practice\n    And the system should facilitate learning from family elders\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:young_adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Learning adult family care from parents' modeling",

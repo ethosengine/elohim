@@ -6,7 +6,7 @@
   "title": "Sustainable consumption choices tracked as environmental care work",
   "description": "Sustainable consumption choices tracked as environmental care work",
   "content": "Scenario: Sustainable consumption choices tracked as environmental care work\n    Given Jasmine preferentially chooses sustainable products\n    And she has bought local/seasonal/sustainable products in 12 of 15 purchases\n    When bioregional_elohim analyzes her consumption patterns\n    Then it should recognize her environmental care contributions\n    And track her choices as care work for ecosystem health\n    And calculate environmental impact reduction from her choices\n    And value bioregional stewardship in care token allocation\n    And demonstrate that ecological care creates economic value\n    And recognize environmental activism as legitimate care labor\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:teen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Sustainable consumption choices tracked as environmental care work",

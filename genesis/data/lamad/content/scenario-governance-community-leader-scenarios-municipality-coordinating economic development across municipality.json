@@ -6,7 +6,7 @@
   "title": "Coordinating economic development across municipality",
   "description": "Coordinating economic development across municipality",
   "content": "Scenario: Coordinating economic development across municipality\n    Given Riverside needs economic revitalization\n    And different neighborhoods have different economic needs\n    When I coordinate city-wide economic development strategy\n    Then Municipal Elohim: analyzes economic flows and opportunities\n    And we identify: where business support like Maria's loan needed most\n    And we coordinate: workforce development with neighborhood needs\n    And we ensure: economic growth benefits whole city not just wealthy areas\n    And we integrate: protocol support with traditional economic development\n    And we maintain: accountability to residents for economic choices\n    And coordination strengthens: inclusive economic resilience\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:community_leader",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-community-leader-scenarios-municipality",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Coordinating economic development across municipality",

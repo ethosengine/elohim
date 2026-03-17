@@ -6,7 +6,7 @@
   "title": "Managing workplace disclosure about domestic violence or crisis circumstances",
   "description": "Managing workplace disclosure about domestic violence or crisis circumstances",
   "content": "Scenario: Managing workplace disclosure about domestic violence or crisis circumstances\n    Given employers may ask about gaps, circumstances, or background\n    And disclosure could lead to discrimination or could generate support\n    When I decide what to disclose to employers\n    Then the workplace_elohim helps me evaluate disclosure risks and benefits\n    And provides guidance on legal protections against discrimination\n    And suggests strategic disclosure approaches when disclosure is beneficial\n    And validates my right to privacy about personal circumstances\n    And helps me navigate background checks or verification issues\n    And my personal_agent reminds me of what I've decided to disclose vs. protect\n    And recognizes disclosure decisions as complex risk assessment\n    And supports my autonomy in disclosure choices\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Managing workplace disclosure about domestic violence or crisis circumstances",

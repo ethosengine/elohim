@@ -4,7 +4,7 @@
   "title": "Activist coordinates rapid response across network",
   "description": "Indigenous land defenders face immediate threat of eviction; the situation requires urgent solidarity action; the land defenders' community issues call for support... (10 steps total)",
   "content": "Given Indigenous land defenders face immediate threat of eviction\nAnd the situation requires urgent solidarity action\nWhen the land defenders' community issues call for support\nAnd the call is verified through network trust relationships\nThen rapid response protocol activates across affinity network\nAnd each community determines its capacity to respond\nAnd coordination happens in real-time across time zones\nAnd actions are culturally appropriate and locally determined\nAnd the network mobilizes pressure while preventing burnout\nAnd the land defenders receive coordinated solidarity support",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic",
     "social_medium",
@@ -34,7 +34,8 @@
     "source": "elohim-import",
     "sourceVersion": "1.0.0",
     "derivedFrom": "source-social-medium-activist-affinity-network",
-    "extractionMethod": "gherkin-parse"
+    "extractionMethod": "gherkin-parse",
+    "originalContentFormat": "gherkin"
   },
   "reach": "commons",
   "createdAt": "2025-12-05T18:41:24.259Z",
@@ -42,7 +43,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

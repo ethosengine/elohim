@@ -6,7 +6,7 @@
   "title": "Accessible household coordination reduces disability-related stress",
   "description": "Accessible household coordination reduces disability-related stress",
   "content": "Scenario: Accessible household coordination reduces disability-related stress\n    Given navigating household management with disability is inherently stressful\n    And inaccessible systems compound that stress\n    When the household_elohim coordinates household functions\n    Then it should actively reduce Alex's cognitive load\n    And it should prevent accessibility barriers from becoming crises\n    And it should provide gentle reminders and support\n    And coordination should feel like genuine assistance\n    And Alex should experience less stress, not more\n    And the protocol should recognize that accessibility reduces disability\n    And good design should make Alex's household management easier than current systems\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessible household coordination reduces disability-related stress",

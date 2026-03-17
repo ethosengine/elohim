@@ -6,7 +6,7 @@
   "title": "Journalist fact-checks governor's claims on economic record",
   "description": "Journalist fact-checks governor's claims on economic record",
   "content": "Scenario: Journalist fact-checks governor's claims on economic record\n    Given the governor campaigns on economic success claims\n    And the journalist provides accountability coverage\n    When the Observer analyzes state economic data\n    Then the journalist verifies job growth claim (accurate but misleading framing)\n    And finds wage growth lags behind neighboring states\n    And shows poverty rate increased despite jobs claim\n    And identifies tax cut benefits concentrated in top income bracket\n    And publishes fact-check grounding rhetoric in evidence\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist fact-checks governor's claims on economic record",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

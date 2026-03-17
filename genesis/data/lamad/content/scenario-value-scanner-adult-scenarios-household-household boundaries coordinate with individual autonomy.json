@@ -6,7 +6,7 @@
   "title": "Household boundaries coordinate with individual autonomy",
   "description": "Household boundaries coordinate with individual autonomy",
   "content": "Scenario: Household boundaries coordinate with individual autonomy\n    Given Sarah has individual autonomy over her choices\n    And she also participates in household governance\n    When Sarah makes decisions affecting the household\n    Then household boundaries should be negotiated, not imposed\n    And Sarah should maintain individual agency within household context\n    And household_elohim should balance individual and collective needs\n    And neither Sarah nor partner should dominate household governance\n    And equitable partnership should be structurally supported\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:adult",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-adult-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household boundaries coordinate with individual autonomy",

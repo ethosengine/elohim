@@ -6,7 +6,7 @@
   "title": "Elder knowledge of historical building techniques and materials",
   "description": "Elder knowledge of historical building techniques and materials",
   "content": "Scenario: Elder knowledge of historical building techniques and materials\n    Given Frank has decades of construction experience\n    And traditional building techniques are often more sustainable\n    When the bioregional_elohim coordinates building knowledge\n    Then it should value Frank's knowledge of traditional techniques\n    And facilitate teaching historical building methods\n    And recognize that older practices may be more ecological\n    And connect past building wisdom to contemporary sustainability\n    And Frank's experience should inform bioregional building culture\n    And elder knowledge should guide sustainable building revival\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder knowledge of historical building techniques and materials",

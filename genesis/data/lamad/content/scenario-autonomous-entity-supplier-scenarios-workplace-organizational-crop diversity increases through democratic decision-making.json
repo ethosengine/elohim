@@ -6,7 +6,7 @@
   "title": "Crop diversity increases through democratic decision-making",
   "description": "Crop diversity increases through democratic decision-making",
   "content": "Scenario: Crop diversity increases through democratic decision-making\n    Given Tom focused on high-value crops to maximize revenue under thin margins\n    And crop diversity benefits soil health and risk distribution\n    When democratic governance enables longer-term thinking\n    Then workers vote to increase crop diversity supporting soil health\n    And diversification reduces dependence on single crop market fluctuations\n    And biodiversity increases through worker interest in varied cultivation\n    And farm resilience improves through democratic long-term planning\n    And workplace_elohim documents crop diversity benefits for economic and ecological health\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:supplier",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Crop diversity increases through democratic decision-making",

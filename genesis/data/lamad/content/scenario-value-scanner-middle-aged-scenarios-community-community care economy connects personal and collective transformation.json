@@ -6,7 +6,7 @@
   "title": "Community care economy connects personal and collective transformation",
   "description": "Community care economy connects personal and collective transformation",
   "content": "Scenario: Community care economy connects personal and collective transformation\n    Given Robert participates in care economy personally\n    And his position enables him to influence broader systems\n    And personal and systemic change reinforce each other\n    When community_elohim supports his participation\n    Then it should help him see connections between personal care and system change\n    And surface opportunities to advocate professionally for care economy principles\n    And support him in spreading care economy through his networks\n    And recognize that his generation can drive mainstream adoption\n    And help him leverage professional, economic, and political position\n    And build movement for care economy transformation\n    And demonstrate that personal practice and systemic advocacy work together\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Community care economy connects personal and collective transformation",

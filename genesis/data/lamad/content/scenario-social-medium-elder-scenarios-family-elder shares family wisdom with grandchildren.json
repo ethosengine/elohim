@@ -6,7 +6,7 @@
   "title": "Elder shares family wisdom with grandchildren",
   "description": "Elder shares family wisdom with grandchildren",
   "content": "Scenario: Elder shares family wisdom with grandchildren\n    Given Rose's granddaughter Emma asks about Rose's childhood during WWII\n    When Rose creates a contribution sharing her memories\n    And she includes photos from her family album\n    And she describes what life was like during wartime\n    Then the contribution reaches all family members immediately\n    And Emma learns family history and develops deeper connection\n    And other grandchildren engage with questions and appreciation\n    And Rose experiences meaningful intergenerational exchange\n    And the family history is preserved in the network\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
     "user_type:elder",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "social-medium",
     "featureId": "feature-social-medium-elder-scenarios-family",
-    "epic": "social_medium"
+    "epic": "social_medium",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elder shares family wisdom with grandchildren",

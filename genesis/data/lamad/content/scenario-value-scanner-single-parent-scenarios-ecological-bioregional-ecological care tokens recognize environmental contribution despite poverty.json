@@ -6,7 +6,7 @@
   "title": "Ecological care tokens recognize environmental contribution despite poverty",
   "description": "Ecological care tokens recognize environmental contribution despite poverty",
   "content": "Scenario: Ecological care tokens recognize environmental contribution despite poverty\n    Given Maria's household practices are environmentally exemplary\n    And she achieves low impact through necessity, not affluent environmentalism\n    When ecological care tokens are calculated\n    Then her resource efficiency should be valued as environmental contribution\n    And she should accumulate ecological care tokens for sustainable practices\n    And low-impact living should be recognized regardless of economic motivation\n    And environmental stewardship should be valued whether chosen or necessary\n    And Maria should receive ecological recognition for her sustainable household\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:single_parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Ecological care tokens recognize environmental contribution despite poverty",

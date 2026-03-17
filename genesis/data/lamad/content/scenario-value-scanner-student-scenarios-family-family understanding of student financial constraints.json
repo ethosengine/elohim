@@ -6,7 +6,7 @@
   "title": "Family understanding of student financial constraints",
   "description": "Family understanding of student financial constraints",
   "content": "Scenario: Family understanding of student financial constraints\n    Given Kenji lives on $180/week total budget\n    And family might not understand severity of his constraints\n    When the family_elohim shares appropriate financial context\n    Then it should help family understand Kenji's resource limitations\n    And it should facilitate realistic expectations for gift-giving, travel, expenses\n    And it should reduce shame around financial scarcity\n    And family should understand student economic reality\n    And the system should bridge understanding gap about student poverty\n    And realistic financial communication should strengthen family relationships\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:student",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-student-scenarios-family",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Family understanding of student financial constraints",

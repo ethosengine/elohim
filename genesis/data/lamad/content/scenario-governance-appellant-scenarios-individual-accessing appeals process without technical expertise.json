@@ -6,7 +6,7 @@
   "title": "Accessing appeals process without technical expertise",
   "description": "Accessing appeals process without technical expertise",
   "content": "Scenario: Accessing appeals process without technical expertise\n    Given I am not tech-savvy and don't understand AI systems well\n    And an agent decision has affected me in a way I disagree with\n    When I want to file an appeal\n    Then I can trigger the appeal with a simple button: \"I disagree with this decision\"\n    And I can state my complaint in plain language without legal jargon\n    And I don't need a lawyer or technical knowledge to participate\n    And The interface guides me through the process step-by-step\n    And Support is available in my language and accessible format\n    And The process respects my dignity regardless of my technical literacy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:governance",
     "user_type:appellant",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "governance",
     "featureId": "feature-governance-appellant-scenarios-individual",
-    "epic": "governance"
+    "epic": "governance",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing appeals process without technical expertise",

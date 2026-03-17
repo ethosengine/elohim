@@ -6,7 +6,7 @@
   "title": "Manager coordinates operations to serve community needs workers prioritize",
   "description": "Manager coordinates operations to serve community needs workers prioritize",
   "content": "Scenario: Manager coordinates operations to serve community needs workers prioritize\n    Given workers democratically decided to prioritize local sourcing\n    And operational coordination is needed for supply chain transition\n    When Marcus coordinates shift from Sysco to Johnson Farm\n    Then Marcus manages logistics of local procurement\n    And Marcus tracks quality, costs, and community feedback\n    And Marcus ensures operational transition doesn't disrupt service\n    And workers govern strategic decision, Marcus executes operationally\n    And community benefits from local food system Marcus helps coordinate\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:autonomous_entity",
     "user_type:manager",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "autonomous-entity",
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
-    "epic": "autonomous_entity"
+    "epic": "autonomous_entity",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Manager coordinates operations to serve community needs workers prioritize",

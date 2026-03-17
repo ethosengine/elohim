@@ -6,7 +6,7 @@
   "title": "Professional identity maintained alongside disability identity",
   "description": "Professional identity maintained alongside disability identity",
   "content": "Scenario: Professional identity maintained alongside disability identity\n    Given Alex is a skilled data analyst with professional expertise\n    And disability is part of Alex's identity but doesn't define professional capability\n    When workplace interactions occur\n    Then the workplace_elohim should help Alex be seen as competent professional\n    And it should support Alex in asserting expertise and professional standing\n    And disability should not overshadow Alex's professional contributions\n    And Alex should be respected for skills and knowledge\n    And the protocol should help balance disability advocacy with professional identity\n    And Alex should not have to choose between being professional and being disabled\n    And both identities should be honored simultaneously\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Professional identity maintained alongside disability identity",

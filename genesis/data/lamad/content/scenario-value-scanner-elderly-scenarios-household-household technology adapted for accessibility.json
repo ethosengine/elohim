@@ -6,7 +6,7 @@
   "title": "Household technology adapted for accessibility",
   "description": "Household technology adapted for accessibility",
   "content": "Scenario: Household technology adapted for accessibility\n    Given Helen has difficulty with complex technology\n    And her home includes various devices and systems\n    When household technology is configured\n    Then all systems should be simplified for her access\n    And voice control should be available throughout\n    And large, simple controls should replace complex interfaces\n    And emergency systems should be easily accessible\n    And technology should serve her, not frustrate her\n    And assistive devices should integrate seamlessly\n    And the household should be adapted to her capabilities\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-household",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Household technology adapted for accessibility",

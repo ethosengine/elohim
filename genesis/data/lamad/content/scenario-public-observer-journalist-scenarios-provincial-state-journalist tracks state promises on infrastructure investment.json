@@ -6,7 +6,7 @@
   "title": "Journalist tracks state promises on infrastructure investment",
   "description": "Journalist tracks state promises on infrastructure investment",
   "content": "Scenario: Journalist tracks state promises on infrastructure investment\n    Given state announced major infrastructure funding 2 years ago\n    And the journalist covered initial announcement\n    When the Observer alerts on promise implementation timeline\n    Then the journalist investigates actual spending and project completion\n    And finds only 18% of promised funding has been allocated\n    And sees projects concentrated in politically connected districts\n    And documents communities still waiting for promised improvements\n    And publishes accountability story on broken infrastructure commitments\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist tracks state promises on infrastructure investment",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

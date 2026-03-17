@@ -6,7 +6,7 @@
   "title": "Parent discovers teacher coalition on class size",
   "description": "Parent discovers teacher coalition on class size",
   "content": "Scenario: Parent discovers teacher coalition on class size\n    Given the board proposes increasing class sizes to save money\n    And the parent opposes this for their child's learning\n    When the Observer shows teacher union position on class sizes\n    Then the parent sees teachers oppose increase for same reasons\n    And understands research on class size impacts on learning\n    And natural parent-teacher alliance against harmful policy becomes visible\n    And coordinated parent-teacher testimony defeats the proposal\n    And board cannot divide parents and teachers\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:parent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-parent-scenarios-educational",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Parent discovers teacher coalition on class size",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

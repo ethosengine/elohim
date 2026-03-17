@@ -6,7 +6,7 @@
   "title": "Building care relationships that will support Margaret's aging",
   "description": "Building care relationships that will support Margaret's aging",
   "content": "Scenario: Building care relationships that will support Margaret's aging\n    Given Margaret is building neighborhood relationships now\n    And she will need neighborhood support as she ages\n    When the neighborhood_elohim tracks care relationship development\n    Then it should recognize Margaret is building care economy capital\n    And her current contributions should create future reciprocity\n    And neighbors she helps now will help her later\n    And neighborhood care networks should support aging in place\n    And Margaret's care work should enable her own aging in community\n    And neighborhood relationships should provide long-term security\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:grandparent",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Building care relationships that will support Margaret's aging",

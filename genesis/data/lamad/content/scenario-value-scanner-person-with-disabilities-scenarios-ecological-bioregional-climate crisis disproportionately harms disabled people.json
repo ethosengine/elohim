@@ -6,7 +6,7 @@
   "title": "Climate crisis disproportionately harms disabled people",
   "description": "Climate crisis disproportionately harms disabled people",
   "content": "Scenario: Climate crisis disproportionately harms disabled people\n    Given disabled people are especially vulnerable to climate impacts\n    And emergency systems often fail disabled people\n    When climate adaptation is planned\n    Then the bioregional_elohim should center disabled people in climate planning\n    And Alex's perspective should inform climate justice strategies\n    And emergency preparedness should account for disability needs\n    And climate solutions should be accessible to disabled people\n    And the protocol should recognize disability as environmental justice issue\n    And Alex's expertise about vulnerability should guide climate work\n    And resilience planning should protect most vulnerable community members\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:person_with_disabilities",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Climate crisis disproportionately harms disabled people",

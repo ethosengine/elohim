@@ -6,7 +6,7 @@
   "title": "Journalist fact-checks mayor's budget claims in real-time",
   "description": "Journalist fact-checks mayor's budget claims in real-time",
   "content": "Scenario: Journalist fact-checks mayor's budget claims in real-time\n    Given the mayor gives state of city address with budget claims\n    And the journalist watches speech with deadline pressure\n    When the Observer provides instant fact-checking against city records\n    Then the journalist verifies mayor claims crime is down (true by 3%)\n    And fact-checks claim of record affordable housing investment (false - down 12%)\n    And checks police budget claim against actual spending (misleading framing)\n    And publishes real-time fact-check during speech\n    And rhetoric meets evidence-based accountability immediately\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:public_observer",
     "user_type:journalist",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "public-observer",
     "featureId": "feature-public-observer-journalist-scenarios-municipality",
-    "epic": "public_observer"
+    "epic": "public_observer",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Journalist fact-checks mayor's budget claims in real-time",
@@ -58,7 +59,7 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
     }
   ]

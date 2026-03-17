@@ -6,7 +6,7 @@
   "title": "Accessing crisis resources without losing dignity",
   "description": "Accessing crisis resources without losing dignity",
   "content": "Scenario: Accessing crisis resources without losing dignity\n    Given I need immediate assistance with food and housing\n    And I am worried about stigma and degradation\n    When I access support through the care economy network\n    Then resources are provided based on my care contributions, not means-testing\n    And I am treated as a community member deserving support\n    And there is no requirement to prove I'm \"needy enough\"\n    And I don't have to expose private trauma to gatekeepers\n    And assistance is framed as reciprocal care, not charity\n    And the system recognizes my parenting labor as valuable contribution\n    And my dignity is preserved throughout the support process\n    And I maintain my standing as a person, not a \"case\"\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "value-scanner",
     "scenario"
@@ -18,7 +18,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
-    "epic": null
+    "epic": null,
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Accessing crisis resources without losing dignity",

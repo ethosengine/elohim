@@ -6,7 +6,7 @@
   "title": "Elderly person's neighborhood contributions made visible",
   "description": "Elderly person's neighborhood contributions made visible",
   "content": "Scenario: Elderly person's neighborhood contributions made visible\n    Given Helen has contributed to neighborhood for decades\n    And she still participates in community memory-keeping\n    When Helen shares neighborhood history\n    Then her contributions should be recognized by neighborhood_elohim\n    And neighbors should see that Helen still gives to community\n    And her knowledge of neighborhood history should be valued\n    And care tokens should reflect her ongoing contributions\n    And she should experience herself as valued neighbor, not burden\n    And the protocol should make visible that care flows both ways\n    And longtime residents should have standing based on accumulated contributions\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:elderly",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Elderly person's neighborhood contributions made visible",

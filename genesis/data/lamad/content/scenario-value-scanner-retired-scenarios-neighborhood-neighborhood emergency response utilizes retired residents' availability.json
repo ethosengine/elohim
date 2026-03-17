@@ -6,7 +6,7 @@
   "title": "Neighborhood emergency response utilizes retired residents' availability",
   "description": "Neighborhood emergency response utilizes retired residents' availability",
   "content": "Scenario: Neighborhood emergency response utilizes retired residents' availability\n    Given Frank has daytime availability when many neighbors work\n    And neighborhoods need emergency response capacity\n    When the neighborhood_elohim coordinates emergency preparedness\n    Then it should include Frank in neighborhood emergency plans\n    And utilize his construction skills for emergency assessment\n    And coordinate check-ins on vulnerable neighbors during crises\n    And recognize retired residents as neighborhood resilience resources\n    And Frank should feel valuable in emergency response role\n    And his availability should serve collective security\n    And neighborhood should benefit from his time flexibility\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:retired",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Neighborhood emergency response utilizes retired residents' availability",

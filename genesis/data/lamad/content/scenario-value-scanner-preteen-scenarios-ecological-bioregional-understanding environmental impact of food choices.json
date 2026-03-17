@@ -6,7 +6,7 @@
   "title": "Understanding environmental impact of food choices",
   "description": "Understanding environmental impact of food choices",
   "content": "Scenario: Understanding environmental impact of food choices\n    Given Marcus is developing capacity for abstract thinking\n    And environmental sustainability connects to care economy\n    When Marcus makes food choices\n    Then the personal_agent should provide age-appropriate environmental information\n    And it should explain ecological impact in concrete terms\n    And it should not overwhelm him with climate anxiety\n    And it should frame environmental care as extension of household care\n    And ecological literacy should develop alongside care economy principles\n    And stewardship should extend from family to bioregion\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:preteen",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Understanding environmental impact of food choices",

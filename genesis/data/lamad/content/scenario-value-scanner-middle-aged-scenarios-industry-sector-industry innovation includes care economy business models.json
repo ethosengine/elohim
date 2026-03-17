@@ -6,7 +6,7 @@
   "title": "Industry innovation includes care economy business models",
   "description": "Industry innovation includes care economy business models",
   "content": "Scenario: Industry innovation includes care economy business models\n    Given industry innovation typically focuses on technology and efficiency\n    And care economy principles could inform business model innovation\n    And Robert's experience could contribute to innovation\n    When industry_elohim supports innovation advocacy\n    Then it should help Robert contribute to industry innovation discussions\n    And support development of care economy business models\n    And help industry recognize care economy as innovation opportunity\n    And build new business models based on care economy principles\n    And advance industry transformation through innovation\n    And demonstrate that care economy enables competitive advantage\n    And create industry future based on care economy\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:middle_aged",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Industry innovation includes care economy business models",

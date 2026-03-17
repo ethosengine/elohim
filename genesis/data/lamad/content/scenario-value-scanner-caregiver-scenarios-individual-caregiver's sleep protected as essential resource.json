@@ -6,7 +6,7 @@
   "title": "Caregiver's sleep protected as essential resource",
   "description": "Caregiver's sleep protected as essential resource",
   "content": "Scenario: Caregiver's sleep protected as essential resource\n    Given James is often awakened by David's nighttime needs\n    And chronic sleep deprivation threatens his ability to provide care\n    When the personal_agent monitors James's sleep patterns\n    Then it should recognize dangerous sleep deprivation\n    And it should prompt solutions for better sleep\n    And it should suggest respite care for nighttime support\n    And it should treat sleep as essential care infrastructure\n    And James's rest should be protected for sustainable caregiving\n",
-  "contentFormat": "gherkin",
+  "contentFormat": "markdown",
   "tags": [
     "epic:value_scanner",
     "user_type:caregiver",
@@ -25,7 +25,8 @@
   "metadata": {
     "category": "value-scanner",
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
-    "epic": "value_scanner"
+    "epic": "value_scanner",
+    "originalContentFormat": "gherkin"
   },
   "openGraphMetadata": {
     "ogTitle": "Caregiver's sleep protected as essential resource",
