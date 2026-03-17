@@ -33,6 +33,7 @@ export { FileAppealComponent } from './components/file-appeal/file-appeal.compon
 export { FeedbackAggregateComponent } from './components/feedback-aggregate/feedback-aggregate.component';
 export { ContributeStatementComponent } from './components/contribute-statement/contribute-statement.component';
 export { SensemakingPageComponent } from './components/sensemaking-page/sensemaking-page.component';
+export { GovernanceDispositionComponent } from './components/governance-disposition/governance-disposition.component';
 
 // Services
 export * from './services';
