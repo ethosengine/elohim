@@ -14,6 +14,9 @@ import { identityGuard } from '@app/imagodei/guards/identity.guard';
  * - /community/governance/challenges/new - File a new challenge
  * - /community/governance/challenges/:id - Challenge detail
  *
+ * - /community/governance/disposition - Governance disposition profile
+ * - /community/governance/proxy-votes - Proxy vote notifications
+ *
  * Future routes:
  * - /community/human - Community-specific profile settings
  * - /community/governance - Governance dashboard
@@ -92,6 +95,22 @@ export const COMMUNITY_ROUTES: Routes = [
             m => m.ChallengeDetailComponent
           ),
         data: { title: 'Challenge Detail' },
+      },
+      {
+        path: 'governance/disposition',
+        loadComponent: async () =>
+          import('./components/governance-disposition/governance-disposition.component').then(
+            m => m.GovernanceDispositionComponent
+          ),
+        data: { title: 'Governance Profile' },
+      },
+      {
+        path: 'governance/proxy-votes',
+        loadComponent: async () =>
+          import('./components/proxy-vote-list/proxy-vote-list.component').then(
+            m => m.ProxyVoteListComponent
+          ),
+        data: { title: 'Proxy Vote Notifications' },
       },
     ],
   },

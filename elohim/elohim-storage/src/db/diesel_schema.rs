@@ -439,6 +439,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    governance_dispositions (id) {
+        id -> Text,
+        human_id -> Text,
+        risk_tolerance -> Float,
+        change_openness -> Float,
+        consensus_preference -> Float,
+        priority_values -> Text,
+        voting_pattern_summary -> Text,
+        total_votes_cast -> Integer,
+        total_challenges_filed -> Integer,
+        total_signals_recorded -> Integer,
+        dht_anchor_hash -> Nullable<Text>,
+        last_computed_at -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     governance_signals (id) {
         id -> Text,
         entity_type -> Text,
@@ -890,6 +909,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     device_policies,
     discussions,
     economic_events,
+    governance_dispositions,
     governance_signals,
     governance_states,
     human_relationships,

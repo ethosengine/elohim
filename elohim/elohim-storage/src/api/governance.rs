@@ -19,16 +19,16 @@ use crate::db::models::{
 };
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::{response, sla_service};
+use crate::services::{disposition_service, response, sla_service};
 use crate::tally;
 use crate::views::{
     AppealView, CastRankedVoteInputView, CastVoteInputView, ChallengeView,
     CreateDiscussionInputView, CreateProposalInputView, CreateProposalOptionInputView,
     CreateStatementInputView, DiscussionView, FileAppealInputView, FileChallengeInputView,
-    GovernanceSignalView, GovernanceStateView, PostMessageInputView, PrecedentView,
-    ProposalOptionView, ProposalView, RankedVoteView, RecordSignalInputView,
-    RespondToChallengeInputView, StatementView, StatementVoteView, VoteOnStatementInputView,
-    VoteView,
+    GovernanceDispositionView, GovernanceSignalView, GovernanceStateView, PostMessageInputView,
+    PrecedentView, ProposalOptionView, ProposalView, RankedVoteView, RecordSignalInputView,
+    RespondToChallengeInputView, StatementView, StatementVoteView, UpdateDispositionInputView,
+    VoteOnStatementInputView, VoteView,
 };
 
 use super::get_conn;
@@ -634,6 +634,26 @@ pub async fn handle(
             Ok(response::ok(&views))
         }
 
+        // GET /api/v1/governance/proposals/{id}/proxy-votes — List proxy votes
+        (&Method::GET, p) if p.starts_with("/proposals/") && p.ends_with("/proxy-votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/proxy-votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+            let hide = proposal.voting_anonymous == 1;
+
+            let votes = governance::get_proxy_votes(&mut conn, id)?;
+            let views: Vec<RankedVoteView> = votes
+                .into_iter()
+                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .collect();
+            Ok(response::ok(&views))
+        }
+
         // GET /api/v1/governance/proposals/{id}
         (&Method::GET, p) if p.starts_with("/proposals/") => {
             let sub = p.strip_prefix("/proposals").unwrap_or("");
@@ -959,6 +979,333 @@ pub async fn handle(
                 &votes,
             );
             Ok(response::ok(&result))
+        }
+
+        // =================================================================
+        // Dispositions (Sprint 8: governance profiles)
+        // =================================================================
+
+        // POST /api/v1/governance/dispositions/{humanId}/compute — Compute and return
+        (&Method::POST, p) if p.starts_with("/dispositions/") && p.ends_with("/compute") => {
+            let human_id = p
+                .strip_prefix("/dispositions/")
+                .and_then(|s| s.strip_suffix("/compute"))
+                .ok_or_else(|| StorageError::InvalidInput("Human ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let disposition = disposition_service::compute_disposition(&mut conn, human_id)?;
+            Ok(response::ok(&GovernanceDispositionView::from(disposition)))
+        }
+
+        // GET /api/v1/governance/dispositions/{humanId} — Get current disposition
+        (&Method::GET, p) if p.starts_with("/dispositions/") => {
+            let sub = p.strip_prefix("/dispositions").unwrap_or("");
+            let human_id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Human ID required".to_string()))?;
+
+            let mut conn = get_conn(pool)?;
+            let result = governance::get_disposition(&mut conn, human_id)?;
+            Ok(response::from_option(
+                Ok(result.map(GovernanceDispositionView::from)),
+                &format!("Disposition not found for human {}", human_id),
+            ))
+        }
+
+        // PUT /api/v1/governance/dispositions/{humanId} — Manual override
+        (&Method::PUT, p) if p.starts_with("/dispositions/") => {
+            let sub = p.strip_prefix("/dispositions").unwrap_or("");
+            let human_id = extract_id(sub)
+                .ok_or_else(|| StorageError::InvalidInput("Human ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: UpdateDispositionInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let mut conn = get_conn(pool)?;
+
+            // Ensure disposition exists — compute first if not
+            let existing = governance::get_disposition(&mut conn, human_id)?;
+            if existing.is_none() {
+                disposition_service::compute_disposition(&mut conn, human_id)?;
+            }
+
+            let values_json = input
+                .priority_values
+                .map(|v| serde_json::to_string(&v.0).unwrap_or_default());
+
+            let disposition = governance::update_disposition_overrides(
+                &mut conn,
+                human_id,
+                input.risk_tolerance,
+                input.change_openness,
+                input.consensus_preference,
+                values_json.as_deref(),
+            )?;
+            Ok(response::ok(&GovernanceDispositionView::from(disposition)))
+        }
+
+        // =================================================================
+        // Proxy Voting (Sprint 8)
+        // =================================================================
+
+        // POST /api/v1/governance/proposals/{id}/proxy-votes — Cast proxy vote
+        (&Method::POST, p) if p.starts_with("/proposals/") && p.ends_with("/proxy-votes") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/proxy-votes"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CastRankedVoteInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            // Validate proxy_elohim_id is set
+            if input.proxy_elohim_id.is_none() {
+                return Ok(response::bad_request(
+                    "proxy_elohim_id is required for proxy votes",
+                ));
+            }
+
+            let mut conn = get_conn(pool)?;
+
+            // Validate proposal exists
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+
+            // Validate human hasn't voted directly
+            if governance::has_direct_vote(&mut conn, id, &input.human_id)? {
+                return Ok(response::bad_request(
+                    "Human has already voted directly — proxy vote not allowed",
+                ));
+            }
+
+            // Fetch options for validation
+            let options = governance::query_proposal_options(&mut conn, id)?;
+
+            // Build VotingConfig from proposal fields
+            let config = tally::VotingConfig {
+                score_min: proposal.score_min,
+                score_max: proposal.score_max,
+                dots_per_voter: proposal.dots_per_voter,
+                quorum_percentage: proposal.quorum_percentage,
+                passage_threshold: proposal.passage_threshold,
+            };
+
+            // Build temporary votes for validation
+            let now = crate::db::models::current_timestamp();
+            let temp_votes: Vec<crate::db::models::RankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| crate::db::models::RankedVote {
+                    id: format!("rv-proxy-{}-{}-{}", id, input.human_id, i),
+                    proposal_id: id.to_string(),
+                    human_id: input.human_id.clone(),
+                    option_id: b.option_id.clone(),
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.clone(),
+                    proxy_elohim_id: input.proxy_elohim_id.clone(),
+                    proxy_justification: input.proxy_justification.clone(),
+                    created_at: now.clone(),
+                    updated_at: now.clone(),
+                    dht_anchor_hash: None,
+                })
+                .collect();
+
+            // Validate ballot
+            let strategy = tally::get_strategy(&proposal.voting_mechanism).ok_or_else(|| {
+                StorageError::InvalidInput(format!(
+                    "Unknown voting mechanism: {}",
+                    proposal.voting_mechanism
+                ))
+            })?;
+            strategy
+                .validate_ballot(&temp_votes, &options, &config)
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!("Ballot validation failed: {}", e))
+                })?;
+
+            // Build NewRankedVote entries
+            let vote_ids: Vec<String> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("rv-proxy-{}-{}-{}", id, input.human_id, i))
+                .collect();
+
+            let new_votes: Vec<NewRankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| NewRankedVote {
+                    id: &vote_ids[i],
+                    proposal_id: id,
+                    human_id: &input.human_id,
+                    option_id: &b.option_id,
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.as_deref(),
+                    proxy_elohim_id: input.proxy_elohim_id.as_deref(),
+                    proxy_justification: input.proxy_justification.as_deref(),
+                    created_at: &now,
+                    updated_at: &now,
+                })
+                .collect();
+
+            let results =
+                governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
+            let hide = proposal.voting_anonymous == 1;
+            let views: Vec<RankedVoteView> = results
+                .into_iter()
+                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .collect();
+            Ok(response::created(&views))
+        }
+
+        // POST /api/v1/governance/proposals/{id}/override-proxy — Override proxy with direct vote
+        (&Method::POST, p) if p.starts_with("/proposals/") && p.ends_with("/override-proxy") => {
+            let id = p
+                .strip_prefix("/proposals/")
+                .and_then(|s| s.strip_suffix("/override-proxy"))
+                .ok_or_else(|| StorageError::InvalidInput("Proposal ID required".to_string()))?;
+
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Body read failed: {}", e)))?;
+            let input: CastRankedVoteInputView = serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            // Override must NOT have proxy_elohim_id (it's a direct vote)
+            if input.proxy_elohim_id.is_some() {
+                return Ok(response::bad_request(
+                    "proxy_elohim_id must not be set for direct override votes",
+                ));
+            }
+
+            let mut conn = get_conn(pool)?;
+
+            let proposal = governance::get_proposal(&mut conn, id)?
+                .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
+
+            // Delete proxy votes for this human
+            let deleted =
+                governance::delete_proxy_votes_for_human(&mut conn, id, &input.human_id)?;
+
+            // Fetch options for validation
+            let options = governance::query_proposal_options(&mut conn, id)?;
+
+            let config = tally::VotingConfig {
+                score_min: proposal.score_min,
+                score_max: proposal.score_max,
+                dots_per_voter: proposal.dots_per_voter,
+                quorum_percentage: proposal.quorum_percentage,
+                passage_threshold: proposal.passage_threshold,
+            };
+
+            // Validate the direct ballot
+            let now = crate::db::models::current_timestamp();
+            let temp_votes: Vec<crate::db::models::RankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| crate::db::models::RankedVote {
+                    id: format!("rv-{}-{}-{}", id, input.human_id, i),
+                    proposal_id: id.to_string(),
+                    human_id: input.human_id.clone(),
+                    option_id: b.option_id.clone(),
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.clone(),
+                    proxy_elohim_id: None,
+                    proxy_justification: None,
+                    created_at: now.clone(),
+                    updated_at: now.clone(),
+                    dht_anchor_hash: None,
+                })
+                .collect();
+
+            let strategy = tally::get_strategy(&proposal.voting_mechanism).ok_or_else(|| {
+                StorageError::InvalidInput(format!(
+                    "Unknown voting mechanism: {}",
+                    proposal.voting_mechanism
+                ))
+            })?;
+            strategy
+                .validate_ballot(&temp_votes, &options, &config)
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!("Ballot validation failed: {}", e))
+                })?;
+
+            // Cast the direct vote
+            let vote_ids: Vec<String> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("rv-{}-{}-{}", id, input.human_id, i))
+                .collect();
+
+            let new_votes: Vec<NewRankedVote> = input
+                .ballots
+                .iter()
+                .enumerate()
+                .map(|(i, b)| NewRankedVote {
+                    id: &vote_ids[i],
+                    proposal_id: id,
+                    human_id: &input.human_id,
+                    option_id: &b.option_id,
+                    rank: b.rank,
+                    score: b.score,
+                    dots: b.dots,
+                    approved: b.approved.map(|a| if a { 1 } else { 0 }),
+                    reasoning: input.reasoning.as_deref(),
+                    proxy_elohim_id: None,
+                    proxy_justification: None,
+                    created_at: &now,
+                    updated_at: &now,
+                })
+                .collect();
+
+            let results =
+                governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
+
+            // Record governance signal for the proxy override
+            let signal_id = format!(
+                "sig-proxy-override-{}-{}-{}",
+                id, input.human_id, now
+            );
+            let new_signal = crate::db::models::NewGovernanceSignal {
+                id: &signal_id,
+                entity_type: "proposal",
+                entity_id: id,
+                human_id: &input.human_id,
+                signal_type: "proxy-override",
+                signal_value: &format!("overrode {} proxy vote(s) with direct vote", deleted),
+                mechanism_level: 3, // Level 3: formal voting
+                proxy_elohim_id: None,
+                created_at: &now,
+            };
+            governance::record_signal(&mut conn, &new_signal)?;
+
+            let hide = proposal.voting_anonymous == 1;
+            let views: Vec<RankedVoteView> = results
+                .into_iter()
+                .map(|v| RankedVoteView::from_ranked_vote(v, hide))
+                .collect();
+            Ok(response::created(&views))
         }
 
         _ => Ok(response::not_found(&format!(

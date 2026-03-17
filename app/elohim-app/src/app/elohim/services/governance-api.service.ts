@@ -40,6 +40,8 @@ import type {
   CreateStatementInputView,
   VoteOnStatementInputView,
   SensemakingResultView,
+  GovernanceDispositionView,
+  UpdateDispositionInputView,
 } from '@elohim/storage-client/generated';
 
 @Injectable({ providedIn: 'root' })
@@ -414,6 +416,75 @@ export class GovernanceApiService implements IGovernance {
           },
         })
         .pipe(catchError(() => of(emptyResult)))
+    );
+  }
+
+  // --- Governance Dispositions ---
+
+  async getDisposition(humanId: string): Promise<GovernanceDispositionView | null> {
+    return firstValueFrom(
+      this.http
+        .get<GovernanceDispositionView>(
+          `/api/v1/governance/dispositions/${encodeURIComponent(humanId)}`
+        )
+        .pipe(catchError(() => of(null)))
+    );
+  }
+
+  async computeDisposition(humanId: string): Promise<GovernanceDispositionView> {
+    return firstValueFrom(
+      this.http.post<GovernanceDispositionView>(
+        `/api/v1/governance/dispositions/${encodeURIComponent(humanId)}/compute`,
+        null
+      )
+    );
+  }
+
+  async updateDisposition(
+    humanId: string,
+    overrides: UpdateDispositionInputView
+  ): Promise<GovernanceDispositionView> {
+    return firstValueFrom(
+      this.http.put<GovernanceDispositionView>(
+        `/api/v1/governance/dispositions/${encodeURIComponent(humanId)}`,
+        overrides
+      )
+    );
+  }
+
+  // --- Proxy Voting ---
+
+  async castProxyVotes(
+    proposalId: string,
+    ballot: CastRankedVoteInputView
+  ): Promise<RankedVoteView[]> {
+    return firstValueFrom(
+      this.http.post<RankedVoteView[]>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/proxy-votes`,
+        ballot
+      )
+    );
+  }
+
+  async getProxyVotes(proposalId: string): Promise<RankedVoteView[]> {
+    return firstValueFrom(
+      this.http
+        .get<RankedVoteView[]>(
+          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/proxy-votes`
+        )
+        .pipe(catchError(() => of([])))
+    );
+  }
+
+  async overrideProxyVote(
+    proposalId: string,
+    ballot: CastRankedVoteInputView
+  ): Promise<RankedVoteView[]> {
+    return firstValueFrom(
+      this.http.post<RankedVoteView[]>(
+        `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/override-proxy`,
+        ballot
+      )
     );
   }
 }

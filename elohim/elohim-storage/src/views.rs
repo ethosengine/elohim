@@ -89,9 +89,9 @@ use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
     AccessGrant, AgreementRow, App, Appeal, Challenge, Chapter, ChapterWithSteps, Content,
     ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
-    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceSignal,
-    GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Path,
-    PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
+    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceDisposition,
+    GovernanceSignal, GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship,
+    Path, PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
     ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Schedule,
     Statement, StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
     StewardshipAllocationWithPresence, Vote,
@@ -3838,6 +3838,67 @@ pub struct RecordSignalInputView {
     pub mechanism_level: i32,
     #[serde(default)]
     pub proxy_elohim_id: Option<String>,
+}
+
+// ============================================================================
+// Governance Disposition Views
+// ============================================================================
+
+/// Governance disposition — persistent governance profile (B: Agent-Scoped)
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceDispositionView {
+    pub id: String,
+    pub human_id: String,
+    pub risk_tolerance: f64,
+    pub change_openness: f64,
+    pub consensus_preference: f64,
+    pub priority_values: JsonVal,
+    pub voting_pattern_summary: JsonVal,
+    pub total_votes_cast: i32,
+    pub total_challenges_filed: i32,
+    pub total_signals_recorded: i32,
+    pub dht_anchor_hash: Option<String>,
+    pub last_computed_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<GovernanceDisposition> for GovernanceDispositionView {
+    fn from(d: GovernanceDisposition) -> Self {
+        Self {
+            id: d.id,
+            human_id: d.human_id,
+            risk_tolerance: d.risk_tolerance as f64,
+            change_openness: d.change_openness as f64,
+            consensus_preference: d.consensus_preference as f64,
+            priority_values: parse_json(&d.priority_values),
+            voting_pattern_summary: parse_json(&d.voting_pattern_summary),
+            total_votes_cast: d.total_votes_cast,
+            total_challenges_filed: d.total_challenges_filed,
+            total_signals_recorded: d.total_signals_recorded,
+            dht_anchor_hash: d.dht_anchor_hash,
+            last_computed_at: d.last_computed_at,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+        }
+    }
+}
+
+/// Update disposition manual overrides — API request
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateDispositionInputView {
+    #[serde(default)]
+    pub risk_tolerance: Option<f64>,
+    #[serde(default)]
+    pub change_openness: Option<f64>,
+    #[serde(default)]
+    pub consensus_preference: Option<f64>,
+    #[serde(default)]
+    pub priority_values: Option<JsonVal>,
 }
 
 /// Start a discussion — API request

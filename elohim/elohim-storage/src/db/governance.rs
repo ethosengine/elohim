@@ -6,14 +6,16 @@
 use diesel::prelude::*;
 
 use super::diesel_schema::{
-    appeals, challenges, discussions, governance_signals, governance_states, precedents,
-    proposal_options, proposals, ranked_votes, statement_votes, statements, votes,
+    appeals, challenges, discussions, governance_dispositions, governance_signals,
+    governance_states, precedents, proposal_options, proposals, ranked_votes, statement_votes,
+    statements, votes,
 };
 use super::models::{
-    Appeal, Challenge, Discussion, GovernanceSignal, GovernanceState, NewAppeal, NewChallenge,
-    NewDiscussion, NewGovernanceSignal, NewGovernanceState, NewPrecedent, NewProposal,
-    NewProposalOption, NewRankedVote, NewStatementVote, NewVote, Precedent, Proposal,
-    ProposalOption, RankedVote, Statement, StatementVote, Vote,
+    Appeal, Challenge, Discussion, GovernanceDisposition, GovernanceSignal, GovernanceState,
+    NewAppeal, NewChallenge, NewDiscussion, NewGovernanceDisposition, NewGovernanceSignal,
+    NewGovernanceState, NewPrecedent, NewProposal, NewProposalOption, NewRankedVote,
+    NewStatementVote, NewVote, Precedent, Proposal, ProposalOption, RankedVote, Statement,
+    StatementVote, Vote,
 };
 use crate::error::StorageError;
 
@@ -681,6 +683,219 @@ pub fn get_all_votes_for_entity(
     statement_votes::table
         .filter(statement_votes::statement_id.eq_any(&statement_ids))
         .order(statement_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// ============================================================================
+// Governance Dispositions (B: Agent-Scoped)
+// ============================================================================
+
+/// Get governance disposition by human_id
+pub fn get_disposition(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<Option<GovernanceDisposition>, StorageError> {
+    governance_dispositions::table
+        .filter(governance_dispositions::human_id.eq(human_id))
+        .first(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Upsert governance disposition — insert or replace by human_id
+pub fn upsert_disposition(
+    conn: &mut SqliteConnection,
+    new: &NewGovernanceDisposition,
+) -> Result<GovernanceDisposition, StorageError> {
+    // Delete existing disposition for this human (unique constraint)
+    diesel::delete(
+        governance_dispositions::table
+            .filter(governance_dispositions::human_id.eq(new.human_id)),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+
+    diesel::insert_into(governance_dispositions::table)
+        .values(new)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+
+    governance_dispositions::table
+        .filter(governance_dispositions::id.eq(new.id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Update specific disposition fields (manual overrides)
+pub fn update_disposition_overrides(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+    risk: Option<f64>,
+    change: Option<f64>,
+    consensus: Option<f64>,
+    values: Option<&str>,
+) -> Result<GovernanceDisposition, StorageError> {
+    let now = crate::db::models::current_timestamp();
+
+    // Apply each override field individually if present
+    if let Some(r) = risk {
+        diesel::update(
+            governance_dispositions::table
+                .filter(governance_dispositions::human_id.eq(human_id)),
+        )
+        .set(governance_dispositions::risk_tolerance.eq(r as f32))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    }
+    if let Some(c) = change {
+        diesel::update(
+            governance_dispositions::table
+                .filter(governance_dispositions::human_id.eq(human_id)),
+        )
+        .set(governance_dispositions::change_openness.eq(c as f32))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    }
+    if let Some(cp) = consensus {
+        diesel::update(
+            governance_dispositions::table
+                .filter(governance_dispositions::human_id.eq(human_id)),
+        )
+        .set(governance_dispositions::consensus_preference.eq(cp as f32))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    }
+    if let Some(v) = values {
+        diesel::update(
+            governance_dispositions::table
+                .filter(governance_dispositions::human_id.eq(human_id)),
+        )
+        .set(governance_dispositions::priority_values.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    }
+
+    // Always update the updated_at timestamp
+    diesel::update(
+        governance_dispositions::table
+            .filter(governance_dispositions::human_id.eq(human_id)),
+    )
+    .set(governance_dispositions::updated_at.eq(&now))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+
+    governance_dispositions::table
+        .filter(governance_dispositions::human_id.eq(human_id))
+        .first(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+// ============================================================================
+// Proxy Voting Helpers
+// ============================================================================
+
+/// Get proxy votes for a proposal (where proxy_elohim_id IS NOT NULL)
+pub fn get_proxy_votes(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+) -> Result<Vec<RankedVote>, StorageError> {
+    ranked_votes::table
+        .filter(ranked_votes::proposal_id.eq(proposal_id))
+        .filter(ranked_votes::proxy_elohim_id.is_not_null())
+        .order(ranked_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Check if a human has cast a direct vote (non-proxy) on a proposal
+pub fn has_direct_vote(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+    human_id: &str,
+) -> Result<bool, StorageError> {
+    let count: i64 = ranked_votes::table
+        .filter(ranked_votes::proposal_id.eq(proposal_id))
+        .filter(ranked_votes::human_id.eq(human_id))
+        .filter(ranked_votes::proxy_elohim_id.is_null())
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))?;
+    Ok(count > 0)
+}
+
+/// Delete proxy votes for a specific human on a proposal
+pub fn delete_proxy_votes_for_human(
+    conn: &mut SqliteConnection,
+    proposal_id: &str,
+    human_id: &str,
+) -> Result<usize, StorageError> {
+    diesel::delete(
+        ranked_votes::table
+            .filter(ranked_votes::proposal_id.eq(proposal_id))
+            .filter(ranked_votes::human_id.eq(human_id))
+            .filter(ranked_votes::proxy_elohim_id.is_not_null()),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))
+}
+
+/// Count ranked votes for a human across all proposals
+pub fn count_ranked_votes_for_human(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<i64, StorageError> {
+    ranked_votes::table
+        .filter(ranked_votes::human_id.eq(human_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))
+}
+
+/// Count challenges filed by a human
+pub fn count_challenges_for_human(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<i64, StorageError> {
+    challenges::table
+        .filter(challenges::challenger_id.eq(human_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))
+}
+
+/// Count governance signals for a human
+pub fn count_signals_for_human(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<i64, StorageError> {
+    governance_signals::table
+        .filter(governance_signals::human_id.eq(human_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count failed: {}", e)))
+}
+
+/// Get all ranked votes for a human (for disposition computation)
+pub fn get_all_ranked_votes_for_human(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<Vec<RankedVote>, StorageError> {
+    ranked_votes::table
+        .filter(ranked_votes::human_id.eq(human_id))
+        .order(ranked_votes::created_at.asc())
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+/// Get all challenges filed by a human (for disposition computation)
+pub fn get_challenges_by_human(
+    conn: &mut SqliteConnection,
+    human_id: &str,
+) -> Result<Vec<Challenge>, StorageError> {
+    challenges::table
+        .filter(challenges::challenger_id.eq(human_id))
+        .order(challenges::created_at.desc())
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
