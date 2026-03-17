@@ -236,3 +236,44 @@ Feature: Collective governance
     Then the gateway shows a "Diverse perspectives — sensemaking available" link
     When the learner clicks the link
     Then the sensemaking view opens with statement voting and cluster visualization
+
+  Scenario: Elohim builds governance disposition from voting history
+    Given "Matthew" has cast 42 votes across 12 proposals
+    And has filed 3 challenges with grounds "accuracy" and "fairness"
+    And has recorded 87 governance signals
+    When the elohim computes Matthew's governance disposition
+    Then the disposition reflects his voting behavior
+    And riskTolerance, changeOpenness, and consensusPreference values are between 0 and 1
+    And priorityValues include "accuracy" and "fairness" weighted by challenge frequency
+
+  Scenario: Elohim votes as proxy when human hasn't engaged
+    Given a proposal "Update assessment rubric" is in voting round
+    And "Matthew" has not voted within the engagement window
+    And Matthew's governance disposition has riskTolerance 0.6 and consensusPreference 0.8
+    When the elohim casts a proxy vote on Matthew's behalf
+    Then the proxy vote includes a justification referencing his disposition
+    And the vote is marked with the elohim's agent ID as proxyElohimId
+    And Matthew receives a notification about the proxy vote
+
+  Scenario: Human reviews proxy vote and confirms
+    Given the elohim has cast a proxy vote for "Matthew" on proposal "Update assessment rubric"
+    And Matthew views his governance notifications
+    When Matthew reviews the proxy vote and confirms it
+    Then the notification is dismissed
+    And the proxy vote remains as the official vote
+
+  Scenario: Human overrides elohim proxy vote
+    Given the elohim has cast a proxy vote for "Matthew" on proposal "Update assessment rubric"
+    And Matthew disagrees with the elohim's choice
+    When Matthew overrides the proxy vote with his own preference
+    Then his direct vote replaces the proxy vote
+    And the override is recorded as a governance signal
+    And the elohim's disposition model notes the divergence for future calibration
+
+  Scenario: Governance disposition reflects consistent values
+    Given "Matthew" has filed challenges primarily on grounds of "accuracy" and "fairness"
+    And his voting pattern shows high consensusPreference across 12 proposals
+    When his governance disposition is computed
+    Then priorityValues show "accuracy" and "fairness" as top-weighted values
+    And the disposition's consensusPreference matches his observed agreement rate
+    And the disposition can be used by his elohim for future proxy decisions
