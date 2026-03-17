@@ -22,9 +22,11 @@ import * as path from 'path';
 // =============================================================================
 
 const VALID_CONTENT_TYPES = [
+  // DNA-notarized types
   'epic', 'concept', 'lesson', 'scenario', 'assessment', 'resource',
   'reflection', 'discussion', 'exercise', 'example', 'reference', 'article',
-  'role', 'quiz', 'simulation'  // Additional types used in seed files
+  // Storage-only types (see protocol schema _storageOnly annotation)
+  'human', 'role',
 ];
 
 // Content Format Architecture:

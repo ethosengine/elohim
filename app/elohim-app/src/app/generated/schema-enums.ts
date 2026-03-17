@@ -1,9 +1,10 @@
-// AUTO-GENERATED from healing.rs - DO NOT EDIT
-// Generated at: 2026-03-05T14:29:44.588Z
-// Source: holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs
+// AUTO-GENERATED — aligned with protocol schema (elohim/sdk/schemas/current/enums/content-type.schema.json)
+// TODO: Phase 2 will replace this with imports from protocol schema codegen
+// Generated at: 2026-03-17T22:00:00.000Z
 
 /**
- * Content types - extended to support all imported content
+ * Content types — DNA-notarized types + storage-only types (human, role)
+ * Must match protocol schema enum: elohim/sdk/schemas/v1/enums/content-type.schema.json
  */
 export const CONTENT_TYPES = [
   'epic',
@@ -11,31 +12,15 @@ export const CONTENT_TYPES = [
   'lesson',
   'scenario',
   'assessment',
+  'resource',
   'reflection',
   'discussion',
   'exercise',
   'example',
   'reference',
   'article',
-  'feature',
-  'practice',
   'human',
-  'organization',
-  'contributor',
-  'video',
-  'audio',
-  'book',
-  'book-chapter',
-  'documentary',
-  'bible-verse',
-  'activity',
-  'narrative',
-  'course-module',
-  'module',
-  'quiz',
-  'podcast',
   'role',
-  'simulation',
 ] as const;
 
 export type ContentType = typeof CONTENT_TYPES[number];
