@@ -61,7 +61,12 @@ kind: Pod
 spec:
   serviceAccount: ee-jenkins
   nodeSelector:
-    node-type: edge
+    node-type: performance
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
   containers:
     - name: node
       image: node:20
@@ -69,11 +74,11 @@ spec:
       tty: true
       resources:
         requests:
-          memory: "2Gi"
+          memory: "4Gi"
           cpu: "1"
           ephemeral-storage: "3Gi"
         limits:
-          memory: "6Gi"
+          memory: "8Gi"
           cpu: "4"
           ephemeral-storage: "6Gi"
 '''
