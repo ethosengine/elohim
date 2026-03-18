@@ -61,12 +61,7 @@ kind: Pod
 spec:
   serviceAccount: jenkins-deployer
   nodeSelector:
-    node-type: performance
-  tolerations:
-    - key: "workload-type"
-      operator: "Equal"
-      value: "build"
-      effect: "NoSchedule"
+    node-type: edge
   containers:
     - name: node
       image: node:20
