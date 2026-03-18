@@ -59,7 +59,7 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
-  serviceAccount: jenkins-deployer
+  serviceAccount: ee-jenkins
   nodeSelector:
     node-type: edge
   containers:
