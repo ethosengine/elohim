@@ -191,7 +191,8 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
-                            export NODE_OPTIONS="--max-old-space-size=6144"
+                            # 2560MB per process × 3 (parent + 2 workers) fits in 8Gi container
+                            export NODE_OPTIONS="--max-old-space-size=2560"
                             pnpm exec jest --ci --coverage --maxWorkers=2
                         '''
                     }
