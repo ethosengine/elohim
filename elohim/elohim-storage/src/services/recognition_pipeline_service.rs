@@ -458,6 +458,7 @@ pub fn settle(
                 share.final_amount, weighted_amount, trigger.event_type
             )),
             metadata_json: None,
+            at_location: None,
         };
 
         record_event(conn, ctx, input)?;

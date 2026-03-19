@@ -186,6 +186,7 @@ diesel::table! {
         metadata_json -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
+        at_location -> Nullable<Text>,
     }
 }
 
@@ -309,6 +310,58 @@ diesel::table! {
         occurrence_count -> Integer,
         created_at -> Text,
         updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    places (id) {
+        id -> Text,
+        app_id -> Text,
+        dht_anchor_hash -> Text,
+        name -> Text,
+        place_type -> Text,
+        constitutional_layer -> Text,
+        h3_index -> Text,
+        h3_resolution -> Integer,
+        geometry_json -> Text,
+        centroid_lat -> Double,
+        centroid_lng -> Double,
+        parent_place_id -> Nullable<Text>,
+        osm_reference_json -> Nullable<Text>,
+        carrying_capacity_json -> Text,
+        governing_collective_id -> Nullable<Text>,
+        status -> Text,
+        created_by -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+        metadata_json -> Text,
+    }
+}
+
+diesel::table! {
+    spatial_contexts (id) {
+        id -> Text,
+        app_id -> Text,
+        entity_type -> Text,
+        entity_id -> Text,
+        latitude -> Nullable<Double>,
+        longitude -> Nullable<Double>,
+        altitude -> Nullable<Double>,
+        accuracy -> Nullable<Double>,
+        h3_res5 -> Nullable<Text>,
+        h3_res7 -> Nullable<Text>,
+        h3_res9 -> Nullable<Text>,
+        place_id -> Nullable<Text>,
+        osm_type -> Nullable<Text>,
+        osm_id -> Nullable<Integer>,
+        label -> Nullable<Text>,
+        context_type -> Text,
+        geometry_json -> Nullable<Text>,
+        metadata_json -> Nullable<Text>,
+        observed_at -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+        is_current -> Integer,
     }
 }
 
@@ -877,6 +930,56 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    hazards (id) {
+        id -> Text,
+        app_id -> Text,
+        place_id -> Text,
+        hazard_type -> Text,
+        severity -> Text,
+        title -> Text,
+        description -> Text,
+        reported_at -> Text,
+        projected_onset -> Nullable<Text>,
+        projected_end -> Nullable<Text>,
+        actual_onset -> Nullable<Text>,
+        resolved_at -> Nullable<Text>,
+        affected_h3_cells -> Text,
+        radius_km -> Nullable<Double>,
+        source -> Text,
+        source_reference -> Nullable<Text>,
+        metadata_json -> Text,
+        status -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    risk_alerts (id) {
+        id -> Text,
+        app_id -> Text,
+        place_id -> Text,
+        alert_type -> Text,
+        severity -> Text,
+        title -> Text,
+        description -> Text,
+        trigger_hazard_id -> Nullable<Text>,
+        trigger_data_json -> Text,
+        triggered_at -> Text,
+        lead_time_hours -> Nullable<Double>,
+        expires_at -> Nullable<Text>,
+        status -> Text,
+        acknowledged_by -> Nullable<Text>,
+        acknowledged_at -> Nullable<Text>,
+        resolved_at -> Nullable<Text>,
+        escalated_to -> Nullable<Text>,
+        metadata_json -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
@@ -912,6 +1015,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     governance_dispositions,
     governance_signals,
     governance_states,
+    hazards,
     human_relationships,
     humans,
     imagodei_observations,
@@ -929,6 +1033,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ranked_votes,
     rea_commitments,
     relationships,
+    risk_alerts,
     schema_version,
     schedules,
     statement_votes,

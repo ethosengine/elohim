@@ -683,6 +683,8 @@ pub struct EconomicEventView {
     pub metadata: Option<JsonVal>,
     pub dht_anchor_hash: Option<String>,
     pub created_at: String,
+    /// Place ID where this event occurred (spatial grounding)
+    pub at_location: Option<String>,
 }
 
 impl From<EconomicEvent> for EconomicEventView {
@@ -714,6 +716,7 @@ impl From<EconomicEvent> for EconomicEventView {
             metadata: parse_json_opt(&e.metadata_json),
             dht_anchor_hash: e.dht_anchor_hash,
             created_at: e.created_at,
+            at_location: e.at_location,
         }
     }
 }
@@ -1622,6 +1625,9 @@ pub struct CreateEconomicEventInputView {
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
     pub metadata: Option<JsonVal>,
+    /// Place ID where this event occurred (spatial grounding)
+    #[serde(default)]
+    pub at_location: Option<String>,
 }
 
 impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
@@ -1649,6 +1655,7 @@ impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
             triggered_by: v.triggered_by,
             note: v.note,
             metadata_json: serialize_json_opt(&v.metadata),
+            at_location: v.at_location,
         }
     }
 }
@@ -4892,7 +4899,474 @@ pub struct UpdateScheduleInputView {
 }
 
 // ============================================================================
+// Spatial Context Views
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SpatialContextView {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub h3_res5: Option<String>,
+    pub h3_res7: Option<String>,
+    pub h3_res9: Option<String>,
+    pub place_id: Option<String>,
+    pub osm_type: Option<String>,
+    pub osm_id: Option<i32>,
+    pub label: Option<String>,
+    pub context_type: String,
+    pub geometry_json: Option<JsonVal>,
+    pub metadata: Option<JsonVal>,
+    pub observed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub is_current: bool,
+}
+
+impl From<crate::db::models::SpatialContext> for SpatialContextView {
+    fn from(s: crate::db::models::SpatialContext) -> Self {
+        Self {
+            id: s.id,
+            entity_type: s.entity_type,
+            entity_id: s.entity_id,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            altitude: s.altitude,
+            accuracy: s.accuracy,
+            h3_res5: s.h3_res5,
+            h3_res7: s.h3_res7,
+            h3_res9: s.h3_res9,
+            place_id: s.place_id,
+            osm_type: s.osm_type,
+            osm_id: s.osm_id,
+            label: s.label,
+            context_type: s.context_type,
+            geometry_json: parse_json_opt(&s.geometry_json),
+            metadata: parse_json_opt(&s.metadata_json),
+            observed_at: s.observed_at,
+            created_at: s.created_at,
+            updated_at: s.updated_at,
+            is_current: s.is_current == 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateSpatialContextInputView {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub place_id: Option<String>,
+    pub osm_type: Option<String>,
+    pub osm_id: Option<i32>,
+    pub label: Option<String>,
+    pub context_type: Option<String>,
+    pub geometry_json: Option<JsonVal>,
+    pub metadata: Option<JsonVal>,
+    pub observed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateSpatialContextInputView {
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub place_id: Option<String>,
+    pub label: Option<String>,
+    pub context_type: Option<String>,
+    pub geometry_json: Option<JsonVal>,
+    pub metadata: Option<JsonVal>,
+    pub observed_at: Option<String>,
+}
+
+// ============================================================================
+// Place Views (governed spatial entity — DHT projection)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PlaceView {
+    pub id: String,
+    pub dht_anchor_hash: String,
+    pub name: String,
+    pub place_type: String,
+    pub constitutional_layer: String,
+    pub h3_index: String,
+    pub h3_resolution: i32,
+    pub geometry_json: Option<JsonVal>,
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    pub parent_place_id: Option<String>,
+    pub osm_reference: Option<JsonVal>,
+    pub carrying_capacity: Option<JsonVal>,
+    pub governing_collective_id: Option<String>,
+    pub status: String,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata: Option<JsonVal>,
+}
+
+impl From<crate::db::models::Place> for PlaceView {
+    fn from(p: crate::db::models::Place) -> Self {
+        Self {
+            id: p.id,
+            dht_anchor_hash: p.dht_anchor_hash,
+            name: p.name,
+            place_type: p.place_type,
+            constitutional_layer: p.constitutional_layer,
+            h3_index: p.h3_index,
+            h3_resolution: p.h3_resolution,
+            geometry_json: Some(parse_json(&p.geometry_json)),
+            centroid_lat: p.centroid_lat,
+            centroid_lng: p.centroid_lng,
+            parent_place_id: p.parent_place_id,
+            osm_reference: parse_json_opt(&p.osm_reference_json),
+            carrying_capacity: Some(parse_json(&p.carrying_capacity_json)),
+            governing_collective_id: p.governing_collective_id,
+            status: p.status,
+            created_by: p.created_by,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            metadata: Some(parse_json(&p.metadata_json)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreatePlaceInputView {
+    pub name: String,
+    pub place_type: String,
+    pub constitutional_layer: String,
+    pub h3_index: String,
+    pub h3_resolution: i32,
+    pub geometry_json: JsonVal,
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    pub parent_place_id: Option<String>,
+    pub osm_reference: Option<JsonVal>,
+    pub carrying_capacity: Option<JsonVal>,
+    pub governing_collective_id: Option<String>,
+    pub status: Option<String>,
+    pub metadata: Option<JsonVal>,
+}
+
+// ============================================================================
+// Hazard Views (Sprint 7 — Risk + Resilience Mapping)
+// ============================================================================
+
+use crate::db::models::{Hazard, RiskAlert};
+
+/// View for a geospatial hazard event
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HazardView {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub hazard_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub reported_at: String,
+    pub projected_onset: Option<String>,
+    pub projected_end: Option<String>,
+    pub actual_onset: Option<String>,
+    pub resolved_at: Option<String>,
+    pub affected_h3_cells: JsonVal,
+    pub radius_km: Option<f64>,
+    pub source: String,
+    pub source_reference: Option<String>,
+    pub metadata: Option<JsonVal>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<Hazard> for HazardView {
+    fn from(h: Hazard) -> Self {
+        Self {
+            id: h.id,
+            app_id: h.app_id,
+            place_id: h.place_id,
+            hazard_type: h.hazard_type,
+            severity: h.severity,
+            title: h.title,
+            description: h.description,
+            reported_at: h.reported_at,
+            projected_onset: h.projected_onset,
+            projected_end: h.projected_end,
+            actual_onset: h.actual_onset,
+            resolved_at: h.resolved_at,
+            affected_h3_cells: parse_json(&h.affected_h3_cells),
+            radius_km: h.radius_km,
+            source: h.source,
+            source_reference: h.source_reference,
+            metadata: parse_json_opt(&Some(h.metadata_json)),
+            status: h.status,
+            created_at: h.created_at,
+            updated_at: h.updated_at,
+        }
+    }
+}
+
+/// Input for creating a hazard
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateHazardInputView {
+    pub place_id: String,
+    pub hazard_type: String,
+    pub severity: String,
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub projected_onset: Option<String>,
+    #[serde(default)]
+    pub projected_end: Option<String>,
+    #[serde(default)]
+    pub affected_h3_cells: Option<Vec<String>>,
+    #[serde(default)]
+    pub radius_km: Option<f64>,
+    #[serde(default = "default_hazard_source")]
+    pub source: String,
+    #[serde(default)]
+    pub source_reference: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+}
+
+fn default_hazard_source() -> String {
+    "manual-report".to_string()
+}
+
+// ============================================================================
+// RiskAlert Views (Sprint 7 — Risk + Resilience Mapping)
+// ============================================================================
+
+/// View for a generated risk alert
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RiskAlertView {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub alert_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub trigger_hazard_id: Option<String>,
+    pub trigger_data: Option<JsonVal>,
+    pub triggered_at: String,
+    pub lead_time_hours: Option<f64>,
+    pub expires_at: Option<String>,
+    pub status: String,
+    pub acknowledged_by: Option<String>,
+    pub acknowledged_at: Option<String>,
+    pub resolved_at: Option<String>,
+    pub escalated_to: Option<String>,
+    pub metadata: Option<JsonVal>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<RiskAlert> for RiskAlertView {
+    fn from(r: RiskAlert) -> Self {
+        Self {
+            id: r.id,
+            app_id: r.app_id,
+            place_id: r.place_id,
+            alert_type: r.alert_type,
+            severity: r.severity,
+            title: r.title,
+            description: r.description,
+            trigger_hazard_id: r.trigger_hazard_id,
+            trigger_data: parse_json_opt(&Some(r.trigger_data_json)),
+            triggered_at: r.triggered_at,
+            lead_time_hours: r.lead_time_hours,
+            expires_at: r.expires_at,
+            status: r.status,
+            acknowledged_by: r.acknowledged_by,
+            acknowledged_at: r.acknowledged_at,
+            resolved_at: r.resolved_at,
+            escalated_to: r.escalated_to,
+            metadata: parse_json_opt(&Some(r.metadata_json)),
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+/// Input for updating a risk alert (PATCH semantics)
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct UpdateRiskAlertInputView {
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub acknowledged_by: Option<String>,
+    #[serde(default)]
+    pub escalated_to: Option<String>,
+}
+
+// ============================================================================
 // Schema Version Tests
+// ============================================================================
+
+// ============================================================================
+// Spatial Dashboard Views (Sprint 8 — Planet-Scale Governance Dashboard)
+// ============================================================================
+
+/// Carrying capacity summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CapacitySummaryView {
+    pub resource_count: u32,
+    pub worst_utilization: f64,
+    pub worst_category: String,
+    pub trigger_governance: bool,
+}
+
+/// Hazard summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HazardEntrySummaryView {
+    pub active_count: u32,
+    pub worst_severity: String,
+    pub nearest_onset_hours: Option<f64>,
+    pub types: Vec<String>,
+}
+
+/// Vulnerability summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct VulnerabilitySummaryView {
+    pub overall_score: f64,
+    pub risk_tier: String,
+    pub preparation_status: String,
+}
+
+/// Weather summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct WeatherEntrySummaryView {
+    pub risk_level: String,
+    pub temperature_c: f64,
+    pub precipitation_mm: f64,
+    pub wind_speed_kmh: f64,
+}
+
+/// Alert summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AlertEntrySummaryView {
+    pub active_count: u32,
+    pub worst_severity: String,
+    pub unacknowledged_count: u32,
+    pub types: Vec<String>,
+}
+
+/// Route summary for the dashboard tile
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RouteEntrySummaryView {
+    pub active_route_count: u32,
+    pub total_distance_km: f64,
+}
+
+/// Single place entry in the planet-scale dashboard
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PlaceDashboardEntry {
+    // Core (always present)
+    pub id: String,
+    pub name: String,
+    pub place_type: String,
+    pub constitutional_layer: String,
+    pub h3_index: String,
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    pub geometry_json: Option<JsonVal>,
+    pub status: String,
+    pub parent_place_id: Option<String>,
+    // Optional enrichments
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity: Option<CapacitySummaryView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hazards: Option<HazardEntrySummaryView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vulnerability: Option<VulnerabilitySummaryView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weather: Option<WeatherEntrySummaryView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alerts: Option<AlertEntrySummaryView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub routes: Option<RouteEntrySummaryView>,
+}
+
+/// Risk tier distribution counts across all places
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RiskTierDistribution {
+    pub low: u32,
+    pub moderate: u32,
+    pub elevated: u32,
+    pub critical: u32,
+    pub unknown: u32,
+}
+
+/// Summary statistics for the full dashboard
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DashboardSummaryView {
+    pub total_places: u32,
+    pub places_by_risk_tier: RiskTierDistribution,
+    pub total_active_hazards: u32,
+    pub total_active_alerts: u32,
+    pub total_unacknowledged_alerts: u32,
+    pub worst_overall_risk: String,
+}
+
+/// Full spatial dashboard response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SpatialDashboardView {
+    pub places: Vec<PlaceDashboardEntry>,
+    pub summary: DashboardSummaryView,
+    pub queried_at: String,
+}
+
 // ============================================================================
 
 #[cfg(test)]

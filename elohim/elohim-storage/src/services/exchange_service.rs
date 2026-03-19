@@ -460,6 +460,7 @@ impl ExchangeService {
                 triggered_by: None,
                 note: input.description.clone(),
                 metadata_json: Some(request_json),
+                at_location: None,
             };
             record_event(conn, ctx, req_event_input)?;
 
@@ -490,6 +491,7 @@ impl ExchangeService {
                 triggered_by: Some(format!("evt-{}", request_id)),
                 note: Some(format!("Intent for request {}", request_id)),
                 metadata_json: Some(intent_json),
+                at_location: None,
             };
             record_event(conn, ctx, intent_event_input)?;
 
@@ -524,6 +526,7 @@ impl ExchangeService {
                 triggered_by: None,
                 note: Some(format!("Service request created: {}", request.title)),
                 metadata_json: Some(created_event_meta.to_string()),
+                at_location: None,
             };
             let created_event = record_event(conn, ctx, creation_event_input)?;
 
@@ -608,6 +611,7 @@ impl ExchangeService {
             triggered_by: None,
             note: updated.description.clone(),
             metadata_json: Some(updated_json),
+            at_location: None,
         };
         record_event(conn, ctx, update_event_input)?;
 
@@ -763,6 +767,7 @@ impl ExchangeService {
                 triggered_by: None,
                 note: input.description.clone(),
                 metadata_json: Some(offer_json),
+                at_location: None,
             };
             record_event(conn, ctx, offer_event_input)?;
 
@@ -793,6 +798,7 @@ impl ExchangeService {
                 triggered_by: Some(format!("evt-{}", offer_id)),
                 note: Some(format!("Intent for offer {}", offer_id)),
                 metadata_json: Some(intent_json),
+                at_location: None,
             };
             record_event(conn, ctx, intent_event_input)?;
 
@@ -827,6 +833,7 @@ impl ExchangeService {
                 triggered_by: None,
                 note: Some(format!("Service offer created: {}", offer.title)),
                 metadata_json: Some(created_event_meta.to_string()),
+                at_location: None,
             };
             let created_event = record_event(conn, ctx, creation_event_input)?;
 
@@ -903,6 +910,7 @@ impl ExchangeService {
             triggered_by: None,
             note: updated.description.clone(),
             metadata_json: Some(updated_json),
+            at_location: None,
         };
         record_event(conn, ctx, update_event_input)?;
 

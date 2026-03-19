@@ -20,21 +20,28 @@ pub mod comments;
 pub mod compute;
 pub mod contributors;
 pub mod custodians;
+pub mod dashboard;
 pub mod economic_events;
 pub mod exchange;
 pub mod flow_planning;
 pub mod gate;
 pub mod governance;
+pub mod hazards;
 pub mod identity;
 pub mod mastery;
+pub mod places;
 pub mod presence;
 pub mod rea_commitments;
 pub mod recognition;
 pub mod resources;
+pub mod risk;
+pub mod routing;
 pub mod schedules;
+pub mod spatial;
 pub mod steward;
 pub mod steward_affinity;
 pub mod stewardship;
+pub mod weather;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -112,9 +119,30 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("recognition") {
         let resource_path = sub_path.strip_prefix("recognition").unwrap_or("");
         recognition::handle(req, method, resource_path, &pool, &app_ctx, services).await
+    } else if sub_path.starts_with("routing") {
+        let resource_path = sub_path.strip_prefix("routing").unwrap_or("");
+        routing::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("weather") {
+        let resource_path = sub_path.strip_prefix("weather").unwrap_or("");
+        weather::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("risk") {
+        let resource_path = sub_path.strip_prefix("risk").unwrap_or("");
+        risk::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("hazards") {
+        let resource_path = sub_path.strip_prefix("hazards").unwrap_or("");
+        hazards::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("dashboard") {
+        let resource_path = sub_path.strip_prefix("dashboard").unwrap_or("");
+        dashboard::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("places") {
+        let resource_path = sub_path.strip_prefix("places").unwrap_or("");
+        places::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("schedules") {
         let resource_path = sub_path.strip_prefix("schedules").unwrap_or("");
         schedules::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("spatial-contexts") {
+        let resource_path = sub_path.strip_prefix("spatial-contexts").unwrap_or("");
+        spatial::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("steward-affinity") {
         let resource_path = sub_path.strip_prefix("steward-affinity").unwrap_or("");
         steward_affinity::handle(req, method, resource_path, &pool, &app_ctx, services).await

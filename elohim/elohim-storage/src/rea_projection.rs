@@ -110,6 +110,7 @@ pub struct EconomicEventPayload {
     pub triggered_by: Option<String>,
     pub note: Option<String>,
     pub metadata_json: Option<String>,
+    pub at_location: Option<String>,
 }
 
 // ============================================================================
@@ -195,6 +196,7 @@ pub fn handle_rea_signal(
                 triggered_by: event.triggered_by,
                 note: event.note,
                 metadata_json: event.metadata_json,
+                at_location: event.at_location,
             };
             economic_events::upsert_with_anchor(&mut conn, ctx, input, Some(&action_hash))?;
         }

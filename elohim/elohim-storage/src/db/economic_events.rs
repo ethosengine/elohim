@@ -60,6 +60,9 @@ pub struct CreateEconomicEventInput {
     pub note: Option<String>,
     #[serde(default)]
     pub metadata_json: Option<String>,
+    /// Place ID where this event occurred (spatial grounding for carrying capacity)
+    #[serde(default)]
+    pub at_location: Option<String>,
 }
 
 /// Query parameters for listing economic events - camelCase for URL params
@@ -326,6 +329,7 @@ pub fn record_event(
         note: input.note.as_deref(),
         metadata_json: input.metadata_json.as_deref(),
         dht_anchor_hash: None,
+        at_location: input.at_location.as_deref(),
     };
 
     diesel::insert_into(economic_events::table)
@@ -371,6 +375,7 @@ pub fn record_content_view(
             triggered_by: None,
             note: None,
             metadata_json: None,
+            at_location: None,
         },
     )
 }
@@ -415,6 +420,7 @@ pub fn record_mastery_advancement(
             triggered_by: None,
             note: Some(format!("Advanced from {} to {}", from_level, to_level)),
             metadata_json: Some(metadata.to_string()),
+            at_location: None,
         },
     )
 }
@@ -453,6 +459,7 @@ pub fn record_citation(
             triggered_by: None,
             note: None,
             metadata_json: None,
+            at_location: None,
         },
     )
 }
@@ -491,6 +498,7 @@ pub fn record_path_completion(
             triggered_by: None,
             note: None,
             metadata_json: None,
+            at_location: None,
         },
     )
 }
@@ -530,6 +538,7 @@ pub fn record_affinity_transfer(
             triggered_by: None,
             note: None,
             metadata_json: None,
+            at_location: None,
         },
     )
 }
@@ -644,6 +653,7 @@ pub fn upsert_with_anchor(
             note: input.note.as_deref(),
             metadata_json: input.metadata_json.as_deref(),
             dht_anchor_hash,
+            at_location: input.at_location.as_deref(),
         };
 
         diesel::insert_into(economic_events::table)

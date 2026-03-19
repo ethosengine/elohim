@@ -16,12 +16,12 @@ use super::diesel_schema::{
     access_grants, agreements, appeals, apps, challenges, chapters, collective_participations,
     collectives, comments, content, content_attestations, content_mastery, content_tags,
     contributor_dashboards, contributor_presences, custodian_metrics, device_policies, discussions,
-    economic_events, governance_dispositions, governance_signals, governance_states,
+    economic_events, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
-    node_stewardship, path_attestations, path_extensions, path_tags, paths, precedents,
+    node_stewardship, path_attestations, path_extensions, path_tags, paths, places, precedents,
     premium_gates, proposal_options, proposals, ranked_votes, rea_commitments, relationships,
-    schedules, statement_votes, statements, steps, steward_credentials, stewarded_nodes,
-    stewardship_allocations, votes,
+    risk_alerts, schedules, spatial_contexts, statement_votes, statements, steps,
+    steward_credentials, stewarded_nodes, stewardship_allocations, votes,
 };
 
 // ============================================================================
@@ -552,6 +552,8 @@ pub struct EconomicEvent {
     pub metadata_json: Option<String>,
     pub dht_anchor_hash: Option<String>,
     pub created_at: String,
+    /// Place ID where this event occurred (spatial grounding for carrying capacity)
+    pub at_location: Option<String>,
 }
 
 /// New economic event for INSERT
@@ -583,6 +585,7 @@ pub struct NewEconomicEvent<'a> {
     pub note: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
+    pub at_location: Option<&'a str>,
 }
 
 // ============================================================================
@@ -2453,6 +2456,236 @@ pub struct NewSchedule {
     pub last_occurred_at: Option<String>,
     pub next_occurrence_at: Option<String>,
     pub occurrence_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
+// Spatial Context — polymorphic geospatial attachment
+// Source of truth: SQLite (operational, Category C)
+// =============================================================================
+
+/// Spatial context record (SELECT)
+#[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
+#[diesel(table_name = spatial_contexts)]
+pub struct SpatialContext {
+    pub id: String,
+    pub app_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub h3_res5: Option<String>,
+    pub h3_res7: Option<String>,
+    pub h3_res9: Option<String>,
+    pub place_id: Option<String>,
+    pub osm_type: Option<String>,
+    pub osm_id: Option<i32>,
+    pub label: Option<String>,
+    pub context_type: String,
+    pub geometry_json: Option<String>,
+    pub metadata_json: Option<String>,
+    pub observed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub is_current: i32,
+}
+
+/// New spatial context for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = spatial_contexts)]
+pub struct NewSpatialContext {
+    pub id: String,
+    pub app_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub h3_res5: Option<String>,
+    pub h3_res7: Option<String>,
+    pub h3_res9: Option<String>,
+    pub place_id: Option<String>,
+    pub osm_type: Option<String>,
+    pub osm_id: Option<i32>,
+    pub label: Option<String>,
+    pub context_type: String,
+    pub geometry_json: Option<String>,
+    pub metadata_json: Option<String>,
+    pub observed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub is_current: i32,
+}
+
+// =============================================================================
+// Place — notarized governed spatial entity
+// Source of truth: DHT (Mishpat DNA, Category A)
+// =============================================================================
+
+/// Place record (SELECT) — storage projection of DHT Place entry
+#[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
+#[diesel(table_name = places)]
+pub struct Place {
+    pub id: String,
+    pub app_id: String,
+    pub dht_anchor_hash: String,
+    pub name: String,
+    pub place_type: String,
+    pub constitutional_layer: String,
+    pub h3_index: String,
+    pub h3_resolution: i32,
+    pub geometry_json: String,
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    pub parent_place_id: Option<String>,
+    pub osm_reference_json: Option<String>,
+    pub carrying_capacity_json: String,
+    pub governing_collective_id: Option<String>,
+    pub status: String,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// New place for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = places)]
+pub struct NewPlace {
+    pub id: String,
+    pub app_id: String,
+    pub dht_anchor_hash: String,
+    pub name: String,
+    pub place_type: String,
+    pub constitutional_layer: String,
+    pub h3_index: String,
+    pub h3_resolution: i32,
+    pub geometry_json: String,
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    pub parent_place_id: Option<String>,
+    pub osm_reference_json: Option<String>,
+    pub carrying_capacity_json: String,
+    pub governing_collective_id: Option<String>,
+    pub status: String,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+// =============================================================================
+// Hazard — geospatial risk event
+// Source of truth: SQLite (operational, Category C)
+// Reconstructable from external feeds / manual reports on cache miss.
+// =============================================================================
+
+/// Hazard record (SELECT)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize)]
+#[diesel(table_name = hazards)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct Hazard {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub hazard_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub reported_at: String,
+    pub projected_onset: Option<String>,
+    pub projected_end: Option<String>,
+    pub actual_onset: Option<String>,
+    pub resolved_at: Option<String>,
+    pub affected_h3_cells: String,
+    pub radius_km: Option<f64>,
+    pub source: String,
+    pub source_reference: Option<String>,
+    pub metadata_json: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New hazard for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = hazards)]
+pub struct NewHazard {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub hazard_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub reported_at: String,
+    pub projected_onset: Option<String>,
+    pub projected_end: Option<String>,
+    pub affected_h3_cells: String,
+    pub radius_km: Option<f64>,
+    pub source: String,
+    pub source_reference: Option<String>,
+    pub metadata_json: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
+// RiskAlert — generated alert from vulnerability assessment
+// Source of truth: SQLite (operational, Category C)
+// Reconstructable by re-running evaluate_and_generate_alerts on each Place.
+// =============================================================================
+
+/// Risk alert record (SELECT)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize)]
+#[diesel(table_name = risk_alerts)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct RiskAlert {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub alert_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub trigger_hazard_id: Option<String>,
+    pub trigger_data_json: String,
+    pub triggered_at: String,
+    pub lead_time_hours: Option<f64>,
+    pub expires_at: Option<String>,
+    pub status: String,
+    pub acknowledged_by: Option<String>,
+    pub acknowledged_at: Option<String>,
+    pub resolved_at: Option<String>,
+    pub escalated_to: Option<String>,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New risk alert for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = risk_alerts)]
+pub struct NewRiskAlert {
+    pub id: String,
+    pub app_id: String,
+    pub place_id: String,
+    pub alert_type: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub trigger_hazard_id: Option<String>,
+    pub trigger_data_json: String,
+    pub triggered_at: String,
+    pub lead_time_hours: Option<f64>,
+    pub expires_at: Option<String>,
+    pub status: String,
+    pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::resource_nature::{Circularity, Depletability, ResourceNature, Rivalry};
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 
@@ -301,6 +302,10 @@ pub struct StewardedResource {
     pub resource_number: String,
     pub steward_id: String,
     pub category: ResourceCategory,
+    /// Economic nature — rivalry, excludability, depletability, fungibility, circularity.
+    /// Source of truth: inherited from parent DHT entry via resource_spec_id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nature: Option<ResourceNature>,
     pub subcategory: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -432,6 +437,19 @@ pub struct StewardedResourceDashboard {
 // Constitutional Limits
 // =============================================================================
 
+/// Filter for targeting constitutional limits by resource nature dimensions.
+/// Enables rules like "all depletable+rival resources at community level require observer attestation."
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NatureFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rivalry: Option<Rivalry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depletability: Option<Depletability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub circularity: Option<Circularity>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConstitutionalLimit {
@@ -461,6 +479,13 @@ pub struct ConstitutionalLimit {
     pub transition_deadline: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hard_stop_date: Option<String>,
+    /// Optional nature filter — this limit applies only to resources matching these nature dimensions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nature_filter: Option<NatureFilter>,
+    /// Optional Place scope — this limit applies within a specific governed Place.
+    /// When set, limit is enforced against the Place's carrying capacity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub place_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -474,6 +499,8 @@ pub struct ConstitutionalLimit {
 pub struct CreateResourceRequest {
     pub steward_id: String,
     pub category: ResourceCategory,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nature: Option<ResourceNature>,
     pub subcategory: String,
     pub name: String,
     pub total_capacity: ResourceMeasure,
@@ -579,6 +606,7 @@ impl ResourceService {
             resource_number,
             steward_id: req.steward_id.clone(),
             category: req.category,
+            nature: req.nature,
             subcategory: req.subcategory,
             name: req.name,
             description: req.description,
@@ -749,6 +777,7 @@ impl ResourceService {
                     triggered_by: None,
                     note: req.note.clone(),
                     metadata_json: None,
+                    at_location: None,
                 },
             )?;
             event.id.clone()
@@ -1070,6 +1099,8 @@ fn constitutional_limit_for(category: &ResourceCategory) -> Option<Constitutiona
             enforcement_method: EnforcementMethod::Progressive,
             transition_deadline: Some("2035-12-31".into()),
             hard_stop_date: None,
+            nature_filter: None,
+            place_id: None,
             created_at: now.clone(),
             updated_at: now,
         }),
@@ -1097,6 +1128,8 @@ fn constitutional_limit_for(category: &ResourceCategory) -> Option<Constitutiona
             enforcement_method: EnforcementMethod::Voluntary,
             transition_deadline: None,
             hard_stop_date: None,
+            nature_filter: None,
+            place_id: None,
             created_at: now.clone(),
             updated_at: now,
         }),
@@ -1124,6 +1157,8 @@ fn constitutional_limit_for(category: &ResourceCategory) -> Option<Constitutiona
             enforcement_method: EnforcementMethod::Progressive,
             transition_deadline: None,
             hard_stop_date: None,
+            nature_filter: None,
+            place_id: None,
             created_at: now.clone(),
             updated_at: now,
         }),

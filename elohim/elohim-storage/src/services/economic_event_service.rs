@@ -223,6 +223,7 @@ impl EconomicEventService {
             triggered_by: staged.id.clone().into(),
             note: Some(note),
             metadata_json: Some(metadata_json),
+            at_location: None,
         };
 
         let event = record_event(conn, ctx, input)?;

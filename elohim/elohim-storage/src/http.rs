@@ -5702,6 +5702,60 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/places — Governed spatial entities (DHT projection)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/places")
+                .handler("list_places")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/places")
+                .handler("create_place")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/places/{id}")
+                .handler("get_place")
+                .cache_ttl(60)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/spatial-contexts — Geospatial context (H3 indexed)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/spatial-contexts")
+                .handler("list_spatial_contexts")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/spatial-contexts")
+                .handler("create_spatial_context")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/spatial-contexts/{id}")
+                .handler("get_spatial_context")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::patch("/api/v1/spatial-contexts/{id}")
+                .handler("update_spatial_context")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::delete("/api/v1/spatial-contexts/{id}")
+                .handler("delete_spatial_context")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/steward-affinity — Steward affinity lifecycle
         // =====================================================================
         .route(
