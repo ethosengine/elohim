@@ -81,6 +81,10 @@ spec:
           memory: "16Gi"
           cpu: "4"
           ephemeral-storage: "6Gi"
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+      command: [cat]
+      tty: true
 '''
         }
     }
@@ -258,7 +262,7 @@ spec:
                 }
             }
             steps {
-                container('node') {
+                container('builder') {
                     dir('sophia') {
                         script {
                             def sonarConfig = getSonarProjectConfig()
