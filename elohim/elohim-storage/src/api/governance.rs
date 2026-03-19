@@ -1200,8 +1200,7 @@ pub async fn handle(
                 .ok_or_else(|| StorageError::NotFound(format!("Proposal {} not found", id)))?;
 
             // Delete proxy votes for this human
-            let deleted =
-                governance::delete_proxy_votes_for_human(&mut conn, id, &input.human_id)?;
+            let deleted = governance::delete_proxy_votes_for_human(&mut conn, id, &input.human_id)?;
 
             // Fetch options for validation
             let options = governance::query_proposal_options(&mut conn, id)?;
@@ -1283,10 +1282,7 @@ pub async fn handle(
                 governance::cast_ranked_votes(&mut conn, id, &input.human_id, &new_votes)?;
 
             // Record governance signal for the proxy override
-            let signal_id = format!(
-                "sig-proxy-override-{}-{}-{}",
-                id, input.human_id, now
-            );
+            let signal_id = format!("sig-proxy-override-{}-{}-{}", id, input.human_id, now);
             let new_signal = crate::db::models::NewGovernanceSignal {
                 id: &signal_id,
                 entity_type: "proposal",

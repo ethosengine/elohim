@@ -710,8 +710,7 @@ pub fn upsert_disposition(
 ) -> Result<GovernanceDisposition, StorageError> {
     // Delete existing disposition for this human (unique constraint)
     diesel::delete(
-        governance_dispositions::table
-            .filter(governance_dispositions::human_id.eq(new.human_id)),
+        governance_dispositions::table.filter(governance_dispositions::human_id.eq(new.human_id)),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -741,8 +740,7 @@ pub fn update_disposition_overrides(
     // Apply each override field individually if present
     if let Some(r) = risk {
         diesel::update(
-            governance_dispositions::table
-                .filter(governance_dispositions::human_id.eq(human_id)),
+            governance_dispositions::table.filter(governance_dispositions::human_id.eq(human_id)),
         )
         .set(governance_dispositions::risk_tolerance.eq(r as f32))
         .execute(conn)
@@ -750,8 +748,7 @@ pub fn update_disposition_overrides(
     }
     if let Some(c) = change {
         diesel::update(
-            governance_dispositions::table
-                .filter(governance_dispositions::human_id.eq(human_id)),
+            governance_dispositions::table.filter(governance_dispositions::human_id.eq(human_id)),
         )
         .set(governance_dispositions::change_openness.eq(c as f32))
         .execute(conn)
@@ -759,8 +756,7 @@ pub fn update_disposition_overrides(
     }
     if let Some(cp) = consensus {
         diesel::update(
-            governance_dispositions::table
-                .filter(governance_dispositions::human_id.eq(human_id)),
+            governance_dispositions::table.filter(governance_dispositions::human_id.eq(human_id)),
         )
         .set(governance_dispositions::consensus_preference.eq(cp as f32))
         .execute(conn)
@@ -768,8 +764,7 @@ pub fn update_disposition_overrides(
     }
     if let Some(v) = values {
         diesel::update(
-            governance_dispositions::table
-                .filter(governance_dispositions::human_id.eq(human_id)),
+            governance_dispositions::table.filter(governance_dispositions::human_id.eq(human_id)),
         )
         .set(governance_dispositions::priority_values.eq(v))
         .execute(conn)
@@ -778,8 +773,7 @@ pub fn update_disposition_overrides(
 
     // Always update the updated_at timestamp
     diesel::update(
-        governance_dispositions::table
-            .filter(governance_dispositions::human_id.eq(human_id)),
+        governance_dispositions::table.filter(governance_dispositions::human_id.eq(human_id)),
     )
     .set(governance_dispositions::updated_at.eq(&now))
     .execute(conn)

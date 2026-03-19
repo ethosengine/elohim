@@ -58,9 +58,7 @@ pub fn compute_disposition(
             // Categorize: consent-based vs competitive mechanisms
             match proposal.voting_mechanism.as_str() {
                 "consent" | "approval" => consent_mechanism_votes += 1,
-                "ranked-choice" | "score" | "dot" | "plurality" => {
-                    competitive_mechanism_votes += 1
-                }
+                "ranked-choice" | "score" | "dot" | "plurality" => competitive_mechanism_votes += 1,
                 _ => {}
             }
         }
