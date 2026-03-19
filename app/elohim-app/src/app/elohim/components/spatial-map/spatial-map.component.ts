@@ -370,7 +370,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     const addLayers = () => {
       if (this.map.getSource('places')) return;
 
-      this.map.addSource('places', { type: 'geojson', data: geojson as GeoJSON.FeatureCollection });
+      this.map.addSource('places', { type: 'geojson', data: geojson as unknown as GeoJSON.FeatureCollection });
 
       this.map.addLayer({
         id: 'place-fills',
@@ -464,7 +464,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
       const geojson = { type: 'FeatureCollection' as const, features };
 
-      this.map.addSource('places', { type: 'geojson', data: geojson as GeoJSON.FeatureCollection });
+      this.map.addSource('places', { type: 'geojson', data: geojson as unknown as GeoJSON.FeatureCollection });
 
       // Fill layer with data-driven risk tier colors
       this.map.addLayer({
@@ -536,7 +536,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
         this.map.addSource('hazard-markers', {
           type: 'geojson',
-          data: hazardGeoJson as GeoJSON.FeatureCollection,
+          data: hazardGeoJson as unknown as GeoJSON.FeatureCollection,
         });
 
         this.map.addLayer({
