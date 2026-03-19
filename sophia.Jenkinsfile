@@ -191,6 +191,7 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
+                            export NODE_OPTIONS="--max-old-space-size=6144"
                             pnpm exec jest --ci --coverage --maxWorkers=2
                         '''
                     }
