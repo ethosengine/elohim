@@ -14,7 +14,6 @@ use ts_rs::TS;
 
 use crate::db::context::AppContext;
 use crate::db::diesel_schema::{economic_events, places};
-use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::services::spatial::CarryingCapacity;
 

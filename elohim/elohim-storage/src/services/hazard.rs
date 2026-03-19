@@ -114,10 +114,6 @@ fn dominant_weather_hazard_type(forecast: &WeatherForecastView) -> String {
 
     if max_precip > 50.0 {
         "flood".to_string()
-    } else if max_wind > 90.0 {
-        "storm".to_string()
-    } else if max_precip > 20.0 {
-        "storm".to_string()
     } else {
         "storm".to_string()
     }

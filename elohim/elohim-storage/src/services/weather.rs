@@ -316,18 +316,19 @@ fn assess_risk(temp_c: f64, precip_mm: f64, wind_kmh: f64, weather_code: i32) ->
     }
 
     // Warning conditions
-    if wind_kmh > 50.0 || precip_mm > 10.0 || temp_c < -10.0 || temp_c > 40.0 {
+    if wind_kmh > 50.0
+        || precip_mm > 10.0
+        || !(-10.0..=40.0).contains(&temp_c)
+    {
         return WeatherRisk::Warning;
     }
 
     // Advisory conditions
     if wind_kmh > 30.0
         || precip_mm > 2.0
-        || temp_c < 0.0
-        || temp_c > 35.0
-        || (61..=67).contains(&weather_code)  // freezing rain
-        || (71..=77).contains(&weather_code)
-    // snow
+        || !(0.0..=35.0).contains(&temp_c)
+        || (61..=67).contains(&weather_code) // freezing rain
+        || (71..=77).contains(&weather_code) // snow
     {
         return WeatherRisk::Advisory;
     }
