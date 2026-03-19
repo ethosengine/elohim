@@ -25,6 +25,26 @@ COPY elohim/constitution ./constitution
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml
 
+# Constitution crate uses workspace inheritance — inline the values since
+# the workspace root (elohim/Cargo.toml) isn't copied into the build context
+RUN sed -i \
+    -e 's|version.workspace = true|version = "0.1.0"|' \
+    -e 's|edition.workspace = true|edition = "2021"|' \
+    -e 's|license.workspace = true|license = "Apache-2.0"|' \
+    -e 's|authors.workspace = true|authors = ["Elohim Protocol"]|' \
+    -e 's|tokio.workspace = true|tokio = { version = "1.43", features = ["full", "sync"] }|' \
+    -e 's|async-trait.workspace = true|async-trait = "0.1"|' \
+    -e 's|serde.workspace = true|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|serde_yaml.workspace = true|serde_yaml = "0.9"|' \
+    -e 's|sha2.workspace = true|sha2 = "0.10"|' \
+    -e 's|hex.workspace = true|hex = "0.4"|' \
+    -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
+    -e 's|tracing.workspace = true|tracing = "0.1"|' \
+    -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
+    -e 's|uuid.workspace = true|uuid = { version = "1.16", features = ["v4", "serde"] }|' \
+    constitution/Cargo.toml
+
 # Create dummy src to build dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
