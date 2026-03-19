@@ -191,9 +191,10 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
-                            # 2560MB per process × 3 (parent + 2 workers) fits in 8Gi container
-                            export NODE_OPTIONS="--max-old-space-size=2560"
-                            pnpm exec jest --ci --coverage --maxWorkers=2
+                            # Single worker to stay within 8Gi container limit
+                            # Coverage instrumentation inflates memory significantly
+                            export NODE_OPTIONS="--max-old-space-size=4096"
+                            pnpm exec jest --ci --coverage --maxWorkers=1
                         '''
                     }
                 }
