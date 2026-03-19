@@ -71,6 +71,9 @@ serde_urlencoded = "0.7"
 # TypeScript generation from Rust types
 ts-rs = { version = "10.1", features = ["serde-compat"] }
 
+# H3 hexagonal spatial index — maps to constitutional governance layers
+h3o = "0.9"
+
 # Local database for metadata
 sled = "0.34"
 

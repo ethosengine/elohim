@@ -33,7 +33,7 @@ import { BannerService } from '../../services/banner.service';
 /**
  * Context app identifiers for the Elohim Protocol
  */
-export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway' | 'avodah';
+export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway' | 'avodah' | 'map';
 
 /**
  * Context app configuration
@@ -134,6 +134,14 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '🔨',
       route: '/avodah',
       tagline: 'Work & Stewardship',
+      available: true,
+    },
+    {
+      id: 'map',
+      name: 'Map',
+      icon: '🌍',
+      route: '/map',
+      tagline: 'Living Places',
       available: true,
     },
   ];
@@ -384,6 +392,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
         return '/community';
       case 'doorway':
         return '/doorway';
+      case 'map':
+        return '/map';
       default:
         return '/lamad/human';
     }
@@ -402,6 +412,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
         return 'Community Home';
       case 'doorway':
         return 'Doorway Console';
+      case 'map':
+        return 'Map';
       default:
         return 'View Profile';
     }

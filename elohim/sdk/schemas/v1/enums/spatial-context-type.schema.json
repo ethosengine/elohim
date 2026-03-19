@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:spatial-context-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SpatialContextType",
+  "description": "Type of spatial context attached to an entity. point=single location, area=polygon boundary, route=path with waypoints.",
+  "type": "string",
+  "enum": ["point", "area", "route"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "SpatialContextType"
+  }
+}

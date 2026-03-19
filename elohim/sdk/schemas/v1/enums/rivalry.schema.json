@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:rivalry",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rivalry",
+  "description": "Whether consumption by one agent prevents consumption by another. rival=strawberry, non-rival=knowledge, partially-rival=bandwidth/shared compute.",
+  "type": "string",
+  "enum": ["rival", "non-rival", "partially-rival"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "Rivalry"
+  }
+}

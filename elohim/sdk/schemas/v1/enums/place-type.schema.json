@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:place-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlaceType",
+  "description": "Classification of governed spatial entities. administrative=city/state, bioregional=watershed/ecosystem, parcel=land plot, infrastructure=solar farm/water treatment, gathering=community center/market, watershed=waterbody/catchment, agricultural=farmland/greenhouse, custom=community-defined.",
+  "type": "string",
+  "enum": ["administrative", "bioregional", "parcel", "infrastructure", "gathering", "watershed", "agricultural", "custom"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "PlaceType"
+  }
+}

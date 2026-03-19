@@ -49,6 +49,14 @@ export const routes: Routes = [
         m => m.ContentViewerComponent
       ),
   },
+  // Spatial map — cross-pillar geospatial view (Places, resources, governance)
+  {
+    path: 'map',
+    loadComponent: async () =>
+      import('./elohim/components/spatial-map/spatial-map.component').then(
+        m => m.SpatialMapComponent
+      ),
+  },
   // EPR protocol handler redirect (web+epr:// links from outside the app)
   {
     path: 'resolve',

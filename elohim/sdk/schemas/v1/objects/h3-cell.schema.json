@@ -1,0 +1,16 @@
+{
+  "$id": "epr:schema:object:h3-cell",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "H3Cell",
+  "description": "H3 hexagonal spatial index cell. Maps to constitutional governance layers: res 0-2=global, res 3=bioregional, res 5=municipal, res 7=neighborhood, res 9=parcel.",
+  "type": "object",
+  "required": ["index", "resolution"],
+  "properties": {
+    "index": { "type": "string", "pattern": "^[0-9a-f]{15}$", "description": "H3 index as 15-character hex string" },
+    "resolution": { "type": "integer", "minimum": 0, "maximum": 15, "description": "H3 resolution level" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "H3Cell"
+  }
+}

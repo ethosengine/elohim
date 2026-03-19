@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:excludability",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Excludability",
+  "description": "Whether access can be restricted. excludable=fenced land, non-excludable=clean air, conditionally-excludable=commons with Ostrom rules.",
+  "type": "string",
+  "enum": ["excludable", "non-excludable", "conditionally-excludable"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "Excludability"
+  }
+}

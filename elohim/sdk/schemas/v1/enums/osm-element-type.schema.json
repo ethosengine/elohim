@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:osm-element-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OsmElementType",
+  "description": "OpenStreetMap element type for external spatial reference. node=point, way=line/polygon, relation=complex boundary/route.",
+  "type": "string",
+  "enum": ["node", "way", "relation"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "OsmElementType"
+  }
+}

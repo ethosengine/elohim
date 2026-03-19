@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:capacity-model",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CapacityModel",
+  "description": "Whether resource has a finite stock, continuous flow, or both. stock=mineral deposit, flow=solar radiation, stock-and-flow=reservoir.",
+  "type": "string",
+  "enum": ["stock", "flow", "stock-and-flow"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "CapacityModel"
+  }
+}

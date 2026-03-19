@@ -1,0 +1,17 @@
+{
+  "$id": "epr:schema:object:osm-reference",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OsmReference",
+  "description": "Pointer to an OpenStreetMap element. OSM is reference data — the protocol references it, doesn't embed it.",
+  "type": "object",
+  "required": ["osmType", "osmId"],
+  "properties": {
+    "osmType": { "$ref": "../enums/osm-element-type.schema.json" },
+    "osmId": { "type": "integer", "description": "OSM element ID" },
+    "version": { "type": "integer", "minimum": 1, "description": "OSM element version for reproducibility" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "OsmReference"
+  }
+}

@@ -9,4 +9,8 @@ resourceClassifiedAs: JsonValue | null, resourceQuantityValue: number | null, re
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */
-metadata: JsonValue | null, dhtAnchorHash: string | null, createdAt: string, };
+metadata: JsonValue | null, dhtAnchorHash: string | null, createdAt: string, 
+/**
+ * Place ID where this event occurred (spatial grounding)
+ */
+atLocation: string | null, };

@@ -1,0 +1,18 @@
+{
+  "$id": "epr:schema:object:geo-point",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GeoPoint",
+  "description": "WGS84 coordinate pair. The atomic spatial primitive — where something IS in the physical world.",
+  "type": "object",
+  "required": ["latitude", "longitude"],
+  "properties": {
+    "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+    "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+    "altitude": { "type": "number", "description": "Meters above WGS84 ellipsoid" },
+    "accuracy": { "type": "number", "minimum": 0, "description": "Accuracy radius in meters" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "GeoPoint"
+  }
+}

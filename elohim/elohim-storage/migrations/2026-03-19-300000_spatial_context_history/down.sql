@@ -1,0 +1,2 @@
+-- Reverse: drop is_current, restore UNIQUE constraint
+-- Would lose history (only keep current entries)

@@ -1,0 +1,28 @@
+{
+  "$id": "epr:schema:object:resource-nature",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResourceNature",
+  "description": "Economic nature of a resource — how it behaves under use, transfer, governance, and full lifecycle. Embedded as a value object on ResourceSpecification, not a standalone entity.",
+  "type": "object",
+  "required": ["rivalry", "excludability", "depletability", "fungibility"],
+  "properties": {
+    "rivalry": { "$ref": "../enums/rivalry.schema.json" },
+    "excludability": { "$ref": "../enums/excludability.schema.json" },
+    "depletability": { "$ref": "../enums/depletability.schema.json" },
+    "fungibility": { "$ref": "../enums/fungibility.schema.json" },
+    "capacityModel": { "$ref": "../enums/capacity-model.schema.json" },
+    "circularity": { "$ref": "../enums/circularity.schema.json" },
+    "endOfLifeResourceSpec": {
+      "type": "string",
+      "description": "ResourceSpecification ID this becomes at end-of-life. Declared at creation, not disposal — the protocol makes end-of-life visible from the beginning."
+    },
+    "transformable": {
+      "type": "boolean",
+      "description": "Whether this resource can serve as input to a process producing a different resource type (energy → computation → governance decision)."
+    }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "ResourceNature"
+  }
+}

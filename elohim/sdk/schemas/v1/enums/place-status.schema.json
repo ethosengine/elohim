@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:place-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlaceStatus",
+  "description": "Lifecycle status of a governed Place. active=recognized boundary, proposed=pending governance approval, disputed=boundary under challenge, dissolved=no longer recognized.",
+  "type": "string",
+  "enum": ["active", "proposed", "disputed", "dissolved"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "PlaceStatus"
+  }
+}

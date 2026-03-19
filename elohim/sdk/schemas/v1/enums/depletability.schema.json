@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:depletability",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Depletability",
+  "description": "Whether stock diminishes with use. depletable=fossil fuel, renewable=solar flow, regenerative=permaculture/living soil, non-depletable=knowledge.",
+  "type": "string",
+  "enum": ["depletable", "renewable", "regenerative", "non-depletable"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "Depletability"
+  }
+}

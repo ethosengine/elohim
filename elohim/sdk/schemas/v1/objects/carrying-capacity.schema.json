@@ -1,0 +1,21 @@
+{
+  "$id": "epr:schema:object:carrying-capacity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CarryingCapacity",
+  "description": "Ecological limit for a resource category within a Place. Planet-scale limits aggregate up the H3 hierarchy.",
+  "type": "object",
+  "required": ["resourceCategory", "maxSustainableYield", "unit", "currentUtilization", "dataQuality"],
+  "properties": {
+    "resourceCategory": { "type": "string", "description": "ResourceCategory this limit applies to" },
+    "maxSustainableYield": { "type": "number", "minimum": 0 },
+    "unit": { "type": "string" },
+    "currentUtilization": { "type": "number", "description": "0.0 to 1.0+; >1.0 means exceeding capacity" },
+    "dataQuality": { "type": "string", "enum": ["measured", "estimated", "manual", "mixed"] },
+    "source": { "type": "string", "description": "Source of the capacity estimate" },
+    "measuredAt": { "type": "string", "format": "date-time" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/spatial.rs",
+    "type": "CarryingCapacity"
+  }
+}

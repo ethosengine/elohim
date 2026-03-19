@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:fungibility",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fungibility",
+  "description": "Whether units are interchangeable. fungible=kWh, non-fungible=land parcel, class-fungible=Grade A eggs.",
+  "type": "string",
+  "enum": ["fungible", "non-fungible", "class-fungible"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "Fungibility"
+  }
+}

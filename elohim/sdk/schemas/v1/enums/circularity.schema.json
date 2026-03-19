@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:circularity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Circularity",
+  "description": "Lifecycle design intent — how value flows back after primary use. linear=single-use (generates circularity obligation), reusable=glass jar, cascading=EV battery to grid storage, circular=food to compost to soil to food.",
+  "type": "string",
+  "enum": ["linear", "reusable", "cascading", "circular"],
+  "_source": {
+    "file": "elohim/elohim-storage/src/services/resource_nature.rs",
+    "type": "Circularity"
+  }
+}

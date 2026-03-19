@@ -8,4 +8,8 @@ export type CreateEconomicEventInputView = { id: string | null, schemaVersion: n
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */
-metadata: JsonValue | null, };
+metadata: JsonValue | null, 
+/**
+ * Place ID where this event occurred (spatial grounding)
+ */
+atLocation: string | null, };
