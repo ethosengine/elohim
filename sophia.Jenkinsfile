@@ -191,9 +191,9 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
-                            # 6GB heap per process × 3 (parent + 2 workers) within 16Gi limit
-                            export NODE_OPTIONS="--max-old-space-size=6144"
-                            pnpm exec jest --ci --coverage --maxWorkers=2
+                            # Coverage instrumentation 2-3x memory; run tests without it
+                            export NODE_OPTIONS="--max-old-space-size=4096"
+                            pnpm exec jest --ci --maxWorkers=2 --forceExit
                         '''
                     }
                 }
