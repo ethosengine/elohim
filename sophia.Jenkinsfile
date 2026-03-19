@@ -74,11 +74,11 @@ spec:
       tty: true
       resources:
         requests:
-          memory: "4Gi"
-          cpu: "1"
+          memory: "8Gi"
+          cpu: "2"
           ephemeral-storage: "3Gi"
         limits:
-          memory: "8Gi"
+          memory: "16Gi"
           cpu: "4"
           ephemeral-storage: "6Gi"
 '''
@@ -94,7 +94,7 @@ spec:
     }
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
         buildDiscarder(logRotator(numToKeepStr: '50'))
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
@@ -191,10 +191,9 @@ spec:
                     dir('sophia') {
                         sh '''#!/bin/bash
                             set -euo pipefail
-                            # Single worker to stay within 8Gi container limit
-                            # Coverage instrumentation inflates memory significantly
-                            export NODE_OPTIONS="--max-old-space-size=4096"
-                            pnpm exec jest --ci --coverage --maxWorkers=1
+                            # 6GB heap per process × 3 (parent + 2 workers) within 16Gi limit
+                            export NODE_OPTIONS="--max-old-space-size=6144"
+                            pnpm exec jest --ci --coverage --maxWorkers=2
                         '''
                     }
                 }
