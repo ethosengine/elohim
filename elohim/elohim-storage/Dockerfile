@@ -19,9 +19,11 @@ RUN apt-get update && apt-get install -y \
 # Copy manifests and local crates first for dependency caching
 COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
 COPY crates ./crates
+COPY elohim/constitution ./constitution
 
-# Fix the path to local crates (now relative to /app)
-RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
+# Fix the paths to local crates (now relative to /app)
+RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml
 
 # Create dummy src to build dependencies
 RUN mkdir -p src && \
