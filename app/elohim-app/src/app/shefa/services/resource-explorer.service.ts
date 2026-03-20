@@ -40,7 +40,7 @@ export const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: Content
     types: ['concept', 'epic', 'article', 'reference', 'example'],
   },
   { title: 'Assessments', icon: 'quiz', types: ['assessment'] },
-  { title: 'Resources', icon: 'library_books', types: ['resource'] },
+  { title: 'Collectives', icon: 'groups', types: ['collective'] },
   { title: 'Scenarios', icon: 'checklist', types: ['scenario'] },
   { title: 'People', icon: 'people', types: ['human', 'role'] },
   {
@@ -217,7 +217,7 @@ export class ResourceExplorerService implements LensProvider {
             parentId,
             childIds: [],
             itemCount: 0,
-            icon: entry.contentType === 'resource' ? 'library_books' : 'description',
+            icon: entry.contentType === 'collective' ? 'groups' : 'description',
             order: index,
           }));
       })

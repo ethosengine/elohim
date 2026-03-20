@@ -20,7 +20,7 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   lesson: '📝',
   scenario: '✓',
   assessment: '📝',
-  resource: '📦',
+  collective: '🏛️',
   reflection: '🪞',
   discussion: '💬',
   exercise: '🏋️',
@@ -179,14 +179,14 @@ export function inferContentTypeFromId(contentId: string): ContentType {
 
   if (id.includes('quiz') || id.includes('assessment')) return 'assessment';
   if (id.includes('discovery-assessment')) return 'discovery-assessment';
-  if (id.includes('video')) return 'resource';
-  if (id.includes('simulation') || id.includes('app-')) return 'resource';
+  if (id.includes('video')) return 'reference';
+  if (id.includes('simulation') || id.includes('app-')) return 'reference';
   if (id.includes('scenario')) return 'scenario';
   if (id.includes('feature')) return 'scenario';
   if (id.includes('epic')) return 'epic';
-  if (id.includes('book-chapter') || id.includes('chapter')) return 'resource';
+  if (id.includes('book-chapter') || id.includes('chapter')) return 'reference';
   if (id.includes('tool')) return 'tool';
-  if (id.includes('organization') || id.includes('org-')) return 'resource';
+  if (id.includes('organization') || id.includes('org-')) return 'collective';
   if (id.includes('path-')) return 'path';
 
   return 'concept';

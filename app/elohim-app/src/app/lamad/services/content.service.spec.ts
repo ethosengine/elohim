@@ -963,19 +963,19 @@ describe('ContentService', () => {
             {
               ...mockContentIndex.nodes[0],
               category: 'test',
-              contentType: 'resource' as ContentType,
+              contentType: 'reference' as ContentType,
               url: 'https://youtube.com/watch?v=123',
             },
             {
               ...mockContentIndex.nodes[1],
               category: 'test',
-              contentType: 'resource' as ContentType,
+              contentType: 'reference' as ContentType,
               tags: ['book'],
             },
             {
               ...mockContentIndex.nodes[2],
               category: 'test',
-              contentType: 'resource' as ContentType,
+              contentType: 'collective' as ContentType,
               tags: ['organization'],
             },
           ],

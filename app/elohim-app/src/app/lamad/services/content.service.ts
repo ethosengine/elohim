@@ -485,12 +485,12 @@ export class ContentService {
   }> {
     return this.getContentPreviewsForCategory(category).pipe(
       map(previews => ({
-        videos: previews.filter(p => p.contentType === 'resource' && p.url?.includes('youtube')),
+        videos: previews.filter(p => p.contentType === 'reference' && p.url?.includes('youtube')),
         organizations: previews.filter(
-          p => p.contentType === 'resource' && p.tags?.includes('organization')
+          p => p.contentType === 'collective' && p.tags?.includes('organization')
         ),
         books: previews.filter(
-          p => p.contentType === 'resource' && p.tags?.includes('book')
+          p => p.contentType === 'reference' && p.tags?.includes('book')
         ),
         tools: previews.filter(p => p.contentType === 'tool'),
       }))
