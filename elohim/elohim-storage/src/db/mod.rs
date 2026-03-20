@@ -75,10 +75,13 @@ use std::time::Duration;
 
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager, Pool};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use tracing::info;
 
 use crate::error::StorageError;
 pub use context::AppContext;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 /// Database statistics
 #[derive(Debug, Clone, serde::Serialize)]
@@ -116,7 +119,26 @@ pub fn init_pool_from_dir(storage_dir: &Path) -> Result<DbPool, StorageError> {
     let database_url = db_path.to_string_lossy().to_string();
 
     info!("Initializing Diesel connection pool at {:?}", db_path);
-    init_pool(&database_url)
+    let pool = init_pool(&database_url)?;
+
+    // Run pending migrations on startup
+    run_migrations(&pool)?;
+
+    Ok(pool)
+}
+
+/// Run pending database migrations
+pub fn run_migrations(pool: &DbPool) -> Result<(), StorageError> {
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+    info!("Running database migrations...");
+    conn.run_pending_migrations(MIGRATIONS)
+        .map_err(|e| StorageError::Internal(format!("Failed to run migrations: {}", e)))?;
+    info!("Database migrations complete");
+
+    Ok(())
 }
 
 /// App-scoped database handle using Diesel connection pool

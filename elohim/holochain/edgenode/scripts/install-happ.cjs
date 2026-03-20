@@ -74,10 +74,10 @@ async function installHapp(adminWs) {
   const existingApp = apps.find(app => app.installed_app_id === APP_ID);
 
   if (existingApp) {
-    console.log(`App '${APP_ID}' is already installed (status: ${existingApp.status})`);
+    console.log(`App '${APP_ID}' is already installed (status: ${JSON.stringify(existingApp.status)})`);
 
-    // Enable if disabled
-    if (existingApp.status === 'disabled') {
+    // Enable if disabled (status is an object: {type: "disabled", value: {...}})
+    if (existingApp.status?.type === 'disabled') {
       console.log(`Enabling app '${APP_ID}'...`);
       await adminWs.enableApp({ installed_app_id: APP_ID });
       console.log(`App '${APP_ID}' enabled`);

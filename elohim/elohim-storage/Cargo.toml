@@ -80,6 +80,7 @@ sled = "0.34"
 # SQLite via Diesel ORM - compile-time verified queries
 # r2d2 for connection pooling (replaces single mutex pattern)
 diesel = { version = "2.2", features = ["sqlite", "r2d2"] }
+diesel_migrations = "2.2"
 
 
 # CRDT sync - Automerge for offline-first document sync
