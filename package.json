@@ -46,5 +46,7 @@
     "schema:test": "node elohim/sdk/schemas/scripts/test-schema.mjs",
     "schema:validate": "node elohim/sdk/schemas/scripts/validate-seeds.mjs",
     "schema:codegen:ts": "node elohim/sdk/schemas/scripts/codegen-ts.mjs"
+  },
+  "dependencies": {
   }
 }
