@@ -365,35 +365,26 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             CONDUCTOR_READY=false
 
                             while [ \$PREFLIGHT_ATTEMPTS -lt \$PREFLIGHT_MAX ]; do
-                                STATUS_JSON=\$(curl -sf "\$DOORWAY_BASE_URL/status" 2>/dev/null || echo '{}')
+                                # /health returns JSON; /status returns HTML dashboard
+                                STATUS_JSON=\$(curl -sf "\$DOORWAY_BASE_URL/health" 2>/dev/null || echo '{}')
 
-                                # Parse status response
+                                # Parse health response
                                 CONDUCTOR_CONNECTED=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected // false')
                                 CONDUCTOR_WORKERS=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected_workers // 0')
-                                STORAGE_HEALTHY=\$(echo "\$STATUS_JSON" | jq -r '.storage.healthy // false')
-                                IMPORT_ENABLED=\$(echo "\$STATUS_JSON" | jq -r '.storage.import_enabled // false')
-                                CELL_DISCOVERED=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.cell_discovered // false')
-                                READY_FOR_SEEDING=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.ready_for_seeding // false')
+                                HEALTHY=\$(echo "\$STATUS_JSON" | jq -r '.healthy // false')
+                                STATUS=\$(echo "\$STATUS_JSON" | jq -r '.status // "unknown"')
+                                ERROR_MSG=\$(echo "\$STATUS_JSON" | jq -r '.error // empty')
 
+                                echo "  Healthy: \$HEALTHY  Status: \$STATUS"
                                 echo "  Conductor: connected=\$CONDUCTOR_CONNECTED workers=\$CONDUCTOR_WORKERS"
-                                echo "  Storage: healthy=\$STORAGE_HEALTHY import=\$IMPORT_ENABLED"
-                                echo "  Cell discovered: \$CELL_DISCOVERED"
-                                echo "  Ready for seeding: \$READY_FOR_SEEDING"
-
-                                # Check recommendations for any blockers
-                                RECOMMENDATIONS=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.recommendations // []')
-                                if [ "\$RECOMMENDATIONS" != "[]" ] && [ "\$RECOMMENDATIONS" != "null" ]; then
-                                    echo "  Recommendations:"
-                                    echo "\$RECOMMENDATIONS" | jq -r '.[] | "    ⚠️  " + .'
+                                if [ -n "\$ERROR_MSG" ]; then
+                                    echo "  ⚠️  \$ERROR_MSG"
                                 fi
 
-                                # Check if ready
-                                if [ "\$CONDUCTOR_CONNECTED" = "true" ] && [ "\$STORAGE_HEALTHY" = "true" ]; then
-                                    # With lazy cell discovery, we don't need cell_discovered=true at preflight
-                                    # The seeder will trigger lazy discovery on first import
+                                # Check if ready — conductor must have workers connected
+                                if [ "\$CONDUCTOR_CONNECTED" = "true" ] && [ "\$HEALTHY" = "true" ]; then
                                     echo ""
                                     echo "✅ Doorway ready for seeding"
-                                    echo "   Note: cell_id will be discovered lazily on first import if not already cached"
                                     CONDUCTOR_READY=true
                                     break
                                 fi
