@@ -14,6 +14,7 @@
 #   genesis/                 → schema validation + tests
 #   schema-validate          → protocol schema seed validation (genesis/ or schema changes)
 #   schema-dna               → DNA conformance check (holochain/ or schema changes)
+#   schema-codegen           → verify codegen is fresh (schema changes)
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -111,6 +112,10 @@ fi
 if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
   PROJECTS="$PROJECTS constants-sync"
 fi
+# Schema codegen freshness when schema definitions change
+if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
+  PROJECTS="$PROJECTS schema-codegen"
+fi
 # Any Jenkinsfile change triggers orchestrator lint
 if echo "$CHANGED" | grep -q "Jenkinsfile"; then
   PROJECTS="$PROJECTS orchestrator"
@@ -141,7 +146,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -151,6 +156,12 @@ run_gate() {
       schema-dna)
         echo "[$PROJECT_NAME] Checking DNA constants against protocol schemas..."
         pnpm run schema:check-dna 2>&1
+        rc=$?
+        ;;
+      schema-codegen)
+        echo "[$PROJECT_NAME] Verifying schema codegen freshness..."
+        pnpm run schema:codegen:ts -- --verify 2>&1 && \
+        pnpm run schema:codegen:rs -- --verify 2>&1
         rc=$?
         ;;
     esac
@@ -222,6 +233,12 @@ run_gate() {
         echo "Running constants sync (schema ↔ generated enums ↔ seed data)..."
         pnpm run schema:codegen:ts 2>&1 && \
         (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
+        rc=$?
+        ;;
+      schema-codegen)
+        echo "Verifying schema codegen freshness..."
+        pnpm run schema:codegen:ts -- --verify 2>&1 && \
+        pnpm run schema:codegen:rs -- --verify 2>&1
         rc=$?
         ;;
       genesis-a2o)
@@ -300,6 +317,7 @@ for PROJECT in $PROJECTS; do
     genesis)          PROJECT_DIR="genesis/seeder" ;;
     schema-validate)  PROJECT_DIR="." ;;
     schema-dna)       PROJECT_DIR="." ;;
+    schema-codegen)   PROJECT_DIR="." ;;
     genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
     orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
     *)                PROJECT_DIR="$PROJECT" ;;

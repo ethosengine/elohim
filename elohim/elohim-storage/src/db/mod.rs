@@ -36,6 +36,7 @@ pub mod content_mastery;
 pub mod contributor_presences;
 pub mod device_policies;
 pub mod economic_events;
+pub mod enum_registry;
 pub mod hazards;
 pub mod human_relationships;
 pub mod humans;

@@ -33,6 +33,7 @@ pub mod places;
 pub mod presence;
 pub mod rea_commitments;
 pub mod recognition;
+pub mod registry;
 pub mod resources;
 pub mod risk;
 pub mod routing;
@@ -116,6 +117,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("contributors") {
         let resource_path = sub_path.strip_prefix("contributors").unwrap_or("");
         contributors::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("registry") {
+        let resource_path = sub_path.strip_prefix("registry").unwrap_or("");
+        registry::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("recognition") {
         let resource_path = sub_path.strip_prefix("recognition").unwrap_or("");
         recognition::handle(req, method, resource_path, &pool, &app_ctx, services).await

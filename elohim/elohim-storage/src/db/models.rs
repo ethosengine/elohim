@@ -16,7 +16,7 @@ use super::diesel_schema::{
     access_grants, agreements, appeals, apps, challenges, chapters, collective_participations,
     collectives, comments, content, content_attestations, content_mastery, content_tags,
     contributor_dashboards, contributor_presences, custodian_metrics, device_policies, discussions,
-    economic_events, governance_dispositions, governance_signals, governance_states, hazards,
+    economic_events, enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
     node_stewardship, path_attestations, path_extensions, path_tags, paths, places, precedents,
     premium_gates, proposal_options, proposals, ranked_votes, rea_commitments, relationships,
@@ -2688,4 +2688,35 @@ pub struct NewRiskAlert {
     pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+// =============================================================================
+// EnumRegistry — extensible vocabulary (Category C operational)
+// Source of truth: SQLite. Seeded from JSON Schema on startup.
+// =============================================================================
+
+/// Enum registry entry (SELECT)
+#[derive(Debug, Clone, Queryable, Selectable, Serialize)]
+#[diesel(table_name = enum_registry)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct EnumRegistryEntry {
+    pub id: i32,
+    pub app_id: String,
+    pub enum_name: String,
+    pub enum_value: String,
+    pub tier: String,
+    pub added_by: Option<String>,
+    pub created_at: String,
+}
+
+/// Enum registry entry (INSERT)
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = enum_registry)]
+pub struct NewEnumRegistryEntry {
+    pub app_id: String,
+    pub enum_name: String,
+    pub enum_value: String,
+    pub tier: String,
+    pub added_by: Option<String>,
+    pub created_at: String,
 }

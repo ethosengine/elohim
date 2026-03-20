@@ -159,6 +159,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    enum_registry (id) {
+        id -> Integer,
+        app_id -> Text,
+        enum_name -> Text,
+        enum_value -> Text,
+        tier -> Text,
+        added_by -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     economic_events (id) {
         id -> Text,
         app_id -> Text,
@@ -1012,6 +1024,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     device_policies,
     discussions,
     economic_events,
+    enum_registry,
     governance_dispositions,
     governance_signals,
     governance_states,
