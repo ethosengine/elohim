@@ -14,21 +14,39 @@ import { ContentType, ContentFormat } from '../models/content-node.model';
  * These represent the semantic category of content.
  */
 export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
-  // Wire types (from protocol schema)
+  // Wire types — core (DNA-notarized)
   epic: '📖',
   concept: '💡',
   lesson: '📝',
   scenario: '✓',
   assessment: '📝',
-  collective: '🏛️',
   reflection: '🪞',
   discussion: '💬',
   exercise: '🏋️',
-  example: '📌',
-  reference: '📑',
   article: '📰',
+  // Wire types — storageOnly (cross-domain references)
   human: '🧑',
   role: '👤',
+  collective: '🏛️',
+  // Wire types — extensible (community vocabulary)
+  example: '📌',
+  reference: '📑',
+  feature: '✓',
+  practice: '🏋️',
+  contributor: '🧑',
+  video: '🎬',
+  audio: '🎧',
+  book: '📚',
+  'book-chapter': '📚',
+  documentary: '🎬',
+  'bible-verse': '📜',
+  activity: '🏋️',
+  narrative: '📖',
+  'course-module': '🗂️',
+  module: '🗂️',
+  quiz: '📝',
+  podcast: '🎧',
+  simulation: '🎮',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',
