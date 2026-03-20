@@ -622,6 +622,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
+                                    --pull always \\
                                     -t elohim-storage:${IMAGE_TAG} \\
                                     -f elohim/elohim-storage/Dockerfile .
 

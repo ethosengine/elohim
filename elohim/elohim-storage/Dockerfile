@@ -2,7 +2,7 @@
 # NOTE: Build context should be repo root directory
 # Run: docker build -f elohim/elohim-storage/Dockerfile -t elohim-storage .
 # Note: sysinfo 0.37.2 (via lair_keystore 0.6.3) requires Rust 1.88+
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.88.0-slim-bookworm AS builder
 
 WORKDIR /app
 
