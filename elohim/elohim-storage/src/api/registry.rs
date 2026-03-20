@@ -41,11 +41,7 @@ pub async fn handle(
     }
 }
 
-async fn handle_list(
-    enum_name: &str,
-    pool: &DbPool,
-    ctx: &AppContext,
-) -> Response<Full<Bytes>> {
+async fn handle_list(enum_name: &str, pool: &DbPool, ctx: &AppContext) -> Response<Full<Bytes>> {
     let mut conn = match get_conn(pool) {
         Ok(c) => c,
         Err(e) => return response::error_response(e),
