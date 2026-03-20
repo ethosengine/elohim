@@ -4,7 +4,7 @@
 #
 # Detects which projects changed and runs `just gate` in each.
 # Each project's justfile defines its own quality checks:
-#   app/elohim-app/          → build + unit tests
+#   app/elohim-app/          → eslint + build + unit tests
 #   doorway/                 → cargo fmt + clippy + tests
 #   doorway/doorway-app/     → eslint + build
 #   sophia/              → pnpm lint + typecheck + test
@@ -33,6 +33,14 @@ PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
 
 
 ZERO_SHA="0000000000000000000000000000000000000000"
+
+# ── Lockfile Consistency Check ────────────────────────────────────
+# Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
+if git diff --name-only HEAD | grep -q 'pnpm-lock.yaml'; then
+  echo "WARNING: pnpm-lock.yaml has uncommitted changes"
+  echo "  CI uses --frozen-lockfile and will fail if lockfile is stale."
+  echo "  Run: git add pnpm-lock.yaml && git commit --amend"
+fi
 
 # ── Change Detection ──────────────────────────────────────────────
 
@@ -150,6 +158,7 @@ run_gate() {
     echo "[$PROJECT_NAME] just not found, using fallback..."
     case "$PROJECT_NAME" in
       elohim-app)
+        pnpm exec eslint src --ext .ts,.html 2>&1 && \
         pnpm exec ng build --configuration=development 2>&1 && \
         pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
