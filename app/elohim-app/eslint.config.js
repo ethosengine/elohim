@@ -157,6 +157,10 @@ module.exports = tseslint.config(
       }],
       "import/no-duplicates": "error",                          // S1128 - Duplicate imports
       "import/no-useless-path-segments": "error",
+      "import/no-extraneous-dependencies": ["error", {          // Catch pnpm hoist phantom deps
+        devDependencies: ["**/*.spec.ts", "**/*.test.ts", "**/vite.config.ts"],
+        peerDependencies: true,
+      }],
 
       // ============================================================
       // GENERAL BEST PRACTICES
