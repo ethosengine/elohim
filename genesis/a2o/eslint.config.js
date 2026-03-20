@@ -119,6 +119,10 @@ export default tseslint.config(
       ],
       'import/no-duplicates': 'error',
       'import/no-useless-path-segments': 'error',
+      'import/no-extraneous-dependencies': ['error', {
+        devDependencies: ['**/*.spec.ts', '**/*.test.ts', '**/*.steps.ts'],
+        peerDependencies: true,
+      }],
 
       // ============================================================
       // GENERAL BEST PRACTICES
