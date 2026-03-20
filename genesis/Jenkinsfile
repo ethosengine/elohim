@@ -253,19 +253,16 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
-                    dir('genesis/seeder') {
-                        sh '''#!/bin/bash
-                            set -euo pipefail
+                    sh '''#!/bin/bash
+                        set -euo pipefail
 
-                            echo "Generating TypeScript types from Rust healing.rs..."
+                        echo "Generating TypeScript enum constants from protocol JSON schemas..."
 
-                            # Generate schema types from Rust source directly (no Rust toolchain needed)
-                            # This parses healing.rs and extracts validation constants
-                            npx tsx src/generate-schema-types.ts
+                        # JSON Schema is the single source of truth — codegen produces both TS and Rust
+                        pnpm run schema:codegen:ts
 
-                            echo "✅ Schema types generated"
-                        '''
-                    }
+                        echo "✅ Schema types generated"
+                    '''
                 }
             }
         }
