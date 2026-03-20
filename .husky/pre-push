@@ -146,7 +146,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -162,6 +162,11 @@ run_gate() {
         echo "[$PROJECT_NAME] Verifying schema codegen freshness..."
         pnpm run schema:codegen:ts -- --verify 2>&1 && \
         pnpm run schema:codegen:rs -- --verify 2>&1
+        rc=$?
+        ;;
+      constants-sync)
+        echo "[$PROJECT_NAME] Running constants sync (schema ↔ generated enums ↔ seed data)..."
+        (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
         rc=$?
         ;;
     esac
@@ -318,6 +323,7 @@ for PROJECT in $PROJECTS; do
     schema-validate)  PROJECT_DIR="." ;;
     schema-dna)       PROJECT_DIR="." ;;
     schema-codegen)   PROJECT_DIR="." ;;
+    constants-sync)   PROJECT_DIR="." ;;
     genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
     orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
     *)                PROJECT_DIR="$PROJECT" ;;
