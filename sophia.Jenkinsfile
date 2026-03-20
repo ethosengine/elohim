@@ -366,6 +366,46 @@ spec:
                 }
             }
         }
+
+        stage('Publish GitHub Release') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('node') {
+                    script {
+                        def version = sh(
+                            script: "node -p \"require('./sophia/packages/sophia-element/package.json').version\"",
+                            returnStdout: true
+                        ).trim()
+                        def tag = "sophia-v${version}"
+
+                        def umd = 'sophia/packages/sophia-element/dist/sophia-element.umd.js'
+                        def umdMap = 'sophia/packages/sophia-element/dist/sophia-element.umd.js.map'
+                        def styles = 'sophia/packages/sophia/dist/index.css'
+
+                        withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                            // Check if release exists; create or update
+                            def exists = sh(
+                                script: "gh release view ${tag} --repo ethosengine/elohim 2>/dev/null && echo yes || echo no",
+                                returnStdout: true
+                            ).trim().endsWith('yes')
+
+                            if (exists) {
+                                echo "Updating existing release ${tag}..."
+                                sh "gh release upload ${tag} ${umd} ${umdMap} '${styles}#sophia-styles.css' --repo ethosengine/elohim --clobber"
+                            } else {
+                                echo "Creating release ${tag}..."
+                                sh """gh release create ${tag} \
+                                    ${umd} ${umdMap} '${styles}#sophia-styles.css' \
+                                    --repo ethosengine/elohim \
+                                    --title 'Sophia Element ${version}' \
+                                    --notes 'sophia-element UMD bundle + styles for elohim-app consumption.'"""
+                            }
+                        }
+                        echo "Published sophia-element ${version} as GitHub Release: ${tag}"
+                    }
+                }
+            }
+        }
     }
 
     post {

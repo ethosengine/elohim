@@ -16,14 +16,32 @@ if [ ! -e "$SOPHIA_DIR/.git" ]; then
   exit 1
 fi
 
-# Check required dist files
+# Check required dist files — try fetching from GitHub Release if missing
+MISSING=false
 for file in "${REQUIRED_FILES[@]}"; do
   if [ ! -f "$SOPHIA_DIR/$file" ]; then
-    echo "ERROR: sophia not built - missing $file"
-    echo "Run: cd app/sophia && pnpm install && pnpm build && pnpm build:umd"
-    exit 1
+    MISSING=true
+    break
   fi
 done
+
+if [ "$MISSING" = true ]; then
+  echo "sophia artifacts missing locally. Attempting to fetch from GitHub Release..."
+  FETCH_SCRIPT="$PROJECT_ROOT/scripts/fetch-sophia-release.sh"
+  if [ -x "$FETCH_SCRIPT" ] && command -v gh &>/dev/null; then
+    "$FETCH_SCRIPT" || true
+  fi
+
+  # Re-check after fetch attempt
+  for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$SOPHIA_DIR/$file" ]; then
+      echo "ERROR: sophia not built - missing $file"
+      echo "Run: cd sophia && pnpm install && pnpm build && pnpm build:umd"
+      echo "Or publish a release: ./scripts/sophia-release.sh"
+      exit 1
+    fi
+  done
+fi
 
 echo "sophia build artifacts verified"
 
