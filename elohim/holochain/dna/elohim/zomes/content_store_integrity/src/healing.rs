@@ -28,10 +28,10 @@ pub const CONTENT_TYPES: &[&str] = &[
     "article",        // Long-form article content
     "feature",        // Gherkin feature (imported from .feature files)
     "practice",       // Practice activity (legacy alias)
-    "human",          // Human persona files
+    "human",          // Human persona + contributor presences
+    "collective",     // Qahal entity — organizations, communities, guilds, networks
     // Extended types (from FCT and other imports)
-    "organization",   // Organization reference
-    "contributor",    // Contributor profile
+    "contributor",    // Contributor profile (legacy — prefer "human")
     "video",          // Video content reference
     "audio",          // Audio content reference
     "book",           // Book reference
