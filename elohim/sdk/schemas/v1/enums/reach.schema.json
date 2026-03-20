@@ -2,12 +2,19 @@
   "$id": "epr:schema:enum:reach",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Reach",
-  "description": "Content reach/visibility level. Ordered from most restrictive to most open. Matches DNA REACH_LEVELS constant.",
+  "description": "Content reach/visibility level. Ordered from most restrictive to most open.",
   "type": "string",
   "enum": ["private", "self", "intimate", "trusted", "familiar", "community", "public", "commons"],
+  "_tiers": {
+    "core": {
+      "values": ["private", "self", "intimate", "trusted", "familiar", "community", "public", "commons"],
+      "rationale": "All reach levels are DNA-notarized. They gate content distribution and are enforced by doorway."
+    }
+  },
   "_dna": {
     "constant": "REACH_LEVELS",
     "zome": "content_store_integrity",
-    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
   }
 }

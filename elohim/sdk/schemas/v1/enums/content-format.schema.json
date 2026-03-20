@@ -2,12 +2,34 @@
   "$id": "epr:schema:enum:content-format",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ContentFormat",
-  "description": "Content format for rendering. Matches DNA CONTENT_FORMATS constant.",
+  "description": "Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints.",
   "type": "string",
-  "enum": ["markdown", "html", "video", "audio", "interactive", "external"],
+  "enum": [
+    "markdown", "html", "video", "audio", "interactive", "external",
+    "plaintext", "text", "plain", "gherkin",
+    "perseus", "perseus-json", "perseus-quiz-json",
+    "video-embed", "audio-file", "html5-app",
+    "human-json", "organization-json", "json",
+    "sophia", "sophia-quiz-json"
+  ],
+  "_tiers": {
+    "core": {
+      "values": ["markdown", "html", "video", "audio", "interactive", "external"],
+      "rationale": "DNA-notarized format categories. Broad enough to encompass all rendering approaches."
+    },
+    "extensible": {
+      "values": ["plaintext", "text", "plain", "gherkin",
+                 "perseus", "perseus-json", "perseus-quiz-json",
+                 "video-embed", "audio-file", "html5-app",
+                 "human-json", "organization-json", "json",
+                 "sophia", "sophia-quiz-json"],
+      "rationale": "Rendering-specific variants. Storage-level hints for content pipeline."
+    }
+  },
   "_dna": {
     "constant": "CONTENT_FORMATS",
     "zome": "content_store_integrity",
-    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
   }
 }

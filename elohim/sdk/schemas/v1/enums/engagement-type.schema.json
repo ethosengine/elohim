@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:enum:engagement-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EngagementType",
+  "description": "Types of learner engagement with content. Drive recognition flows and mastery progression.",
+  "type": "string",
+  "enum": ["view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply"],
+  "_tiers": {
+    "core": {
+      "values": ["view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply"],
+      "rationale": "All engagement types are protocol-level — they drive recognition flows and couple knowledge+value+governance."
+    }
+  },
+  "_dna": {
+    "constant": "ENGAGEMENT_TYPES",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

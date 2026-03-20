@@ -2,12 +2,24 @@
   "$id": "epr:schema:enum:mastery-level",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "MasteryLevel",
-  "description": "Bloom's taxonomy-aligned mastery progression. Matches DNA MASTERY_LEVELS constant.",
+  "description": "Bloom's taxonomy-aligned mastery progression.",
   "type": "string",
-  "enum": ["not_started", "seen", "remember", "understand", "apply", "analyze", "evaluate", "create"],
+  "enum": ["not_started", "seen", "remember", "understand", "apply", "analyze", "evaluate", "create",
+           "recognize", "recall", "synthesize"],
+  "_tiers": {
+    "core": {
+      "values": ["not_started", "seen", "remember", "understand", "apply", "analyze", "evaluate", "create"],
+      "rationale": "Bloom's taxonomy levels. DNA-notarized. Level 4 (apply) is the attestation gate for governance participation."
+    },
+    "extensible": {
+      "values": ["recognize", "recall", "synthesize"],
+      "rationale": "Legacy aliases from imported content. Map to core levels: recognize→remember, recall→remember, synthesize→create."
+    }
+  },
   "_dna": {
     "constant": "MASTERY_LEVELS",
     "zome": "content_store_integrity",
-    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
   }
 }

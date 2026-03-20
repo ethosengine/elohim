@@ -1,0 +1,24 @@
+{
+  "$id": "epr:schema:enum:step-type",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StepType",
+  "description": "Types of steps within learning paths.",
+  "type": "string",
+  "enum": ["content", "read", "path", "external", "practice", "assess", "video", "interactive", "checkpoint", "reflection"],
+  "_tiers": {
+    "core": {
+      "values": ["content", "path", "external", "checkpoint", "reflection"],
+      "rationale": "DNA-notarized step types. Structural path elements."
+    },
+    "extensible": {
+      "values": ["read", "practice", "assess", "video", "interactive"],
+      "rationale": "Rendering hints. Storage-level refinements of core types."
+    }
+  },
+  "_dna": {
+    "constant": "STEP_TYPES",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

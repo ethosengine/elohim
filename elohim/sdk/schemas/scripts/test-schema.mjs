@@ -140,10 +140,10 @@ async function main() {
     'CreateContentInput rejects missing title',
   );
 
-  // Invalid content type
+  // Invalid content type (not in any tier)
   assert(
-    !inputValidate({ id: 'test', title: 'Test', contentType: 'bible-verse' }),
-    'CreateContentInput rejects non-DNA content type "bible-verse"',
+    !inputValidate({ id: 'test', title: 'Test', contentType: 'squirrel' }),
+    'CreateContentInput rejects unregistered content type "squirrel"',
   );
 
   // Invalid reach

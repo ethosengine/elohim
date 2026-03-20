@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Verifies that DNA constants match protocol schema enum definitions.
- * Parses Rust source to extract const arrays and compares against schema enums.
+ * Verifies that generated Rust constants match protocol schema enum definitions.
+ * Parses generated_enums.rs to extract CORE_* and ALL_* arrays, then compares
+ * against schema _tiers.core and full enum values respectively.
  *
  * Usage: node elohim/sdk/schemas/scripts/check-dna.mjs
  */
@@ -11,22 +12,25 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
-const SCHEMA_DIR = resolve(__dirname, '../current/enums');
+const SCHEMA_DIR = resolve(__dirname, '../v1/enums');
+const GENERATED_RS = resolve(
+  REPO_ROOT,
+  'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs',
+);
 
 /**
- * Extract a `pub const NAME: [&str; N] = [...]` array from Rust source.
- * Handles multi-line arrays with inline comments.
+ * Extract a `pub const NAME: &[&str] = &[...]` array from generated Rust source.
+ * Also handles legacy `[&str; N]` fixed-size arrays for backward compat.
  */
 function extractRustConstArray(source, constName) {
+  // Match both &[&str] slices and [&str; N] fixed arrays
   const pattern = new RegExp(
-    `pub\\s+const\\s+${constName}\\s*:\\s*\\[&str;\\s*\\d+\\]\\s*=\\s*\\[([^\\]]+)\\]`,
-    's',
+    `pub\\s+const\\s+${constName}\\s*:\\s*(?:&\\[&str\\]|\\[&str;\\s*\\d+\\])\\s*=\\s*&?\\[([\\s\\S]*?)\\];`,
   );
   const match = source.match(pattern);
   if (!match) return null;
 
   // Strip comments first (line by line), then join and split by commas.
-  // This prevents commas inside comments from being treated as separators.
   const stripped = match[1]
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
@@ -39,6 +43,15 @@ function extractRustConstArray(source, constName) {
 }
 
 async function main() {
+  let generatedSource;
+  try {
+    generatedSource = await readFile(GENERATED_RS, 'utf8');
+  } catch {
+    console.error(`FAIL: Could not read generated enums: ${GENERATED_RS}`);
+    console.error('Run: pnpm run schema:codegen:rs');
+    process.exit(1);
+  }
+
   const enumFiles = (await readdir(SCHEMA_DIR)).filter((f) =>
     f.endsWith('.schema.json'),
   );
@@ -52,21 +65,13 @@ async function main() {
     // Only check schemas that declare a _dna mapping
     if (!schema._dna) continue;
 
-    const { constant: constName, file: dnaFile } = schema._dna;
-    const dnaPath = resolve(REPO_ROOT, dnaFile);
+    const { constant: constName } = schema._dna;
+    const coreValues = schema._tiers?.core?.values || schema.enum;
 
-    let dnaSource;
-    try {
-      dnaSource = await readFile(dnaPath, 'utf8');
-    } catch {
-      console.error(`FAIL: Could not read DNA source: ${dnaPath}`);
-      failures++;
-      continue;
-    }
-
-    const dnaValues = extractRustConstArray(dnaSource, constName);
-    if (!dnaValues) {
-      console.error(`FAIL: Could not find const ${constName} in ${dnaFile}`);
+    // Check CORE_* constant matches _tiers.core values
+    const coreRust = extractRustConstArray(generatedSource, `CORE_${constName}`);
+    if (!coreRust) {
+      console.error(`FAIL: Could not find CORE_${constName} in generated_enums.rs`);
       failures++;
       continue;
     }
@@ -74,22 +79,44 @@ async function main() {
     checks++;
     let enumFailures = 0;
 
-    // Check that every DNA value is in the schema enum
-    for (const val of dnaValues) {
-      if (!schema.enum.includes(val)) {
+    // CORE_* should exactly match _tiers.core.values
+    for (const val of coreRust) {
+      if (!coreValues.includes(val)) {
         console.error(
-          `FAIL: DNA ${constName} has "${val}" but schema ${file} does not`,
+          `FAIL: CORE_${constName} has "${val}" but schema ${file} _tiers.core does not`,
+        );
+        enumFailures++;
+      }
+    }
+    for (const val of coreValues) {
+      if (!coreRust.includes(val)) {
+        console.error(
+          `FAIL: Schema ${file} _tiers.core has "${val}" but CORE_${constName} does not`,
         );
         enumFailures++;
       }
     }
 
-    // Check that every schema enum value is in the DNA (unless _storageOnly)
-    const storageOnly = schema._storageOnly || [];
-    for (const val of schema.enum) {
-      if (!dnaValues.includes(val) && !storageOnly.includes(val)) {
+    // Check ALL_* constant matches full enum
+    const allRust = extractRustConstArray(generatedSource, `ALL_${constName}`);
+    if (!allRust) {
+      console.error(`FAIL: Could not find ALL_${constName} in generated_enums.rs`);
+      failures++;
+      continue;
+    }
+
+    for (const val of allRust) {
+      if (!schema.enum.includes(val)) {
         console.error(
-          `FAIL: Schema ${file} has "${val}" but DNA ${constName} does not (and not marked _storageOnly)`,
+          `FAIL: ALL_${constName} has "${val}" but schema ${file} enum does not`,
+        );
+        enumFailures++;
+      }
+    }
+    for (const val of schema.enum) {
+      if (!allRust.includes(val)) {
+        console.error(
+          `FAIL: Schema ${file} enum has "${val}" but ALL_${constName} does not`,
         );
         enumFailures++;
       }
@@ -97,7 +124,7 @@ async function main() {
 
     if (enumFailures === 0) {
       console.log(
-        `PASS: ${file} <-> ${constName} (${dnaValues.length} DNA values, ${schema.enum.length} schema values)`,
+        `PASS: ${file} <-> CORE_${constName} (${coreRust.length}), ALL_${constName} (${allRust.length})`,
       );
     } else {
       failures += enumFailures;

@@ -2,23 +2,40 @@
   "$id": "epr:schema:enum:content-type",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ContentType",
-  "description": "Content type vocabulary. Values marked [DNA] are notarized in the Holochain DHT. Values marked [storage] are storage-only projections not validated by DNA.",
+  "description": "Content type vocabulary. Core types are DNA-notarized (three-leg coupled: knowledge+value+governance). Storage-only types are cross-domain entity references. Extensible types are community vocabulary.",
   "type": "string",
   "enum": [
     "epic", "concept", "lesson", "scenario", "assessment",
-    "collective", "reflection", "discussion", "exercise",
-    "example", "reference", "article",
-    "human", "role"
+    "reflection", "discussion", "exercise", "article",
+    "human", "role", "collective",
+    "example", "reference",
+    "feature", "practice", "contributor",
+    "video", "audio", "book", "book-chapter", "documentary",
+    "bible-verse", "activity", "narrative", "course-module",
+    "module", "quiz", "podcast", "simulation"
   ],
+  "_tiers": {
+    "core": {
+      "values": ["epic", "concept", "lesson", "scenario", "assessment",
+                 "reflection", "discussion", "exercise", "article"],
+      "rationale": "Three-leg coupled: knowledge + value + governance. DNA-notarized, immutable once signed."
+    },
+    "storageOnly": {
+      "values": ["human", "role", "collective"],
+      "rationale": "Cross-domain entity references. Notarized in their own DNAs (imagodei/mishpat). Referenced in content graph but not content primitives."
+    },
+    "extensible": {
+      "values": ["example", "reference", "feature", "practice", "contributor",
+                 "video", "audio", "book", "book-chapter", "documentary",
+                 "bible-verse", "activity", "narrative", "course-module",
+                 "module", "quiz", "podcast", "simulation"],
+      "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes."
+    }
+  },
   "_dna": {
     "constant": "CONTENT_TYPES",
     "zome": "content_store_integrity",
-    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
-  },
-  "_storageOnly": ["human", "role", "collective"],
-  "_storageOnlyRationale": {
-    "human": "Imagodei identity entity. Notarized in imagodei DNA as Human entry type. Stored in lamad content graph for cross-domain referencing. Also used for contributor presences — network placeholders so value can flow to contributors regardless of active participation.",
-    "role": "Governance archetype. Conceptually belongs to qahal/mishpat domain. Stored as learning content about governance roles.",
-    "collective": "Qahal entity — organizations, communities, guilds, networks. Notarized on Mishpat DNA as Collective entry type. Stored in content graph for cross-domain referencing."
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
   }
 }

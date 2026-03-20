@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:enum:completion-criteria",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompletionCriteria",
+  "description": "Criteria for completing a learning path step. Gates path progression.",
+  "type": "string",
+  "enum": ["all-required", "pass-assessment", "view-content"],
+  "_tiers": {
+    "core": {
+      "values": ["all-required", "pass-assessment", "view-content"],
+      "rationale": "All completion criteria are protocol-level — they gate path progression and mastery attestation."
+    }
+  },
+  "_dna": {
+    "constant": "COMPLETION_CRITERIA",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

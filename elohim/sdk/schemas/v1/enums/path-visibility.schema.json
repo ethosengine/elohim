@@ -1,0 +1,24 @@
+{
+  "$id": "epr:schema:enum:path-visibility",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PathVisibility",
+  "description": "Visibility levels for learning paths.",
+  "type": "string",
+  "enum": ["private", "intimate", "unlisted", "community", "public", "draft"],
+  "_tiers": {
+    "core": {
+      "values": ["private", "unlisted", "community", "public"],
+      "rationale": "DNA-notarized visibility. Gates content distribution."
+    },
+    "extensible": {
+      "values": ["intimate", "draft"],
+      "rationale": "Storage-level refinements. Intimate is mutual-attestation paths. Draft is pre-publication state."
+    }
+  },
+  "_dna": {
+    "constant": "PATH_VISIBILITIES",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}
