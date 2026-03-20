@@ -319,7 +319,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     this.map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     // Click handler for place boundaries — works in both normal and dashboard mode
-    this.map.on('click', 'place-fills', (e) => {
+    this.map.on('click', 'place-fills', (e: maplibregl.MapLayerMouseEvent) => {
       if (e.features?.length) {
         const props = e.features[0].properties;
         this.placesApi

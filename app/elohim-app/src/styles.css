@@ -1,3 +1,6 @@
+/* MapLibre GL map styles */
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
 /* Global styles for elohim.host landing page */
 
 * {
