@@ -585,18 +585,20 @@ describe('PathNavigatorComponent', () => {
       expect(component.isFocusedView).toBe(false);
     });
 
-    it('should increment content refresh key when toggling focused view', () =>
-      new Promise<void>(done => {
+    it('should increment content refresh key when toggling focused view', () => {
+      vi.useFakeTimers();
+      try {
         fixture.detectChanges();
         const initialKey = component.contentRefreshKey;
 
         component.onFocusedViewToggle(true);
+        vi.advanceTimersByTime(350);
 
-        setTimeout(() => {
-          expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
-          done();
-        }, 350);
-      }));
+        expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('exploration events', () => {
