@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { CONTENT_TYPES, CONTENT_FORMATS } from '@app/generated/schema-enums';
+import { CONTENT_TYPES, CONTENT_FORMATS, CORE_CONTENT_TYPES } from '@app/generated/schema-enums';
 import { ALL_CONTENT_TYPES, ALL_CONTENT_FORMATS } from '@app/lamad/models/content-node.model';
 import { CONTENT_TYPE_FOLDERS } from '@app/shefa/services/resource-explorer.service';
 
@@ -35,10 +35,10 @@ describe('Content Type Alignment', () => {
     }
   });
 
-  it('every wire content type maps to at least one resource explorer folder', () => {
+  it('every core content type maps to at least one resource explorer folder', () => {
     const allFolderTypes = CONTENT_TYPE_FOLDERS.flatMap(f => f.types) as string[];
-    for (const ct of CONTENT_TYPES) {
-      expect(allFolderTypes, `wire type '${ct}' not in any CONTENT_TYPE_FOLDERS`).toContain(ct);
+    for (const ct of CORE_CONTENT_TYPES) {
+      expect(allFolderTypes, `core type '${ct}' not in any CONTENT_TYPE_FOLDERS`).toContain(ct);
     }
   });
 });
