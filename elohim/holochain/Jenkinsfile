@@ -1011,7 +1011,9 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-mongodb.yaml"
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-nats.yaml"
 
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/edgenode/alpha.yaml', envFile)
+                            // Per-human manifests — each human gets named services (elohim-matthew-alpha, etc.)
+                            // so doorway can route to the correct conductor/storage by name
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/humans/matthew-manager.yaml', envFile, 'elohim-matthew')
                             deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
 
                             sh 'sleep 15'
@@ -1062,7 +1064,8 @@ HAPP_TAG=${HAPP_TAG}
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-nats.yaml"
 
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/edgenode/staging.yaml', envFile)
+                            // Per-human manifests — Pete is the staging human
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/humans/pete-pastor.yaml', envFile, 'elohim-pete')
                             deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
                             deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
                             sh 'sleep 15'
@@ -1154,7 +1157,8 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            deployEdgeWithManifest('prod', 'elohim-prod', 'genesis/orchestrator/manifests/edgenode/prod.yaml', envFile)
+                            // Per-human manifests — Frank is the prod human
+                            deployEdgeWithManifest('prod', 'elohim-prod', 'genesis/orchestrator/manifests/humans/frank-farmer.yaml', envFile, 'elohim-frank')
 
                             sh 'sleep 15'
 
