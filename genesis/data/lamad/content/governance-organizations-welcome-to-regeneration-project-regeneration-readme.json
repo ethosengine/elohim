@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-welcome-to-regeneration-project-regeneration-readme",
   "did": "did:web:elohim.host:content:governance:organizations:welcome-to-regeneration-project-regeneration:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Regeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.",

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-buycott-readme",
   "did": "did:web:elohim.host:content:governance:organizations:buycott:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Buycott is a free app to vote with your wallet. Boycott bad products and find sustainable alternatives.",

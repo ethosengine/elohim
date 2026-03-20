@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-global-carbon-reward-climate-initiative-readme",
   "did": "did:web:elohim.host:content:governance:organizations:global-carbon-reward-climate-initiative:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",

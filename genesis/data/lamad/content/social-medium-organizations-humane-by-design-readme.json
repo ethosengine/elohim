@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-humane-by-design-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:humane-by-design:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "A resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being.",

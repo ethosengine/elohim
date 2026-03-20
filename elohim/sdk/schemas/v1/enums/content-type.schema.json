@@ -6,7 +6,7 @@
   "type": "string",
   "enum": [
     "epic", "concept", "lesson", "scenario", "assessment",
-    "resource", "reflection", "discussion", "exercise",
+    "collective", "reflection", "discussion", "exercise",
     "example", "reference", "article",
     "human", "role"
   ],
@@ -15,9 +15,10 @@
     "zome": "content_store_integrity",
     "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs"
   },
-  "_storageOnly": ["human", "role"],
+  "_storageOnly": ["human", "role", "collective"],
   "_storageOnlyRationale": {
-    "human": "Imagodei identity entity. Notarized in imagodei DNA as Human entry type. Stored in lamad content graph for cross-domain referencing.",
-    "role": "Governance archetype. Conceptually belongs to qahal/mishpat domain. Stored as learning content about governance roles."
+    "human": "Imagodei identity entity. Notarized in imagodei DNA as Human entry type. Stored in lamad content graph for cross-domain referencing. Also used for contributor presences — network placeholders so value can flow to contributors regardless of active participation.",
+    "role": "Governance archetype. Conceptually belongs to qahal/mishpat domain. Stored as learning content about governance roles.",
+    "collective": "Qahal entity — organizations, communities, guilds, networks. Notarized on Mishpat DNA as Collective entry type. Stored in content graph for cross-domain referencing."
   }
 }

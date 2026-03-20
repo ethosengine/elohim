@@ -66,7 +66,7 @@ pub const CONTENT_TYPES: [&str; 12] = [
     "lesson",      // Digestible learning session (AI-derived from concepts)
     "scenario",    // Gherkin feature/scenario
     "assessment",  // Quiz or test
-    "resource",    // Supporting material
+    "collective",  // Qahal entity — organizations, communities, guilds, networks
     "reflection",  // Journaling/reflection prompt
     "discussion",  // Discussion topic
     "exercise",    // Practice activity

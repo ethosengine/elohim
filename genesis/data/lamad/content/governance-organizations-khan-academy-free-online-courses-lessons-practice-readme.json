@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-khan-academy-free-online-courses-lessons-practice-readme",
   "did": "did:web:elohim.host:content:governance:organizations:khan-academy-free-online-courses-lessons-practice:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Learn for free about math, art, computer programming, economics, physics, chemistry, biology, medicine, finance, history, and more. Khan Academy is a nonprofit with the mission of providing a free, world-class education for anyone, anywhere.",

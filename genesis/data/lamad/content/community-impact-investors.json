@@ -1,7 +1,7 @@
 {
   "id": "community-impact-investors",
   "did": "did:web:elohim.host:community:impact-investors",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Impact Investors",
   "description": "Community with 1 members",

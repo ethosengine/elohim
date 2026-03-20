@@ -1,7 +1,7 @@
 {
   "id": "org-ibew-local-123",
   "did": "did:web:elohim.host:org:ibew-local-123",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "IBEW Local 123",
   "description": "Organization with 1 members",

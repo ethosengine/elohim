@@ -1,7 +1,7 @@
 {
   "id": "org-learning-collective",
   "did": "did:web:elohim.host:org:learning-collective",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Valley Learning Collective",
   "description": "Organization with 1 members",

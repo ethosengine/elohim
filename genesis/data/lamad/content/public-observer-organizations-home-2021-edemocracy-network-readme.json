@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-home-2021-edemocracy-network-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:home-2021-edemocracy-network:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "This is what democracy looks like? We are a non-profit organization that helps community members achieve fair, accessible and engaging public consultation processes that prioritize ensuring all voices are heard. We are focused on climate solutions, […]",

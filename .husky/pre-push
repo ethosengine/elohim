@@ -107,6 +107,10 @@ fi
 if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
   PROJECTS="$PROJECTS schema-dna"
 fi
+# Constants sync when seed data, schema enums, or generated constants change
+if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
+  PROJECTS="$PROJECTS constants-sync"
+fi
 # Any Jenkinsfile change triggers orchestrator lint
 if echo "$CHANGED" | grep -q "Jenkinsfile"; then
   PROJECTS="$PROJECTS orchestrator"
@@ -212,6 +216,12 @@ run_gate() {
         ;;
       schema-dna)
         pnpm run schema:check-dna 2>&1
+        rc=$?
+        ;;
+      constants-sync)
+        echo "Running constants sync (schema ↔ generated enums ↔ seed data)..."
+        pnpm run schema:codegen:ts 2>&1 && \
+        (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
         rc=$?
         ;;
       genesis-a2o)

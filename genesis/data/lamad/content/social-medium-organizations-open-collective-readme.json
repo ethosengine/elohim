@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-open-collective-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:open-collective:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Make your community sustainable. Collect and spend money transparently.",

@@ -1,7 +1,7 @@
 {
   "id": "community-builders-guild",
   "did": "did:web:elohim.host:community:builders-guild",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Builders Guild",
   "description": "Community with 1 members",

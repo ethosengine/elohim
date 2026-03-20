@@ -1,7 +1,7 @@
 {
   "id": "community-apprenticeship-program",
   "did": "did:web:elohim.host:community:apprenticeship-program",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Apprenticeship Program",
   "description": "Community with 1 members",

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-the-consilience-project-readme",
   "did": "did:web:elohim.host:content:governance:organizations:the-consilience-project:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Consilience Project is a non-profit media organization that aims to help catalyze a cultural movement toward higher-quality sensemaking.",

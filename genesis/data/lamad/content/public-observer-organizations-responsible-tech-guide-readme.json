@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-responsible-tech-guide-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:responsible-tech-guide:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "There is a vibrant community focused on reducing the harms of technology, diversifying the tech pipeline, and ensuring that technology is aligned with the public interest.",

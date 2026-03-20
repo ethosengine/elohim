@@ -12,7 +12,7 @@ export const CONTENT_TYPES = [
   'lesson',
   'scenario',
   'assessment',
-  'resource',
+  'collective',
   'reflection',
   'discussion',
   'exercise',

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-happy-planet-index-how-happy-is-the-planet-readme",
   "did": "did:web:elohim.host:content:governance:organizations:happy-planet-index-how-happy-is-the-planet:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "How happy Is the planet",

@@ -1,7 +1,7 @@
 {
   "id": "community-educators-network",
   "did": "did:web:elohim.host:community:educators-network",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Educators Network",
   "description": "Community with 1 members",

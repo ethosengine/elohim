@@ -1,7 +1,7 @@
 {
   "id": "org-bub-construction",
   "did": "did:web:elohim.host:org:bub-construction",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Bub's Construction",
   "description": "Organization with 1 members",

@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:public-engagement-and-online-decision-making-ethelo:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",

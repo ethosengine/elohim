@@ -1,7 +1,7 @@
 {
   "id": "org-valley-market",
   "did": "did:web:elohim.host:org:valley-market",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Valley Market",
   "description": "Organization with 1 members",

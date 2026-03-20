@@ -1,7 +1,7 @@
 {
   "id": "org-consolidated-mining",
   "did": "did:web:elohim.host:org:consolidated-mining",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Consolidated Mining Corp",
   "description": "Organization with 1 members",

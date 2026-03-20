@@ -1,7 +1,7 @@
 {
   "id": "governance-video-transitiontowns-readme",
   "did": "did:web:elohim.host:content:governance:video:transitiontowns:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Video",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "An international movement of communities reimagining and rebuilding our world.",

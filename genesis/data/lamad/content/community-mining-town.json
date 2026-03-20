@@ -1,7 +1,7 @@
 {
   "id": "community-mining-town",
   "did": "did:web:elohim.host:community:mining-town",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Mining Town",
   "description": "Community with 1 members",

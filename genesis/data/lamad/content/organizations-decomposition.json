@@ -1,7 +1,7 @@
 {
   "id": "organizations-decomposition",
   "did": "did:web:elohim.host:content:organizations-decomposition",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Organizations Decomposition Summary",
   "description": "**Date:** 2025-11-18 **Source:** `docs/keen.json` **Total Organizations:** 103",

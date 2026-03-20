@@ -1,7 +1,7 @@
 {
   "id": "community-gig-workers-alliance",
   "did": "did:web:elohim.host:community:gig-workers-alliance",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Gig Workers Alliance",
   "description": "Community with 1 members",

@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-home-page-e-estonia-readme",
   "did": "did:web:elohim.host:content:governance:organizations:home-page-e-estonia:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",

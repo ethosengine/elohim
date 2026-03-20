@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-ground-news-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:ground-news:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Top Stories from around you and around the world. Compare how different news publishers frame the same news",

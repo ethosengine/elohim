@@ -1,7 +1,7 @@
 {
   "id": "org-valley-power-electric",
   "did": "did:web:elohim.host:org:valley-power-electric",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Valley Power & Electric",
   "description": "Organization with 1 members",

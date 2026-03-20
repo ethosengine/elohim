@@ -1,7 +1,7 @@
 {
   "id": "community-local-business",
   "did": "did:web:elohim.host:community:local-business",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Local Business",
   "description": "Community with 2 members",

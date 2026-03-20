@@ -1,7 +1,7 @@
 {
   "id": "community-rust-meetup",
   "did": "did:web:elohim.host:community:rust-meetup",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Rust Meetup",
   "description": "Community with 1 members",

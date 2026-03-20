@@ -1,7 +1,7 @@
 {
   "id": "community-neighborhood-association",
   "did": "did:web:elohim.host:community:neighborhood-association",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Neighborhood Association",
   "description": "Community with 1 members",

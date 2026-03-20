@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-international-idea-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:international-idea:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Our objective is to promote and advance sustainable democracy and to ... International Institute for Democracy and Electoral Assistance (International IDEA )",

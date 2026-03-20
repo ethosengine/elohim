@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-thriving-places-index-readme",
   "did": "did:web:elohim.host:content:governance:organizations:thriving-places-index:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Thriving Places Index measures the local conditions for wellbeing, and whether those conditions are being delivered fairly and sustainably. It consists of a broad set of indicators grouped into these three headline domains, from datasets produced by established national data agencies such as the…",

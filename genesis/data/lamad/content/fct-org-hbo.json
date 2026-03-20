@@ -1,6 +1,6 @@
 {
   "id": "fct-org-hbo",
-  "contentType": "resource",
+  "contentType": "collective",
   "title": "HBO",
   "description": "Streaming Service referenced in FCT",
   "content": "# HBO\n\n**Type:** streaming-service\n\n",

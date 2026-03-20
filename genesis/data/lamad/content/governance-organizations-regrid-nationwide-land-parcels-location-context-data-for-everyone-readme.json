@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-regrid-nationwide-land-parcels-location-context-data-for-everyone-readme",
   "did": "did:web:elohim.host:content:governance:organizations:regrid-nationwide-land-parcels-location-context-data-for-everyone:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Regrid is the leading provider of nationwide land parcels and location context data, with over 155 million property boundaries and records.",

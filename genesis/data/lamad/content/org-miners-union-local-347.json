@@ -1,7 +1,7 @@
 {
   "id": "org-miners-union-local-347",
   "did": "did:web:elohim.host:org:miners-union-local-347",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Miners Union Local 347",
   "description": "Organization with 1 members",

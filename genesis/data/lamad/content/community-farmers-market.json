@@ -1,7 +1,7 @@
 {
   "id": "community-farmers-market",
   "did": "did:web:elohim.host:community:farmers-market",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Farmers Market",
   "description": "Community with 2 members",

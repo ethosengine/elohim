@@ -1,7 +1,7 @@
 {
   "id": "social-medium-organizations-foundations-of-humane-technology-course-readme",
   "did": "did:web:elohim.host:content:social-medium:organizations:foundations-of-humane-technology-course:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "A free online course for product teams building technology that strengthens human capacity.",

@@ -1,7 +1,7 @@
 {
   "id": "community-engineers-network",
   "did": "did:web:elohim.host:community:engineers-network",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Engineers Network",
   "description": "Community with 1 members",

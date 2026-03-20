@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-solarpunk-syquydyu-readme",
   "did": "did:web:elohim.host:content:governance:organizations:solarpunk-syquydyu:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through both. Solarpunk also emphasizes handcrafted wares (as opposed to mass-produced products) and communit…",

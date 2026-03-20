@@ -1,7 +1,7 @@
 {
   "id": "community-homeschool-coop",
   "did": "did:web:elohim.host:community:homeschool-coop",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Homeschool Coop",
   "description": "Community with 3 members",

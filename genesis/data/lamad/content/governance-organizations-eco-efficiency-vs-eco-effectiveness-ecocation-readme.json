@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-eco-efficiency-vs-eco-effectiveness-ecocation-readme",
   "did": "did:web:elohim.host:content:governance:organizations:eco-efficiency-vs-eco-effectiveness-ecocation:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",

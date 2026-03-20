@@ -1,7 +1,7 @@
 {
   "id": "community-utility-workers",
   "did": "did:web:elohim.host:community:utility-workers",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Utility Workers",
   "description": "Community with 1 members",

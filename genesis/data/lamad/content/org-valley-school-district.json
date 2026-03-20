@@ -1,7 +1,7 @@
 {
   "id": "org-valley-school-district",
   "did": "did:web:elohim.host:org:valley-school-district",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Valley School District",
   "description": "Organization with 2 members",

@@ -1,7 +1,7 @@
 {
   "id": "org-ethosengine",
   "did": "did:web:elohim.host:org:ethosengine",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "EthosEngine",
   "description": "Organization with 2 members",

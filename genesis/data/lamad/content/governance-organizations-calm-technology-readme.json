@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-calm-technology-readme",
   "did": "did:web:elohim.host:content:governance:organizations:calm-technology:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Calm technology is maintained by Amber Case",

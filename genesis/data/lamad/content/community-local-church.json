@@ -1,7 +1,7 @@
 {
   "id": "community-local-church",
   "did": "did:web:elohim.host:community:local-church",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Local Church",
   "description": "Community with 13 members",

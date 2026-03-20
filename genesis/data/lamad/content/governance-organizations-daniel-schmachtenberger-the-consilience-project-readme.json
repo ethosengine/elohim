@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-daniel-schmachtenberger-the-consilience-project-readme",
   "did": "did:web:elohim.host:content:governance:organizations:daniel-schmachtenberger-the-consilience-project:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The Consilience Project ... The Consilience Project is developing a transmedia body of social theory and philosophy that explains and seeks solutions to the unique ...",

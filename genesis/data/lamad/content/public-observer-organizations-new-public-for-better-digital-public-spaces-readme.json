@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-new-public-for-better-digital-public-spaces-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:new-public-for-better-digital-public-spaces:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "New_ Public aims to inspire and connect designers and technologists to build more flourishing, public friendly digital spaces.",

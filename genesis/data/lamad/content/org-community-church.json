@@ -1,7 +1,7 @@
 {
   "id": "org-community-church",
   "did": "did:web:elohim.host:org:community-church",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Community Church",
   "description": "Organization with 1 members",

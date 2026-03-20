@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-commons-engine-designing-commons-oriented-economies-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:commons-engine-designing-commons-oriented-economies:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Commons Engine solves real-world problems through helping to generate commons-resource sharing organizations",

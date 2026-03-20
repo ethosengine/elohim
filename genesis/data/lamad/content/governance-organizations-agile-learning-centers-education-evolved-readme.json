@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-agile-learning-centers-education-evolved-readme",
   "did": "did:web:elohim.host:content:governance:organizations:agile-learning-centers-education-evolved:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",

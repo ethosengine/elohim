@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-radicalxchange-readme",
   "did": "did:web:elohim.host:content:governance:organizations:radicalxchange:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "We are a community of activists, artists, entrepreneurs, and scholars committed to using mechanism design to inspire radical social change.",

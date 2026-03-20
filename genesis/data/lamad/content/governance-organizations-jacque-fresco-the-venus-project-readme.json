@@ -1,7 +1,7 @@
 {
   "id": "governance-organizations-jacque-fresco-the-venus-project-readme",
   "did": "did:web:elohim.host:content:governance:organizations:jacque-fresco-the-venus-project:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Jacque Fresco is an industrial designer and social engineer. He’s also active in the field of Human Factors, where he developed an integrated social system.",

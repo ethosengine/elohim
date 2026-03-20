@@ -1,7 +1,7 @@
 {
   "id": "org-pure-valley-association",
   "did": "did:web:elohim.host:org:pure-valley-association",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Pure Valley Community Association",
   "description": "Organization with 1 members",

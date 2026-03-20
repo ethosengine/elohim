@@ -1,7 +1,7 @@
 {
   "id": "org-community-foundation",
   "did": "did:web:elohim.host:org:community-foundation",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Valley Community Foundation",
   "description": "Organization with 1 members",

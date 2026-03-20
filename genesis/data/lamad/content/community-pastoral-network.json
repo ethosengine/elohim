@@ -1,7 +1,7 @@
 {
   "id": "community-pastoral-network",
   "did": "did:web:elohim.host:community:pastoral-network",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Pastoral Network",
   "description": "Community with 1 members",

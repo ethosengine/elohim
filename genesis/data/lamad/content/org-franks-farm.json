@@ -1,7 +1,7 @@
 {
   "id": "org-franks-farm",
   "did": "did:web:elohim.host:org:franks-farm",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Frank's Family Farm",
   "description": "Organization with 1 members",

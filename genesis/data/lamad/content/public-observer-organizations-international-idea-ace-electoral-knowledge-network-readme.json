@@ -1,7 +1,7 @@
 {
   "id": "public-observer-organizations-international-idea-ace-electoral-knowledge-network-readme",
   "did": "did:web:elohim.host:content:public-observer:organizations:international-idea-ace-electoral-knowledge-network:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The International Institute for Democracy and Electoral Assistance (International IDEA) is an intergovernmental organization with the mandate to promote and ...",

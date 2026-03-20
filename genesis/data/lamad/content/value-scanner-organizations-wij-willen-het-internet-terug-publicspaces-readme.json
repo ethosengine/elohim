@@ -1,7 +1,7 @@
 {
   "id": "value-scanner-organizations-wij-willen-het-internet-terug-publicspaces-readme",
   "did": "did:web:elohim.host:content:value-scanner:organizations:wij-willen-het-internet-terug-publicspaces:readme",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Door PublicSpaces zijn in 2026 zijn alle privacy officers en CTO’s van publieke organisaties in Nederland op de hoogte van alternatieve digitale instrumenten gebaseerd op publieke waarden.",

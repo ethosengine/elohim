@@ -1,7 +1,7 @@
 {
   "id": "community-holochain-devs",
   "did": "did:web:elohim.host:community:holochain-devs",
-  "contentType": "resource",
+  "contentType": "collective",
   "activityPubType": "Group",
   "title": "Holochain Devs",
   "description": "Community with 1 members",
