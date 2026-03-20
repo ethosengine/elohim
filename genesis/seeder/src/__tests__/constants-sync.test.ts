@@ -2,11 +2,13 @@
  * Constants Sync Tests
  *
  * Validates that content format constants stay in sync across:
- * - Rust healing.rs (source of truth)
- * - Generated TypeScript schema-enums.ts
+ * - Generated Rust (generated_enums.rs, from JSON Schema)
+ * - Generated TypeScript (schema-enums.ts, from JSON Schema)
  * - Actual content JSON files in genesis/data/lamad/content/
  *
- * Catches drift between layers that caused the "sophia format rejected" bug.
+ * Both Rust and TypeScript are generated from the same JSON Schema source,
+ * so drift should be impossible if codegen is run. These tests catch
+ * stale codegen artifacts.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
@@ -40,7 +42,7 @@ const APP_GENERATED = path.join(
   'schema-enums.ts',
 );
 const SEEDER_GENERATED = path.join(REPO_ROOT, 'genesis', 'seeder', 'src', 'generated', 'schema-enums.ts');
-const HEALING_RS = path.join(
+const GENERATED_ENUMS_RS = path.join(
   REPO_ROOT,
   'elohim',
   'holochain',
@@ -49,7 +51,7 @@ const HEALING_RS = path.join(
   'zomes',
   'content_store_integrity',
   'src',
-  'healing.rs',
+  'generated_enums.rs',
 );
 
 /** Normalization mappings from seed-sqlite.ts that map variant formats to canonical */
@@ -66,7 +68,7 @@ const FORMAT_MAPPINGS: Record<string, string> = {
   txt: 'text',
 };
 
-/** Parse a Rust const array from healing.rs source */
+/** Parse a Rust const array from generated_enums.rs (uses &[&str] slices) */
 function parseRustConstArray(source: string, constName: string): string[] {
   const pattern = new RegExp(
     `pub const ${constName}:\\s*&\\[&str\\]\\s*=\\s*&\\[([\\s\\S]*?)\\];`,
@@ -97,15 +99,15 @@ function collectContentFormats(): Set<string> {
   return formats;
 }
 
-describe('Constants Sync: healing.rs ↔ schema-enums.ts', () => {
-  it('generated CONTENT_FORMATS should match healing.rs', () => {
-    if (!fs.existsSync(HEALING_RS)) {
-      console.warn('healing.rs not found, skipping Rust sync check');
+describe('Constants Sync: generated_enums.rs ↔ schema-enums.ts', () => {
+  it('generated ALL_CONTENT_FORMATS should match between Rust and TypeScript', () => {
+    if (!fs.existsSync(GENERATED_ENUMS_RS)) {
+      console.warn('generated_enums.rs not found, skipping Rust sync check');
       return;
     }
 
-    const rustSource = fs.readFileSync(HEALING_RS, 'utf8');
-    const rustFormats = parseRustConstArray(rustSource, 'CONTENT_FORMATS');
+    const rustSource = fs.readFileSync(GENERATED_ENUMS_RS, 'utf8');
+    const rustFormats = parseRustConstArray(rustSource, 'ALL_CONTENT_FORMATS');
 
     expect(rustFormats.length).toBeGreaterThan(0);
 
@@ -194,7 +196,7 @@ describe('Constants Sync: seeder generated ↔ app generated', () => {
     if (!fs.existsSync(APP_GENERATED)) {
       throw new Error(
         `App-side generated file not found at ${APP_GENERATED}. ` +
-          'Run: cd genesis/seeder && npx tsx src/generate-schema-types.ts',
+          'Run: pnpm run schema:codegen:ts',
       );
     }
     if (!fs.existsSync(SEEDER_GENERATED)) {
@@ -204,8 +206,6 @@ describe('Constants Sync: seeder generated ↔ app generated', () => {
     const appContent = fs.readFileSync(APP_GENERATED, 'utf8');
     const seederContent = fs.readFileSync(SEEDER_GENERATED, 'utf8');
 
-    // Strip timestamp line (differs per run) before comparing
-    const stripTimestamp = (s: string) => s.replace(/^\/\/ Generated at:.*$/m, '');
-    expect(stripTimestamp(appContent)).toEqual(stripTimestamp(seederContent));
+    expect(appContent).toEqual(seederContent);
   });
 });

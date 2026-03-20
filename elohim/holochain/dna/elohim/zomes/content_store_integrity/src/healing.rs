@@ -7,137 +7,18 @@
 use hc_rna::{SelfHealingEntry, ValidationStatus};
 use crate::*;
 
-// ============================================================================
-// Validation Constants - Aligned with lib.rs and data/lamad content
-// ============================================================================
-
-/// Content types - extended to support all imported content
-pub const CONTENT_TYPES: &[&str] = &[
-    // Core types (from lib.rs)
-    "epic",           // High-level narrative/vision document
-    "concept",        // Atomic knowledge unit
-    "lesson",         // Digestible learning session (AI-derived from concepts)
-    "scenario",       // Gherkin feature/scenario
-    "assessment",     // Quiz or test
-
-    "reflection",     // Journaling/reflection prompt
-    "discussion",     // Discussion topic
-    "exercise",       // Practice activity
-    "example",        // Illustrative example
-    "reference",      // Reference material
-    "article",        // Long-form article content
-    "feature",        // Gherkin feature (imported from .feature files)
-    "practice",       // Practice activity (legacy alias)
-    "human",          // Human persona + contributor presences
-    "collective",     // Qahal entity — organizations, communities, guilds, networks
-    // Extended types (from FCT and other imports)
-    "contributor",    // Contributor profile (legacy — prefer "human")
-    "video",          // Video content reference
-    "audio",          // Audio content reference
-    "book",           // Book reference
-    "book-chapter",   // Book chapter reference
-    "documentary",    // Documentary reference
-    "bible-verse",    // Biblical scripture reference
-    "activity",       // Learning activity
-    "narrative",      // Narrative/story content
-    "course-module",  // Course module structure
-    "module",         // Generic module
-    "quiz",           // Quiz content (distinct from assessment)
-    "podcast",        // Podcast content reference
-    "role",           // Role/persona in simulation or governance
-    "simulation",     // Simulation exercise
-];
-
-/// Reach levels - must match REACH_LEVELS in lib.rs
-pub const REACH_LEVELS: &[&str] = &[
-    "private",    // Only self
-    "self",       // Only self (alias)
-    "intimate",   // Closest relationships
-    "trusted",    // Trusted circle
-    "familiar",   // Extended network
-    "community",  // Community members
-    "public",     // Anyone authenticated
-    "commons",    // Anyone, including anonymous
-];
-
-/// Content formats - all formats used in data/lamad content
-pub const CONTENT_FORMATS: &[&str] = &[
-    "markdown",        // Markdown format
-    "html",            // HTML format
-    "plaintext",       // Plain text
-    "text",            // Plain text (alias)
-    "plain",           // Plain text (alias)
-    "video",           // Video media reference
-    "audio",           // Audio media reference
-    "interactive",     // Interactive content
-    "external",        // External URL reference
-    "gherkin",         // Gherkin/Cucumber scenario format (imported from .feature files)
-    "perseus",           // Perseus quiz/assessment format (Khan Academy derived, canonical)
-    "perseus-json",      // Perseus format (alias)
-    "perseus-quiz-json", // Perseus quiz format (self-documenting assessment content)
-    "video-embed",     // Embedded video (YouTube, Vimeo, etc.)
-    "audio-file",      // Audio file reference
-    "html5-app",       // HTML5 interactive application
-    "human-json",      // Human persona JSON format
-    "organization-json", // Organization JSON format
-    "json",              // Generic JSON format
-    "sophia",            // Sophia assessment format (psychometric/discovery)
-    "sophia-quiz-json",  // Sophia quiz format (self-documenting assessment content)
-];
-
-pub const PATH_VISIBILITIES: &[&str] = &[
-    "private",   // Only creator
-    "intimate",  // Mutual-attestation paths (e.g. love-map)
-    "unlisted",  // Accessible by link
-    "community", // Community members
-    "public",    // Anyone
-    "draft",     // Draft in progress
-];
-
-pub const STEP_TYPES: &[&str] = &[
-    "content",   // Reference content
-    "read",      // Read content (seeder default)
-    "path",      // Reference another path
-    "external",  // External URL
-    "practice",  // Practice activity
-    "assess",    // Assessment step
-    "video",     // Video content step
-    "interactive", // Interactive activity
-];
-
-/// Mastery levels - must match MASTERY_LEVELS in lib.rs (Bloom's Taxonomy)
-pub const MASTERY_LEVELS: &[&str] = &[
-    "not_started", // 0 - No engagement
-    "seen",        // 1 - Content viewed
-    "remember",    // 2 - Basic recall demonstrated
-    "understand",  // 3 - Comprehension demonstrated
-    "apply",       // 4 - Application in novel contexts (ATTESTATION GATE)
-    "analyze",     // 5 - Can break down, connect, contribute analysis
-    "evaluate",    // 6 - Can assess, critique, peer review
-    "create",      // 7 - Can author, derive, synthesize
-    // Legacy aliases
-    "recognize",   // Alias for remember
-    "recall",      // Alias for remember
-    "synthesize",  // Alias for create
-];
-
-pub const COMPLETION_CRITERIA: &[&str] = &[
-    "all-required",     // All steps required
-    "pass-assessment",  // Must pass assessment
-    "view-content",     // Just view content
-];
-
-/// Engagement types for mastery tracking
-pub const ENGAGEMENT_TYPES: &[&str] = &[
-    "view",       // Passive viewing
-    "quiz",       // Took assessment
-    "practice",   // Practice exercise
-    "discuss",    // Participated in discussion
-    "create",     // Created content
-    "peer",       // Peer interaction
-    "teach",      // Teaching/mentoring
-    "apply",      // Real-world application
-];
+// Healing uses ALL_* constants (full vocabulary including extensible types).
+// These are auto-generated from protocol JSON schemas.
+use crate::generated_enums::{
+    ALL_CONTENT_TYPES as CONTENT_TYPES,
+    ALL_CONTENT_FORMATS as CONTENT_FORMATS,
+    ALL_REACH_LEVELS as REACH_LEVELS,
+    ALL_MASTERY_LEVELS as MASTERY_LEVELS,
+    ALL_PATH_VISIBILITIES as PATH_VISIBILITIES,
+    ALL_STEP_TYPES as STEP_TYPES,
+    ALL_COMPLETION_CRITERIA as COMPLETION_CRITERIA,
+    ALL_ENGAGEMENT_TYPES as ENGAGEMENT_TYPES,
+};
 
 // ============================================================================
 // Content Self-Healing Implementation

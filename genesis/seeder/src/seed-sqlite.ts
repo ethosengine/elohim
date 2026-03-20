@@ -21,6 +21,7 @@ import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { CONTENT_FORMATS } from './validation-constants.js';
+import { ALL_STEP_TYPES } from './generated/schema-enums.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -93,33 +94,31 @@ function normalizeContentFormat(format: string | undefined): string {
   return 'markdown';
 }
 
-/** Valid step types accepted by elohim-storage */
-const VALID_STEP_TYPES = [
-  'learn', 'practice', 'quiz', 'assessment', 'discussion',
-  'project', 'resource', 'video', 'reading', 'checkpoint'
-];
-
-/** Map legacy/variant step types to valid values */
+/** Map legacy/variant step types to schema-canonical values.
+ * ALL_STEP_TYPES imported from generated schema-enums (single source of truth). */
 function normalizeStepType(stepType: string | undefined): string {
-  if (!stepType) return 'learn';
+  if (!stepType) return 'content';
 
   const normalized = stepType.toLowerCase();
 
-  // Map variants to canonical values
+  // Map legacy values to schema-canonical values
   const mappings: Record<string, string> = {
-    'content': 'learn',
-    'assess': 'assessment',
-    'test': 'quiz',
+    'learn': 'content',
+    'reading': 'read',
+    'quiz': 'assess',
+    'assessment': 'assess',
+    'discussion': 'reflection',
+    'project': 'practice',
+    'resource': 'external',
+    'test': 'assess',
     'watch': 'video',
-    'read': 'reading',
   };
 
-  if (mappings[normalized]) return mappings[normalized];
-  if (VALID_STEP_TYPES.includes(normalized)) return normalized;
+  const mapped = mappings[normalized] || normalized;
+  if ((ALL_STEP_TYPES as readonly string[]).includes(mapped)) return mapped;
 
-  // Default to learn for unknown types
-  console.warn(`   ⚠️ Unknown stepType '${stepType}', defaulting to 'learn'`);
-  return 'learn';
+  console.warn(`   ⚠️ Unknown stepType '${stepType}', defaulting to 'content'`);
+  return 'content';
 }
 
 // ============================================================================

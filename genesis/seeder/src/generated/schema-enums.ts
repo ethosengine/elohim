@@ -1,59 +1,39 @@
-// AUTO-GENERATED — aligned with protocol schema (elohim/sdk/schemas/current/enums/content-type.schema.json)
-// TODO: Phase 2 will replace this with imports from protocol schema codegen
-// Generated at: 2026-03-17T22:00:00.000Z
+// AUTO-GENERATED from protocol JSON schemas.
+// DO NOT EDIT — regenerate with: pnpm run schema:codegen:ts
+//
+// Source: elohim/sdk/schemas/v1/enums/*.schema.json
 
-/**
- * Content types — DNA-notarized types + storage-only types (human, role)
- * Must match protocol schema enum: elohim/sdk/schemas/v1/enums/content-type.schema.json
- */
-export const CONTENT_TYPES = [
-  'epic',
-  'concept',
-  'lesson',
-  'scenario',
-  'assessment',
-  'collective',
-  'reflection',
-  'discussion',
-  'exercise',
-  'example',
-  'reference',
-  'article',
-  'human',
-  'role',
+export const CORE_COMPLETION_CRITERIA = [
+  'all-required',
+  'pass-assessment',
+  'view-content',
 ] as const;
-
-export type ContentType = typeof CONTENT_TYPES[number];
-
-/**
- * Reach levels - must match REACH_LEVELS in lib.rs
- */
-export const REACH_LEVELS = [
-  'private',
-  'self',
-  'intimate',
-  'trusted',
-  'familiar',
-  'community',
-  'public',
-  'commons',
+export const ALL_COMPLETION_CRITERIA = [
+  'all-required',
+  'pass-assessment',
+  'view-content',
 ] as const;
+export const COMPLETION_CRITERIA = ALL_COMPLETION_CRITERIA;
+export type CompletionCriteria = (typeof ALL_COMPLETION_CRITERIA)[number];
 
-export type ReachLevel = typeof REACH_LEVELS[number];
-
-/**
- * Content formats - all formats used in data/lamad content
- */
-export const CONTENT_FORMATS = [
+export const CORE_CONTENT_FORMATS = [
   'markdown',
   'html',
-  'plaintext',
-  'text',
-  'plain',
   'video',
   'audio',
   'interactive',
   'external',
+] as const;
+export const ALL_CONTENT_FORMATS = [
+  'markdown',
+  'html',
+  'video',
+  'audio',
+  'interactive',
+  'external',
+  'plaintext',
+  'text',
+  'plain',
   'gherkin',
   'perseus',
   'perseus-json',
@@ -67,37 +47,89 @@ export const CONTENT_FORMATS = [
   'sophia',
   'sophia-quiz-json',
 ] as const;
+export const CONTENT_FORMATS = ALL_CONTENT_FORMATS;
+export type ContentFormat = (typeof ALL_CONTENT_FORMATS)[number];
 
-export type ContentFormat = typeof CONTENT_FORMATS[number];
-
-export const PATH_VISIBILITIES = [
-  'private',
-  'intimate',
-  'unlisted',
-  'community',
-  'public',
-  'draft',
+export const CORE_CONTENT_TYPES = [
+  'epic',
+  'concept',
+  'lesson',
+  'scenario',
+  'assessment',
+  'reflection',
+  'discussion',
+  'exercise',
+  'article',
 ] as const;
-
-export type PathVisibility = typeof PATH_VISIBILITIES[number];
-
-export const STEP_TYPES = [
-  'content',
-  'read',
-  'path',
-  'external',
+export const ALL_CONTENT_TYPES = [
+  'epic',
+  'concept',
+  'lesson',
+  'scenario',
+  'assessment',
+  'reflection',
+  'discussion',
+  'exercise',
+  'article',
+  'human',
+  'role',
+  'collective',
+  'example',
+  'reference',
+  'feature',
   'practice',
-  'assess',
+  'contributor',
   'video',
-  'interactive',
+  'audio',
+  'book',
+  'book-chapter',
+  'documentary',
+  'bible-verse',
+  'activity',
+  'narrative',
+  'course-module',
+  'module',
+  'quiz',
+  'podcast',
+  'simulation',
 ] as const;
+export const CONTENT_TYPES = ALL_CONTENT_TYPES;
+export type ContentType = (typeof ALL_CONTENT_TYPES)[number];
 
-export type StepType = typeof STEP_TYPES[number];
+export const CORE_ENGAGEMENT_TYPES = [
+  'view',
+  'quiz',
+  'practice',
+  'discuss',
+  'create',
+  'peer',
+  'teach',
+  'apply',
+] as const;
+export const ALL_ENGAGEMENT_TYPES = [
+  'view',
+  'quiz',
+  'practice',
+  'discuss',
+  'create',
+  'peer',
+  'teach',
+  'apply',
+] as const;
+export const ENGAGEMENT_TYPES = ALL_ENGAGEMENT_TYPES;
+export type EngagementType = (typeof ALL_ENGAGEMENT_TYPES)[number];
 
-/**
- * Mastery levels - must match MASTERY_LEVELS in lib.rs (Bloom's Taxonomy)
- */
-export const MASTERY_LEVELS = [
+export const CORE_MASTERY_LEVELS = [
+  'not_started',
+  'seen',
+  'remember',
+  'understand',
+  'apply',
+  'analyze',
+  'evaluate',
+  'create',
+] as const;
+export const ALL_MASTERY_LEVELS = [
   'not_started',
   'seen',
   'remember',
@@ -110,29 +142,68 @@ export const MASTERY_LEVELS = [
   'recall',
   'synthesize',
 ] as const;
+export const MASTERY_LEVELS = ALL_MASTERY_LEVELS;
+export type MasteryLevel = (typeof ALL_MASTERY_LEVELS)[number];
 
-export type MasteryLevel = typeof MASTERY_LEVELS[number];
-
-export const COMPLETION_CRITERIA = [
-  'all-required',
-  'pass-assessment',
-  'view-content',
+export const CORE_PATH_VISIBILITIES = [
+  'private',
+  'unlisted',
+  'community',
+  'public',
 ] as const;
+export const ALL_PATH_VISIBILITIES = [
+  'private',
+  'intimate',
+  'unlisted',
+  'community',
+  'public',
+  'draft',
+] as const;
+export const PATH_VISIBILITIES = ALL_PATH_VISIBILITIES;
+export type PathVisibility = (typeof ALL_PATH_VISIBILITIES)[number];
 
-export type CompletionCriteria = typeof COMPLETION_CRITERIA[number];
+export const CORE_REACH_LEVELS = [
+  'private',
+  'self',
+  'intimate',
+  'trusted',
+  'familiar',
+  'community',
+  'public',
+  'commons',
+] as const;
+export const ALL_REACH_LEVELS = [
+  'private',
+  'self',
+  'intimate',
+  'trusted',
+  'familiar',
+  'community',
+  'public',
+  'commons',
+] as const;
+export const REACH_LEVELS = ALL_REACH_LEVELS;
+export type Reach = (typeof ALL_REACH_LEVELS)[number];
 
-/**
- * Engagement types for mastery tracking
- */
-export const ENGAGEMENT_TYPES = [
-  'view',
-  'quiz',
+export const CORE_STEP_TYPES = [
+  'content',
+  'path',
+  'external',
+  'checkpoint',
+  'reflection',
+] as const;
+export const ALL_STEP_TYPES = [
+  'content',
+  'read',
+  'path',
+  'external',
   'practice',
-  'discuss',
-  'create',
-  'peer',
-  'teach',
-  'apply',
+  'assess',
+  'video',
+  'interactive',
+  'checkpoint',
+  'reflection',
 ] as const;
+export const STEP_TYPES = ALL_STEP_TYPES;
+export type StepType = (typeof ALL_STEP_TYPES)[number];
 
-export type EngagementType = typeof ENGAGEMENT_TYPES[number];

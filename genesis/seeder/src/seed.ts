@@ -40,6 +40,7 @@ import StorageClient from './storage-client.js'; // Used for computing blob hash
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
+import { ALL_STEP_TYPES } from './generated/schema-enums.js';
 
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -1554,33 +1555,30 @@ async function seedViaDoorway(): Promise<SeedResult> {
       sectionId?: string;
     }
 
-    // Valid step types per storage validation
-    // Storage accepts: learn, practice, quiz, assessment, discussion, project, resource, video, reading, checkpoint
-    const VALID_STEP_TYPES = ['learn', 'practice', 'quiz', 'assessment', 'discussion', 'project', 'resource', 'video', 'reading', 'checkpoint'];
-
-    // Normalize step type aliases to valid storage values
+    // Normalize step type aliases to schema-canonical values.
+    // ALL_STEP_TYPES imported from generated schema-enums (single source of truth).
     function normalizeStepType(type: string | undefined): string {
-      if (!type) return 'learn';  // Default to 'learn' (generic content)
+      if (!type) return 'content';  // Default to 'content' (generic content step)
       const normalized = type.toLowerCase();
-      // Map old/alternative step types to storage-accepted values
+      // Map legacy/alternative step types to schema-canonical values
       const aliases: Record<string, string> = {
-        // Old seeder types -> new storage types
-        'content': 'learn',
-        'read': 'reading',
-        'assess': 'assessment',
-        'path': 'resource',      // Sub-path reference
-        'external': 'resource',  // External link
-        'interactive': 'practice',
+        'learn': 'content',
+        'reading': 'read',
+        'quiz': 'assess',
+        'assessment': 'assess',
+        'discussion': 'reflection',
+        'project': 'practice',
+        'resource': 'external',
         // Common variations
-        'lesson': 'learn',
-        'article': 'reading',
-        'test': 'quiz',
+        'lesson': 'content',
+        'article': 'read',
+        'test': 'assess',
         'exercise': 'practice',
       };
       const mapped = aliases[normalized] || normalized;
-      if (!VALID_STEP_TYPES.includes(mapped)) {
-        console.warn(`   ⚠️ Unknown stepType '${type}' -> defaulting to 'learn'`);
-        return 'learn';
+      if (!(ALL_STEP_TYPES as readonly string[]).includes(mapped)) {
+        console.warn(`   ⚠️ Unknown stepType '${type}' -> defaulting to 'content'`);
+        return 'content';
       }
       return mapped;
     }

@@ -11,6 +11,7 @@ use hc_rna::{
     Validator, Transcriber, ReferenceResolver, DegradationHandler, DegradationDecision,
     EntryTypeProvider,
 };
+use content_store_integrity::{CONTENT_TYPES, REACH_LEVELS, MASTERY_LEVELS};
 use serde_json::Value;
 
 // ============================================================================
@@ -36,11 +37,7 @@ impl Validator for ContentValidator {
         let content_type = data["content_type"].as_str()
             .ok_or("Content content_type is required and must be string")?;
 
-        // Validate against allowed values
-        const CONTENT_TYPES: &[&str] = &[
-            "epic", "concept", "lesson", "scenario", "assessment", "resource",
-            "practice", "reflection", "reference", "external"
-        ];
+        // Validate against allowed values (CONTENT_TYPES from integrity crate)
         if !CONTENT_TYPES.contains(&content_type) {
             return Err(format!("Invalid content_type '{}'. Must be one of: {:?}",
                 content_type, CONTENT_TYPES));
@@ -48,9 +45,7 @@ impl Validator for ContentValidator {
 
         // Reach must be valid if present
         if let Some(reach) = data["reach"].as_str() {
-            const REACH_LEVELS: &[&str] = &[
-                "private", "intimate", "trusted", "familiar", "community", "public", "commons"
-            ];
+            // REACH_LEVELS from integrity crate
             if !REACH_LEVELS.contains(&reach) {
                 return Err(format!("Invalid reach '{}'. Must be one of: {:?}",
                     reach, REACH_LEVELS));
@@ -149,10 +144,7 @@ impl Validator for ContentMasteryValidator {
         let mastery_level = data["mastery_level"].as_str()
             .ok_or("Mastery mastery_level is required")?;
 
-        const MASTERY_LEVELS: &[&str] = &[
-            "not_started", "seen", "remember", "understand",
-            "apply", "analyze", "evaluate", "create"
-        ];
+        // MASTERY_LEVELS from integrity crate
         if !MASTERY_LEVELS.contains(&mastery_level) {
             return Err(format!("Invalid mastery_level '{}'. Must be one of: {:?}",
                 mastery_level, MASTERY_LEVELS));

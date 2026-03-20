@@ -19,34 +19,26 @@ use doorway_client::Cacheable;
 pub mod healing;
 
 // =============================================================================
-// Protocol Constants (enums as string arrays for msgpack compatibility)
+// Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
+pub mod generated_enums;
 
-/// Reach levels - graduated visibility in the network
-/// Determines who can see content/profiles
-pub const REACH_LEVELS: [&str; 8] = [
-    "private",    // Only self
-    "self",       // Only self (alias)
-    "intimate",   // Closest relationships
-    "trusted",    // Trusted circle
-    "familiar",   // Extended network
-    "community",  // Community members
-    "public",     // Anyone authenticated
-    "commons",    // Anyone, including anonymous
-];
+// Re-export CORE_* as the existing names for backward compatibility.
+// DNA validation uses these (core tier only). Healing uses ALL_* (full vocabulary).
+pub use generated_enums::{
+    CORE_CONTENT_TYPES as CONTENT_TYPES,
+    CORE_CONTENT_FORMATS as CONTENT_FORMATS,
+    CORE_REACH_LEVELS as REACH_LEVELS,
+    CORE_MASTERY_LEVELS as MASTERY_LEVELS,
+    CORE_PATH_VISIBILITIES as PATH_VISIBILITIES,
+    CORE_ENGAGEMENT_TYPES as ENGAGEMENT_TYPES,
+    CORE_STEP_TYPES as STEP_TYPES,
+    CORE_COMPLETION_CRITERIA as COMPLETION_CRITERIA,
+};
 
-/// Mastery levels - Bloom's Taxonomy based progression
-/// Maps to 0-7 numeric values for comparison
-pub const MASTERY_LEVELS: [&str; 8] = [
-    "not_started", // 0 - No engagement
-    "seen",        // 1 - Content viewed
-    "remember",    // 2 - Basic recall demonstrated
-    "understand",  // 3 - Comprehension demonstrated
-    "apply",       // 4 - Application in novel contexts (ATTESTATION GATE)
-    "analyze",     // 5 - Can break down, connect, contribute analysis
-    "evaluate",    // 6 - Can assess, critique, peer review
-    "create",      // 7 - Can author, derive, synthesize
-];
+// =============================================================================
+// Protocol Constants (non-generated)
+// =============================================================================
 
 /// The level index at which participation privileges unlock (apply = 4)
 pub const ATTESTATION_GATE_LEVEL: usize = 4;
@@ -59,51 +51,6 @@ pub const AGENT_TYPES: [&str; 4] = [
     "elohim",       // Constitutional AI agent
 ];
 
-/// Content types supported in Lamad
-pub const CONTENT_TYPES: [&str; 12] = [
-    "epic",        // High-level narrative/vision document
-    "concept",     // Atomic knowledge unit
-    "lesson",      // Digestible learning session (AI-derived from concepts)
-    "scenario",    // Gherkin feature/scenario
-    "assessment",  // Quiz or test
-    "collective",  // Qahal entity — organizations, communities, guilds, networks
-    "reflection",  // Journaling/reflection prompt
-    "discussion",  // Discussion topic
-    "exercise",    // Practice activity
-    "example",     // Illustrative example
-    "reference",   // Reference material
-    "article",     // Long-form article content
-];
-
-/// Content format types
-pub const CONTENT_FORMATS: [&str; 6] = [
-    "markdown",
-    "html",
-    "video",
-    "audio",
-    "interactive",
-    "external",
-];
-
-/// Path visibility types
-pub const PATH_VISIBILITIES: [&str; 4] = [
-    "private",   // Only creator
-    "unlisted",  // Accessible by link
-    "community", // Community members
-    "public",    // Anyone
-];
-
-/// Engagement types for mastery tracking
-pub const ENGAGEMENT_TYPES: [&str; 8] = [
-    "view",       // Passive viewing
-    "quiz",       // Took assessment
-    "practice",   // Practice exercise
-    "comment",    // Added comment/discussion
-    "review",     // Peer reviewed content
-    "contribute", // Made contribution
-    "path_step",  // Encountered in learning path
-    "refresh",    // Explicit refresh engagement
-];
 
 // =============================================================================
 // Blob Management - Phase 1: Large Media Support (Video, Podcasts)
@@ -777,23 +724,6 @@ pub struct PathStep {
     pub validation_status: String,
 }
 
-/// Step types for PathStep.step_type
-pub const STEP_TYPES: [&str; 5] = [
-    "content",      // Regular content node
-    "path",         // Nested learning path (composition)
-    "external",     // External resource (URL)
-    "checkpoint",   // Assessment/quiz checkpoint
-    "reflection",   // Reflection/journaling prompt
-];
-
-/// Completion criteria for PathStep.completion_criteria
-pub const COMPLETION_CRITERIA: [&str; 5] = [
-    "view",             // Just view the content
-    "quiz_pass",        // Pass associated quiz
-    "practice_complete", // Complete practice exercises
-    "reflection_submit", // Submit reflection
-    "time_spent",       // Spend minimum time
-];
 
 /// Path chapter entry - thematic grouping of steps
 /// Named "chapter" to evoke narrative journey rather than institutional "module"

@@ -1708,29 +1708,7 @@ pub struct GrantAttestationInput {
 // Input/Output Types for Content Mastery
 // =============================================================================
 
-/// Mastery levels (Bloom's Taxonomy)
-pub const MASTERY_LEVELS: [&str; 8] = [
-    "not_started",  // 0 - No engagement
-    "seen",         // 1 - Content viewed
-    "remember",     // 2 - Basic recall demonstrated
-    "understand",   // 3 - Comprehension demonstrated
-    "apply",        // 4 - Application in novel contexts (ATTESTATION GATE)
-    "analyze",      // 5 - Can break down, connect, contribute analysis
-    "evaluate",     // 6 - Can assess, critique, peer review
-    "create",       // 7 - Can author, derive, synthesize
-];
-
-/// Engagement types for mastery tracking
-pub const ENGAGEMENT_TYPES: [&str; 8] = [
-    "view",         // Viewed content
-    "quiz",         // Completed quiz
-    "practice",     // Did practice exercise
-    "comment",      // Added comment/discussion
-    "review",       // Peer reviewed content
-    "contribute",   // Contributed to content
-    "path_step",    // Completed as path step
-    "refresh",      // Refreshed stale mastery
-];
+// MASTERY_LEVELS and ENGAGEMENT_TYPES imported from content_store_integrity (via generated_enums)
 
 /// Input for initializing mastery tracking
 #[derive(Serialize, Deserialize, Debug)]
