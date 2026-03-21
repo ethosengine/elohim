@@ -368,7 +368,9 @@ spec:
         }
 
         stage('Publish GitHub Release') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            // TODO: Re-enable when GitHub release publishing is needed.
+            // Currently disabled — sophia UMD is consumed via file copy, not GitHub Releases.
+            when { expression { false } }
             steps {
                 container('node') {
                     dir('sophia') {
