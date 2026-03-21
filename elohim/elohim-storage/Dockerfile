@@ -66,8 +66,10 @@ ARG CACHE_BUST=unknown
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 
-# Build the release binary (ARG CACHE_BUST above ensures this reruns on new commits)
-RUN cargo build --release
+# Build the release binary
+# CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
+# when the value changes (ARG alone is insufficient for BuildKit cache invalidation)
+RUN echo "Building at ${CACHE_BUST}" && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
