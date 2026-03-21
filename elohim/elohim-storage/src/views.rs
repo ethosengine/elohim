@@ -1298,7 +1298,7 @@ impl From<CreateStepInputView> for CreateStepInput {
             chapter_id: v.chapter_id,
             title: v.title,
             description: v.description,
-            step_type: v.step_type.unwrap_or_else(|| "learn".to_string()),
+            step_type: v.step_type.unwrap_or_else(|| "content".to_string()),
             resource_id: v.resource_id,
             resource_type: v.resource_type,
             order_index: v.order_index,

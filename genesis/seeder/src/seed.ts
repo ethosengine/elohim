@@ -1622,7 +1622,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // If path has flat conceptIds array
       if (pathData.conceptIds && Array.isArray(pathData.conceptIds)) {
         return pathData.conceptIds.map((id: string, i: number) => ({
-          stepType: 'learn',
+          stepType: 'content',
           resourceId: id,
           orderIndex: i,
         }));
@@ -1644,7 +1644,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
             for (const id of chapter.conceptIds) {
               steps.push({
-                stepType: 'learn',
+                stepType: 'content',
                 resourceId: id,
                 orderIndex: orderIndex++,
                 chapterId,
@@ -1667,7 +1667,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
               if (module.conceptIds && Array.isArray(module.conceptIds)) {
                 for (const id of module.conceptIds) {
                   steps.push({
-                    stepType: 'learn',
+                    stepType: 'content',
                     resourceId: id,
                     orderIndex: orderIndex++,
                     chapterId,
@@ -1690,7 +1690,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   if (section.conceptIds && Array.isArray(section.conceptIds)) {
                     for (const id of section.conceptIds) {
                       steps.push({
-                        stepType: 'learn',
+                        stepType: 'content',
                         resourceId: id,
                         orderIndex: orderIndex++,
                         chapterId,
@@ -1744,7 +1744,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
             pathId,
             chapterId: chapter.id,
             title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-            stepType: 'learn',
+            stepType: 'content',
             resourceId: conceptId,
             orderIndex: orderIndex++,
             metadataJson: JSON.stringify({ moduleId: null, sectionId: null }),
@@ -1763,7 +1763,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                 pathId,
                 chapterId: chapter.id,
                 title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-                stepType: 'learn',
+                stepType: 'content',
                 resourceId: conceptId,
                 orderIndex: orderIndex++,
                 metadataJson: JSON.stringify({
@@ -1804,7 +1804,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                     pathId,
                     chapterId: chapter.id,
                     title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-                    stepType: 'learn',
+                    stepType: 'content',
                     resourceId: conceptId,
                     orderIndex: orderIndex++,
                     metadataJson: JSON.stringify({
@@ -1897,7 +1897,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
             pathId: pathData.id,
             chapterId: `${pathData.id}-chapter-1`,
             title: `Step ${idx + 1}`,
-            stepType: 'learn',
+            stepType: 'content',
             resourceId: conceptId,
             orderIndex: idx,
             metadataJson: JSON.stringify({}),
