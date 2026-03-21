@@ -640,7 +640,11 @@ pub struct NewContentMastery<'a> {
 
 /// Bloom's taxonomy mastery levels
 pub mod mastery_levels {
+    use crate::generated_enums::ALL_MASTERY_LEVELS;
+
     pub const NOT_STARTED: &str = "not_started";
+    pub const SEEN: &str = "seen";
+    /// Legacy alias — schema canonical value is "seen"
     pub const AWARE: &str = "aware";
     pub const REMEMBER: &str = "remember";
     pub const UNDERSTAND: &str = "understand";
@@ -649,10 +653,10 @@ pub mod mastery_levels {
     pub const EVALUATE: &str = "evaluate";
     pub const CREATE: &str = "create";
 
-    /// All mastery levels in order
+    /// Core mastery levels in order (schema-canonical)
     pub const ALL: [&str; 8] = [
         NOT_STARTED,
-        AWARE,
+        SEEN,
         REMEMBER,
         UNDERSTAND,
         APPLY,
@@ -661,11 +665,11 @@ pub mod mastery_levels {
         CREATE,
     ];
 
-    /// Convert mastery level to index (0-7)
+    /// Convert mastery level to index (0-7). Accepts legacy "aware" as alias for "seen".
     pub fn to_index(level: &str) -> i32 {
         match level {
             NOT_STARTED => 0,
-            AWARE => 1,
+            SEEN | AWARE => 1,
             REMEMBER => 2,
             UNDERSTAND => 3,
             APPLY => 4,
@@ -681,9 +685,9 @@ pub mod mastery_levels {
         ALL.iter().position(|&l| l == level)
     }
 
-    /// Check if a mastery level is valid
+    /// Check if a mastery level is valid (uses schema-generated vocabulary)
     pub fn is_valid(level: &str) -> bool {
-        ALL.contains(&level)
+        ALL_MASTERY_LEVELS.contains(&level) || level == AWARE
     }
 
     /// Check if mastery level indicates mastered (APPLY or above)
@@ -695,7 +699,7 @@ pub mod mastery_levels {
     pub fn from_index(index: i32) -> &'static str {
         match index {
             0 => NOT_STARTED,
-            1 => AWARE,
+            1 => SEEN,
             2 => REMEMBER,
             3 => UNDERSTAND,
             4 => APPLY,

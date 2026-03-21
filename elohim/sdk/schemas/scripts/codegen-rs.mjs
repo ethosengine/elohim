@@ -17,9 +17,13 @@ import { tmpdir } from 'node:os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
 const ENUM_DIR = resolve(__dirname, '../v1/enums');
-const OUTPUT_FILE = resolve(
+const OUTPUT_DNA = resolve(
   REPO_ROOT,
   'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs',
+);
+const OUTPUT_STORAGE = resolve(
+  REPO_ROOT,
+  'elohim/elohim-storage/src/generated_enums.rs',
 );
 
 const VERIFY = process.argv.includes('--verify');
@@ -92,26 +96,36 @@ ${items}
 async function main() {
   const generated = await generate();
 
-  if (VERIFY) {
-    let existing;
-    try {
-      existing = await readFile(OUTPUT_FILE, 'utf8');
-    } catch {
-      console.error(`FAIL: Generated file does not exist: ${OUTPUT_FILE}`);
-      process.exit(1);
-    }
+  const targets = [
+    { label: 'DNA', path: OUTPUT_DNA },
+    { label: 'Storage', path: OUTPUT_STORAGE },
+  ];
 
-    if (existing === generated) {
-      console.log('Rust codegen is up to date.');
-      process.exit(0);
-    } else {
-      console.error('FAIL: Rust codegen is stale. Run: pnpm run schema:codegen:rs');
-      process.exit(1);
+  if (VERIFY) {
+    let stale = false;
+    for (const { label, path } of targets) {
+      let existing;
+      try {
+        existing = await readFile(path, 'utf8');
+      } catch {
+        console.error(`FAIL: Generated file does not exist (${label}): ${path}`);
+        stale = true;
+        continue;
+      }
+      if (existing !== generated) {
+        console.error(`FAIL: Rust codegen is stale (${label}). Run: pnpm run schema:codegen:rs`);
+        stale = true;
+      }
     }
+    if (stale) process.exit(1);
+    console.log('Rust codegen is up to date.');
+    process.exit(0);
   }
 
-  await writeFile(OUTPUT_FILE, generated);
-  console.log(`Generated: ${OUTPUT_FILE}`);
+  for (const { label, path } of targets) {
+    await writeFile(path, generated);
+    console.log(`Generated (${label}): ${path}`);
+  }
 }
 
 main().catch((err) => {

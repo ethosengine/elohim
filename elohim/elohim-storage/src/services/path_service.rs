@@ -10,6 +10,7 @@ use diesel::prelude::*;
 use crate::db::models::{Chapter, NewChapter, NewStep, Path, PathWithSteps, Step};
 use crate::db::{context::AppContext, paths_diesel, DbPool};
 use crate::error::StorageError;
+use crate::generated_enums::{ALL_PATH_VISIBILITIES, ALL_STEP_TYPES};
 
 use super::events::{EventBus, StorageEvent};
 
@@ -327,19 +328,11 @@ impl PathService {
             )));
         }
 
-        // Validate visibility — aligned with healing.rs PATH_VISIBILITIES
-        let valid_visibility = [
-            "public",
-            "private",
-            "unlisted",
-            "draft",
-            "intimate",
-            "community",
-        ];
-        if !valid_visibility.contains(&input.visibility.as_str()) {
+        // Validate visibility — from protocol schema (generated_enums)
+        if !ALL_PATH_VISIBILITIES.contains(&input.visibility.as_str()) {
             return Err(StorageError::InvalidInput(format!(
                 "visibility '{}' is not valid. Valid values: {:?}",
-                input.visibility, valid_visibility
+                input.visibility, ALL_PATH_VISIBILITIES
             )));
         }
 
@@ -440,24 +433,12 @@ impl PathService {
         self.validate_step_type(&input.step_type)
     }
 
-    /// Validate step_type value
+    /// Validate step_type value — from protocol schema (generated_enums)
     fn validate_step_type(&self, step_type: &str) -> Result<(), StorageError> {
-        let valid_types = [
-            "learn",
-            "practice",
-            "quiz",
-            "assessment",
-            "discussion",
-            "project",
-            "resource",
-            "video",
-            "reading",
-            "checkpoint",
-        ];
-        if !valid_types.contains(&step_type) {
+        if !ALL_STEP_TYPES.contains(&step_type) {
             return Err(StorageError::InvalidInput(format!(
                 "step_type '{}' is not valid. Valid types: {:?}",
-                step_type, valid_types
+                step_type, ALL_STEP_TYPES
             )));
         }
         Ok(())

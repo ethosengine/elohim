@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::db::{self, content_diesel, context::AppContext, DbPool};
 use crate::error::StorageError;
+use crate::generated_enums::{ALL_CONTENT_FORMATS, ALL_CONTENT_TYPES, ALL_REACH_LEVELS};
 
 use super::events::{EventBus, StorageEvent};
 
@@ -258,97 +259,33 @@ impl ContentService {
             ));
         }
 
-        // Validate content_type is reasonable
-        let valid_types = [
-            "concept",
-            "article",
-            "quiz",
-            "assessment",
-            "video",
-            "audio",
-            "image",
-            "document",
-            "interactive",
-            "simulation",
-            "reference",
-            "path",
-            "module",
-            "chapter",
-            "lesson",
-            "exercise",
-            "project",
-            "discussion",
-            "poll",
-            "survey",
-            "scenario",
-            "role",
-            "resource",
-        ];
-        if !valid_types.contains(&input.content_type.as_str())
+        // Validate content_type — from protocol schema (generated_enums), permissive
+        if !ALL_CONTENT_TYPES.contains(&input.content_type.as_str())
             && !input.content_type.starts_with("custom:")
         {
             // Allow custom types with prefix
             // Just warn, don't reject - be permissive
         }
 
-        // Validate content_format — aligned with healing.rs CONTENT_FORMATS
-        let valid_formats = [
-            "markdown",
-            "html",
-            "json",
-            "text",
-            "plaintext",
-            "plain",
-            "perseus",
-            "perseus-json",
-            "perseus-quiz-json",
-            "sophia-quiz-json",
-            "sophia",
-            "gherkin",
-            "yaml",
-            "toml",
-            "latex",
-            "asciidoc",
-            "html5-app",
-            "iframe",
-            "embed",
-            "video",
-            "audio",
-            "interactive",
-            "external",
-            "video-embed",
-            "audio-file",
-            "human-json",
-            "organization-json",
-        ];
-        if !valid_formats.contains(&input.content_format.as_str()) {
+        // Validate content_format — from protocol schema (generated_enums) + storage-specific extensions
+        const STORAGE_EXTRA_FORMATS: &[&str] = &["yaml", "toml", "latex", "asciidoc", "iframe", "embed"];
+        if !ALL_CONTENT_FORMATS.contains(&input.content_format.as_str())
+            && !STORAGE_EXTRA_FORMATS.contains(&input.content_format.as_str())
+        {
             return Err(StorageError::InvalidInput(format!(
-                "content_format '{}' is not valid. Valid formats: {:?}",
-                input.content_format, valid_formats
+                "content_format '{}' is not valid. Valid formats: {:?} (+ storage: {:?})",
+                input.content_format, ALL_CONTENT_FORMATS, STORAGE_EXTRA_FORMATS
             )));
         }
 
-        // Validate reach level — protocol spec (8 levels) + legacy for backward compat
-        let valid_reach = [
-            // Protocol spec (social/relational hierarchy)
-            "private",
-            "self",
-            "intimate",
-            "trusted",
-            "familiar",
-            "community",
-            "public",
-            "commons",
-            // Legacy values (backward compat with existing stored data)
-            "regional",
-            "local",
-            "invited",
-            "federated",
-        ];
-        if !valid_reach.contains(&input.reach.as_str()) {
+        // Validate reach level — from protocol schema (generated_enums) + legacy for backward compat
+        const LEGACY_REACH_LEVELS: &[&str] = &["regional", "local", "invited", "federated"];
+        if !ALL_REACH_LEVELS.contains(&input.reach.as_str())
+            && !LEGACY_REACH_LEVELS.contains(&input.reach.as_str())
+        {
             return Err(StorageError::InvalidInput(format!(
-                "reach '{}' is not valid. Valid values: {:?}",
-                input.reach, valid_reach
+                "reach '{}' is not valid. Valid values: {:?} (+ legacy: {:?})",
+                input.reach, ALL_REACH_LEVELS, LEGACY_REACH_LEVELS
             )));
         }
 

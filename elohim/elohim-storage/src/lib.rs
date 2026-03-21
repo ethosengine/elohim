@@ -37,6 +37,9 @@
 // (must be declared before any modules that use randomness)
 mod getrandom_custom;
 
+// Protocol enum constants — AUTO-GENERATED from JSON schemas
+pub mod generated_enums;
+
 // Enriched API endpoints (controller layer for /api/v1/*)
 pub mod api;
 
