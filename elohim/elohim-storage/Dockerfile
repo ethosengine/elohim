@@ -58,8 +58,9 @@ RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim*
 
 # Copy actual source and migrations (embed_migrations! needs them at compile time)
-COPY elohim/elohim-storage/src ./src
+# Migrations must be present for diesel embed_migrations! proc macro
 COPY elohim/elohim-storage/migrations ./migrations
+COPY elohim/elohim-storage/src ./src
 
 # Touch source files to ensure rebuild and build the release binary
 RUN touch src/main.rs src/lib.rs && cargo build --release
