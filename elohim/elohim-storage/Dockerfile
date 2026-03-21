@@ -57,13 +57,17 @@ RUN cargo build --release
 RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim*
 
+# Cache buster — pass --build-arg CACHE_BUST=$(git rev-parse HEAD) to invalidate
+# when source changes but Docker thinks COPY layers are identical
+ARG CACHE_BUST=unknown
+
 # Copy actual source and migrations (embed_migrations! needs them at compile time)
 # Migrations must be present for diesel embed_migrations! proc macro
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 
-# Touch source files to ensure rebuild and build the release binary
-RUN touch src/main.rs src/lib.rs && cargo build --release
+# Build the release binary (ARG CACHE_BUST above ensures this reruns on new commits)
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
