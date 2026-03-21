@@ -541,6 +541,7 @@ def printDeploymentVerification(commit, results) {
  * Produces an advisory JSON report for quality-architect consumption.
  */
 def runBddCoverageGap() {
+    sh 'corepack enable'
     dir('genesis/a2o') {
         sh 'pnpm install --frozen-lockfile'
         sh 'pnpm exec tsx scripts/scan-coverage.ts --ci'
@@ -1071,6 +1072,7 @@ spec:
 │                     E2E FEDERATION SMOKE TEST (ADVISORY)                      │
 └──────────────────────────────────────────────────────────────────────────────┘'''
                         }
+                        sh 'corepack enable'
                         dir('genesis/a2o') {
                             sh 'pnpm install --frozen-lockfile'
                             sh '''
