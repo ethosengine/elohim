@@ -13,6 +13,7 @@ import { readdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
@@ -102,8 +103,18 @@ async function main() {
   ];
 
   if (VERIFY) {
+    // Write to temp file, run rustfmt, then compare against each target
+    const tmpDir = await mkdtemp(join(tmpdir(), 'codegen-rs-'));
+    const tmpFile = join(tmpDir, 'generated_enums.rs');
     let stale = false;
     for (const { label, path } of targets) {
+      await writeFile(tmpFile, generated);
+      try {
+        execFileSync('rustfmt', [tmpFile], { stdio: 'pipe' });
+      } catch {
+        // rustfmt not available — compare raw
+      }
+      const expected = await readFile(tmpFile, 'utf8');
       let existing;
       try {
         existing = await readFile(path, 'utf8');
@@ -112,11 +123,12 @@ async function main() {
         stale = true;
         continue;
       }
-      if (existing !== generated) {
+      if (existing !== expected) {
         console.error(`FAIL: Rust codegen is stale (${label}). Run: pnpm run schema:codegen:rs`);
         stale = true;
       }
     }
+    await rm(tmpDir, { recursive: true });
     if (stale) process.exit(1);
     console.log('Rust codegen is up to date.');
     process.exit(0);
@@ -124,6 +136,12 @@ async function main() {
 
   for (const { label, path } of targets) {
     await writeFile(path, generated);
+    // Run rustfmt so the generated file matches each target's formatting config
+    try {
+      execFileSync('rustfmt', [path], { stdio: 'pipe' });
+    } catch {
+      // rustfmt not available — file is still valid Rust, just may not match fmt
+    }
     console.log(`Generated (${label}): ${path}`);
   }
 }

@@ -4,18 +4,10 @@
 //! Source: elohim/sdk/schemas/v1/enums/*.schema.json
 
 /// Core completioncriteria — All completion criteria are protocol-level — they gate path progression and mastery attestation.
-pub const CORE_COMPLETION_CRITERIA: &[&str] = &[
-    "all-required",
-    "pass-assessment",
-    "view-content",
-];
+pub const CORE_COMPLETION_CRITERIA: &[&str] = &["all-required", "pass-assessment", "view-content"];
 
 /// All completioncriteria — includes storage-only and extensible.
-pub const ALL_COMPLETION_CRITERIA: &[&str] = &[
-    "all-required",
-    "pass-assessment",
-    "view-content",
-];
+pub const ALL_COMPLETION_CRITERIA: &[&str] = &["all-required", "pass-assessment", "view-content"];
 
 /// Core contentformat — DNA-notarized format categories. Broad enough to encompass all rendering approaches.
 pub const CORE_CONTENT_FORMATS: &[&str] = &[
@@ -101,26 +93,12 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
 
 /// Core engagementtype — All engagement types are protocol-level — they drive recognition flows and couple knowledge+value+governance.
 pub const CORE_ENGAGEMENT_TYPES: &[&str] = &[
-    "view",
-    "quiz",
-    "practice",
-    "discuss",
-    "create",
-    "peer",
-    "teach",
-    "apply",
+    "view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply",
 ];
 
 /// All engagementtype — includes storage-only and extensible.
 pub const ALL_ENGAGEMENT_TYPES: &[&str] = &[
-    "view",
-    "quiz",
-    "practice",
-    "discuss",
-    "create",
-    "peer",
-    "teach",
-    "apply",
+    "view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply",
 ];
 
 /// Core masterylevel — Bloom's taxonomy levels. DNA-notarized. Level 4 (apply) is the attestation gate for governance participation.
@@ -151,12 +129,7 @@ pub const ALL_MASTERY_LEVELS: &[&str] = &[
 ];
 
 /// Core pathvisibility — DNA-notarized visibility. Gates content distribution.
-pub const CORE_PATH_VISIBILITIES: &[&str] = &[
-    "private",
-    "unlisted",
-    "community",
-    "public",
-];
+pub const CORE_PATH_VISIBILITIES: &[&str] = &["private", "unlisted", "community", "public"];
 
 /// All pathvisibility — includes storage-only and extensible.
 pub const ALL_PATH_VISIBILITIES: &[&str] = &[
@@ -193,13 +166,7 @@ pub const ALL_REACH_LEVELS: &[&str] = &[
 ];
 
 /// Core steptype — DNA-notarized step types. Structural path elements.
-pub const CORE_STEP_TYPES: &[&str] = &[
-    "content",
-    "path",
-    "external",
-    "checkpoint",
-    "reflection",
-];
+pub const CORE_STEP_TYPES: &[&str] = &["content", "path", "external", "checkpoint", "reflection"];
 
 /// All steptype — includes storage-only and extensible.
 pub const ALL_STEP_TYPES: &[&str] = &[

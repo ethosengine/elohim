@@ -43,8 +43,11 @@
 
 import { type TokenType, type GovernanceLayer } from './protocol-core.model';
 
-// Re-export governance types for consumers
+import type { ResourceNature } from '@elohim/storage-client/generated';
+
+// Re-export for consumers
 export type { GovernanceLayer } from './protocol-core.model';
+export type { ResourceNature } from '@elohim/storage-client/generated';
 
 // ============================================================================
 // ValueFlows Action Vocabulary
@@ -201,6 +204,13 @@ export interface ResourceSpecification {
 
   /** Substitutable with other resources of same spec? */
   substitutable: boolean;
+
+  /**
+   * Economic nature — how this resource behaves under use, transfer,
+   * governance, and full lifecycle. Enables governance to reason about
+   * scarcity, depletion, circularity, and conservation.
+   */
+  nature?: ResourceNature;
 
   /** Image for UI */
   image?: string;
@@ -1499,3 +1509,265 @@ export type ClaimState =
  * Re-export Shefa-related types from protocol-core for convenience.
  */
 export type { TokenType, TokenDecayRate } from './protocol-core.model';
+
+// Re-export ResourceNature sub-types from generated
+export type {
+  Rivalry,
+  Excludability,
+  Depletability,
+  Fungibility,
+  CapacityModel,
+  Circularity,
+} from '@elohim/storage-client/generated';
+
+// ============================================================================
+// Resource Nature — Action Validation & Governance Helpers
+// ============================================================================
+
+/**
+ * Classic economics 2x2 derived from rivalry × excludability.
+ */
+export type GoodsClassification = 'private' | 'common-pool' | 'club' | 'public';
+
+/**
+ * Derive the classic economics goods classification from ResourceNature.
+ *
+ * - Private: rival + excludable (strawberry, private land)
+ * - Common-pool: rival + non-excludable (fishery, aquifer) — needs Ostrom governance
+ * - Club: non-rival + excludable (streaming service, gated content)
+ * - Public: non-rival + non-excludable (knowledge, clean air) — needs funding mechanism
+ */
+export function classifyGoods(nature: ResourceNature): GoodsClassification {
+  const rival = nature.rivalry !== 'non-rival';
+  const excludable = nature.excludability !== 'non-excludable';
+  if (rival && excludable) return 'private';
+  if (rival && !excludable) return 'common-pool';
+  if (!rival && excludable) return 'club';
+  return 'public';
+}
+
+/**
+ * Governance requirements derived from resource nature.
+ * Each boolean indicates a governance mechanism that SHOULD be activated
+ * when managing resources of this nature.
+ */
+export interface NatureGovernanceRequirements {
+  /** Common-pool resources need consent-based allocation (Ostrom rules) */
+  requiresConsentAllocation: boolean;
+  /** Rival + depletable resources need observer/oracle attestation for usage */
+  requiresObserverAttestation: boolean;
+  /** Public goods need a funding mechanism (who pays to produce them) */
+  requiresFundingMechanism: boolean;
+  /** Regenerative resources need stewardship incentives */
+  requiresStewardshipIncentive: boolean;
+  /** Linear consumption without end-of-life path generates circularity obligations */
+  requiresCircularityObligation: boolean;
+}
+
+/**
+ * Derive governance requirements from resource nature.
+ *
+ * The protocol couples power with responsibility at every level:
+ * - Power to consume rival resources → responsibility for circularity
+ * - Power to extract depletable resources → responsibility for observer attestation
+ * - Power to use common-pool resources → responsibility for consent governance
+ */
+export function governanceRequirementsForNature(
+  nature: ResourceNature
+): NatureGovernanceRequirements {
+  const goods = classifyGoods(nature);
+  const isRival = nature.rivalry !== 'non-rival';
+  const isDepletable = nature.depletability === 'depletable';
+  const isLinear = nature.circularity === 'linear';
+  const noEndOfLife = !nature.endOfLifeResourceSpec;
+
+  return {
+    requiresConsentAllocation: goods === 'common-pool',
+    requiresObserverAttestation: isRival && isDepletable,
+    requiresFundingMechanism: goods === 'public',
+    requiresStewardshipIncentive: nature.depletability === 'regenerative',
+    requiresCircularityObligation: isRival && (isLinear || (isDepletable && noEndOfLife)),
+  };
+}
+
+/**
+ * Result of validating an REA action against a resource's nature.
+ */
+export interface NatureActionValidation {
+  allowed: boolean;
+  reason?: string;
+  suggestion?: REAAction;
+}
+
+/**
+ * Validate whether an REA action is valid for a resource with the given nature.
+ *
+ * Key rules:
+ * - `consume` requires rival or partially-rival (can't consume non-rival knowledge)
+ * - `transfer`/`transfer-custody` requires rival (non-rival goods can't transfer — you still have them)
+ * - `pickup`/`dropoff` requires rival (physical logistics)
+ * - `produce` on depletable should have process input (can't create matter from nothing)
+ *
+ * Returns { allowed: true } or { allowed: false, reason, suggestion }.
+ */
+export function isActionValidForNature(
+  action: REAAction,
+  nature: ResourceNature
+): NatureActionValidation {
+  const isRival = nature.rivalry !== 'non-rival';
+
+  switch (action) {
+    case 'consume':
+      if (!isRival)
+        return {
+          allowed: false,
+          reason: 'Cannot consume a non-rival resource — use does not diminish it',
+          suggestion: 'use',
+        };
+      return { allowed: true };
+
+    case 'transfer':
+    case 'transfer-all-rights':
+    case 'transfer-custody':
+      if (!isRival)
+        return {
+          allowed: false,
+          reason:
+            'Cannot transfer a non-rival resource — the sender still has it. Use cite or use instead.',
+          suggestion: 'cite',
+        };
+      return { allowed: true };
+
+    case 'pickup':
+    case 'dropoff':
+      if (!isRival)
+        return {
+          allowed: false,
+          reason: 'Logistics actions only apply to rival (physical) resources',
+          suggestion: 'use',
+        };
+      return { allowed: true };
+
+    // Always valid
+    case 'use':
+    case 'cite':
+    case 'work':
+    case 'deliver-service':
+    case 'produce':
+    case 'raise':
+    case 'lower':
+    case 'modify':
+    case 'combine':
+    case 'separate':
+    case 'move':
+    case 'give':
+    case 'take':
+    case 'accept':
+      return { allowed: true };
+  }
+}
+
+/**
+ * Determine lifecycle side-effects for a consume event based on resource nature.
+ *
+ * The circularity deficit accumulator: consuming a linear resource (no recycling
+ * path) generates obligation tokens that accumulate until someone builds the
+ * capacity to close the loop. Power coupled with responsibility.
+ */
+export interface ConsumeLifecycleEffect {
+  /** Should this consumption generate a circularity obligation token? */
+  generatesCircularityObligation: boolean;
+  /** Should this consumption expect a matching produce event for end-of-life resource? */
+  expectsEndOfLifeProduction: boolean;
+  /** The ResourceSpecification ID of the expected end-of-life output */
+  endOfLifeResourceSpec?: string;
+}
+
+export function consumeLifecycleEffect(nature: ResourceNature): ConsumeLifecycleEffect {
+  const isRival = nature.rivalry !== 'non-rival';
+  const isLinear = nature.circularity === 'linear';
+  const isCircular = nature.circularity === 'circular';
+  const isDepletable = nature.depletability === 'depletable';
+  const noEndOfLife = !nature.endOfLifeResourceSpec;
+
+  return {
+    generatesCircularityObligation: isRival && (isLinear || (isDepletable && noEndOfLife)),
+    expectsEndOfLifeProduction: isCircular && !!nature.endOfLifeResourceSpec,
+    endOfLifeResourceSpec: nature.endOfLifeResourceSpec ?? undefined,
+  };
+}
+
+// ============================================================================
+// Temporal Coupling — Schedule requirements derived from ResourceNature
+// ============================================================================
+
+/**
+ * Well-known Schedule entityType values for resource temporal coupling.
+ * These attach to a resource via the polymorphic Schedule system (entityType + entityId).
+ */
+export const RESOURCE_SCHEDULE_TYPES = {
+  /** When this resource's flow replenishes (solar: FREQ=DAILY, harvest: FREQ=YEARLY;BYMONTH=6,7,8,9) */
+  REPLENISHMENT: 'resource-replenishment',
+  /** When this resource needs stewardship attention (cleaning, watering, repair) */
+  MAINTENANCE: 'resource-maintenance',
+  /** When to evaluate degradation for cascading resources (battery capacity check) */
+  CASCADE_CHECK: 'resource-cascade-check',
+} as const;
+
+/**
+ * A schedule that SHOULD exist for a resource based on its nature.
+ */
+export interface ExpectedResourceSchedule {
+  entityType: string;
+  required: boolean;
+  reason: string;
+  suggestedRrule?: string;
+}
+
+/**
+ * Derive what schedules SHOULD exist for a resource based on its nature.
+ *
+ * Renewable flow resources need replenishment schedules (temporal rate limits).
+ * Cascading resources need degradation check schedules (cascade triggers).
+ * Regenerative resources benefit from maintenance schedules (stewardship incentives).
+ */
+export function expectedSchedulesForNature(
+  nature: ResourceNature,
+): ExpectedResourceSchedule[] {
+  const schedules: ExpectedResourceSchedule[] = [];
+
+  // Renewable + flow → requires replenishment schedule for conservation constraints
+  if (
+    nature.depletability === 'renewable' &&
+    nature.capacityModel === 'flow'
+  ) {
+    schedules.push({
+      entityType: RESOURCE_SCHEDULE_TYPES.REPLENISHMENT,
+      required: true,
+      reason:
+        'Renewable flow resources need a replenishment rhythm for conservation rate-limit enforcement',
+    });
+  }
+
+  // Cascading → requires degradation check schedule
+  if (nature.circularity === 'cascading') {
+    schedules.push({
+      entityType: RESOURCE_SCHEDULE_TYPES.CASCADE_CHECK,
+      required: true,
+      reason:
+        'Cascading resources need periodic evaluation to trigger cascade to end-of-life resource',
+    });
+  }
+
+  // Regenerative → suggests maintenance schedule (stewardship incentive)
+  if (nature.depletability === 'regenerative') {
+    schedules.push({
+      entityType: RESOURCE_SCHEDULE_TYPES.MAINTENANCE,
+      required: false,
+      reason:
+        'Regenerative resources improve under active care — maintenance schedules drive stewardship incentives',
+    });
+  }
+
+  return schedules;
+}

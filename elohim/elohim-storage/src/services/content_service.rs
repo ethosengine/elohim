@@ -268,7 +268,8 @@ impl ContentService {
         }
 
         // Validate content_format — from protocol schema (generated_enums) + storage-specific extensions
-        const STORAGE_EXTRA_FORMATS: &[&str] = &["yaml", "toml", "latex", "asciidoc", "iframe", "embed"];
+        const STORAGE_EXTRA_FORMATS: &[&str] =
+            &["yaml", "toml", "latex", "asciidoc", "iframe", "embed"];
         if !ALL_CONTENT_FORMATS.contains(&input.content_format.as_str())
             && !STORAGE_EXTRA_FORMATS.contains(&input.content_format.as_str())
         {

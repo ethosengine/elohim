@@ -294,6 +294,63 @@ pub struct StatementVote {
 pub const STATEMENT_VOTES: [&str; 3] = ["agree", "disagree", "pass"];
 
 // =============================================================================
+// Spatial Governance — Place (governed spatial entity)
+// =============================================================================
+//
+// "This is our watershed." Communities witness and govern spatial boundaries.
+// If centralized, someone becomes the boundary authority — the land registrar.
+// Place is notarized because boundary-drawing IS governance.
+
+/// Place - A named, governed spatial entity.
+///
+/// Cities, watersheds, land parcels, solar farms, gathering spaces.
+/// Notarized on Mishpat DNA because the community must witness
+/// "these are our boundaries" — if centralized, someone draws
+/// the lines and everyone else lives inside them.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Place {
+    pub id: String,
+    pub name: String,
+    pub place_type: String,             // PlaceType enum value
+    pub constitutional_layer: String,   // ConstitutionalLayer this place maps to
+    /// Primary H3 cell at canonical resolution for this place
+    pub h3_index: String,
+    pub h3_resolution: u8,
+    /// GeoJSON geometry (boundary polygon, point, or multipolygon)
+    pub geometry_json: String,
+    /// Centroid for quick spatial lookups
+    pub centroid_lat: f64,
+    pub centroid_lng: f64,
+    /// Parent place ID (nesting: parcel → community → bioregion → global)
+    pub parent_place_id: Option<String>,
+    /// OpenStreetMap reference (OsmReference as JSON)
+    pub osm_reference_json: Option<String>,
+    /// Carrying capacity constraints (CarryingCapacity[] as JSON)
+    pub carrying_capacity_json: String,
+    /// Governance collective with authority over this place
+    pub governing_collective_id: Option<String>,
+    pub status: String,                 // active, proposed, disputed, dissolved
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+pub const PLACE_TYPES: [&str; 8] = [
+    "administrative",
+    "bioregional",
+    "parcel",
+    "infrastructure",
+    "gathering",
+    "watershed",
+    "agricultural",
+    "custom",
+];
+
+pub const PLACE_STATUS: [&str; 4] = ["active", "proposed", "disputed", "dissolved"];
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -334,6 +391,7 @@ pub enum EntryTypes {
     ProposalVote(ProposalVote),
     OpinionStatement(OpinionStatement),
     StatementVote(StatementVote),
+    Place(Place),
     StringAnchor(StringAnchor),
 }
 
@@ -389,6 +447,16 @@ pub enum LinkTypes {
     // GovernanceState
     IdToGovernanceState,        // Anchor(entity_type:entity_id) -> GovernanceState
     GovernanceStateByStatus,    // Anchor(status) -> GovernanceState
+
+    // =========================================================================
+    // Place — Governed Spatial Entity
+    // =========================================================================
+    IdToPlace,                  // Anchor(place_id) -> Place
+    H3CellToPlace,             // Anchor(h3_index) -> Place (THE key spatial query link)
+    PlaceByType,               // Anchor(place_type) -> Place
+    PlaceByLayer,              // Anchor(constitutional_layer) -> Place
+    ParentToChildPlace,        // Place -> Place (containment hierarchy)
+    PlaceToCollective,         // Place -> Anchor(collective_id)
 }
 
 // =============================================================================
@@ -437,6 +505,7 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         EntryTypes::ProposalVote(vote) => validate_proposal_vote(vote),
         EntryTypes::OpinionStatement(statement) => validate_opinion_statement(statement),
         EntryTypes::StatementVote(vote) => validate_statement_vote(vote),
+        EntryTypes::Place(place) => validate_place(place),
         EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -568,6 +637,46 @@ fn validate_statement_vote(vote: &StatementVote) -> ExternResult<ValidateCallbac
     if !STATEMENT_VOTES.contains(&vote.vote.as_str()) {
         return Ok(ValidateCallbackResult::Invalid(
             format!("Invalid statement vote: {}", vote.vote),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_place(place: &Place) -> ExternResult<ValidateCallbackResult> {
+    if place.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Place id cannot be empty".into()));
+    }
+    if place.name.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Place name cannot be empty".into()));
+    }
+    if !PLACE_TYPES.contains(&place.place_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Invalid place type: {}", place.place_type),
+        ));
+    }
+    if !PLACE_STATUS.contains(&place.status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Invalid place status: {}", place.status),
+        ));
+    }
+    if place.h3_index.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Place h3_index cannot be empty".into()));
+    }
+    if place.h3_resolution > 15 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Invalid H3 resolution: {} (must be 0-15)", place.h3_resolution),
+        ));
+    }
+    // Validate latitude range
+    if place.centroid_lat < -90.0 || place.centroid_lat > 90.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Invalid centroid latitude: {} (must be -90 to 90)", place.centroid_lat),
+        ));
+    }
+    // Validate longitude range
+    if place.centroid_lng < -180.0 || place.centroid_lng > 180.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("Invalid centroid longitude: {} (must be -180 to 180)", place.centroid_lng),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
