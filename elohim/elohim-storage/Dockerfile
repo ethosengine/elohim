@@ -53,9 +53,13 @@ RUN mkdir -p src && \
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
 
-# Remove placeholder source and binaries to force rebuild
+# Remove placeholder source, binaries, and proc-macro outputs to force rebuild.
+# CRITICAL: build/ and .fingerprint/ contain embed_migrations! output from the
+# placeholder build (empty migrations dir). Without removing these, Cargo reuses
+# the cached proc-macro result and the real migrations are never embedded.
 RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
-    target/release/deps/elohim* target/release/deps/libelohim*
+    target/release/deps/elohim* target/release/deps/libelohim* \
+    target/release/build/elohim* target/release/.fingerprint/elohim*
 
 # Cache buster — pass --build-arg CACHE_BUST=$(git rev-parse HEAD) to invalidate
 # when source changes but Docker thinks COPY layers are identical
