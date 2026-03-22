@@ -549,6 +549,9 @@ importers:
 
   genesis/a2o:
     dependencies:
+      '@cucumber/cucumber':
+        specifier: ^11.2.0
+        version: 11.3.0
       playwright:
         specifier: ^1.50.0
         version: 1.58.2
@@ -556,9 +559,6 @@ importers:
         specifier: ^7.3.0
         version: 7.22.0
     devDependencies:
-      '@cucumber/cucumber':
-        specifier: ^11.2.0
-        version: 11.3.0
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.3
