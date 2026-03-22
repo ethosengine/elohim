@@ -538,10 +538,13 @@ impl P2PNode {
                     // deliver the result back to the HTTP handler.
                     let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
                     if let Some(peer_id) = peers.first() {
-                        let req_id = swarm
-                            .behaviour_mut()
-                            .epr_protocol
-                            .send_request(peer_id, EprRequest::Resolve { id: id.clone() });
+                        let req_id = swarm.behaviour_mut().epr_protocol.send_request(
+                            peer_id,
+                            EprRequest::Resolve {
+                                id: id.clone(),
+                                agent_pubkey: None,
+                            },
+                        );
                         debug!(peer = %peer_id, id = %id, request_id = ?req_id, "Sent EPR Resolve request to peer");
                         self.pending_epr_resolves
                             .lock()
@@ -1263,9 +1266,29 @@ impl P2PNode {
                         content_format: Some(content.content_format.clone()),
                         tags: content_with_tags.tags.clone(),
                     },
-                    shefa: crate::epr_codec::EprShefaContext {
-                        stewards: vec![],
-                        allocations: vec![],
+                    shefa: {
+                        match crate::db::stewardship_allocations::get_allocations_for_content(
+                            &mut conn,
+                            &app_ctx,
+                            &content.id,
+                        ) {
+                            Ok(allocations) if !allocations.is_empty() => {
+                                crate::epr_codec::EprShefaContext {
+                                    stewards: allocations
+                                        .iter()
+                                        .map(|a| a.steward_presence_id.clone())
+                                        .collect(),
+                                    allocations: allocations
+                                        .iter()
+                                        .map(|a| a.allocation_ratio as f64)
+                                        .collect(),
+                                }
+                            }
+                            _ => crate::epr_codec::EprShefaContext {
+                                stewards: vec![],
+                                allocations: vec![],
+                            },
+                        }
                     },
                     qahal: crate::epr_codec::EprQahalContext {
                         reach: Some(content.reach.clone()),
@@ -1297,7 +1320,7 @@ impl P2PNode {
     /// Handle an incoming EPR request from a peer
     async fn handle_epr_request(&self, request: EprRequest) -> EprResponse {
         match request {
-            EprRequest::Resolve { id } => {
+            EprRequest::Resolve { id, agent_pubkey } => {
                 debug!(id = %id, "Handling EPR Resolve request");
                 match self.resolve_epr_head_locally(&id) {
                     Some(bytes) => {
