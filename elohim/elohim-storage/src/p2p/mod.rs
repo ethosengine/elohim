@@ -177,6 +177,7 @@ pub enum P2PCommand {
     /// Resolve an EPR Head via Kademlia DHT lookup
     ResolveEpr {
         id: String,
+        agent_pubkey: String,
         reply: oneshot::Sender<Option<Vec<u8>>>,
     },
     /// Fetch content bytes via shard protocol from a connected peer
@@ -192,6 +193,7 @@ pub enum P2PCommand {
 pub struct P2PHandle {
     status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
     command_tx: mpsc::Sender<P2PCommand>,
+    agent_pubkey: String,
 }
 
 impl P2PHandle {
@@ -218,6 +220,7 @@ impl P2PHandle {
             .command_tx
             .send(P2PCommand::ResolveEpr {
                 id: id.to_string(),
+                agent_pubkey: self.agent_pubkey.clone(),
                 reply: reply_tx,
             })
             .await
@@ -519,7 +522,11 @@ impl P2PNode {
                     }
                 }
             }
-            P2PCommand::ResolveEpr { id, reply } => {
+            P2PCommand::ResolveEpr {
+                id,
+                agent_pubkey,
+                reply,
+            } => {
                 let key = RecordKey::new(&format!("epr:{}", id));
                 // First check local Kademlia store
                 let local_result = swarm
@@ -542,7 +549,7 @@ impl P2PNode {
                             peer_id,
                             EprRequest::Resolve {
                                 id: id.clone(),
-                                agent_pubkey: None,
+                                agent_pubkey: Some(agent_pubkey.clone()),
                             },
                         );
                         debug!(peer = %peer_id, id = %id, request_id = ?req_id, "Sent EPR Resolve request to peer");
@@ -1484,6 +1491,7 @@ impl P2PNode {
         P2PHandle {
             status_rx: self.status_tx.subscribe(),
             command_tx: self.command_tx.clone(),
+            agent_pubkey: self.identity.agent_pubkey().to_string(),
         }
     }
 
