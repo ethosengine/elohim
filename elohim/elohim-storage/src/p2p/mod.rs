@@ -150,6 +150,8 @@ pub struct P2PNode {
     pending_epr_resolves: PendingEprMap,
     /// Pending shard fetch requests awaiting responses from peers
     pending_shard_fetches: PendingShardMap,
+    /// Whether startup EPR Head publication has run
+    initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// P2P node status for observability
@@ -383,6 +385,7 @@ impl P2PNode {
             pending_shard_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -485,6 +488,11 @@ impl P2PNode {
                 _ = status_interval.tick() => {
                     drop(swarm);
                     self.refresh_status().await;
+                    // One-time startup EPR Head publication
+                    if !self.initial_publish_done.load(std::sync::atomic::Ordering::Relaxed) {
+                        self.initial_publish_done.store(true, std::sync::atomic::Ordering::Relaxed);
+                        self.publish_all_epr_heads().await;
+                    }
                 }
                 _ = sync_interval.tick() => {
                     drop(swarm);
@@ -581,6 +589,102 @@ impl P2PNode {
                 }
             }
         }
+    }
+
+    /// Publish EPR Heads for all existing content to Kademlia DHT.
+    /// Runs once on startup with adaptive rate limiting.
+    async fn publish_all_epr_heads(&self) {
+        let pool = match self.db_pool.as_ref() {
+            Some(p) => p,
+            None => {
+                info!("Skipping startup EPR publish — no DB pool");
+                return;
+            }
+        };
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(error = %e, "Skipping startup EPR publish — DB connection failed");
+                return;
+            }
+        };
+
+        let app_ctx = crate::db::AppContext::default_lamad();
+        let query = crate::db::content_diesel::ContentQuery {
+            limit: 10000,
+            ..Default::default()
+        };
+        let content_items =
+            match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                Ok(items) => items,
+                Err(e) => {
+                    warn!(error = %e, "Skipping startup EPR publish — content query failed");
+                    return;
+                }
+            };
+        drop(conn); // Release connection before async work
+
+        let total = content_items.len();
+        if total == 0 {
+            info!("No content to publish EPR Heads for");
+            return;
+        }
+
+        info!(
+            total = total,
+            "Starting EPR Head publication for existing content"
+        );
+
+        let mut published = 0u64;
+        let mut failed = 0u64;
+        let mut batch_delay = Duration::from_millis(1);
+
+        for item in &content_items {
+            if let Some(head_bytes) = self.resolve_epr_head_locally(&item.content.id) {
+                let key = RecordKey::new(&format!("epr:{}", item.content.id));
+                let record = Record {
+                    key,
+                    value: head_bytes,
+                    publisher: Some(*self.identity.peer_id()),
+                    expires: None,
+                };
+                let mut swarm = self.swarm.write().await;
+                match swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .put_record(record, libp2p::kad::Quorum::One)
+                {
+                    Ok(_) => {
+                        published += 1;
+                        // Adaptive: success reduces delay (floor 1ms)
+                        batch_delay =
+                            Duration::from_millis((batch_delay.as_millis() as u64 / 2).max(1));
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        debug!(id = %item.content.id, error = ?e, "Failed to publish EPR Head");
+                        // Adaptive: failure increases delay (cap 500ms)
+                        batch_delay =
+                            Duration::from_millis((batch_delay.as_millis() as u64 * 2).min(500));
+                    }
+                }
+                drop(swarm);
+            }
+
+            // Adaptive pacing
+            if batch_delay.as_millis() > 1 {
+                tokio::time::sleep(batch_delay).await;
+            } else {
+                tokio::task::yield_now().await;
+            }
+        }
+
+        info!(
+            published = published,
+            failed = failed,
+            total = total,
+            "Startup EPR Head publication complete"
+        );
     }
 
     /// Handle a swarm event
