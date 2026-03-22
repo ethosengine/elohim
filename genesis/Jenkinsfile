@@ -467,12 +467,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         sleep 2
                                     done
 
-                                    # Operator seeds ALL content (bootstrap concession for public demo)
-                                    # Other peers get stewardship-filtered content
-                                    SEED_CMD="npx tsx src/seed-sqlite.ts"
-                                    if [ "${humanId}" != "human-matthew-manager" ]; then
-                                        SEED_CMD="\$SEED_CMD --conductor-for=${humanId}"
-                                    fi
+                                    # All peers get stewardship-filtered content.
+                                    # P2P EPR resolution handles cross-steward access.
+                                    SEED_CMD="npx tsx src/seed-sqlite.ts --conductor-for=${humanId}"
                                     STORAGE_URL="http://${storageUrl}" \$SEED_CMD
 
                                     echo ""
