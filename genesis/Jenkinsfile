@@ -467,8 +467,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         sleep 2
                                     done
 
-                                    STORAGE_URL="http://${storageUrl}" \\
-                                        npx tsx src/seed-sqlite.ts --conductor-for=${humanId}
+                                    # Operator seeds ALL content (bootstrap concession for public demo)
+                                    # Other peers get stewardship-filtered content
+                                    SEED_CMD="npx tsx src/seed-sqlite.ts"
+                                    if [ "${humanId}" != "human-matthew-manager" ]; then
+                                        SEED_CMD="\$SEED_CMD --conductor-for=${humanId}"
+                                    fi
+                                    STORAGE_URL="http://${storageUrl}" \$SEED_CMD
 
                                     echo ""
                                     echo "✅ ${humanId} seeded successfully"
