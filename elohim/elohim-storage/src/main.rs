@@ -335,7 +335,15 @@ async fn async_main(
         };
 
         // Create P2P node with blob store access
-        let p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
+        let mut p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
+
+        // Wire DB pool for EPR Head resolution (if content DB is available)
+        if args.enable_content_db {
+            if let Ok(pool) = init_pool_from_dir(&config.storage_dir) {
+                p2p_node = p2p_node.with_db_pool(pool);
+                info!("  P2P EPR resolution: DB pool wired");
+            }
+        }
 
         // Start listening
         p2p_node.start().await?;
@@ -358,7 +366,7 @@ async fn async_main(
         if !args.announce_addrs.is_empty() {
             info!("  Announce addresses: {}", args.announce_addrs.join(", "));
         }
-        info!("  Protocols: /elohim/shard/1.0.0, /elohim/sync/1.0.0, /elohim/id/1.0.0");
+        info!("  Protocols: /elohim/shard/1.0.0, /elohim/storage-sync/1.0.0, /elohim/epr/1.0.0, /elohim/id/1.0.0");
 
         Some(p2p_node)
     } else {

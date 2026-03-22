@@ -14,6 +14,7 @@ use super::kad_store::SledRecordStore;
 
 use std::time::Duration;
 
+use super::epr_protocol::{EprCodec, EprProtocol};
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::P2PConfig;
@@ -65,6 +66,8 @@ pub struct ElohimStorageBehaviour {
     pub shard_protocol: RequestResponse<ShardCodec>,
     /// Request-response for CRDT sync
     pub sync_protocol: RequestResponse<SyncCodec>,
+    /// Request-response for EPR Head resolution
+    pub epr_protocol: RequestResponse<EprCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -88,6 +91,8 @@ pub enum ElohimStorageBehaviourEvent {
     ShardProtocol(request_response::Event<super::ShardRequest, super::ShardResponse>),
     /// Sync protocol event
     SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
+    /// EPR protocol event
+    EprProtocol(request_response::Event<super::EprRequest, super::EprResponse>),
     /// mDNS event
     Mdns(mdns::Event),
     /// Relay client event (reservations, connection through relay)
@@ -127,6 +132,14 @@ impl From<request_response::Event<super::SyncRequest, super::SyncResponse>>
 {
     fn from(event: request_response::Event<super::SyncRequest, super::SyncResponse>) -> Self {
         Self::SyncProtocol(event)
+    }
+}
+
+impl From<request_response::Event<super::EprRequest, super::EprResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(event: request_response::Event<super::EprRequest, super::EprResponse>) -> Self {
+        Self::EprProtocol(event)
     }
 }
 
@@ -189,6 +202,12 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // EPR request-response protocol for cross-peer content resolution
+        let epr_protocol = RequestResponse::new(
+            [(EprProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
             .expect("mDNS behaviour should be created");
@@ -224,6 +243,7 @@ impl ElohimStorageBehaviour {
             kademlia,
             shard_protocol,
             sync_protocol,
+            epr_protocol,
             mdns,
             relay_client,
             relay_server,
