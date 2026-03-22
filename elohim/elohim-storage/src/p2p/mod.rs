@@ -29,11 +29,13 @@
 //! ```
 
 pub mod behaviour;
+pub mod epr_protocol;
 pub mod kad_store;
 pub mod shard_protocol;
 pub mod sync_protocol;
 
 use futures::StreamExt;
+use libp2p::kad::{store::RecordStore, Record, RecordKey};
 use libp2p::{
     autonat, dcutr, identify, kad, mdns,
     multiaddr::Protocol,
@@ -45,8 +47,30 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tracing::{debug, error, info, warn};
+
+use crate::db::DbPool;
+
+/// Map of pending EPR resolve requests: request ID → (requested content ID, reply sender)
+type PendingEprMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            (String, oneshot::Sender<Option<Vec<u8>>>),
+        >,
+    >,
+>;
+
+/// Map of pending shard fetch requests: outbound request ID → reply sender
+type PendingShardMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Option<Vec<u8>>>,
+        >,
+    >,
+>;
 
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
@@ -54,6 +78,7 @@ use crate::identity::NodeIdentity;
 use crate::sync::{DocStore, StreamTracker, SyncManager};
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
+pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
@@ -115,6 +140,16 @@ pub struct P2PNode {
     nat_status: Arc<RwLock<String>>,
     /// Active relay reservation count
     relay_reservations: Arc<std::sync::atomic::AtomicUsize>,
+    /// Command channel receiver (consumed by run())
+    command_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<P2PCommand>>>,
+    /// Command channel sender (cloned into P2PHandle)
+    command_tx: mpsc::Sender<P2PCommand>,
+    /// Database pool for EPR Head construction from content records
+    db_pool: Option<DbPool>,
+    /// Pending EPR resolve requests awaiting responses from peers
+    pending_epr_resolves: PendingEprMap,
+    /// Pending shard fetch requests awaiting responses from peers
+    pending_shard_fetches: PendingShardMap,
 }
 
 /// P2P node status for observability
@@ -135,17 +170,65 @@ pub struct P2PStatusInfo {
     pub relay_mode: String,
 }
 
-/// Send+Sync handle for querying P2P status from HttpServer.
+/// Commands sent from HTTP handlers to the P2P event loop.
+pub enum P2PCommand {
+    /// Publish an EPR Head to Kademlia DHT
+    PublishEprHead { id: String, head_bytes: Vec<u8> },
+    /// Resolve an EPR Head via Kademlia DHT lookup
+    ResolveEpr {
+        id: String,
+        reply: oneshot::Sender<Option<Vec<u8>>>,
+    },
+    /// Fetch content bytes via shard protocol from a connected peer
+    FetchShard {
+        hash: String,
+        reply: oneshot::Sender<Option<Vec<u8>>>,
+    },
+}
+
+/// Send+Sync handle for querying P2P status and sending commands from HttpServer.
 /// Separated from P2PNode because libp2p Swarm types are not Send.
 #[derive(Clone)]
 pub struct P2PHandle {
     status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
+    command_tx: mpsc::Sender<P2PCommand>,
 }
 
 impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Publish an EPR Head to the DHT. Fire-and-forget.
+    pub async fn publish_epr_head(&self, id: String, head_bytes: Vec<u8>) {
+        if let Err(e) = self
+            .command_tx
+            .send(P2PCommand::PublishEprHead { id, head_bytes })
+            .await
+        {
+            warn!(error = %e, "Failed to send PublishEprHead command to P2P loop");
+        }
+    }
+
+    /// Resolve an EPR Head from the DHT. Returns None on timeout or not found.
+    pub async fn resolve_epr(&self, id: &str) -> Option<Vec<u8>> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        if self
+            .command_tx
+            .send(P2PCommand::ResolveEpr {
+                id: id.to_string(),
+                reply: reply_tx,
+            })
+            .await
+            .is_err()
+        {
+            return None;
+        }
+        match tokio::time::timeout(Duration::from_secs(5), reply_rx).await {
+            Ok(Ok(result)) => result,
+            _ => None,
+        }
     }
 }
 
@@ -202,6 +285,7 @@ impl P2PNode {
         let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
 
         let (shutdown_tx, _) = broadcast::channel(1);
+        let (command_tx, command_rx) = mpsc::channel(64);
 
         let initial_status = P2PStatusInfo {
             peer_id: peer_id.to_string(),
@@ -229,7 +313,22 @@ impl P2PNode {
             status_tx,
             nat_status: Arc::new(RwLock::new("Unknown".to_string())),
             relay_reservations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            command_rx: Arc::new(tokio::sync::Mutex::new(command_rx)),
+            command_tx,
+            db_pool: None,
+            pending_epr_resolves: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            pending_shard_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
         })
+    }
+
+    /// Set the database pool for EPR Head construction
+    pub fn with_db_pool(mut self, pool: DbPool) -> Self {
+        self.db_pool = Some(pool);
+        self
     }
 
     /// Get the local PeerId
@@ -308,6 +407,7 @@ impl P2PNode {
 
         let mut status_interval = tokio::time::interval(Duration::from_secs(30));
         let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
+        let mut command_rx = self.command_rx.lock().await;
 
         loop {
             let mut swarm = self.swarm.write().await;
@@ -316,6 +416,10 @@ impl P2PNode {
                 event = swarm.select_next_some() => {
                     drop(swarm); // Release write lock before handling
                     self.handle_event(event).await;
+                }
+                Some(cmd) = command_rx.recv() => {
+                    self.handle_command(&mut swarm, cmd).await;
+                    drop(swarm);
                 }
                 _ = status_interval.tick() => {
                     drop(swarm);
@@ -328,6 +432,84 @@ impl P2PNode {
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
                     break;
+                }
+            }
+        }
+    }
+
+    /// Handle a command from P2PHandle (HTTP handlers)
+    async fn handle_command(&self, swarm: &mut Swarm<ElohimStorageBehaviour>, cmd: P2PCommand) {
+        match cmd {
+            P2PCommand::PublishEprHead { id, head_bytes } => {
+                let key = RecordKey::new(&format!("epr:{}", id));
+                let record = Record {
+                    key,
+                    value: head_bytes,
+                    publisher: Some(*self.identity.peer_id()),
+                    expires: None,
+                };
+                match swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .put_record(record, libp2p::kad::Quorum::One)
+                {
+                    Ok(_) => {
+                        info!(id = %id, "Published EPR Head to Kademlia");
+                    }
+                    Err(e) => {
+                        warn!(id = %id, error = ?e, "Failed to publish EPR Head to Kademlia");
+                    }
+                }
+            }
+            P2PCommand::ResolveEpr { id, reply } => {
+                let key = RecordKey::new(&format!("epr:{}", id));
+                // First check local Kademlia store
+                let local_result = swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .store_mut()
+                    .get(&key)
+                    .map(|cow| cow.value.clone());
+
+                if let Some(data) = local_result {
+                    debug!(id = %id, "EPR Head resolved from local Kademlia store");
+                    let _ = reply.send(Some(data));
+                } else {
+                    // Not in local store — send resolve request to the first connected
+                    // peer and register the reply sender so handle_epr_response can
+                    // deliver the result back to the HTTP handler.
+                    let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+                    if let Some(peer_id) = peers.first() {
+                        let req_id = swarm
+                            .behaviour_mut()
+                            .epr_protocol
+                            .send_request(peer_id, EprRequest::Resolve { id: id.clone() });
+                        debug!(peer = %peer_id, id = %id, request_id = ?req_id, "Sent EPR Resolve request to peer");
+                        self.pending_epr_resolves
+                            .lock()
+                            .await
+                            .insert(req_id, (id, reply));
+                    } else {
+                        debug!(id = %id, "No connected peers for EPR resolve");
+                        let _ = reply.send(None);
+                    }
+                }
+            }
+            P2PCommand::FetchShard { hash, reply } => {
+                let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+                if let Some(peer_id) = peers.first() {
+                    let req_id = swarm
+                        .behaviour_mut()
+                        .shard_protocol
+                        .send_request(peer_id, ShardRequest::Get { hash: hash.clone() });
+                    debug!(peer = %peer_id, hash = %hash, request_id = ?req_id, "Sent shard fetch request to peer");
+                    self.pending_shard_fetches
+                        .lock()
+                        .await
+                        .insert(req_id, reply);
+                } else {
+                    debug!(hash = %hash, "No connected peers for shard fetch");
+                    let _ = reply.send(None);
                 }
             }
         }
@@ -396,8 +578,22 @@ impl P2PNode {
                         request_id,
                         response,
                     } => {
-                        debug!(request_id = ?request_id, response = ?response, "Received shard response");
-                        // Response handling would go here for outbound requests
+                        let pending_tx =
+                            self.pending_shard_fetches.lock().await.remove(&request_id);
+                        if let Some(tx) = pending_tx {
+                            match response {
+                                ShardResponse::Data(data) => {
+                                    debug!(request_id = ?request_id, size = data.len(), "Shard fetch completed");
+                                    let _ = tx.send(Some(data));
+                                }
+                                _ => {
+                                    debug!(request_id = ?request_id, response = ?response, "Shard fetch returned non-data");
+                                    let _ = tx.send(None);
+                                }
+                            }
+                        } else {
+                            debug!(request_id = ?request_id, response = ?response, "Received shard response");
+                        }
                     }
                 }
             }
@@ -409,6 +605,10 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound shard request failed");
+                // Clean up any pending shard fetch so the caller gets None instead of hanging
+                if let Some(tx) = self.pending_shard_fetches.lock().await.remove(&request_id) {
+                    let _ = tx.send(None);
+                }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
                 request_response::Event::InboundFailure {
@@ -496,6 +696,55 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "Sync response sent");
+            }
+
+            // === EPR protocol events ===
+            behaviour::ElohimStorageBehaviourEvent::EprProtocol(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(peer = %peer, request = ?request, "Received EPR request");
+                    let response = self.handle_epr_request(request).await;
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .epr_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send EPR response");
+                    }
+                }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    self.handle_epr_response(peer, request_id, response).await;
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::EprProtocol(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound EPR request failed");
+            }
+            behaviour::ElohimStorageBehaviourEvent::EprProtocol(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(peer = %peer, request_id = ?request_id, error = ?error, "Inbound EPR request failed");
+            }
+            behaviour::ElohimStorageBehaviourEvent::EprProtocol(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(peer = %peer, request_id = ?request_id, "EPR response sent");
             }
 
             // === NAT traversal events ===
@@ -936,6 +1185,209 @@ impl P2PNode {
         }
     }
 
+    /// Look up content from local DB and encode as an EPR Head (MessagePack).
+    /// Returns None if content not found or DB not available.
+    fn resolve_epr_head_locally(&self, id: &str) -> Option<Vec<u8>> {
+        let pool = self.db_pool.as_ref()?;
+        let mut conn = pool.get().ok()?;
+        let app_ctx = crate::db::AppContext::default_lamad();
+        match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id) {
+            Ok(Some(content_with_tags)) => {
+                let content = &content_with_tags.content;
+                let head = crate::epr_codec::EprHead {
+                    version: 1,
+                    id: content.id.clone(),
+                    content: content.blob_cid.clone().unwrap_or_default(),
+                    lamad: crate::epr_codec::EprLamadContext {
+                        title: content.title.clone(),
+                        content_type: content.content_type.clone(),
+                        description: content.description.clone(),
+                        content_format: Some(content.content_format.clone()),
+                        tags: content_with_tags.tags.clone(),
+                    },
+                    shefa: crate::epr_codec::EprShefaContext {
+                        stewards: vec![],
+                        allocations: vec![],
+                    },
+                    qahal: crate::epr_codec::EprQahalContext {
+                        reach: Some(content.reach.clone()),
+                        layer: None,
+                    },
+                    relationships: vec![],
+                    author: content.created_by.clone(),
+                    updated: Some(content.updated_at.clone()),
+                };
+                match rmp_serde::to_vec(&head) {
+                    Ok(bytes) => Some(bytes),
+                    Err(e) => {
+                        warn!(id = %id, error = %e, "Failed to encode EPR Head");
+                        None
+                    }
+                }
+            }
+            Ok(None) => {
+                debug!(id = %id, "Content not found for EPR resolve");
+                None
+            }
+            Err(e) => {
+                warn!(id = %id, error = %e, "DB error resolving EPR Head");
+                None
+            }
+        }
+    }
+
+    /// Handle an incoming EPR request from a peer
+    async fn handle_epr_request(&self, request: EprRequest) -> EprResponse {
+        match request {
+            EprRequest::Resolve { id } => {
+                debug!(id = %id, "Handling EPR Resolve request");
+                match self.resolve_epr_head_locally(&id) {
+                    Some(bytes) => {
+                        info!(id = %id, size = bytes.len(), "Serving EPR Head");
+                        EprResponse::Head(bytes)
+                    }
+                    None => EprResponse::NotFound,
+                }
+            }
+            EprRequest::Announce { head } => {
+                debug!(size = head.len(), "Handling EPR Announce request");
+                // Decode and validate the EPR Head
+                match rmp_serde::from_slice::<crate::epr_codec::EprHead>(&head) {
+                    Ok(epr_head) => {
+                        // Store in local Kademlia
+                        let key = RecordKey::new(&format!("epr:{}", epr_head.id));
+                        let record = Record {
+                            key,
+                            value: head,
+                            publisher: None,
+                            expires: None,
+                        };
+                        let mut swarm = self.swarm.write().await;
+                        match swarm
+                            .behaviour_mut()
+                            .kademlia
+                            .put_record(record, libp2p::kad::Quorum::One)
+                        {
+                            Ok(_) => {
+                                info!(id = %epr_head.id, "Stored announced EPR Head");
+                                EprResponse::Announced {
+                                    accepted: true,
+                                    reason: None,
+                                }
+                            }
+                            Err(e) => EprResponse::Announced {
+                                accepted: false,
+                                reason: Some(format!("Kademlia put failed: {:?}", e)),
+                            },
+                        }
+                    }
+                    Err(e) => EprResponse::Announced {
+                        accepted: false,
+                        reason: Some(format!("Invalid EPR Head format: {}", e)),
+                    },
+                }
+            }
+            EprRequest::ResolveBatch { ids } => {
+                debug!(count = ids.len(), "Handling EPR ResolveBatch request");
+                let mut results = Vec::with_capacity(ids.len());
+                for id in &ids {
+                    match self.resolve_epr_head_locally(id) {
+                        Some(bytes) => results.push(bytes),
+                        None => results.push(vec![]),
+                    }
+                }
+                EprResponse::HeadBatch(results)
+            }
+            EprRequest::GetDocument { id } => {
+                debug!(id = %id, "EPR GetDocument not yet implemented");
+                EprResponse::Error("GetDocument not yet implemented".to_string())
+            }
+        }
+    }
+
+    /// Handle an outbound EPR response from a peer.
+    /// Delivers to pending resolve callers and caches in local Kademlia.
+    async fn handle_epr_response(
+        &self,
+        peer: PeerId,
+        request_id: request_response::OutboundRequestId,
+        response: EprResponse,
+    ) {
+        // Check if there's a pending resolve waiting for this response
+        let pending = self.pending_epr_resolves.lock().await.remove(&request_id);
+
+        match response {
+            EprResponse::Head(data) => {
+                // Decode and validate the EPR Head before caching
+                match rmp_serde::from_slice::<crate::epr_codec::EprHead>(&data) {
+                    Ok(head) => {
+                        // Validate ID matches what was requested (anti-poisoning)
+                        if let Some((ref requested_id, _)) = pending {
+                            if head.id != *requested_id {
+                                warn!(
+                                    peer = %peer,
+                                    requested = %requested_id,
+                                    received = %head.id,
+                                    "EPR Head ID mismatch — peer returned wrong content, ignoring"
+                                );
+                                if let Some((_, tx)) = pending {
+                                    let _ = tx.send(None);
+                                }
+                                return;
+                            }
+                        }
+
+                        info!(
+                            peer = %peer, id = %head.id,
+                            "Received EPR Head from peer, caching locally"
+                        );
+                        let key = RecordKey::new(&format!("epr:{}", head.id));
+                        let record = Record {
+                            key,
+                            value: data.clone(),
+                            publisher: None,
+                            expires: None,
+                        };
+                        let mut swarm = self.swarm.write().await;
+                        let _ = swarm
+                            .behaviour_mut()
+                            .kademlia
+                            .put_record(record, libp2p::kad::Quorum::One);
+                    }
+                    Err(e) => {
+                        warn!(peer = %peer, error = %e, "Failed to decode EPR Head response");
+                        if let Some((_, tx)) = pending {
+                            let _ = tx.send(None);
+                        }
+                        return;
+                    }
+                }
+                // Deliver to waiting caller
+                if let Some((_, tx)) = pending {
+                    let _ = tx.send(Some(data));
+                }
+            }
+            EprResponse::NotFound => {
+                debug!(peer = %peer, request_id = ?request_id, "EPR Head not found on peer");
+                if let Some((_, tx)) = pending {
+                    let _ = tx.send(None);
+                }
+            }
+            EprResponse::Error(msg) => {
+                warn!(peer = %peer, error = %msg, "EPR error from peer");
+                if let Some((_, tx)) = pending {
+                    let _ = tx.send(None);
+                }
+            }
+            _ => {
+                debug!(peer = %peer, request_id = ?request_id, "Unhandled EPR response type");
+                if let Some((_, tx)) = pending {
+                    let _ = tx.send(None);
+                }
+            }
+        }
+    }
+
     /// Get shutdown sender for graceful shutdown
     pub fn shutdown_sender(&self) -> broadcast::Sender<()> {
         self.shutdown_tx.clone()
@@ -946,10 +1398,11 @@ impl P2PNode {
         &self.sync_manager
     }
 
-    /// Create a Send+Sync handle for HttpServer to query P2P status
+    /// Create a Send+Sync handle for HttpServer to query P2P status and send commands
     pub fn handle(&self) -> P2PHandle {
         P2PHandle {
             status_rx: self.status_tx.subscribe(),
+            command_tx: self.command_tx.clone(),
         }
     }
 
