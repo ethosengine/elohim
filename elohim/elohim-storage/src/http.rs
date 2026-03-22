@@ -2159,17 +2159,59 @@ impl HttpServer {
                     ));
                 }
 
-                // Content not found locally — try P2P EPR resolution
+                // Content not found locally — try P2P EPR resolution + shard fetch
                 #[cfg(feature = "p2p")]
                 if let Some(ref handle) = self.p2p_handle {
-                    debug!(id = %content_id, "Content not found locally, trying P2P EPR resolve");
-                    if let Some(head_bytes) = handle.resolve_epr(content_id).await {
-                        if let Ok(head) =
-                            rmp_serde::from_slice::<crate::epr_codec::EprHead>(&head_bytes)
-                        {
-                            info!(id = %content_id, "EPR Head resolved via P2P");
-                            let view = ContentView::from_epr_head(&head);
-                            return Ok(response::ok(&view));
+                    debug!(id = %content_id, "Content not found locally, trying P2P resolve + fetch");
+                    if let Some((head, content_bytes)) = handle.resolve_and_fetch(content_id).await
+                    {
+                        info!(id = %content_id, size = content_bytes.len(), "Content resolved via P2P");
+
+                        // Store blob
+                        let blob_result = self.blob_store.store(&content_bytes).await;
+
+                        // Persist to local SQLite so future GETs are local
+                        if let Some(ref svc) = self.services {
+                            let body_str = String::from_utf8_lossy(&content_bytes).to_string();
+                            let input = db::content_diesel::CreateContentInput {
+                                id: content_id.to_string(),
+                                title: head.lamad.title.clone(),
+                                description: head.lamad.description.clone(),
+                                content_type: head.lamad.content_type.clone(),
+                                content_format: head
+                                    .lamad
+                                    .content_format
+                                    .clone()
+                                    .unwrap_or_else(|| "markdown".to_string()),
+                                blob_hash: blob_result.as_ref().ok().map(|r| r.hash.clone()),
+                                blob_cid: if head.content.is_empty() {
+                                    None
+                                } else {
+                                    Some(head.content.clone())
+                                },
+                                content_size_bytes: Some(content_bytes.len() as i32),
+                                metadata_json: Some(r#"{"resolved_via":"p2p"}"#.to_string()),
+                                reach: head
+                                    .qahal
+                                    .reach
+                                    .clone()
+                                    .unwrap_or_else(|| "commons".to_string()),
+                                created_by: head.author.clone(),
+                                tags: head.lamad.tags.clone(),
+                                content_body: Some(body_str),
+                            };
+                            match svc.content.create(input) {
+                                Ok(content_with_tags) => {
+                                    info!(id = %content_id, "P2P content persisted to local SQLite");
+                                    let view = ContentView::from(content_with_tags);
+                                    return Ok(response::ok(&view));
+                                }
+                                Err(e) => {
+                                    warn!(id = %content_id, error = %e, "Failed to persist P2P content");
+                                    let view = ContentView::from_epr_head(&head);
+                                    return Ok(response::ok(&view));
+                                }
+                            }
                         }
                     }
                 }
