@@ -624,7 +624,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 nerdctl -n k8s.io pull rust:1.88.0-slim-bookworm || true
 
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
+                                    nerdctl -n k8s.io build --no-cache \\
                                     --build-arg CACHE_BUST=${GIT_COMMIT_HASH} \\
                                     -t elohim-storage:${IMAGE_TAG} \\
                                     -f elohim/elohim-storage/Dockerfile .
