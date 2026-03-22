@@ -1911,9 +1911,63 @@ impl HttpServer {
 
                 let input_view: CreateContentInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                let input: db::content_diesel::CreateContentInput = input_view.into();
 
-                Ok(response::from_create_result(services.content.create(input)))
+                // Capture EPR-relevant data before consuming input_view
+                #[cfg(feature = "p2p")]
+                let epr_data = (
+                    input_view.id.clone(),
+                    input_view.title.clone(),
+                    input_view
+                        .content_type
+                        .clone()
+                        .unwrap_or_else(|| "concept".to_string()),
+                    input_view.description.clone(),
+                    input_view.content_format.clone(),
+                    input_view.blob_cid.clone(),
+                    input_view.reach.clone(),
+                    input_view.created_by.clone(),
+                    input_view.tags.clone(),
+                );
+
+                let input: db::content_diesel::CreateContentInput = input_view.into();
+                let result = services.content.create(input);
+
+                // Auto-publish EPR Head on successful create
+                #[cfg(feature = "p2p")]
+                if result.is_ok() {
+                    if let Some(ref handle) = self.p2p_handle {
+                        let handle = handle.clone();
+                        let (id, title, content_type, desc, fmt, cid, reach, author, tags) =
+                            epr_data;
+                        tokio::spawn(async move {
+                            let head = crate::epr_codec::EprHead {
+                                version: 1,
+                                id: id.clone(),
+                                content: cid.unwrap_or_default(),
+                                lamad: crate::epr_codec::EprLamadContext {
+                                    title,
+                                    content_type,
+                                    description: desc,
+                                    content_format: fmt,
+                                    tags,
+                                },
+                                shefa: crate::epr_codec::EprShefaContext {
+                                    stewards: vec![],
+                                    allocations: vec![],
+                                },
+                                qahal: crate::epr_codec::EprQahalContext { reach, layer: None },
+                                relationships: vec![],
+                                author,
+                                updated: Some(chrono::Utc::now().to_rfc3339()),
+                            };
+                            if let Ok(bytes) = rmp_serde::to_vec(&head) {
+                                handle.publish_epr_head(id, bytes).await;
+                            }
+                        });
+                    }
+                }
+
+                Ok(response::from_create_result(result))
             }
             _ => Ok(response::method_not_allowed()),
         }
@@ -1950,6 +2004,28 @@ impl HttpServer {
         if let Err(msg) = validate_schema_versions(&versions) {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
+
+        // Capture EPR-relevant data before input_views are consumed
+        #[cfg(feature = "p2p")]
+        let epr_inputs: Vec<_> = input_views
+            .iter()
+            .map(|v| {
+                (
+                    v.id.clone(),
+                    v.title.clone(),
+                    v.content_type
+                        .clone()
+                        .unwrap_or_else(|| "concept".to_string()),
+                    v.description.clone(),
+                    v.content_format.clone(),
+                    v.blob_cid.clone(),
+                    v.reach.clone(),
+                    v.created_by.clone(),
+                    v.tags.clone(),
+                )
+            })
+            .collect();
+
         let items: Vec<db::content_diesel::CreateContentInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
@@ -1957,7 +2033,49 @@ impl HttpServer {
         info!(count = count, "Bulk creating content");
 
         match services.content.bulk_create(items) {
-            Ok(result) => Ok(response::ok_with_schema_info(&result)),
+            Ok(result) => {
+                // Auto-publish EPR Heads to DHT for cross-peer discovery
+                #[cfg(feature = "p2p")]
+                if let Some(ref handle) = self.p2p_handle {
+                    let handle = handle.clone();
+                    let inserted = result.inserted;
+                    if inserted > 0 {
+                        let epr_data = epr_inputs;
+                        tokio::spawn(async move {
+                            for (id, title, content_type, desc, fmt, cid, reach, author, tags) in
+                                epr_data
+                            {
+                                let head = crate::epr_codec::EprHead {
+                                    version: 1,
+                                    id: id.clone(),
+                                    content: cid.unwrap_or_default(),
+                                    lamad: crate::epr_codec::EprLamadContext {
+                                        title,
+                                        content_type,
+                                        description: desc,
+                                        content_format: fmt,
+                                        tags,
+                                    },
+                                    shefa: crate::epr_codec::EprShefaContext {
+                                        stewards: vec![],
+                                        allocations: vec![],
+                                    },
+                                    qahal: crate::epr_codec::EprQahalContext { reach, layer: None },
+                                    relationships: vec![],
+                                    author,
+                                    updated: Some(chrono::Utc::now().to_rfc3339()),
+                                };
+                                if let Ok(bytes) = rmp_serde::to_vec(&head) {
+                                    handle.publish_epr_head(id, bytes).await;
+                                }
+                            }
+                            info!(count = inserted, "Published EPR Heads to DHT");
+                        });
+                    }
+                }
+
+                Ok(response::ok_with_schema_info(&result))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -2032,6 +2150,30 @@ impl HttpServer {
                     .content
                     .get(content_id)
                     .map(|opt| opt.map(ContentView::from));
+
+                // If content found locally or DB error, return immediately
+                if !matches!(&result, Ok(None)) {
+                    return Ok(response::from_option(
+                        result,
+                        &format!("Content not found: {}", content_id),
+                    ));
+                }
+
+                // Content not found locally — try P2P EPR resolution
+                #[cfg(feature = "p2p")]
+                if let Some(ref handle) = self.p2p_handle {
+                    debug!(id = %content_id, "Content not found locally, trying P2P EPR resolve");
+                    if let Some(head_bytes) = handle.resolve_epr(content_id).await {
+                        if let Ok(head) =
+                            rmp_serde::from_slice::<crate::epr_codec::EprHead>(&head_bytes)
+                        {
+                            info!(id = %content_id, "EPR Head resolved via P2P");
+                            let view = ContentView::from_epr_head(&head);
+                            return Ok(response::ok(&view));
+                        }
+                    }
+                }
+
                 Ok(response::from_option(
                     result,
                     &format!("Content not found: {}", content_id),
