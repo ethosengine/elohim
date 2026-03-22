@@ -2203,6 +2203,60 @@ impl HttpServer {
                             match svc.content.create(input) {
                                 Ok(content_with_tags) => {
                                     info!(id = %content_id, "P2P content persisted to local SQLite");
+
+                                    // Log CONTENT_DELIVERY recognition event (fire-and-forget)
+                                    if let Ok(mut econ_conn) = self.get_conn() {
+                                        let primary_steward = head
+                                            .shefa
+                                            .stewards
+                                            .first()
+                                            .cloned()
+                                            .unwrap_or_else(|| "unknown".to_string());
+                                        let econ_input =
+                                            crate::db::economic_events::CreateEconomicEventInput {
+                                                id: None,
+                                                action:
+                                                    crate::db::models::rea_actions::DELIVER_SERVICE
+                                                        .to_string(),
+                                                provider: primary_steward,
+                                                receiver: content_id.to_string(),
+                                                lamad_event_type: Some(
+                                                    crate::db::models::lamad_event_types::CONTENT_DELIVERY
+                                                        .to_string(),
+                                                ),
+                                                content_id: Some(content_id.to_string()),
+                                                resource_quantity_value: Some(1.0),
+                                                note: Some(
+                                                    "P2P EPR resolution".to_string(),
+                                                ),
+                                                resource_conforms_to: None,
+                                                resource_inventoried_as: None,
+                                                resource_classified_as: vec![],
+                                                resource_quantity_unit: None,
+                                                effort_quantity_value: None,
+                                                effort_quantity_unit: None,
+                                                has_point_in_time: None,
+                                                has_duration: None,
+                                                input_of: None,
+                                                output_of: None,
+                                                contributor_presence_id: None,
+                                                path_id: None,
+                                                triggered_by: None,
+                                                metadata_json: None,
+                                                at_location: None,
+                                            };
+                                        let econ_ctx = db::AppContext::default_lamad();
+                                        if let Err(e) = crate::db::economic_events::record_event(
+                                            &mut econ_conn,
+                                            &econ_ctx,
+                                            econ_input,
+                                        ) {
+                                            debug!(id = %content_id, error = %e, "Failed to log delivery recognition (non-fatal)");
+                                        } else {
+                                            debug!(id = %content_id, "Delivery recognition event recorded");
+                                        }
+                                    }
+
                                     let view = ContentView::from(content_with_tags);
                                     return Ok(response::ok(&view));
                                 }
