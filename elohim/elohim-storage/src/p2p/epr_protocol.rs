@@ -35,7 +35,10 @@ impl AsRef<str> for EprProtocol {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EprRequest {
     /// Resolve an EPR Head by content ID
-    Resolve { id: String },
+    Resolve {
+        id: String,
+        agent_pubkey: Option<String>,
+    },
     /// Announce an EPR Head to the network (MessagePack-encoded EprHead)
     Announce { head: Vec<u8> },
     /// Resolve multiple EPR Heads in one request
@@ -58,6 +61,11 @@ pub enum EprResponse {
     },
     /// Content not found
     NotFound,
+    /// Access denied — reach gate failed
+    AccessDenied {
+        required_reach: String,
+        reason: String,
+    },
     /// Error
     Error(String),
 }
@@ -177,11 +185,15 @@ mod tests {
     fn test_epr_request_resolve_roundtrip() {
         let request = EprRequest::Resolve {
             id: "fct-module-01-church-dilemma".to_string(),
+            agent_pubkey: Some("uhCAk_test_agent".to_string()),
         };
         let bytes = rmp_serde::to_vec(&request).unwrap();
         let decoded: EprRequest = rmp_serde::from_slice(&bytes).unwrap();
         match decoded {
-            EprRequest::Resolve { id } => assert_eq!(id, "fct-module-01-church-dilemma"),
+            EprRequest::Resolve { id, agent_pubkey } => {
+                assert_eq!(id, "fct-module-01-church-dilemma");
+                assert_eq!(agent_pubkey.unwrap(), "uhCAk_test_agent");
+            }
             _ => panic!("Wrong variant"),
         }
     }
@@ -295,6 +307,26 @@ mod tests {
         let bytes = rmp_serde::to_vec(&response).unwrap();
         let decoded: EprResponse = rmp_serde::from_slice(&bytes).unwrap();
         assert!(matches!(decoded, EprResponse::NotFound));
+    }
+
+    #[test]
+    fn test_epr_response_access_denied_roundtrip() {
+        let response = EprResponse::AccessDenied {
+            required_reach: "trusted".to_string(),
+            reason: "No relationship with content steward".to_string(),
+        };
+        let bytes = rmp_serde::to_vec(&response).unwrap();
+        let decoded: EprResponse = rmp_serde::from_slice(&bytes).unwrap();
+        match decoded {
+            EprResponse::AccessDenied {
+                required_reach,
+                reason,
+            } => {
+                assert_eq!(required_reach, "trusted");
+                assert_eq!(reason, "No relationship with content steward");
+            }
+            _ => panic!("Wrong variant"),
+        }
     }
 
     #[test]
