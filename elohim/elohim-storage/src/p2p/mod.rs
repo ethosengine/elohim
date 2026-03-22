@@ -230,6 +230,64 @@ impl P2PHandle {
             _ => None,
         }
     }
+
+    /// Fetch content bytes via shard protocol. Returns None on timeout or not found.
+    pub async fn fetch_shard(&self, hash: &str) -> Option<Vec<u8>> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        if self
+            .command_tx
+            .send(P2PCommand::FetchShard {
+                hash: hash.to_string(),
+                reply: reply_tx,
+            })
+            .await
+            .is_err()
+        {
+            return None;
+        }
+        match tokio::time::timeout(Duration::from_secs(5), reply_rx).await {
+            Ok(Ok(result)) => result,
+            _ => None,
+        }
+    }
+
+    /// Full P2P content resolution: EPR Head -> shard fetch -> (EprHead, content_bytes).
+    ///
+    /// Resolves the EPR Head for metadata, extracts blob_cid, then fetches the
+    /// actual content bytes via shard protocol. Returns None if either step fails.
+    ///
+    /// The resolution logic is decoupled from peer selection — today it uses the
+    /// first connected peer; future versions can rank by latency or load-balance.
+    pub async fn resolve_and_fetch(
+        &self,
+        id: &str,
+    ) -> Option<(crate::epr_codec::EprHead, Vec<u8>)> {
+        // Step 1: Resolve EPR Head
+        let head_bytes = self.resolve_epr(id).await?;
+        let head: crate::epr_codec::EprHead = rmp_serde::from_slice(&head_bytes).ok()?;
+
+        // Step 2: Fetch content bytes via shard protocol using blob_cid
+        if head.content.is_empty() {
+            debug!(id = %id, "EPR Head has no blob_cid, skipping shard fetch");
+            return None;
+        }
+        let content_bytes = self.fetch_shard(&head.content).await?;
+
+        // Step 3: Verify content integrity (accept sha256-hex or CID formats)
+        use sha2::{Digest, Sha256};
+        let computed_hash = format!("sha256-{}", hex::encode(Sha256::digest(&content_bytes)));
+        if computed_hash != head.content && !head.content.starts_with("bafkrei") {
+            warn!(
+                id = %id,
+                expected = %head.content,
+                actual = %computed_hash,
+                "Content integrity check failed"
+            );
+            return None;
+        }
+
+        Some((head, content_bytes))
+    }
 }
 
 impl P2PNode {
