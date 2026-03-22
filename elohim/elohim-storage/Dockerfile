@@ -59,6 +59,7 @@ RUN cargo build --release
 # the cached proc-macro result and the real migrations are never embedded.
 RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim* \
+    target/release/build/diesel* target/release/.fingerprint/diesel* \
     target/release/build/elohim* target/release/.fingerprint/elohim*
 
 # Cache buster — pass --build-arg CACHE_BUST=$(git rev-parse HEAD) to invalidate
