@@ -940,9 +940,10 @@ pub mod lamad_event_types {
     pub const AFFINITY_TRANSFER: &str = "affinity-transfer";
     pub const CITATION: &str = "citation";
     pub const MASTERY_ADVANCE: &str = "mastery-advance";
+    pub const CONTENT_DELIVERY: &str = "content-delivery";
 
     /// All supported lamad event types
-    pub const ALL: [&str; 11] = [
+    pub const ALL: [&str; 12] = [
         CONTENT_VIEW,
         PATH_STEP_COMPLETE,
         AFFINITY_MARK,
@@ -954,6 +955,7 @@ pub mod lamad_event_types {
         AFFINITY_TRANSFER,
         CITATION,
         MASTERY_ADVANCE,
+        CONTENT_DELIVERY,
     ];
 
     /// Check if an event type is valid
