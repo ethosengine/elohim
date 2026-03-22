@@ -114,6 +114,7 @@ pub struct NewContent<'a> {
     pub metadata_json: Option<&'a str>,
     pub reach: &'a str,
     pub created_by: Option<&'a str>,
+    pub content_body: Option<&'a str>,
 }
 
 /// Content tag row

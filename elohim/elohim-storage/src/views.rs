@@ -184,6 +184,51 @@ impl From<ContentWithTags> for ContentView {
     }
 }
 
+impl ContentView {
+    /// Construct a minimal ContentView from an EPR Head resolved via P2P.
+    /// Provides enough data for the frontend to render content metadata
+    /// while the full content body is fetched asynchronously.
+    pub fn from_epr_head(head: &crate::epr_codec::EprHead) -> Self {
+        Self {
+            id: head.id.clone(),
+            app_id: "lamad".to_string(),
+            title: head.lamad.title.clone(),
+            description: head.lamad.description.clone(),
+            content_type: head.lamad.content_type.clone(),
+            content_format: head
+                .lamad
+                .content_format
+                .clone()
+                .unwrap_or_else(|| "markdown".to_string()),
+            blob_hash: None,
+            blob_cid: if head.content.is_empty() {
+                None
+            } else {
+                Some(head.content.clone())
+            },
+            content_size_bytes: None,
+            metadata: None,
+            reach: head
+                .qahal
+                .reach
+                .clone()
+                .unwrap_or_else(|| "commons".to_string()),
+            validation_status: "valid".to_string(),
+            created_by: head.author.clone(),
+            created_at: head
+                .updated
+                .clone()
+                .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string()),
+            updated_at: head
+                .updated
+                .clone()
+                .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string()),
+            content_body: None,
+            dht_anchor_hash: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -1225,6 +1270,7 @@ impl From<CreateContentInputView> for CreateContentInput {
             reach: v.reach.unwrap_or_else(|| "public".to_string()),
             created_by: v.created_by,
             tags: v.tags,
+            content_body: v.content_body,
         }
     }
 }

@@ -43,6 +43,8 @@ pub struct CreateContentInput {
     pub created_by: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub content_body: Option<String>,
 }
 
 /// Input for partially updating a content item (PATCH semantics).
@@ -260,6 +262,7 @@ pub fn create_content(
             metadata_json: input.metadata_json.as_deref(),
             reach: &input.reach,
             created_by: input.created_by.as_deref(),
+            content_body: input.content_body.as_deref(),
         };
 
         diesel::insert_into(content::table)
@@ -334,6 +337,7 @@ pub fn bulk_create_content(
                 metadata_json: input.metadata_json.as_deref(),
                 reach: &input.reach,
                 created_by: input.created_by.as_deref(),
+                content_body: input.content_body.as_deref(),
             };
 
             match diesel::insert_into(content::table)
@@ -587,6 +591,7 @@ mod tests {
             reach: "public".to_string(),
             created_by: None,
             tags: vec!["core".to_string()],
+            content_body: None,
         };
         create_content(&mut conn, &lamad_ctx, lamad_content).unwrap();
 
@@ -604,6 +609,7 @@ mod tests {
             reach: "public".to_string(),
             created_by: None,
             tags: vec!["infrastructure".to_string()],
+            content_body: None,
         };
         create_content(&mut conn, &elohim_ctx, elohim_content).unwrap();
 
@@ -653,6 +659,7 @@ mod tests {
                 reach: "public".to_string(),
                 created_by: None,
                 tags: vec![],
+                content_body: None,
             },
             CreateContentInput {
                 id: "content-2".to_string(),
@@ -667,6 +674,7 @@ mod tests {
                 reach: "public".to_string(),
                 created_by: None,
                 tags: vec![],
+                content_body: None,
             },
         ];
 
@@ -688,6 +696,7 @@ mod tests {
             reach: "public".to_string(),
             created_by: None,
             tags: vec![],
+            content_body: None,
         }];
 
         let result2 = bulk_create_content(&mut conn, &lamad_ctx, items2).unwrap();
