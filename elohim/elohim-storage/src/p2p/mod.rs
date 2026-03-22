@@ -1324,11 +1324,78 @@ impl P2PNode {
         }
     }
 
+    /// Check if a requesting agent is authorized to access content at the given reach level.
+    /// Returns Ok(()) if authorized, Err(reason) if denied.
+    fn check_reach_authorization(
+        &self,
+        reach: &str,
+        agent_pubkey: Option<&str>,
+    ) -> Result<(), String> {
+        match reach {
+            "commons" | "public" => Ok(()),
+            _ => {
+                let agent_key = agent_pubkey
+                    .ok_or_else(|| "Agent identity required for restricted content".to_string())?;
+
+                let pool = self
+                    .db_pool
+                    .as_ref()
+                    .ok_or_else(|| "Database not available for authorization".to_string())?;
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| format!("DB connection failed: {}", e))?;
+
+                let app_ctx = crate::db::AppContext::default_lamad();
+
+                // Map agent_pubkey -> human
+                let human = crate::db::humans::get_human_by_agent_key(&mut conn, agent_key)
+                    .map_err(|e| format!("Agent lookup failed: {}", e))?
+                    .ok_or_else(|| "Unknown agent — no human identity found".to_string())?;
+
+                // Check if requesting human has any relationship with any peer.
+                // For now, any relationship qualifies. Future: differentiate by reach tier.
+                let relationships = crate::db::human_relationships::get_relationships_for_human(
+                    &mut conn, &app_ctx, &human.id,
+                );
+
+                match relationships {
+                    Ok(rels) if !rels.is_empty() => Ok(()),
+                    _ => Err(format!("No qualifying relationship for reach '{}'", reach)),
+                }
+            }
+        }
+    }
+
     /// Handle an incoming EPR request from a peer
     async fn handle_epr_request(&self, request: EprRequest) -> EprResponse {
         match request {
             EprRequest::Resolve { id, agent_pubkey } => {
                 debug!(id = %id, "Handling EPR Resolve request");
+
+                // Check reach authorization before serving
+                if let Some(ref pool) = self.db_pool {
+                    if let Ok(mut conn) = pool.get() {
+                        let app_ctx = crate::db::AppContext::default_lamad();
+                        if let Ok(Some(content_with_tags)) =
+                            crate::db::content_diesel::get_content_with_tags(
+                                &mut conn, &app_ctx, &id,
+                            )
+                        {
+                            let reach = &content_with_tags.content.reach;
+                            if let Err(reason) =
+                                self.check_reach_authorization(reach, agent_pubkey.as_deref())
+                            {
+                                info!(id = %id, reach = %reach, reason = %reason, "EPR access denied");
+                                return EprResponse::AccessDenied {
+                                    required_reach: reach.clone(),
+                                    reason,
+                                };
+                            }
+                        }
+                    }
+                }
+
+                // Authorized — serve the EPR Head
                 match self.resolve_epr_head_locally(&id) {
                     Some(bytes) => {
                         info!(id = %id, size = bytes.len(), "Serving EPR Head");
