@@ -118,8 +118,7 @@ pub async fn verify_trust_context(
         verify_stewardship_cids(hc_client, &credentials.stewardship_cids).await?;
 
     // Calculate ambient reach ceiling from verified credentials
-    let reach_ceiling =
-        calculate_reach_ceiling(&verified_memberships, &verified_relationships);
+    let reach_ceiling = calculate_reach_ceiling(&verified_memberships, &verified_relationships);
 
     Ok(VerifiedTrustContext {
         agent_pubkey: credentials.agent_pubkey.clone(),
@@ -144,15 +143,15 @@ fn calculate_reach_ceiling(
     relationships: &[VerifiedRelationship],
 ) -> String {
     // Check for intimate: mutual intimate relationship with both consents
-    if relationships.iter().any(|r| {
-        r.intimacy_level == "intimate" && r.consent_given_by_a && r.consent_given_by_b
-    }) {
+    if relationships
+        .iter()
+        .any(|r| r.intimacy_level == "intimate" && r.consent_given_by_a && r.consent_given_by_b)
+    {
         return "intimate".to_string();
     }
 
     // Check for trusted: any relationship at intimacy >= trusted
-    let trusted_idx =
-        crate::db::models::intimacy_levels::index_of("trusted").unwrap_or(2);
+    let trusted_idx = crate::db::models::intimacy_levels::index_of("trusted").unwrap_or(2);
     if relationships.iter().any(|r| {
         crate::db::models::intimacy_levels::index_of(&r.intimacy_level)
             .map(|idx| idx >= trusted_idx)
@@ -162,10 +161,7 @@ fn calculate_reach_ceiling(
     }
 
     // Check for community: any consented membership
-    if memberships
-        .iter()
-        .any(|m| m.consent_state == "consented")
-    {
+    if memberships.iter().any(|m| m.consent_state == "consented") {
         return "community".to_string();
     }
 

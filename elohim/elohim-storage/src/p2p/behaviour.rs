@@ -97,7 +97,12 @@ pub enum ElohimStorageBehaviourEvent {
     /// EPR protocol event
     EprProtocol(request_response::Event<super::EprRequest, super::EprResponse>),
     /// Trust protocol event
-    TrustProtocol(request_response::Event<super::trust_protocol::TrustHandshake, super::trust_protocol::TrustResponse>),
+    TrustProtocol(
+        request_response::Event<
+            super::trust_protocol::TrustHandshake,
+            super::trust_protocol::TrustResponse,
+        >,
+    ),
     /// mDNS event
     Mdns(mdns::Event),
     /// Relay client event (reservations, connection through relay)

@@ -1964,7 +1964,11 @@ impl HttpServer {
                                     stewards: vec![],
                                     allocations: vec![],
                                 },
-                                qahal: crate::epr_codec::EprQahalContext { reach, layer: None, attestation_requirements: vec![] },
+                                qahal: crate::epr_codec::EprQahalContext {
+                                    reach,
+                                    layer: None,
+                                    attestation_requirements: vec![],
+                                },
                                 relationships: vec![],
                                 author,
                                 updated: Some(chrono::Utc::now().to_rfc3339()),
@@ -2069,7 +2073,11 @@ impl HttpServer {
                                         stewards: vec![],
                                         allocations: vec![],
                                     },
-                                    qahal: crate::epr_codec::EprQahalContext { reach, layer: None, attestation_requirements: vec![] },
+                                    qahal: crate::epr_codec::EprQahalContext {
+                                        reach,
+                                        layer: None,
+                                        attestation_requirements: vec![],
+                                    },
                                     relationships: vec![],
                                     author,
                                     updated: Some(chrono::Utc::now().to_rfc3339()),
@@ -2257,8 +2265,8 @@ impl HttpServer {
                                                     prereq_content_id,
                                                 );
                                             match mastery {
-                                                Ok(Some(m))
-                                                    if m.mastery_level != "not_started" => {}
+                                                Ok(Some(m)) if m.mastery_level != "not_started" => {
+                                                }
                                                 _ => {
                                                     has_all_prereqs = false;
                                                     break;

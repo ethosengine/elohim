@@ -343,8 +343,9 @@ async fn async_main(
                 p2p_node = p2p_node.with_db_pool(pool.clone());
                 // Wire policy enforcement for content filtering on P2P path
                 let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool);
-                let enforcement =
-                    Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache));
+                let enforcement = Arc::new(
+                    elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache),
+                );
                 p2p_node = p2p_node.with_policy_enforcement(enforcement);
                 info!("  P2P EPR resolution: DB pool + policy enforcement wired");
             }
@@ -490,10 +491,10 @@ async fn async_main(
                 let services = Arc::new(Services::new(pool.clone()));
                 http_server = http_server.with_services(services);
                 // Wire policy enforcement for content filtering
-                let policy_cache =
-                    elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
-                let enforcement =
-                    Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache));
+                let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
+                let enforcement = Arc::new(
+                    elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache),
+                );
                 http_server = http_server.with_policy_enforcement(enforcement);
                 http_server = http_server.with_db_pool(pool);
 

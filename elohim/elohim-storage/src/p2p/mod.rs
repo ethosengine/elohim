@@ -1527,9 +1527,12 @@ impl P2PNode {
                     },
                     qahal: {
                         let mut attestation_requirements = Vec::new();
-                        if let Ok(atts) = crate::db::content_attestations::query_attestations_for_content(
-                            &mut conn, &content.id,
-                        ) {
+                        if let Ok(atts) =
+                            crate::db::content_attestations::query_attestations_for_content(
+                                &mut conn,
+                                &content.id,
+                            )
+                        {
                             for att in &atts {
                                 if att.is_revoked == 0 {
                                     let req = if let Some(ref evidence) = att.evidence {
@@ -1574,8 +1577,14 @@ impl P2PNode {
     fn resolve_agent(
         &self,
         agent_pubkey: Option<&str>,
-    ) -> Result<(crate::db::PooledConn, crate::db::AppContext, crate::db::models::Human), String>
-    {
+    ) -> Result<
+        (
+            crate::db::PooledConn,
+            crate::db::AppContext,
+            crate::db::models::Human,
+        ),
+        String,
+    > {
         let agent_key = agent_pubkey
             .ok_or_else(|| "Agent identity required for restricted content".to_string())?;
         let pool = self
@@ -1622,10 +1631,7 @@ impl P2PNode {
             .load(conn)
             .map_err(|e| format!("Presence lookup failed: {}", e))?;
 
-        Ok(presences
-            .into_iter()
-            .filter_map(|p| p.steward_id)
-            .collect())
+        Ok(presences.into_iter().filter_map(|p| p.steward_id).collect())
     }
 
     /// Check if a requesting agent is authorized to access content at the given reach level.
@@ -1664,13 +1670,15 @@ impl P2PNode {
 
             "community" => {
                 let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-                let participations =
-                    crate::db::collectives::get_participations_for_human(
-                        &mut conn, &app_ctx, &human.id,
-                    )
-                    .map_err(|e| format!("Participation lookup failed: {}", e))?;
+                let participations = crate::db::collectives::get_participations_for_human(
+                    &mut conn, &app_ctx, &human.id,
+                )
+                .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
-                if participations.iter().any(|p| p.consent_state == "consented") {
+                if participations
+                    .iter()
+                    .any(|p| p.consent_state == "consented")
+                {
                     Ok(())
                 } else {
                     Err("No consented collective membership".to_string())
@@ -1682,23 +1690,21 @@ impl P2PNode {
                 let steward_human_ids =
                     self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
 
-                let participations =
-                    crate::db::collectives::get_participations_for_human(
-                        &mut conn, &app_ctx, &human.id,
-                    )
-                    .map_err(|e| format!("Participation lookup failed: {}", e))?;
+                let participations = crate::db::collectives::get_participations_for_human(
+                    &mut conn, &app_ctx, &human.id,
+                )
+                .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
                 for participation in &participations {
                     if participation.consent_state != "consented" {
                         continue;
                     }
-                    let members =
-                        crate::db::collectives::get_participants_of_collective(
-                            &mut conn,
-                            &app_ctx,
-                            &participation.collective_id,
-                        )
-                        .map_err(|e| format!("Members lookup failed: {}", e))?;
+                    let members = crate::db::collectives::get_participants_of_collective(
+                        &mut conn,
+                        &app_ctx,
+                        &participation.collective_id,
+                    )
+                    .map_err(|e| format!("Members lookup failed: {}", e))?;
 
                     if members
                         .iter()
@@ -1716,11 +1722,10 @@ impl P2PNode {
                 let steward_human_ids =
                     self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
 
-                let relationships =
-                    crate::db::human_relationships::get_relationships_for_human(
-                        &mut conn, &app_ctx, &human.id,
-                    )
-                    .map_err(|e| format!("Relationship lookup failed: {}", e))?;
+                let relationships = crate::db::human_relationships::get_relationships_for_human(
+                    &mut conn, &app_ctx, &human.id,
+                )
+                .map_err(|e| format!("Relationship lookup failed: {}", e))?;
 
                 let trusted_idx = crate::db::models::intimacy_levels::index_of("trusted")
                     .ok_or_else(|| "Invalid intimacy level config".to_string())?;
@@ -1750,11 +1755,10 @@ impl P2PNode {
                 let steward_human_ids =
                     self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
 
-                let relationships =
-                    crate::db::human_relationships::get_relationships_for_human(
-                        &mut conn, &app_ctx, &human.id,
-                    )
-                    .map_err(|e| format!("Relationship lookup failed: {}", e))?;
+                let relationships = crate::db::human_relationships::get_relationships_for_human(
+                    &mut conn, &app_ctx, &human.id,
+                )
+                .map_err(|e| format!("Relationship lookup failed: {}", e))?;
 
                 for rel in &relationships {
                     let other_id = if rel.party_a_id == human.id {
@@ -1775,9 +1779,8 @@ impl P2PNode {
             }
 
             "self" | "private" => {
-                let agent_key = agent_pubkey.ok_or_else(|| {
-                    "Agent identity required for private content".to_string()
-                })?;
+                let agent_key = agent_pubkey
+                    .ok_or_else(|| "Agent identity required for private content".to_string())?;
                 let pool = self
                     .db_pool
                     .as_ref()
@@ -1903,7 +1906,8 @@ impl P2PNode {
                                                         info!(id = %id, "P2P attestation gate: prerequisite mastery required");
                                                         return EprResponse::AccessDenied {
                                                             required_reach: reach.clone(),
-                                                            reason: "Prerequisite mastery required".to_string(),
+                                                            reason: "Prerequisite mastery required"
+                                                                .to_string(),
                                                         };
                                                     }
                                                 }
