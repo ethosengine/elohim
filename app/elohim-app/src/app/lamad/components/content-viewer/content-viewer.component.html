@@ -417,6 +417,42 @@
             </div>
           </div>
 
+          <!-- Stewardship -->
+          <div class="stewardship-section" *ngIf="stewardship">
+            <h3>Stewardship</h3>
+            <div *ngIf="stewardship.allocations.length === 0" class="stewardship-empty">
+              No stewardship allocations yet.
+            </div>
+            <div *ngIf="stewardship.allocations.length > 0" class="stewardship-list">
+              <div
+                *ngFor="let alloc of stewardship.allocations"
+                class="stewardship-card"
+                [class.stewardship-disputed]="alloc.governanceState === 'disputed'"
+                data-testid="trust-stewardship-card"
+              >
+                <div class="steward-identity">
+                  <span class="steward-name">{{ alloc.steward?.displayName || alloc.stewardPresenceId }}</span>
+                  <span class="steward-role">{{ alloc.contributionType }}</span>
+                </div>
+                <div class="steward-metrics">
+                  <div class="allocation-bar">
+                    <div
+                      class="allocation-fill"
+                      [style.width.%]="alloc.allocationRatio * 100"
+                    ></div>
+                  </div>
+                  <span class="allocation-pct">{{ (alloc.allocationRatio * 100) | number:'1.0-0' }}%</span>
+                </div>
+                <div class="steward-recognition" *ngIf="alloc.recognitionAccumulated > 0">
+                  {{ alloc.recognitionAccumulated | number:'1.1-1' }} recognition
+                </div>
+                <div class="steward-dispute" *ngIf="alloc.governanceState === 'disputed'">
+                  Disputed{{ alloc.disputeReason ? ': ' + alloc.disputeReason : '' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Warnings -->
           <div *ngIf="trustBadge.hasWarnings" class="trust-warnings">
             <h3>⚠️ Content Warnings</h3>

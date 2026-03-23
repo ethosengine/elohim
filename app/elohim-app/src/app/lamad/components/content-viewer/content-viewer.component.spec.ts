@@ -15,6 +15,7 @@ import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
@@ -30,6 +31,7 @@ describe('ContentViewerComponent', () => {
   let pathContextServiceSpy: any;
   let rendererRegistrySpy: any;
   let routerSpy: any;
+  let stewardshipServiceSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
 
@@ -123,6 +125,16 @@ describe('ContentViewerComponent', () => {
       getFeedbackStats: vi.fn().mockReturnValue(of(null)),
     };
 
+    const stewardshipSpyObj = {
+      getContentStewardship: vi.fn().mockReturnValue(of({
+        contentId: 'test-content-1',
+        allocations: [],
+        totalAllocation: 0,
+        hasDisputes: false,
+        primarySteward: null,
+      })),
+    };
+
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
       providers: [
@@ -139,6 +151,7 @@ describe('ContentViewerComponent', () => {
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
         { provide: SeoService, useValue: seoServiceSpyObj },
         { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
+        { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -161,6 +174,7 @@ describe('ContentViewerComponent', () => {
     pathContextServiceSpy = TestBed.inject(PathContextService);
     rendererRegistrySpy = TestBed.inject(RendererRegistryService);
     routerSpy = TestBed.inject(Router);
+    stewardshipServiceSpy = TestBed.inject(StewardshipAllocationService);
     vi.spyOn(routerSpy, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(ContentViewerComponent);
@@ -903,6 +917,63 @@ describe('ContentViewerComponent', () => {
       expect(component.getFlagClass('outdated')).toBe('flag-tag flag-outdated');
       expect(component.getFlagClass('under-review')).toBe('flag-tag flag-under-review');
     });
+  });
+
+  describe('Stewardship in Trust Tab', () => {
+    it('should load stewardship data when content loads', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      expect(stewardshipServiceSpy.getContentStewardship).toHaveBeenCalledWith('test-content-1');
+    }));
+
+    it('should store stewardship data on component', fakeAsync(() => {
+      const mockStewardship = {
+        contentId: 'test-content-1',
+        allocations: [{
+          steward: { id: 's1', displayName: 'Alice', presenceState: 'active' },
+          id: 'alloc-1',
+          appId: 'test',
+          contentId: 'test-content-1',
+          stewardPresenceId: 'sp-1',
+          allocationRatio: 0.6,
+          allocationMethod: 'manual',
+          contributionType: 'author',
+          contributionEvidence: null,
+          governanceState: 'active',
+          disputeId: null,
+          disputeReason: null,
+          disputedAt: null,
+          disputedBy: null,
+          negotiationSessionId: null,
+          elohimRatifiedAt: null,
+          elohimRatifierId: null,
+          effectiveFrom: '2026-01-01',
+          effectiveUntil: null,
+          supersededBy: null,
+          recognitionAccumulated: 42.5,
+          lastRecognitionAt: '2026-03-20',
+          note: null,
+          metadata: null,
+          createdAt: '2026-01-01',
+          updatedAt: '2026-03-20',
+          dhtAnchorHash: null,
+        }],
+        totalAllocation: 0.6,
+        hasDisputes: false,
+        primarySteward: null,
+      };
+      stewardshipServiceSpy.getContentStewardship.mockReturnValue(of(mockStewardship));
+      fixture.detectChanges();
+      tick();
+      expect(component.stewardship).toEqual(mockStewardship);
+    }));
+
+    it('should handle empty stewardship gracefully', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      expect(component.stewardship).toBeTruthy();
+      expect(component.stewardship!.allocations).toEqual([]);
+    }));
   });
 
   describe('content editor capability', () => {

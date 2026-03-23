@@ -46,6 +46,8 @@ import {
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
+import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
+import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 import { SeoService } from '../../../services/seo.service';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
@@ -90,6 +92,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   // Trust data
   trustBadge: TrustBadge | null = null;
   isLoadingTrust = false;
+
+  // Stewardship data
+  stewardship: ContentStewardshipView | null = null;
 
   // Governance data
   governanceState: GovernanceStateRecord | null = null;
@@ -147,6 +152,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly governanceService = inject(GovernanceService);
   private readonly signalService = inject(GovernanceSignalService);
   private readonly document = inject(DOCUMENT);
+  private readonly stewardshipService = inject(StewardshipAllocationService);
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
@@ -339,6 +345,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
           // Load trust badge data for Attestations tab
           this.loadTrustBadge(nodeId);
+          this.loadStewardship(nodeId);
 
           // Load governance data for Governance tab
           this.loadGovernanceData(nodeId);
@@ -398,6 +405,23 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         },
         error: () => {
           this.isLoadingTrust = false;
+        },
+      });
+  }
+
+  /**
+   * Load stewardship allocation data for the trust tab.
+   */
+  private loadStewardship(nodeId: string): void {
+    this.stewardshipService
+      .getContentStewardship(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: stewardship => {
+          this.stewardship = stewardship;
+        },
+        error: () => {
+          // Stewardship is supplemental — don't block on failure
         },
       });
   }
