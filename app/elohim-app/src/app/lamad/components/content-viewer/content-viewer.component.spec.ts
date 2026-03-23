@@ -876,6 +876,35 @@ describe('ContentViewerComponent', () => {
     }));
   });
 
+  describe('Content Flags', () => {
+    it('should return empty array when node has no flags', () => {
+      component.node = { ...mockContentNode, flags: undefined };
+      expect(component.getFlags()).toEqual([]);
+    });
+
+    it('should return flags when node has flags', () => {
+      const flags = [
+        { type: 'disputed' as const, reason: 'Factual accuracy questioned', flaggedAt: '2026-03-01' },
+      ];
+      component.node = { ...mockContentNode, flags };
+      expect(component.getFlags()).toEqual(flags);
+    });
+
+    it('should return correct flag label', () => {
+      expect(component.getFlagLabel('disputed')).toBe('Disputed');
+      expect(component.getFlagLabel('outdated')).toBe('Outdated');
+      expect(component.getFlagLabel('appeal-pending')).toBe('Appeal Pending');
+      expect(component.getFlagLabel('under-review')).toBe('Under Review');
+      expect(component.getFlagLabel('partial-revocation')).toBe('Partial Revocation');
+    });
+
+    it('should return correct flag CSS class', () => {
+      expect(component.getFlagClass('disputed')).toBe('flag-tag flag-disputed');
+      expect(component.getFlagClass('outdated')).toBe('flag-tag flag-outdated');
+      expect(component.getFlagClass('under-review')).toBe('flag-tag flag-under-review');
+    });
+  });
+
   describe('content editor capability', () => {
     it('should check edit capability on content load', fakeAsync(() => {
       editorServiceSpy.canEdit.mockReturnValue(true);

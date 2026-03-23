@@ -49,7 +49,7 @@ import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reactio
 import { SeoService } from '../../../services/seo.service';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
-import { ContentNode } from '../../models/content-node.model';
+import { ContentNode, ContentFlag } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
 import {
   ContentRenderer,
@@ -895,6 +895,29 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     return lines.join('\n') || 'No resilience data available';
+  }
+
+  // =========================================================================
+  // Content Flag Helpers
+  // =========================================================================
+
+  getFlags(): ContentFlag[] {
+    return this.node?.flags || [];
+  }
+
+  getFlagLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'disputed': 'Disputed',
+      'outdated': 'Outdated',
+      'appeal-pending': 'Appeal Pending',
+      'under-review': 'Under Review',
+      'partial-revocation': 'Partial Revocation',
+    };
+    return labels[type] || type;
+  }
+
+  getFlagClass(type: string): string {
+    return `flag-tag flag-${type}`;
   }
 
   // =========================================================================

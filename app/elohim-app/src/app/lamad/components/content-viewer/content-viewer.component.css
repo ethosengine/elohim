@@ -266,6 +266,58 @@
   border: 1px solid rgb(99 102 241 / 20%);
 }
 
+/* Content flag tags — only visible when flags exist */
+.flag-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.flag-tag {
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  opacity: 0.85;
+}
+
+.flag-tag:hover {
+  opacity: 1;
+}
+
+.flag-disputed {
+  background: rgb(239 68 68 / 8%);
+  color: #dc2626;
+  border: 1px solid rgb(239 68 68 / 25%);
+}
+
+.flag-outdated {
+  background: rgb(245 158 11 / 8%);
+  color: #d97706;
+  border: 1px solid rgb(245 158 11 / 25%);
+}
+
+.flag-appeal-pending {
+  background: rgb(139 92 246 / 8%);
+  color: #7c3aed;
+  border: 1px solid rgb(139 92 246 / 25%);
+}
+
+.flag-under-review {
+  background: rgb(59 130 246 / 8%);
+  color: #2563eb;
+  border: 1px solid rgb(59 130 246 / 25%);
+}
+
+.flag-partial-revocation {
+  background: rgb(239 68 68 / 8%);
+  color: #dc2626;
+  border: 1px solid rgb(239 68 68 / 25%);
+}
+
 /* Content actions (download, edit, etc.) */
 .content-actions {
   margin-top: 1.5rem;

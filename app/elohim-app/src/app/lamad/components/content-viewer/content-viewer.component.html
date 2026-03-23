@@ -87,6 +87,18 @@
           <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
         </div>
 
+        <div class="flag-tags" *ngIf="getFlags().length > 0">
+          <span
+            *ngFor="let flag of getFlags()"
+            [class]="getFlagClass(flag.type)"
+            [title]="flag.reason"
+            (click)="setActiveTab('trust')"
+            role="button"
+            [attr.aria-label]="getFlagLabel(flag.type) + ': ' + flag.reason"
+            data-testid="viewer-content-flag"
+          >{{ getFlagLabel(flag.type) }}</span>
+        </div>
+
         <!-- Content actions -->
         <div class="content-actions">
           <app-content-download [node]="node"></app-content-download>
