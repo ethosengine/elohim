@@ -1889,7 +1889,16 @@ impl HttpServer {
         match method {
             Method::GET => match services.content.list(&query) {
                 Ok(items) => {
-                    let views: Vec<ContentView> = items.into_iter().map(Into::into).collect();
+                    // Reach-based filtering: unauthenticated requests only see commons/public
+                    let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
+                        || req.headers().get("X-Agent-Id").is_some();
+                    let views: Vec<ContentView> = items
+                        .into_iter()
+                        .map(Into::into)
+                        .filter(|v: &ContentView| {
+                            has_auth || v.reach == "commons" || v.reach == "public"
+                        })
+                        .collect();
                     let body = serde_json::json!({
                         "items": views,
                         "count": views.len(),
@@ -2151,6 +2160,26 @@ impl HttpServer {
                     .get(content_id)
                     .map(|opt| opt.map(ContentView::from));
 
+                // Reach-based access control: commons/public serve without auth,
+                // restricted content requires authentication
+                if let Ok(Some(ref view)) = result {
+                    let is_public = view.reach == "commons" || view.reach == "public";
+                    if !is_public {
+                        let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
+                            || req.headers().get("X-Agent-Id").is_some();
+                        if !has_auth {
+                            return Ok(Response::builder()
+                                .status(StatusCode::FORBIDDEN)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"error":"Authentication required","requiredReach":"{}"}}"#,
+                                    view.reach
+                                ))))
+                                .unwrap());
+                        }
+                    }
+                }
+
                 // If content found locally or DB error, return immediately
                 if !matches!(&result, Ok(None)) {
                     return Ok(response::from_option(
@@ -2332,7 +2361,14 @@ impl HttpServer {
         match method {
             Method::GET => match services.path.list(limit, offset) {
                 Ok(paths) => {
-                    let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
+                    // Reach-based filtering: unauthenticated requests only see public paths
+                    let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
+                        || req.headers().get("X-Agent-Id").is_some();
+                    let views: Vec<PathView> = paths
+                        .into_iter()
+                        .map(|p| p.into())
+                        .filter(|v: &PathView| has_auth || v.visibility == "public")
+                        .collect();
                     let body = serde_json::json!({
                         "items": views,
                         "count": views.len(),

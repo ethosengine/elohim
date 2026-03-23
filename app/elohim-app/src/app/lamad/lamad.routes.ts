@@ -38,10 +38,10 @@ export const LAMAD_ROUTES: Routes = [
       // ============================================
 
       // Path step navigation - the main learning interface
+      // Access control: handled by storage reach check (commons/public = no auth)
       // SEO: Dynamic title set by PathNavigatorComponent
       {
         path: 'path/:pathId/step/:stepIndex',
-        canActivate: [identityGuard],
         loadComponent: async () =>
           import('./components/path-navigator/path-navigator.component').then(
             m => m.PathNavigatorComponent
