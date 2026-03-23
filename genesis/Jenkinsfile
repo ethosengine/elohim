@@ -260,11 +260,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 set -euo pipefail
                                 echo "Resetting ${human.service}..."
 
-                                # Delete content.db
+                                # Delete content.db and kill the process so the pod restarts with fresh migrations
                                 kubectl exec -n ${human.namespace} ${human.service}-0 -c elohim-storage -- rm -f /data/content.db 2>/dev/null || true
-
-                                # Restart pod to trigger fresh migrations
-                                kubectl delete pod -n ${human.namespace} ${human.service}-0 --wait=false
+                                kubectl exec -n ${human.namespace} ${human.service}-0 -c elohim-storage -- kill 1 2>/dev/null || true
 
                                 echo "   ✅ ${human.humanId} reset initiated"
                             """
