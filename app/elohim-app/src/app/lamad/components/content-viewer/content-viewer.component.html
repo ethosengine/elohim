@@ -56,10 +56,22 @@
         <h1 class="content-title">
           {{ node.title }}
           <span
+            class="reach-badge"
+            [class]="'reach-badge reach-' + (node.reach || 'commons')"
+            [title]="getReachTooltip()"
+            (click)="setActiveTab('trust')"
+            role="button"
+            [attr.aria-label]="'Reach: ' + (node.reach || 'commons') + '. Click to view trust details.'"
+            data-testid="viewer-reach-badge"
+          >{{ getReachIcon() }}</span>
+          <span
             class="resilience-info"
             [title]="getResilienceTooltip()"
+            (click)="setActiveTab('trust')"
+            role="button"
+            aria-label="View resilience and stewardship details"
             data-testid="viewer-resilience-info"
-          >ⓘ</span>
+          >{{ getResilienceIcon() }}</span>
         </h1>
         <p class="content-description">{{ node.description }}</p>
 

@@ -199,14 +199,29 @@
   line-height: 1.3;
 }
 
-/* Resilience info placeholder — will become the dynamic resilience icon */
-.resilience-info {
-  font-size: 0.5em;
+/* Reach badge — indicates content reach tier */
+.reach-badge {
+  font-size: 0.45em;
   vertical-align: super;
-  cursor: help;
-  opacity: 0.5;
+  cursor: pointer;
+  opacity: 0.7;
   transition: opacity 0.2s;
-  margin-left: 0.25em;
+  margin-left: 0.3em;
+  letter-spacing: -0.1em;
+}
+
+.reach-badge:hover {
+  opacity: 1;
+}
+
+/* Resilience indicator — stewardship health */
+.resilience-info {
+  font-size: 0.4em;
+  vertical-align: super;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  margin-left: 0.15em;
 }
 
 .resilience-info:hover {

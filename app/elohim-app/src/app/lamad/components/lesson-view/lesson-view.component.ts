@@ -99,7 +99,20 @@ interface InlineQuizCompletionEvent {
               </div>
             }
           </div>
-          <h1 class="lesson-title">{{ content.title || content.id }}</h1>
+          <h1 class="lesson-title">
+            {{ content.title || content.id }}
+            <span
+              class="reach-badge"
+              [class]="'reach-badge reach-' + (content.reach || 'commons')"
+              [title]="getReachTooltip()"
+              data-testid="lesson-reach-badge"
+            >{{ getReachIcon() }}</span>
+            <span
+              class="resilience-info"
+              [title]="getResilienceTooltip()"
+              data-testid="lesson-resilience-info"
+            >{{ getResilienceIcon() }}</span>
+          </h1>
           @if (content.description) {
             <p class="lesson-description">{{ content.description }}</p>
           }
@@ -279,6 +292,20 @@ interface InlineQuizCompletionEvent {
         font-weight: 600;
         color: var(--text-primary, #202124);
         line-height: 1.3;
+      }
+
+      .reach-badge, .resilience-info {
+        font-size: 0.45em;
+        vertical-align: super;
+        cursor: help;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+        margin-left: 0.2em;
+        letter-spacing: -0.1em;
+      }
+
+      .reach-badge:hover, .resilience-info:hover {
+        opacity: 1;
       }
 
       .lesson-description {
@@ -652,6 +679,53 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
       path: 'Path',
     };
     return labels[this.content.contentType] || this.content.contentType;
+  }
+
+  /** Reach icon — concentric circles metaphor. */
+  getReachIcon(): string {
+    const reach = (this.content?.reach as string) || 'commons';
+    switch (reach) {
+      case 'private': case 'self': return '\u{1F512}';
+      case 'intimate': return '\u{25C9}';
+      case 'trusted': return '\u{25CE}';
+      case 'familiar': case 'invited': return '\u{25CB}\u{25CF}';
+      case 'community': case 'local': case 'neighborhood': case 'municipal': return '\u{25CE}\u{25CB}';
+      default: return '\u{25CB}\u{25CB}\u{25CB}';
+    }
+  }
+
+  /** Reach tooltip. */
+  getReachTooltip(): string {
+    const reach = (this.content?.reach as string) || 'commons';
+    const desc: Record<string, string> = {
+      commons: 'Commons — accessible to everyone',
+      public: 'Public — accessible to everyone',
+      community: 'Community — requires collective membership',
+      familiar: 'Familiar — requires shared collective with steward',
+      trusted: 'Trusted — requires relationship with steward',
+      intimate: 'Intimate — requires mutual intimate relationship',
+      private: 'Private — creator only',
+      self: 'Private — creator only',
+    };
+    return desc[reach] || `Reach: ${reach}`;
+  }
+
+  /** Resilience icon — stewardship health. */
+  getResilienceIcon(): string {
+    const count = this.content?.stewardedBy?.length || 0;
+    if (count >= 3) return '\u{1F7E2}';
+    if (count >= 1) return '\u{1F7E1}';
+    return '\u{26AA}';
+  }
+
+  /** Resilience tooltip. */
+  getResilienceTooltip(): string {
+    if (!this.content?.stewardedBy?.length) return 'No stewards assigned';
+    const stewards = this.content.stewardedBy
+      .sort((a, b) => b.affinity - a.affinity)
+      .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
+      .join(', ');
+    return `Stewards: ${stewards}`;
   }
 
   /**

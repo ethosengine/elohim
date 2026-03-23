@@ -806,18 +806,77 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   }
 
   /**
-   * Build a tooltip string showing resilience/stewardship data for this content node.
-   * Placeholder for the future dynamic resilience icon.
+   * Reach icon — concentric circles metaphor. More circles = wider reach.
+   * Handles both frontend ReachLevel values and backend trust-tier values.
+   */
+  getReachIcon(): string {
+    const reach = (this.node?.reach as string) || 'commons';
+    switch (reach) {
+      case 'private':
+      case 'self':
+        return '\u{1F512}'; // lock
+      case 'intimate':
+        return '\u{25C9}'; // fisheye (single filled dot)
+      case 'trusted':
+        return '\u{25CE}'; // bullseye
+      case 'familiar':
+      case 'invited':
+        return '\u{25CB}\u{25CF}'; // two circles
+      case 'community':
+      case 'local':
+      case 'neighborhood':
+      case 'municipal':
+        return '\u{25CE}\u{25CB}'; // bullseye + circle
+      case 'commons':
+      case 'public':
+      case 'regional':
+      case 'bioregional':
+      default:
+        return '\u{25CB}\u{25CB}\u{25CB}'; // three open circles
+    }
+  }
+
+  /**
+   * Reach tooltip — explains what the reach level means for this content.
+   */
+  getReachTooltip(): string {
+    const reach = (this.node?.reach as string) || 'commons';
+    const descriptions: Record<string, string> = {
+      commons: 'Commons — accessible to everyone',
+      public: 'Public — accessible to everyone',
+      community: 'Community — requires collective membership',
+      familiar: 'Familiar — requires shared collective with steward',
+      trusted: 'Trusted — requires relationship with steward',
+      intimate: 'Intimate — requires mutual intimate relationship',
+      private: 'Private — creator only',
+      self: 'Private — creator only',
+      local: 'Local — household/immediate area',
+      neighborhood: 'Neighborhood — local area',
+      municipal: 'Municipal — city/town',
+      regional: 'Regional — state/province',
+      federated: 'Federated — multiple communities',
+      invited: 'Invited — explicitly invited individuals',
+    };
+    return descriptions[reach] || `Reach: ${reach}`;
+  }
+
+  /**
+   * Resilience icon — indicates stewardship health.
+   */
+  getResilienceIcon(): string {
+    const stewardCount = this.node?.stewardedBy?.length || 0;
+    if (stewardCount >= 3) return '\u{1F7E2}'; // green circle
+    if (stewardCount >= 1) return '\u{1F7E1}'; // yellow circle
+    return '\u{26AA}'; // white circle (no stewards)
+  }
+
+  /**
+   * Resilience tooltip — stewardship and trust data for this content.
    */
   getResilienceTooltip(): string {
     if (!this.node) return '';
 
     const lines: string[] = [];
-
-    // Reach level
-    if (this.node.reach) {
-      lines.push(`Reach: ${this.node.reach}`);
-    }
 
     // Stewards
     if (this.node.stewardedBy?.length) {
@@ -826,15 +885,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
         .join(', ');
       lines.push(`Stewards: ${stewards}`);
+    } else {
+      lines.push('No stewards assigned');
     }
 
     // Trust score
     if (this.node.trustScore != null) {
       lines.push(`Trust: ${Math.round(this.node.trustScore * 100)}%`);
     }
-
-    // Content ID (proves data pipeline)
-    lines.push(`ID: ${this.node.id}`);
 
     return lines.join('\n') || 'No resilience data available';
   }
