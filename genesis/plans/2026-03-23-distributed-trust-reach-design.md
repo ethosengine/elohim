@@ -145,3 +145,29 @@ The elohim are the nervous system of the protocol, not a gatekeeper. They create
 - Stewardship compute budgeting and allocation (Layer 4)
 - Elohim governance mediation across all layers
 - Immediate revocation via governance signal protocol
+- Stewarded account modality (children, seniors, those rebuilding trust)
+- Per-connection ambient trust negotiation with CID verification
+
+## Foundational Assumption: The Full Spectrum of Humanity
+
+The protocol does not assume good actors. It assumes the full range of human expression — including sociopaths, social dominators, conspiracy theorists, the easily manipulated, those with criminal history, and every other challenge to collective trust. They are all here. They all have nodes. They all have dignity.
+
+The system is resilient not through exclusion but through three structural properties:
+
+### 1. Harm Cannot Scale
+
+On the extractive web, a charismatic manipulator reaches millions because algorithms reward engagement regardless of truth. On the elohim protocol, reach is earned through community endorsement. Deception might fool an immediate circle, but reaching the district requires evidence reviewed by independent people. Reaching the city requires verification across multiple communities. The cost of deception scales exponentially with reach. Conspiracy theories cannot go viral — they can only travel as far as people who examine them and endorse them. Without an audience to monetize, the economics of exploitation collapse.
+
+### 2. The Good-Faith Majority Has Coordination Tools
+
+The central failure of current platforms: the majority is atomized. Each person fights trolls alone. The motivated minority exploits this atomization — it's the collective action problem that breaks every online community.
+
+The elohim protocol gives the majority solidarity: challenges and appeals (qahal governance), consent-based decision-making, ranked-choice governance for proportional representation, and elohim-mediated deliberation that carries human interests into the process so the majority doesn't need to all show up simultaneously. The elohim make quorum irrelevant — they ensure the community's voice is heard even when individuals are busy living their lives.
+
+### 3. Dignity Is Structural, Not Conditional
+
+Every human on the protocol has a node, has local reach, can contribute to their immediate community, and can earn trust through demonstrated care. The system never says "you are not allowed." It says "your reach reflects what you have earned." That rule is the same for Maria contributing to her neighborhood, Emma earning district reach for her science fair, Grandma Rose maintaining her community connections, and a person rebuilding trust after incarceration.
+
+The protocol does not punish permanently. It provides the same path to everyone: contribute, earn endorsement, expand reach. The stewarded account modality (children, seniors, those with care providers) adds protective context — not restriction but supported participation. The steward configures the context, the elohim watches the steward, and earned reach is the graduation mechanism for everyone.
+
+Power over the protocol lives with the majority that operates in good faith. The constitutional layer — immutable principles that no actor can override — ensures that even governance itself cannot be captured. Communication is sacred. Attention is commons. Data is sovereign. Reach must be earned. These are mathematical constraints, not policies that can be lobbied away.
