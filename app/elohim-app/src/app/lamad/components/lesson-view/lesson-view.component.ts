@@ -98,6 +98,17 @@ interface InlineQuizCompletionEvent {
                 }
               </div>
             }
+            @if (getFlags().length) {
+              <div class="flag-tags">
+                @for (flag of getFlags(); track flag.type) {
+                  <span
+                    [class]="getFlagClass(flag.type)"
+                    [title]="flag.reason"
+                    data-testid="lesson-content-flag"
+                  >{{ getFlagLabel(flag.type) }}</span>
+                }
+              </div>
+            }
           </div>
           <h1 class="lesson-title">
             {{ content.title || content.id }}
@@ -307,6 +318,27 @@ interface InlineQuizCompletionEvent {
       .reach-badge:hover, .resilience-info:hover {
         opacity: 1;
       }
+
+      .flag-tags {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+      }
+      .flag-tag {
+        padding: 0.2rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: help;
+        opacity: 0.85;
+      }
+      .flag-tag:hover { opacity: 1; }
+      .flag-disputed { background: rgb(239 68 68 / 8%); color: #dc2626; border: 1px solid rgb(239 68 68 / 25%); }
+      .flag-outdated { background: rgb(245 158 11 / 8%); color: #d97706; border: 1px solid rgb(245 158 11 / 25%); }
+      .flag-appeal-pending { background: rgb(139 92 246 / 8%); color: #7c3aed; border: 1px solid rgb(139 92 246 / 25%); }
+      .flag-under-review { background: rgb(59 130 246 / 8%); color: #2563eb; border: 1px solid rgb(59 130 246 / 25%); }
+      .flag-partial-revocation { background: rgb(239 68 68 / 8%); color: #dc2626; border: 1px solid rgb(239 68 68 / 25%); }
 
       .lesson-description {
         margin: 0;
@@ -726,6 +758,26 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
       .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
       .join(', ');
     return `Stewards: ${stewards}`;
+  }
+
+  /** Content flags as subtle tags. */
+  getFlags(): { type: string; reason: string; flaggedAt: string }[] {
+    return this.content?.flags || [];
+  }
+
+  getFlagLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'disputed': 'Disputed',
+      'outdated': 'Outdated',
+      'appeal-pending': 'Appeal Pending',
+      'under-review': 'Under Review',
+      'partial-revocation': 'Partial Revocation',
+    };
+    return labels[type] || type;
+  }
+
+  getFlagClass(type: string): string {
+    return `flag-tag flag-${type}`;
   }
 
   /**
