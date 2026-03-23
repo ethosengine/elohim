@@ -171,3 +171,26 @@ Every human on the protocol has a node, has local reach, can contribute to their
 The protocol does not punish permanently. It provides the same path to everyone: contribute, earn endorsement, expand reach. The stewarded account modality (children, seniors, those with care providers) adds protective context — not restriction but supported participation. The steward configures the context, the elohim watches the steward, and earned reach is the graduation mechanism for everyone.
 
 Power over the protocol lives with the majority that operates in good faith. The constitutional layer — immutable principles that no actor can override — ensures that even governance itself cannot be captured. Communication is sacred. Attention is commons. Data is sovereign. Reach must be earned. These are mathematical constraints, not policies that can be lobbied away.
+
+## The Three-Pillar Coupling: Scale Power, Scale Responsibility
+
+On the extractive web, information, value, and governance are decoupled. Information scales without accountability (platforms profit from extremism). Value accumulates without obligation (billionaires with no stewardship). Governance gets captured by value (lobbying buys the rules). The decoupling IS the capture mechanism. Whoever can accumulate one dimension without the other two wins — and everyone else loses.
+
+The EPR protocol's three-pillar coupling is the forcing function that makes this impossible.
+
+Every piece of content on the protocol carries all three pillars simultaneously:
+- **Lamad** (information): what it teaches, who it reaches, what knowledge it carries
+- **Shefa** (value): who stewards it, how recognition distributes, what compute sustains it
+- **Qahal** (governance): what reach it has earned, what constitutional authority applies, what attestations validate it
+
+These are mathematically coupled — you cannot have one without the others:
+
+**Information without governance is propaganda.** Content cannot reach beyond its local context without community endorsement, peer review, and governance ratification. The attestation chain IS the coupling. A podcast episode reaches commons not because the creator declared it but because 80% of the attestation types were earned through independent community processes.
+
+**Value without responsibility is extraction.** Recognition accumulates for stewards only because they maintain content that the community endorsed and that serves learners. The stewardship allocation IS the coupling. Your 400 stewards aren't paying a subscription — they're lending compute from hardware they own because they care. Their stewardship commitment is inseparable from the content's availability.
+
+**Governance without contribution is tyranny.** Participation in governance decisions requires earned attestations through demonstrated contribution. You cannot vote on content reach without having contributed content yourself. You cannot challenge a stewardship allocation without having stewardship experience. The attestation gate IS the coupling. Power scales only with demonstrated care.
+
+The primitive signals of value — recognition events, stewardship allocations, affinity scores — are structurally coupled to the primitive signals of responsibility — attestation requirements, governance participation obligations, community endorsement thresholds. As one scales, the others must scale with it. A podcaster with 90,000 unique visitors has proportionally more governance oversight, more stewardship infrastructure, and more attestation requirements than a family sharing recipes within their household. The coupling is automatic, not enforced — it emerges from the structure of the EPR itself.
+
+This is what the three-pillar EPR Head encodes. Not three independent metadata fields, but a single indivisible context: this content carries knowledge AND value AND governance simultaneously. You cannot resolve the knowledge without acknowledging the value. You cannot consume the value without operating within the governance. The coupling is the protocol's immune system against capture at every scale.
