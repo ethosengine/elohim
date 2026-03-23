@@ -76,16 +76,30 @@ async function installHapp(adminWs) {
   if (existingApp) {
     console.log(`App '${APP_ID}' is already installed (status: ${JSON.stringify(existingApp.status)})`);
 
-    // Enable if disabled (status is an object: {type: "disabled", value: {...}})
-    if (existingApp.status?.type === 'disabled') {
-      console.log(`Enabling app '${APP_ID}'...`);
-      await adminWs.enableApp({ installed_app_id: APP_ID });
-      console.log(`App '${APP_ID}' enabled`);
-    }
+    // Check for stale install — if installed app is missing expected roles, reinstall
+    const expectedRoles = ['lamad', 'infrastructure', 'imagodei', 'mishpat', 'node_registry'];
+    const installedRoles = Object.keys(existingApp.cell_info || {});
+    const missingRoles = expectedRoles.filter(r => !installedRoles.includes(r));
 
-    // Still need to ensure app interface is attached (may not exist after restart)
-    await ensureAppInterface(adminWs);
-    return;
+    if (missingRoles.length > 0) {
+      console.log(`Stale hApp detected — missing roles: ${missingRoles.join(', ')}`);
+      console.log(`Installed roles: ${installedRoles.join(', ')}`);
+      console.log(`Uninstalling stale hApp '${APP_ID}'...`);
+      await adminWs.uninstallApp({ installed_app_id: APP_ID });
+      console.log(`Stale hApp removed. Will reinstall with full bundle.`);
+      // Fall through to fresh install below
+    } else {
+      // Enable if disabled (status is an object: {type: "disabled", value: {...}})
+      if (existingApp.status?.type === 'disabled') {
+        console.log(`Enabling app '${APP_ID}'...`);
+        await adminWs.enableApp({ installed_app_id: APP_ID });
+        console.log(`App '${APP_ID}' enabled`);
+      }
+
+      // Still need to ensure app interface is attached (may not exist after restart)
+      await ensureAppInterface(adminWs);
+      return;
+    }
   }
 
   // Generate agent key
