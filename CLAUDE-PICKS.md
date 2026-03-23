@@ -1,6 +1,6 @@
 # What Spoke to Me: A Survey of What I'd Love to Work On
 
-_Updated 2026-03-15. Completed items cleared — see git history for previous versions._
+_Updated 2026-03-23. Completed items cleared — see git history for previous versions._
 
 ---
 
@@ -13,6 +13,9 @@ These items have been built since the original survey (2026-02-25). Archived her
 - **Sophia Moment JSON**: 4 instruments authored (values-hierarchy, attachment-style, strengths-finder, epic-domain) with 5 assessment JSONs, self-registering instrument pattern, and full pipeline from genesis JSON through storage to rendering. Minor gaps: `personal-values-discovery.json` instrument metadata not yet authored; constitutional reasoning exists as mastery assessment only.
 - **Offline Queue / IndexedDB**: `IndexedDBCacheService` (80.5% coverage), `WriteBufferService` (85.9%), `LocalSourceChainService` (47%). Infrastructure complete — TTL caching, priority queuing with IDB persistence, append-only local chain model.
 - **Story-First Loop**: 28 feature files across 8 directories. Pattern established and practiced. `dev-intent.jsonl` fallback in use. Ongoing discipline, not a deliverable.
+- **Distributed Trust Auth (2026-03-23)**: Full four-layer trust model from design through implementation. Reach-tier differentiated authorization (all 6 tiers: commons through private). Attestation gates on HTTP and P2P (prerequisite mastery, consent, payment). Recognition pipeline wired to P2P delivery (replaces raw economic events). Policy enforcement instantiated and active. EPR Head carries `attestation_requirements`. 5-peer cross-env topology deployed (Matthew+Jessica on alpha, Pete+Timothy on staging). 5 A2O distributed trust scenarios. 500 Rust tests.
+- **Ambient Trust Architecture (2026-03-23)**: Per-connection DHT-verified trust negotiation designed and scaffolded. `/elohim/trust/1.0.0` handshake protocol (MessagePack codec with roundtrip tests). `PeerTrustCache` with TTL expiry. `trust_verification` module with three-pillar types and reach ceiling calculation. `verify_credentials()` zome functions in imagodei and mishpat DNAs. Fast-path in `check_reach_authorization` skips DB for cached peers. Conductor integration stubs ready for live DHT verification.
+- **EPR Visibility (2026-03-23)**: Reach and resilience badge indicators on content-viewer and lesson-view headers. Progressive disclosure: ambient icons, tooltip on hover, click-through to trust tab. Proves the EPR data pipeline end-to-end from Rust storage to Angular UI.
 
 ---
 
@@ -43,25 +46,23 @@ Read-only layer fully functional. **Sprint 2 complete (2026-03-15)**: proposals,
 
 ## 3. Steward Economy Services
 
-The steward economy has two layers now: a solid Rust pipeline backend and a fragmented Angular frontend that doesn't yet compose the pieces into a lived experience.
+The steward economy backend is now fully wired — including P2P delivery recognition. The gap has shifted from plumbing to experience.
 
-**Backend (complete)**: Recognition pipeline (`recognition_pipeline_service.rs`) with 5 composable stages: normalize → resolve stewards → weight by affinity → constitutional limits → settle economic events. Steward affinity service with mastery gate, curation event deltas, and real affinity wired into weighting. All exposed via REST. This layer works end-to-end.
+**Backend (complete + P2P wired)**: Recognition pipeline fires on every P2P content delivery (2026-03-23), replacing raw economic events with the full 5-stage pipeline: normalize → resolve stewards → weight by affinity → constitutional limits → settle. Steward affinity service with mastery gate, curation deltas, real affinity wired into weighting. All exposed via REST.
 
-**Frontend (fragmented)**: Five independent API clients exist but nothing ties them together:
+**Frontend progress**: Reach and resilience badges (2026-03-23) are the first visible surface — learners can see stewardship health via the resilience indicator next to content titles. Five API clients still exist independently:
 
 | Service | Pillar | Tests | Status |
 |---------|--------|-------|--------|
 | `RecognitionApiService` | elohim | 2 | Working, not barrel-exported |
-| `StewardshipAllocationService` | lamad | 23 | Tested (2026-03-14), thin API client |
-| `EconomicEventsApiService` | shefa | 8 | Working, newly barrel-exported |
-| `ExchangeApiService` | shefa | 0 | Working, newly barrel-exported |
-| `StewardAffinityApiService` | shefa | 0 | New (2026-03-14), not yet consumed |
+| `StewardshipAllocationService` | lamad | 23 | Tested, thin API client |
+| `EconomicEventsApiService` | shefa | 8 | Working, barrel-exported |
+| `ExchangeApiService` | shefa | 0 | Working, barrel-exported |
+| `StewardAffinityApiService` | shefa | 0 | Not yet consumed |
 
-**Done (2026-03-14)**: Steward affinity lifecycle in Rust — `steward_affinity` table + API, mastery gate, curation events (+0.10 edit, +0.05 review, +0.15 dispute resolution), constitutional floor/ceiling in Stage 4, genesis seeder with `CATEGORY_AFFINITY_MAP`. Design: `genesis/plans/2026-03-14-steward-affinity-lifecycle-design.md`. Also: `StewardshipAllocationService` test coverage (23 tests, all methods covered), `StewardAffinityApiService` thin client created, barrel exports fixed for `EconomicEventsApiService` + `ExchangeApiService`.
+**The remaining question**: The resilience badge shows stewardship *health* but not the lived experience. The next move is a `StewardEconomyCoordinator` in shefa that composes these five clients into reactive state: "You just learned from content stewarded by X, who earned Y recognition." The EPR context menu (Surface 3, designed not built) is where steward portfolio detail will live.
 
-**The big question**: Where does the learner *feel* the steward economy? Right now recognition fires silently — a learner completes an exercise, the pipeline distributes recognition to stewards, economic events are created in the database... and nothing is visible. No steward sees their portfolio grow. No learner sees who stewarded what they just learned. No curator sees their affinity reflected back. The pipeline is a tree falling in a forest. The next move isn't more backend — it's a `StewardEconomyCoordinator` in shefa that composes these five clients into reactive state the UI can render: "You just learned from content stewarded by X, who earned Y recognition. Your curation of Z increased your affinity to W."
-
-**Remaining**: Coordinator service (composes the 5 clients). Portfolio UI (steward dashboard). Curation tracking UI. Affinity decay (time-based). `derived_affinity` (network/community signals). Wire recognition trigger to assessment completion in lamad.
+**Remaining**: Coordinator service. Portfolio UI (steward dashboard). Curation tracking UI. Affinity decay. `derived_affinity`. Assessment completion → recognition trigger.
 
 **Impact**: High for M5-M6. The economic experience is what makes stewardship feel real.
 **Effort**: Medium. All plumbing exists; this is composition and UX.
@@ -95,4 +96,25 @@ Feedback loop closed: gate evaluates → observations stored → behavioral trus
 
 ---
 
+## 5. Ambient Trust — Conductor Integration (Layer B+C Stubs)
+
+The ambient trust architecture is scaffolded (protocol, cache, types, fast-path) but conductor integration stubs need filling. This is the work that turns "server auth on every peer" into "distributed trust negotiated between peers."
+
+**Scaffolded (2026-03-23)**: `trust_verification.rs` types + reach ceiling calculation. `trust_protocol.rs` handshake codec. `trust_cache.rs` per-connection cache. Fast-path in `check_reach_authorization`. `verify_credentials()` zome functions in imagodei + mishpat.
+
+**Remaining**: Fill the four verification helper stubs (`verify_membership_cids`, `verify_relationship_cids`, `verify_attestation_cids`, `verify_stewardship_cids`) with actual `hc_client.call_zome()` calls. This requires ActionHash parsing from CID strings and mapping conductor responses back to the verified types. Then: populate the handshake with real credentials from the local agent's memberships/relationships.
+
+**Design**: `genesis/plans/2026-03-23-ambient-trust-verification-design.md`
+**Plan**: `genesis/plans/2026-03-23-ambient-trust-verification-plan.md`
+
+**Impact**: This completes the P2P trust model. Without it, reach checks work but hit the DB every time and don't verify against the DHT.
+**Effort**: Medium. Infrastructure exists. The work is mapping conductor wire formats to trust types.
+
+---
+
 ## Small Gaps to Close
+
+- **EPR link navigation boxes (Surface 2)**: Content references should render as compact cards with reach/resilience badges. The `EprRelationship` data is in EPR Heads but not rendered as navigation. Designed, not built.
+- **Context menu (Surface 3)**: Three-dot menu on content with flag/feedback modal + deep navigation to stewardship/governance/attestation detail. Designed, not built.
+- **Stewardship display in trust tab**: The Attestations tab shows trust badges but not stewardship allocations. The data flows to `ContentNode.stewardedBy` but isn't rendered in the tab. Quick win.
+- **Content flags display**: `ContentNode.flags` (disputed, outdated, appeal-pending) exists in the model but isn't rendered anywhere. Should appear as subtle indicators alongside reach/resilience badges.
