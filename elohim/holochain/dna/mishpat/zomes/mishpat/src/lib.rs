@@ -1505,3 +1505,61 @@ pub fn query_statement_votes(input: QueryStatementVotesInput) -> ExternResult<Ve
 //       None,
 //       challenger_id,
 //   )?;
+
+// =============================================================================
+// Credential Verification (for P2P trust negotiation)
+// =============================================================================
+
+/// Status of a verified credential
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VerificationStatus {
+    Valid,
+    NotFound,
+    Revoked,
+    Expired,
+}
+
+/// Result of verifying a single credential against the DHT
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CredentialVerification {
+    pub hash: ActionHash,
+    pub status: VerificationStatus,
+    pub entry_type: Option<String>,
+    pub agent: Option<AgentPubKey>,
+}
+
+/// Verify multiple credentials against the DHT.
+/// Used by elohim-storage during P2P trust negotiation to verify
+/// collective membership CIDs presented by connecting peers.
+#[hdk_extern]
+pub fn verify_credentials(hashes: Vec<ActionHash>) -> ExternResult<Vec<CredentialVerification>> {
+    let mut results = Vec::with_capacity(hashes.len());
+
+    for hash in hashes {
+        let record = get(hash.clone(), GetOptions::default())?;
+        let verification = match record {
+            Some(record) => {
+                let entry_type_name = match record.action().entry_type() {
+                    Some(EntryType::App(app_entry)) => Some(format!("{:?}", app_entry)),
+                    _ => None,
+                };
+                let agent = Some(record.action().author().clone());
+                CredentialVerification {
+                    hash,
+                    status: VerificationStatus::Valid,
+                    entry_type: entry_type_name,
+                    agent,
+                }
+            }
+            None => CredentialVerification {
+                hash,
+                status: VerificationStatus::NotFound,
+                entry_type: None,
+                agent: None,
+            },
+        };
+        results.push(verification);
+    }
+
+    Ok(results)
+}

@@ -78,6 +78,9 @@ pub mod sensemaking;
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
+// Three-pillar trust verification via conductor (DHT credential checks)
+pub mod trust_verification;
+
 // P2P identity and discovery (always available, but some types require p2p feature)
 pub mod content_server;
 pub mod identity;

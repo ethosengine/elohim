@@ -1964,7 +1964,7 @@ impl HttpServer {
                                     stewards: vec![],
                                     allocations: vec![],
                                 },
-                                qahal: crate::epr_codec::EprQahalContext { reach, layer: None },
+                                qahal: crate::epr_codec::EprQahalContext { reach, layer: None, attestation_requirements: vec![] },
                                 relationships: vec![],
                                 author,
                                 updated: Some(chrono::Utc::now().to_rfc3339()),
@@ -2069,7 +2069,7 @@ impl HttpServer {
                                         stewards: vec![],
                                         allocations: vec![],
                                     },
-                                    qahal: crate::epr_codec::EprQahalContext { reach, layer: None },
+                                    qahal: crate::epr_codec::EprQahalContext { reach, layer: None, attestation_requirements: vec![] },
                                     relationships: vec![],
                                     author,
                                     updated: Some(chrono::Utc::now().to_rfc3339()),
@@ -2160,8 +2160,8 @@ impl HttpServer {
                     .get(content_id)
                     .map(|opt| opt.map(ContentView::from));
 
-                // Reach-based access control: commons/public serve without auth,
-                // restricted content requires authentication
+                // Layer 1: Reach-based access control
+                // commons/public serve without auth, restricted content requires authentication
                 if let Ok(Some(ref view)) = result {
                     let is_public = view.reach == "commons" || view.reach == "public";
                     if !is_public {
@@ -2176,6 +2176,111 @@ impl HttpServer {
                                     view.reach
                                 ))))
                                 .unwrap());
+                        }
+                    }
+
+                    // Policy enforcement: check device policy ceiling
+                    let agent_id = Self::extract_agent_id(&req);
+                    if let (Some(ref enforcement), Some(ref agent)) =
+                        (&self.policy_enforcement, &agent_id)
+                    {
+                        let reach_level_num = match view.reach.as_str() {
+                            "commons" | "public" => 0u8,
+                            "community" => 1,
+                            "familiar" => 2,
+                            "trusted" => 3,
+                            "intimate" => 4,
+                            "self" | "private" => 5,
+                            _ => 0,
+                        };
+                        let content_meta = ContentMetadata {
+                            hash: content_id.to_string(),
+                            categories: Vec::new(),
+                            age_rating: None,
+                            reach_level: Some(reach_level_num),
+                        };
+                        match enforcement.can_serve(agent, &content_meta) {
+                            Ok(PolicyDecision::Block { reason }) => {
+                                return Ok(Response::builder()
+                                    .status(StatusCode::FORBIDDEN)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error":"Policy blocked","reason":"{}"}}"#,
+                                        reason
+                                    ))))
+                                    .unwrap());
+                            }
+                            Ok(PolicyDecision::Allow) => {}
+                            Err(_) => {} // Policy lookup failure is non-blocking
+                        }
+                    }
+
+                    // Layer 2: Attestation gate — prerequisite mastery check
+                    // EPR Heads (discovery) flow freely; body access may require attestations
+                    if let Some(ref agent) = Self::extract_agent_id(&req) {
+                        if let Ok(mut att_conn) = self.get_conn() {
+                            let attestations =
+                                crate::db::content_attestations::query_attestations_for_content(
+                                    &mut att_conn,
+                                    content_id,
+                                );
+                            if let Ok(atts) = attestations {
+                                let prereq_atts: Vec<_> = atts
+                                    .iter()
+                                    .filter(|a| {
+                                        a.attestation_type == "prerequisite-mastery"
+                                            && a.is_revoked == 0
+                                    })
+                                    .collect();
+
+                                if !prereq_atts.is_empty() {
+                                    // Requester must have mastery of the prerequisite content
+                                    let app_ctx = db::AppContext::default_lamad();
+                                    let human = crate::db::humans::get_human_by_agent_key(
+                                        &mut att_conn,
+                                        agent,
+                                    );
+                                    if let Ok(Some(human)) = human {
+                                        let mut has_all_prereqs = true;
+                                        for prereq in &prereq_atts {
+                                            // The prereq's content_id is the prerequisite content
+                                            // evidence field stores the prerequisite content ID
+                                            let prereq_content_id = prereq
+                                                .evidence
+                                                .as_deref()
+                                                .unwrap_or(&prereq.content_id);
+                                            let mastery =
+                                                crate::db::content_mastery::get_mastery_for_content(
+                                                    &mut att_conn,
+                                                    &app_ctx,
+                                                    &human.id,
+                                                    prereq_content_id,
+                                                );
+                                            match mastery {
+                                                Ok(Some(m))
+                                                    if m.mastery_level != "not_started" => {}
+                                                _ => {
+                                                    has_all_prereqs = false;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if !has_all_prereqs {
+                                            return Ok(Response::builder()
+                                                .status(StatusCode::FORBIDDEN)
+                                                .header(
+                                                    header::CONTENT_TYPE,
+                                                    "application/json",
+                                                )
+                                                .body(Full::new(Bytes::from(format!(
+                                                    r#"{{"error":"Prerequisite mastery required","contentId":"{}"}}"#,
+                                                    content_id
+                                                ))))
+                                                .unwrap());
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2233,56 +2338,32 @@ impl HttpServer {
                                 Ok(content_with_tags) => {
                                     info!(id = %content_id, "P2P content persisted to local SQLite");
 
-                                    // Log CONTENT_DELIVERY recognition event (fire-and-forget)
-                                    if let Ok(mut econ_conn) = self.get_conn() {
-                                        let primary_steward = head
-                                            .shefa
-                                            .stewards
-                                            .first()
-                                            .cloned()
-                                            .unwrap_or_else(|| "unknown".to_string());
-                                        let econ_input =
-                                            crate::db::economic_events::CreateEconomicEventInput {
-                                                id: None,
-                                                action:
-                                                    crate::db::models::rea_actions::DELIVER_SERVICE
-                                                        .to_string(),
-                                                provider: primary_steward,
-                                                receiver: content_id.to_string(),
-                                                lamad_event_type: Some(
-                                                    crate::db::models::lamad_event_types::CONTENT_DELIVERY
-                                                        .to_string(),
-                                                ),
-                                                content_id: Some(content_id.to_string()),
-                                                resource_quantity_value: Some(1.0),
-                                                note: Some(
-                                                    "P2P EPR resolution".to_string(),
-                                                ),
-                                                resource_conforms_to: None,
-                                                resource_inventoried_as: None,
-                                                resource_classified_as: vec![],
-                                                resource_quantity_unit: None,
-                                                effort_quantity_value: None,
-                                                effort_quantity_unit: None,
-                                                has_point_in_time: None,
-                                                has_duration: None,
-                                                input_of: None,
-                                                output_of: None,
-                                                contributor_presence_id: None,
-                                                path_id: None,
-                                                triggered_by: None,
-                                                metadata_json: None,
-                                                at_location: None,
-                                            };
-                                        let econ_ctx = db::AppContext::default_lamad();
-                                        if let Err(e) = crate::db::economic_events::record_event(
-                                            &mut econ_conn,
-                                            &econ_ctx,
-                                            econ_input,
+                                    // Distribute recognition through the pipeline (fire-and-forget)
+                                    // Pipeline handles: normalize → resolve stewards → weight by affinity → limit → settle
+                                    if let Ok(mut recog_conn) = self.get_conn() {
+                                        let recog_ctx = db::AppContext::default_lamad();
+                                        let trigger = crate::services::recognition_pipeline_service::RecognitionTrigger {
+                                            content_id: content_id.to_string(),
+                                            event_type: crate::db::models::lamad_event_types::CONTENT_DELIVERY.to_string(),
+                                            raw_amount: 1.0,
+                                            triggered_by: Some("p2p-epr-resolution".to_string()),
+                                        };
+                                        match crate::services::recognition_pipeline_service::distribute(
+                                            &mut recog_conn,
+                                            &recog_ctx,
+                                            trigger,
                                         ) {
-                                            debug!(id = %content_id, error = %e, "Failed to log delivery recognition (non-fatal)");
-                                        } else {
-                                            debug!(id = %content_id, "Delivery recognition event recorded");
+                                            Ok(result) => {
+                                                debug!(
+                                                    id = %content_id,
+                                                    stewards = result.distributions.len(),
+                                                    events = result.economic_event_ids.len(),
+                                                    "Recognition distributed via pipeline"
+                                                );
+                                            }
+                                            Err(e) => {
+                                                debug!(id = %content_id, error = %e, "Recognition pipeline failed (non-fatal)");
+                                            }
                                         }
                                     }
 
@@ -4558,6 +4639,7 @@ impl HttpServer {
                     qahal: crate::epr_codec::EprQahalContext {
                         reach: Some(content.reach.clone()),
                         layer: None,
+                        attestation_requirements: vec![],
                     },
                     relationships: vec![],
                     author: content.created_by.clone(),

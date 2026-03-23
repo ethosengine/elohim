@@ -340,8 +340,13 @@ async fn async_main(
         // Wire DB pool for EPR Head resolution (if content DB is available)
         if args.enable_content_db {
             if let Ok(pool) = init_pool_from_dir(&config.storage_dir) {
-                p2p_node = p2p_node.with_db_pool(pool);
-                info!("  P2P EPR resolution: DB pool wired");
+                p2p_node = p2p_node.with_db_pool(pool.clone());
+                // Wire policy enforcement for content filtering on P2P path
+                let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool);
+                let enforcement =
+                    Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache));
+                p2p_node = p2p_node.with_policy_enforcement(enforcement);
+                info!("  P2P EPR resolution: DB pool + policy enforcement wired");
             }
         }
 
@@ -484,6 +489,12 @@ async fn async_main(
                 // Create services with the pool
                 let services = Arc::new(Services::new(pool.clone()));
                 http_server = http_server.with_services(services);
+                // Wire policy enforcement for content filtering
+                let policy_cache =
+                    elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
+                let enforcement =
+                    Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache));
+                http_server = http_server.with_policy_enforcement(enforcement);
                 http_server = http_server.with_db_pool(pool);
 
                 info!("Database API:");

@@ -33,6 +33,8 @@ pub mod epr_protocol;
 pub mod kad_store;
 pub mod shard_protocol;
 pub mod sync_protocol;
+pub mod trust_cache;
+pub mod trust_protocol;
 
 use futures::StreamExt;
 use libp2p::kad::{store::RecordStore, Record, RecordKey};
@@ -146,6 +148,10 @@ pub struct P2PNode {
     command_tx: mpsc::Sender<P2PCommand>,
     /// Database pool for EPR Head construction from content records
     db_pool: Option<DbPool>,
+    /// Policy enforcement for content filtering on P2P path
+    policy_enforcement: Option<Arc<crate::db::policy_cache::PolicyEnforcement>>,
+    /// Per-connection trust context cache for ambient authorization
+    peer_trust_cache: trust_cache::PeerTrustCache,
     /// Pending EPR resolve requests awaiting responses from peers
     pending_epr_resolves: PendingEprMap,
     /// Pending shard fetch requests awaiting responses from peers
@@ -295,6 +301,20 @@ impl P2PHandle {
     }
 }
 
+/// Map reach level string to numeric index for comparison.
+/// Used by the cache fast-path to compare ambient ceiling against requested reach.
+fn reach_level_index(reach: &str) -> u8 {
+    match reach {
+        "commons" | "public" => 0,
+        "community" => 1,
+        "familiar" => 2,
+        "trusted" => 3,
+        "intimate" => 4,
+        "self" | "private" => 5,
+        _ => 0,
+    }
+}
+
 impl P2PNode {
     /// Create a new P2P node
     pub async fn new(
@@ -379,6 +399,8 @@ impl P2PNode {
             command_rx: Arc::new(tokio::sync::Mutex::new(command_rx)),
             command_tx,
             db_pool: None,
+            policy_enforcement: None,
+            peer_trust_cache: trust_cache::PeerTrustCache::new(),
             pending_epr_resolves: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -392,6 +414,15 @@ impl P2PNode {
     /// Set the database pool for EPR Head construction
     pub fn with_db_pool(mut self, pool: DbPool) -> Self {
         self.db_pool = Some(pool);
+        self
+    }
+
+    /// Set policy enforcement for content filtering on P2P path
+    pub fn with_policy_enforcement(
+        mut self,
+        enforcement: Arc<crate::db::policy_cache::PolicyEnforcement>,
+    ) -> Self {
+        self.policy_enforcement = Some(enforcement);
         self
     }
 
@@ -697,23 +728,39 @@ impl P2PNode {
                 peer_id, endpoint, ..
             } => {
                 debug!(peer = %peer_id, "Connected to peer");
-                // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
-                // With mDNS enabled, discovery handles this (line 362-368). Without mDNS,
-                // peers dialed via DNS bootstrap connect but aren't added to Kademlia
-                // because DNS multiaddrs lack PeerIDs at deploy time.
-                if !self.config.enable_mdns {
-                    let addr = endpoint.get_remote_address().clone();
+                {
                     let mut swarm = self.swarm.write().await;
+                    // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
+                    // With mDNS enabled, discovery handles this. Without mDNS,
+                    // peers dialed via DNS bootstrap connect but aren't added to Kademlia
+                    // because DNS multiaddrs lack PeerIDs at deploy time.
+                    if !self.config.enable_mdns {
+                        let addr = endpoint.get_remote_address().clone();
+                        swarm
+                            .behaviour_mut()
+                            .kademlia
+                            .add_address(&peer_id, addr.clone());
+                        info!(peer = %peer_id, addr = %addr, "Added peer to Kademlia (bootstrap connection)");
+                    }
+                    // Trigger trust handshake with new peer
+                    debug!(peer = %peer_id, "Sending trust handshake");
+                    let handshake = trust_protocol::TrustHandshake {
+                        agent_pubkey: self.identity.peer_id().to_string(),
+                        membership_cids: vec![],
+                        relationship_cids: vec![],
+                        attestation_cids: vec![],
+                        stewardship_cids: vec![],
+                    };
                     swarm
                         .behaviour_mut()
-                        .kademlia
-                        .add_address(&peer_id, addr.clone());
-                    info!(peer = %peer_id, addr = %addr, "Added peer to Kademlia (bootstrap connection)");
+                        .trust_protocol
+                        .send_request(&peer_id, handshake);
                 }
                 self.refresh_status().await;
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
+                self.peer_trust_cache.remove(&peer_id).await;
                 self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
@@ -917,6 +964,83 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "EPR response sent");
+            }
+
+            // === Trust protocol events ===
+            behaviour::ElohimStorageBehaviourEvent::TrustProtocol(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(peer = %peer, agent = %request.agent_pubkey, "Received trust handshake");
+                    // Build context from presented credentials (conductor integration fills stubs)
+                    let ctx = crate::trust_verification::VerifiedTrustContext {
+                        agent_pubkey: request.agent_pubkey.clone(),
+                        agent_verified: true,
+                        reach_ceiling: "public".to_string(),
+                        verified_memberships: vec![],
+                        verified_relationships: vec![],
+                        verified_attestations: vec![],
+                        verified_stewardship: vec![],
+                        verified_at: std::time::Instant::now(),
+                        ttl: std::time::Duration::from_secs(3600),
+                    };
+                    let response = trust_protocol::TrustResponse::Verified {
+                        reach_ceiling: ctx.reach_ceiling.clone(),
+                        ttl_seconds: 3600,
+                    };
+                    self.peer_trust_cache.insert(peer, ctx).await;
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .trust_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send trust response");
+                    }
+                }
+                request_response::Message::Response { response, .. } => match response {
+                    trust_protocol::TrustResponse::Verified {
+                        reach_ceiling,
+                        ttl_seconds,
+                    } => {
+                        debug!(peer = %peer, ceiling = %reach_ceiling, ttl = ttl_seconds, "Trust handshake verified");
+                        let ctx = crate::trust_verification::VerifiedTrustContext {
+                            agent_pubkey: peer.to_string(),
+                            agent_verified: true,
+                            reach_ceiling,
+                            verified_memberships: vec![],
+                            verified_relationships: vec![],
+                            verified_attestations: vec![],
+                            verified_stewardship: vec![],
+                            verified_at: std::time::Instant::now(),
+                            ttl: std::time::Duration::from_secs(ttl_seconds),
+                        };
+                        self.peer_trust_cache.insert(peer, ctx).await;
+                    }
+                    trust_protocol::TrustResponse::Rejected { reason } => {
+                        info!(peer = %peer, reason = %reason, "Trust handshake rejected");
+                    }
+                    trust_protocol::TrustResponse::Error(msg) => {
+                        warn!(peer = %peer, error = %msg, "Trust handshake error");
+                    }
+                },
+            },
+            behaviour::ElohimStorageBehaviourEvent::TrustProtocol(
+                request_response::Event::OutboundFailure { peer, error, .. },
+            ) => {
+                debug!(peer = %peer, error = ?error, "Trust handshake outbound failure");
+            }
+            behaviour::ElohimStorageBehaviourEvent::TrustProtocol(
+                request_response::Event::InboundFailure { peer, error, .. },
+            ) => {
+                debug!(peer = %peer, error = ?error, "Trust handshake inbound failure");
+            }
+            behaviour::ElohimStorageBehaviourEvent::TrustProtocol(
+                request_response::Event::ResponseSent { peer, .. },
+            ) => {
+                debug!(peer = %peer, "Trust response sent");
             }
 
             // === NAT traversal events ===
@@ -1401,9 +1525,27 @@ impl P2PNode {
                             },
                         }
                     },
-                    qahal: crate::epr_codec::EprQahalContext {
-                        reach: Some(content.reach.clone()),
-                        layer: None,
+                    qahal: {
+                        let mut attestation_requirements = Vec::new();
+                        if let Ok(atts) = crate::db::content_attestations::query_attestations_for_content(
+                            &mut conn, &content.id,
+                        ) {
+                            for att in &atts {
+                                if att.is_revoked == 0 {
+                                    let req = if let Some(ref evidence) = att.evidence {
+                                        format!("{}:{}", att.attestation_type, evidence)
+                                    } else {
+                                        att.attestation_type.clone()
+                                    };
+                                    attestation_requirements.push(req);
+                                }
+                            }
+                        }
+                        crate::epr_codec::EprQahalContext {
+                            reach: Some(content.reach.clone()),
+                            layer: None,
+                            attestation_requirements,
+                        }
                     },
                     relationships: vec![],
                     author: content.created_by.clone(),
@@ -1428,45 +1570,237 @@ impl P2PNode {
         }
     }
 
+    /// Resolve an agent pubkey to a DB connection, app context, and Human record.
+    fn resolve_agent(
+        &self,
+        agent_pubkey: Option<&str>,
+    ) -> Result<(crate::db::PooledConn, crate::db::AppContext, crate::db::models::Human), String>
+    {
+        let agent_key = agent_pubkey
+            .ok_or_else(|| "Agent identity required for restricted content".to_string())?;
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| "Database not available for authorization".to_string())?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| format!("DB connection failed: {}", e))?;
+        let app_ctx = crate::db::AppContext::default_lamad();
+        let human = crate::db::humans::get_human_by_agent_key(&mut conn, agent_key)
+            .map_err(|e| format!("Agent lookup failed: {}", e))?
+            .ok_or_else(|| "Unknown agent — no human identity found".to_string())?;
+        Ok((conn, app_ctx, human))
+    }
+
+    /// Get human IDs of all active stewards for a content item.
+    /// Maps: content_id → stewardship_allocations → contributor_presences → steward_id (human).
+    fn get_steward_human_ids(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        ctx: &crate::db::AppContext,
+        content_id: &str,
+    ) -> Result<Vec<String>, String> {
+        use crate::db::diesel_schema::contributor_presences;
+        use diesel::prelude::*;
+
+        let allocations =
+            crate::db::stewardship_allocations::get_allocations_for_content(conn, ctx, content_id)
+                .map_err(|e| format!("Allocation lookup failed: {}", e))?;
+
+        if allocations.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let presence_ids: Vec<&str> = allocations
+            .iter()
+            .map(|a| a.steward_presence_id.as_str())
+            .collect();
+
+        let presences: Vec<crate::db::models::ContributorPresence> = contributor_presences::table
+            .filter(contributor_presences::id.eq_any(&presence_ids))
+            .filter(contributor_presences::app_id.eq(ctx.app_id()))
+            .load(conn)
+            .map_err(|e| format!("Presence lookup failed: {}", e))?;
+
+        Ok(presences
+            .into_iter()
+            .filter_map(|p| p.steward_id)
+            .collect())
+    }
+
     /// Check if a requesting agent is authorized to access content at the given reach level.
     /// Returns Ok(()) if authorized, Err(reason) if denied.
+    ///
+    /// Reach tiers (lowest to highest):
+    /// - commons/public: no check
+    /// - community: consented collective membership
+    /// - familiar: shared collective with a content steward
+    /// - trusted: relationship with steward at intimacy >= trusted
+    /// - intimate: mutual intimate relationship with steward (both consents)
+    /// - self/private: agent is the content creator
+    ///
+    /// Fast path: if the peer has a cached trust context with a reach ceiling
+    /// at or above the requested tier, and the tier is community or below,
+    /// skip DB lookups entirely (ambient authorization).
     fn check_reach_authorization(
         &self,
         reach: &str,
         agent_pubkey: Option<&str>,
+        content_id: &str,
     ) -> Result<(), String> {
+        // Fast path: check cached peer trust context (ambient authorization)
+        if let Some(ctx) = self.peer_trust_cache.try_get_by_agent(agent_pubkey) {
+            let reach_idx = reach_level_index(reach);
+            let ceiling_idx = reach_level_index(&ctx.reach_ceiling);
+            // For community and below, ambient ceiling is sufficient — no content-specific check needed
+            if ceiling_idx >= reach_idx && reach_idx <= reach_level_index("community") {
+                return Ok(());
+            }
+            // For familiar+ tiers, fall through — need content-specific steward match
+        }
+
         match reach {
             "commons" | "public" => Ok(()),
-            _ => {
-                let agent_key = agent_pubkey
-                    .ok_or_else(|| "Agent identity required for restricted content".to_string())?;
 
+            "community" => {
+                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
+                let participations =
+                    crate::db::collectives::get_participations_for_human(
+                        &mut conn, &app_ctx, &human.id,
+                    )
+                    .map_err(|e| format!("Participation lookup failed: {}", e))?;
+
+                if participations.iter().any(|p| p.consent_state == "consented") {
+                    Ok(())
+                } else {
+                    Err("No consented collective membership".to_string())
+                }
+            }
+
+            "familiar" => {
+                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
+                let steward_human_ids =
+                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+
+                let participations =
+                    crate::db::collectives::get_participations_for_human(
+                        &mut conn, &app_ctx, &human.id,
+                    )
+                    .map_err(|e| format!("Participation lookup failed: {}", e))?;
+
+                for participation in &participations {
+                    if participation.consent_state != "consented" {
+                        continue;
+                    }
+                    let members =
+                        crate::db::collectives::get_participants_of_collective(
+                            &mut conn,
+                            &app_ctx,
+                            &participation.collective_id,
+                        )
+                        .map_err(|e| format!("Members lookup failed: {}", e))?;
+
+                    if members
+                        .iter()
+                        .any(|m| steward_human_ids.contains(&m.human_id))
+                    {
+                        return Ok(());
+                    }
+                }
+
+                Err("No shared collective with content steward".to_string())
+            }
+
+            "trusted" => {
+                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
+                let steward_human_ids =
+                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+
+                let relationships =
+                    crate::db::human_relationships::get_relationships_for_human(
+                        &mut conn, &app_ctx, &human.id,
+                    )
+                    .map_err(|e| format!("Relationship lookup failed: {}", e))?;
+
+                let trusted_idx = crate::db::models::intimacy_levels::index_of("trusted")
+                    .ok_or_else(|| "Invalid intimacy level config".to_string())?;
+
+                for rel in &relationships {
+                    let other_id = if rel.party_a_id == human.id {
+                        &rel.party_b_id
+                    } else {
+                        &rel.party_a_id
+                    };
+                    if steward_human_ids.contains(other_id) {
+                        if let Some(rel_idx) =
+                            crate::db::models::intimacy_levels::index_of(&rel.intimacy_level)
+                        {
+                            if rel_idx >= trusted_idx {
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+
+                Err("No trusted relationship with content steward".to_string())
+            }
+
+            "intimate" => {
+                let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
+                let steward_human_ids =
+                    self.get_steward_human_ids(&mut conn, &app_ctx, content_id)?;
+
+                let relationships =
+                    crate::db::human_relationships::get_relationships_for_human(
+                        &mut conn, &app_ctx, &human.id,
+                    )
+                    .map_err(|e| format!("Relationship lookup failed: {}", e))?;
+
+                for rel in &relationships {
+                    let other_id = if rel.party_a_id == human.id {
+                        &rel.party_b_id
+                    } else {
+                        &rel.party_a_id
+                    };
+                    if steward_human_ids.contains(other_id)
+                        && rel.intimacy_level == "intimate"
+                        && rel.consent_given_by_a == 1
+                        && rel.consent_given_by_b == 1
+                    {
+                        return Ok(());
+                    }
+                }
+
+                Err("No mutual intimate relationship with content steward".to_string())
+            }
+
+            "self" | "private" => {
+                let agent_key = agent_pubkey.ok_or_else(|| {
+                    "Agent identity required for private content".to_string()
+                })?;
                 let pool = self
                     .db_pool
                     .as_ref()
-                    .ok_or_else(|| "Database not available for authorization".to_string())?;
+                    .ok_or_else(|| "Database not available".to_string())?;
                 let mut conn = pool
                     .get()
                     .map_err(|e| format!("DB connection failed: {}", e))?;
-
                 let app_ctx = crate::db::AppContext::default_lamad();
 
-                // Map agent_pubkey -> human
-                let human = crate::db::humans::get_human_by_agent_key(&mut conn, agent_key)
-                    .map_err(|e| format!("Agent lookup failed: {}", e))?
-                    .ok_or_else(|| "Unknown agent — no human identity found".to_string())?;
+                let content = crate::db::content_diesel::get_content_with_tags(
+                    &mut conn, &app_ctx, content_id,
+                )
+                .map_err(|e| format!("Content lookup failed: {}", e))?
+                .ok_or_else(|| "Content not found".to_string())?;
 
-                // Check if requesting human has any relationship with any peer.
-                // For now, any relationship qualifies. Future: differentiate by reach tier.
-                let relationships = crate::db::human_relationships::get_relationships_for_human(
-                    &mut conn, &app_ctx, &human.id,
-                );
-
-                match relationships {
-                    Ok(rels) if !rels.is_empty() => Ok(()),
-                    _ => Err(format!("No qualifying relationship for reach '{}'", reach)),
+                if content.content.created_by.as_deref() == Some(agent_key) {
+                    Ok(())
+                } else {
+                    Err("Content is private — only the creator can access it".to_string())
                 }
             }
+
+            _ => Err(format!("Unknown reach level: {}", reach)),
         }
     }
 
@@ -1487,13 +1821,96 @@ impl P2PNode {
                         {
                             let reach = &content_with_tags.content.reach;
                             if let Err(reason) =
-                                self.check_reach_authorization(reach, agent_pubkey.as_deref())
+                                self.check_reach_authorization(reach, agent_pubkey.as_deref(), &id)
                             {
                                 info!(id = %id, reach = %reach, reason = %reason, "EPR access denied");
                                 return EprResponse::AccessDenied {
                                     required_reach: reach.clone(),
                                     reason,
                                 };
+                            }
+
+                            // Policy enforcement: check device policy ceiling
+                            if let (Some(ref enforcement), Some(ref agent)) =
+                                (&self.policy_enforcement, &agent_pubkey)
+                            {
+                                let reach_level_num = match reach.as_str() {
+                                    "commons" | "public" => 0u8,
+                                    "community" => 1,
+                                    "familiar" => 2,
+                                    "trusted" => 3,
+                                    "intimate" => 4,
+                                    "self" | "private" => 5,
+                                    _ => 0,
+                                };
+                                let content_meta = crate::db::policy_cache::ContentMetadata {
+                                    hash: id.clone(),
+                                    categories: content_with_tags.tags.clone(),
+                                    age_rating: None,
+                                    reach_level: Some(reach_level_num),
+                                };
+                                match enforcement.can_serve(agent, &content_meta) {
+                                    Ok(crate::db::policy_cache::PolicyDecision::Block {
+                                        reason,
+                                    }) => {
+                                        info!(id = %id, reason = %reason, "P2P content blocked by policy");
+                                        return EprResponse::AccessDenied {
+                                            required_reach: reach.clone(),
+                                            reason,
+                                        };
+                                    }
+                                    Ok(crate::db::policy_cache::PolicyDecision::Allow) => {}
+                                    Err(_) => {} // Policy lookup failure is non-blocking
+                                }
+                            }
+
+                            // Layer 2: Attestation gate (mirrors HTTP path)
+                            if let Some(ref agent_key) = agent_pubkey {
+                                let attestations =
+                                    crate::db::content_attestations::query_attestations_for_content(
+                                        &mut conn, &id,
+                                    );
+                                if let Ok(atts) = attestations {
+                                    let prereq_atts: Vec<_> = atts
+                                        .iter()
+                                        .filter(|a| {
+                                            a.attestation_type == "prerequisite-mastery"
+                                                && a.is_revoked == 0
+                                        })
+                                        .collect();
+
+                                    if !prereq_atts.is_empty() {
+                                        let human = crate::db::humans::get_human_by_agent_key(
+                                            &mut conn, agent_key,
+                                        );
+                                        if let Ok(Some(human)) = human {
+                                            for att in &prereq_atts {
+                                                let prereq_content_id = att
+                                                    .evidence
+                                                    .as_deref()
+                                                    .unwrap_or(&att.content_id);
+                                                let mastery =
+                                                    crate::db::content_mastery::get_mastery_for_content(
+                                                        &mut conn,
+                                                        &app_ctx,
+                                                        &human.id,
+                                                        prereq_content_id,
+                                                    );
+                                                match mastery {
+                                                    Ok(Some(m))
+                                                        if m.mastery_level != "not_started" => {}
+                                                    _ => {
+                                                        info!(id = %id, "P2P attestation gate: prerequisite mastery required");
+                                                        return EprResponse::AccessDenied {
+                                                            required_reach: reach.clone(),
+                                                            reason: "Prerequisite mastery required".to_string(),
+                                                        };
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

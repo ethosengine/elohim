@@ -17,6 +17,7 @@ use std::time::Duration;
 use super::epr_protocol::{EprCodec, EprProtocol};
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
+use super::trust_protocol::{TrustCodec, TrustProtocol};
 use super::P2PConfig;
 
 /// Relay operating mode
@@ -68,6 +69,8 @@ pub struct ElohimStorageBehaviour {
     pub sync_protocol: RequestResponse<SyncCodec>,
     /// Request-response for EPR Head resolution
     pub epr_protocol: RequestResponse<EprCodec>,
+    /// Request-response for trust negotiation
+    pub trust_protocol: RequestResponse<TrustCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -93,6 +96,8 @@ pub enum ElohimStorageBehaviourEvent {
     SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
     /// EPR protocol event
     EprProtocol(request_response::Event<super::EprRequest, super::EprResponse>),
+    /// Trust protocol event
+    TrustProtocol(request_response::Event<super::trust_protocol::TrustHandshake, super::trust_protocol::TrustResponse>),
     /// mDNS event
     Mdns(mdns::Event),
     /// Relay client event (reservations, connection through relay)
@@ -140,6 +145,24 @@ impl From<request_response::Event<super::EprRequest, super::EprResponse>>
 {
     fn from(event: request_response::Event<super::EprRequest, super::EprResponse>) -> Self {
         Self::EprProtocol(event)
+    }
+}
+
+impl
+    From<
+        request_response::Event<
+            super::trust_protocol::TrustHandshake,
+            super::trust_protocol::TrustResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            super::trust_protocol::TrustHandshake,
+            super::trust_protocol::TrustResponse,
+        >,
+    ) -> Self {
+        Self::TrustProtocol(event)
     }
 }
 
@@ -208,6 +231,12 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // Trust request-response protocol for per-connection trust negotiation
+        let trust_protocol = RequestResponse::new(
+            [(TrustProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
             .expect("mDNS behaviour should be created");
@@ -244,6 +273,7 @@ impl ElohimStorageBehaviour {
             shard_protocol,
             sync_protocol,
             epr_protocol,
+            trust_protocol,
             mdns,
             relay_client,
             relay_server,

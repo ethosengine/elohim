@@ -2277,6 +2277,8 @@ pub struct EprShefaContextInputView {
 pub struct EprQahalContextInputView {
     pub reach: Option<String>,
     pub layer: Option<String>,
+    #[serde(default)]
+    pub attestation_requirements: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2315,10 +2317,12 @@ impl From<EprHeadInputView> for EprHead {
                 || EprQahalContext {
                     reach: None,
                     layer: None,
+                    attestation_requirements: vec![],
                 },
                 |q| EprQahalContext {
                     reach: q.reach,
                     layer: q.layer,
+                    attestation_requirements: q.attestation_requirements,
                 },
             ),
             relationships: v

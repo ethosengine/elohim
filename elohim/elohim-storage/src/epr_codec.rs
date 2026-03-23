@@ -70,6 +70,10 @@ pub struct EprQahalContext {
     pub reach: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layer: Option<String>,
+    /// Attestation requirements for body access (Layer 2 gate).
+    /// Format: "type:reference" e.g. "prerequisite-mastery:calculus-101"
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attestation_requirements: Vec<String>,
 }
 
 /// Typed relationship to another EPR Head.
@@ -174,6 +178,7 @@ mod tests {
             qahal: EprQahalContext {
                 reach: Some("commons".to_string()),
                 layer: Some("communal".to_string()),
+                attestation_requirements: vec![],
             },
             relationships: vec![EprRelationship {
                 rel_type: "TEACHES".to_string(),
@@ -299,6 +304,7 @@ mod tests {
             qahal: EprQahalContext {
                 reach: None,
                 layer: None,
+                attestation_requirements: vec![],
             },
             relationships: vec![],
             author: None,

@@ -209,6 +209,7 @@ mod tests {
             qahal: EprQahalContext {
                 reach: None,
                 layer: None,
+                attestation_requirements: vec![],
             },
             relationships: vec![],
             author: None,
