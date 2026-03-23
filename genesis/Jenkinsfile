@@ -15,6 +15,7 @@
  *   - TARGET_HOST: Override auto-detected host (optional)
  *   - SEED_DATA: Enable/disable seeding (default: true)
  *   - SEED_IDS: Comma-separated list of specific IDs to seed (optional)
+ *   - RESET_STORAGE: Reset storage databases before seeding (default: false)
  */
 
 def resolveDoorwayHost(String targetHost, String explicitDoorway) {
@@ -125,6 +126,11 @@ spec:
             defaultValue: '',
             description: 'Specific content IDs to seed (comma-separated). Empty = all content'
         )
+        booleanParam(
+            name: 'RESET_STORAGE',
+            defaultValue: false,
+            description: 'Reset storage databases before seeding (deletes content.db and restarts pods to run fresh migrations)'
+        )
     }
 
     environment {
@@ -229,6 +235,62 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         echo "✅ Doorway API (external): ${doorwayHost}"
                         echo "✅ Doorway API (internal): ${internalDoorway}"
                         echo "✅ Storage API (internal): ${env.INTERNAL_STORAGE_URL}"
+                    }
+                }
+            }
+        }
+
+        stage('Reset Storage') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.RESET_STORAGE }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def humans = getHumanStorageUrls('alpha')
+
+                        echo """
+═══════════════════════════════════════════════════════════
+🗑️  RESETTING STORAGE DATABASES
+═══════════════════════════════════════════════════════════
+"""
+                        for (human in humans) {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "Resetting ${human.service}..."
+
+                                # Delete content.db
+                                kubectl exec -n ${human.namespace} ${human.service}-0 -c elohim-storage -- rm -f /data/content.db 2>/dev/null || true
+
+                                # Restart pod to trigger fresh migrations
+                                kubectl delete pod -n ${human.namespace} ${human.service}-0 --wait=false
+
+                                echo "   ✅ ${human.humanId} reset initiated"
+                            """
+                        }
+
+                        // Wait for pods to begin restarting
+                        sh '''#!/bin/bash
+                            echo ""
+                            echo "Waiting for pods to restart..."
+                            sleep 30
+                        '''
+
+                        for (human in humans) {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "Waiting for ${human.service}..."
+                                kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=120s
+                                echo "   ✅ ${human.service} ready"
+                            """
+                        }
+
+                        echo """
+═══════════════════════════════════════════════════════════
+✅ ALL STORAGE DATABASES RESET
+═══════════════════════════════════════════════════════════
+"""
                     }
                 }
             }
