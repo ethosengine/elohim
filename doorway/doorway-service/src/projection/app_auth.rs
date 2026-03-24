@@ -74,12 +74,12 @@ pub async fn issue_app_token(
         .map_err(|e| format!("Failed to send token request: {e}"))?;
 
     // Wait for response with timeout
+    // Conductor may respond with Binary or Text frame (same fix as discovery.rs)
     let response = tokio::time::timeout(Duration::from_secs(10), async {
         while let Some(msg) = read.next().await {
-            match msg {
-                Ok(Message::Binary(data)) => {
-                    return parse_token_response(&data);
-                }
+            let data = match msg {
+                Ok(Message::Binary(b)) => b,
+                Ok(Message::Text(t)) => t.into_bytes(),
                 Ok(Message::Close(_)) => {
                     return Err("Admin connection closed".to_string());
                 }
@@ -87,7 +87,8 @@ pub async fn issue_app_token(
                     return Err(format!("WebSocket error: {e}"));
                 }
                 _ => continue,
-            }
+            };
+            return parse_token_response(&data);
         }
         Err("No response received".to_string())
     })

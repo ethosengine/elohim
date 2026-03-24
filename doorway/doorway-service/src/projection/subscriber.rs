@@ -520,28 +520,10 @@ impl SignalSubscriber {
     {
         tokio::time::timeout(Duration::from_secs(5), async {
             while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Binary(data)) => {
-                        // Parse response to check for errors
-                        if let Ok(rmpv::Value::Map(ref map)) =
-                            rmpv::decode::read_value(&mut std::io::Cursor::new(&data))
-                        {
-                            // Check for error response
-                            for (k, v) in map {
-                                if let rmpv::Value::String(key) = k {
-                                    if key.as_str() == Some("type") {
-                                        if let rmpv::Value::String(val) = v {
-                                            if val.as_str() == Some("error") {
-                                                return Err("Authentication rejected".to_string());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // Any non-error response means success
-                        return Ok(());
-                    }
+                // Conductor may respond with Binary or Text frame (same fix as discovery.rs)
+                let response_bytes = match msg {
+                    Ok(Message::Binary(b)) => b,
+                    Ok(Message::Text(t)) => t.into_bytes(),
                     Ok(Message::Close(_)) => {
                         return Err("Connection closed during auth".to_string());
                     }
@@ -549,7 +531,26 @@ impl SignalSubscriber {
                         return Err(format!("WebSocket error: {e}"));
                     }
                     _ => continue,
+                };
+
+                // Parse response to check for errors
+                if let Ok(rmpv::Value::Map(ref map)) =
+                    rmpv::decode::read_value(&mut std::io::Cursor::new(&response_bytes))
+                {
+                    for (k, v) in map {
+                        if let rmpv::Value::String(key) = k {
+                            if key.as_str() == Some("type") {
+                                if let rmpv::Value::String(val) = v {
+                                    if val.as_str() == Some("error") {
+                                        return Err("Authentication rejected".to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+                // Any non-error response means success
+                return Ok(());
             }
             Err("No auth response received".to_string())
         })
