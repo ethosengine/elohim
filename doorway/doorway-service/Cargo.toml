@@ -106,6 +106,9 @@ base64ct = "=1.6.0"
 # Shared types with DNAs
 doorway-client = { path = "../../crates/doorway-client" }
 
+# Shared compute reporting types
+elohim-compute = { path = "../../elohim/elohim-compute" }
+
 [dev-dependencies]
 tokio-test = "0.4"
 
