@@ -110,6 +110,13 @@ export class ProjectionAPIService implements IStorageApi {
   private readonly http = inject(HttpClient);
   private readonly storageClient = inject(StorageClientService);
 
+  // Circuit breaker: after consecutive failures, disable for a cooldown period.
+  // Self-healing: retries after cooldown to detect when cache becomes populated.
+  private consecutiveFailures = 0;
+  private disabledUntil = 0;
+  private static readonly FAILURE_THRESHOLD = 3;
+  private static readonly COOLDOWN_MS = 30_000; // 30 seconds
+
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
@@ -136,9 +143,26 @@ export class ProjectionAPIService implements IStorageApi {
   /** Default timeout for projection API calls */
   private readonly defaultTimeout = 5000;
 
-  /** Whether projection API is enabled */
+  /** Whether projection API is enabled (respects circuit breaker) */
   get enabled(): boolean {
-    return environment.projectionApi?.enabled !== false;
+    if (environment.projectionApi?.enabled === false) return false;
+    // Circuit breaker: skip projection during cooldown
+    if (Date.now() < this.disabledUntil) return false;
+    return true;
+  }
+
+  /** Record a successful projection read — resets circuit breaker */
+  private recordSuccess(): void {
+    this.consecutiveFailures = 0;
+  }
+
+  /** Record a failed/empty projection read — trips circuit breaker after threshold */
+  private recordFailure(): void {
+    this.consecutiveFailures++;
+    if (this.consecutiveFailures >= ProjectionAPIService.FAILURE_THRESHOLD) {
+      this.disabledUntil = Date.now() + ProjectionAPIService.COOLDOWN_MS;
+      this.consecutiveFailures = 0;
+    }
   }
 
   // =========================================================================
@@ -253,8 +277,15 @@ export class ProjectionAPIService implements IStorageApi {
 
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
-      map(data => this.transformContent(data)),
-      catchError((err: HttpErrorResponse) => this.handleContentError(err, `getContentNode(${id})`)),
+      map(data => {
+        const node = this.transformContent(data);
+        this.recordSuccess();
+        return node;
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.recordFailure();
+        return this.handleContentError(err, `getContentNode(${id})`);
+      }),
       shareReplay(1)
     );
   }
@@ -367,8 +398,15 @@ export class ProjectionAPIService implements IStorageApi {
 
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
-      map(data => this.transformPath(data)),
-      catchError((err: HttpErrorResponse) => this.handlePathError(err, `getPathNode(${id})`)),
+      map(data => {
+        const path = this.transformPath(data);
+        this.recordSuccess();
+        return path;
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.recordFailure();
+        return this.handlePathError(err, `getPathNode(${id})`);
+      }),
       shareReplay(1)
     );
   }
