@@ -55,6 +55,8 @@ describe('DataLoaderService', () => {
     };
     const projectionApiSpy = {
       getPathOverview: vi.fn(),
+      getContentNode: vi.fn().mockReturnValue(of(null)),
+      getPathNode: vi.fn().mockReturnValue(of(null)),
       enabled: false,
     };
     const contentResolverSpy = {
