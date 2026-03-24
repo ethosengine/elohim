@@ -327,19 +327,40 @@ impl DiscoveryService {
 
         let response_bytes = match response {
             Message::Binary(b) => b,
-            _ => return Err("Unexpected response type".to_string()),
+            Message::Text(t) => t.into_bytes(),
+            other => {
+                return Err(format!(
+                    "Unexpected response type: {:?}",
+                    match &other {
+                        Message::Ping(_) => "Ping",
+                        Message::Pong(_) => "Pong",
+                        Message::Close(_) => "Close",
+                        Message::Frame(_) => "Frame",
+                        _ => "Unknown",
+                    }
+                ))
+            }
         };
 
         // Parse response to extract cell info
         self.parse_list_apps_response(&response_bytes)
     }
 
-    /// Parse list_apps response to extract cell info
+    /// Parse list_apps response to extract cell info.
+    ///
+    /// Handles two conductor response formats:
+    /// - Array format: cell_info is `[[role_name, [variant_info]]]`
+    /// - Map format: cell_info is `{role_name: [variant_info]}`
     fn parse_list_apps_response(&self, response: &[u8]) -> Result<Vec<CellInfo>, String> {
         let value: Value = rmpv::decode::read_value(&mut &response[..])
             .map_err(|e| format!("Failed to decode response: {e}"))?;
 
-        // Response format: { type: "list_apps", data: [{ installed_app_id, cell_info: [...] }] }
+        debug!(
+            "list_apps response structure: {}",
+            summarize_value(&value, 3)
+        );
+
+        // Response format: { type: "list_apps", data: [{ installed_app_id, cell_info: ... }] }
         let data = value
             .as_map()
             .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some("data")))
@@ -353,7 +374,6 @@ impl DiscoveryService {
         for app in apps {
             let app_map = app.as_map().ok_or("Expected app object")?;
 
-            // Check if this is our app
             let app_id = app_map
                 .iter()
                 .find(|(k, _)| k.as_str() == Some("installed_app_id"))
@@ -364,59 +384,109 @@ impl DiscoveryService {
                 continue;
             }
 
-            // Extract cell_info
             let cell_info = app_map
                 .iter()
                 .find(|(k, _)| k.as_str() == Some("cell_info"))
                 .map(|(_, v)| v)
                 .ok_or("Missing cell_info")?;
 
-            // cell_info is an array of [role_name, cell_info_variant]
-            if let Some(arr) = cell_info.as_array() {
+            debug!("cell_info structure: {}", summarize_value(cell_info, 4));
+
+            // Try map format first: { role_name: [variant_info, ...] }
+            if let Some(cell_map) = cell_info.as_map() {
+                for (role_key, role_variants) in cell_map {
+                    let role_name = role_key.as_str().unwrap_or("unknown").to_string();
+                    self.extract_cells_from_variants(&role_name, role_variants, &mut cells);
+                }
+            }
+            // Then try array format: [[role_name, [variant_info, ...]], ...]
+            else if let Some(arr) = cell_info.as_array() {
                 for item in arr {
                     if let Some(pair) = item.as_array() {
                         if pair.len() >= 2 {
                             let role_name = pair[0].as_str().unwrap_or("unknown").to_string();
-
-                            // cell_info_variant is typically { provisioned: { cell_id: [dna_hash, agent] } }
-                            // or { stem: ... } etc.
-                            if let Some(variant_map) = pair[1].as_map() {
-                                for (variant_type, variant_data) in variant_map {
-                                    if variant_type.as_str() == Some("provisioned") {
-                                        if let Some(data_map) = variant_data.as_map() {
-                                            if let Some(cell_id) = data_map
-                                                .iter()
-                                                .find(|(k, _)| k.as_str() == Some("cell_id"))
-                                                .map(|(_, v)| v)
-                                            {
-                                                if let Some(id_arr) = cell_id.as_array() {
-                                                    if id_arr.len() >= 2 {
-                                                        let dna_hash = encode_base64(
-                                                            id_arr[0].as_slice().unwrap_or(&[]),
-                                                        );
-                                                        let agent_pub_key = encode_base64(
-                                                            id_arr[1].as_slice().unwrap_or(&[]),
-                                                        );
-
-                                                        cells.push(CellInfo {
-                                                            dna_hash,
-                                                            agent_pub_key,
-                                                            role_name: role_name.clone(),
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            self.extract_cells_from_variants(&role_name, &pair[1], &mut cells);
+                        }
+                    }
+                    // Also handle map entries within the array
+                    else if let Some(item_map) = item.as_map() {
+                        for (role_key, role_variants) in item_map {
+                            let role_name = role_key.as_str().unwrap_or("unknown").to_string();
+                            self.extract_cells_from_variants(&role_name, role_variants, &mut cells);
                         }
                     }
                 }
             }
         }
 
+        info!(
+            "Parsed {} cells: [{}]",
+            cells.len(),
+            cells
+                .iter()
+                .map(|c| c.role_name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         Ok(cells)
+    }
+
+    /// Extract CellInfo from variant data for a given role.
+    /// Handles both single variant and array of variants.
+    fn extract_cells_from_variants(
+        &self,
+        role_name: &str,
+        variants: &Value,
+        cells: &mut Vec<CellInfo>,
+    ) {
+        // variants can be a single variant or an array of variants
+        let variant_list: Vec<&Value> = if let Some(arr) = variants.as_array() {
+            arr.iter().collect()
+        } else {
+            vec![variants]
+        };
+
+        for variant in variant_list {
+            // Try direct provisioned map: { provisioned: { cell_id: [...] } }
+            if let Some(variant_map) = variant.as_map() {
+                for (variant_type, variant_data) in variant_map {
+                    if variant_type.as_str() == Some("provisioned") {
+                        if let Some(cell) =
+                            self.extract_cell_from_provisioned(role_name, variant_data)
+                        {
+                            cells.push(cell);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Extract CellInfo from a provisioned variant's data.
+    fn extract_cell_from_provisioned(
+        &self,
+        role_name: &str,
+        provisioned_data: &Value,
+    ) -> Option<CellInfo> {
+        let data_map = provisioned_data.as_map()?;
+        let cell_id = data_map
+            .iter()
+            .find(|(k, _)| k.as_str() == Some("cell_id"))
+            .map(|(_, v)| v)?;
+
+        let id_arr = cell_id.as_array()?;
+        if id_arr.len() < 2 {
+            return None;
+        }
+
+        let dna_hash = encode_base64(id_arr[0].as_slice().unwrap_or(&[]));
+        let agent_pub_key = encode_base64(id_arr[1].as_slice().unwrap_or(&[]));
+
+        Some(CellInfo {
+            dna_hash,
+            agent_pub_key,
+            role_name: role_name.to_string(),
+        })
     }
 
     /// Discover import config from a cell
@@ -518,6 +588,55 @@ impl DiscoveryService {
 fn encode_base64(bytes: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// Summarize a MessagePack value for debug logging (avoids dumping binary blobs).
+fn summarize_value(value: &Value, max_depth: usize) -> String {
+    if max_depth == 0 {
+        return "...".to_string();
+    }
+    match value {
+        Value::Nil => "nil".to_string(),
+        Value::Boolean(b) => b.to_string(),
+        Value::Integer(i) => i.to_string(),
+        Value::F32(f) => f.to_string(),
+        Value::F64(f) => f.to_string(),
+        Value::String(s) => format!("\"{}\"", s.as_str().unwrap_or("?")),
+        Value::Binary(b) => format!("<bin:{}>", b.len()),
+        Value::Array(arr) => {
+            let items: Vec<String> = arr
+                .iter()
+                .take(3)
+                .map(|v| summarize_value(v, max_depth - 1))
+                .collect();
+            let suffix = if arr.len() > 3 {
+                format!("...+{}", arr.len() - 3)
+            } else {
+                String::new()
+            };
+            format!("[{}{}]", items.join(", "), suffix)
+        }
+        Value::Map(m) => {
+            let items: Vec<String> = m
+                .iter()
+                .take(5)
+                .map(|(k, v)| {
+                    format!(
+                        "{}: {}",
+                        summarize_value(k, 1),
+                        summarize_value(v, max_depth - 1)
+                    )
+                })
+                .collect();
+            let suffix = if m.len() > 5 {
+                format!("...+{}", m.len() - 5)
+            } else {
+                String::new()
+            };
+            format!("{{{}{}}}", items.join(", "), suffix)
+        }
+        Value::Ext(tag, data) => format!("<ext:{}:{}>", tag, data.len()),
+    }
 }
 
 /// Spawn discovery as a background task
