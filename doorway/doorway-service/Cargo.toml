@@ -34,6 +34,15 @@ holochain_client = { version = "0.9.0-dev.5", default-features = false }
 holo_hash = { version = "0.7.0-dev.3", features = ["encoding"] }
 holochain_zome_types = { version = "0.7.0-dev.5", default-features = false }
 holochain_types = { version = "0.7.0-dev.11", default-features = false }
+# Wire format for conductor WebSocket protocol (WireMessage::Authenticate)
+# Used by projection subscriber to encode auth exactly as the conductor expects.
+# We'd prefer to use holochain_client::AppWebsocket directly, but it requires
+# SocketAddr (IP:port) — not hostnames — which doesn't work with k8s headless
+# services. When we move to native (non-k8s) deployment, we can drop this
+# wrapper and use AppWebsocket::connect() directly.
+holochain_websocket = "0.7.0-dev.11"
+holochain_conductor_api = { version = "0.7.0-dev.11", default-features = false }
+holochain_serialized_bytes = "0.0.56"
 
 # Provide custom getrandom implementation for holochain's wasm-oriented dependencies
 getrandom = { version = "0.3", features = ["std"] }

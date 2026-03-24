@@ -27,7 +27,16 @@ The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM.
 | `src/routes/identity.rs` | DID documents + identity API proxy |
 | `src/main.rs` | Startup: creates AppState, self-registers steward storage |
 | `src/cache/resolution.rs` | DoorwayResolver: tiered content resolution (Projection -> Conductor -> External) |
+| `src/projection/subscriber.rs` | Signal subscriber: connects to conductor app interface, receives DHT signals |
 | `src/services/discovery.rs` | DiscoveryService: conductor DNA introspection (route stubs, future) |
+
+## Projection Signal Subscriber
+
+The subscriber (`src/projection/subscriber.rs`) connects to each conductor's app WebSocket to receive DHT signals for the projection cache. It uses our own `tokio-tungstenite` connection (supports hostnames/URLs) but the official `holochain_websocket::WireMessage` for auth encoding — byte-identical to what the conductor expects.
+
+**Why the wrapper:** `holochain_client::AppWebsocket::connect()` requires `SocketAddr` (IP:port), not hostnames. In k8s, conductors are reached via headless service hostnames (e.g., `ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8445`). When deployment moves to native P2P (not k8s-simulated), this wrapper can be replaced with `AppWebsocket::connect()` directly.
+
+**Dependencies for wire format:** `holochain_websocket` (WireMessage), `holochain_conductor_api` (AppAuthenticationRequest), `holochain_serialized_bytes` (SerializedBytes encoding).
 
 ## Adding New Routes
 

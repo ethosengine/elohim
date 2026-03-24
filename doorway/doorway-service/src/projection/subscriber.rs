@@ -1,15 +1,26 @@
-//! Signal Subscriber - connects to Holochain conductor for real-time signals
+//! Signal Subscriber — connects to Holochain conductor for real-time signals.
 //!
 //! Subscribes to the conductor's app WebSocket interface and receives
 //! post_commit signals from the DNA, feeding them to the Projection Engine.
+//!
+//! ## Why this wrapper exists
+//!
+//! `holochain_client::AppWebsocket` requires `SocketAddr` (IP:port), not hostnames.
+//! In k8s, we connect via headless service hostnames (e.g., `ws://elohim-matthew-alpha-0
+//! .elohim-matthew-alpha-headless:8445`). So we manage our own WebSocket connection
+//! with `tokio-tungstenite` (supports URLs) but use the official `holochain_websocket::
+//! WireMessage` for auth encoding — byte-identical to what the conductor expects.
+//!
+//! When deployment moves to native P2P (not k8s-simulated), this wrapper can be
+//! replaced with `AppWebsocket::connect()` directly.
 //!
 //! ## Authentication Flow (Holochain 0.3+)
 //!
 //! 1. Connect to admin interface
 //! 2. Request AppAuthenticationToken for the installed app
 //! 3. Connect to app interface
-//! 4. Send AppAuthenticationRequest with token
-//! 5. Receive signals
+//! 4. Send AppAuthenticationRequest via WireMessage::Authenticate
+//! 5. Receive signals via WireMessage::Signal
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -396,68 +407,30 @@ impl SignalSubscriber {
             .map_err(|e| format!("Failed to build request: {e}"))
     }
 
-    /// Connect to conductor and listen for signals.
+    /// Connect to conductor, authenticate, and listen for signals.
     ///
-    /// Tries connecting WITHOUT auth first (most conductors don't require it).
-    /// If the conductor closes the connection immediately, retries WITH auth.
+    /// Authentication is required — without it the conductor doesn't associate
+    /// the connection with an app, so no signals are routed and the connection
+    /// is dropped after idle timeout (~10s).
     async fn connect_and_listen(&self, token: &AppAuthToken) -> Result<(), String> {
-        // First attempt: connect without auth (like WorkerPool does)
         let request = self.build_ws_request()?;
         let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
             .map_err(|e| format!("WebSocket connect failed: {e}"))?;
 
-        debug!("WebSocket connected (no-auth mode), listening for signals...");
+        debug!("WebSocket connected, sending authentication...");
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Check if conductor accepts the connection by waiting briefly for a close frame.
-        // If no close within 500ms, the connection is accepted without auth.
-        match tokio::time::timeout(Duration::from_millis(500), read.next()).await {
-            Ok(Some(Ok(Message::Close(_)))) => {
-                // Conductor closed immediately → auth required. Reconnect with auth.
-                info!("Conductor requires authentication, reconnecting with token...");
-                let _ = write.close().await;
+        // Authenticate with the conductor's app interface
+        self.send_auth_request(&mut write, token).await?;
+        self.wait_for_auth_response(&mut read).await?;
 
-                let request = self.build_ws_request()?;
-                let (ws_stream, _) = connect_async_with_config(request, None, false)
-                    .await
-                    .map_err(|e| format!("WebSocket reconnect failed: {e}"))?;
-
-                let (mut write, mut read) = ws_stream.split();
-
-                self.send_auth_request(&mut write, token).await?;
-                self.wait_for_auth_response(&mut read).await?;
-
-                info!("Connected and authenticated to app interface");
-                self.listen_loop(write, read).await
-            }
-            Ok(Some(Ok(msg))) => {
-                // Got a real message (signal!) — connection accepted without auth
-                info!("Connected to app interface (no auth required)");
-                self.handle_incoming_message(&msg);
-                self.listen_loop(write, read).await
-            }
-            Ok(Some(Err(e))) => Err(format!("WebSocket error during probe: {e}")),
-            Ok(None) => Err("WebSocket stream ended during probe".to_string()),
-            Err(_) => {
-                // Timeout — no close frame, no message. Connection accepted silently.
-                info!("Connected to app interface (no auth required, silent accept)");
-                self.listen_loop(write, read).await
-            }
-        }
+        info!("Connected and authenticated to app interface");
+        self.listen_loop(write, read).await
     }
 
-    /// Handle an incoming WebSocket message (signal dispatch)
-    fn handle_incoming_message(&self, msg: &Message) {
-        match msg {
-            Message::Text(text) => self.handle_message(text),
-            Message::Binary(data) => self.handle_binary(data),
-            _ => {}
-        }
-    }
-
-    /// Main signal listening loop (shared by auth and no-auth paths)
+    /// Main signal listening loop
     async fn listen_loop<S>(
         &self,
         mut write: futures_util::stream::SplitSink<S, Message>,
@@ -519,7 +492,11 @@ impl SignalSubscriber {
         }
     }
 
-    /// Send AppAuthenticationRequest to the app interface
+    /// Send AppAuthenticationRequest to the app interface.
+    ///
+    /// Uses the official `holochain_websocket::WireMessage` + `holochain_conductor_api::
+    /// AppAuthenticationRequest` for byte-identical encoding to what the conductor expects.
+    /// See module doc for why we wrap our own WebSocket but use official encoding.
     async fn send_auth_request<S>(
         &self,
         write: &mut futures_util::stream::SplitSink<S, Message>,
@@ -529,39 +506,35 @@ impl SignalSubscriber {
         S: futures_util::Sink<Message> + Unpin,
         <S as futures_util::Sink<Message>>::Error: std::fmt::Display,
     {
-        // Build AppAuthenticationRequest message
-        // Format: { token: <bytes> } wrapped in request envelope
-        let inner = rmpv::Value::Map(vec![(
-            rmpv::Value::String("token".into()),
-            rmpv::Value::Binary(token.token.clone()),
-        )]);
+        use holochain_conductor_api::AppAuthenticationRequest;
+        use holochain_serialized_bytes::prelude::*;
+        use holochain_websocket::WireMessage;
 
-        let mut inner_buf = Vec::new();
-        rmpv::encode::write_value(&mut inner_buf, &inner)
-            .map_err(|e| format!("Failed to encode auth request: {e}"))?;
+        // Step 1: Serialize AppAuthenticationRequest via holochain_serialized_bytes (msgpack)
+        let auth_request = AppAuthenticationRequest {
+            token: token.token.clone(),
+        };
+        let inner: SerializedBytes = auth_request
+            .try_into()
+            .map_err(|e: SerializedBytesError| format!("Failed to serialize auth request: {e}"))?;
 
-        // Wrap in authenticate envelope (Holochain 0.6 format: { type: "authenticate", data: <binary> })
-        let envelope = rmpv::Value::Map(vec![
-            (
-                rmpv::Value::String("type".into()),
-                rmpv::Value::String("authenticate".into()),
-            ),
-            (
-                rmpv::Value::String("data".into()),
-                rmpv::Value::Binary(inner_buf),
-            ),
-        ]);
+        // Step 2: Wrap in WireMessage::Authenticate { data: <inner bytes> }
+        let wire_msg = WireMessage::Authenticate {
+            data: UnsafeBytes::from(inner).into(),
+        };
 
-        let mut buf = Vec::new();
-        rmpv::encode::write_value(&mut buf, &envelope)
-            .map_err(|e| format!("Failed to encode envelope: {e}"))?;
+        // Step 3: Serialize the WireMessage itself (double msgpack — this is the wire format)
+        let outer: SerializedBytes = wire_msg
+            .try_into()
+            .map_err(|e: SerializedBytesError| format!("Failed to serialize wire message: {e}"))?;
 
+        // Step 4: Send as binary WebSocket frame
         write
-            .send(Message::Binary(buf))
+            .send(Message::Binary(outer.bytes().to_vec()))
             .await
             .map_err(|e| format!("Failed to send auth request: {e}"))?;
 
-        debug!("Sent AppAuthenticationRequest");
+        debug!("Sent AppAuthenticationRequest (official WireMessage encoding)");
         Ok(())
     }
 
