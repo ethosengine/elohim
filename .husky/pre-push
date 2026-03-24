@@ -9,6 +9,7 @@
 #   doorway/doorway-app/     → eslint + build
 #   sophia/              → pnpm lint + typecheck + test
 #   elohim/elohim-storage/   → cargo fmt + clippy + tests
+#   elohim/elohim-compute/   → cargo fmt + clippy + tests
 #   steward/node/            → cargo fmt + clippy + tests
 #   app/elohim-library/      → tsc type-check + vitest tests
 #   genesis/                 → schema validation + tests
@@ -90,6 +91,9 @@ if echo "$CHANGED" | grep -q "^sophia/"; then
 fi
 if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
   PROJECTS="$PROJECTS elohim-storage"
+fi
+if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
+  PROJECTS="$PROJECTS elohim-compute"
 fi
 if echo "$CHANGED" | grep -q "^steward/node/"; then
   PROJECTS="$PROJECTS steward-node"
@@ -211,6 +215,12 @@ run_gate() {
         RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 2>&1
         rc=$?
         ;;
+      elohim-compute)
+        cargo fmt --check 2>&1 && \
+        cargo clippy -- -D warnings 2>&1 && \
+        cargo test 2>&1
+        rc=$?
+        ;;
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
@@ -318,6 +328,7 @@ for PROJECT in $PROJECTS; do
     doorway)          PROJECT_DIR="doorway/doorway-service" ;;
     doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
     elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
+    elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
     steward-node)     PROJECT_DIR="steward/node" ;;
     genesis)          PROJECT_DIR="genesis/seeder" ;;
     schema-validate)  PROJECT_DIR="." ;;
