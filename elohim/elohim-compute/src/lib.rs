@@ -7,11 +7,11 @@
 pub mod counters;
 pub mod health;
 pub mod peers;
-// pub mod report;
+pub mod report;
 pub mod resources;
 
 pub use counters::{RequestCounterSnapshot, RequestCounters};
 pub use health::{HealthReporter, ServiceHealth};
 pub use peers::{PeerHealthRegistry, PeerHealthSnapshot};
-// pub use report::ComputeReport;
+pub use report::ComputeReport;
 pub use resources::{ResourceReporter, ResourceSnapshot};
