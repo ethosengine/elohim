@@ -372,10 +372,8 @@ impl SignalSubscriber {
         info!("Signal subscriber stopped");
     }
 
-    /// Connect to conductor and listen for signals
-    async fn connect_and_listen(&self, token: &AppAuthToken) -> Result<(), String> {
-        // Build request with proper headers (like conductor.rs)
-        // This ensures the app interface accepts the connection
+    /// Build a WebSocket connect request for the app interface
+    fn build_ws_request(&self) -> Result<Request<()>, String> {
         let host = self
             .config
             .app_url
@@ -383,7 +381,7 @@ impl SignalSubscriber {
             .last()
             .unwrap_or("localhost:4445");
 
-        let request = Request::builder()
+        Request::builder()
             .uri(&self.config.app_url)
             .header("Host", host)
             .header("Origin", "http://localhost")
@@ -395,24 +393,82 @@ impl SignalSubscriber {
                 tokio_tungstenite::tungstenite::handshake::client::generate_key(),
             )
             .body(())
-            .map_err(|e| format!("Failed to build request: {e}"))?;
+            .map_err(|e| format!("Failed to build request: {e}"))
+    }
 
+    /// Connect to conductor and listen for signals.
+    ///
+    /// Tries connecting WITHOUT auth first (most conductors don't require it).
+    /// If the conductor closes the connection immediately, retries WITH auth.
+    async fn connect_and_listen(&self, token: &AppAuthToken) -> Result<(), String> {
+        // First attempt: connect without auth (like WorkerPool does)
+        let request = self.build_ws_request()?;
         let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
             .map_err(|e| format!("WebSocket connect failed: {e}"))?;
 
-        debug!("WebSocket connected, sending authentication...");
+        debug!("WebSocket connected (no-auth mode), listening for signals...");
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Step 3: Send AppAuthenticationRequest
-        self.send_auth_request(&mut write, token).await?;
+        // Check if conductor accepts the connection by waiting briefly for a close frame.
+        // If no close within 500ms, the connection is accepted without auth.
+        match tokio::time::timeout(Duration::from_millis(500), read.next()).await {
+            Ok(Some(Ok(Message::Close(_)))) => {
+                // Conductor closed immediately → auth required. Reconnect with auth.
+                info!("Conductor requires authentication, reconnecting with token...");
+                let _ = write.close().await;
 
-        // Step 4: Wait for auth response
-        self.wait_for_auth_response(&mut read).await?;
+                let request = self.build_ws_request()?;
+                let (ws_stream, _) = connect_async_with_config(request, None, false)
+                    .await
+                    .map_err(|e| format!("WebSocket reconnect failed: {e}"))?;
 
-        info!("Connected and authenticated to app interface");
+                let (mut write, mut read) = ws_stream.split();
 
+                self.send_auth_request(&mut write, token).await?;
+                self.wait_for_auth_response(&mut read).await?;
+
+                info!("Connected and authenticated to app interface");
+                self.listen_loop(write, read).await
+            }
+            Ok(Some(Ok(msg))) => {
+                // Got a real message (signal!) — connection accepted without auth
+                info!("Connected to app interface (no auth required)");
+                self.handle_incoming_message(&msg);
+                self.listen_loop(write, read).await
+            }
+            Ok(Some(Err(e))) => Err(format!("WebSocket error during probe: {e}")),
+            Ok(None) => Err("WebSocket stream ended during probe".to_string()),
+            Err(_) => {
+                // Timeout — no close frame, no message. Connection accepted silently.
+                info!("Connected to app interface (no auth required, silent accept)");
+                self.listen_loop(write, read).await
+            }
+        }
+    }
+
+    /// Handle an incoming WebSocket message (signal dispatch)
+    fn handle_incoming_message(&self, msg: &Message) {
+        match msg {
+            Message::Text(text) => self.handle_message(text),
+            Message::Binary(data) => self.handle_binary(data),
+            _ => {}
+        }
+    }
+
+    /// Main signal listening loop (shared by auth and no-auth paths)
+    async fn listen_loop<S>(
+        &self,
+        mut write: futures_util::stream::SplitSink<S, Message>,
+        mut read: futures_util::stream::SplitStream<S>,
+    ) -> Result<(), String>
+    where
+        S: futures_util::Sink<Message>
+            + futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+            + Unpin,
+        <S as futures_util::Sink<Message>>::Error: std::fmt::Display,
+    {
         // Continue with the same split streams
         let mut shutdown_rx = self.shutdown_receiver();
         let mut ping_interval = tokio::time::interval(self.config.ping_interval);
