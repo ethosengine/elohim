@@ -502,8 +502,11 @@ async fn main() -> anyhow::Result<()> {
             let (all_signals_tx, all_signals_rx) =
                 tokio::sync::broadcast::channel::<ProjectionSignal>(2000);
 
+            let peer_health = Arc::clone(&state.peer_health);
+
             for (i, conductor_app_url) in conductor_urls.iter().enumerate() {
                 let admin_url = derive_admin_url_from_app(conductor_app_url);
+                let conductor_id = format!("conductor-{i}");
 
                 let subscriber_config = SubscriberConfig {
                     admin_url: admin_url.clone(),
@@ -514,22 +517,43 @@ async fn main() -> anyhow::Result<()> {
 
                 let (subscriber, _sub_handle) = spawn_subscriber(subscriber_config);
 
+                peer_health.register(&conductor_id, conductor_app_url);
+
                 // Forward this subscriber's signals to the shared engine channel
                 let mut sub_rx = subscriber.subscribe();
                 let fwd_tx = all_signals_tx.clone();
-                let conductor_id = format!("conductor-{i}");
+                let peer_health_clone = Arc::clone(&peer_health);
+                let conductor_id_clone = conductor_id.clone();
                 tokio::spawn(async move {
+                    peer_health_clone.update_health(
+                        &conductor_id_clone,
+                        elohim_compute::ServiceHealth::Healthy,
+                        "connected",
+                    );
                     loop {
                         match sub_rx.recv().await {
                             Ok(signal) => {
+                                peer_health_clone.record_signal(&conductor_id_clone);
                                 if fwd_tx.send(signal).is_err() {
                                     break; // engine dropped
                                 }
                             }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                peer_health_clone.update_health(
+                                    &conductor_id_clone,
+                                    elohim_compute::ServiceHealth::Offline,
+                                    "channel closed",
+                                );
+                                break;
+                            }
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                peer_health_clone.update_health(
+                                    &conductor_id_clone,
+                                    elohim_compute::ServiceHealth::Degraded,
+                                    &format!("lagged {n} signals"),
+                                );
                                 warn!(
-                                    conductor = %conductor_id,
+                                    conductor = %conductor_id_clone,
                                     lagged = n,
                                     "Signal forwarder lagged"
                                 );
@@ -539,7 +563,7 @@ async fn main() -> anyhow::Result<()> {
                 });
 
                 info!(
-                    conductor = %format!("conductor-{i}"),
+                    conductor = %conductor_id,
                     admin_url = %admin_url,
                     app_url = %conductor_app_url,
                     "Signal subscriber spawned"
