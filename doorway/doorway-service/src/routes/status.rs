@@ -269,6 +269,26 @@ pub struct PeerView {
     pub response_time_ms: Option<u32>,
 }
 
+/// A projection subscriber peer card for the status page
+pub struct ProjectionPeerView {
+    pub conductor_id: String,
+    pub dot_color: String,
+    pub health: String,
+    pub reason: String,
+    pub signals_received: String,
+    pub last_signal: String,
+    pub reconnect_attempts: u32,
+}
+
+/// Resource usage summary for the status page
+pub struct ResourceUsageView {
+    pub projection_storage: String,
+    pub projection_documents: String,
+    pub hot_cache_entries: String,
+    pub total_requests: String,
+    pub active_subscribers: String,
+}
+
 /// Shefa compute contribution (placeholder for future)
 #[allow(dead_code)]
 pub struct ShefaView {
@@ -299,6 +319,8 @@ pub struct StatusPageTemplate {
     pub federation_enabled: bool,
     pub peers: Vec<PeerView>,
     pub shefa: Option<ShefaView>,
+    pub projection_peers: Vec<ProjectionPeerView>,
+    pub resource_usage: ResourceUsageView,
     pub is_operator: bool,
     pub attestation_log: Vec<String>,
 }
@@ -653,6 +675,32 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 // HTML Page Handler
 // =============================================================================
 
+/// Format bytes as human-readable (KB/MB/GB)
+fn format_bytes(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Format a number with comma separators
+fn format_number(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
 /// Handle status page request — returns server-rendered HTML via Askama
 ///
 /// When a valid operator JWT (Admin-level) is present in the Authorization header
@@ -759,6 +807,53 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
         .clone()
         .unwrap_or_else(|| data.node_id.clone());
 
+    // Build projection peer views from compute report
+    let projection_peers: Vec<ProjectionPeerView> = data
+        .compute
+        .peers
+        .iter()
+        .map(|p| {
+            let dot_color = match p.health {
+                elohim_compute::ServiceHealth::Healthy => "green",
+                elohim_compute::ServiceHealth::Degraded => "yellow",
+                elohim_compute::ServiceHealth::Offline => "red",
+            };
+            ProjectionPeerView {
+                conductor_id: p.peer_id.clone(),
+                dot_color: dot_color.to_string(),
+                health: p.health.to_string(),
+                reason: p.reason.clone(),
+                signals_received: format_number(p.signals_received),
+                last_signal: p
+                    .last_signal_at
+                    .map(|t| {
+                        let secs = (chrono::Utc::now() - t).num_seconds().max(0);
+                        if secs < 60 {
+                            format!("{}s ago", secs)
+                        } else if secs < 3600 {
+                            format!("{}m ago", secs / 60)
+                        } else {
+                            format!("{}h ago", secs / 3600)
+                        }
+                    })
+                    .unwrap_or_else(|| "never".to_string()),
+                reconnect_attempts: p.reconnect_attempts,
+            }
+        })
+        .collect();
+
+    let resource_usage = ResourceUsageView {
+        projection_storage: format_bytes(data.compute.resources.managed_storage_bytes),
+        projection_documents: format_number(data.compute.resources.managed_document_count),
+        hot_cache_entries: format_number(
+            data.compute.extensions["hotCacheEntries"]
+                .as_u64()
+                .unwrap_or(0),
+        ),
+        total_requests: format_number(data.compute.resources.requests.total),
+        active_subscribers: format_number(data.compute.resources.active_connections as u64),
+    };
+
     let template = StatusPageTemplate {
         doorway_id,
         status_label,
@@ -775,6 +870,8 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
         federation_enabled: data.federation.enabled,
         peers,
         shefa: None,
+        projection_peers,
+        resource_usage,
         is_operator,
         attestation_log: if is_operator {
             build_operator_attestation_log(&state).await

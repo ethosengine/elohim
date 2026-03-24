@@ -154,6 +154,58 @@
       {% endfor %}
     </div>
 
+    <!-- Projection Subscribers -->
+    {% if !projection_peers.is_empty() %}
+    <div class="section">
+      <h2>Projection Subscribers</h2>
+      <div class="peer-grid">
+        {% for peer in projection_peers %}
+        <div class="peer-card">
+          <div class="peer-header">
+            <span class="dot dot-{{ peer.dot_color }}"></span>
+            <span class="peer-id">{{ peer.conductor_id }}</span>
+          </div>
+          <div class="peer-details">
+            <span>{{ peer.health }}: {{ peer.reason }}</span>
+            <span>Signals: {{ peer.signals_received }}</span>
+            <span>Last: {{ peer.last_signal }}</span>
+            {% if peer.reconnect_attempts > 0 %}
+            <span>Reconnects: {{ peer.reconnect_attempts }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Resource Usage -->
+    <div class="section">
+      <h2>Resource Usage</h2>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="label">Projection Storage</div>
+          <div class="value">{{ resource_usage.projection_storage }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Documents</div>
+          <div class="value">{{ resource_usage.projection_documents }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Hot Cache</div>
+          <div class="value">{{ resource_usage.hot_cache_entries }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Requests</div>
+          <div class="value">{{ resource_usage.total_requests }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Subscribers</div>
+          <div class="value">{{ resource_usage.active_subscribers }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Federation Peers -->
     {% if federation_enabled %}
     <div class="section">
