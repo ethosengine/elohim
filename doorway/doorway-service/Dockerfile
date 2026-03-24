@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
 # Copy manifests and local crates first for dependency caching
 COPY doorway/doorway-service/Cargo.toml doorway/doorway-service/Cargo.lock ./
 COPY crates ./crates
+COPY elohim/elohim-compute ./elohim/elohim-compute
 COPY elohim/holochain/holochain-cache-core ./elohim/holochain/holochain-cache-core
 
 # Create dummy src to build dependencies
@@ -25,6 +26,7 @@ RUN mkdir -p src/bin && \
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../../elohim/elohim-compute"|path = "elohim/elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/holochain/holochain-cache-core"|path = "elohim/holochain/holochain-cache-core"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
