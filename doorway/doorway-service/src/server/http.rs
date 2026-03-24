@@ -430,6 +430,28 @@ impl AppState {
     pub fn set_orchestrator(&mut self, state: Arc<OrchestratorState>) {
         self.orchestrator = Some(state);
     }
+
+    /// Upgrade projection store from memory-only to MongoDB-backed.
+    ///
+    /// Called after AppState construction when MongoDB is available.
+    /// Creates indexes, then replaces the memory-only projection and rebuilds
+    /// the DoorwayResolver to use the new persistent store.
+    pub async fn init_projection(&mut self, mongo: &MongoClient) -> Result<(), DoorwayError> {
+        let projection_store =
+            ProjectionStore::new(mongo.clone(), ProjectionConfig::default()).await?;
+        let projection = Some(Arc::new(projection_store));
+
+        // Rebuild resolver with the new MongoDB-backed projection
+        self.resolver = Arc::new(DoorwayResolver::new(
+            projection.clone(),
+            self.pool.clone(),
+            None,
+        ));
+
+        self.projection = projection;
+        info!("Projection store upgraded to MongoDB-backed");
+        Ok(())
+    }
 }
 
 /// Start the HTTP server

@@ -16,7 +16,8 @@ use doorway::{
     nats::NatsClient,
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{
-        spawn_engine_task, spawn_subscriber, EngineConfig, ProjectionEngine, SubscriberConfig,
+        spawn_engine_task, spawn_subscriber, EngineConfig, ProjectionEngine, ProjectionSignal,
+        SubscriberConfig,
     },
     server,
     services::{
@@ -214,6 +215,24 @@ async fn main() -> anyhow::Result<()> {
         server::AppState::with_services(args.clone(), mongo, nats)
     };
     state.orchestrator = orchestrator_state.clone();
+
+    // Upgrade projection store from memory-only to MongoDB-backed
+    if let Some(mongo) = state.mongo.clone() {
+        match state.init_projection(&mongo).await {
+            Ok(()) => info!("Projection store initialized with MongoDB"),
+            Err(e) => {
+                if args.dev_mode {
+                    warn!(
+                        "MongoDB projection init failed (dev mode, using memory-only): {}",
+                        e
+                    );
+                } else {
+                    error!("MongoDB projection init failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
 
     // Create single-connection ImportClient for import operations
     // Uses ONE connection to app interface to avoid overwhelming conductor during batch imports
@@ -472,33 +491,76 @@ async fn main() -> anyhow::Result<()> {
 
             Some((tokio::spawn(async {}), engine_handle))
         } else {
-            // Production mode + projection_writer=true: start signal subscriber
-            let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-
+            // Production mode + projection_writer=true: start multi-peer signal subscribers
+            // One subscriber per conductor, all feeding into a shared signal channel.
             info!(
-                "Starting projection engine with signal subscriber (admin: {}, app: {})",
-                args.conductor_url, app_url
+                "Starting projection engine with {} signal subscriber(s)",
+                conductor_urls.len()
             );
 
-            // Start signal subscriber with proper authentication
-            let subscriber_config = SubscriberConfig {
-                admin_url: args.conductor_url.clone(),
-                app_url,
-                installed_app_id: args.installed_app_id.clone(),
-                ..SubscriberConfig::default()
-            };
-            let (subscriber, subscriber_handle) = spawn_subscriber(subscriber_config);
+            // Shared channel: all subscribers forward signals here → engine
+            let (all_signals_tx, all_signals_rx) =
+                tokio::sync::broadcast::channel::<ProjectionSignal>(2000);
 
-            // Create and start projection engine
+            for (i, conductor_app_url) in conductor_urls.iter().enumerate() {
+                let admin_url = derive_admin_url_from_app(conductor_app_url);
+
+                let subscriber_config = SubscriberConfig {
+                    admin_url: admin_url.clone(),
+                    app_url: conductor_app_url.clone(),
+                    installed_app_id: args.installed_app_id.clone(),
+                    ..SubscriberConfig::default()
+                };
+
+                let (subscriber, _sub_handle) = spawn_subscriber(subscriber_config);
+
+                // Forward this subscriber's signals to the shared engine channel
+                let mut sub_rx = subscriber.subscribe();
+                let fwd_tx = all_signals_tx.clone();
+                let conductor_id = format!("conductor-{i}");
+                tokio::spawn(async move {
+                    loop {
+                        match sub_rx.recv().await {
+                            Ok(signal) => {
+                                if fwd_tx.send(signal).is_err() {
+                                    break; // engine dropped
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!(
+                                    conductor = %conductor_id,
+                                    lagged = n,
+                                    "Signal forwarder lagged"
+                                );
+                            }
+                        }
+                    }
+                });
+
+                info!(
+                    conductor = %format!("conductor-{i}"),
+                    admin_url = %admin_url,
+                    app_url = %conductor_app_url,
+                    "Signal subscriber spawned"
+                );
+            }
+
+            // Drop the extra sender so channel closes when all forwarders complete
+            drop(all_signals_tx);
+
+            // Create and start projection engine with aggregated signals
             let engine = Arc::new(ProjectionEngine::new(
                 projection_store.clone(),
                 EngineConfig::default(),
             ));
-            let signal_rx = subscriber.subscribe();
-            let engine_handle = spawn_engine_task(engine, signal_rx);
+            let engine_handle = spawn_engine_task(engine, all_signals_rx);
 
-            info!("Projection engine started (writer mode)");
-            Some((subscriber_handle, engine_handle))
+            info!(
+                "Projection engine started (writer mode, {} subscriber(s))",
+                conductor_urls.len()
+            );
+            Some((tokio::spawn(async {}), engine_handle))
         }
     } else {
         warn!("Projection engine not started (no projection store)");

@@ -291,10 +291,24 @@ export class DataLoaderService {
   /**
    * Load a LearningPath by ID.
    * Does NOT load the content for each step (lazy loading).
-   * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
+   *
+   * Read path: Projection API (fast, aggregated across all peers) → ContentService fallback.
    */
   getPath(pathId: string): Observable<LearningPath> {
-    return this.contentService.getPath(pathId).pipe(
+    // Primary: projection cache (fast, serves commons content from all peers)
+    // Fallback: ContentService (direct storage)
+    const source$ = this.projectionApi.enabled
+      ? this.projectionApi.getPathNode(pathId).pipe(
+          timeout(3000),
+          switchMap(path => path
+            ? of(path)
+            : this.contentService.getPath(pathId)
+          ),
+          catchError(() => this.contentService.getPath(pathId))
+        )
+      : this.contentService.getPath(pathId);
+
+    return source$.pipe(
       map(path => {
         if (!path) {
           throw new Error(`Path not found: ${pathId}`);
@@ -405,13 +419,28 @@ export class DataLoaderService {
    */
   /**
    * Load a ContentNode by ID.
-   * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
+   *
+   * Read path: Projection API (fast, aggregated across all peers) → ContentService fallback.
+   * Writes still go to /db/ via ContentService.
    *
    * IMPORTANT: Returns a placeholder node instead of throwing for missing content.
    * This prevents one missing item from breaking entire path loading.
    */
   getContent(resourceId: string): Observable<ContentNode> {
-    return this.contentService.getContent(resourceId).pipe(
+    // Primary: projection cache (fast, serves commons content from all peers)
+    // Fallback: ContentService (direct storage, includes blob resolution)
+    const source$ = this.projectionApi.enabled
+      ? this.projectionApi.getContentNode(resourceId).pipe(
+          timeout(3000),
+          switchMap(content => content
+            ? of(content)
+            : this.contentService.getContent(resourceId)
+          ),
+          catchError(() => this.contentService.getContent(resourceId))
+        )
+      : this.contentService.getContent(resourceId);
+
+    return source$.pipe(
       map(content => {
         if (!content) {
           this.logger.warn('Content not found, returning placeholder', { resourceId });
