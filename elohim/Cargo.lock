@@ -334,6 +334,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-compute"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dashmap",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "enumflags2"
 version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

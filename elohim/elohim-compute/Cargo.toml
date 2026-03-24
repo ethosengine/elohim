@@ -1,0 +1,14 @@
+[package]
+name = "elohim-compute"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+description = "Shared compute reporting types and traits for the Elohim fleet"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dashmap = "6.1"
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
