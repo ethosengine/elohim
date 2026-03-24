@@ -10,6 +10,9 @@ use hyper::{Request, Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
+use std::sync::OnceLock;
+use tokio::sync::Mutex as TokioMutex;
+
 use crate::auth::{extract_token_from_header, JwtValidator, PermissionLevel};
 use crate::orchestrator::NodeHealthStatus;
 use crate::server::AppState;
@@ -163,6 +166,53 @@ pub struct Diagnostics {
     pub recommendations: Vec<String>,
 }
 
+/// Doorway's implementation of the shared HealthReporter trait.
+struct DoorwayHealthReporter<'a> {
+    state: &'a AppState,
+    conductor_connected: bool,
+    storage_reachable: bool,
+}
+
+impl elohim_compute::HealthReporter for DoorwayHealthReporter<'_> {
+    fn service_id(&self) -> &str {
+        "doorway"
+    }
+
+    fn health(&self) -> elohim_compute::ServiceHealth {
+        if self.conductor_connected && self.storage_reachable {
+            elohim_compute::ServiceHealth::Healthy
+        } else if self.state.args.dev_mode {
+            elohim_compute::ServiceHealth::Degraded
+        } else if !self.conductor_connected && !self.storage_reachable {
+            elohim_compute::ServiceHealth::Offline
+        } else {
+            elohim_compute::ServiceHealth::Degraded
+        }
+    }
+
+    fn health_reason(&self) -> String {
+        let conductor = if self.conductor_connected {
+            "connected"
+        } else {
+            "disconnected"
+        };
+        let storage = if self.storage_reachable {
+            "reachable"
+        } else {
+            "unreachable"
+        };
+        let subscribers = self.state.peer_health.active_count();
+        format!(
+            "conductor {}, storage {}, {} active subscriber(s)",
+            conductor, storage, subscribers
+        )
+    }
+
+    fn started_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.state.started_at
+    }
+}
+
 /// Status response payload
 #[derive(Debug, Serialize)]
 pub struct StatusResponse {
@@ -194,6 +244,8 @@ pub struct StatusResponse {
     pub federation: FederationHealthStats,
     /// Diagnostic information and recommendations
     pub diagnostics: Diagnostics,
+    /// Uniform compute report (shared fleet contract)
+    pub compute: elohim_compute::ComputeReport,
 }
 
 // =============================================================================
@@ -254,6 +306,45 @@ pub struct StatusPageTemplate {
 // =============================================================================
 // Shared Data Gathering
 // =============================================================================
+
+/// Cached MongoDB projection stats (refreshed every 30s)
+static PROJECTION_STATS_CACHE: OnceLock<TokioMutex<(std::time::Instant, u64, u64)>> =
+    OnceLock::new();
+
+async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
+    let cache = PROJECTION_STATS_CACHE.get_or_init(|| {
+        TokioMutex::new((
+            std::time::Instant::now() - std::time::Duration::from_secs(60),
+            0,
+            0,
+        ))
+    });
+
+    let mut cached = cache.lock().await;
+    if cached.0.elapsed().as_secs() < 30 {
+        return (cached.1, cached.2);
+    }
+
+    let result = if let Some(ref mongo) = state.mongo {
+        let db = mongo.inner().database(mongo.db_name());
+        match db
+            .run_command(bson::doc! { "collStats": "projected_entries" })
+            .await
+        {
+            Ok(doc) => {
+                let bytes = doc.get_i64("size").unwrap_or(0).max(0) as u64;
+                let docs = doc.get_i64("count").unwrap_or(0).max(0) as u64;
+                (bytes, docs)
+            }
+            Err(_) => (0, 0),
+        }
+    } else {
+        (0, 0)
+    };
+
+    *cached = (std::time::Instant::now(), result.0, result.1);
+    result
+}
 
 /// Build the StatusResponse from the current AppState.
 /// Shared by both the JSON endpoint and the HTML page handler.
@@ -484,6 +575,35 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         recommendations,
     };
 
+    // Build uniform compute report
+    let (projection_bytes, projection_documents) = fetch_projection_stats(state).await;
+    let hot_cache_entries = state
+        .projection
+        .as_ref()
+        .map(|p| p.hot_cache_stats().total_entries)
+        .unwrap_or(0);
+
+    let reporter = DoorwayHealthReporter {
+        state,
+        conductor_connected,
+        storage_reachable: storage.reachable,
+    };
+    let resources = elohim_compute::ResourceSnapshot {
+        timestamp: chrono::Utc::now(),
+        requests: state.request_counters.snapshot(),
+        active_connections: state.peer_health.active_count(),
+        managed_storage_bytes: projection_bytes,
+        managed_document_count: projection_documents,
+    };
+    let compute_peers = state.peer_health.snapshot();
+    let extensions = serde_json::json!({
+        "hotCacheEntries": hot_cache_entries,
+        "cacheHitRate": cache_stats.hit_rate(),
+    });
+    let mut compute =
+        elohim_compute::ComputeReport::build(&reporter, resources, compute_peers, extensions);
+    compute.version = env!("CARGO_PKG_VERSION").to_string();
+
     StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
@@ -499,6 +619,7 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         orchestrator,
         federation,
         diagnostics,
+        compute,
     }
 }
 
@@ -981,6 +1102,26 @@ mod tests {
                 status: "healthy".to_string(),
                 recommendations: vec![],
             },
+            compute: elohim_compute::ComputeReport {
+                service_id: "doorway".to_string(),
+                version: "0.1.0".to_string(),
+                health: elohim_compute::ServiceHealth::Healthy,
+                health_reason: "all systems go".to_string(),
+                started_at: chrono::Utc::now(),
+                uptime_seconds: 60,
+                resources: elohim_compute::ResourceSnapshot {
+                    timestamp: chrono::Utc::now(),
+                    requests: elohim_compute::RequestCounterSnapshot {
+                        total: 0,
+                        by_category: std::collections::HashMap::new(),
+                    },
+                    active_connections: 0,
+                    managed_storage_bytes: 0,
+                    managed_document_count: 0,
+                },
+                peers: vec![],
+                extensions: serde_json::json!({}),
+            },
         };
 
         let json = serde_json::to_string(&status).unwrap();
@@ -997,5 +1138,8 @@ mod tests {
         assert!(json.contains("peerCount"));
         assert!(json.contains("selfId"));
         assert!(json.contains("consensusStatus"));
+        assert!(json.contains("\"compute\""));
+        assert!(json.contains("\"serviceId\""));
+        assert!(json.contains("\"uptimeSeconds\""));
     }
 }
