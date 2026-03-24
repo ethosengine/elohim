@@ -36,7 +36,9 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
-use super::app_auth::{issue_app_token, AppAuthToken};
+// issue_app_token unused while auth is disabled (conductor doesn't require it).
+// Kept in app_auth.rs for when auth becomes required.
+use super::app_auth::AppAuthToken;
 use super::engine::ProjectionSignal;
 
 // =============================================================================
@@ -200,8 +202,8 @@ impl Default for SubscriberConfig {
             installed_app_id: "elohim".to_string(),
             token_expiry_seconds: 0, // No expiry - we'll refresh on reconnect
             reconnect_delay: Duration::from_secs(5),
-            max_reconnect_attempts: 0, // Infinite
-            ping_interval: Duration::from_secs(30),
+            max_reconnect_attempts: 0,             // Infinite
+            ping_interval: Duration::from_secs(5), // Must be < conductor idle timeout (~10s)
         }
     }
 }
@@ -293,6 +295,12 @@ impl SignalSubscriber {
     }
 
     /// Start the subscriber (blocking)
+    ///
+    /// Connects to the conductor's app WebSocket WITHOUT authentication.
+    /// The conductor on alpha doesn't require auth (worker pool proves this).
+    /// Keepalive pings (5s interval) prevent the conductor's idle timeout (~10s).
+    ///
+    /// If auth becomes required in future, re-enable the token flow below.
     pub async fn run(&self) {
         let mut reconnect_attempts = 0u32;
         let mut shutdown_rx = self.shutdown_receiver();
@@ -304,47 +312,9 @@ impl SignalSubscriber {
                 break;
             }
 
-            // Step 1: Get auth token from admin interface
-            info!(
-                "Requesting app auth token for '{}' from {}",
-                self.config.installed_app_id, self.config.admin_url
-            );
-
-            let token = match issue_app_token(
-                &self.config.admin_url,
-                &self.config.installed_app_id,
-                self.config.token_expiry_seconds,
-            )
-            .await
-            {
-                Ok(t) => {
-                    info!("Obtained app authentication token");
-                    t
-                }
-                Err(e) => {
-                    error!("Failed to get app auth token: {}", e);
-                    reconnect_attempts += 1;
-
-                    if self.config.max_reconnect_attempts > 0
-                        && reconnect_attempts >= self.config.max_reconnect_attempts
-                    {
-                        error!("Max reconnection attempts reached, stopping subscriber");
-                        break;
-                    }
-
-                    info!(
-                        "Retrying in {:?} (attempt {})",
-                        self.config.reconnect_delay, reconnect_attempts
-                    );
-                    sleep(self.config.reconnect_delay).await;
-                    continue;
-                }
-            };
-
-            // Step 2: Connect to app interface and authenticate
             info!("Connecting to app interface at {}", self.config.app_url);
 
-            match self.connect_and_listen(&token).await {
+            match self.connect_and_listen_no_auth().await {
                 Ok(()) => {
                     // Clean disconnect, reset counter
                     reconnect_attempts = 0;
@@ -407,12 +377,29 @@ impl SignalSubscriber {
             .map_err(|e| format!("Failed to build request: {e}"))
     }
 
-    /// Connect to conductor, authenticate, and listen for signals.
+    /// Connect to conductor WITHOUT auth and listen for signals.
     ///
-    /// Authentication is required — without it the conductor doesn't associate
-    /// the connection with an app, so no signals are routed and the connection
-    /// is dropped after idle timeout (~10s).
-    async fn connect_and_listen(&self, token: &AppAuthToken) -> Result<(), String> {
+    /// The conductor's app interface on alpha doesn't require auth — the worker
+    /// pool connects the same way and successfully makes zome calls. Keepalive
+    /// pings prevent the conductor's ~10s idle timeout.
+    async fn connect_and_listen_no_auth(&self) -> Result<(), String> {
+        let request = self.build_ws_request()?;
+        let (ws_stream, _) = connect_async_with_config(request, None, false)
+            .await
+            .map_err(|e| format!("WebSocket connect failed: {e}"))?;
+
+        info!("Connected to conductor app interface (no auth, keepalive pings)");
+
+        let (write, read) = ws_stream.split();
+        self.listen_loop(write, read).await
+    }
+
+    /// Connect to conductor WITH auth and listen for signals.
+    ///
+    /// Currently unused — kept for when conductors require authentication.
+    /// Uses official holochain_websocket::WireMessage encoding (see module doc).
+    #[allow(dead_code)]
+    async fn connect_and_listen_with_auth(&self, token: &AppAuthToken) -> Result<(), String> {
         let request = self.build_ws_request()?;
         let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
@@ -422,7 +409,6 @@ impl SignalSubscriber {
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Authenticate with the conductor's app interface
         self.send_auth_request(&mut write, token).await?;
         self.wait_for_auth_response(&mut read).await?;
 
