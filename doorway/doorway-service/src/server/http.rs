@@ -107,6 +107,12 @@ pub struct AppState {
     pub route_registry: Arc<RouteRegistry>,
     /// Journal inference mode — determined at boot by sidecar availability
     pub journal_inference_available: bool,
+    /// Per-peer projection subscriber health (shared crate)
+    pub peer_health: Arc<elohim_compute::PeerHealthRegistry>,
+    /// Request throughput counters for /api/v1/cache/ (shared crate)
+    pub request_counters: Arc<elohim_compute::RequestCounters>,
+    /// Service boot time (for uptime in ComputeReport)
+    pub started_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl AppState {
@@ -177,6 +183,9 @@ impl AppState {
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
             journal_inference_available: false,
+            peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
+            request_counters: Arc::new(elohim_compute::RequestCounters::new()),
+            started_at: chrono::Utc::now(),
         }
     }
 
@@ -251,6 +260,9 @@ impl AppState {
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
             journal_inference_available: false,
+            peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
+            request_counters: Arc::new(elohim_compute::RequestCounters::new()),
+            started_at: chrono::Utc::now(),
         }
     }
 
@@ -340,6 +352,9 @@ impl AppState {
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
             journal_inference_available: false,
+            peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
+            request_counters: Arc::new(elohim_compute::RequestCounters::new()),
+            started_at: chrono::Utc::now(),
         }
     }
 
@@ -423,6 +438,9 @@ impl AppState {
             cors_config,
             route_registry: Arc::new(RouteRegistry::with_defaults()),
             journal_inference_available: false,
+            peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
+            request_counters: Arc::new(elohim_compute::RequestCounters::new()),
+            started_at: chrono::Utc::now(),
         })
     }
 
