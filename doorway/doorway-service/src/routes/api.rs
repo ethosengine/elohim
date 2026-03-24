@@ -207,6 +207,9 @@ pub async fn handle_api_request(
         }
     };
 
+    // Track request for resource accounting
+    state.request_counters.increment(route.doc_type);
+
     // Parse requester identity from auth header (passed to DNA for access control)
     let requester = parse_requester_identity(auth_header.as_deref(), &state);
 
