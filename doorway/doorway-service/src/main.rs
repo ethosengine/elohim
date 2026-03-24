@@ -539,6 +539,10 @@ async fn main() -> anyhow::Result<()> {
                                 }
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                // Note: record_reconnect() is available but not wired here
+                                // because there is no reconnect loop yet. When subscriber
+                                // reconnection is implemented, it should call
+                                // peer_health.record_reconnect() on each attempt.
                                 peer_health_clone.update_health(
                                     &conductor_id_clone,
                                     elohim_compute::ServiceHealth::Offline,

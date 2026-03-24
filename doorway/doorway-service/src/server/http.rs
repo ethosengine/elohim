@@ -113,6 +113,8 @@ pub struct AppState {
     pub request_counters: Arc<elohim_compute::RequestCounters>,
     /// Service boot time (for uptime in ComputeReport)
     pub started_at: chrono::DateTime<chrono::Utc>,
+    /// Cached MongoDB projection stats (per-instance, not global static)
+    pub projection_stats_cache: Arc<tokio::sync::Mutex<(std::time::Instant, u64, u64)>>,
 }
 
 impl AppState {
@@ -186,6 +188,11 @@ impl AppState {
             peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
             request_counters: Arc::new(elohim_compute::RequestCounters::new()),
             started_at: chrono::Utc::now(),
+            projection_stats_cache: Arc::new(tokio::sync::Mutex::new((
+                std::time::Instant::now() - std::time::Duration::from_secs(60),
+                0,
+                0,
+            ))),
         }
     }
 
@@ -263,6 +270,11 @@ impl AppState {
             peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
             request_counters: Arc::new(elohim_compute::RequestCounters::new()),
             started_at: chrono::Utc::now(),
+            projection_stats_cache: Arc::new(tokio::sync::Mutex::new((
+                std::time::Instant::now() - std::time::Duration::from_secs(60),
+                0,
+                0,
+            ))),
         }
     }
 
@@ -355,6 +367,11 @@ impl AppState {
             peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
             request_counters: Arc::new(elohim_compute::RequestCounters::new()),
             started_at: chrono::Utc::now(),
+            projection_stats_cache: Arc::new(tokio::sync::Mutex::new((
+                std::time::Instant::now() - std::time::Duration::from_secs(60),
+                0,
+                0,
+            ))),
         }
     }
 
@@ -441,6 +458,11 @@ impl AppState {
             peer_health: Arc::new(elohim_compute::PeerHealthRegistry::new()),
             request_counters: Arc::new(elohim_compute::RequestCounters::new()),
             started_at: chrono::Utc::now(),
+            projection_stats_cache: Arc::new(tokio::sync::Mutex::new((
+                std::time::Instant::now() - std::time::Duration::from_secs(60),
+                0,
+                0,
+            ))),
         })
     }
 

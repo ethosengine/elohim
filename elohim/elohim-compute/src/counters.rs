@@ -33,6 +33,11 @@ impl RequestCounters {
             .fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Snapshot all counters for serialization.
+    ///
+    /// Note: `total` may transiently exceed `sum(by_category)` by the number of
+    /// in-flight `increment()` calls (Relaxed ordering). Acceptable for monitoring;
+    /// not suitable for billing.
     pub fn snapshot(&self) -> RequestCounterSnapshot {
         let by_category: HashMap<String, u64> = self
             .by_category

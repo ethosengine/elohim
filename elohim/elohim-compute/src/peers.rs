@@ -1,4 +1,10 @@
 //! Per-peer health tracking registry.
+//!
+//! Snapshots are not point-in-time consistent across fields. A concurrent
+//! `record_signal()` between reading `signals_received` and `health` may
+//! cause the snapshot to show a signal count that hasn't yet been reflected
+//! in the health state. Acceptable for operator dashboards; automated
+//! decisions should treat snapshots as eventually-consistent.
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;

@@ -10,9 +10,6 @@ use hyper::{Request, Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
-use std::sync::OnceLock;
-use tokio::sync::Mutex as TokioMutex;
-
 use crate::auth::{extract_token_from_header, JwtValidator, PermissionLevel};
 use crate::orchestrator::NodeHealthStatus;
 use crate::server::AppState;
@@ -186,6 +183,7 @@ impl elohim_compute::HealthReporter for DoorwayHealthReporter<'_> {
         } else if !self.conductor_connected && !self.storage_reachable {
             elohim_compute::ServiceHealth::Offline
         } else {
+            // One subsystem connected, one not — partial availability in production
             elohim_compute::ServiceHealth::Degraded
         }
     }
@@ -329,20 +327,8 @@ pub struct StatusPageTemplate {
 // Shared Data Gathering
 // =============================================================================
 
-/// Cached MongoDB projection stats (refreshed every 30s)
-static PROJECTION_STATS_CACHE: OnceLock<TokioMutex<(std::time::Instant, u64, u64)>> =
-    OnceLock::new();
-
 async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
-    let cache = PROJECTION_STATS_CACHE.get_or_init(|| {
-        TokioMutex::new((
-            std::time::Instant::now() - std::time::Duration::from_secs(60),
-            0,
-            0,
-        ))
-    });
-
-    let mut cached = cache.lock().await;
+    let mut cached = state.projection_stats_cache.lock().await;
     if cached.0.elapsed().as_secs() < 30 {
         return (cached.1, cached.2);
     }
@@ -358,7 +344,10 @@ async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
                 let docs = doc.get_i64("count").unwrap_or(0).max(0) as u64;
                 (bytes, docs)
             }
-            Err(_) => (0, 0),
+            Err(e) => {
+                tracing::warn!("collStats query failed (deprecated in MongoDB 6.2+): {e}");
+                (0, 0)
+            }
         }
     } else {
         (0, 0)
