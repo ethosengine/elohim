@@ -71,7 +71,6 @@ import {
   type IStorageApi,
   type IStorageWriter,
   type ContentFilters,
-  type PathFilters,
   type RelationshipFilters,
   type UpdateContentPatch,
   type CreatePresenceInput,
@@ -88,8 +87,6 @@ import type {
   ContentMasteryView,
   ContentWithTagsView,
   CreateContentInputView,
-  PathView,
-  PathWithDetailsView,
   StewardshipAllocationView,
   ContentStewardshipView,
 } from '@elohim/storage-client/generated';
@@ -195,38 +192,6 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
         timeout(this.defaultTimeoutMs),
         catchError(error => this.handleError('updateContent', error))
       );
-  }
-
-  /** Get a single learning path by ID, with full details. */
-  getPath(id: string): Observable<PathWithDetailsView | null> {
-    return this.http
-      .get<PathWithDetailsView>(`${this.baseUrl}/db/paths/${encodeURIComponent(id)}`)
-      .pipe(
-        timeout(this.defaultTimeoutMs),
-        catchError(error => {
-          if ((error as Record<string, unknown>)['status'] === 404) {
-            return of(null);
-          }
-          return this.handleError('getPath', error);
-        })
-      );
-  }
-
-  /** List learning paths with optional filters. */
-  getPaths(filters?: PathFilters): Observable<PathView[]> {
-    let params = new HttpParams().set('appId', this.appId);
-
-    if (filters?.pathType) params = params.set('pathType', filters.pathType);
-    if (filters?.difficulty) params = params.set('difficulty', filters.difficulty);
-    if (filters?.visibility) params = params.set('visibility', filters.visibility);
-    if (filters?.tags?.length) params = params.set('tags', filters.tags.join(','));
-    if (filters?.limit) params = params.set('limit', filters.limit.toString());
-    if (filters?.offset) params = params.set('offset', filters.offset.toString());
-
-    return this.http.get<PathView[]>(`${this.baseUrl}/db/paths`, { params }).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError(error => this.handleError('getPaths', error))
-    );
   }
 
   /** Get relationships for a content node, with joined content. */

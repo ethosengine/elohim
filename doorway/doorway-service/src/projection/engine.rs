@@ -56,7 +56,7 @@ use super::store::ProjectionStore;
 ///   (used by ContentServerCommitted signals from infrastructure DNA)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectionSignal {
-    /// Document type (e.g., "Content", "LearningPath", "MyCustomType")
+    /// Document type (e.g., "Content", "Human", "MyCustomType")
     /// For "update_endpoints" action, this is ignored.
     pub doc_type: String,
     /// Action ("commit", "delete", "update", "update_endpoints")
@@ -78,7 +78,7 @@ pub struct ProjectionSignal {
     /// Search tokens (DNA computes these from title, description, tags, etc.)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub search_tokens: Vec<String>,
-    /// Cache keys to invalidate (e.g., ["LearningPath:governance-intro"])
+    /// Cache keys to invalidate (e.g., ["Content:governance-intro"])
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub invalidates: Vec<String>,
     /// TTL in seconds (None = no expiry)
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn test_signal_deserialization() {
         let json = r#"{
-            "doc_type": "LearningPath",
+            "doc_type": "Content",
             "action": "commit",
             "id": "governance-intro",
             "data": {"title": "Introduction to Governance"},
@@ -311,7 +311,7 @@ mod tests {
         }"#;
 
         let signal: ProjectionSignal = serde_json::from_str(json).unwrap();
-        assert_eq!(signal.doc_type, "LearningPath");
+        assert_eq!(signal.doc_type, "Content");
         assert_eq!(signal.action, "commit");
         assert_eq!(signal.id, "governance-intro");
         assert_eq!(signal.search_tokens.len(), 2);

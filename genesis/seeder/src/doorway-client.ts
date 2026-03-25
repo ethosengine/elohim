@@ -832,66 +832,6 @@ export class DoorwayClient {
   }
 
   /**
-   * Bulk create paths directly via storage service.
-   *
-   * @param items - Path items to create (with nested chapters/steps)
-   * @returns BulkCreateResult with inserted/skipped counts
-   */
-  async bulkCreatePaths(
-    items: Array<{
-      schemaVersion?: number;
-      id: string;
-      title: string;
-      description?: string;
-      pathType?: string;
-      difficulty?: string;
-      estimatedDuration?: string;
-      visibility?: string;
-      metadataJson?: string;
-      tags?: string[];
-      chapters?: Array<{
-        id: string;
-        title: string;
-        description?: string;
-        orderIndex: number;
-        steps?: Array<{
-          id: string;
-          pathId: string;
-          chapterId?: string;
-          title: string;
-          stepType?: string;
-          resourceId?: string;
-          orderIndex: number;
-          metadataJson?: string;
-        }>;
-      }>;
-    }>
-  ): Promise<BulkCreateResult> {
-    if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would bulk create ${items.length} paths`);
-      return { inserted: items.length, skipped: 0, errors: [] };
-    }
-
-    const response = await this.fetch('/db/paths/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
-      body: JSON.stringify(items),
-      timeout: 120000,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
-        const supported = response.headers.get('X-Supported-Schema-Versions');
-        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
-      }
-      throw new Error(`Bulk create paths failed: HTTP ${response.status}: ${errorText}`);
-    }
-
-    return await response.json();
-  }
-
-  /**
    * Bulk create relationships directly via storage service.
    *
    * @param items - Relationship items to create

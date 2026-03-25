@@ -7,7 +7,7 @@
 
 /**
  * Paginated list response from elohim-storage.
- * All list endpoints (GET /db/content, /db/paths, /db/relationships) return this shape.
+ * All list endpoints (GET /db/content, /db/relationships) return this shape.
  */
 export interface ListResponse<T> {
   /** Array of items matching the query */
@@ -22,7 +22,7 @@ export interface ListResponse<T> {
 
 /**
  * Result from bulk create operations.
- * Returned by POST /db/content/bulk, /db/paths/bulk, /db/relationships/bulk
+ * Returned by POST /db/content/bulk, /db/relationships/bulk
  */
 export interface BulkCreateResult {
   /** Number of items successfully inserted */

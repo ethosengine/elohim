@@ -641,10 +641,15 @@ pub struct ShardLocation {
 }
 
 // =============================================================================
-// Learning Path Entries
+// Learning Path Entries (DEPRECATED)
+//
+// Paths are now Content entries with content_type "path" and content_format
+// "epr-composite". These entry types are retained so existing DHT entries
+// continue to validate. Do NOT create new entries of these types.
 // =============================================================================
 
-/// Learning path entry
+/// DEPRECATED: Paths are now Content entries with content_type "path".
+/// Validation retained for existing DHT entries. Do not create new entries.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct LearningPath {
@@ -688,7 +693,8 @@ impl Cacheable for LearningPath {
     }
 }
 
-/// Path step entry - represents a single learning activity
+/// DEPRECATED: Paths are now Content entries with content_type "path".
+/// Validation retained for existing DHT entries. Do not create new entries.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct PathStep {
@@ -725,8 +731,11 @@ pub struct PathStep {
 }
 
 
-/// Path chapter entry - thematic grouping of steps
-/// Named "chapter" to evoke narrative journey rather than institutional "module"
+/// DEPRECATED: Paths are now Content entries with content_type "path".
+/// Validation retained for existing DHT entries. Do not create new entries.
+///
+/// Path chapter entry - thematic grouping of steps.
+/// Named "chapter" to evoke narrative journey rather than institutional "module".
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct PathChapter {

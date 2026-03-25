@@ -21,7 +21,6 @@ export { STORAGE_API } from './storage-api.interface';
 export type {
   IStorageApi,
   ContentFilters,
-  PathFilters,
   RelationshipFilters,
   UpdateContentPatch,
 } from './storage-api.interface';

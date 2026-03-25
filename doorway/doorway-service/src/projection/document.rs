@@ -33,7 +33,7 @@ pub struct ProjectedDocument {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub mongo_id: Option<String>,
 
-    /// Document type (e.g., "Content", "LearningPath", "Relationship")
+    /// Document type (e.g., "Content", "Human", "Relationship")
     pub doc_type: String,
 
     /// Document ID within its type (often the entry's id field)

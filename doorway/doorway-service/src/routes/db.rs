@@ -21,9 +21,6 @@
 //! - GET /db/content - List content
 //! - GET /db/content/{id} - Get content by ID
 //! - POST /db/content/bulk - Bulk create content
-//! - GET /db/paths - List paths
-//! - GET /db/paths/{id} - Get path by ID with steps
-//! - POST /db/paths/bulk - Bulk create paths
 //! - GET /db/stats - Database statistics
 
 use bytes::Bytes;

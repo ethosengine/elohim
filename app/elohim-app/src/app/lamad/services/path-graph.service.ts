@@ -15,6 +15,8 @@ import {
   PathStep,
   PathContentMetadata,
   PathReference,
+  DifficultyLevel,
+  PathType,
 } from '../models/learning-path.model';
 
 /**
@@ -74,16 +76,16 @@ export class PathGraphService {
 
     const pathMetadata: PathContentMetadata = {
       pathId: path.id,
-      difficulty: path.difficulty,
-      estimatedDuration: path.estimatedDuration,
+      difficulty: (path.difficulty ?? 'beginner') as DifficultyLevel,
+      estimatedDuration: path.estimatedDuration ?? '',
       stepCount: this.countSteps(path),
       chapterCount: path.chapters?.length,
       contentNodeIds,
       nestedPathIds: nestedPathIds.length > 0 ? nestedPathIds : undefined,
       creatorInfo: path.createdBy ? { presenceId: path.createdBy } : undefined,
-      forkedFromPathId: path.forkedFrom,
+      forkedFromPathId: (path.node?.metadata as Record<string, unknown>)?.['forkedFrom'] as string | undefined,
       canonicalStatus: 'draft', // New paths start as draft
-      pathType: path.pathType,
+      pathType: path.pathType as PathType | undefined,
       attestationsGranted: path.attestationsGranted,
     };
 
@@ -95,13 +97,13 @@ export class PathGraphService {
       description: path.description,
       content: path.purpose,
       contentFormat: 'markdown',
-      tags: [...path.tags, 'path', path.difficulty],
+      tags: [...path.tags, 'path', path.difficulty ?? 'beginner'],
       relatedNodeIds: contentNodeIds,
       metadata: pathMetadata as unknown as ContentMetadata,
       authorId: path.createdBy,
       reach,
-      createdAt: path.createdAt,
-      updatedAt: path.updatedAt,
+      createdAt: path.createdAt ?? new Date().toISOString(),
+      updatedAt: path.updatedAt ?? new Date().toISOString(),
     };
 
     // In prototype mode, we just return the node

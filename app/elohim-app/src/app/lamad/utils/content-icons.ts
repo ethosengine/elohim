@@ -91,6 +91,7 @@ export const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
   'instrument-json': '🧪',
   'external-link': '🔗',
   epub: '📚',
+  'epr-composite': '🗺️',
 };
 
 /**

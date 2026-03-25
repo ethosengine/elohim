@@ -3,7 +3,7 @@
  *
  * Client for elohim-storage backend which provides:
  * - Blob store: Content-addressed storage for images, ZIPs, media
- * - SQL metadata: Content nodes, paths, projections
+ * - SQL metadata: Content nodes, relationships, projections
  *
  * Routes requests based on connection strategy:
  * - Doorway mode (browser): Blobs via /api/blob/{hash}, DB via /db/{table}
@@ -44,21 +44,6 @@ export interface StorageContentNode {
   validationStatus?: string; // draft, approved, etc.
   createdBy?: string; // agent who created the content
   contentSizeBytes?: number; // size of blob content
-}
-
-/** Path from storage */
-export interface StoragePath {
-  id: string;
-  version: string;
-  title: string;
-  description: string;
-  difficulty: string;
-  estimatedDuration: string | null;
-  pathType: string;
-  thumbnailUrl: string | null;
-  thumbnailBlobHash: string | null;
-  metadataJson: string | null;
-  tags: string[];
 }
 
 /** Content query filter */
@@ -186,54 +171,6 @@ export class StorageClientService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Path Metadata Operations
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Get path by ID.
-   */
-  getPath(id: string): Observable<StoragePath | null> {
-    const baseUrl = this.getStorageBaseUrl();
-    // Doorway proxies /db/* routes (no /api/ prefix for db)
-    const endpoint = `${baseUrl}/db/paths/${encodeURIComponent(id)}`;
-
-    return this.http.get<StoragePath>(endpoint).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError((error: HttpErrorResponse) => {
-        if (error.status === 404) return of(null);
-        return this.handleError('getPath', error);
-      })
-    );
-  }
-
-  /**
-   * Get all paths.
-   * @endpoint GET /db/paths
-   * @returns ListResponse with items, count, limit, offset
-   */
-  getAllPaths(): Observable<ListResponse<StoragePath>> {
-    const baseUrl = this.getStorageBaseUrl();
-    // Doorway proxies /db/* routes (no /api/ prefix for db)
-    const endpoint = `${baseUrl}/db/paths`;
-
-    return this.http.get<ListResponse<StoragePath>>(endpoint).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError((error: HttpErrorResponse) => this.handleError('getAllPaths', error))
-    );
-  }
-
-  /**
-   * Get thumbnail URL for a path.
-   * Returns blob URL if thumbnailBlobHash is set, otherwise returns thumbnailUrl.
-   */
-  getPathThumbnailUrl(path: StoragePath): string | null {
-    if (path.thumbnailBlobHash) {
-      return this.getBlobUrl(path.thumbnailBlobHash);
-    }
-    return path.thumbnailUrl;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
   // Connection Mode
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -306,22 +243,6 @@ export class StorageClientService {
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000), // 2 min for bulk ops
       catchError((error: HttpErrorResponse) => this.handleError('bulkCreateContent', error))
-    );
-  }
-
-  /**
-   * Bulk create paths.
-   * @endpoint POST /db/paths/bulk
-   * @returns BulkCreateResult with inserted/skipped counts
-   */
-  bulkCreatePaths(items: Partial<StoragePath>[]): Observable<BulkCreateResult> {
-    const baseUrl = this.getStorageBaseUrl();
-    // Doorway proxies /db/* routes (no /api/ prefix for db)
-    const endpoint = `${baseUrl}/db/paths/bulk`;
-
-    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
-      timeout(120000),
-      catchError((error: HttpErrorResponse) => this.handleError('bulkCreatePaths', error))
     );
   }
 

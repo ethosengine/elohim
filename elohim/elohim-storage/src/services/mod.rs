@@ -35,7 +35,6 @@ pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
 pub mod mastery_depth;
-pub mod path_service;
 pub mod presence_service;
 pub mod rea_commitment_service;
 pub mod recognition_pipeline_service;
@@ -63,7 +62,6 @@ pub use economic_event_service::EconomicEventService;
 pub use events::{EventBus, EventListener, StorageEvent};
 pub use exchange_service::ExchangeService;
 pub use knowledge_service::KnowledgeService;
-pub use path_service::PathService;
 pub use presence_service::PresenceService;
 pub use relationship_service::RelationshipService;
 pub use resource_service::ResourceService;
@@ -83,7 +81,6 @@ use std::sync::Arc;
 /// Pass this to HttpServer for handler access.
 pub struct Services {
     pub content: Arc<ContentService>,
-    pub path: Arc<PathService>,
     pub relationship: Arc<RelationshipService>,
     pub knowledge: Arc<KnowledgeService>,
     pub events: Arc<EventBus>,
@@ -113,7 +110,6 @@ impl Services {
                 ctx.clone(),
                 events.clone(),
             )),
-            path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
             relationship: Arc::new(RelationshipService::new(
                 pool.clone(),
                 ctx.clone(),
@@ -140,7 +136,6 @@ impl Services {
                 ctx.clone(),
                 events.clone(),
             )),
-            path: Arc::new(PathService::new(pool.clone(), ctx.clone(), events.clone())),
             relationship: Arc::new(RelationshipService::new(
                 pool.clone(),
                 ctx.clone(),

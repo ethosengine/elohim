@@ -17,6 +17,7 @@ pub const CORE_CONTENT_FORMATS: &[&str] = &[
     "audio",
     "interactive",
     "external",
+    "epr-composite",
 ];
 
 /// All contentformat — includes storage-only and extensible.
@@ -27,6 +28,7 @@ pub const ALL_CONTENT_FORMATS: &[&str] = &[
     "audio",
     "interactive",
     "external",
+    "epr-composite",
     "plaintext",
     "text",
     "plain",
@@ -55,6 +57,7 @@ pub const CORE_CONTENT_TYPES: &[&str] = &[
     "discussion",
     "exercise",
     "article",
+    "path",
 ];
 
 /// All contenttype — includes storage-only and extensible.
@@ -68,6 +71,7 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
     "discussion",
     "exercise",
     "article",
+    "path",
     "human",
     "role",
     "collective",

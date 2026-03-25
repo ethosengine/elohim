@@ -24,7 +24,7 @@ import {
   KnowledgeMapType,
   KnowledgeNode,
 } from '../../lamad/models/knowledge-map.model';
-import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
+import { LearningPath, PathIndex, PathIndexEntry, parsePathView } from '../../lamad/models/learning-path.model';
 import {
   PathExtensionIndex,
   PathExtension,
@@ -289,31 +289,27 @@ export class DataLoaderService {
   // NOTE: PATH_TIMEOUT_MS removed - ContentService handles timeouts
 
   /**
-   * Load a LearningPath by ID.
+   * Load a LearningPath (PathView) by ID.
+   * Delegates to getContent() and parses via parsePathView().
    * Does NOT load the content for each step (lazy loading).
    *
-   * Read path: Projection API (fast, aggregated across all peers) → ContentService fallback.
+   * Read path: getContent() (projection → ContentService fallback) → parsePathView.
    */
   getPath(pathId: string): Observable<LearningPath> {
-    // Primary: projection cache (fast, serves commons content from all peers)
-    // Fallback: ContentService (direct storage)
-    const source$ = this.projectionApi.enabled
-      ? this.projectionApi.getPathNode(pathId).pipe(
-          timeout(3000),
-          switchMap(path => path
-            ? of(path)
-            : this.contentService.getPath(pathId)
-          ),
-          catchError(() => this.contentService.getPath(pathId))
-        )
-      : this.contentService.getPath(pathId);
-
-    return source$.pipe(
-      map(path => {
-        if (!path) {
+    return this.getContent(pathId).pipe(
+      map(node => {
+        if (!node || node.contentType === 'placeholder') {
+          // Distinguish true 404 from network-error placeholders:
+          // Placeholders from network errors contain the original error in description
+          const isNetworkError = node?.description?.includes('Error') ||
+            node?.description?.includes('timeout') ||
+            node?.description?.includes('could not be loaded');
+          if (isNetworkError) {
+            throw new Error(`Path load failed: ${pathId}`);
+          }
           throw new Error(`Path not found: ${pathId}`);
         }
-        return path;
+        return parsePathView(node);
       }),
       tap(path => {
         // Store in IndexedDB cache for offline persistence (background, non-blocking)
@@ -328,7 +324,7 @@ export class DataLoaderService {
         const errMsg = err instanceof Error ? err.message : String(err);
 
         // "Not found" is a data issue, not connectivity — don't try cache
-        if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
+        if (errMsg.includes('Path not found')) {
           this.logger.warn('Path not found (may be stale reference)', { pathId });
           throw err;
         }
@@ -372,45 +368,8 @@ export class DataLoaderService {
    * @returns Observable of lightweight LearningPath (steps array will be empty)
    */
   getPathOverview(pathId: string): Observable<LearningPath> {
-    // Try projection API first if enabled
-    if (this.projectionApi.enabled) {
-      return this.projectionApi.getPathOverview(pathId).pipe(
-        timeout(5000),
-        switchMap(result => {
-          if (result) {
-            return of(result as LearningPath);
-          }
-          // Fall back to Holochain REST
-          return this.getPathOverviewFromHolochain(pathId);
-        }),
-        catchError(() => this.getPathOverviewFromHolochain(pathId))
-      );
-    }
-
-    return this.getPathOverviewFromHolochain(pathId);
-  }
-
-  /**
-   * Load path overview from content service (uses doorway projection).
-   */
-  private getPathOverviewFromHolochain(pathId: string): Observable<LearningPath> {
-    return this.contentService.getPath(pathId).pipe(
-      timeout(10000),
-      map(result => {
-        if (!result) {
-          throw new Error(`Path not found: ${pathId}`);
-        }
-        return result;
-      }),
-      catchError((err: unknown) => {
-        this.logger.warn('Path overview failed', {
-          pathId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        throw err;
-      }),
-      shareReplay(1)
-    );
+    // Paths are now ContentNodes — delegate to getPath() which uses getContent() + parsePathView
+    return this.getPath(pathId);
   }
 
   /**
@@ -728,12 +687,12 @@ export class DataLoaderService {
 
   /**
    * Load the path index for discovery.
-   * Uses ContentService (doorway projection) as the source.
+   * Queries content by type 'path', parses each into PathView, builds PathIndex.
    * Cached with shareReplay(1) to prevent redundant calls.
    */
   getPathIndex(): Observable<PathIndex> {
-    this.pathIndexCache$ ??= this.contentService.queryPaths({}).pipe(
-      map(paths => this.transformPathsToIndex(paths)),
+    this.pathIndexCache$ ??= this.contentService.queryContent({ contentType: 'path' }).pipe(
+      map(nodes => this.transformContentNodesToPathIndex(nodes)),
       shareReplay(1),
       catchError(err => {
         this.logger.error('Failed to load path index', err);
@@ -749,61 +708,31 @@ export class DataLoaderService {
   }
 
   /**
-   * Transform LearningPath[] to PathIndex model.
+   * Transform ContentNode[] (type=path) to PathIndex model.
    */
-  private transformPathsToIndex(paths: LearningPath[]): PathIndex {
+  private transformContentNodesToPathIndex(nodes: ContentNode[]): PathIndex {
+    const entries: PathIndexEntry[] = nodes.map(node => {
+      const parsed = parsePathView(node);
+      return {
+        id: parsed.id,
+        title: parsed.title,
+        description: parsed.description ?? '',
+        difficulty: (parsed.difficulty as PathIndexEntry['difficulty']) ?? 'beginner',
+        estimatedDuration: parsed.estimatedDuration ?? '',
+        stepCount: parsed.steps.length,
+        tags: parsed.tags ?? [],
+        thumbnailUrl: parsed.thumbnailUrl,
+        thumbnailAlt: parsed.thumbnailAlt,
+        chapterCount: parsed.chapters?.length,
+        pathType: parsed.pathType as PathIndexEntry['pathType'],
+        attestationsGranted: parsed.attestationsGranted,
+      };
+    });
     return {
       lastUpdated: new Date().toISOString(),
-      totalCount: paths.length,
-      paths: paths.map(p => ({
-        id: p.id,
-        title: p.title,
-        description: p.description ?? '',
-        difficulty: p.difficulty,
-        estimatedDuration: p.estimatedDuration ?? '',
-        stepCount: this.calculateStepCount(p),
-        tags: p.tags ?? [],
-        thumbnailUrl: p.thumbnailUrl,
-        thumbnailAlt: p.thumbnailAlt,
-        chapterCount: p.chapters?.length,
-        pathType: p.pathType,
-        attestationsGranted: p.attestationsGranted,
-      })),
+      totalCount: entries.length,
+      paths: entries,
     };
-  }
-
-  /**
-   * Calculate total step count for a path (handles both flat and chapter-based paths).
-   */
-  private calculateStepCount(path: LearningPath): number {
-    // Check if raw data includes pre-computed stepCount (from doorway)
-    const rawStepCount = (path as unknown as Record<string, unknown>)['stepCount'];
-    if (typeof rawStepCount === 'number' && rawStepCount > 0) {
-      return rawStepCount;
-    }
-
-    // Calculate from structure
-    if (path.chapters && path.chapters.length > 0) {
-      return path.chapters.reduce((total, chapter) => {
-        if (chapter.steps) {
-          return total + chapter.steps.length;
-        }
-        if (chapter.modules) {
-          return (
-            total +
-            chapter.modules.reduce(
-              (modTotal, mod) =>
-                modTotal +
-                mod.sections.reduce((secTotal, sec) => secTotal + (sec.conceptIds?.length ?? 0), 0),
-              0
-            )
-          );
-        }
-        return total;
-      }, 0);
-    }
-
-    return path.steps?.length ?? 0;
   }
 
   /**

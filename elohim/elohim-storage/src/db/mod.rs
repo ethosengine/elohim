@@ -1,12 +1,12 @@
 //! SQLite database module for structured content storage
 //!
-//! This module provides fast local storage for content and paths,
+//! This module provides fast local storage for content,
 //! replacing DHT-based content storage for better performance.
 //!
 //! ## Architecture
 //!
 //! - Content bodies stored in blob_store (content-addressed)
-//! - Content metadata, paths, steps, tags stored in SQLite
+//! - Content metadata and tags stored in SQLite
 //! - DHT used only for attestations and agent-centric data
 //! - All operations are app-scoped for multi-tenant isolation
 //!
@@ -14,12 +14,7 @@
 //!
 //! - `apps` - Registered apps for multi-tenancy
 //! - `content` - Content metadata (id, app_id, title, type, blob_hash)
-//! - `paths` - Learning paths
-//! - `steps` - Path steps referencing content
-//! - `chapters` - Optional grouping within paths
 //! - `content_tags` - Tag index for fast lookup
-//! - `path_tags` - Path tag index
-//! - `path_attestations` - Attestations granted upon path completion
 
 // Diesel modules with app scoping
 pub mod cache_queries;
@@ -27,7 +22,6 @@ pub mod content_diesel;
 pub mod context;
 pub mod diesel_schema;
 pub mod models;
-pub mod paths_diesel;
 
 // Diesel modules for graph relationships and domain models
 pub mod agreements;
@@ -44,7 +38,6 @@ pub mod humans;
 pub mod imagodei_observations;
 pub mod knowledge_maps_diesel;
 pub mod local_sessions;
-pub mod path_extensions_diesel;
 pub mod places;
 pub mod rea_commitments;
 pub mod relationships_diesel;
@@ -88,8 +81,6 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DbStats {
     pub content_count: u64,
-    pub path_count: u64,
-    pub step_count: u64,
     pub unique_tags: u64,
 }
 
@@ -174,14 +165,10 @@ impl AppScopedDb {
         let mut conn = self.conn()?;
 
         let content_count = content_diesel::content_count(&mut conn, &self.ctx)?;
-        let path_count = paths_diesel::path_count(&mut conn, &self.ctx)?;
-        let step_count = paths_diesel::total_step_count(&mut conn, &self.ctx)?;
         let tag_count = content_diesel::tag_count(&mut conn, &self.ctx)?;
 
         Ok(DbStats {
             content_count: content_count as u64,
-            path_count: path_count as u64,
-            step_count: step_count as u64,
             unique_tags: tag_count as u64,
         })
     }
@@ -190,8 +177,4 @@ impl AppScopedDb {
 // Re-export Diesel types
 pub mod diesel_types {
     pub use super::content_diesel::{BulkResult, ContentQuery, CreateContentInput};
-    pub use super::paths_diesel::{
-        BulkPathResult, CreateAttestationInput, CreateChapterInput, CreatePathInput,
-        CreateStepInput,
-    };
 }

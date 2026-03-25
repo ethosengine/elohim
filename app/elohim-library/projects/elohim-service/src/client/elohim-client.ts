@@ -450,12 +450,10 @@ export class ElohimClient {
     contentType: ContentType,
     id: string
   ): Promise<T | null> {
-    // Map content type to elohim-storage route
-    // 'content' → /db/content/, 'path' → /db/paths/
-    const route = contentType === 'path' ? 'paths' : contentType;
+    // All content (including paths) lives in /db/content
     // Use storageUrl directly for /db/* routes if configured (local dev bypass)
     const baseUrl = mode.storageUrl ?? mode.doorway.url;
-    const url = `${baseUrl}/db/${route}/${id}`;
+    const url = `${baseUrl}/db/content/${id}`;
 
     const headers: Record<string, string> = {};
     // Only include auth header when using doorway (storage doesn't need it in dev)
@@ -481,14 +479,10 @@ export class ElohimClient {
     mode: BrowserMode,
     query: ContentQuery
   ): Promise<T[]> {
-    // Map content type to elohim-storage route
-    // Default to 'content' if not specified
-    const contentType = query.contentType ?? 'content';
-    const route = contentType === 'path' ? 'paths' : contentType;
-
+    // All content (including paths) lives in /db/content.
+    // contentType is sent as a query parameter for server-side filtering.
     const params = new URLSearchParams();
-    // Note: query.contentType is used for route selection (line 486-487), NOT as a filter.
-    // Sending it as content_type would filter by literal value 'content' which matches nothing.
+    if (query.contentType) params.set('contentType', query.contentType);
     if (query.tags?.length) params.set('tags', query.tags.join(','));
     if (query.search) params.set('search', query.search);
     if (query.limit) params.set('limit', String(query.limit));
@@ -496,7 +490,7 @@ export class ElohimClient {
 
     // Use storageUrl directly for /db/* routes if configured (local dev bypass)
     const baseUrl = mode.storageUrl ?? mode.doorway.url;
-    const url = `${baseUrl}/db/${route}?${params}`;
+    const url = `${baseUrl}/db/content?${params}`;
 
     const headers: Record<string, string> = {};
     // Only include auth header when using doorway (storage doesn't need it in dev)
@@ -536,10 +530,8 @@ export class ElohimClient {
     const baseUrl = mode.storageUrl ?? mode.doorway.url;
 
     for (const [contentType, ops] of byType) {
-      // Map content type to elohim-storage route
-      // 'content' → /db/content/, 'path' → /db/paths/
-      const route = contentType === 'path' ? 'paths' : contentType;
-      const url = `${baseUrl}/db/${route}/bulk`;
+      // All content (including paths) goes to /db/content/bulk
+      const url = `${baseUrl}/db/content/bulk`;
       const items = ops.map(op => op.data);
 
       const response = await fetch(url, {

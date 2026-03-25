@@ -61,8 +61,8 @@ pub fn parse_sse_event(lines: &[String]) -> Option<SseEvent> {
 /// Map SSE event type to ProjectedDocument doc_type
 pub fn event_type_to_doc_type(event_type: &str) -> Option<&'static str> {
     match event_type {
+        // Paths are now ContentNodes — they arrive as cache.content events
         "cache.content" => Some("Content"),
-        "cache.path" => Some("LearningPath"),
         "cache.human" => Some("Human"),
         "cache.relationship" => Some("Relationship"),
         _ => None,
@@ -73,7 +73,6 @@ pub fn event_type_to_doc_type(event_type: &str) -> Option<&'static str> {
 #[derive(Debug, Default)]
 pub struct StreamResult {
     pub content_count: usize,
-    pub path_count: usize,
     pub human_count: usize,
     pub relationship_count: usize,
     pub errors: Vec<String>,
@@ -158,7 +157,6 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
                         if event.event_type == "cache.done" {
                             info!(
                                 content = result.content_count,
-                                paths = result.path_count,
                                 humans = result.human_count,
                                 relationships = result.relationship_count,
                                 "Cache stream completed (done event)"
@@ -199,7 +197,6 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
                             } else {
                                 match doc_type {
                                     "Content" => result.content_count += 1,
-                                    "LearningPath" => result.path_count += 1,
                                     "Human" => result.human_count += 1,
                                     "Relationship" => result.relationship_count += 1,
                                     _ => {}
@@ -218,7 +215,6 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
 
     info!(
         content = result.content_count,
-        paths = result.path_count,
         humans = result.human_count,
         relationships = result.relationship_count,
         "Cache stream finished (stream ended)"
@@ -250,7 +246,6 @@ pub fn spawn_stream_task(
                 info!(
                     storage_url = %storage_url,
                     content = result.content_count,
-                    paths = result.path_count,
                     humans = result.human_count,
                     relationships = result.relationship_count,
                     "Cache stream warm-up completed successfully"
@@ -259,7 +254,6 @@ pub fn spawn_stream_task(
                 warn!(
                     storage_url = %storage_url,
                     content = result.content_count,
-                    paths = result.path_count,
                     humans = result.human_count,
                     relationships = result.relationship_count,
                     errors = ?result.errors,
@@ -342,13 +336,14 @@ mod tests {
     #[test]
     fn test_event_type_to_doc_type() {
         assert_eq!(event_type_to_doc_type("cache.content"), Some("Content"));
-        assert_eq!(event_type_to_doc_type("cache.path"), Some("LearningPath"));
         assert_eq!(event_type_to_doc_type("cache.human"), Some("Human"));
         assert_eq!(
             event_type_to_doc_type("cache.relationship"),
             Some("Relationship")
         );
         assert_eq!(event_type_to_doc_type("cache.done"), None);
+        // cache.path no longer exists — paths are ContentNodes now
+        assert_eq!(event_type_to_doc_type("cache.path"), None);
     }
 
     #[test]
@@ -362,7 +357,6 @@ mod tests {
     fn test_stream_result_default() {
         let result = StreamResult::default();
         assert_eq!(result.content_count, 0);
-        assert_eq!(result.path_count, 0);
         assert_eq!(result.human_count, 0);
         assert_eq!(result.relationship_count, 0);
         assert!(result.errors.is_empty());

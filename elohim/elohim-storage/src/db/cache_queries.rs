@@ -6,11 +6,12 @@
 use diesel::prelude::*;
 
 use super::context::AppContext;
-use super::diesel_schema::{content, humans, paths, relationships};
-use super::models::{Content, Human, Path, Relationship};
+use super::diesel_schema::{content, humans, relationships};
+use super::models::{Content, Human, Relationship};
 use crate::error::StorageError;
 
-/// List content with reach = 'commons' (cacheable for projection)
+/// List content with reach = 'commons' (cacheable for projection).
+/// This now includes paths (contentType = 'path') since paths are content rows.
 pub fn list_cacheable_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -25,22 +26,6 @@ pub fn list_cacheable_content(
         .offset(offset)
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Cacheable content query failed: {e}")))
-}
-
-/// List all paths (all are public per cache rules)
-pub fn list_cacheable_paths(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-    limit: i64,
-    offset: i64,
-) -> Result<Vec<Path>, StorageError> {
-    paths::table
-        .filter(paths::app_id.eq(&ctx.app_id))
-        .order(paths::updated_at.asc())
-        .limit(limit)
-        .offset(offset)
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("Cacheable paths query failed: {e}")))
 }
 
 /// List humans with profile_reach = 'public'

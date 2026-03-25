@@ -830,6 +830,10 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
   return response.json();
 }
 
+// TODO: Legacy seeder still calls /db/paths/bulk which no longer exists.
+// Paths are now ContentNodes — this function needs to be updated to use
+// /db/content/bulk with contentType: 'path' and relationships for steps.
+// See genesis/seeder/src/seed-content.ts for the new pattern.
 async function seedPaths(items: CreatePathInput[]): Promise<{ inserted: number; skipped: number; errors: string[] }> {
   if (DRY_RUN) {
     console.log(`   [DRY RUN] Would seed ${items.length} paths`);

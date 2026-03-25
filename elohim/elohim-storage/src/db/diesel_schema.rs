@@ -59,19 +59,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    chapters (id) {
-        id -> Text,
-        app_id -> Text,
-        path_id -> Text,
-        title -> Text,
-        description -> Nullable<Text>,
-        order_index -> Integer,
-        estimated_duration -> Nullable<Text>,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     content (id) {
         id -> Text,
         app_id -> Text,
@@ -250,44 +237,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    path_attestations (app_id, path_id, attestation_type) {
-        app_id -> Text,
-        path_id -> Text,
-        attestation_type -> Text,
-        attestation_name -> Text,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
-    path_tags (app_id, path_id, tag) {
-        app_id -> Text,
-        path_id -> Text,
-        tag -> Text,
-    }
-}
-
-diesel::table! {
-    paths (id) {
-        id -> Text,
-        app_id -> Text,
-        title -> Text,
-        description -> Nullable<Text>,
-        path_type -> Text,
-        difficulty -> Nullable<Text>,
-        estimated_duration -> Nullable<Text>,
-        thumbnail_url -> Nullable<Text>,
-        thumbnail_alt -> Nullable<Text>,
-        metadata_json -> Nullable<Text>,
-        visibility -> Text,
-        created_by -> Nullable<Text>,
-        created_at -> Text,
-        updated_at -> Text,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     relationships (id) {
         id -> Text,
         app_id -> Text,
@@ -460,24 +409,6 @@ diesel::table! {
         app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
-        dht_anchor_hash -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
-    steps (id) {
-        id -> Text,
-        app_id -> Text,
-        path_id -> Text,
-        chapter_id -> Nullable<Text>,
-        title -> Text,
-        description -> Nullable<Text>,
-        step_type -> Text,
-        resource_id -> Nullable<Text>,
-        resource_type -> Nullable<Text>,
-        order_index -> Integer,
-        estimated_duration -> Nullable<Text>,
-        metadata_json -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
     }
 }
@@ -872,30 +803,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    path_extensions (id) {
-        id -> Text,
-        app_id -> Text,
-        base_path_id -> Text,
-        base_path_version -> Text,
-        extended_by -> Text,
-        title -> Text,
-        description -> Nullable<Text>,
-        insertions_json -> Nullable<Text>,
-        annotations_json -> Nullable<Text>,
-        reorderings_json -> Nullable<Text>,
-        exclusions_json -> Nullable<Text>,
-        visibility -> Text,
-        shared_with_json -> Nullable<Text>,
-        forked_from -> Nullable<Text>,
-        forks_json -> Nullable<Text>,
-        upstream_proposal_json -> Nullable<Text>,
-        stats_json -> Nullable<Text>,
-        created_at -> Text,
-        updated_at -> Text,
-    }
-}
-
-diesel::table! {
     imagodei_observations (id) {
         id -> Text,
         app_id -> Text,
@@ -993,16 +900,10 @@ diesel::table! {
 }
 
 diesel::joinable!(statement_votes -> statements (statement_id));
-diesel::joinable!(chapters -> paths (path_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(node_stewardship -> stewarded_nodes (node_id));
 diesel::joinable!(node_stewardship -> humans (human_id));
-diesel::joinable!(path_attestations -> paths (path_id));
-diesel::joinable!(path_tags -> paths (path_id));
-diesel::joinable!(steps -> chapters (chapter_id));
-diesel::joinable!(path_extensions -> paths (base_path_id));
-diesel::joinable!(steps -> paths (path_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
@@ -1010,7 +911,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     appeals,
     apps,
     challenges,
-    chapters,
     comments,
     collective_participations,
     collectives,
@@ -1035,10 +935,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     knowledge_maps,
     local_sessions,
     node_stewardship,
-    path_attestations,
-    path_extensions,
-    path_tags,
-    paths,
     precedents,
     premium_gates,
     proposal_options,
@@ -1055,6 +951,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     steward_credentials,
     stewarded_nodes,
     stewardship_allocations,
-    steps,
     votes,
 );

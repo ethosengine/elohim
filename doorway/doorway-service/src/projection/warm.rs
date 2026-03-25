@@ -3,21 +3,21 @@
 //! **DEPRECATED**: Use `warm_stream` instead, which streams cacheable content
 //! via SSE from elohim-storage, filtered by reach, with reconnect support.
 //!
-//! This module fetches all content and paths from each peer's storage URL
+//! This module fetches all content from each peer's storage URL
 //! via HTTP pull with arbitrary limits. It doesn't respect reach levels
 //! and pulls blindly. Kept temporarily as fallback for older storage versions.
 
 #![allow(deprecated)]
 
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use super::document::ProjectedDocument;
 use super::store::ProjectionStore;
 
 /// Warm the projection cache from peer storage endpoints.
 ///
-/// For each storage URL, fetches `/db/content?limit=10000` and `/db/paths?limit=1000`,
+/// For each storage URL, fetches `/db/content?limit=10000`,
 /// then upserts each item into the projection store. Errors are logged but don't
 /// block startup — partial warmup is better than no warmup.
 #[deprecated(since = "0.1.0", note = "Use warm_stream::stream_from_peer instead")]
@@ -31,13 +31,12 @@ pub async fn warm_projection_cache(
         .unwrap();
 
     let mut total_content = 0usize;
-    let mut total_paths = 0usize;
     let mut errors = Vec::new();
 
     for storage_url in &storage_urls {
         let base = storage_url.trim_end_matches('/');
 
-        // Fetch content
+        // Fetch content (paths are now ContentNodes, so this covers everything)
         match fetch_and_project(&client, &store, base, "content", "Content").await {
             Ok(count) => {
                 total_content += count;
@@ -52,35 +51,16 @@ pub async fn warm_projection_cache(
                 errors.push(format!("{base}/db/content: {e}"));
             }
         }
-
-        // Fetch paths — list endpoint returns metadata only, so we fetch each
-        // path individually via /db/paths/{id} to get full data with steps/chapters
-        match fetch_paths_individually(&client, &store, base).await {
-            Ok(count) => {
-                total_paths += count;
-                info!(
-                    storage_url = %base,
-                    count,
-                    "Warmed paths from storage (full data with steps)"
-                );
-            }
-            Err(e) => {
-                warn!(storage_url = %base, error = %e, "Failed to warm paths");
-                errors.push(format!("{base}/db/paths: {e}"));
-            }
-        }
     }
 
     info!(
         total_content,
-        total_paths,
         peer_count = storage_urls.len(),
         "Projection cache warm-up complete"
     );
 
     WarmResult {
         content_count: total_content,
-        path_count: total_paths,
         errors,
     }
 }
@@ -147,86 +127,9 @@ async fn fetch_and_project(
     Ok(count)
 }
 
-/// Fetch paths individually to get full data (steps, chapters).
-///
-/// The list endpoint `/db/paths` returns metadata only — no steps.
-/// We fetch the list for IDs, then GET each `/db/paths/{id}` for full data.
-async fn fetch_paths_individually(
-    client: &reqwest::Client,
-    store: &ProjectionStore,
-    base_url: &str,
-) -> Result<usize, String> {
-    // Step 1: Get path IDs from list endpoint
-    let list_url = format!("{base_url}/db/paths?limit=1000");
-    let resp = client
-        .get(&list_url)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
-    }
-
-    #[derive(serde::Deserialize)]
-    struct DbResponse {
-        items: Vec<serde_json::Value>,
-    }
-
-    let response: DbResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("JSON parse failed: {e}"))?;
-
-    let ids: Vec<String> = response
-        .items
-        .iter()
-        .filter_map(|item| item.get("id").and_then(|v| v.as_str()).map(String::from))
-        .collect();
-
-    if ids.is_empty() {
-        return Ok(0);
-    }
-
-    info!(count = ids.len(), "Fetching full path data individually");
-
-    // Step 2: Fetch each path individually for full data with steps
-    let mut projected = 0usize;
-    for id in &ids {
-        let path_url = format!("{base_url}/db/paths/{id}");
-        match client.get(&path_url).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                if let Ok(item) = resp.json::<serde_json::Value>().await {
-                    let doc = ProjectedDocument::new(
-                        "LearningPath",
-                        id,
-                        "cache-warm",
-                        "cache-warm",
-                        item,
-                    );
-                    if let Err(e) = store.set(doc).await {
-                        warn!(id = %id, error = %e, "Failed to project warmed path");
-                    } else {
-                        projected += 1;
-                    }
-                }
-            }
-            Ok(resp) => {
-                debug!(id = %id, status = %resp.status(), "Path fetch returned non-200");
-            }
-            Err(e) => {
-                warn!(id = %id, error = %e, "Failed to fetch path");
-            }
-        }
-    }
-
-    Ok(projected)
-}
-
 /// Result of cache warm-up
 pub struct WarmResult {
     pub content_count: usize,
-    pub path_count: usize,
     pub errors: Vec<String>,
 }
 
@@ -254,13 +157,11 @@ pub fn spawn_warm_task(
         if result.errors.is_empty() {
             info!(
                 content = result.content_count,
-                paths = result.path_count,
                 "Cache warm-up completed successfully"
             );
         } else {
             warn!(
                 content = result.content_count,
-                paths = result.path_count,
                 errors = ?result.errors,
                 "Cache warm-up completed with errors"
             );

@@ -107,7 +107,7 @@ struct Args {
     enable_import_api: bool,
 
     /// Enable SQLite content database
-    /// When enabled, exposes /db/* endpoints for content and paths
+    /// When enabled, exposes /db/* endpoints for content
     #[arg(long, env = "ENABLE_CONTENT_DB")]
     enable_content_db: bool,
 
@@ -504,10 +504,6 @@ async fn async_main(
                 info!("  GET  /db/content/{{id}}    - Get content by ID");
                 info!("  POST /db/content         - Create content");
                 info!("  POST /db/content/bulk    - Bulk create content");
-                info!("  GET  /db/paths           - List paths");
-                info!("  GET  /db/paths/{{id}}      - Get path with steps");
-                info!("  POST /db/paths           - Create path");
-                info!("  POST /db/paths/bulk      - Bulk create paths");
                 info!("Session API:");
                 info!("  GET    /session       - Get active session");
                 info!("  POST   /session       - Create session");

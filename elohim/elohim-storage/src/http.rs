@@ -73,7 +73,6 @@ use crate::views::{
     CreateHumanRelationshipInputView,
     CreateMasteryInputView,
     CreateNodeStewardshipInputView,
-    CreatePathInputView,
     CreateRelationshipInputView,
     CreateScheduleInputView,
     CreateStewardedNodeInputView,
@@ -85,8 +84,6 @@ use crate::views::{
     LocalSessionView,
     NodeStewardshipView,
     PackageManifestView,
-    PathView,
-    PathWithDetailsView,
     RelationshipSeedView,
     RelationshipView,
     ScheduleView,
@@ -1492,10 +1489,6 @@ impl HttpServer {
     /// - GET /db/content/{id} - Get content by ID
     /// - POST /db/content - Create single content
     /// - POST /db/content/bulk - Bulk create content
-    /// - GET /db/paths - List paths
-    /// - GET /db/paths/{id} - Get path by ID with steps
-    /// - POST /db/paths - Create single path
-    /// - POST /db/paths/bulk - Bulk create paths
     /// - GET /db/relationships - List relationships (with query params)
     /// - GET /db/relationships/{id} - Get relationship by ID
     /// - POST /db/relationships - Create relationship
@@ -1506,18 +1499,13 @@ impl HttpServer {
     /// - POST /db/knowledge-maps - Create knowledge map
     /// - PUT /db/knowledge-maps/{id} - Update knowledge map
     /// - DELETE /db/knowledge-maps/{id} - Delete knowledge map
-    /// - GET /db/path-extensions - List path extensions
-    /// - GET /db/path-extensions/{id} - Get path extension by ID
-    /// - POST /db/path-extensions - Create path extension
-    /// - PUT /db/path-extensions/{id} - Update path extension
-    /// - DELETE /db/path-extensions/{id} - Delete path extension
     ///
     /// Extract app context from path, supporting both:
     /// - New: /db/{app_id}/content/... -> AppContext(app_id)
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
     fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
         // Check if path starts with a known resource type (legacy route)
-        let legacy_prefixes = ["content", "paths", "stats", "schema"];
+        let legacy_prefixes = ["content", "stats", "schema"];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
                 // Legacy route: default to 'lamad' for learning content
@@ -1592,18 +1580,6 @@ impl HttpServer {
             return self.handle_db_content_by_id(req, method, content_id).await;
         }
 
-        if resource_path == "paths" {
-            return self.handle_db_paths_list(req, method).await;
-        }
-
-        if resource_path == "paths/bulk" {
-            return self.handle_db_paths_bulk(req, method).await;
-        }
-
-        if let Some(path_id) = resource_path.strip_prefix("paths/") {
-            return self.handle_db_path_by_id(req, method, path_id).await;
-        }
-
         // Relationships routes
         if resource_path == "relationships" {
             return self.handle_db_relationships_list(req, method).await;
@@ -1629,17 +1605,6 @@ impl HttpServer {
         if let Some(map_id) = resource_path.strip_prefix("knowledge-maps/") {
             return self
                 .handle_db_knowledge_map_by_id(req, method, map_id)
-                .await;
-        }
-
-        // Path extensions routes
-        if resource_path == "path-extensions" {
-            return self.handle_db_path_extensions_list(req, method).await;
-        }
-
-        if let Some(ext_id) = resource_path.strip_prefix("path-extensions/") {
-            return self
-                .handle_db_path_extension_by_id(req, method, ext_id)
                 .await;
         }
 
@@ -2434,147 +2399,6 @@ impl HttpServer {
         }
     }
 
-    /// GET /db/paths - List paths, POST /db/paths - Create path
-    async fn handle_db_paths_list(
-        &self,
-        req: Request<Incoming>,
-        method: Method,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let services = self
-            .services
-            .as_ref()
-            .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
-
-        let query_str = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query_str.as_bytes())
-                .into_owned()
-                .collect();
-
-        let limit: u32 = params
-            .get("limit")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(100);
-        let offset: u32 = params
-            .get("offset")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-
-        match method {
-            Method::GET => match services.path.list(limit, offset) {
-                Ok(paths) => {
-                    // Reach-based filtering: unauthenticated requests only see public paths
-                    let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
-                        || req.headers().get("X-Agent-Id").is_some();
-                    let views: Vec<PathView> = paths
-                        .into_iter()
-                        .map(|p| p.into())
-                        .filter(|v: &PathView| has_auth || v.visibility == "public")
-                        .collect();
-                    let body = serde_json::json!({
-                        "items": views,
-                        "count": views.len(),
-                        "limit": limit,
-                        "offset": offset,
-                    });
-                    Ok(response::ok(&body))
-                }
-                Err(e) => Ok(response::error_response(e)),
-            },
-            Method::POST => {
-                // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
-                // Currently null for direct storage writes. Backfill needed for pre-coherence data.
-                let body = req
-                    .collect()
-                    .await
-                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-                let body_bytes = body.to_bytes();
-
-                let input_view: CreatePathInputView = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                let input: db::paths_diesel::CreatePathInput = input_view.into();
-
-                Ok(response::from_create_result(services.path.create(input)))
-            }
-            _ => Ok(response::method_not_allowed()),
-        }
-    }
-
-    /// POST /db/paths/bulk - Bulk create paths
-    async fn handle_db_paths_bulk(
-        &self,
-        req: Request<Incoming>,
-        method: Method,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        if method != Method::POST {
-            return Ok(response::method_not_allowed());
-        }
-
-        let services = self
-            .services
-            .as_ref()
-            .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
-
-        if let Err(msg) = validate_schema_version_header(&req) {
-            return Ok(response::error_response(StorageError::InvalidInput(msg)));
-        }
-
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-        let body_bytes = body.to_bytes();
-
-        let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
-            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
-        if let Err(msg) = validate_schema_versions(&versions) {
-            return Ok(response::error_response(StorageError::InvalidInput(msg)));
-        }
-        let paths: Vec<db::paths_diesel::CreatePathInput> =
-            input_views.into_iter().map(|v| v.into()).collect();
-
-        let count = paths.len();
-        info!(count = count, "Bulk creating paths");
-
-        match services.path.bulk_create(paths) {
-            Ok(result) => Ok(response::ok_with_schema_info(&result)),
-            Err(e) => Ok(response::error_response(e)),
-        }
-    }
-
-    /// GET/DELETE /db/paths/{id} - Get or delete path by ID
-    async fn handle_db_path_by_id(
-        &self,
-        _req: Request<Incoming>,
-        method: Method,
-        path_id: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let services = self
-            .services
-            .as_ref()
-            .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
-
-        match method {
-            Method::GET => match services.path.get_with_steps(path_id) {
-                Ok(Some(path)) => {
-                    let view: PathWithDetailsView = path.into();
-                    Ok(response::ok(&view))
-                }
-                Ok(None) => Ok(response::not_found(&format!("Path not found: {}", path_id))),
-                Err(e) => Ok(response::error_response(e)),
-            },
-            Method::DELETE => {
-                let result = services.path.delete(path_id);
-                Ok(response::from_delete_bool_result(
-                    result,
-                    &format!("Path not found: {}", path_id),
-                ))
-            }
-            _ => Ok(response::method_not_allowed()),
-        }
-    }
-
     // =========================================================================
     // Relationship handlers
     // =========================================================================
@@ -2856,116 +2680,6 @@ impl HttpServer {
                 Ok(response::from_delete_bool_result(
                     result,
                     &format!("Knowledge map not found: {}", map_id),
-                ))
-            }
-            _ => Ok(response::method_not_allowed()),
-        }
-    }
-
-    // =========================================================================
-    // Path Extension handlers
-    // =========================================================================
-
-    /// GET /db/path-extensions - List path extensions, POST - Create path extension
-    async fn handle_db_path_extensions_list(
-        &self,
-        req: Request<Incoming>,
-        method: Method,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let services = self
-            .services
-            .as_ref()
-            .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
-
-        let query_str = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query_str.as_bytes())
-                .into_owned()
-                .collect();
-
-        let query = db::path_extensions_diesel::PathExtensionQuery {
-            base_path_id: params.get("base_path_id").cloned(),
-            extended_by: params.get("extended_by").cloned(),
-            visibility: params.get("visibility").cloned(),
-            forked_from: params.get("forked_from").cloned(),
-            limit: params
-                .get("limit")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(100),
-            offset: params
-                .get("offset")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        };
-
-        match method {
-            Method::GET => match services.knowledge.list_path_extensions(&query) {
-                Ok(items) => {
-                    let body = serde_json::json!({
-                        "items": items,
-                        "count": items.len(),
-                        "limit": query.limit,
-                        "offset": query.offset,
-                    });
-                    Ok(response::ok(&body))
-                }
-                Err(e) => Ok(response::error_response(e)),
-            },
-            Method::POST => {
-                let body = req
-                    .collect()
-                    .await
-                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-                let body_bytes = body.to_bytes();
-                let input: db::path_extensions_diesel::CreatePathExtensionInput =
-                    serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                Ok(response::from_create_result(
-                    services.knowledge.create_path_extension(input),
-                ))
-            }
-            _ => Ok(response::method_not_allowed()),
-        }
-    }
-
-    /// GET/PUT/DELETE /db/path-extensions/{id} - Path extension by ID
-    async fn handle_db_path_extension_by_id(
-        &self,
-        req: Request<Incoming>,
-        method: Method,
-        ext_id: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let services = self
-            .services
-            .as_ref()
-            .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
-
-        match method {
-            Method::GET => {
-                let result = services.knowledge.get_path_extension(ext_id);
-                Ok(response::from_option(
-                    result,
-                    &format!("Path extension not found: {}", ext_id),
-                ))
-            }
-            Method::PUT => {
-                let body = req
-                    .collect()
-                    .await
-                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-                let body_bytes = body.to_bytes();
-                let input: db::path_extensions_diesel::CreatePathExtensionInput =
-                    serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                Ok(response::from_result(
-                    services.knowledge.update_path_extension(ext_id, input),
-                ))
-            }
-            Method::DELETE => {
-                let result = services.knowledge.delete_path_extension(ext_id);
-                Ok(response::from_delete_bool_result(
-                    result,
-                    &format!("Path extension not found: {}", ext_id),
                 ))
             }
             _ => Ok(response::method_not_allowed()),
@@ -6657,37 +6371,6 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
-        // Learning paths
-        .route(
-            Route::get("/db/paths")
-                .handler("list_paths")
-                .cache_ttl(300)
-                .build(),
-        )
-        .route(
-            Route::post("/db/paths")
-                .handler("create_path")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::post("/db/paths/bulk")
-                .handler("bulk_create_paths")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::get("/db/paths/{id}")
-                .handler("get_path")
-                .cache_ttl(300)
-                .build(),
-        )
-        .route(
-            Route::delete("/db/paths/{id}")
-                .handler("delete_path")
-                .auth_required()
-                .build(),
-        )
         // Knowledge graph relationships
         .route(
             Route::get("/db/relationships")
@@ -6753,37 +6436,6 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::delete("/db/knowledge-maps/{id}")
                 .handler("delete_knowledge_map")
-                .auth_required()
-                .build(),
-        )
-        // Path extensions
-        .route(
-            Route::get("/db/path-extensions")
-                .handler("list_path_extensions")
-                .cache_ttl(300)
-                .build(),
-        )
-        .route(
-            Route::post("/db/path-extensions")
-                .handler("create_path_extension")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::get("/db/path-extensions/{id}")
-                .handler("get_path_extension")
-                .cache_ttl(300)
-                .build(),
-        )
-        .route(
-            Route::put("/db/path-extensions/{id}")
-                .handler("update_path_extension")
-                .auth_required()
-                .build(),
-        )
-        .route(
-            Route::delete("/db/path-extensions/{id}")
-                .handler("delete_path_extension")
                 .auth_required()
                 .build(),
         )
@@ -7064,7 +6716,6 @@ mod tests {
         // Spot-check a few known routes exist
         let paths: Vec<&str> = manifest.routes.iter().map(|r| r.path.as_str()).collect();
         assert!(paths.contains(&"/db/content"), "missing /db/content");
-        assert!(paths.contains(&"/db/paths"), "missing /db/paths");
         assert!(
             paths.contains(&"/api/v1/mastery"),
             "missing /api/v1/mastery"

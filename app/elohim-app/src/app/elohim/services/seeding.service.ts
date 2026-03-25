@@ -31,7 +31,6 @@ import { Injectable, inject, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 
 import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
 
 import { StorageClientService } from './storage-client.service';
 import {
@@ -204,108 +203,19 @@ export class SeedingService implements OnDestroy {
   }
 
   /**
-   * Bulk create paths.
-   *
-   * @param paths - Array of learning paths to create
-   * @param priority - Priority level
-   * @returns Batch operation result
-   */
-  async bulkCreatePaths(
-    paths: LearningPath[],
-    priority: WritePriority = WritePriority.Bulk
-  ): Promise<BatchResult> {
-    if (!this.writeBuffer.isReady) {
-      await this.initialize('import');
-    }
-
-    const startTime = performance.now();
-    this.stateSubject.next('seeding');
-
-    const progress: SeedingProgress = {
-      mode: 'import',
-      phase: 'queuing',
-      totalItems: paths.length,
-      processedItems: 0,
-      successCount: 0,
-      failureCount: 0,
-      percentComplete: 0,
-    };
-    this.progressSubject.next(progress);
-
-    // Queue all paths for writing (camelCase InputView)
-    for (const pathData of paths) {
-      // Extract metadata safely to avoid index signature spread issues
-      // Use proper type extraction instead of direct cast
-      const pathDataRecord = pathData as Partial<LearningPath> & Record<string, unknown>;
-      const existingMetadata = pathDataRecord['metadata'] as Record<string, unknown> | undefined;
-      const combinedMetadata: Record<string, unknown> = {
-        chapters: pathData.chapters,
-        ...existingMetadata,
-      };
-
-      const payload = JSON.stringify({
-        id: pathData.id,
-        version: pathData.version ?? '1.0.0',
-        title: pathData.title,
-        description: pathData.description,
-        purpose: pathData.purpose ?? '',
-        difficulty: pathData.difficulty,
-        estimatedDuration: pathData.estimatedDuration ?? '',
-        tags: pathData.tags ?? [],
-        visibility: pathData.visibility ?? 'public',
-        metadata: combinedMetadata,
-        steps: pathData.steps.map((step, index) => ({
-          orderIndex: step.order ?? index,
-          stepType: step.stepType ?? 'content',
-          resourceId: step.resourceId,
-          stepTitle: step.stepTitle ?? `Step ${index + 1}`,
-          stepNarrative: step.stepNarrative ?? '',
-          isOptional: step.optional ?? false,
-        })),
-      });
-
-      this.writeBuffer.queueWrite(pathData.id, WriteOpType.CreateEntry, payload, priority);
-    }
-
-    progress.phase = 'flushing';
-    this.progressSubject.next({ ...progress });
-
-    const failedIds: string[] = [];
-    const result = await this.flushWithTracking(progress, failedIds);
-
-    progress.phase = 'complete';
-    progress.percentComplete = 100;
-    this.progressSubject.next({ ...progress });
-    this.stateSubject.next('idle');
-
-    return {
-      successCount: result.successCount,
-      failureCount: result.failureCount,
-      failedIds,
-      durationMs: performance.now() - startTime,
-    };
-  }
-
-  /**
    * Recovery sync from family network.
    *
    * Used when an edgenode needs to rebuild from family network replication.
+   * Paths are now ContentNodes — pass them in the contents array.
    *
-   * @param contents - Content from family network
-   * @param paths - Paths from family network
-   * @returns Combined batch result
+   * @param contents - Content from family network (includes paths as ContentNodes)
+   * @returns Batch result
    */
-  async recoverySync(
-    contents: ContentNode[],
-    paths: LearningPath[]
-  ): Promise<{ content: BatchResult; paths: BatchResult }> {
+  async recoverySync(contents: ContentNode[]): Promise<BatchResult> {
     await this.initialize('recovery');
 
     // High priority for recovery - these are the user's actual data
-    const contentResult = await this.bulkCreateContent(contents, WritePriority.High);
-    const pathsResult = await this.bulkCreatePaths(paths, WritePriority.Normal);
-
-    return { content: contentResult, paths: pathsResult };
+    return this.bulkCreateContent(contents, WritePriority.High);
   }
 
   /**

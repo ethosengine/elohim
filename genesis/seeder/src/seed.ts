@@ -9,9 +9,8 @@
  * ## Architecture
  *
  * The seeder calls Doorway's bulk HTTP endpoints which proxy to elohim-storage:
- * - POST /api/db/content/bulk - Bulk create content nodes
- * - POST /api/db/paths/bulk - Bulk create learning paths
- * - POST /api/db/relationships/bulk - Bulk create relationships
+ * - POST /api/db/content/bulk - Bulk create content nodes (including paths as epr-composite)
+ * - POST /api/db/relationships/bulk - Bulk create relationships (including path step edges)
  *
  * These are synchronous operations that return immediately with results.
  *
@@ -40,8 +39,6 @@ import StorageClient from './storage-client.js'; // Used for computing blob hash
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
-import { ALL_STEP_TYPES } from './generated/schema-enums.js';
-
 // ========================================
 // PERFORMANCE TIMING UTILITIES
 // ========================================
@@ -1346,6 +1343,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
       // Extract relationships from content items
       const relationships: Array<{
+        schemaVersion?: number;
         sourceId: string;
         targetId: string;
         relationshipType: string;
@@ -1530,10 +1528,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
   if (allPaths.length > 0) {
     timer.startPhase('Path Import');
-    console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
+    console.log(`\n🚀 Importing ${allPaths.length} paths as ContentNodes via doorway...`);
 
     // Build content title lookup map from loaded concepts
-    // Used to resolve conceptIds to proper titles in path steps
+    // Used to resolve conceptIds to proper titles in epr-composite sections
     const contentTitleMap = new Map<string, string>();
     for (const { concept } of filteredConcepts) {
       if (concept.id && concept.title) {
@@ -1541,414 +1539,374 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }
     }
 
-    // Step type matching zome's PathImportStepInput struct
-    interface StepInput {
-      stepType: string;
+    /**
+     * Extract all step references from a path's hierarchy as a flat list.
+     * Handles all path formats: chapters>steps, chapters>modules>sections>conceptIds,
+     * flat steps, flat conceptIds. Returns { resourceId, title, required, role } tuples
+     * with a global orderIndex across all chapters.
+     */
+    function extractFlatStepRefs(pathData: any): Array<{
       resourceId: string;
-      orderIndex: number;
-      stepTitle?: string;
-      stepNarrative?: string;
-      isOptional?: boolean;
-      // Module association metadata for UI filtering
-      moduleId?: string;
+      title: string;
+      required: boolean;
       chapterId?: string;
-      sectionId?: string;
-    }
+    }> {
+      const refs: Array<{ resourceId: string; title: string; required: boolean; chapterId?: string }> = [];
 
-    // Normalize step type aliases to schema-canonical values.
-    // ALL_STEP_TYPES imported from generated schema-enums (single source of truth).
-    function normalizeStepType(type: string | undefined): string {
-      if (!type) return 'content';  // Default to 'content' (generic content step)
-      const normalized = type.toLowerCase();
-      // Map legacy/alternative step types to schema-canonical values
-      const aliases: Record<string, string> = {
-        'learn': 'content',
-        'reading': 'read',
-        'quiz': 'assess',
-        'assessment': 'assess',
-        'discussion': 'reflection',
-        'project': 'practice',
-        'resource': 'external',
-        // Common variations
-        'lesson': 'content',
-        'article': 'read',
-        'test': 'assess',
-        'exercise': 'practice',
-      };
-      const mapped = aliases[normalized] || normalized;
-      if (!(ALL_STEP_TYPES as readonly string[]).includes(mapped)) {
-        console.warn(`   ⚠️ Unknown stepType '${type}' -> defaulting to 'content'`);
-        return 'content';
-      }
-      return mapped;
-    }
-
-    // Helper to extract step data from a step object (preserves optional fields)
-    function extractStepData(
-      step: any,
-      orderIndex: number,
-      metadata?: { chapterId?: string; moduleId?: string; sectionId?: string }
-    ): StepInput {
-      return {
-        stepType: normalizeStepType(step.stepType || step.stepType),
-        resourceId: step.resourceId || step.resourceId || step.id,
-        orderIndex: step.orderIndex ?? step.orderIndex ?? orderIndex,
-        // Optional fields - only include if present
-        ...(step.stepTitle || step.stepTitle ? { stepTitle: step.stepTitle || step.stepTitle } : {}),
-        ...(step.stepNarrative || step.stepNarrative ? { stepNarrative: step.stepNarrative || step.stepNarrative } : {}),
-        ...((step.isOptional ?? step.optional) !== undefined ? { isOptional: step.isOptional ?? step.optional ?? false } : {}),
-        // Module association metadata
-        ...(metadata?.chapterId ? { chapterId: metadata.chapterId } : {}),
-        ...(metadata?.moduleId ? { moduleId: metadata.moduleId } : {}),
-        ...(metadata?.sectionId ? { sectionId: metadata.sectionId } : {}),
-      };
-    }
-
-    // DEPRECATED: This function globally flattens hierarchy, losing chapter structure.
-    // Use extractStepsFromChapter() instead which preserves per-chapter hierarchy.
-    // Kept for backward compatibility only.
-    // Helper to flatten hierarchical path structure into steps
-    // Paths can have: chapters → modules → sections → conceptIds
-    function extractStepsFromPath(pathData: any): StepInput[] {
-      const steps: StepInput[] = [];
-      let orderIndex = 0;
-      let moduleCount = 0;
-
-      // If path has explicit steps array, use it directly
-      if (pathData.steps && Array.isArray(pathData.steps)) {
-        return pathData.steps.map((step: any, i: number) => extractStepData(step, i));
-      }
-
-      // If path has flat conceptIds array
-      if (pathData.conceptIds && Array.isArray(pathData.conceptIds)) {
-        return pathData.conceptIds.map((id: string, i: number) => ({
-          stepType: 'content',
-          resourceId: id,
-          orderIndex: i,
-        }));
-      }
-
-      // Flatten hierarchical structure: chapters → modules → sections
-      // Each level can have either conceptIds (flat) or steps (structured)
-      if (pathData.chapters && Array.isArray(pathData.chapters)) {
+      if (pathData.chapters?.length) {
         for (const chapter of pathData.chapters) {
           const chapterId = chapter.id;
 
-          // Chapter-level steps array (structured) - preserves step metadata
-          if (chapter.steps && Array.isArray(chapter.steps)) {
+          // Direct chapter steps
+          if (chapter.steps?.length) {
             for (const step of chapter.steps) {
-              steps.push(extractStepData(step, orderIndex++, { chapterId }));
+              const rid = step.resourceId || step.id;
+              if (rid) {
+                refs.push({
+                  resourceId: rid,
+                  title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                  required: step.required !== false && step.isOptional !== true,
+                  chapterId,
+                });
+              }
             }
           }
-          // Chapter-level conceptIds (flat)
-          if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
-            for (const id of chapter.conceptIds) {
-              steps.push({
-                stepType: 'content',
-                resourceId: id,
-                orderIndex: orderIndex++,
+
+          // Chapter-level conceptIds
+          if (chapter.conceptIds?.length) {
+            for (const conceptId of chapter.conceptIds) {
+              refs.push({
+                resourceId: conceptId,
+                title: contentTitleMap.get(conceptId) || conceptId,
+                required: true,
                 chapterId,
               });
             }
           }
-          // Modules within chapters
-          if (chapter.modules && Array.isArray(chapter.modules)) {
-            for (const module of chapter.modules) {
-              const moduleId = module.id;
-              moduleCount++;
 
-              // Module-level steps array - preserves step metadata
-              if (module.steps && Array.isArray(module.steps)) {
-                for (const step of module.steps) {
-                  steps.push(extractStepData(step, orderIndex++, { chapterId, moduleId }));
-                }
-              }
-              // Module-level conceptIds
-              if (module.conceptIds && Array.isArray(module.conceptIds)) {
-                for (const id of module.conceptIds) {
-                  steps.push({
-                    stepType: 'content',
-                    resourceId: id,
-                    orderIndex: orderIndex++,
+          // Modules within chapters
+          if (chapter.modules?.length) {
+            for (const module of chapter.modules) {
+              if (module.conceptIds?.length) {
+                for (const conceptId of module.conceptIds) {
+                  refs.push({
+                    resourceId: conceptId,
+                    title: contentTitleMap.get(conceptId) || conceptId,
+                    required: true,
                     chapterId,
-                    moduleId,
                   });
                 }
               }
-              // Sections within modules
-              if (module.sections && Array.isArray(module.sections)) {
-                for (const section of module.sections) {
-                  const sectionId = section.id;
-
-                  // Section-level steps array - preserves step metadata
-                  if (section.steps && Array.isArray(section.steps)) {
-                    for (const step of section.steps) {
-                      steps.push(extractStepData(step, orderIndex++, { chapterId, moduleId, sectionId }));
-                    }
+              if (module.steps?.length) {
+                for (const step of module.steps) {
+                  const rid = step.resourceId || step.id;
+                  if (rid) {
+                    refs.push({
+                      resourceId: rid,
+                      title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                      required: step.required !== false && step.isOptional !== true,
+                      chapterId,
+                    });
                   }
-                  // Section-level conceptIds
-                  if (section.conceptIds && Array.isArray(section.conceptIds)) {
-                    for (const id of section.conceptIds) {
-                      steps.push({
-                        stepType: 'content',
-                        resourceId: id,
-                        orderIndex: orderIndex++,
+                }
+              }
+              if (module.sections?.length) {
+                for (const section of module.sections) {
+                  if (section.conceptIds?.length) {
+                    for (const conceptId of section.conceptIds) {
+                      refs.push({
+                        resourceId: conceptId,
+                        title: contentTitleMap.get(conceptId) || conceptId,
+                        required: true,
                         chapterId,
-                        moduleId,
-                        sectionId,
                       });
                     }
                   }
+                  if (section.steps?.length) {
+                    for (const step of section.steps) {
+                      const rid = step.resourceId || step.id;
+                      if (rid) {
+                        refs.push({
+                          resourceId: rid,
+                          title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                          required: step.required !== false && step.isOptional !== true,
+                          chapterId,
+                        });
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         }
-      }
-
-      // Log step extraction summary
-      if (moduleCount > 0) {
-        console.log(`   📍 Path "${pathData.id}": Extracted ${steps.length} steps from ${moduleCount} modules`);
-      }
-
-      return steps;
-    }
-
-    // Extract steps from a single chapter (not globally)
-    // Used for proper hierarchical transformation that preserves chapter structure
-    function extractStepsFromChapter(chapter: any, pathId: string): any[] {
-      const steps: any[] = [];
-      let orderIndex = 0;
-
-      // Direct chapter steps (2-level format: chapters → steps)
-      if (chapter.steps?.length) {
-        for (const step of chapter.steps) {
-          steps.push({
-            id: step.id || `${chapter.id}-step-${orderIndex + 1}`,
-            pathId,
-            chapterId: chapter.id,
-            title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
-            stepType: normalizeStepType(step.stepType),
-            resourceId: step.resourceId || null,
-            orderIndex: orderIndex++,
-            metadataJson: JSON.stringify({ moduleId: null, sectionId: null }),
-          });
+      } else if (pathData.steps?.length) {
+        // Legacy flat steps
+        for (const step of pathData.steps) {
+          const rid = step.resourceId || step.id;
+          if (rid) {
+            refs.push({
+              resourceId: rid,
+              title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+              required: step.required !== false && step.isOptional !== true,
+            });
+          }
         }
-      }
-
-      // Chapter-level conceptIds (flat)
-      if (chapter.conceptIds?.length) {
-        for (const conceptId of chapter.conceptIds) {
-          steps.push({
-            id: `${chapter.id}-step-${orderIndex + 1}`,
-            pathId,
-            chapterId: chapter.id,
-            title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-            stepType: 'content',
+      } else if (pathData.conceptIds?.length) {
+        // Legacy flat conceptIds
+        for (const conceptId of pathData.conceptIds) {
+          refs.push({
             resourceId: conceptId,
-            orderIndex: orderIndex++,
-            metadataJson: JSON.stringify({ moduleId: null, sectionId: null }),
+            title: contentTitleMap.get(conceptId) || conceptId,
+            required: true,
           });
         }
       }
 
-      // Module → Section → conceptIds (4-level format: chapters → modules → sections → conceptIds)
-      if (chapter.modules?.length) {
-        for (const module of chapter.modules) {
-          // Module-level conceptIds
-          if (module.conceptIds?.length) {
-            for (const conceptId of module.conceptIds) {
-              steps.push({
-                id: `${module.id}-step-${orderIndex + 1}`,
-                pathId,
-                chapterId: chapter.id,
-                title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-                stepType: 'content',
-                resourceId: conceptId,
-                orderIndex: orderIndex++,
-                metadataJson: JSON.stringify({
-                  moduleId: module.id,
-                  sectionId: null,
-                }),
-              });
-            }
-          }
-
-          // Module-level steps
-          if (module.steps?.length) {
-            for (const step of module.steps) {
-              steps.push({
-                id: step.id || `${module.id}-step-${orderIndex + 1}`,
-                pathId,
-                chapterId: chapter.id,
-                title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
-                stepType: normalizeStepType(step.stepType),
-                resourceId: step.resourceId || null,
-                orderIndex: orderIndex++,
-                metadataJson: JSON.stringify({
-                  moduleId: module.id,
-                  sectionId: null,
-                }),
-              });
-            }
-          }
-
-          // Sections within modules
-          if (module.sections?.length) {
-            for (const section of module.sections) {
-              // Section-level conceptIds
-              if (section.conceptIds?.length) {
-                for (const conceptId of section.conceptIds) {
-                  steps.push({
-                    id: `${section.id}-step-${orderIndex + 1}`,
-                    pathId,
-                    chapterId: chapter.id,
-                    title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
-                    stepType: 'content',
-                    resourceId: conceptId,
-                    orderIndex: orderIndex++,
-                    metadataJson: JSON.stringify({
-                      moduleId: module.id,
-                      sectionId: section.id,
-                    }),
-                  });
-                }
-              }
-
-              // Section-level steps
-              if (section.steps?.length) {
-                for (const step of section.steps) {
-                  steps.push({
-                    id: step.id || `${section.id}-step-${orderIndex + 1}`,
-                    pathId,
-                    chapterId: chapter.id,
-                    title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
-                    stepType: normalizeStepType(step.stepType),
-                    resourceId: step.resourceId || null,
-                    orderIndex: orderIndex++,
-                    metadataJson: JSON.stringify({
-                      moduleId: module.id,
-                      sectionId: section.id,
-                    }),
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return steps;
+      return refs;
     }
 
-    // Transform paths directly with proper chapter hierarchy (no global flattening)
-    const transformedPaths = allPaths.map(({ pathData }) => {
-      const thumbnailHash = pathThumbnailHashes.get(pathData.id);
-
-      let chapters: any[];
+    /**
+     * Convert a path JSON object into a ContentNode for bulk creation.
+     * Paths become ContentNodes with contentType 'path' and contentFormat 'epr-composite'.
+     * The contentBody holds a structured JSON layout of EPR references.
+     */
+    function pathToContent(pathData: any, thumbnailHash: string | undefined): {
+      id: string;
+      title: string;
+      description: string;
+      contentType: string;
+      contentFormat: string;
+      contentBody: string;
+      metadataJson: string;
+      reach: string;
+      tags: string[];
+    } {
+      // Build epr-composite sections from chapters (or wrap flat steps in a default section)
+      let sections: any[];
 
       if (pathData.chapters?.length) {
-        // Transform each source chapter directly (preserves hierarchy)
-        chapters = pathData.chapters.map((ch: any, idx: number) => {
-          const chapterSteps = extractStepsFromChapter(ch, pathData.id);
+        sections = pathData.chapters.map((ch: any) => {
+          // Collect items from the chapter hierarchy
+          const items: any[] = [];
+
+          // Direct chapter steps
+          if (ch.steps?.length) {
+            for (const step of ch.steps) {
+              const rid = step.resourceId || step.id;
+              if (rid) {
+                items.push({
+                  ref: `epr:${rid}`,
+                  role: (step.required === false || step.isOptional === true) ? 'optional' : 'step',
+                  title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                  completionCriteria: { type: 'view' },
+                });
+              }
+            }
+          }
+
+          // Chapter-level conceptIds
+          if (ch.conceptIds?.length) {
+            for (const conceptId of ch.conceptIds) {
+              items.push({
+                ref: `epr:${conceptId}`,
+                role: 'step',
+                title: contentTitleMap.get(conceptId) || conceptId,
+                completionCriteria: { type: 'view' },
+              });
+            }
+          }
+
+          // Modules within chapters
+          if (ch.modules?.length) {
+            for (const module of ch.modules) {
+              if (module.conceptIds?.length) {
+                for (const conceptId of module.conceptIds) {
+                  items.push({
+                    ref: `epr:${conceptId}`,
+                    role: 'step',
+                    title: contentTitleMap.get(conceptId) || conceptId,
+                    completionCriteria: { type: 'view' },
+                  });
+                }
+              }
+              if (module.steps?.length) {
+                for (const step of module.steps) {
+                  const rid = step.resourceId || step.id;
+                  if (rid) {
+                    items.push({
+                      ref: `epr:${rid}`,
+                      role: (step.required === false || step.isOptional === true) ? 'optional' : 'step',
+                      title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                      completionCriteria: { type: 'view' },
+                    });
+                  }
+                }
+              }
+              if (module.sections?.length) {
+                for (const section of module.sections) {
+                  if (section.conceptIds?.length) {
+                    for (const conceptId of section.conceptIds) {
+                      items.push({
+                        ref: `epr:${conceptId}`,
+                        role: 'step',
+                        title: contentTitleMap.get(conceptId) || conceptId,
+                        completionCriteria: { type: 'view' },
+                      });
+                    }
+                  }
+                  if (section.steps?.length) {
+                    for (const step of section.steps) {
+                      const rid = step.resourceId || step.id;
+                      if (rid) {
+                        items.push({
+                          ref: `epr:${rid}`,
+                          role: (step.required === false || step.isOptional === true) ? 'optional' : 'step',
+                          title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+                          completionCriteria: { type: 'view' },
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           return {
             id: ch.id,
             title: ch.title || '',
             description: ch.description || '',
-            orderIndex: ch.order ?? ch.orderIndex ?? idx,
-            estimatedDuration: ch.estimatedDuration || null,
-            steps: chapterSteps,
+            level: 'unit',
+            items,
           };
         });
 
-        // Log chapter hierarchy summary
-        const totalSteps = chapters.reduce((sum, ch) => sum + ch.steps.length, 0);
-        console.log(`   📍 Path "${pathData.id}": ${chapters.length} chapters, ${totalSteps} total steps`);
+        const totalItems = sections.reduce((sum: number, s: any) => sum + s.items.length, 0);
+        console.log(`   📍 Path "${pathData.id}": ${sections.length} sections, ${totalItems} total items`);
       } else if (pathData.steps?.length) {
-        // Legacy flat steps - wrap in default chapter
-        chapters = [{
-          id: `${pathData.id}-chapter-1`,
+        // Legacy flat steps - wrap in a default section
+        const items = pathData.steps
+          .filter((step: any) => step.resourceId || step.id)
+          .map((step: any) => {
+            const rid = step.resourceId || step.id;
+            return {
+              ref: `epr:${rid}`,
+              role: (step.required === false || step.isOptional === true) ? 'optional' : 'step',
+              title: step.stepTitle || step.title || contentTitleMap.get(rid) || rid,
+              completionCriteria: { type: 'view' },
+            };
+          });
+        sections = [{
+          id: `${pathData.id}-section-1`,
           title: pathData.title || 'Main Content',
           description: pathData.description || '',
-          orderIndex: 0,
-          estimatedDuration: null,
-          steps: pathData.steps.map((step: any, idx: number) => ({
-            id: step.id || `${pathData.id}-step-${idx + 1}`,
-            pathId: pathData.id,
-            chapterId: `${pathData.id}-chapter-1`,
-            title: step.stepTitle || step.title || `Step ${idx + 1}`,
-            stepType: normalizeStepType(step.stepType),
-            resourceId: step.resourceId || null,
-            orderIndex: idx,
-            metadataJson: JSON.stringify({}),
-          })),
+          level: 'unit',
+          items,
         }];
-        console.log(`   📍 Path "${pathData.id}": 1 default chapter, ${pathData.steps.length} steps (legacy format)`);
+        console.log(`   📍 Path "${pathData.id}": 1 default section, ${items.length} items (legacy steps)`);
       } else if (pathData.conceptIds?.length) {
-        // Legacy flat conceptIds - wrap in default chapter
-        chapters = [{
-          id: `${pathData.id}-chapter-1`,
+        // Legacy flat conceptIds - wrap in a default section
+        const items = pathData.conceptIds.map((conceptId: string) => ({
+          ref: `epr:${conceptId}`,
+          role: 'step',
+          title: contentTitleMap.get(conceptId) || conceptId,
+          completionCriteria: { type: 'view' },
+        }));
+        sections = [{
+          id: `${pathData.id}-section-1`,
           title: pathData.title || 'Main Content',
           description: pathData.description || '',
-          orderIndex: 0,
-          estimatedDuration: null,
-          steps: pathData.conceptIds.map((conceptId: string, idx: number) => ({
-            id: `${pathData.id}-step-${idx + 1}`,
-            pathId: pathData.id,
-            chapterId: `${pathData.id}-chapter-1`,
-            title: `Step ${idx + 1}`,
-            stepType: 'content',
-            resourceId: conceptId,
-            orderIndex: idx,
-            metadataJson: JSON.stringify({}),
-          })),
+          level: 'unit',
+          items,
         }];
-        console.log(`   📍 Path "${pathData.id}": 1 default chapter, ${pathData.conceptIds.length} steps (conceptIds format)`);
+        console.log(`   📍 Path "${pathData.id}": 1 default section, ${items.length} items (conceptIds)`);
       } else {
-        chapters = [];
-        console.log(`   📍 Path "${pathData.id}": No chapters or steps found`);
+        sections = [];
+        console.log(`   📍 Path "${pathData.id}": No chapters or steps found (metadata-only path)`);
       }
 
+      const thumbnailUrl = thumbnailHash ? `/blob/${thumbnailHash}` : pathData.thumbnailUrl || undefined;
+      const pathType = normalizePathType(pathData.pathType || pathData.metadata?.pathType);
+
       return {
-        schemaVersion: 1,
         id: pathData.id,
         title: pathData.title,
         description: pathData.description || '',
-        pathType: normalizePathType(pathData.pathType),
-        difficulty: pathData.difficulty || 'beginner',
-        estimatedDuration: pathData.estimatedDuration || null,
-        visibility: pathData.visibility || 'public',
-        metadataJson: JSON.stringify(
-          pathData.chapters
-            ? { chapters: pathData.chapters, ...pathData.metadata }
-            : pathData.metadata || {}
-        ),
+        contentType: 'path',
+        contentFormat: 'epr-composite',
+        contentBody: JSON.stringify({
+          schemaVersion: 1,
+          pathType,
+          layout: 'sequential',
+          sections,
+        }),
+        metadataJson: JSON.stringify({
+          difficulty: pathData.difficulty || 'beginner',
+          estimatedDuration: pathData.estimatedMinutes ? `${pathData.estimatedMinutes}m`
+            : pathData.estimatedDuration || undefined,
+          thumbnailUrl,
+          thumbnailAlt: pathData.thumbnailAlt,
+          pathType,
+          ...pathData.metadata, // preserve any extra metadata
+        }),
+        reach: pathData.visibility || 'public',
         tags: pathData.tags || [],
-        thumbnailUrl: thumbnailHash ? `/blob/${thumbnailHash}` : pathData.thumbnailUrl || null,
-        thumbnailBlobHash: thumbnailHash || null,
-        chapters,
       };
+    }
+
+    /**
+     * Extract step relationships from a path. Each step becomes a 'step' relationship
+     * from the path to the referenced content, with orderIndex metadata for ordering.
+     */
+    function pathToStepRelationships(pathData: any): Array<{
+      sourceId: string;
+      targetId: string;
+      relationshipType: string;
+      confidence: number;
+      inferenceSource: string;
+      metadataJson: string;
+    }> {
+      const stepRefs = extractFlatStepRefs(pathData);
+      return stepRefs.map((ref, globalIndex) => ({
+        sourceId: pathData.id,
+        targetId: ref.resourceId,
+        relationshipType: 'step',
+        confidence: 1.0,
+        inferenceSource: 'explicit',
+        metadataJson: JSON.stringify({ orderIndex: globalIndex }),
+      }));
+    }
+
+    // Transform all paths into ContentNode inputs + step Relationships
+    const pathContentItems = allPaths.map(({ pathData }) => {
+      const thumbnailHash = pathThumbnailHashes.get(pathData.id);
+      return pathToContent(pathData, thumbnailHash);
     });
 
-    result.pathsAttempted = transformedPaths.length;  // Track for verification
+    const stepRelationships = allPaths.flatMap(({ pathData }) =>
+      pathToStepRelationships(pathData)
+    );
 
-    // Bulk create paths via direct HTTP call
-    console.log(`   📤 Bulk creating ${transformedPaths.length} paths...`);
+    result.pathsAttempted = pathContentItems.length;
+
+    // Bulk create path ContentNodes
+    console.log(`   📤 Bulk creating ${pathContentItems.length} path content nodes...`);
     const pathsStartTime = Date.now();
 
     try {
-      const pathsBulkResult = await timer.timeOperation('bulk_create_paths', () =>
-        doorwayClient.bulkCreatePaths(transformedPaths)
+      const pathsBulkResult = await timer.timeOperation('bulk_create_path_content', () =>
+        doorwayClient.bulkCreateContent(pathContentItems)
       );
 
       const pathsElapsed = Date.now() - pathsStartTime;
-      const pathsRate = transformedPaths.length / (pathsElapsed / 1000);
+      const pathsRate = pathContentItems.length / (pathsElapsed / 1000);
 
       result.pathsSucceeded = pathsBulkResult.inserted;
 
       // Report errors if any
       if (pathsBulkResult.errors.length > 0) {
-        console.log(`   ⚠️ ${pathsBulkResult.errors.length} path errors during import:`);
+        console.log(`   ⚠️ ${pathsBulkResult.errors.length} path content errors during import:`);
         for (const err of pathsBulkResult.errors.slice(0, 5)) {
           console.error(`      • ${err}`);
         }
@@ -1957,11 +1915,31 @@ async function seedViaDoorway(): Promise<SeedResult> {
         }
       }
 
-      console.log(`   ✅ Paths import complete: ${pathsBulkResult.inserted} inserted, ${pathsBulkResult.skipped} skipped (${pathsElapsed}ms, ${pathsRate.toFixed(1)} paths/sec)`);
+      console.log(`   ✅ Path content import complete: ${pathsBulkResult.inserted} inserted, ${pathsBulkResult.skipped} skipped (${pathsElapsed}ms, ${pathsRate.toFixed(1)} paths/sec)`);
+
+      // Bulk create step relationships
+      if (stepRelationships.length > 0) {
+        console.log(`   📤 Bulk creating ${stepRelationships.length} step relationships...`);
+        try {
+          const relResult = await timer.timeOperation('bulk_create_step_relationships', () =>
+            doorwayClient.bulkCreateRelationships(stepRelationships)
+          );
+          console.log(`   ✅ Step relationships import complete: ${relResult.created} created`);
+          if (relResult.errors.length > 0) {
+            console.log(`   ⚠️ ${relResult.errors.length} step relationship errors:`);
+            for (const err of relResult.errors.slice(0, 3)) {
+              console.error(`      • ${err}`);
+            }
+          }
+        } catch (relErr: any) {
+          console.warn(`   ⚠️ Step relationships bulk create failed: ${relErr.message}`);
+          // Don't exit - relationship failure shouldn't abort seeding
+        }
+      }
 
     } catch (pathErr: any) {
-      console.error(`   ❌ Paths bulk create failed: ${pathErr.message}`);
-      console.error(`\n❌ SEEDING FAILED: Paths bulk create failed. Check elohim-storage logs.`);
+      console.error(`   ❌ Path content bulk create failed: ${pathErr.message}`);
+      console.error(`\n❌ SEEDING FAILED: Path content bulk create failed. Check elohim-storage logs.`);
       // Don't exit - paths failure shouldn't abort if content succeeded
       result.pathsSucceeded = 0;
     }
@@ -2138,6 +2116,21 @@ async function seed() {
   } else if (seedResult.contentSucceeded !== seedResult.contentAttempted) {
     // Even without verification, warn if doorway reported failures
     console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
+  }
+
+  // Trigger projection cache warm-up so doorway serves freshly seeded content
+  // without requiring a restart. The endpoint returns 202 and warms in background.
+  try {
+    console.log('\n🔄 Triggering projection cache warm-up...');
+    const warmResp = await fetch(`${DOORWAY_URL}/admin/cache/warm`, { method: 'POST' });
+    if (warmResp.ok) {
+      const warmData = await warmResp.json();
+      console.log(`   ✅ Cache warm-up triggered (${warmData.peers} peer(s))`);
+    } else {
+      console.warn(`   ⚠️ Cache warm-up returned ${warmResp.status} — doorway may need restart`);
+    }
+  } catch (e) {
+    console.warn(`   ⚠️ Cache warm-up request failed — doorway may need restart`);
   }
 }
 

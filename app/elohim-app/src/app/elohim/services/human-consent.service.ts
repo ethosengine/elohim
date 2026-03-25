@@ -366,8 +366,9 @@ export class HumanConsentService {
       return of(true);
     }
 
-    // Check if current user is in participantIds
-    if (path.participantIds?.includes(currentAgentId)) {
+    // Check if current user is in participantIds (from node metadata or invitedAgentIds)
+    const participantIds = (path.node?.invitedAgentIds ?? (path.node?.metadata as Record<string, unknown>)?.['participantIds'] as string[] | undefined);
+    if (participantIds?.includes(currentAgentId)) {
       // For intimate paths, also check attestations if required
       // Note: Attestation service integration pending (Phase 6)
       // Currently trusts participantIds for intimate paths

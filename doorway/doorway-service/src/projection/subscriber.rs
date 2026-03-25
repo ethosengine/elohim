@@ -912,10 +912,10 @@ mod tests {
         // Test wrapped format { "signal": ... }
         let json = serde_json::json!({
             "signal": {
-                "doc_type": "LearningPath",
+                "doc_type": "Content",
                 "action": "commit",
-                "id": "test-path",
-                "data": {"title": "Test Path"},
+                "id": "test-content",
+                "data": {"title": "Test Content"},
                 "action_hash": "uhCkk...",
                 "author": "uhCAk..."
             }

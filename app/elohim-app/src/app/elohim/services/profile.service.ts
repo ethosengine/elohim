@@ -564,7 +564,7 @@ export class ProfileService {
       pathId: path.id,
       title: path.title,
       description: path.description,
-      difficulty: path.difficulty,
+      difficulty: (path.difficulty ?? 'beginner') as 'beginner' | 'intermediate' | 'advanced',
       totalSteps,
       completedSteps,
       currentStepIndex: progress?.currentStepIndex ?? 0,
