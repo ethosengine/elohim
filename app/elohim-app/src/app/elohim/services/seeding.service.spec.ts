@@ -15,7 +15,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SeedingService, SeedingMode, BatchResult, SeedingProgress } from './seeding.service';
 import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+
 
 describe('SeedingService', () => {
   let service: SeedingService;
@@ -140,58 +140,6 @@ describe('SeedingService', () => {
   });
 
   // ==========================================================================
-  // Bulk Path Creation Tests
-  // ==========================================================================
-
-  describe('bulk path operations', () => {
-    it('should have bulkCreatePaths method', () => {
-      expect(typeof service.bulkCreatePaths).toBe('function');
-    });
-
-    it('bulkCreatePaths should return Promise<BatchResult>', () => {
-      const mockPaths: LearningPath[] = [];
-      const promise = service.bulkCreatePaths(mockPaths);
-      expect(typeof promise.then).toBe('function');
-    });
-
-    it('should accept empty paths array', async () => {
-      const mockPaths: LearningPath[] = [];
-      const promise = service.bulkCreatePaths(mockPaths);
-      expect(typeof promise.then).toBe('function');
-    });
-
-    it('should accept multiple paths', async () => {
-      const mockPaths: LearningPath[] = [
-        {
-          id: 'path-1',
-          version: '1.0.0',
-          title: 'Path 1',
-          description: 'Description 1',
-          purpose: 'Test purpose',
-          difficulty: 'beginner',
-          steps: [],
-          visibility: 'public',
-          createdBy: 'test-author',
-          contributors: [],
-          tags: [],
-          estimatedDuration: '1 hour',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-
-      const promise = service.bulkCreatePaths(mockPaths);
-      expect(typeof promise.then).toBe('function');
-    });
-
-    it('bulkCreatePaths should auto-initialize if not ready', async () => {
-      const mockPaths: LearningPath[] = [];
-      await service.bulkCreatePaths(mockPaths);
-      expect(service.state).toBe('idle');
-    });
-  });
-
-  // ==========================================================================
   // Recovery and Sync Tests
   // ==========================================================================
 
@@ -204,10 +152,9 @@ describe('SeedingService', () => {
       expect(typeof service.incrementalSync).toBe('function');
     });
 
-    it('recoverySync should return Promise with content and paths', () => {
+    it('recoverySync should return Promise<BatchResult>', () => {
       const mockContent: ContentNode[] = [];
-      const mockPaths: LearningPath[] = [];
-      const promise = service.recoverySync(mockContent, mockPaths);
+      const promise = service.recoverySync(mockContent);
       expect(typeof promise.then).toBe('function');
     });
 
@@ -332,10 +279,6 @@ describe('SeedingService', () => {
       expect(typeof service.bulkCreateContent).toBe('function');
     });
 
-    it('should have bulkCreatePaths', () => {
-      expect(typeof service.bulkCreatePaths).toBe('function');
-    });
-
     it('should have recoverySync', () => {
       expect(typeof service.recoverySync).toBe('function');
     });
@@ -377,15 +320,9 @@ describe('SeedingService', () => {
       expect(() => service.bulkCreateContent(mockContent)).not.toThrow();
     });
 
-    it('should accept LearningPath[] for bulkCreatePaths', () => {
-      const mockPaths: LearningPath[] = [];
-      expect(() => service.bulkCreatePaths(mockPaths)).not.toThrow();
-    });
-
-    it('should accept ContentNode[] and LearningPath[] for recoverySync', () => {
+    it('should accept ContentNode[] for recoverySync', () => {
       const mockContent: ContentNode[] = [];
-      const mockPaths: LearningPath[] = [];
-      expect(() => service.recoverySync(mockContent, mockPaths)).not.toThrow();
+      expect(() => service.recoverySync(mockContent)).not.toThrow();
     });
 
     it('should accept ContentNode[] for incrementalSync', () => {
@@ -409,13 +346,8 @@ describe('SeedingService', () => {
       expect(typeof result.then).toBe('function');
     });
 
-    it('bulkCreatePaths should return Promise<BatchResult>', () => {
-      const result = service.bulkCreatePaths([]);
-      expect(typeof result.then).toBe('function');
-    });
-
-    it('recoverySync should return Promise', () => {
-      const result = service.recoverySync([], []);
+    it('recoverySync should return Promise<BatchResult>', () => {
+      const result = service.recoverySync([]);
       expect(typeof result.then).toBe('function');
     });
 
@@ -450,14 +382,8 @@ describe('SeedingService', () => {
       expect(typeof promise.then).toBe('function');
     });
 
-    it('should handle empty paths array', async () => {
-      const mockPaths: LearningPath[] = [];
-      const promise = service.bulkCreatePaths(mockPaths);
-      expect(typeof promise.then).toBe('function');
-    });
-
     it('should handle recovery sync with empty content', async () => {
-      const promise = service.recoverySync([], []);
+      const promise = service.recoverySync([]);
       expect(typeof promise.then).toBe('function');
     });
 

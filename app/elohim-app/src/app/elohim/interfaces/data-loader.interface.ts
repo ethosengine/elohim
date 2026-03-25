@@ -12,11 +12,11 @@
  * @example
  * ```typescript
  * @Injectable({ providedIn: 'root' })
- * export class PathViewService {
+ * export class ContentViewService {
  *   private readonly loader = inject(DATA_LOADER);
  *
- *   loadPathWithContent(id: string): Observable<PathWithDetailsView | null> {
- *     return this.loader.loadPath(id);
+ *   loadContentNode(id: string): Observable<ContentWithTagsView | null> {
+ *     return this.loader.loadContent(id);
  *   }
  * }
  * ```
@@ -27,7 +27,7 @@ import { InjectionToken } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import type { ContentFilters } from './storage-api.interface';
-import type { ContentWithTagsView, PathWithDetailsView } from '@elohim/storage-client/generated';
+import type { ContentWithTagsView } from '@elohim/storage-client/generated';
 
 /**
  * Abstract data loader — orchestrates content loading across backends.
@@ -39,9 +39,6 @@ import type { ContentWithTagsView, PathWithDetailsView } from '@elohim/storage-c
 export interface IDataLoader {
   /** Load a single content item by ID, using the best available backend. */
   loadContent(id: string): Observable<ContentWithTagsView | null>;
-
-  /** Load a single learning path by ID, with full details. */
-  loadPath(id: string): Observable<PathWithDetailsView | null>;
 
   /** Load multiple content items with optional filters. */
   loadContents(filters?: ContentFilters): Observable<ContentWithTagsView[]>;

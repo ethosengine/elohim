@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
-import { StorageClientService, StorageContentNode, StoragePath } from './storage-client.service';
+import { StorageClientService, StorageContentNode } from './storage-client.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import { vi } from 'vitest';
@@ -337,169 +337,6 @@ describe('StorageClientService', () => {
     }));
   });
 
-  describe('getPath', () => {
-    it('should fetch path by ID', fakeAsync(() => {
-      const mockPath: StoragePath = {
-        id: 'test-path',
-        version: '1.0',
-        title: 'Test Path',
-        description: 'Test path description',
-        difficulty: 'beginner',
-        estimatedDuration: '30 minutes',
-        pathType: 'course',
-        thumbnailUrl: null,
-        thumbnailBlobHash: null,
-        metadataJson: null,
-        tags: ['test'],
-      };
-
-      let result: StoragePath | null | undefined;
-
-      service.getPath('test-path').subscribe(path => {
-        result = path;
-      });
-
-      const req = httpMock.expectOne('http://localhost:8888/db/paths/test-path');
-      expect(req.request.method).toBe('GET');
-      req.flush(mockPath);
-
-      tick();
-      expect(result).toEqual(mockPath);
-    }));
-
-    it('should return null for 404', fakeAsync(() => {
-      let result: StoragePath | null | undefined;
-
-      service.getPath('nonexistent').subscribe(path => {
-        result = path;
-      });
-
-      const req = httpMock.expectOne('http://localhost:8888/db/paths/nonexistent');
-      req.flush(null, { status: 404, statusText: 'Not Found' });
-
-      tick();
-      expect(result).toBeNull();
-    }));
-  });
-
-  describe('getAllPaths', () => {
-    it('should fetch all paths', fakeAsync(() => {
-      const mockResponse: ListResponse<StoragePath> = {
-        items: [
-          {
-            id: 'path-1',
-            version: '1.0',
-            title: 'Path 1',
-            description: 'First path',
-            difficulty: 'beginner',
-            estimatedDuration: '1 hour',
-            pathType: 'course',
-            thumbnailUrl: null,
-            thumbnailBlobHash: null,
-            metadataJson: null,
-            tags: [],
-          },
-        ],
-        count: 1,
-        limit: 100,
-        offset: 0,
-      };
-
-      let result: ListResponse<StoragePath> | undefined;
-
-      service.getAllPaths().subscribe(response => {
-        result = response;
-      });
-
-      const req = httpMock.expectOne('http://localhost:8888/db/paths');
-      expect(req.request.method).toBe('GET');
-      req.flush(mockResponse);
-
-      tick();
-      expect(result).toEqual(mockResponse);
-      expect(result!.items.length).toBe(1);
-    }));
-  });
-
-  describe('getPathThumbnailUrl', () => {
-    it('should return blob URL when thumbnailBlobHash is set', () => {
-      const path: StoragePath = {
-        id: 'test',
-        version: '1.0',
-        title: 'Test',
-        description: '',
-        difficulty: 'beginner',
-        estimatedDuration: null,
-        pathType: 'course',
-        thumbnailUrl: 'https://example.com/thumb.jpg',
-        thumbnailBlobHash: 'sha256-abc123',
-        metadataJson: null,
-        tags: [],
-      };
-
-      const url = service.getPathThumbnailUrl(path);
-      expect(url).toBe('http://localhost:8888/api/blob/sha256-abc123');
-    });
-
-    it('should return thumbnailUrl when no blob hash', () => {
-      const path: StoragePath = {
-        id: 'test',
-        version: '1.0',
-        title: 'Test',
-        description: '',
-        difficulty: 'beginner',
-        estimatedDuration: null,
-        pathType: 'course',
-        thumbnailUrl: 'https://example.com/thumb.jpg',
-        thumbnailBlobHash: null,
-        metadataJson: null,
-        tags: [],
-      };
-
-      const url = service.getPathThumbnailUrl(path);
-      expect(url).toBe('https://example.com/thumb.jpg');
-    });
-
-    it('should return null when both are null', () => {
-      const path: StoragePath = {
-        id: 'test',
-        version: '1.0',
-        title: 'Test',
-        description: '',
-        difficulty: 'beginner',
-        estimatedDuration: null,
-        pathType: 'course',
-        thumbnailUrl: null,
-        thumbnailBlobHash: null,
-        metadataJson: null,
-        tags: [],
-      };
-
-      const url = service.getPathThumbnailUrl(path);
-      expect(url).toBeNull();
-    });
-
-    it('should prefer blob hash over URL', () => {
-      const path: StoragePath = {
-        id: 'test',
-        version: '1.0',
-        title: 'Test',
-        description: '',
-        difficulty: 'beginner',
-        estimatedDuration: null,
-        pathType: 'course',
-        thumbnailUrl: 'https://example.com/thumb.jpg',
-        thumbnailBlobHash: 'sha256-priority',
-        metadataJson: null,
-        tags: [],
-      };
-
-      const url = service.getPathThumbnailUrl(path);
-      expect(url).toContain('sha256-priority');
-      expect(url).not.toContain('example.com');
-    });
-  });
-
   describe('bulkCreateContent', () => {
     it('should bulk create content items', fakeAsync(() => {
       const items: Partial<StorageContentNode>[] = [
@@ -550,40 +387,6 @@ describe('StorageClientService', () => {
       req.flush({ inserted: 0, skipped: 0 });
 
       tick(120000); // Should not timeout before 2 minutes
-    }));
-  });
-
-  describe('bulkCreatePaths', () => {
-    it('should bulk create paths', fakeAsync(() => {
-      const items: Partial<StoragePath>[] = [
-        {
-          id: 'path-1',
-          version: '1.0',
-          title: 'Path 1',
-          description: '',
-          difficulty: 'beginner',
-          pathType: 'course',
-          tags: [],
-        },
-      ];
-
-      const mockResult: BulkCreateResult = {
-        inserted: 1,
-        skipped: 0,
-      };
-
-      let result: BulkCreateResult | undefined;
-
-      service.bulkCreatePaths(items).subscribe(response => {
-        result = response;
-      });
-
-      const req = httpMock.expectOne('http://localhost:8888/db/paths/bulk');
-      expect(req.request.method).toBe('POST');
-      req.flush(mockResult);
-
-      tick();
-      expect(result).toEqual(mockResult);
     }));
   });
 

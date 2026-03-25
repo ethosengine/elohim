@@ -31,8 +31,6 @@ import type {
   ContentMasteryView,
   ContentStewardshipView,
   ContentWithTagsView,
-  PathView,
-  PathWithDetailsView,
   RelationshipView,
   RelationshipWithContentView,
 } from '@elohim/storage-client/generated';
@@ -47,20 +45,6 @@ export interface ContentFilters {
   tags?: string[];
   reach?: string;
   search?: string;
-  limit?: number;
-  offset?: number;
-}
-
-/**
- * Query filters for path listing.
- *
- * Maps to the /db/paths endpoint query parameters.
- */
-export interface PathFilters {
-  pathType?: string;
-  difficulty?: string;
-  visibility?: string;
-  tags?: string[];
   limit?: number;
   offset?: number;
 }
@@ -111,12 +95,6 @@ export interface IStorageApi {
 
   /** List content items with optional filters. */
   getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]>;
-
-  /** Get a single learning path by ID, with full details. */
-  getPath(id: string): Observable<PathWithDetailsView | null>;
-
-  /** List learning paths with optional filters. */
-  getPaths(filters?: PathFilters): Observable<PathView[]>;
 
   /** List content relationships with optional filters. */
   getRelationships(filters?: RelationshipFilters): Observable<RelationshipView[]>;

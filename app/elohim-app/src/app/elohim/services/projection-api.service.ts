@@ -23,13 +23,11 @@ import { LearningPath, parsePathView } from '../../lamad/models/learning-path.mo
 
 import { StorageClientService } from './storage-client.service';
 
-import type { IStorageApi, ContentFilters, PathFilters, RelationshipFilters } from '../interfaces';
+import type { IStorageApi, ContentFilters, RelationshipFilters } from '../interfaces';
 import type {
   ContentMasteryView,
   ContentStewardshipView,
   ContentWithTagsView,
-  PathView,
-  PathWithDetailsView,
   RelationshipView,
   RelationshipWithContentView,
 } from '@elohim/storage-client/generated';
@@ -199,42 +197,6 @@ export class ProjectionAPIService implements IStorageApi {
     const url = this.buildApiUrl('/Content');
 
     return this.http.get<ContentWithTagsView[]>(url, { params }).pipe(
-      timeout(this.defaultTimeout),
-      map(data => data ?? []),
-      catchError(() => of([]))
-    );
-  }
-
-  /** Get a single learning path by ID, with full details. */
-  getPath(id: string): Observable<PathWithDetailsView | null> {
-    if (!this.enabled) {
-      return of(null);
-    }
-
-    const url = this.buildApiUrl(`/LearningPath/${encodeURIComponent(id)}`);
-
-    return this.http.get<PathWithDetailsView>(url).pipe(
-      timeout(this.defaultTimeout),
-      catchError((err: HttpErrorResponse) => {
-        if (err.status === 404) return of(null);
-        return of(null);
-      })
-    );
-  }
-
-  /** List learning paths with optional filters. */
-  getPaths(_filters?: PathFilters): Observable<PathView[]> {
-    if (!this.enabled) {
-      return of([]);
-    }
-
-    let params = new HttpParams();
-    if (_filters?.limit) params = params.set('limit', _filters.limit.toString());
-    if (_filters?.offset) params = params.set('skip', _filters.offset.toString());
-
-    const url = this.buildApiUrl('/LearningPath');
-
-    return this.http.get<PathView[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
       map(data => data ?? []),
       catchError(() => of([]))
