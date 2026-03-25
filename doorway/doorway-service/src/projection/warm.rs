@@ -1,11 +1,13 @@
 //! Cache Warm-Up — bootstrap projection from peer storage.
 //!
-//! The signal subscriber only receives FUTURE DHT writes. Content that was
-//! seeded before the subscriber connected needs to be fetched explicitly.
+//! **DEPRECATED**: Use `warm_stream` instead, which streams cacheable content
+//! via SSE from elohim-storage, filtered by reach, with reconnect support.
 //!
 //! This module fetches all content and paths from each peer's storage URL
-//! and projects them into MongoDB as a one-time bootstrap on startup.
-//! Subsequent updates arrive via signals.
+//! via HTTP pull with arbitrary limits. It doesn't respect reach levels
+//! and pulls blindly. Kept temporarily as fallback for older storage versions.
+
+#![allow(deprecated)]
 
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -18,6 +20,7 @@ use super::store::ProjectionStore;
 /// For each storage URL, fetches `/db/content?limit=10000` and `/db/paths?limit=1000`,
 /// then upserts each item into the projection store. Errors are logged but don't
 /// block startup — partial warmup is better than no warmup.
+#[deprecated(since = "0.1.0", note = "Use warm_stream::stream_from_peer instead")]
 pub async fn warm_projection_cache(
     store: Arc<ProjectionStore>,
     storage_urls: Vec<String>,
@@ -231,6 +234,7 @@ pub struct WarmResult {
 ///
 /// Waits `delay` seconds after startup to let MongoDB and storage settle,
 /// then warms the projection cache from all configured storage peers.
+#[deprecated(since = "0.1.0", note = "Use warm_stream::spawn_stream_task instead")]
 pub fn spawn_warm_task(
     store: Arc<ProjectionStore>,
     storage_urls: Vec<String>,
