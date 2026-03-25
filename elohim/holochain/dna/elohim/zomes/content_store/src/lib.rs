@@ -2109,7 +2109,8 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     // Branch based on batch_type
     match batch.batch_type.as_str() {
         "paths" | "path" => {
-            // Parse and process paths
+            // DEPRECATED: Path import via LearningPath entries. Will fail with deprecation error.
+            // Paths should now be imported as Content entries with content_type "path".
             let items: Vec<PathImportInput> = serde_json::from_str(&input.items_json)
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
                     "Failed to parse paths items_json: {}", e
@@ -2850,156 +2851,32 @@ pub fn get_blob_captions(input: QueryBlobVariantsInput) -> ExternResult<Vec<Blob
 }
 
 // =============================================================================
-// Learning Path Operations
+// Learning Path Operations (DEPRECATED)
+//
+// Paths are now Content entries with content_type "path" and content_format
+// "epr-composite". Write operations return deprecation errors. Read operations
+// are retained for accessing existing DHT entries during migration.
 // =============================================================================
 
-/// Create a learning path
+/// DEPRECATED: Use create_content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn create_path(input: CreatePathInput) -> ExternResult<ActionHash> {
-    // Check for existing path with this ID to prevent duplicates
-    if path_exists_by_id(&input.id)? {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Path with id '{}' already exists. Use update_path to modify existing paths.",
-            input.id
-        ))));
-    }
-
-    let agent_info = agent_info()?;
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    let path = LearningPath {
-        id: input.id.clone(),
-        version: input.version,
-        title: input.title,
-        description: input.description,
-        purpose: input.purpose,
-        created_by: agent_info.agent_initial_pubkey.to_string(),
-        difficulty: input.difficulty,
-        estimated_duration: input.estimated_duration,
-        visibility: input.visibility,
-        path_type: input.path_type,
-        tags: input.tags,
-        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
-        created_at: timestamp.clone(),
-        updated_at: timestamp,
-        schema_version: 2,
-        validation_status: "Valid".to_string(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::LearningPath(path))?;
-
-    // Create ID lookup link
-    let anchor = StringAnchor::new("path_id", &input.id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
-
-    // Create global "all_paths" index link for get_all_paths()
-    let all_paths_anchor = StringAnchor::new("all_paths", "index");
-    let all_paths_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_paths_anchor))?;
-    create_link(all_paths_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
-
-    Ok(action_hash)
+pub fn create_path(_input: CreatePathInput) -> ExternResult<ActionHash> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "LearningPath is deprecated. Use Content with content_type 'path' and content_format 'epr-composite' instead.".to_string()
+    )))
 }
 
-/// Add a step to a learning path
+/// DEPRECATED: Use create_content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Generate step ID
-    let step_id = match &input.chapter_id {
-        Some(ch_id) => format!("{}-{}-step-{}", input.path_id, ch_id, input.order_index),
-        None => format!("{}-step-{}", input.path_id, input.order_index),
-    };
-
-    let step = PathStep {
-        id: step_id.clone(),
-        path_id: input.path_id.clone(),
-        chapter_id: input.chapter_id.clone(),
-        module_id: input.module_id.clone(),
-        section_id: input.section_id.clone(),
-        order_index: input.order_index,
-        step_type: input.step_type,
-        resource_id: input.resource_id.clone(),
-        step_title: input.step_title,
-        step_narrative: input.step_narrative,
-        is_optional: input.is_optional,
-        // Learning objectives and engagement
-        learning_objectives_json: serde_json::to_string(&input.learning_objectives.unwrap_or_default())
-            .unwrap_or_else(|_| "[]".to_string()),
-        reflection_prompts_json: serde_json::to_string(&input.reflection_prompts.unwrap_or_default())
-            .unwrap_or_else(|_| "[]".to_string()),
-        practice_exercises_json: serde_json::to_string(&input.practice_exercises.unwrap_or_default())
-            .unwrap_or_else(|_| "[]".to_string()),
-        // Completion and gating
-        estimated_minutes: input.estimated_minutes,
-        completion_criteria: input.completion_criteria,
-        attestation_required: input.attestation_required,
-        attestation_granted: input.attestation_granted,
-        mastery_threshold: input.mastery_threshold,
-        // Metadata
-        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
-        created_at: timestamp.clone(),
-        updated_at: timestamp,
-        schema_version: 2,
-        validation_status: "Valid".to_string(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::PathStep(step))?;
-
-    // Create ID lookup link for step
-    let step_anchor = StringAnchor::new("step_id", &step_id);
-    let step_anchor_hash = hash_entry(&EntryTypes::StringAnchor(step_anchor))?;
-    create_link(step_anchor_hash, action_hash.clone(), LinkTypes::IdToStep, ())?;
-
-    // Link path to step
-    let path_anchor = StringAnchor::new("path_id", &input.path_id);
-    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-
-    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
-    let path_links = get_links(query, GetStrategy::default())?;
-
-    if let Some(path_link) = path_links.first() {
-        let path_action_hash = ActionHash::try_from(path_link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
-        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToStep, ())?;
-    }
-
-    // Link to chapter if specified
-    if let Some(chapter_id) = &input.chapter_id {
-        let chapter_anchor = StringAnchor::new("chapter_id", chapter_id);
-        let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
-
-        let chapter_query = LinkQuery::try_new(chapter_anchor_hash, LinkTypes::IdToChapter)?;
-        let chapter_links = get_links(chapter_query, GetStrategy::default())?;
-
-        if let Some(chapter_link) = chapter_links.first() {
-            let chapter_action_hash = ActionHash::try_from(chapter_link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
-            // Link chapter to step
-            create_link(chapter_action_hash.clone(), action_hash.clone(), LinkTypes::ChapterToStep, ())?;
-            // Link step back to chapter (for reverse lookup)
-            create_link(action_hash.clone(), chapter_action_hash, LinkTypes::StepToChapter, ())?;
-        }
-    }
-
-    // Link step to content (if resource exists)
-    let resource_anchor = StringAnchor::new("content_id", &input.resource_id);
-    let resource_anchor_hash = hash_entry(&EntryTypes::StringAnchor(resource_anchor))?;
-
-    let content_query = LinkQuery::try_new(resource_anchor_hash, LinkTypes::IdToContent)?;
-    let content_links = get_links(content_query, GetStrategy::default())?;
-
-    if let Some(content_link) = content_links.first() {
-        create_link(action_hash.clone(), content_link.target.clone(), LinkTypes::StepToContent, ())?;
-    }
-
-    Ok(action_hash)
+pub fn add_path_step(_input: AddPathStepInput) -> ExternResult<ActionHash> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "PathStep is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
+    )))
 }
 
-/// Batch add multiple steps to a path (for efficient seeding)
+/// DEPRECATED: Use create_content with content_type "path" instead.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchAddPathStepsInput {
     pub steps: Vec<AddPathStepInput>,
@@ -3012,30 +2889,16 @@ pub struct BatchAddPathStepsOutput {
     pub errors: Vec<String>,
 }
 
+/// DEPRECATED: Use create_content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn batch_add_path_steps(input: BatchAddPathStepsInput) -> ExternResult<BatchAddPathStepsOutput> {
-    let mut action_hashes = Vec::new();
-    let mut errors = Vec::new();
-
-    for step_input in input.steps {
-        match add_path_step(step_input.clone()) {
-            Ok(hash) => {
-                action_hashes.push(hash);
-            }
-            Err(e) => {
-                errors.push(format!("Failed to add step {}: {:?}", step_input.order_index, e));
-            }
-        }
-    }
-
-    Ok(BatchAddPathStepsOutput {
-        created_count: action_hashes.len() as u32,
-        action_hashes,
-        errors,
-    })
+pub fn batch_add_path_steps(_input: BatchAddPathStepsInput) -> ExternResult<BatchAddPathStepsOutput> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "batch_add_path_steps is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
+    )))
 }
 
-/// Batch check which path IDs already exist
+/// DEPRECATED: LearningPath entries are deprecated. Retained for migration support.
 #[hdk_extern]
 pub fn check_path_ids_exist(input: CheckIdsExistInput) -> ExternResult<CheckIdsExistOutput> {
     let mut existing_ids = Vec::new();
@@ -3075,7 +2938,7 @@ pub struct PathIndex {
     pub last_updated: String,
 }
 
-/// Get all learning paths (for path index)
+/// DEPRECATED: LearningPath entries are deprecated. Retained for reading existing DHT entries.
 /// Uses link-based lookup via global "all_paths" anchor
 #[hdk_extern]
 pub fn get_all_paths(_: ()) -> ExternResult<PathIndex> {
@@ -3126,8 +2989,8 @@ pub fn get_all_paths(_: ()) -> ExternResult<PathIndex> {
     })
 }
 
+/// DEPRECATED: LearningPath entries are deprecated. Retained for reading existing DHT entries.
 /// Delete a learning path and its steps (removes links, entries remain in DHT)
-/// Used for re-seeding paths with corrected step resource IDs
 #[hdk_extern]
 pub fn delete_path(path_id: String) -> ExternResult<bool> {
     // Find path by ID
@@ -3173,7 +3036,7 @@ pub fn delete_path(path_id: String) -> ExternResult<bool> {
     Ok(true)
 }
 
-/// Get a learning path with all its steps
+/// DEPRECATED: LearningPath entries are deprecated. Retained for reading existing DHT entries.
 #[hdk_extern]
 pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps>> {
     // Find path by ID
@@ -3240,13 +3103,9 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
     }))
 }
 
-/// Get a lightweight path overview (no step content, just metadata and count)
+/// DEPRECATED: LearningPath entries are deprecated. Retained for reading existing DHT entries.
 ///
-/// This is MUCH faster than get_path_with_steps because it:
-/// - Only counts step links instead of fetching each step record
-/// - Returns path.metadata_json which contains chapter structure
-///
-/// Use for: path listings, path-overview page, initial navigation
+/// Get a lightweight path overview (no step content, just metadata and count).
 #[hdk_extern]
 pub fn get_path_overview(path_id: String) -> ExternResult<Option<PathOverview>> {
     // Find path by ID
@@ -3291,62 +3150,22 @@ pub fn get_path_overview(path_id: String) -> ExternResult<Option<PathOverview>> 
 }
 
 // =============================================================================
-// Chapter Operations
+// Chapter Operations (DEPRECATED)
+//
+// PathChapter entries are deprecated. Paths are now Content entries.
+// Write operations return errors. Read operations retained for existing entries.
 // =============================================================================
 
-/// Create a chapter for a learning path
+/// DEPRECATED: PathChapter is deprecated. Use Content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn create_chapter(input: CreateChapterInput) -> ExternResult<ChapterOutput> {
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Generate chapter ID
-    let chapter_id = format!("{}-chapter-{}", input.path_id, input.order_index);
-
-    let chapter = PathChapter {
-        id: chapter_id.clone(),
-        path_id: input.path_id.clone(),
-        order_index: input.order_index,
-        title: input.title,
-        description: input.description,
-        learning_objectives_json: serde_json::to_string(&input.learning_objectives)
-            .unwrap_or_else(|_| "[]".to_string()),
-        estimated_minutes: input.estimated_minutes,
-        is_optional: input.is_optional,
-        attestation_granted: input.attestation_granted,
-        mastery_threshold: input.mastery_threshold,
-        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
-        created_at: timestamp.clone(),
-        updated_at: timestamp,
-    };
-
-    let action_hash = create_entry(&EntryTypes::PathChapter(chapter.clone()))?;
-
-    // Create ID lookup link for chapter
-    let chapter_anchor = StringAnchor::new("chapter_id", &chapter_id);
-    let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
-    create_link(chapter_anchor_hash, action_hash.clone(), LinkTypes::IdToChapter, ())?;
-
-    // Link path to chapter
-    let path_anchor = StringAnchor::new("path_id", &input.path_id);
-    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-
-    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
-    let path_links = get_links(query, GetStrategy::default())?;
-
-    if let Some(path_link) = path_links.first() {
-        let path_action_hash = ActionHash::try_from(path_link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
-        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToChapter, ())?;
-    }
-
-    Ok(ChapterOutput {
-        action_hash,
-        chapter,
-    })
+pub fn create_chapter(_input: CreateChapterInput) -> ExternResult<ChapterOutput> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "PathChapter is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
+    )))
 }
 
-/// Get a chapter by ID
+/// DEPRECATED: PathChapter entries are deprecated. Retained for reading existing DHT entries.
 #[hdk_extern]
 pub fn get_chapter_by_id(chapter_id: String) -> ExternResult<Option<ChapterOutput>> {
     let anchor = StringAnchor::new("chapter_id", &chapter_id);
@@ -3383,7 +3202,7 @@ pub fn get_chapter_by_id(chapter_id: String) -> ExternResult<Option<ChapterOutpu
     }))
 }
 
-/// Get all chapters for a path
+/// DEPRECATED: PathChapter entries are deprecated. Retained for reading existing DHT entries.
 #[hdk_extern]
 pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSteps>> {
     // Find path by ID
@@ -3461,7 +3280,7 @@ pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSte
     Ok(chapters)
 }
 
-/// Get a full path with chapters and steps organized
+/// DEPRECATED: LearningPath entries are deprecated. Retained for reading existing DHT entries.
 #[hdk_extern]
 pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAndSteps>> {
     // Find path by ID
@@ -3535,258 +3354,38 @@ pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAnd
     }))
 }
 
-/// Update a chapter
+/// DEPRECATED: PathChapter is deprecated. Use Content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn update_chapter(input: UpdateChapterInput) -> ExternResult<ChapterOutput> {
-    // Get existing chapter
-    let existing = get_chapter_by_id(input.chapter_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("Chapter not found: {}", input.chapter_id)
-        )))?;
-
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Create updated chapter (immutable DHT pattern)
-    let updated_chapter = PathChapter {
-        id: existing.chapter.id,
-        path_id: existing.chapter.path_id.clone(),
-        order_index: input.order_index.unwrap_or(existing.chapter.order_index),
-        title: input.title.unwrap_or(existing.chapter.title),
-        description: input.description.or(existing.chapter.description),
-        learning_objectives_json: input.learning_objectives
-            .map(|lo| serde_json::to_string(&lo).unwrap_or_else(|_| "[]".to_string()))
-            .unwrap_or(existing.chapter.learning_objectives_json),
-        estimated_minutes: input.estimated_minutes.or(existing.chapter.estimated_minutes),
-        is_optional: input.is_optional.unwrap_or(existing.chapter.is_optional),
-        attestation_granted: input.attestation_granted.or(existing.chapter.attestation_granted),
-        mastery_threshold: input.mastery_threshold.or(existing.chapter.mastery_threshold),
-        metadata_json: existing.chapter.metadata_json,
-        created_at: existing.chapter.created_at,
-        updated_at: timestamp,
-    };
-
-    let action_hash = create_entry(&EntryTypes::PathChapter(updated_chapter.clone()))?;
-
-    // Update the ID lookup link
-    let chapter_anchor = StringAnchor::new("chapter_id", &input.chapter_id);
-    let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
-
-    // Delete old link
-    let old_query = LinkQuery::try_new(chapter_anchor_hash.clone(), LinkTypes::IdToChapter)?;
-    let old_links = get_links(old_query, GetStrategy::default())?;
-    for link in old_links {
-        delete_link(link.create_link_hash, GetOptions::default())?;
-    }
-
-    // Create new link
-    create_link(chapter_anchor_hash, action_hash.clone(), LinkTypes::IdToChapter, ())?;
-
-    // Update path-to-chapter link
-    let path_anchor = StringAnchor::new("path_id", &existing.chapter.path_id);
-    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-    let path_query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
-    let path_links = get_links(path_query, GetStrategy::default())?;
-
-    if let Some(path_link) = path_links.first() {
-        let path_action_hash = ActionHash::try_from(path_link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
-
-        // Delete old path-to-chapter links pointing to old chapter
-        let old_chapter_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToChapter)?;
-        let old_chapter_links = get_links(old_chapter_query, GetStrategy::default())?;
-        for link in old_chapter_links {
-            if link.target == existing.action_hash.clone().into() {
-                delete_link(link.create_link_hash, GetOptions::default())?;
-            }
-        }
-
-        // Create new link
-        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToChapter, ())?;
-    }
-
-    Ok(ChapterOutput {
-        action_hash,
-        chapter: updated_chapter,
-    })
+pub fn update_chapter(_input: UpdateChapterInput) -> ExternResult<ChapterOutput> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "PathChapter is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
+    )))
 }
 
 // =============================================================================
-// Path Update Operations
+// Path Update Operations (DEPRECATED)
 // =============================================================================
 
-/// Update a learning path
+/// DEPRECATED: LearningPath is deprecated. Use Content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn update_path(input: UpdatePathInput) -> ExternResult<PathWithSteps> {
-    // Get existing path
-    let existing = get_path_with_steps(input.path_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("Path not found: {}", input.path_id)
-        )))?;
-
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Create updated path (immutable DHT pattern)
-    let updated_path = LearningPath {
-        id: existing.path.id,
-        version: existing.path.version,
-        title: input.title.unwrap_or(existing.path.title),
-        description: input.description.unwrap_or(existing.path.description),
-        purpose: input.purpose.or(existing.path.purpose),
-        created_by: existing.path.created_by,
-        difficulty: input.difficulty.unwrap_or(existing.path.difficulty),
-        estimated_duration: input.estimated_duration.or(existing.path.estimated_duration),
-        visibility: input.visibility.unwrap_or(existing.path.visibility),
-        path_type: existing.path.path_type,
-        tags: input.tags.unwrap_or(existing.path.tags),
-        metadata_json: existing.path.metadata_json,
-        created_at: existing.path.created_at,
-        updated_at: timestamp,
-        schema_version: 2,
-        validation_status: "Valid".to_string(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::LearningPath(updated_path.clone()))?;
-
-    // Update the ID lookup link
-    let path_anchor = StringAnchor::new("path_id", &input.path_id);
-    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-
-    // Delete old link
-    let old_query = LinkQuery::try_new(path_anchor_hash.clone(), LinkTypes::IdToPath)?;
-    let old_links = get_links(old_query, GetStrategy::default())?;
-    for link in old_links {
-        delete_link(link.create_link_hash, GetOptions::default())?;
-    }
-
-    // Create new link
-    create_link(path_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
-
-    // Update all_paths index link
-    let all_paths_anchor = StringAnchor::new("all_paths", "index");
-    let all_paths_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_paths_anchor))?;
-
-    // Delete old all_paths link
-    let old_all_query = LinkQuery::try_new(all_paths_anchor_hash.clone(), LinkTypes::IdToPath)?;
-    let old_all_links = get_links(old_all_query, GetStrategy::default())?;
-    for link in old_all_links {
-        if link.target == existing.action_hash.clone().into() {
-            delete_link(link.create_link_hash, GetOptions::default())?;
-        }
-    }
-
-    // Create new all_paths link
-    create_link(all_paths_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
-
-    // Re-link all steps to new path action hash
-    for step_output in &existing.steps {
-        create_link(action_hash.clone(), step_output.action_hash.clone(), LinkTypes::PathToStep, ())?;
-    }
-
-    Ok(PathWithSteps {
-        action_hash,
-        path: updated_path,
-        steps: existing.steps,
-    })
+pub fn update_path(_input: UpdatePathInput) -> ExternResult<PathWithSteps> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "LearningPath is deprecated. Use Content with content_type 'path' and content_format 'epr-composite' instead.".to_string()
+    )))
 }
 
-/// Update a step
+/// DEPRECATED: PathStep is deprecated. Use Content with content_type "path" instead.
+/// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn update_step(input: UpdateStepInput) -> ExternResult<PathStepOutput> {
-    // Get existing step by ID
-    let step_anchor = StringAnchor::new("step_id", &input.step_id);
-    let step_anchor_hash = hash_entry(&EntryTypes::StringAnchor(step_anchor))?;
-
-    let query = LinkQuery::try_new(step_anchor_hash.clone(), LinkTypes::IdToStep)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("Step not found: {}", input.step_id)
-        )))?;
-
-    let existing_action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
-
-    let record = get(existing_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Step record not found".to_string())))?;
-
-    let existing: PathStep = record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not deserialize step".to_string()
-        )))?;
-
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Create updated step
-    let updated_step = PathStep {
-        id: existing.id,
-        path_id: existing.path_id.clone(),
-        chapter_id: input.chapter_id.or(existing.chapter_id),
-        module_id: existing.module_id,
-        section_id: existing.section_id,
-        order_index: input.order_index.unwrap_or(existing.order_index),
-        step_type: existing.step_type,
-        resource_id: existing.resource_id.clone(),
-        step_title: input.step_title.or(existing.step_title),
-        step_narrative: input.step_narrative.or(existing.step_narrative),
-        is_optional: input.is_optional.unwrap_or(existing.is_optional),
-        learning_objectives_json: input.learning_objectives
-            .map(|lo| serde_json::to_string(&lo).unwrap_or_else(|_| "[]".to_string()))
-            .unwrap_or(existing.learning_objectives_json),
-        reflection_prompts_json: input.reflection_prompts
-            .map(|rp| serde_json::to_string(&rp).unwrap_or_else(|_| "[]".to_string()))
-            .unwrap_or(existing.reflection_prompts_json),
-        practice_exercises_json: input.practice_exercises
-            .map(|pe| serde_json::to_string(&pe).unwrap_or_else(|_| "[]".to_string()))
-            .unwrap_or(existing.practice_exercises_json),
-        estimated_minutes: input.estimated_minutes.or(existing.estimated_minutes),
-        completion_criteria: input.completion_criteria.or(existing.completion_criteria),
-        attestation_required: input.attestation_required.or(existing.attestation_required),
-        attestation_granted: input.attestation_granted.or(existing.attestation_granted),
-        mastery_threshold: input.mastery_threshold.or(existing.mastery_threshold),
-        metadata_json: existing.metadata_json,
-        created_at: existing.created_at,
-        updated_at: timestamp,
-        schema_version: 2,
-        validation_status: "Valid".to_string(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::PathStep(updated_step.clone()))?;
-
-    // Update the ID lookup link
-    // Delete old link
-    for lnk in links {
-        delete_link(lnk.create_link_hash, GetOptions::default())?;
-    }
-
-    // Create new link
-    create_link(step_anchor_hash, action_hash.clone(), LinkTypes::IdToStep, ())?;
-
-    // Re-link to path
-    let path_anchor = StringAnchor::new("path_id", &existing.path_id);
-    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-    let path_query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
-    let path_links = get_links(path_query, GetStrategy::default())?;
-
-    if let Some(path_link) = path_links.first() {
-        let path_action_hash = ActionHash::try_from(path_link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
-        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToStep, ())?;
-    }
-
-    Ok(PathStepOutput {
-        action_hash,
-        step: updated_step,
-    })
+pub fn update_step(_input: UpdateStepInput) -> ExternResult<PathStepOutput> {
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "PathStep is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
+    )))
 }
 
-/// Get a step by ID
+/// DEPRECATED: PathStep entries are deprecated. Retained for reading existing DHT entries.
 #[hdk_extern]
 pub fn get_step_by_id(step_id: String) -> ExternResult<Option<PathStepOutput>> {
     let anchor = StringAnchor::new("step_id", &step_id);
@@ -4019,7 +3618,8 @@ fn content_exists_by_id(id: &str) -> ExternResult<bool> {
     Ok(!links.is_empty())
 }
 
-/// Check if a learning path with the given ID already exists.
+/// DEPRECATED: LearningPath entries are deprecated. Retained for potential migration use.
+#[allow(dead_code)]
 fn path_exists_by_id(id: &str) -> ExternResult<bool> {
     let anchor = StringAnchor::new("path_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
