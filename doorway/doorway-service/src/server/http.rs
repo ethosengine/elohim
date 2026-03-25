@@ -1002,6 +1002,67 @@ async fn handle_request(
             let hash = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
             to_boxed(routes::handle_check_blob(hash, Arc::clone(&state)).await)
         }
+        // POST /admin/cache/warm - Trigger projection cache warm-up from storage
+        // Called by seeder after bulk content creation to populate projection cache
+        (Method::POST, "/admin/cache/warm") => {
+            let state = Arc::clone(&state);
+            to_boxed(
+                async move {
+                    if let Some(ref projection_store) = state.projection {
+                        // Build peer URL list (same logic as startup)
+                        let mut peer_urls: Vec<String> = Vec::new();
+                        if let Some(ref url) = state.args.storage_url {
+                            peer_urls.push(url.clone());
+                        }
+                        for url in &state.args.storage_urls {
+                            let trimmed = url.trim().to_string();
+                            if !trimmed.is_empty() && !peer_urls.contains(&trimmed) {
+                                peer_urls.push(trimmed);
+                            }
+                        }
+
+                        if peer_urls.is_empty() {
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .header("Content-Type", "application/json")
+                                .body(Full::new(Bytes::from(
+                                    r#"{"error":"No storage URLs configured"}"#,
+                                )))
+                                .unwrap()
+                        } else {
+                            let store = Arc::clone(projection_store);
+                            let count = peer_urls.len();
+                            // Spawn warm-up in background — don't block the response
+                            tokio::spawn(async move {
+                                for url in &peer_urls {
+                                    crate::projection::warm_stream::stream_from_peer(
+                                        Arc::clone(&store),
+                                        url,
+                                    )
+                                    .await;
+                                }
+                            });
+                            Response::builder()
+                                .status(StatusCode::ACCEPTED)
+                                .header("Content-Type", "application/json")
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"status":"warming","peers":{count}}}"#
+                                ))))
+                                .unwrap()
+                        }
+                    } else {
+                        Response::builder()
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(
+                                r#"{"error":"Projection store not available"}"#,
+                            )))
+                            .unwrap()
+                    }
+                }
+                .await,
+            )
+        }
 
         // ====================================================================
         // Admin User Management API

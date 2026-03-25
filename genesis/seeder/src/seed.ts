@@ -2117,6 +2117,21 @@ async function seed() {
     // Even without verification, warn if doorway reported failures
     console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
   }
+
+  // Trigger projection cache warm-up so doorway serves freshly seeded content
+  // without requiring a restart. The endpoint returns 202 and warms in background.
+  try {
+    console.log('\n🔄 Triggering projection cache warm-up...');
+    const warmResp = await fetch(`${DOORWAY_URL}/admin/cache/warm`, { method: 'POST' });
+    if (warmResp.ok) {
+      const warmData = await warmResp.json();
+      console.log(`   ✅ Cache warm-up triggered (${warmData.peers} peer(s))`);
+    } else {
+      console.warn(`   ⚠️ Cache warm-up returned ${warmResp.status} — doorway may need restart`);
+    }
+  } catch (e) {
+    console.warn(`   ⚠️ Cache warm-up request failed — doorway may need restart`);
+  }
 }
 
 seed().catch((error) => {
