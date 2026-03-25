@@ -412,6 +412,19 @@ impl HttpServer {
                 }
             }
 
+            // Cache stream for projection warm-up (SSE)
+            (Method::GET, "/api/v1/cache/stream") => {
+                if let Some(ref pool) = self.db_pool {
+                    let response = crate::cache_stream::create_cache_stream(
+                        pool.clone(),
+                        "lamad", // Default app context for cache stream
+                    );
+                    return Ok(response.map(Either::Right));
+                } else {
+                    Ok(response::service_unavailable("Database not available"))
+                }
+            }
+
             // Enriched API: Business logic endpoints
             (method, p) if p.starts_with("/api/v1/") => {
                 if let Some(ref pool) = self.db_pool {
@@ -7019,6 +7032,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/db/allocations/{id}/resolve")
                 .handler("resolve_db_allocation")
                 .auth_required()
+                .build(),
+        )
+        // Cache stream for projection warm-up (SSE)
+        .route(
+            Route::get("/api/v1/cache/stream")
+                .handler("cache_stream")
                 .build(),
         )
         // Blob proxy: doorway caches blobs from /blob/{hash}
