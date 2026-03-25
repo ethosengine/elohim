@@ -47,7 +47,7 @@ struct ApiError {
 /// Parsed cache route components
 #[derive(Debug)]
 struct CacheRoute<'a> {
-    /// Document type (e.g., "Content", "LearningPath")
+    /// Document type (e.g., "Content", "Human")
     doc_type: &'a str,
     /// Optional document ID for single lookups
     doc_id: Option<&'a str>,
@@ -311,8 +311,8 @@ mod tests {
 
     #[test]
     fn test_parse_cache_route_collection() {
-        let route = CacheRoute::parse("/api/v1/cache/LearningPath").unwrap();
-        assert_eq!(route.doc_type, "LearningPath");
+        let route = CacheRoute::parse("/api/v1/cache/Human").unwrap();
+        assert_eq!(route.doc_type, "Human");
         assert_eq!(route.doc_id, None);
     }
 

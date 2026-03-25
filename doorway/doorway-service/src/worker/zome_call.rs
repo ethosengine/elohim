@@ -16,7 +16,6 @@
 //!     // Dispatch based on doc_type to actual getters
 //!     match input.doc_type.as_str() {
 //!         "Content" => get_content_by_id(&input.id),
-//!         "LearningPath" => get_path_by_id(&input.id),
 //!         _ => Ok(None),  // Unknown type
 //!     }
 //! }
@@ -44,7 +43,7 @@ pub struct RequesterIdentity {
 /// Input for the DNA's `__doorway_get` function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DoorwayGetInput {
-    /// Document type (e.g., "Content", "LearningPath")
+    /// Document type (e.g., "Content", "Human")
     pub doc_type: String,
     /// Document ID
     pub id: String,
@@ -56,7 +55,7 @@ pub struct DoorwayGetInput {
 /// Input for the DNA's `__doorway_write` function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DoorwayWriteInput {
-    /// Document type (e.g., "Content", "LearningPath")
+    /// Document type (e.g., "Content", "Human")
     pub doc_type: String,
     /// Operation type ("create", "update", "delete")
     pub op_type: String,

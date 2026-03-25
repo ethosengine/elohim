@@ -1193,7 +1193,7 @@ async fn handle_request(
         }
 
         // Database API routes (proxied to elohim-storage)
-        // GET/POST/DELETE /db/content[/{id}], /db/paths[/{id}], /db/stats
+        // GET/POST/DELETE /db/content[/{id}], /db/stats, etc.
         // Required for browser clients since they can't access elohim-storage directly (CORS)
         (_, p) if p.starts_with("/db/") => {
             debug!(path = %p, "Forwarding database request to elohim-storage");

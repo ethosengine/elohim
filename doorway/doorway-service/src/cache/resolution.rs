@@ -28,7 +28,7 @@
 //!
 //! // Resolve any type - doorway doesn't care what the type is
 //! let content = resolver.resolve("Content", "manifesto").await?;
-//! let path = resolver.resolve("LearningPath", "governance-intro").await?;
+//! let human = resolver.resolve("Human", "agent-123").await?;
 //! let custom = resolver.resolve("MyCustomType", "my-id").await?;
 //! ```
 

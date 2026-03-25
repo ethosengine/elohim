@@ -4,7 +4,5 @@
 //! optimized indexes and query patterns.
 
 pub mod content;
-pub mod paths;
 
 pub use content::{ContentProjection, ContentQuery};
-pub use paths::{PathProjection, PathQuery};
