@@ -69,6 +69,9 @@ pub mod progress_ws;
 pub mod services;
 pub mod sse;
 
+// Cache stream for projection warm-up (SSE)
+pub mod cache_stream;
+
 // Tally strategies for multi-mechanism voting
 pub mod tally;
 
