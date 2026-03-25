@@ -10,9 +10,11 @@ pub mod provisioner;
 pub mod registry;
 pub mod router;
 pub mod typed_admin;
+pub mod typed_app;
 
 pub use pool_map::{ConductorPoolMap, ConductorPoolStatus};
 pub use provisioner::{AgentProvisioner, ProvisionedAgent};
 pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};
 pub use router::ConductorRouter;
 pub use typed_admin::TypedAdminClient;
+pub use typed_app::TypedAppClient;
