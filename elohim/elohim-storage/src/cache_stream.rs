@@ -176,9 +176,8 @@ pub fn create_cache_stream(pool: DbPool, app_id: &str) -> hyper::Response<SseBod
 
     // Build SSE response from mpsc receiver + heartbeat
     let rx_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-    let events = tokio_stream::StreamExt::map(rx_stream, |bytes| {
-        Ok::<_, Infallible>(Frame::data(bytes))
-    });
+    let events =
+        tokio_stream::StreamExt::map(rx_stream, |bytes| Ok::<_, Infallible>(Frame::data(bytes)));
 
     let heartbeat = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(
         std::time::Duration::from_secs(30),
