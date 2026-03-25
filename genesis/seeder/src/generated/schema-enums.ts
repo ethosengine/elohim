@@ -23,6 +23,7 @@ export const CORE_CONTENT_FORMATS = [
   'audio',
   'interactive',
   'external',
+  'epr-composite',
 ] as const;
 export const ALL_CONTENT_FORMATS = [
   'markdown',
@@ -31,6 +32,7 @@ export const ALL_CONTENT_FORMATS = [
   'audio',
   'interactive',
   'external',
+  'epr-composite',
   'plaintext',
   'text',
   'plain',
@@ -60,6 +62,7 @@ export const CORE_CONTENT_TYPES = [
   'discussion',
   'exercise',
   'article',
+  'path',
 ] as const;
 export const ALL_CONTENT_TYPES = [
   'epic',
@@ -71,6 +74,7 @@ export const ALL_CONTENT_TYPES = [
   'discussion',
   'exercise',
   'article',
+  'path',
   'human',
   'role',
   'collective',
