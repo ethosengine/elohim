@@ -529,7 +529,7 @@ export class ElohimClient {
     // Use storageUrl directly for /db/* routes if configured (local dev bypass)
     const baseUrl = mode.storageUrl ?? mode.doorway.url;
 
-    for (const [contentType, ops] of byType) {
+    for (const [_contentType, ops] of byType) {
       // All content (including paths) goes to /db/content/bulk
       const url = `${baseUrl}/db/content/bulk`;
       const items = ops.map(op => op.data);

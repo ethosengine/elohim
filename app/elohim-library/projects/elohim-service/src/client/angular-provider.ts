@@ -5,6 +5,7 @@
  * Configure the client mode based on your environment.
  */
 
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { InjectionToken, Provider, FactoryProvider } from '@angular/core';
 
 import { ElohimClient, ElohimClientConfig, ClientMode, ReachLevel } from './index';
