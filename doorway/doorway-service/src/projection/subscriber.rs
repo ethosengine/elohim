@@ -36,9 +36,7 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
-// issue_app_token unused while auth is disabled (conductor doesn't require it).
-// Kept in app_auth.rs for when auth becomes required.
-use super::app_auth::AppAuthToken;
+use super::app_auth::{issue_app_token, AppAuthToken};
 use super::engine::ProjectionSignal;
 
 // =============================================================================
@@ -296,12 +294,13 @@ impl SignalSubscriber {
 
     /// Start the subscriber (blocking)
     ///
-    /// Connects to the conductor's app WebSocket WITHOUT authentication.
-    /// The conductor on alpha doesn't require auth (worker pool proves this).
-    /// Keepalive pings (5s interval) prevent the conductor's idle timeout (~10s).
-    ///
-    /// If auth becomes required in future, re-enable the token flow below.
+    /// Uses the official `holochain_client::AppWebsocket` for authenticated connection
+    /// and signal subscription. This handles the wire protocol correctly, including
+    /// keepalive and signal routing.
     pub async fn run(&self) {
+        use holochain_client::{AppWebsocket, ClientAgentSigner};
+        use holochain_types::signal::Signal;
+
         let mut reconnect_attempts = 0u32;
         let mut shutdown_rx = self.shutdown_receiver();
 
@@ -312,48 +311,170 @@ impl SignalSubscriber {
                 break;
             }
 
-            info!("Connecting to app interface at {}", self.config.app_url);
+            // Step 1: Get auth token from admin interface using TypedAdminClient
+            info!(
+                "Requesting app auth token for '{}' from {}",
+                self.config.installed_app_id, self.config.admin_url
+            );
 
-            match self.connect_and_listen_no_auth().await {
-                Ok(()) => {
-                    // Clean disconnect, reset counter
-                    reconnect_attempts = 0;
+            let token = match issue_app_token(
+                &self.config.admin_url,
+                &self.config.installed_app_id,
+                self.config.token_expiry_seconds,
+            )
+            .await
+            {
+                Ok(t) => {
+                    info!("Obtained app authentication token");
+                    t
                 }
                 Err(e) => {
-                    error!("App interface error: {}", e);
+                    error!("Failed to get app auth token: {}", e);
                     reconnect_attempts += 1;
-
-                    if self.config.max_reconnect_attempts > 0
-                        && reconnect_attempts >= self.config.max_reconnect_attempts
-                    {
-                        error!(
-                            "Max reconnection attempts ({}) reached, stopping subscriber",
-                            self.config.max_reconnect_attempts
-                        );
+                    if self.should_stop(reconnect_attempts) {
                         break;
+                    }
+                    self.wait_reconnect(&mut shutdown_rx, reconnect_attempts)
+                        .await;
+                    continue;
+                }
+            };
+
+            // Step 2: Connect via official AppWebsocket (handles auth + signal subscription)
+            // Strip ws:// scheme — ToSocketAddrs resolves hostnames via DNS
+            let app_addr = self
+                .config
+                .app_url
+                .replace("ws://", "")
+                .replace("wss://", "");
+
+            info!(
+                "Connecting to app interface via AppWebsocket at {}",
+                app_addr
+            );
+
+            let signer = ClientAgentSigner::default();
+            let app_ws = match AppWebsocket::connect(
+                &*app_addr,
+                token.token,
+                signer.into(),
+                Some("doorway-projection".to_string()),
+            )
+            .await
+            {
+                Ok(ws) => {
+                    reconnect_attempts = 0;
+                    info!(
+                        agent = %ws.cached_app_info().agent_pub_key,
+                        "Connected and authenticated to conductor (official AppWebsocket)"
+                    );
+                    ws
+                }
+                Err(e) => {
+                    error!("AppWebsocket connect failed: {}", e);
+                    reconnect_attempts += 1;
+                    if self.should_stop(reconnect_attempts) {
+                        break;
+                    }
+                    self.wait_reconnect(&mut shutdown_rx, reconnect_attempts)
+                        .await;
+                    continue;
+                }
+            };
+
+            // Step 3: Subscribe to signals — the official client routes signals
+            // from this app's cells to our handler
+            let signal_tx = self.signal_tx.clone();
+            let _signal_handle = app_ws
+                .on_signal(move |signal| {
+                    if let Signal::App { signal, .. } = signal {
+                        // Signal payload is ExternIO (msgpack bytes) — try to parse
+                        let bytes: Vec<u8> = signal.into_inner().into();
+                        if let Ok(value) = rmp_serde::from_slice::<JsonValue>(&bytes) {
+                            // Try to parse as ProjectionSignal
+                            if let Ok(proj_signal) =
+                                serde_json::from_value::<ProjectionSignal>(value.clone())
+                            {
+                                info!(
+                                    doc_type = proj_signal.doc_type,
+                                    action = proj_signal.action,
+                                    id = proj_signal.id,
+                                    "Received projection signal via AppWebsocket"
+                                );
+                                let _ = signal_tx.send(proj_signal);
+                            } else {
+                                debug!("Received non-projection app signal: {:?}", value);
+                            }
+                        }
+                    }
+                })
+                .await;
+
+            info!("Signal subscription active, waiting for conductor disconnect...");
+
+            // Step 4: Hold the connection open until conductor disconnects or shutdown
+            // The official AppWebsocket handles keepalive internally
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        info!("Shutdown received, closing AppWebsocket");
+                        break;
+                    }
+                    // Poll periodically — if the connection dies, on_signal stops
+                    // and we'll detect it on the next reconnect cycle
+                    _ = sleep(Duration::from_secs(30)) => {
+                        // Connection health check: try app_info()
+                        match app_ws.app_info().await {
+                            Ok(Some(_)) => {
+                                debug!("AppWebsocket health check passed");
+                            }
+                            _ => {
+                                warn!("AppWebsocket health check failed, reconnecting");
+                                break;
+                            }
+                        }
                     }
                 }
             }
 
             // Wait before reconnecting
-            info!(
-                "Reconnecting in {:?} (attempt {})",
-                self.config.reconnect_delay, reconnect_attempts
-            );
-
-            tokio::select! {
-                _ = sleep(self.config.reconnect_delay) => {}
-                _ = shutdown_rx.recv() => {
-                    info!("Shutdown received during reconnect wait");
-                    break;
-                }
-            }
+            self.wait_reconnect(&mut shutdown_rx, reconnect_attempts)
+                .await;
         }
 
         info!("Signal subscriber stopped");
     }
 
+    /// Check if we should stop reconnecting
+    fn should_stop(&self, attempts: u32) -> bool {
+        if self.config.max_reconnect_attempts > 0 && attempts >= self.config.max_reconnect_attempts
+        {
+            error!(
+                "Max reconnection attempts ({}) reached, stopping subscriber",
+                self.config.max_reconnect_attempts
+            );
+            return true;
+        }
+        false
+    }
+
+    /// Wait for reconnect delay or shutdown
+    async fn wait_reconnect(&self, shutdown_rx: &mut broadcast::Receiver<()>, attempts: u32) {
+        info!(
+            "Reconnecting in {:?} (attempt {})",
+            self.config.reconnect_delay, attempts
+        );
+        tokio::select! {
+            _ = sleep(self.config.reconnect_delay) => {}
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown received during reconnect wait");
+            }
+        }
+    }
+
     /// Build a WebSocket connect request for the app interface
+    /// (Used by manual WS fallback paths — kept for future use)
+    #[allow(dead_code)]
     fn build_ws_request(&self) -> Result<Request<()>, String> {
         let host = self
             .config
@@ -382,6 +503,7 @@ impl SignalSubscriber {
     /// The conductor's app interface on alpha doesn't require auth — the worker
     /// pool connects the same way and successfully makes zome calls. Keepalive
     /// pings prevent the conductor's ~10s idle timeout.
+    #[allow(dead_code)]
     async fn connect_and_listen_no_auth(&self) -> Result<(), String> {
         let request = self.build_ws_request()?;
         let (ws_stream, _) = connect_async_with_config(request, None, false)
@@ -416,7 +538,7 @@ impl SignalSubscriber {
         self.listen_loop(write, read).await
     }
 
-    /// Main signal listening loop
+    #[allow(dead_code)]
     async fn listen_loop<S>(
         &self,
         mut write: futures_util::stream::SplitSink<S, Message>,
