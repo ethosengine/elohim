@@ -595,6 +595,22 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Warm projection cache from existing storage content (background, delayed)
+    // Signals only deliver FUTURE writes — existing content needs explicit fetch.
+    if args.projection_writer && !peer_urls.is_empty() {
+        if let Some(ref projection_store) = state.projection {
+            let _warm_handle = doorway::projection::warm::spawn_warm_task(
+                Arc::clone(projection_store),
+                peer_urls.clone(),
+                10, // 10s delay — let MongoDB + storage settle
+            );
+            info!(
+                peers = peer_urls.len(),
+                "Projection cache warm-up scheduled (10s delay)"
+            );
+        }
+    }
+
     // Start Orchestrator background tasks (if enabled)
     // The state is already created and wired to AppState above
     let _orchestrator = if let Some(ref orch_state) = orchestrator_state {

@@ -40,6 +40,7 @@ pub mod document;
 pub mod engine;
 pub mod store;
 pub mod subscriber;
+pub mod warm;
 
 // Re-export main types
 pub use document::{ProjectedDocument, ProjectionQuery};
