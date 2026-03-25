@@ -323,8 +323,9 @@ impl ContentResolver {
         }
 
         // 2. Find first available source that supports this content type
+        // "*" is a wildcard — matches any content type (used by doorway's type-agnostic projection)
         for source in &self.sources {
-            if source.available && source.content_types.iter().any(|t| t == content_type) {
+            if source.available && source.content_types.iter().any(|t| t == "*" || t == content_type) {
                 return self.build_result(source, content_type, content_id, false);
             }
         }
@@ -350,7 +351,7 @@ impl ContentResolver {
     pub fn get_resolution_chain(&self, content_type: &str) -> String {
         let chain: Vec<serde_json::Value> = self.sources
             .iter()
-            .filter(|s| s.available && s.content_types.iter().any(|t| t == content_type))
+            .filter(|s| s.available && s.content_types.iter().any(|t| t == "*" || t == content_type))
             .map(|s| serde_json::json!({
                 "id": s.id,
                 "tier": s.tier as u8,
