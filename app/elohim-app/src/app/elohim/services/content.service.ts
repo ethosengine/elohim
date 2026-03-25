@@ -19,7 +19,7 @@ import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath, PathStep } from '../../lamad/models/learning-path.model';
+import { LearningPath, PathStep, parsePathView } from '../../lamad/models/learning-path.model';
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
@@ -430,15 +430,16 @@ export class ContentService {
   // =========================================================================
 
   /**
-   * Get a single learning path by ID
+   * Get a single learning path by ID.
+   * Fetches as ContentNode, then parses via parsePathView().
    */
   getPath(id: string): Observable<LearningPath | null> {
     // Check cache first
     const cached = this.pathCache.get(id);
     if (cached) return cached;
 
-    const obs = from(this.client.get<RawPathData>('path', id)).pipe(
-      map(data => (data ? this.transformPath(data) : null)),
+    const obs = this.getContent(id).pipe(
+      map(node => (node ? parsePathView(node) : null)),
       catchError(_err => {
         return of(null);
       }),
@@ -450,19 +451,12 @@ export class ContentService {
   }
 
   /**
-   * Query paths with filters
+   * Query paths with filters.
+   * Queries content by type 'path', then parses each via parsePathView().
    */
   queryPaths(filters: PathFilters): Observable<LearningPath[]> {
-    const query: ContentQuery = {
-      contentType: 'path',
-      tags: filters.tags,
-      search: filters.search,
-      limit: filters.limit,
-      offset: filters.offset,
-    };
-
-    return from(this.client.query<RawPathData>(query)).pipe(
-      map(items => items.map(p => this.transformPath(p))),
+    return this.queryContent({ contentType: 'path', tags: filters.tags, search: filters.search, limit: filters.limit, offset: filters.offset }).pipe(
+      map(nodes => nodes.map(n => parsePathView(n))),
       map(items => this.applyPathFilters(items, filters)),
       catchError(_err => {
         return of([]);
@@ -626,6 +620,8 @@ export class ContentService {
    */
   invalidatePath(id: string): void {
     this.pathCache.delete(id);
+    // Also invalidate content cache since getPath() delegates to getContent()
+    this.contentCache.delete(id);
   }
 
   // =========================================================================
@@ -719,85 +715,8 @@ export class ContentService {
     return content;
   }
 
-  /**
-   * Transform raw data to LearningPath model
-   *
-   * Handles two response formats:
-   * 1. Flat: { id, title, steps, chapters, ... }
-   * 2. Nested: { path: {...}, chapters: [...], ungrouped_steps: [...] }
-   * 3. Metadata: { path: {..., metadata: { chapters: [...] } } }
-   */
-  private transformPath(data: RawPathData): LearningPath {
-    // Handle nested response format from elohim-storage
-    const pathData = data.path ?? data;
-    // Chapters can be at top-level, in path data, or in metadata
-    const metadataChapters = (pathData.metadata?.['chapters'] ?? []) as RawChapterData[];
-    const rawChapters = data.chapters ?? pathData.chapters ?? metadataChapters;
-    const ungroupedSteps = data.ungroupedSteps ?? [];
-
-    // Transform chapters with their steps
-    const chapters = rawChapters.map((ch: RawChapterData) => ({
-      id: ch.id,
-      title: ch.title ?? '',
-      description: ch.description ?? '',
-      order: ch.orderIndex ?? 0,
-      orderIndex: ch.orderIndex ?? 0,
-      estimatedDuration: ch.estimatedDuration ?? ch.estimatedDuration,
-      steps: (ch.steps ?? []).map((s: RawStepData) => this.transformStep(s)),
-    }));
-
-    // Collect all steps from chapters + ungrouped
-    type TransformedChapter = (typeof chapters)[number];
-    const allSteps = [
-      ...chapters.flatMap((ch: TransformedChapter) => ch.steps),
-      ...ungroupedSteps.map((s: RawStepData) => this.transformStep(s)),
-    ];
-
-    return {
-      id: pathData.id ?? pathData.docId,
-      version: pathData.version ?? '1.0.0',
-      title: pathData.title ?? '',
-      description: pathData.description ?? '',
-      purpose: pathData.purpose ?? '',
-      difficulty: pathData.difficulty ?? 'beginner',
-      estimatedDuration: pathData.estimatedDuration ?? pathData.estimatedDuration,
-      visibility: pathData.visibility ?? 'public',
-      pathType: pathData.pathType ?? 'course',
-      thumbnailUrl: this.resolveBlobUrl(pathData.thumbnailUrl),
-      thumbnailAlt: pathData.thumbnailAlt,
-      tags: pathData.tags ?? [],
-      createdBy: pathData.createdBy ?? pathData.createdBy ?? '',
-      contributors: pathData.contributors ?? [],
-      steps: allSteps,
-      chapters,
-      stepCount: pathData.stepCount ?? pathData.stepCount ?? allSteps.length,
-      chapterCount: pathData.chapterCount ?? pathData.chapterCount ?? chapters.length,
-      createdAt: pathData.createdAt,
-      updatedAt: pathData.updatedAt,
-    } as LearningPath;
-  }
-
-  /**
-   * Transform a step from snake_case to camelCase
-   */
-  private transformStep(step: RawStepData): PathStep {
-    return {
-      pathId: step.pathId,
-      chapterId: step.chapterId,
-      stepTitle: step.title ?? '',
-      stepNarrative: step.description ?? '',
-      stepType: step.stepType ?? 'content',
-      resourceId: step.resourceId ?? '',
-      order: step.orderIndex ?? 0,
-      orderIndex: step.orderIndex ?? 0,
-      estimatedDuration: step.estimatedDuration,
-      metadata: step.metadata,
-      // Required PathStep fields with safe defaults
-      learningObjectives: [],
-      optional: false,
-      completionCriteria: [],
-    } as PathStep;
-  }
+  // NOTE: transformPath() and transformStep() removed — paths are now ContentNodes
+  // parsed via parsePathView(). See learning-path.model.ts.
 
   /**
    * Apply local content filters (for fields not supported by backend query)

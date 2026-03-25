@@ -556,7 +556,8 @@ type AppFormatExtension =
   | 'video-file' // Direct video file (blob-based streaming)
   | 'instrument-json' // Psychometric instrument definition (subscales, scoring, display config)
   | 'external-link' // Link to external resource
-  | 'epub'; // E-book format
+  | 'epub' // E-book format
+  | 'epr-composite'; // EPR composite layout (paths, curated collections)
 
 export type ContentFormat = WireContentFormat | AppFormatExtension;
 
@@ -567,6 +568,7 @@ export const ALL_CONTENT_FORMATS = [
   'instrument-json',
   'external-link',
   'epub',
+  'epr-composite',
 ] as const;
 
 /**

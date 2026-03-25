@@ -194,31 +194,34 @@ describe('DataLoaderService', () => {
   describe('getPath', () => {
     it('should load path via ContentService', () =>
       new Promise<void>(done => {
-        const mockPath: LearningPath = {
+        // getPath now delegates to getContent + parsePathView
+        const mockPathNode = {
           id: 'test-path',
-          version: '1.0.0',
+          contentType: 'path',
           title: 'Test Path',
           description: 'A test path',
-          purpose: 'Testing',
-          createdBy: 'test-agent',
-          contributors: [],
-          difficulty: 'beginner',
-          estimatedDuration: '1 hour',
-          visibility: 'public',
-          pathType: 'journey',
+          content: { sections: [] },
+          contentFormat: 'epr-composite',
           tags: ['test'],
+          relatedNodeIds: [],
+          metadata: {
+            pathType: 'journey',
+            difficulty: 'beginner',
+            estimatedDuration: '1 hour',
+            purpose: 'Testing',
+          },
+          authorId: 'test-agent',
+          reach: 'commons',
           createdAt: '2025-01-01T00:00:00.000Z',
           updatedAt: '2025-01-01T00:00:00.000Z',
-          steps: [],
         };
 
-        // ContentService returns path directly
-        mockContentService.getPath.mockReturnValue(of(mockPath));
+        mockContentService.getContent.mockReturnValue(of(mockPathNode));
 
         service.getPath('test-path').subscribe(path => {
           expect(path.id).toBe('test-path');
           expect(path.title).toBe('Test Path');
-          expect(mockContentService.getPath).toHaveBeenCalledWith('test-path');
+          expect(mockContentService.getContent).toHaveBeenCalledWith('test-path');
           done();
         });
       }));
@@ -272,44 +275,45 @@ describe('DataLoaderService', () => {
   describe('getPathIndex', () => {
     it('should load path index from ContentService', () =>
       new Promise<void>(done => {
-        const mockPaths: LearningPath[] = [
+        // getPathIndex now calls queryContent({ contentType: 'path' })
+        const mockPathNodes = [
           {
             id: 'test-path',
-            version: '1.0.0',
+            contentType: 'path',
             title: 'Test',
             description: 'Desc',
-            purpose: 'Testing',
-            createdBy: 'test-agent',
-            contributors: [],
-            difficulty: 'beginner',
-            estimatedDuration: '1h',
-            visibility: 'public',
-            pathType: 'journey',
+            content: {
+              sections: [
+                {
+                  id: 'sec-1',
+                  title: 'Section 1',
+                  level: 'lesson',
+                  items: [{ ref: 'step-1', role: 'step' }],
+                },
+              ],
+            },
+            contentFormat: 'epr-composite',
             tags: [],
+            relatedNodeIds: [],
+            metadata: {
+              pathType: 'journey',
+              difficulty: 'beginner',
+              estimatedDuration: '1h',
+            },
+            authorId: 'test-agent',
+            reach: 'commons',
             createdAt: '2025-01-01T00:00:00.000Z',
             updatedAt: '2025-01-01T00:00:00.000Z',
-            steps: [
-              {
-                order: 0,
-                stepType: 'content',
-                resourceId: 'step-1',
-                stepTitle: 'Step 1',
-                stepNarrative: '',
-                optional: false,
-                learningObjectives: [],
-                completionCriteria: [],
-              },
-            ],
           },
         ];
 
-        mockContentService.queryPaths.mockReturnValue(of(mockPaths));
+        mockContentService.queryContent.mockReturnValue(of(mockPathNodes));
 
         service.getPathIndex().subscribe(index => {
           expect(index.totalCount).toBe(1);
           expect(index.paths.length).toBe(1);
           expect(index.paths[0].id).toBe('test-path');
-          expect(mockContentService.queryPaths).toHaveBeenCalled();
+          expect(mockContentService.queryContent).toHaveBeenCalled();
           done();
         });
       }));

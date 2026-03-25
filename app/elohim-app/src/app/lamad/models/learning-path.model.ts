@@ -1,9 +1,167 @@
-import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+/**
+ * Path types — derived from ContentNode with contentType 'path'.
+ *
+ * Paths are no longer a separate entity. They are ContentNodes with
+ * contentFormat 'epr-composite' whose body is a recursive sections tree.
+ * This file defines the parsed view types and backward-compatible aliases.
+ *
+ * Migration (2026-03-25): LearningPath → PathView over ContentNode.
+ */
 
-// @coverage: 33.3% (2026-02-24)
+import { ContentNode, ContentMetadata } from './content-node.model';
 
-import { ContentNode } from './content-node.model';
+// =========================================================================
+// Core PathView Types (new canonical model)
+// =========================================================================
+
+/**
+ * Parsed view of a ContentNode with contentType 'path'.
+ *
+ * Created by parsePathView(node). Contains the underlying ContentNode
+ * plus parsed fields from its body and metadata.
+ */
+export interface PathView {
+  /** The underlying ContentNode */
+  node: ContentNode;
+
+  /** Path type hint for UI rendering (from metadata) */
+  pathType: string;
+
+  /** Difficulty level (from metadata) */
+  difficulty?: string;
+
+  /** Human-readable estimated duration (from metadata) */
+  estimatedDuration?: string;
+
+  /** Thumbnail image URL (from metadata) */
+  thumbnailUrl?: string;
+
+  /** Alt text for thumbnail (from metadata) */
+  thumbnailAlt?: string;
+
+  /** Recursive sections tree parsed from body */
+  sections: PathSection[];
+
+  // =========================================================================
+  // Convenience accessors — mirror old LearningPath fields for compat
+  // =========================================================================
+
+  /** Same as node.id */
+  id: string;
+  /** Same as node.title */
+  title: string;
+  /** Same as node.description */
+  description: string;
+  /** Version from metadata (default '1.0.0') */
+  version: string;
+  /** Tags from node */
+  tags: string[];
+  /** Visibility mapped from node.reach */
+  visibility: PathVisibility;
+  /** Created by (node.authorId) */
+  createdBy: string;
+  /** Contributors list */
+  contributors: string[];
+  /** Created at timestamp */
+  createdAt?: string;
+  /** Updated at timestamp */
+  updatedAt?: string;
+
+  /**
+   * Flat steps array — synthesized from sections tree for backward compat.
+   * Contains one PathStep per leaf item across all sections.
+   */
+  steps: PathStep[];
+
+  /**
+   * Chapters — synthesized from top-level sections for backward compat.
+   * Each top-level section becomes a PathChapter.
+   */
+  chapters?: PathChapter[];
+
+  /** Purpose from metadata or description */
+  purpose: string;
+
+  /** Pre-requisite path IDs */
+  prerequisitePaths?: string[];
+  /** Attestations granted on completion */
+  attestationsGranted?: string[];
+
+  // Social metadata (from node)
+  thumbnailUrl2?: string; // unused, for structural compat
+
+  /** Step count (computed) */
+  stepCount?: number;
+  /** Chapter count (computed) */
+  chapterCount?: number;
+}
+
+/**
+ * PathSection — a node in the recursive sections tree.
+ *
+ * Sections can nest (sections within sections) to support
+ * scope-and-sequence hierarchy: course → unit → lesson → items.
+ */
+export interface PathSection {
+  /** Section identifier */
+  id: string;
+  /** Section title */
+  title: string;
+  /** What this section covers */
+  description?: string;
+  /** Hierarchy level: course, unit, lesson, etc. */
+  level?: string;
+  /** Order within parent */
+  order: number;
+  /** Nested sub-sections */
+  sections?: PathSection[];
+  /** Leaf-level content items (EPR references) */
+  items?: PathItem[];
+
+  // Legacy compat fields (synthesized for old code)
+  /** Concept IDs — flattened from items[].ref */
+  conceptIds: string[];
+  /** Estimated duration */
+  estimatedDuration?: string;
+  /** Whether optional */
+  optional?: boolean;
+  /** Estimated minutes */
+  estimatedMinutes?: number;
+  /** Assessments in this section */
+  assessments?: SectionAssessment[];
+  /** Modules within this section (synthesized for 4-level compat) */
+  modules?: PathModule[];
+  /** Steps within this section (synthesized for 2-level compat) */
+  steps?: PathStep[];
+  /** Attestation granted on completion */
+  attestationGranted?: string;
+}
+
+/**
+ * PathItem — a single content reference within a section.
+ *
+ * Items use EPR references (epr:content-id) to point at ContentNodes.
+ * Pedagogical context (narrative, objectives) lives here — it's the
+ * teacher's editorial arrangement, not graph metadata.
+ */
+export interface PathItem {
+  /** EPR reference (e.g., "epr:concept-concentric-circles" or just "concept-id") */
+  ref: string;
+  /** Role in the section: step, checkpoint, reflection */
+  role: string;
+  /** Display title override */
+  title?: string;
+  /** Narrative context for this item within the path */
+  narrative?: string;
+  /** Learning objectives */
+  learningObjectives?: string[];
+  /** Completion criteria */
+  completionCriteria?: { type: string; threshold?: number };
+}
+
+// =========================================================================
+// Legacy Types — backward-compatible aliases and synthesized types
+// =========================================================================
 
 /**
  * Difficulty level for learning paths and content.
@@ -12,444 +170,95 @@ export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 
 /**
  * Path type hint for UI rendering.
- * - 'journey': Standard learning path (default)
- * - 'quest': Achievement-oriented with milestones
- * - 'expedition': Long-form deep dive
- * - 'practice': Skill-building through repetition
  */
 export type PathType = 'journey' | 'quest' | 'expedition' | 'practice';
 
 /**
- * LearningPath - A curated journey through Territory resources.
- *
- * Paths can be structured in two ways:
- * 1. Flat: Just `steps[]` - simple sequential journey (legacy)
- * 2. Hierarchical: `chapters[]` → `modules[]` → `sections[]` → `conceptIds[]`
- *
- * The hierarchical structure enables:
- * - Chapters: Top-level thematic groupings
- * - Modules: Mid-level organization within chapters (the "lesson" unit)
- * - Sections: Focused learning sessions within modules
- * - Concepts: Individual content items referenced by ID
- *
- * Paths can also compose other paths:
- * - A step can reference another path (stepType: 'path')
- * - This enables "journeys within journeys" without rigid hierarchy
- *
- * Holochain mapping:
- * - Entry type: "learning_path"
- * - Steps/chapters stored inline (they're small)
- * - resourceId/pathId links via action hash
+ * @deprecated Use PathView instead. This alias exists for backward compatibility.
  */
-export interface LearningPath {
-  // Identity - becomes action hash in Holochain
-  id: string;
-  version: string;
-
-  // Descriptive metadata
-  title: string;
-  description: string;
-  purpose: string;
-
-  // Authorship - agent public keys in Holochain
-  createdBy: string;
-  contributors: string[];
-  forkedFrom?: string;
-  createdAt: string; // ISO 8601
-  updatedAt: string;
-
-  /**
-   * Journey structure - use ONE of:
-   * - `steps[]` for flat sequential paths
-   * - `chapters[]` for thematically grouped paths
-   *
-   * If both exist, `chapters` takes precedence.
-   */
-  steps: PathStep[];
-
-  /**
-   * Chapters - thematic groupings within a path.
-   * Use for longer journeys that benefit from organization.
-   * Each chapter contains its own steps.
-   */
-  chapters?: PathChapter[];
-
-  // Classification
-  tags: string[];
-  difficulty: DifficultyLevel;
-  estimatedDuration: string;
-
-  // =========================================================================
-  // Visibility & Consent (Graduated Intimacy Model)
-  // =========================================================================
-
-  /**
-   * Path visibility level - determines who can discover and access this path.
-   *
-   * Graduated intimacy model (matching human consent levels):
-   * - 'public': Anyone can discover and follow
-   * - 'connections': Only mutual connections can see
-   * - 'trusted': Only trusted circle can see
-   * - 'intimate': Only love-map participants (emergent paths)
-   *
-   * Legacy values still supported:
-   * - 'organization': Maps to 'connections' (deprecated)
-   * - 'private': Maps to creator-only (no participants)
-   */
-  visibility: PathVisibility;
-
-  /**
-   * For intimate/shared paths - human IDs who can access this path.
-   * Empty or undefined means only the creator can see (private).
-   */
-  participantIds?: string[];
-
-  /**
-   * Is this path emergent (generated from affinity analysis)?
-   *
-   * Emergent paths are created by comparing two humans' affinity patterns
-   * and generating a bridging path that connects their shared interests.
-   * These are "love map" paths - personalized journeys toward understanding.
-   */
-  isEmergent?: boolean;
-
-  /**
-   * For emergent paths - the negotiation that created this path.
-   * Links to PathNegotiation record for provenance.
-   */
-  negotiationId?: string;
-
-  /**
-   * Required attestations to access this path.
-   *
-   * Attestation-gated visibility enables consent-verified access:
-   * - "I attest I am married to X" + "I attest I am married to Y"
-   * - Only X and Y (with mutual attestations) can access their love map
-   *
-   * This is more powerful than participantIds because:
-   * - Attestations can be revoked (divorce)
-   * - Attestations carry semantic meaning (not just "who" but "relationship")
-   * - Attestations can be verified by others if needed
-   *
-   * Format: Array of attestation type IDs that are required.
-   * All required attestations must be present for access.
-   */
-  requiredAttestations?: string[];
-
-  /**
-   * For mutual attestation requirements (love maps).
-   *
-   * When true, the path requires BOTH participants to have
-   * attested the relationship (e.g., mutual marriage attestation).
-   * The attestation must reference the other participant.
-   */
-  requiresMutualAttestation?: boolean;
-
-  // Prerequisites and outcomes
-  prerequisitePaths?: string[];
-  attestationsGranted?: string[];
-
-  /** Path type hint for UI rendering */
-  pathType?: PathType;
-
-  // =========================================================================
-  // Social Graph Metadata (for sharing learning paths)
-  // =========================================================================
-
-  /**
-   * Open Graph metadata for social sharing.
-   * When a path is shared, this provides rich preview cards.
-   */
-  socialMetadata?: OpenGraphMetadata;
-
-  /**
-   * Optional JSON-LD metadata for semantic web interoperability.
-   *
-   * Future: Schema.org Course or LearningResource types.
-   * Prevents tech debt when we need semantic web export.
-   */
-  linkedData?: JsonLdMetadata;
-
-  /**
-   * ActivityPub Collection type for federated social web.
-   *
-   * Learning paths map to ActivityStreams collections:
-   * - Default → 'OrderedCollection' (sequential steps maintain order)
-   * - pathType='practice' → 'Collection' (order less important)
-   *
-   * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#collections
-   */
-  activityPubType?: 'Collection' | 'OrderedCollection';
-
-  /**
-   * Decentralized Identifier (DID) for cryptographic identity.
-   *
-   * Separate from `id` to maintain human-friendly URLs and filenames.
-   * The `id` field remains the primary routing identifier.
-   *
-   * Example: "did:web:elohim.host:paths:elohim-protocol"
-   *
-   * Reference: https://www.w3.org/TR/did-core/
-   */
-  did?: string;
-
-  // =========================================================================
-  // Visual Assets
-  // =========================================================================
-
-  /**
-   * Thumbnail/cover image URL for path cards and landing pages.
-   * Falls back to socialMetadata.ogImage if not set.
-   */
-  thumbnailUrl?: string;
-
-  /** Alt text for thumbnail (accessibility) */
-  thumbnailAlt?: string;
-}
+export type LearningPath = PathView;
 
 /**
- * PathChapter - A thematic grouping within a path.
+ * PathChapter — synthesized from top-level sections for backward compat.
  *
- * Chapters provide:
- * - Visual/conceptual organization for longer journeys
- * - Optional attestations at chapter completion (milestones)
- * - Clearer progress indication ("Chapter 2 of 5")
- *
- * Structure: chapters[] → modules[] → sections[] → conceptIds[]
- *
- * Aligned with MCP schema for rich hierarchical organization.
+ * @deprecated Use PathSection with level='course' instead.
  */
 export interface PathChapter {
   id: string;
-
-  /** Chapter title */
   title: string;
-
-  /** What this chapter covers */
   description?: string;
-
-  /** Order within path */
   order: number;
-
-  /**
-   * Modules in this chapter (4-level hierarchy: chapter → modules → sections → conceptIds)
-   * Use this for complex paths with multiple layers of organization.
-   */
   modules?: PathModule[];
-
-  /**
-   * Direct steps in this chapter (2-level hierarchy: chapter → steps)
-   * Use this for simpler paths where chapters contain steps directly.
-   * If both `modules` and `steps` exist, `modules` takes precedence.
-   */
   steps?: PathStep[];
-
-  /** Estimated duration for this chapter */
   estimatedDuration?: string;
-
-  /** Attestation granted on chapter completion (milestone) */
   attestationGranted?: string;
-
-  /** Whether this chapter is optional */
   optional?: boolean;
 }
 
 /**
- * PathModule - A thematic grouping of sections within a chapter.
+ * PathModule — synthesized from mid-level sections for backward compat.
  *
- * Modules provide mid-level organization:
- * - Group related sections together
- * - Enable "Module 2 of 4" progress indication
- * - Support module-level learning objectives
- *
- * Aligned with MCP schema: Chapter → Module → Section → Concepts
+ * @deprecated Use PathSection with level='unit' instead.
  */
 export interface PathModule {
   id: string;
-
-  /** Module title */
   title: string;
-
-  /** What this module covers */
   description?: string;
-
-  /** Order within chapter */
   order: number;
-
-  /** Sections in this module */
   sections: PathSection[];
-
-  /** Estimated duration for this module */
   estimatedDuration?: string;
-
-  /** Learning objectives for this module */
   learningObjectives?: string[];
-
-  /** Whether this module is optional */
   optional?: boolean;
 }
 
 /**
- * PathSection - A focused grouping of concepts within a module.
- *
- * Sections are the leaf-level groupings that contain actual content:
- * - Reference concepts by ID (conceptIds)
- * - Typically represent a single focused learning session (a "lesson")
- * - Limited to ~1 hour of learning (human capacity constraint)
- * - Contains skill-based assessments derived from content
- *
- * Aligned with MCP schema: Chapter → Module → Section → conceptIds[]
- */
-export interface PathSection {
-  id: string;
-
-  /** Section title */
-  title: string;
-
-  /** What this section covers */
-  description?: string;
-
-  /** Order within module */
-  order: number;
-
-  /**
-   * Concept IDs referenced by this section.
-   * These link to ContentNode entries in the content graph.
-   */
-  conceptIds: string[];
-
-  /**
-   * Skill-based assessments for this section.
-   * Following Khan Academy model: assessments are derived from content.
-   * Multiple assessments can approach the same concept from different angles.
-   */
-  assessments?: SectionAssessment[];
-
-  /** Estimated duration in minutes (max ~60 for a single lesson) */
-  estimatedMinutes?: number;
-
-  /** Estimated duration for this section (legacy string format) */
-  estimatedDuration?: string;
-
-  /** Whether this section is optional */
-  optional?: boolean;
-}
-
-/**
- * SectionAssessment - A skill-based assessment within a section.
- *
- * Following the Khan Academy model:
- * - Assessments are derived FROM the content within the section
- * - Multiple assessments can cover the same concept from different angles
- * - Types: core (direct), applied (scenarios), synthesis (integration)
+ * SectionAssessment - assessment within a section.
  */
 export interface SectionAssessment {
-  /** Unique assessment ID */
   id: string;
-
-  /** Assessment title (e.g., "Adding Two Numbers" or "Adding Two Numbers - Word Problems") */
   title: string;
-
-  /**
-   * Assessment type:
-   * - 'core': Direct application of concepts (knowledge recall, understanding)
-   * - 'applied': Scenarios, word problems, real-world application
-   * - 'synthesis': Combining multiple concepts, higher-order thinking
-   */
   type: 'core' | 'applied' | 'synthesis';
-
-  /** What this assessment measures */
   description?: string;
-
-  /** Reference to assessment content (if stored separately) */
   assessmentId?: string;
 }
 
 /**
- * PathStep - A single step in a learning path.
+ * PathStep — synthesized from leaf items for backward compat.
  *
- * Steps can reference:
- * - Content (stepType: 'content') - default, links to ContentNode
- * - Another path (stepType: 'path') - enables composition
- * - External resource (stepType: 'external') - links outside Territory
- * - Checkpoint (stepType: 'checkpoint') - reflection/assessment moment
+ * Future: migrate consumers to use PathItem instead.
  */
 export interface PathStep {
   order: number;
-
-  /**
-   * What this step references:
-   * - 'content': A ContentNode in the Territory (default)
-   * - 'path': Another LearningPath (journey composition)
-   * - 'external': An external URL
-   * - 'checkpoint': A reflection/assessment moment (no content reference)
-   */
   stepType?: 'content' | 'path' | 'external' | 'checkpoint';
-
-  /**
-   * Reference ID - interpretation depends on stepType:
-   * - content: ContentNode.id
-   * - path: LearningPath.id (nested journey)
-   * - external: (use externalUrl instead)
-   * - checkpoint: (not used)
-   */
   resourceId: string;
-
-  /**
-   * Module association metadata for UI filtering.
-   * When viewing a module, the UI filters steps to show only those
-   * with matching moduleId, enabling "Step 2 of 5" within the current module.
-   */
   chapterId?: string;
   moduleId?: string;
   sectionId?: string;
-
-  /**
-   * For stepType: 'path' - the nested path ID.
-   * When present, this step represents completing an entire sub-journey.
-   */
   pathId?: string;
-
-  /**
-   * For stepType: 'external' - the external URL.
-   */
   externalUrl?: string;
-
-  // Path-specific context (not in the content node itself)
   stepTitle: string;
   stepNarrative: string;
   learningObjectives: string[];
   reflectionPrompts?: string[];
   practiceExercises?: string[];
-
-  // Metadata
   estimatedTime?: string;
   optional: boolean;
-
-  // Alternatives and gating
   alternativeResourceIds?: string[];
   completionCriteria: string[];
   attestationRequired?: string;
   attestationGranted?: string;
-
-  // Phase 6 Extension (Post-MVP) - Concepts addressed by this step
   conceptsAddressed?: string[];
+  /** Shared concepts for cross-path mastery (used by getConceptProgressForPath) */
+  sharedConcepts?: string[];
 }
 
 /**
  * PathStepView - Composite returned by PathService.getPathStep()
- * Combines step context with resolved content.
  */
 export interface PathStepView {
   step: PathStep;
-
-  /** Resolved content (for stepType: 'content') */
   content: ContentNode;
-
-  /** Resolved nested path (for stepType: 'path') */
-  nestedPath?: LearningPath;
-
-  /** Chapter context (if step is within a chapter) */
+  nestedPath?: PathView;
   chapter?: {
     id: string;
     title: string;
@@ -457,14 +266,10 @@ export interface PathStepView {
     stepIndexWithinChapter: number;
     totalStepsInChapter: number;
   };
-
-  // Navigation context
   hasPrevious: boolean;
   hasNext: boolean;
   previousStepIndex?: number;
   nextStepIndex?: number;
-
-  // Progress for authenticated user
   isCompleted?: boolean;
   affinity?: number;
   notes?: string;
@@ -474,15 +279,9 @@ export interface PathStepView {
  * PathOverviewView - Rich view for path landing/overview pages.
  */
 export interface PathOverviewView {
-  path: LearningPath;
-
-  /** Resolved chapter summaries (if path has chapters) */
+  path: PathView;
   chapterSummaries?: ChapterSummary[];
-
-  /** Flat step count (total across all chapters) */
   totalStepCount: number;
-
-  /** Human's progress (if authenticated) */
   progress?: {
     completedSteps: number;
     totalRequiredSteps: number;
@@ -491,11 +290,7 @@ export interface PathOverviewView {
     currentChapterIndex?: number;
     attestationsEarned: string[];
   };
-
-  /** Nested path summaries (for steps that reference other paths) */
   nestedPathSummaries?: PathIndexEntry[];
-
-  /** Prerequisites with completion status */
   prerequisites?: {
     pathId: string;
     title: string;
@@ -514,14 +309,12 @@ export interface ChapterSummary {
   stepCount: number;
   estimatedDuration?: string;
   attestationGranted?: string;
-
-  /** Progress (if authenticated) */
   completedSteps?: number;
   isComplete?: boolean;
 }
 
 /**
- * PathIndex - Catalog entry for path discovery (lightweight)
+ * PathIndexEntry - Catalog entry for path discovery (lightweight)
  */
 export interface PathIndexEntry {
   id: string;
@@ -531,23 +324,11 @@ export interface PathIndexEntry {
   estimatedDuration: string;
   stepCount: number;
   tags: string[];
-
-  /** Chapter count (if path uses chapters) */
   chapterCount?: number;
-
-  /** Path type for UI hints */
   pathType?: PathType;
-
-  /** Attestations granted upon completion */
   attestationsGranted?: string[];
-
-  /** Category for grouping */
   category?: string;
-
-  /** Thumbnail image URL for path cards */
   thumbnailUrl?: string;
-
-  /** Alt text for thumbnail (accessibility) */
   thumbnailAlt?: string;
 }
 
@@ -561,161 +342,301 @@ export interface PathIndex {
 }
 
 // =========================================================================
-// Path as ContentNode (Graph Integration)
-// =========================================================================
-
-/**
- * PathContentMetadata - Metadata for paths represented as ContentNodes on the graph.
- *
- * When a LearningPath is registered on the Content Graph, it becomes a ContentNode
- * with contentType: 'path'. This interface defines the metadata structure stored
- * in the ContentNode.metadata field.
- *
- * This enables:
- * - Graph traversal to discover paths containing specific content
- * - Paths can be found via "what paths cover topic X?" queries
- * - Paths participate in the attestation/governance system
- * - Unified search across content and paths
- *
- * The ContentNode with type 'path' links to the full LearningPath via pathId,
- * which contains the complete step definitions. The ContentNode is a lightweight
- * index entry for graph discoverability.
- */
-export interface PathContentMetadata {
-  /** Reference to the full LearningPath definition */
-  pathId: string;
-
-  /** Difficulty level for filtering */
-  difficulty: DifficultyLevel;
-
-  /** Human-readable estimated duration (e.g., "2-3 hours") */
-  estimatedDuration: string;
-
-  /** Total number of steps in the path */
-  stepCount: number;
-
-  /** Number of chapters (if path uses chapter organization) */
-  chapterCount?: number;
-
-  /**
-   * Content node IDs referenced by this path's steps.
-   * Enables reverse lookup: "which paths contain this content?"
-   *
-   * This is a flattened list of all resourceIds from steps/chapters.
-   * Nested paths (stepType: 'path') are NOT expanded - only direct content.
-   */
-  contentNodeIds: string[];
-
-  /**
-   * Nested path IDs (for stepType: 'path' steps).
-   * Enables path composition graph: "which paths include this path?"
-   */
-  nestedPathIds?: string[];
-
-  /**
-   * Creator information for branded paths.
-   * Links to the ContributorPresence for economic attribution.
-   */
-  creatorInfo?: {
-    /** ContributorPresence ID for the creator */
-    presenceId: string;
-
-    /** Brand name for display (e.g., "Bare Marriage") */
-    brandName?: string;
-
-    /** Brand logo URL for path cards */
-    brandLogoUrl?: string;
-  };
-
-  /**
-   * If this path was forked from another, link to the original.
-   * Enables fork tree visualization and attribution.
-   */
-  forkedFromPathId?: string;
-
-  /**
-   * Fork generation (0 = original, 1 = direct fork, 2 = fork of fork, etc.)
-   */
-  forkGeneration?: number;
-
-  /**
-   * Canonical status for governance.
-   * - 'draft': Author working copy
-   * - 'community': Community-endorsed but not canonical
-   * - 'canonical': Officially ratified path
-   */
-  canonicalStatus?: 'draft' | 'community' | 'canonical';
-
-  /** Path type hint for UI rendering */
-  pathType?: PathType;
-
-  /** Attestations granted upon path completion */
-  attestationsGranted?: string[];
-}
-
-/**
- * PathReference - Lightweight reference to a path, used in graph queries.
- */
-export interface PathReference {
-  /** Path node ID (the ContentNode ID, not the LearningPath ID) */
-  nodeId: string;
-
-  /** The underlying LearningPath ID */
-  pathId: string;
-
-  /** Path title */
-  title: string;
-
-  /** Relationship type (how this path relates to the query) */
-  relationship: 'contains' | 'references' | 'requires';
-}
-
-// =========================================================================
 // Path Visibility (Graduated Intimacy Model)
 // =========================================================================
 
-/**
- * PathVisibility - Graduated intimacy levels for path access.
- *
- * Mirrors human consent levels to ensure paths can only be seen
- * by those with appropriate relationship consent.
- *
- * - 'public': Anyone can discover and follow (commons)
- * - 'connections': Mutual connections only (friend-level)
- * - 'trusted': Trusted circle only (elevated trust)
- * - 'intimate': Love-map participants only (attestation-gated)
- *
- * Legacy values (deprecated but supported):
- * - 'organization': Maps to 'connections'
- * - 'private': Creator-only (no participants)
- */
 export type PathVisibility =
   | 'public'
   | 'connections'
   | 'trusted'
   | 'intimate'
-  // Legacy values (deprecated)
   | 'organization'
   | 'private';
 
-/**
- * Maps legacy visibility values to graduated intimacy levels.
- */
 export const VISIBILITY_MIGRATION: Record<string, PathVisibility> = {
   organization: 'connections',
-  private: 'intimate', // Private paths become intimate (creator is only participant)
+  private: 'intimate',
 };
 
-/**
- * Checks if a visibility level requires consent verification.
- */
 export function requiresConsent(visibility: PathVisibility): boolean {
   return visibility !== 'public';
 }
 
-/**
- * Checks if a visibility level requires attestation verification.
- */
 export function requiresAttestation(visibility: PathVisibility): boolean {
   return visibility === 'intimate';
+}
+
+// =========================================================================
+// Legacy types kept for backward compat (re-exported from old model)
+// =========================================================================
+
+/** @deprecated Use PathView */
+export interface PathContentMetadata {
+  pathId: string;
+  difficulty: DifficultyLevel;
+  estimatedDuration: string;
+  stepCount: number;
+  chapterCount?: number;
+  contentNodeIds: string[];
+  nestedPathIds?: string[];
+  creatorInfo?: {
+    presenceId: string;
+    brandName?: string;
+    brandLogoUrl?: string;
+  };
+  forkedFromPathId?: string;
+  forkGeneration?: number;
+  canonicalStatus?: 'draft' | 'community' | 'canonical';
+  pathType?: PathType;
+  attestationsGranted?: string[];
+}
+
+/** @deprecated Use ContentNode relationship queries */
+export interface PathReference {
+  nodeId: string;
+  pathId: string;
+  title: string;
+  relationship: 'contains' | 'references' | 'requires';
+}
+
+// =========================================================================
+// Parser — ContentNode → PathView
+// =========================================================================
+
+/**
+ * Resolve an EPR reference to a plain content ID.
+ * Strips "epr:" prefix if present.
+ */
+function resolveRef(ref: string): string {
+  return ref.startsWith('epr:') ? ref.slice(4) : ref;
+}
+
+/**
+ * Map a reach level to a PathVisibility value for backward compat.
+ */
+function reachToVisibility(reach: string | undefined): PathVisibility {
+  switch (reach) {
+    case 'commons':
+      return 'public';
+    case 'community':
+    case 'federated':
+      return 'connections';
+    case 'local':
+    case 'neighborhood':
+    case 'municipal':
+    case 'bioregional':
+    case 'regional':
+      return 'trusted';
+    case 'invited':
+      return 'intimate';
+    case 'private':
+      return 'private';
+    default:
+      return 'public';
+  }
+}
+
+/**
+ * Recursively collect all leaf items from a sections tree, producing flat PathSteps.
+ */
+function collectSteps(sections: PathSection[], stepOffset: number): PathStep[] {
+  const steps: PathStep[] = [];
+  for (const section of sections) {
+    // Collect items at this level
+    if (section.items) {
+      for (const item of section.items) {
+        const contentId = resolveRef(item.ref);
+        steps.push({
+          order: stepOffset + steps.length,
+          stepType: item.role === 'checkpoint' ? 'checkpoint' : 'content',
+          resourceId: contentId,
+          sectionId: section.id,
+          stepTitle: item.title ?? contentId,
+          stepNarrative: item.narrative ?? '',
+          learningObjectives: item.learningObjectives ?? [],
+          optional: false,
+          completionCriteria: item.completionCriteria
+            ? [JSON.stringify(item.completionCriteria)]
+            : [],
+        });
+      }
+    }
+    // Recurse into sub-sections
+    if (section.sections) {
+      const childSteps = collectSteps(section.sections, stepOffset + steps.length);
+      steps.push(...childSteps);
+    }
+  }
+  return steps;
+}
+
+/**
+ * Enrich a raw section from JSON body with backward-compat fields.
+ */
+function enrichSection(raw: RawSection, index: number): PathSection {
+  const items = (raw.items ?? []).map(
+    (item: RawItem): PathItem => ({
+      ref: item.ref,
+      role: item.role ?? 'step',
+      title: item.title,
+      narrative: item.narrative,
+      learningObjectives: item.learningObjectives,
+      completionCriteria: item.completionCriteria,
+    })
+  );
+
+  const childSections = (raw.sections ?? []).map((s: RawSection, i: number) =>
+    enrichSection(s, i)
+  );
+
+  // Flatten concept IDs from items + child sections
+  const conceptIds = [
+    ...items.map((item: PathItem) => resolveRef(item.ref)),
+    ...childSections.flatMap((s: PathSection) => s.conceptIds),
+  ];
+
+  // Build legacy steps from items
+  const steps = items.map(
+    (item: PathItem, i: number): PathStep => ({
+      order: i,
+      stepType: item.role === 'checkpoint' ? 'checkpoint' : 'content',
+      resourceId: resolveRef(item.ref),
+      stepTitle: item.title ?? resolveRef(item.ref),
+      stepNarrative: item.narrative ?? '',
+      learningObjectives: item.learningObjectives ?? [],
+      optional: false,
+      completionCriteria: item.completionCriteria
+        ? [JSON.stringify(item.completionCriteria)]
+        : [],
+    })
+  );
+
+  return {
+    id: raw.id ?? `section-${index}`,
+    title: raw.title ?? '',
+    description: raw.description,
+    level: raw.level ?? 'lesson',
+    order: index,
+    sections: childSections.length > 0 ? childSections : undefined,
+    items: items.length > 0 ? items : undefined,
+    conceptIds,
+    estimatedDuration: raw.estimatedDuration,
+    optional: raw.optional,
+    steps: steps.length > 0 ? steps : undefined,
+  };
+}
+
+/**
+ * Synthesize PathChapter[] from top-level sections.
+ */
+function sectionsToChapters(sections: PathSection[]): PathChapter[] {
+  return sections.map((section, i) => {
+    // Convert child sections to PathModule[]
+    const modules: PathModule[] = (section.sections ?? []).map(
+      (childSection, j): PathModule => ({
+        id: childSection.id,
+        title: childSection.title,
+        description: childSection.description,
+        order: j,
+        sections: childSection.sections ?? [],
+        estimatedDuration: childSection.estimatedDuration,
+        learningObjectives: [],
+      })
+    );
+
+    return {
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      order: i,
+      modules: modules.length > 0 ? modules : undefined,
+      steps: section.steps,
+      estimatedDuration: section.estimatedDuration,
+      attestationGranted: section.attestationGranted,
+      optional: section.optional,
+    };
+  });
+}
+
+/** Raw section shape from JSON body */
+interface RawSection {
+  id?: string;
+  title?: string;
+  description?: string;
+  level?: string;
+  sections?: RawSection[];
+  items?: RawItem[];
+  estimatedDuration?: string;
+  optional?: boolean;
+}
+
+/** Raw item shape from JSON body */
+interface RawItem {
+  ref: string;
+  role?: string;
+  title?: string;
+  narrative?: string;
+  learningObjectives?: string[];
+  completionCriteria?: { type: string; threshold?: number };
+}
+
+/**
+ * Parse a ContentNode into a PathView.
+ *
+ * Extracts sections from the composite body, path-specific metadata,
+ * and synthesizes backward-compatible steps/chapters arrays.
+ */
+export function parsePathView(node: ContentNode): PathView {
+  // Parse body — may be string JSON or already-parsed object
+  let body: Record<string, unknown>;
+  if (typeof node.content === 'string') {
+    try {
+      body = JSON.parse(node.content) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
+  } else {
+    body = (node.content as Record<string, unknown>) ?? {};
+  }
+
+  const meta: ContentMetadata = node.metadata ?? {};
+
+  // Parse sections from body
+  const rawSections = (body['sections'] as RawSection[]) ?? [];
+  const sections = rawSections.map((s, i) => enrichSection(s, i));
+
+  // Synthesize flat steps from sections tree
+  const steps = collectSteps(sections, 0);
+
+  // Synthesize chapters from top-level sections
+  const chapters = sections.length > 0 ? sectionsToChapters(sections) : undefined;
+
+  return {
+    node,
+    pathType: (meta as Record<string, unknown>)['pathType'] as string ?? body['pathType'] as string ?? 'journey',
+    difficulty: (meta as Record<string, unknown>)['difficulty'] as string ?? undefined,
+    estimatedDuration: (meta as Record<string, unknown>)['estimatedDuration'] as string ?? undefined,
+    thumbnailUrl: (meta as Record<string, unknown>)['thumbnailUrl'] as string ?? undefined,
+    thumbnailAlt: (meta as Record<string, unknown>)['thumbnailAlt'] as string ?? undefined,
+    sections,
+
+    // Convenience accessors for backward compat
+    id: node.id,
+    title: node.title,
+    description: node.description,
+    version: ((meta as Record<string, unknown>)['version'] as string) ?? '1.0.0',
+    tags: node.tags ?? [],
+    visibility: reachToVisibility(node.reach),
+    createdBy: node.authorId ?? '',
+    contributors: ((meta as Record<string, unknown>)['contributors'] as string[]) ?? [],
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    steps,
+    chapters,
+    purpose: ((meta as Record<string, unknown>)['purpose'] as string) ?? node.description,
+    prerequisitePaths: (meta as Record<string, unknown>)['prerequisitePaths'] as string[] | undefined,
+    attestationsGranted: (meta as Record<string, unknown>)['attestationsGranted'] as string[] | undefined,
+    stepCount: steps.length,
+    chapterCount: chapters?.length,
+  };
 }

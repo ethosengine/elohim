@@ -221,7 +221,7 @@ describe('DataLoaderService', () => {
       updatedAt: '2026-01-01T00:00:00Z',
     };
 
-    const mockPath: LearningPath = {
+    const mockPath = {
       id: 'test-path-1',
       version: '1.0.0',
       title: 'Cached Path',
@@ -231,12 +231,25 @@ describe('DataLoaderService', () => {
       estimatedDuration: '1h',
       tags: ['test'],
       steps: [],
+      sections: [],
+      node: {
+        id: 'test-path-1',
+        contentType: 'path',
+        title: 'Cached Path',
+        description: 'From IDB cache',
+        content: { sections: [] },
+        contentFormat: 'epr-composite',
+        tags: ['test'],
+        relatedNodeIds: [],
+        metadata: {},
+      },
+      pathType: 'journey',
       createdBy: 'agent-1',
       contributors: [],
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
       visibility: 'public',
-    };
+    } as unknown as LearningPath;
 
     beforeEach(() => {
       // Enable IDB for these tests
@@ -302,7 +315,8 @@ describe('DataLoaderService', () => {
 
     describe('getPath', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
+        // getPath now delegates to getContent which calls contentService.getContent
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network timeout')));
         idbMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
         let result: LearningPath | undefined;
@@ -317,7 +331,11 @@ describe('DataLoaderService', () => {
       }));
 
       it('should re-throw when path not found (404, not connectivity)', fakeAsync(() => {
-        contentServiceMock.getPath.mockReturnValue(of(null));
+        // getPath calls getContent; placeholder content triggers 'Path not found'
+        contentServiceMock.getContent.mockReturnValue(of({
+          id: 'missing-path', contentType: 'placeholder', title: '', description: '',
+          content: '', contentFormat: 'markdown', tags: [], relatedNodeIds: [], metadata: {},
+        }));
 
         let error: Error | undefined;
         service.getPath('missing-path').subscribe({
@@ -332,7 +350,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should re-throw when IDB also misses', fakeAsync(() => {
-        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network timeout')));
         idbMock.getPath.mockReturnValue(Promise.resolve(null));
 
         let error: Error | undefined;
@@ -349,7 +367,7 @@ describe('DataLoaderService', () => {
 
       it('should not attempt IDB when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.getPath.mockReturnValue(throwError(() => new Error('Network timeout')));
+        contentServiceMock.getContent.mockReturnValue(throwError(() => new Error('Network timeout')));
 
         let error: Error | undefined;
         service.getPath('test-path').subscribe({

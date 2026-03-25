@@ -19,7 +19,7 @@ import { Observable, of } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { LearningPath, parsePathView } from '../../lamad/models/learning-path.model';
 
 import { StorageClientService } from './storage-client.service';
 
@@ -590,32 +590,40 @@ export class ProjectionAPIService implements IStorageApi {
   }
 
   /**
-   * Transform projected path to LearningPath model
+   * Transform projected path to LearningPath (PathView) model.
+   * Constructs a synthetic ContentNode from projected data, then parses via parsePathView.
    */
   private transformPath(data: unknown): LearningPath {
     const d = data as Record<string, unknown>;
-    return {
-      id: (d['id'] ?? d['docId']) as string,
-      version: (d['version'] ?? '1.0.0') as string,
+    const id = (d['id'] ?? d['docId'] ?? '') as string;
+
+    // Build a synthetic ContentNode from projected path data
+    const node: ContentNode = {
+      id,
+      contentType: 'path',
       title: (d['title'] ?? '') as string,
       description: (d['description'] ?? '') as string,
-      purpose: (d['purpose'] ?? '') as string,
-      difficulty: (d['difficulty'] ?? 'beginner') as string,
-      estimatedDuration: d['estimatedDuration'] as string | undefined,
-      visibility: (d['visibility'] ?? 'public') as string,
-      pathType: (d['pathType'] ?? 'course') as string,
-      thumbnailUrl: this.resolveBlobUrl(d['thumbnailUrl'] as string | null | undefined),
-      thumbnailAlt: d['thumbnailAlt'] as string | undefined,
+      content: d['content'] ?? d['contentBody'] ?? d['sections'] ?? {},
+      contentFormat: 'epr-composite' as ContentNode['contentFormat'],
       tags: (d['tags'] ?? []) as string[],
-      createdBy: (d['createdBy'] ?? d['author'] ?? '') as string,
-      contributors: (d['contributors'] ?? []) as string[],
-      steps: (d['steps'] ?? []) as unknown[],
-      chapters: (d['chapters'] ?? []) as unknown[],
-      stepCount: (d['stepCount'] ?? 0) as number,
-      chapterCount: (d['chapterCount'] ?? 0) as number,
+      relatedNodeIds: [],
+      metadata: {
+        pathType: (d['pathType'] ?? 'course') as string,
+        difficulty: (d['difficulty'] ?? 'beginner') as string,
+        estimatedDuration: d['estimatedDuration'] as string | undefined,
+        thumbnailUrl: this.resolveBlobUrl(d['thumbnailUrl'] as string | null | undefined),
+        thumbnailAlt: d['thumbnailAlt'] as string | undefined,
+        version: (d['version'] ?? '1.0.0') as string,
+        purpose: (d['purpose'] ?? '') as string,
+        contributors: (d['contributors'] ?? []) as string[],
+      },
+      authorId: (d['createdBy'] ?? d['author'] ?? '') as string,
+      reach: (d['visibility'] ?? 'commons') as ContentNode['reach'],
       createdAt: d['createdAt'] as string | undefined,
       updatedAt: d['updatedAt'] as string | undefined,
-    } as LearningPath;
+    };
+
+    return parsePathView(node);
   }
 
   /**

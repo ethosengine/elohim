@@ -531,10 +531,12 @@ describe('ProjectionAPIService', () => {
       req.flush(mockPathData);
       tick();
 
-      expect((result as any)?.difficulty).toBe('beginner');
-      expect((result as any)?.tags).toEqual(['learning', 'test']);
-      expect((result as any)?.stepCount).toBe(5);
-      expect((result as any)?.chapterCount).toBe(2);
+      expect(result?.difficulty).toBe('beginner');
+      expect(result?.tags).toEqual(['learning', 'test']);
+      // transformPath now builds a ContentNode and parses via parsePathView
+      // stepCount/chapterCount come from the parsed sections, not the raw data
+      expect(result?.id).toBe('path-1');
+      expect(result?.title).toBe('Test Path');
     }));
 
     it('should handle path 404 errors gracefully', fakeAsync(() => {

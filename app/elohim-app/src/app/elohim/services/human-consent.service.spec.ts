@@ -829,7 +829,11 @@ describe('HumanConsentService', () => {
       const intimatePath = {
         ...mockPath,
         visibility: 'intimate' as const,
-        participantIds: [mockAgentId],
+        node: {
+          ...(mockPath as any).node,
+          invitedAgentIds: [mockAgentId],
+          metadata: { participantIds: [mockAgentId] },
+        },
       };
 
       let canView = false;

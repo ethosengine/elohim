@@ -38,14 +38,19 @@ describe('ContentService', () => {
     id: 'test-path-1',
     title: 'Test Learning Path',
     description: 'A test path',
-    version: '1.0.0',
-    difficulty: 'beginner',
-    visibility: 'public',
-    pathType: 'course',
+    contentType: 'path',
+    contentFormat: 'epr-composite',
+    content: { sections: [] },
     tags: ['learning'],
-    createdBy: 'user-1',
-    steps: [],
-    chapters: [],
+    relatedNodeIds: [],
+    metadata: {
+      version: '1.0.0',
+      difficulty: 'beginner',
+      pathType: 'course',
+      purpose: 'A test path',
+    },
+    authorId: 'user-1',
+    reach: 'commons',
   };
 
   beforeEach(() => {
@@ -487,20 +492,24 @@ describe('ContentService', () => {
       expect(mockClient.get).toHaveBeenCalledTimes(1);
     }));
 
-    it('should transform nested path response format', fakeAsync(() => {
-      const nestedResponse = {
-        id: 'test-path-1', // Required by ContentReadable type
-        path: mockPathData,
-        chapters: [
-          {
-            id: 'ch-1',
-            title: 'Chapter 1',
-            steps: [{ id: 'step-1', title: 'Step 1', orderIndex: 0 }],
-          },
-        ],
-        ungroupedSteps: [],
+    it('should parse composite body with sections', fakeAsync(() => {
+      const pathWithSections = {
+        ...mockPathData,
+        id: 'nested-path',
+        content: {
+          sections: [
+            {
+              id: 'ch-1',
+              title: 'Chapter 1',
+              level: 'course',
+              items: [
+                { ref: 'epr:concept-1', role: 'step', title: 'Step 1' },
+              ],
+            },
+          ],
+        },
       };
-      mockClient.get.mockReturnValue(Promise.resolve(nestedResponse as any));
+      mockClient.get.mockReturnValue(Promise.resolve(pathWithSections as any));
 
       let result: LearningPath | null = null;
       service.getPath('nested-path').subscribe(path => {
@@ -511,11 +520,15 @@ describe('ContentService', () => {
       expect(result).toBeTruthy();
       expect(result!.chapters?.length).toBe(1);
       expect(result!.chapters?.[0]?.title).toBe('Chapter 1');
+      expect(result!.steps.length).toBe(1);
+      expect(result!.steps[0].resourceId).toBe('concept-1');
     }));
   });
 
   describe('queryPaths', () => {
     it('should query paths with filters', fakeAsync(() => {
+      // queryPaths now calls queryContent which calls client.query with contentType: 'content'
+      // then filters by contentType === 'path' locally
       mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
       let result: LearningPath[] = [];
@@ -529,8 +542,8 @@ describe('ContentService', () => {
 
     it('should filter by difficulty locally', fakeAsync(() => {
       const items = [
-        { ...mockPathData, id: '1', difficulty: 'beginner' },
-        { ...mockPathData, id: '2', difficulty: 'advanced' },
+        { ...mockPathData, id: '1', metadata: { ...mockPathData.metadata, difficulty: 'beginner' } },
+        { ...mockPathData, id: '2', metadata: { ...mockPathData.metadata, difficulty: 'advanced' } },
       ];
       mockClient.query.mockReturnValue(Promise.resolve(items));
 
