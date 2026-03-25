@@ -49,19 +49,12 @@ fn event_type(event: &StorageEvent) -> &'static str {
         StorageEvent::ContentUpdated { .. } => "content.updated",
         StorageEvent::ContentDeleted { .. } => "content.deleted",
         StorageEvent::ContentBulkCreated { .. } => "content.bulk-created",
-        StorageEvent::PathCreated { .. } => "path.created",
-        StorageEvent::PathUpdated { .. } => "path.updated",
-        StorageEvent::PathDeleted { .. } => "path.deleted",
-        StorageEvent::PathBulkCreated { .. } => "path.bulk-created",
         StorageEvent::RelationshipCreated { .. } => "relationship.created",
         StorageEvent::RelationshipDeleted { .. } => "relationship.deleted",
         StorageEvent::RelationshipBulkCreated { .. } => "relationship.bulk-created",
         StorageEvent::KnowledgeMapCreated { .. } => "knowledge-map.created",
         StorageEvent::KnowledgeMapUpdated { .. } => "knowledge-map.updated",
         StorageEvent::KnowledgeMapDeleted { .. } => "knowledge-map.deleted",
-        StorageEvent::PathExtensionCreated { .. } => "path-extension.created",
-        StorageEvent::PathExtensionUpdated { .. } => "path-extension.updated",
-        StorageEvent::PathExtensionDeleted { .. } => "path-extension.deleted",
     }
 }
 
@@ -78,14 +71,6 @@ fn event_data(event: &StorageEvent) -> String {
         StorageEvent::ContentUpdated { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::ContentDeleted { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::ContentBulkCreated { count, ids } => {
-            serde_json::json!({ "count": count, "ids": ids }).to_string()
-        }
-        StorageEvent::PathCreated { id, title } => {
-            serde_json::json!({ "id": id, "title": title }).to_string()
-        }
-        StorageEvent::PathUpdated { id } => serde_json::json!({ "id": id }).to_string(),
-        StorageEvent::PathDeleted { id } => serde_json::json!({ "id": id }).to_string(),
-        StorageEvent::PathBulkCreated { count, ids } => {
             serde_json::json!({ "count": count, "ids": ids }).to_string()
         }
         StorageEvent::RelationshipCreated {
@@ -111,14 +96,6 @@ fn event_data(event: &StorageEvent) -> String {
         } => serde_json::json!({ "id": id, "mapType": map_type, "ownerId": owner_id }).to_string(),
         StorageEvent::KnowledgeMapUpdated { id } => serde_json::json!({ "id": id }).to_string(),
         StorageEvent::KnowledgeMapDeleted { id } => serde_json::json!({ "id": id }).to_string(),
-        StorageEvent::PathExtensionCreated {
-            id,
-            base_path_id,
-            extended_by,
-        } => serde_json::json!({ "id": id, "basePathId": base_path_id, "extendedBy": extended_by })
-            .to_string(),
-        StorageEvent::PathExtensionUpdated { id } => serde_json::json!({ "id": id }).to_string(),
-        StorageEvent::PathExtensionDeleted { id } => serde_json::json!({ "id": id }).to_string(),
     }
 }
 
@@ -245,10 +222,6 @@ mod tests {
                 content_type: None
             }),
             "content.created"
-        );
-        assert_eq!(
-            event_type(&StorageEvent::PathDeleted { id: "".into() }),
-            "path.deleted"
         );
         assert_eq!(
             event_type(&StorageEvent::KnowledgeMapCreated {

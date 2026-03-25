@@ -137,6 +137,5 @@ pub use db::policy_cache::{
 
 // Service re-exports
 pub use services::{
-    ContentService, EventBus, KnowledgeService, PathService, RelationshipService, Services,
-    StorageEvent,
+    ContentService, EventBus, KnowledgeService, RelationshipService, Services, StorageEvent,
 };

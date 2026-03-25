@@ -11,12 +11,8 @@
 //! id: manifesto
 //! data: {"id":"manifesto","title":"The Elohim Protocol",...}
 //!
-//! event: cache.path
-//! id: governance-intro
-//! data: {"id":"governance-intro","title":"Introduction to Governance",...}
-//!
 //! event: cache.done
-//! data: {"content":342,"paths":12,"humans":5,"relationships":89}
+//! data: {"content":342,"humans":5,"relationships":89}
 //! ```
 
 use std::convert::Infallible;
@@ -33,7 +29,7 @@ use crate::db::cache_queries;
 use crate::db::context::AppContext;
 use crate::db::DbPool;
 use crate::sse::SseBody;
-use crate::views::{ContentView, HumanView, PathView, RelationshipView};
+use crate::views::{ContentView, HumanView, RelationshipView};
 
 const BATCH_SIZE: i64 = 500;
 
@@ -41,7 +37,6 @@ const BATCH_SIZE: i64 = 500;
 #[derive(Debug, Default, Serialize)]
 pub struct StreamCounts {
     pub content: usize,
-    pub paths: usize,
     pub humans: usize,
     pub relationships: usize,
 }
@@ -77,7 +72,7 @@ pub fn create_cache_stream(pool: DbPool, app_id: &str) -> hyper::Response<SseBod
         let ctx = AppContext::new(&app_id);
         let mut counts = StreamCounts::default();
 
-        // Stream content (reach = 'commons')
+        // Stream content (reach = 'commons') — paths are now content rows with contentType 'path'
         counts.content = stream_table(
             &tx,
             &pool,
@@ -89,27 +84,6 @@ pub fn create_cache_stream(pool: DbPool, app_id: &str) -> hyper::Response<SseBod
                         .into_iter()
                         .map(|c| {
                             let view = ContentView::from(c);
-                            let id = view.id.clone();
-                            (id, serde_json::to_value(&view).unwrap_or_default())
-                        })
-                        .collect()
-                })
-            },
-        )
-        .await;
-
-        // Stream paths (all public)
-        counts.paths = stream_table(
-            &tx,
-            &pool,
-            &ctx,
-            "cache.path",
-            |conn, ctx, limit, offset| {
-                cache_queries::list_cacheable_paths(conn, ctx, limit, offset).map(|items| {
-                    items
-                        .into_iter()
-                        .map(|p| {
-                            let view = PathView::from(p);
                             let id = view.id.clone();
                             (id, serde_json::to_value(&view).unwrap_or_default())
                         })
@@ -167,7 +141,6 @@ pub fn create_cache_stream(pool: DbPool, app_id: &str) -> hyper::Response<SseBod
 
         info!(
             content = counts.content,
-            paths = counts.paths,
             humans = counts.humans,
             relationships = counts.relationships,
             "Cache stream complete"
@@ -292,7 +265,7 @@ mod tests {
     #[test]
     fn test_format_cache_event_preserves_json() {
         let data = serde_json::json!({"id": "abc", "title": "Hello World"});
-        let event = format_cache_event("cache.path", "abc", &data);
+        let event = format_cache_event("cache.content", "abc", &data);
         assert!(event.contains(r#""id":"abc""#));
         assert!(event.contains(r#""title":"Hello World""#));
     }
@@ -301,14 +274,12 @@ mod tests {
     fn test_format_done_event() {
         let counts = StreamCounts {
             content: 10,
-            paths: 3,
             humans: 2,
             relationships: 5,
         };
         let event = format_done_event(&counts);
         assert!(event.starts_with("event: cache.done\n"));
         assert!(event.contains("\"content\":10"));
-        assert!(event.contains("\"paths\":3"));
         assert!(event.contains("\"humans\":2"));
         assert!(event.contains("\"relationships\":5"));
         assert!(event.ends_with("\n\n"));
@@ -319,7 +290,6 @@ mod tests {
         let counts = StreamCounts::default();
         let event = format_done_event(&counts);
         assert!(event.contains("\"content\":0"));
-        assert!(event.contains("\"paths\":0"));
     }
 
     #[test]

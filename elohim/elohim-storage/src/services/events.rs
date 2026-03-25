@@ -31,22 +31,6 @@ pub enum StorageEvent {
         ids: Vec<String>,
     },
 
-    // Path events
-    PathCreated {
-        id: String,
-        title: String,
-    },
-    PathUpdated {
-        id: String,
-    },
-    PathDeleted {
-        id: String,
-    },
-    PathBulkCreated {
-        count: usize,
-        ids: Vec<String>,
-    },
-
     // Relationship events
     RelationshipCreated {
         id: String,
@@ -71,19 +55,6 @@ pub enum StorageEvent {
         id: String,
     },
     KnowledgeMapDeleted {
-        id: String,
-    },
-
-    // Path extension events
-    PathExtensionCreated {
-        id: String,
-        base_path_id: String,
-        extended_by: String,
-    },
-    PathExtensionUpdated {
-        id: String,
-    },
-    PathExtensionDeleted {
         id: String,
     },
 }
@@ -146,9 +117,6 @@ impl EventListener for LoggingEventListener {
             }
             StorageEvent::ContentDeleted { id } => {
                 debug!(id = %id, "Content deleted");
-            }
-            StorageEvent::PathCreated { id, title } => {
-                debug!(id = %id, title = %title, "Path created");
             }
             StorageEvent::RelationshipCreated {
                 source_id,

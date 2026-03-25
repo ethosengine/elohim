@@ -4,8 +4,8 @@
 //! Wire types in models.rs use snake_case for database compatibility.
 //!
 //! Pattern:
-//! - Service layer returns Wire types (Path, Content, etc.)
-//! - HTTP layer converts to View types (PathView, ContentView, etc.)
+//! - Service layer returns Wire types (Content, Relationship, etc.)
+//! - HTTP layer converts to View types (ContentView, RelationshipView, etc.)
 //! - ts-rs generates camelCase TypeScript from View types
 //!
 //! Design principles:
@@ -87,14 +87,13 @@ pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
 
 use crate::db::contributors::ImpactSummary;
 use crate::db::models::{
-    AccessGrant, AgreementRow, App, Appeal, Challenge, Chapter, ChapterWithSteps, Content,
-    ContentAttestation, ContentMastery, ContentStewardship, ContentWithTags, ContributorDashboard,
-    ContributorPresence, CustodianMetrics, Discussion, EconomicEvent, GovernanceDisposition,
-    GovernanceSignal, GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship,
-    Path, PathAttestation, PathWithDetails, PathWithSteps, Precedent, PremiumGate, Proposal,
-    ProposalOption, RankedVote, ReaCommitment, Relationship, RelationshipWithContent, Schedule,
-    Statement, StatementVote, Step, StewardCredential, StewardedNode, StewardshipAllocation,
-    StewardshipAllocationWithPresence, Vote,
+    AccessGrant, AgreementRow, App, Appeal, Challenge, Content, ContentAttestation, ContentMastery,
+    ContentStewardship, ContentWithTags, ContributorDashboard, ContributorPresence,
+    CustodianMetrics, Discussion, EconomicEvent, GovernanceDisposition, GovernanceSignal,
+    GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Precedent,
+    PremiumGate, Proposal, ProposalOption, RankedVote, ReaCommitment, Relationship,
+    RelationshipWithContent, Schedule, Statement, StatementVote, StewardCredential, StewardedNode,
+    StewardshipAllocation, StewardshipAllocationWithPresence, Vote,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -243,236 +242,6 @@ impl From<ContentWithTags> for ContentWithTagsView {
         Self {
             content: c.content.into(),
             tags: c.tags,
-        }
-    }
-}
-
-// ============================================================================
-// Path Views
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PathView {
-    pub id: String,
-    pub app_id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub path_type: String,
-    pub difficulty: Option<String>,
-    pub estimated_duration: Option<String>,
-    pub thumbnail_url: Option<String>,
-    pub thumbnail_alt: Option<String>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub visibility: String,
-    pub created_by: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub dht_anchor_hash: Option<String>,
-}
-
-impl From<Path> for PathView {
-    fn from(p: Path) -> Self {
-        Self {
-            id: p.id,
-            app_id: p.app_id,
-            title: p.title,
-            description: p.description,
-            path_type: p.path_type,
-            difficulty: p.difficulty,
-            estimated_duration: p.estimated_duration,
-            thumbnail_url: p.thumbnail_url,
-            thumbnail_alt: p.thumbnail_alt,
-            metadata: parse_json_opt(&p.metadata_json),
-            visibility: p.visibility,
-            created_by: p.created_by,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            dht_anchor_hash: p.dht_anchor_hash,
-        }
-    }
-}
-
-// ============================================================================
-// Chapter Views
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ChapterView {
-    pub id: String,
-    pub app_id: String,
-    pub path_id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub order_index: i32,
-    pub estimated_duration: Option<String>,
-    pub dht_anchor_hash: Option<String>,
-}
-
-impl From<Chapter> for ChapterView {
-    fn from(c: Chapter) -> Self {
-        Self {
-            id: c.id,
-            app_id: c.app_id,
-            path_id: c.path_id,
-            title: c.title,
-            description: c.description,
-            order_index: c.order_index,
-            estimated_duration: c.estimated_duration,
-            dht_anchor_hash: c.dht_anchor_hash,
-        }
-    }
-}
-
-// ============================================================================
-// Step Views
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct StepView {
-    pub id: String,
-    pub app_id: String,
-    pub path_id: String,
-    pub chapter_id: Option<String>,
-    pub title: String,
-    pub description: Option<String>,
-    pub step_type: String,
-    pub resource_id: Option<String>,
-    pub resource_type: Option<String>,
-    pub order_index: i32,
-    pub estimated_duration: Option<String>,
-    /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<JsonVal>,
-    pub dht_anchor_hash: Option<String>,
-}
-
-impl From<Step> for StepView {
-    fn from(s: Step) -> Self {
-        Self {
-            id: s.id,
-            app_id: s.app_id,
-            path_id: s.path_id,
-            chapter_id: s.chapter_id,
-            title: s.title,
-            description: s.description,
-            step_type: s.step_type,
-            resource_id: s.resource_id,
-            resource_type: s.resource_type,
-            order_index: s.order_index,
-            estimated_duration: s.estimated_duration,
-            metadata: parse_json_opt(&s.metadata_json),
-            dht_anchor_hash: s.dht_anchor_hash,
-        }
-    }
-}
-
-// ============================================================================
-// Path Attestation Views
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PathAttestationView {
-    pub app_id: String,
-    pub path_id: String,
-    pub attestation_type: String,
-    pub attestation_name: String,
-    /// DHT provenance: ActionHash of the Attestation entry in imagodei DNA. None for pre-coherence rows.
-    pub dht_anchor_hash: Option<String>,
-}
-
-impl From<PathAttestation> for PathAttestationView {
-    fn from(a: PathAttestation) -> Self {
-        Self {
-            app_id: a.app_id,
-            path_id: a.path_id,
-            attestation_type: a.attestation_type,
-            attestation_name: a.attestation_name,
-            dht_anchor_hash: a.dht_anchor_hash,
-        }
-    }
-}
-
-// ============================================================================
-// Composite Path Views
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct ChapterWithStepsView {
-    #[serde(flatten)]
-    pub chapter: ChapterView,
-    pub steps: Vec<StepView>,
-}
-
-impl From<ChapterWithSteps> for ChapterWithStepsView {
-    fn from(c: ChapterWithSteps) -> Self {
-        Self {
-            chapter: c.chapter.into(),
-            steps: c.steps.into_iter().map(|s| s.into()).collect(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PathWithDetailsView {
-    #[serde(flatten)]
-    pub path: PathView,
-    pub tags: Vec<String>,
-    pub chapters: Vec<ChapterWithStepsView>,
-    pub ungrouped_steps: Vec<StepView>,
-    pub attestations: Vec<PathAttestationView>,
-}
-
-impl From<PathWithDetails> for PathWithDetailsView {
-    fn from(p: PathWithDetails) -> Self {
-        Self {
-            path: p.path.into(),
-            tags: p.tags,
-            chapters: p.chapters.into_iter().map(|c| c.into()).collect(),
-            ungrouped_steps: p.ungrouped_steps.into_iter().map(|s| s.into()).collect(),
-            attestations: p.attestations.into_iter().map(|a| a.into()).collect(),
-        }
-    }
-}
-
-// Diesel PathWithSteps → PathWithDetailsView (flat steps, no chapters)
-impl From<PathWithSteps> for PathWithDetailsView {
-    fn from(p: PathWithSteps) -> Self {
-        Self {
-            path: p.path.into(),
-            tags: vec![],
-            chapters: vec![],
-            ungrouped_steps: p.steps.into_iter().map(|s| s.into()).collect(),
-            attestations: vec![],
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct PathWithStepsView {
-    #[serde(flatten)]
-    pub path: PathView,
-    pub steps: Vec<StepView>,
-}
-
-impl From<PathWithSteps> for PathWithStepsView {
-    fn from(p: PathWithSteps) -> Self {
-        Self {
-            path: p.path.into(),
-            steps: p.steps.into_iter().map(|s| s.into()).collect(),
         }
     }
 }
@@ -1300,145 +1069,6 @@ pub struct UpdateContentInputView {
     pub tags: Option<Vec<String>>,
     #[serde(default)]
     pub reach: Option<String>,
-}
-
-// ============================================================================
-// Path Input Views
-// ============================================================================
-
-use crate::db::paths_diesel::{CreateChapterInput, CreatePathInput, CreateStepInput};
-
-/// Input for creating a step - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateStepInputView {
-    pub id: String,
-    pub path_id: String,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub chapter_id: Option<String>,
-    pub title: String,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub step_type: Option<String>,
-    #[serde(default)]
-    pub resource_id: Option<String>,
-    #[serde(default)]
-    pub resource_type: Option<String>,
-    #[serde(default)]
-    pub order_index: i32,
-    #[serde(default)]
-    pub estimated_duration: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-}
-
-impl From<CreateStepInputView> for CreateStepInput {
-    fn from(v: CreateStepInputView) -> Self {
-        Self {
-            id: v.id,
-            chapter_id: v.chapter_id,
-            title: v.title,
-            description: v.description,
-            step_type: v.step_type.unwrap_or_else(|| "content".to_string()),
-            resource_id: v.resource_id,
-            resource_type: v.resource_type,
-            order_index: v.order_index,
-            estimated_duration: v.estimated_duration,
-            metadata_json: serialize_json_opt(&v.metadata),
-        }
-    }
-}
-
-/// Input for creating a chapter - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreateChapterInputView {
-    pub id: String,
-    pub title: String,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub order_index: i32,
-    #[serde(default)]
-    pub estimated_duration: Option<String>,
-    #[serde(default)]
-    pub steps: Vec<CreateStepInputView>,
-}
-
-impl From<CreateChapterInputView> for CreateChapterInput {
-    fn from(v: CreateChapterInputView) -> Self {
-        Self {
-            id: v.id,
-            title: v.title,
-            description: v.description,
-            order_index: v.order_index,
-            estimated_duration: v.estimated_duration,
-            steps: v.steps.into_iter().map(|s| s.into()).collect(),
-        }
-    }
-}
-
-/// Input for creating a path - camelCase API boundary type
-#[derive(Debug, Clone, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct CreatePathInputView {
-    pub id: String,
-    pub title: String,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub path_type: Option<String>,
-    #[serde(default)]
-    pub difficulty: Option<String>,
-    #[serde(default)]
-    pub estimated_duration: Option<String>,
-    #[serde(default)]
-    pub thumbnail_url: Option<String>,
-    #[serde(default)]
-    pub thumbnail_alt: Option<String>,
-    /// Parsed metadata object (serialized to JSON string for DB)
-    #[serde(default)]
-    pub metadata: Option<JsonVal>,
-    #[serde(default)]
-    pub visibility: Option<String>,
-    #[serde(default)]
-    pub created_by: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
-    pub chapters: Vec<CreateChapterInputView>,
-}
-
-impl From<CreatePathInputView> for CreatePathInput {
-    fn from(v: CreatePathInputView) -> Self {
-        Self {
-            id: v.id,
-            title: v.title,
-            description: v.description,
-            path_type: v.path_type.unwrap_or_else(|| "guided".to_string()),
-            difficulty: v.difficulty,
-            estimated_duration: v.estimated_duration,
-            thumbnail_url: v.thumbnail_url,
-            thumbnail_alt: v.thumbnail_alt,
-            metadata_json: serialize_json_opt(&v.metadata),
-            visibility: v.visibility.unwrap_or_else(|| "public".to_string()),
-            created_by: v.created_by,
-            tags: v.tags,
-            chapters: v.chapters.into_iter().map(|c| c.into()).collect(),
-            attestations: vec![],
-        }
-    }
 }
 
 // ============================================================================
@@ -5477,12 +5107,6 @@ mod schema_version_tests {
         // Every InputView type must appear here. If you add a new one, add it below.
         let content: CreateContentInputView =
             serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
-        let step: CreateStepInputView =
-            serde_json::from_value(serde_json::json!({"id":"x","pathId":"p","title":"x"})).unwrap();
-        let chapter: CreateChapterInputView =
-            serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
-        let path: CreatePathInputView =
-            serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
         let rel: CreateRelationshipInputView = serde_json::from_value(
             serde_json::json!({"sourceId":"a","targetId":"b","relationshipType":"r"}),
         )
@@ -5520,9 +5144,6 @@ mod schema_version_tests {
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);
-        assert_eq!(step.schema_version, 1);
-        assert_eq!(chapter.schema_version, 1);
-        assert_eq!(path.schema_version, 1);
         assert_eq!(rel.schema_version, 1);
         assert_eq!(human_rel.schema_version, 1);
         assert_eq!(presence.schema_version, 1);
