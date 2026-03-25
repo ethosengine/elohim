@@ -101,10 +101,17 @@ async fn fetch_and_project(
         return Err(format!("HTTP {}", resp.status()));
     }
 
-    let items: Vec<serde_json::Value> = resp
+    // Storage returns {"items":[...]} wrapper, not a bare array
+    #[derive(serde::Deserialize)]
+    struct DbResponse {
+        items: Vec<serde_json::Value>,
+    }
+
+    let response: DbResponse = resp
         .json()
         .await
         .map_err(|e| format!("JSON parse failed: {e}"))?;
+    let items = response.items;
 
     let count = items.len();
 
