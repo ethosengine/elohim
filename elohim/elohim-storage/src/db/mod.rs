@@ -22,6 +22,7 @@
 //! - `path_attestations` - Attestations granted upon path completion
 
 // Diesel modules with app scoping
+pub mod cache_queries;
 pub mod content_diesel;
 pub mod context;
 pub mod diesel_schema;
