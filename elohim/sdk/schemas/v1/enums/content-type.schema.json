@@ -6,7 +6,7 @@
   "type": "string",
   "enum": [
     "epic", "concept", "lesson", "scenario", "assessment",
-    "reflection", "discussion", "exercise", "article",
+    "reflection", "discussion", "exercise", "article", "path",
     "human", "role", "collective",
     "example", "reference",
     "feature", "practice", "contributor",
@@ -17,7 +17,7 @@
   "_tiers": {
     "core": {
       "values": ["epic", "concept", "lesson", "scenario", "assessment",
-                 "reflection", "discussion", "exercise", "article"],
+                 "reflection", "discussion", "exercise", "article", "path"],
       "rationale": "Three-leg coupled: knowledge + value + governance. DNA-notarized, immutable once signed."
     },
     "storageOnly": {

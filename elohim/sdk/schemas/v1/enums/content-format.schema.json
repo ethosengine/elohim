@@ -5,7 +5,7 @@
   "description": "Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints.",
   "type": "string",
   "enum": [
-    "markdown", "html", "video", "audio", "interactive", "external",
+    "markdown", "html", "video", "audio", "interactive", "external", "epr-composite",
     "plaintext", "text", "plain", "gherkin",
     "perseus", "perseus-json", "perseus-quiz-json",
     "video-embed", "audio-file", "html5-app",
@@ -14,7 +14,7 @@
   ],
   "_tiers": {
     "core": {
-      "values": ["markdown", "html", "video", "audio", "interactive", "external"],
+      "values": ["markdown", "html", "video", "audio", "interactive", "external", "epr-composite"],
       "rationale": "DNA-notarized format categories. Broad enough to encompass all rendering approaches."
     },
     "extensible": {
