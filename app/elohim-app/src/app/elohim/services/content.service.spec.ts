@@ -527,8 +527,8 @@ describe('ContentService', () => {
 
   describe('queryPaths', () => {
     it('should query paths with filters', fakeAsync(() => {
-      // queryPaths now calls queryContent which calls client.query with contentType: 'content'
-      // then filters by contentType === 'path' locally
+      // queryPaths calls queryContent with contentType: 'path' filter
+      // which passes through to storage for server-side filtering
       mockClient.query.mockReturnValue(Promise.resolve([mockPathData]));
 
       let result: LearningPath[] = [];

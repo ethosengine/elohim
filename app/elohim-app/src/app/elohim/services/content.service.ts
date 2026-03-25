@@ -380,7 +380,7 @@ export class ContentService {
    */
   queryContent(filters: ContentFilters): Observable<ContentNode[]> {
     const query: ContentQuery = {
-      contentType: 'content',
+      contentType: filters.contentType as ContentType | undefined,
       tags: filters.tags,
       search: filters.search,
       limit: filters.limit,
