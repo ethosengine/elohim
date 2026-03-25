@@ -512,6 +512,8 @@ async fn main() -> anyhow::Result<()> {
                     admin_url: admin_url.clone(),
                     app_url: conductor_app_url.clone(),
                     installed_app_id: args.installed_app_id.clone(),
+                    storage_url: peer_urls.get(i).cloned(),
+                    projection_store: state.projection.as_ref().map(Arc::clone),
                     ..SubscriberConfig::default()
                 };
 
@@ -599,7 +601,7 @@ async fn main() -> anyhow::Result<()> {
     // Signals only deliver FUTURE writes — existing content needs explicit fetch.
     if args.projection_writer && !peer_urls.is_empty() {
         if let Some(ref projection_store) = state.projection {
-            let _warm_handle = doorway::projection::warm::spawn_warm_task(
+            let _warm_handle = doorway::projection::warm_stream::spawn_stream_task(
                 Arc::clone(projection_store),
                 peer_urls.clone(),
                 10, // 10s delay — let MongoDB + storage settle

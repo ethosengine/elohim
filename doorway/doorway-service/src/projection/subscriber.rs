@@ -174,7 +174,7 @@ pub struct AppSignal {
 }
 
 /// Subscriber configuration
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SubscriberConfig {
     /// Conductor admin WebSocket URL (for requesting auth tokens)
     pub admin_url: String,
@@ -190,6 +190,32 @@ pub struct SubscriberConfig {
     pub max_reconnect_attempts: u32,
     /// Ping interval for keepalive
     pub ping_interval: Duration,
+    /// Storage URL for cache stream warm-up on reconnect
+    pub storage_url: Option<String>,
+    /// Projection store for cache stream warm-up on reconnect
+    pub projection_store: Option<Arc<super::store::ProjectionStore>>,
+}
+
+impl std::fmt::Debug for SubscriberConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SubscriberConfig")
+            .field("admin_url", &self.admin_url)
+            .field("app_url", &self.app_url)
+            .field("installed_app_id", &self.installed_app_id)
+            .field("token_expiry_seconds", &self.token_expiry_seconds)
+            .field("reconnect_delay", &self.reconnect_delay)
+            .field("max_reconnect_attempts", &self.max_reconnect_attempts)
+            .field("ping_interval", &self.ping_interval)
+            .field("storage_url", &self.storage_url)
+            .field(
+                "projection_store",
+                &self
+                    .projection_store
+                    .as_ref()
+                    .map(|_| "ProjectionStore(...)"),
+            )
+            .finish()
+    }
 }
 
 impl Default for SubscriberConfig {
@@ -202,6 +228,8 @@ impl Default for SubscriberConfig {
             reconnect_delay: Duration::from_secs(5),
             max_reconnect_attempts: 0,             // Infinite
             ping_interval: Duration::from_secs(5), // Must be < conductor idle timeout (~10s)
+            storage_url: None,
+            projection_store: None,
         }
     }
 }
@@ -231,6 +259,8 @@ impl SubscriberConfig {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(0),
             ping_interval: Duration::from_secs(30),
+            storage_url: None,
+            projection_store: None,
         }
     }
 }
@@ -371,6 +401,18 @@ impl SignalSubscriber {
                 .await;
 
             info!("Signal subscription active");
+
+            // Trigger cache stream warm-up on (re)connect
+            if let (Some(ref storage_url), Some(ref store)) =
+                (&self.config.storage_url, &self.config.projection_store)
+            {
+                let store = Arc::clone(store);
+                let url = storage_url.clone();
+                tokio::spawn(async move {
+                    super::warm_stream::stream_from_peer(store, &url).await;
+                });
+                info!("Cache stream warm-up triggered after connect");
+            }
 
             // Hold connection with health checks until disconnect or shutdown
             hold_connection(&client, Duration::from_secs(30), self.shutdown_receiver()).await;
