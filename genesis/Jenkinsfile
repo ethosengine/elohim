@@ -340,6 +340,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         echo "✅ HumanId validation passed"
                     '''
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+
+                        echo "Verifying manifest codegen is up to date..."
+                        pnpm -w run manifest:codegen:verify
+                        echo "✅ Manifest codegen verified"
+                    '''
                     dir('genesis/seeder') {
                         sh '''#!/bin/bash
                             set -euo pipefail
