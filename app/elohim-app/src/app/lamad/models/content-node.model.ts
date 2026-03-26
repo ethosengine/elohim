@@ -36,6 +36,7 @@ import {
   type ContentFormat as WireContentFormat,
 } from '@app/generated/schema-enums';
 
+import type { LamadContentType } from '../generated/manifest-types';
 import type { Place } from '@app/qahal/models/place.model';
 
 // Re-export GeographicContext for backward compatibility
@@ -446,16 +447,11 @@ export interface ContentFlag {
  */
 
 /** App-layer content type extensions beyond protocol primitives.
- * Values here are frontend-only — not in the protocol schema.
- * When a type moves to the schema's extensible tier, remove it from here. */
-type AppContentTypeExtension =
-  | 'community' // Community group or collective
-  | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.)
-  | 'instrument' // Psychometric instrument definition (subscales, scoring, display)
-  | 'tool' // External tools and utilities
-  | 'placeholder'; // Missing/errored content - shown when content can't be loaded
+ * Values here are frontend-only — not in the protocol schema or manifest.
+ * community, discovery-assessment, instrument, tool moved to manifest-types.ts. */
+type AppContentTypeExtension = 'placeholder'; // Missing/errored content - shown when content can't be loaded
 
-export type ContentType = WireContentType | AppContentTypeExtension;
+export type ContentType = WireContentType | LamadContentType | AppContentTypeExtension;
 
 /** All content types (wire + app extensions) as runtime array */
 export const ALL_CONTENT_TYPES = [
