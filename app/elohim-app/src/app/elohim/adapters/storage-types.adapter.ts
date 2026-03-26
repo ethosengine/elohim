@@ -26,19 +26,12 @@ export type {
   EconomicEventView,
   ContentMasteryView,
   ContentView,
-  PathView,
-  StepView,
-  ChapterView,
   ContentWithTagsView,
-  PathWithDetailsView,
-  PathWithStepsView,
-  ChapterWithStepsView,
   RelationshipWithContentView,
   StewardshipAllocationView,
   StewardshipAllocationWithPresenceView,
   ContentStewardshipView,
   LocalSessionView,
-  PathAttestationView,
 } from '@elohim/storage-client/generated';
 
 // Import base types for extending
