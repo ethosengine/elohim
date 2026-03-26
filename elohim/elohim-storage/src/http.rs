@@ -1847,8 +1847,8 @@ impl HttpServer {
                 .collect();
 
         let query = ContentQuery {
-            content_type: params.get("content_type").cloned(),
-            content_format: params.get("content_format").cloned(),
+            content_type: params.get("contentType").or_else(|| params.get("content_type")).cloned(),
+            content_format: params.get("contentFormat").or_else(|| params.get("content_format")).cloned(),
             tags: params
                 .get("tags")
                 .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
