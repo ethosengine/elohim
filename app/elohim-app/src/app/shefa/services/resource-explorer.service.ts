@@ -48,7 +48,7 @@ export const CONTENT_TYPE_FOLDERS: { title: string; icon: string; types: Content
     icon: 'directions_run',
     types: ['exercise', 'reflection', 'discussion'],
   },
-  { title: 'Courses', icon: 'school', types: ['lesson'] },
+  { title: 'Courses', icon: 'school', types: ['lesson', 'path'] },
 ];
 
 /**
