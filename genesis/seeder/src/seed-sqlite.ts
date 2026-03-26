@@ -853,7 +853,7 @@ async function seedPaths(items: CreatePathInput[]): Promise<{ inserted: number; 
   return response.json();
 }
 
-async function getStats(): Promise<{ content_count: number; path_count: number; step_count: number; unique_tags: number }> {
+async function getStats(): Promise<{ content_count: number; unique_tags: number }> {
   const response = await fetch(`${STORAGE_URL}/db/stats`);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
@@ -901,7 +901,7 @@ async function main() {
   console.log(`\nChecking storage availability...`);
   try {
     const stats = await getStats();
-    console.log(`   Current database: ${formatCount(stats.content_count)} content, ${formatCount(stats.path_count)} paths`);
+    console.log(`   Current database: ${formatCount(stats.content_count)} content, ${formatCount(stats.unique_tags)} tags`);
   } catch (err) {
     console.error(`\nError: Cannot connect to storage at ${STORAGE_URL}`);
     console.error(`   ${err}`);
@@ -1148,8 +1148,6 @@ async function main() {
     const finalStats = await getStats();
     console.log(`\nFinal database state:`);
     console.log(`   Content: ${formatCount(finalStats.content_count)} items`);
-    console.log(`   Paths: ${formatCount(finalStats.path_count)} items`);
-    console.log(`   Steps: ${formatCount(finalStats.step_count)} items`);
     console.log(`   Tags: ${formatCount(finalStats.unique_tags)} unique`);
   } catch (err) {
     console.log(`\nCould not get final stats: ${err}`);
