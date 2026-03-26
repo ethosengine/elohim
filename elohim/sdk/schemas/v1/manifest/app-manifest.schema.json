@@ -1,0 +1,320 @@
+{
+  "$id": "epr:schema:manifest:app-manifest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AppManifest",
+  "description": "Protocol-level schema for app manifests. An app manifest is an EPR (content-addressed, stewarded, governed) that declares an app's content types, formats, renderers, relationships, and signals. The protocol validates the SHAPE of manifests (three-leg coupling, substrate signal mapping); apps validate their own vocabulary.",
+  "type": "object",
+  "required": ["id", "name", "version", "vocabulary"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Content-addressed identifier for this manifest (CIDv1). Canonical EPR address."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable app name. Used in registry listings and governance references.",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of this manifest. Manifests are immutable once published; new versions create new EPRs.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the app's purpose and domain."
+    },
+    "vocabulary": {
+      "$ref": "#/$defs/Vocabulary"
+    },
+    "rendering": {
+      "type": "object",
+      "description": "Map of renderer name to RendererRegistration. Declares the rendering components this app provides for its content formats.",
+      "additionalProperties": {
+        "$ref": "#/$defs/RendererRegistration"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Vocabulary": {
+      "title": "Vocabulary",
+      "description": "The app's content vocabulary — the types, formats, relationships, and signals it declares. The protocol validates structural coupling; the app owns the semantic meaning of each entry.",
+      "type": "object",
+      "required": ["contentTypes"],
+      "properties": {
+        "contentTypes": {
+          "type": "object",
+          "description": "Map of content type name to ContentTypeDeclaration. Each type must declare its three-leg coupling.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ContentTypeDeclaration"
+          },
+          "minProperties": 1
+        },
+        "contentFormats": {
+          "type": "object",
+          "description": "Map of format name to ContentFormatDeclaration. Declares how content is serialized and which renderer handles it.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ContentFormatDeclaration"
+          }
+        },
+        "relationships": {
+          "type": "object",
+          "description": "Map of relationship name to RelationshipDeclaration. Declares the graph edges this app uses between content types.",
+          "additionalProperties": {
+            "$ref": "#/$defs/RelationshipDeclaration"
+          }
+        },
+        "signals": {
+          "type": "object",
+          "description": "Map of signal name to SignalDeclaration. Declares the substrate signals this app emits, each mapped to an economic action.",
+          "additionalProperties": {
+            "$ref": "#/$defs/SignalDeclaration"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContentTypeDeclaration": {
+      "title": "ContentTypeDeclaration",
+      "description": "Declaration of a content type within the app vocabulary. Every content type must declare its three-leg coupling — how knowledge, value, and governance attach to it.",
+      "type": "object",
+      "required": ["description", "coupling"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this content type represents in the app's domain."
+        },
+        "coupling": {
+          "$ref": "#/$defs/ThreeLegCoupling"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ThreeLegCoupling": {
+      "title": "ThreeLegCoupling",
+      "description": "The three-leg coupling contract for a content type. Every EPR carries lamad (knowledge) + shefa (value) + qahal (governance) dimensions. No value-blind content. No governance-free content.",
+      "type": "object",
+      "required": ["value", "governance"],
+      "properties": {
+        "knowledge": {
+          "$ref": "#/$defs/KnowledgeLeg"
+        },
+        "value": {
+          "$ref": "#/$defs/ValueLeg"
+        },
+        "governance": {
+          "$ref": "#/$defs/GovernanceLeg"
+        }
+      },
+      "additionalProperties": false
+    },
+    "KnowledgeLeg": {
+      "title": "KnowledgeLeg",
+      "description": "Knowledge dimension of three-leg coupling. Declares how this content type relates to other content in the knowledge graph.",
+      "type": "object",
+      "properties": {
+        "relationships": {
+          "type": "object",
+          "description": "Map of relationship name to an array of target content type names. Declares which graph edges this content type participates in.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ValueLeg": {
+      "title": "ValueLeg",
+      "description": "Value dimension of three-leg coupling. Declares the economic flows triggered by interactions with this content type. Maps to REA (Resource-Event-Agent) economic actions.",
+      "type": "object",
+      "properties": {
+        "onConsume": {
+          "$ref": "#/$defs/ValueFlowEvent",
+          "description": "Economic flow triggered when a learner consumes this content (reads, watches, listens)."
+        },
+        "onComplete": {
+          "$ref": "#/$defs/ValueFlowEvent",
+          "description": "Economic flow triggered when a learner completes this content (finishes assessment, reaches end)."
+        },
+        "onContribute": {
+          "$ref": "#/$defs/ValueFlowEvent",
+          "description": "Economic flow triggered when a steward contributes this content (creates, curates, reviews)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ValueFlowEvent": {
+      "title": "ValueFlowEvent",
+      "description": "A single economic flow event, mapped to a REA economic action. Declares what happens in the value network when this event fires.",
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "REA economic action type (e.g. 'use', 'consume', 'produce', 'transfer', 'cite')."
+        },
+        "resourceConformsTo": {
+          "type": "string",
+          "description": "ResourceSpecification that the affected resource conforms to. References a protocol-level resource spec."
+        },
+        "recognition": {
+          "type": "string",
+          "description": "How this economic event is recognized in the value network (e.g. 'mastery-credit', 'stewardship-standing', 'contribution-record')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "GovernanceLeg": {
+      "title": "GovernanceLeg",
+      "description": "Governance dimension of three-leg coupling. Declares how this content type is governed — its visibility reach, governance model, and the signals that can act on it.",
+      "type": "object",
+      "required": ["defaultReach", "minimumReach", "governanceModel"],
+      "properties": {
+        "defaultReach": {
+          "type": "string",
+          "description": "Default reach level for new content of this type. Must be a valid reach value (private, self, intimate, trusted, familiar, community, public, commons)."
+        },
+        "minimumReach": {
+          "type": "string",
+          "description": "Minimum reach level — content of this type cannot be more restrictive than this. Ensures governance-required visibility."
+        },
+        "governanceModel": {
+          "type": "string",
+          "description": "Governance model applied to this content type (e.g. 'steward-consent', 'community-vote', 'constitutional')."
+        },
+        "signalTypes": {
+          "type": "array",
+          "description": "Signal types that can act on this content type. References signal names declared in vocabulary.signals.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContentFormatDeclaration": {
+      "title": "ContentFormatDeclaration",
+      "description": "Declaration of a content format — how content is serialized and rendered. Maps to a renderer and declares MIME types and file extensions.",
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this format."
+        },
+        "renderer": {
+          "type": "string",
+          "description": "Reference to a renderer name declared in the manifest's rendering section."
+        },
+        "mimeTypes": {
+          "type": "array",
+          "description": "MIME types associated with this format.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "description": "File extensions associated with this format (without leading dot).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Alternative names for this format, for backward compatibility or convenience.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelationshipDeclaration": {
+      "title": "RelationshipDeclaration",
+      "description": "Declaration of a relationship type — a directed edge in the content graph. Declares which content types can participate as source and target.",
+      "type": "object",
+      "required": ["description", "sourceTypes", "targetTypes"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this relationship means."
+        },
+        "sourceTypes": {
+          "type": "array",
+          "description": "Content type names that can be the source (from) of this relationship.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetTypes": {
+          "type": "array",
+          "description": "Content type names that can be the target (to) of this relationship.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inverse": {
+          "type": "string",
+          "description": "Name of the inverse relationship, if declared. E.g. 'contains' has inverse 'belongs_to'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SignalDeclaration": {
+      "title": "SignalDeclaration",
+      "description": "Declaration of a signal type — an event emitted by app interactions that maps to a substrate signal and economic action. Signals are the bridge between user activity and the value/governance network.",
+      "type": "object",
+      "required": ["description", "substrateSignal"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this signal represents."
+        },
+        "substrateSignal": {
+          "type": "string",
+          "description": "The substrate-level signal category this maps to. Determines which resource dimension is affected.",
+          "enum": ["attention", "compute", "storage", "bandwidth", "resource"]
+        },
+        "economicAction": {
+          "type": "string",
+          "description": "REA economic action triggered by this signal (e.g. 'use', 'consume', 'produce')."
+        },
+        "resourceType": {
+          "type": "string",
+          "description": "ResourceSpecification this signal acts upon. References a protocol-level resource spec."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RendererRegistration": {
+      "title": "RendererRegistration",
+      "description": "Registration of a rendering component that can display content in specific formats. Maps content formats to UI components.",
+      "type": "object",
+      "required": ["component", "formats"],
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "Component identifier — web component tag name or framework component reference."
+        },
+        "formats": {
+          "type": "array",
+          "description": "Content format names this renderer can handle. References format names from vocabulary.contentFormats.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "platform": {
+          "type": "string",
+          "description": "Target platform for this renderer (e.g. 'web', 'tauri', 'universal'). Defaults to 'universal' if omitted."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
