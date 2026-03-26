@@ -8,11 +8,7 @@ export const CORE_COMPLETION_CRITERIA = [
   'pass-assessment',
   'view-content',
 ] as const;
-export const ALL_COMPLETION_CRITERIA = [
-  'all-required',
-  'pass-assessment',
-  'view-content',
-] as const;
+export const ALL_COMPLETION_CRITERIA = ['all-required', 'pass-assessment', 'view-content'] as const;
 export const COMPLETION_CRITERIA = ALL_COMPLETION_CRITERIA;
 export type CompletionCriteria = (typeof ALL_COMPLETION_CRITERIA)[number];
 
@@ -154,12 +150,7 @@ export const ALL_MASTERY_LEVELS = [
 export const MASTERY_LEVELS = ALL_MASTERY_LEVELS;
 export type MasteryLevel = (typeof ALL_MASTERY_LEVELS)[number];
 
-export const CORE_PATH_VISIBILITIES = [
-  'private',
-  'unlisted',
-  'community',
-  'public',
-] as const;
+export const CORE_PATH_VISIBILITIES = ['private', 'unlisted', 'community', 'public'] as const;
 export const ALL_PATH_VISIBILITIES = [
   'private',
   'intimate',
@@ -194,13 +185,7 @@ export const ALL_REACH_LEVELS = [
 export const REACH_LEVELS = ALL_REACH_LEVELS;
 export type Reach = (typeof ALL_REACH_LEVELS)[number];
 
-export const CORE_STEP_TYPES = [
-  'content',
-  'path',
-  'external',
-  'checkpoint',
-  'reflection',
-] as const;
+export const CORE_STEP_TYPES = ['content', 'path', 'external', 'checkpoint', 'reflection'] as const;
 export const ALL_STEP_TYPES = [
   'content',
   'read',
@@ -215,4 +200,3 @@ export const ALL_STEP_TYPES = [
 ] as const;
 export const STEP_TYPES = ALL_STEP_TYPES;
 export type StepType = (typeof ALL_STEP_TYPES)[number];
-

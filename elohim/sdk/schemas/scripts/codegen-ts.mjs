@@ -162,10 +162,16 @@ async function generateEnumConstants() {
 // Source: elohim/sdk/schemas/v1/enums/*.schema.json
 `;
 
+  // Remove trailing empty block to avoid double-newline at EOF
+  while (blocks.length > 0 && blocks[blocks.length - 1] === '') blocks.pop();
   return header + '\n' + blocks.join('\n') + '\n';
 }
 
 function formatTsConst(name, values) {
+  // Try single-line format first (prettier collapses short arrays)
+  const singleLine = `export const ${name} = [${values.map((v) => `'${v}'`).join(', ')}] as const;`;
+  if (singleLine.length <= 100) return singleLine;
+  // Fall back to multi-line for long arrays
   const items = values.map((v) => `  '${v}',`).join('\n');
   return `export const ${name} = [\n${items}\n] as const;`;
 }
