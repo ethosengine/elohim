@@ -330,6 +330,7 @@ spec:
     environment {
         // Only set static values here
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
     }
 
     options {

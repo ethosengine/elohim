@@ -135,6 +135,7 @@ spec:
 
     environment {
         NO_COLOR = '1'
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
     }
 
     options {

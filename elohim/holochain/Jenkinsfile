@@ -308,6 +308,7 @@ spec:
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         HAPP_NAME = "elohim"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
         // Pipeline state tracking
         IMAGES_PUSHED = 'false'
         HAPP_AVAILABLE = 'false'

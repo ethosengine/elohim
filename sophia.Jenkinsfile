@@ -89,6 +89,10 @@ spec:
         }
     }
 
+    environment {
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
+    }
+
     parameters {
         booleanParam(
             name: 'FORCE_BUILD',
@@ -135,7 +139,13 @@ spec:
                     sh 'git submodule update --init --recursive sophia'
                     // Remove parent workspace config so pnpm treats sophia as standalone.
                     // Must happen after checkout, before any pnpm command.
-                    sh 'rm -f pnpm-workspace.yaml .npmrc package.json'
+                    sh '''
+                        rm -f pnpm-workspace.yaml package.json
+                        # Keep only registry config from parent .npmrc, drop workspace-specific settings
+                        grep -E '^(registry=|//)' .npmrc > /tmp/registry-npmrc || true
+                        rm -f .npmrc
+                        if [ -s /tmp/registry-npmrc ]; then cp /tmp/registry-npmrc .npmrc; fi
+                    '''
                     echo "Building Sophia for branch: ${env.BRANCH_NAME}"
                 }
             }

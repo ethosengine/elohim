@@ -583,6 +583,7 @@ spec:
         // For PR builds, CHANGE_BRANCH holds the source branch (e.g. 'staging');
         // use it so downstream jobs are triggered on the real branch, not 'PR-NNN'.
         BRANCH_NAME = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'dev'}"
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
     }
 
     parameters {
