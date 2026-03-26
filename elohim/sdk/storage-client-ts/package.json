@@ -46,5 +46,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://nexus.ethosengine.com/repository/npm-hosted/"
   }
 }

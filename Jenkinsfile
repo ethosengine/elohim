@@ -576,6 +576,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
                             sh 'pnpm install --frozen-lockfile && pnpm run build'
                             sh 'ls -la dist/ dist/generated/'
+                            // Publish to Nexus so downstream pipelines (genesis) can resolve without workspace root
+                            sh '''#!/bin/bash
+                                set -euo pipefail
+                                echo "Publishing @elohim/storage-client to Nexus..."
+                                pnpm publish --no-git-checks 2>&1 || {
+                                    # 403 = version already exists (idempotent)
+                                    echo "ℹ️  Publish skipped (version may already exist)"
+                                }
+                            '''
                         }
                     }
                     dir('app/elohim-app') {

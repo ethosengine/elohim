@@ -49,7 +49,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@elohim/storage-client": "workspace:*",
+    "@elohim/storage-client": "^0.1.0",
     "@holochain/client": "^0.20.1",
     "multiformats": "^13.4.1",
     "ws": "^8.16.0"
