@@ -142,45 +142,6 @@ interface CreateContentInput {
   tags: string[];
 }
 
-interface CreatePathInput {
-  id: string;
-  title: string;
-  description?: string;
-  pathType: string;
-  difficulty?: string;
-  estimatedDuration?: string;
-  thumbnailUrl?: string;
-  thumbnailAlt?: string;
-  metadataJson?: string;
-  visibility: string;
-  createdBy?: string;
-  tags: string[];
-  chapters: CreateChapterInput[];
-}
-
-interface CreateChapterInput {
-  id: string;
-  title: string;
-  description?: string;
-  orderIndex: number;
-  estimatedDuration?: string;
-  steps: CreateStepInput[];
-}
-
-interface CreateStepInput {
-  id: string;
-  pathId: string;
-  chapterId?: string;
-  title: string;
-  description?: string;
-  stepType: string;
-  resourceId?: string;
-  resourceType?: string;
-  orderIndex: number;
-  estimatedDuration?: string;
-  metadataJson?: string;
-}
-
 // ============================================================================
 // JSON file types from data/lamad/
 // ============================================================================
@@ -210,8 +171,10 @@ interface PathJson {
   title: string;
   description?: string;
   purpose?: string;
+  pathType?: string;
   difficulty?: string;
   estimatedDuration?: string;
+  estimatedMinutes?: number;
   thumbnailUrl?: string;
   thumbnailAlt?: string;
   version?: string;
@@ -236,6 +199,7 @@ interface StepJson {
   order?: number;
   stepType?: string;
   resourceId?: string;
+  title?: string;
   stepTitle?: string;
   stepNarrative?: string;
   learningObjectives?: string[];
@@ -665,145 +629,149 @@ function loadPathFiles(): PathJson[] {
   return paths;
 }
 
-function transformPath(json: PathJson): CreatePathInput {
-  const chapters: CreateChapterInput[] = [];
-  let stepIndex = 0;
+interface SectionNode {
+  id?: string;
+  title?: string;
+  description?: string;
+  level?: string;
+  sections?: SectionNode[];
+  items?: SectionItem[];
+  estimatedDuration?: string;
+  optional?: boolean;
+}
 
-  // Build metadata JSON
-  const metadata: Record<string, unknown> = {};
-  if (json.purpose) metadata.purpose = json.purpose;
-  if (json.version) metadata.version = json.version;
-  if (json.thumbnailAlt) metadata.thumbnailAlt = json.thumbnailAlt;
+interface SectionItem {
+  ref: string;
+  role?: string;
+  title?: string;
+  narrative?: string;
+  learningObjectives?: string[];
+  completionCriteria?: { type: string; threshold?: number };
+}
 
-  // Handle hierarchical chapters format
-  if (json.chapters && json.chapters.length > 0) {
-    for (let ci = 0; ci < json.chapters.length; ci++) {
-      const chapter = json.chapters[ci];
-      const chapterSteps: CreateStepInput[] = [];
+/**
+ * Convert path JSON chapters into the sections tree format.
+ * Handles three input shapes:
+ * 1. chapters -> modules -> sections -> conceptIds (elohim-protocol)
+ * 2. chapters -> steps (governance paths, bdd-smoke-tests)
+ * 3. flat conceptIds (no chapters)
+ */
+function chaptersToSections(json: PathJson): SectionNode[] {
+  // Handle flat conceptIds (no chapters)
+  if ((!json.chapters || json.chapters.length === 0) && json.conceptIds?.length) {
+    return [{
+      id: `${json.id}-default`,
+      title: json.title,
+      description: json.description,
+      level: 'unit',
+      items: json.conceptIds.map(id => ({
+        ref: id,
+        role: 'step',
+        title: formatConceptTitle(id),
+      })),
+    }];
+  }
 
-      // Flatten modules/sections into steps
-      if (chapter.modules) {
-        for (const mod of chapter.modules) {
-          if (mod.sections) {
-            for (const section of mod.sections) {
-              if (section.conceptIds) {
-                for (const conceptId of section.conceptIds) {
-                  chapterSteps.push({
-                    id: `${json.id}-step-${stepIndex}`,
-                    pathId: json.id,
-                    chapterId: chapter.id,
-                    // Use concept ID as title - each step gets unique title
-                    // Section title is stored in metadata for grouping context
-                    title: formatConceptTitle(conceptId),
-                    description: section.description,
-                    stepType: 'content',
-                    resourceId: conceptId,
-                    resourceType: 'content',
-                    orderIndex: stepIndex++,
-                    estimatedDuration: section.estimatedMinutes
-                      ? `${section.estimatedMinutes} minutes`
-                      : undefined,
-                    // Store section context in metadata for UI grouping
-                    metadataJson: JSON.stringify({
-                      sectionTitle: section.title,
-                      sectionOrder: section.order,
-                    }),
-                  });
-                }
-              }
-            }
+  if (!json.chapters) return [];
+
+  return json.chapters.map((chapter, ci) => {
+    const section: SectionNode = {
+      id: chapter.id,
+      title: chapter.title,
+      description: chapter.description,
+      level: 'unit',
+      estimatedDuration: chapter.estimatedDuration,
+    };
+
+    // Shape 1: chapters -> modules -> sections -> conceptIds
+    if (chapter.modules?.length) {
+      section.sections = [];
+      for (const mod of chapter.modules) {
+        if (mod.sections) {
+          for (const sec of mod.sections) {
+            section.sections.push({
+              id: sec.id,
+              title: sec.title ?? mod.title,
+              description: sec.description,
+              level: 'lesson',
+              items: (sec.conceptIds ?? []).map(id => ({
+                ref: id,
+                role: 'step',
+                title: formatConceptTitle(id),
+              })),
+            });
           }
         }
       }
-
-      // Handle flat conceptIds in chapter
-      if (chapter.conceptIds) {
-        for (const conceptId of chapter.conceptIds) {
-          chapterSteps.push({
-            id: `${json.id}-step-${stepIndex}`,
-            pathId: json.id,
-            chapterId: chapter.id,
-            title: formatConceptTitle(conceptId),
-            stepType: 'content',
-            resourceId: conceptId,
-            resourceType: 'content',
-            orderIndex: stepIndex++,
-          });
-        }
-      }
-
-      // Handle direct steps in chapter (know-thyself format)
-      if (chapter.steps) {
-        for (const step of chapter.steps) {
-          chapterSteps.push({
-            id: `${json.id}-step-${stepIndex}`,
-            pathId: json.id,
-            chapterId: chapter.id,
-            title: step.stepTitle || step.resourceId || `Step ${stepIndex + 1}`,
-            description: step.stepNarrative,
-            stepType: normalizeStepType(step.stepType),
-            resourceId: step.resourceId,
-            resourceType: 'content',
-            orderIndex: step.order ?? stepIndex,
-            estimatedDuration: step.estimatedTime,
-            metadataJson: step.learningObjectives || step.completionCriteria
-              ? JSON.stringify({
-                  learningObjectives: step.learningObjectives,
-                  completionCriteria: step.completionCriteria,
-                  optional: step.optional,
-                })
-              : undefined,
-          });
-          stepIndex++;
-        }
-      }
-
-      chapters.push({
-        id: chapter.id,
-        title: chapter.title,
-        description: chapter.description,
-        orderIndex: chapter.order ?? ci,
-        estimatedDuration: chapter.estimatedDuration,
-        steps: chapterSteps,
-      });
+      return section;
     }
-  }
 
-  // Handle flat conceptIds format (no chapters)
-  if (json.conceptIds && json.conceptIds.length > 0 && chapters.length === 0) {
-    // Create a default chapter to hold steps
-    const defaultSteps: CreateStepInput[] = json.conceptIds.map((conceptId, i) => ({
-      id: `${json.id}-step-${i}`,
-      pathId: json.id,
-      title: formatConceptTitle(conceptId),
-      stepType: 'content',
-      resourceId: conceptId,
-      resourceType: 'content',
-      orderIndex: i,
-    }));
+    // Shape 2: chapters -> steps (flat)
+    if (chapter.steps?.length) {
+      section.items = chapter.steps.map(step => {
+        const item: SectionItem = {
+          ref: step.resourceId,
+          role: normalizeStepType(step.stepType),
+          title: step.stepTitle || step.title || formatConceptTitle(step.resourceId),
+        };
+        if (step.stepNarrative) item.narrative = step.stepNarrative;
+        if (step.learningObjectives) item.learningObjectives = step.learningObjectives;
+        if (step.completionCriteria) {
+          item.completionCriteria = Array.isArray(step.completionCriteria)
+            ? { type: step.completionCriteria.join(', ') }
+            : step.completionCriteria;
+        }
+        return item;
+      });
+      return section;
+    }
 
-    chapters.push({
-      id: `${json.id}-default-chapter`,
-      title: json.title,
-      description: json.description,
-      orderIndex: 0,
-      steps: defaultSteps,
-    });
-  }
+    // Shape 2b: chapters -> conceptIds (flat)
+    if (chapter.conceptIds?.length) {
+      section.items = chapter.conceptIds.map(id => ({
+        ref: id,
+        role: 'step',
+        title: formatConceptTitle(id),
+      }));
+      return section;
+    }
+
+    return section;
+  });
+}
+
+/**
+ * Transform a path JSON file into a CreateContentInput for /db/content/bulk.
+ * Chapters/modules/sections/conceptIds -> recursive RawSection[] tree with RawItem[] leaves.
+ * This is the format parsePathView() in learning-path.model.ts expects.
+ */
+function transformPathToContent(json: PathJson): CreateContentInput {
+  const sections = chaptersToSections(json);
+
+  // Build metadata
+  const metadata: Record<string, unknown> = {};
+  if (json.pathType) metadata.pathType = json.pathType;
+  if (json.difficulty) metadata.difficulty = json.difficulty;
+  if (json.estimatedDuration) metadata.estimatedDuration = json.estimatedDuration;
+  if (json.estimatedMinutes) metadata.estimatedDuration = `${json.estimatedMinutes} minutes`;
+  if (json.version) metadata.version = json.version;
+  if (json.purpose) metadata.purpose = json.purpose;
+  if (json.thumbnailUrl) metadata.thumbnailUrl = json.thumbnailUrl;
+  if (json.thumbnailAlt) metadata.thumbnailAlt = json.thumbnailAlt;
+
+  const contentBody = JSON.stringify({ sections });
 
   return {
     id: json.id,
     title: json.title,
     description: json.description,
-    pathType: 'guided',
-    difficulty: json.difficulty,
-    estimatedDuration: json.estimatedDuration,
-    thumbnailUrl: json.thumbnailUrl,
-    thumbnailAlt: json.thumbnailAlt,
+    contentType: 'path',
+    contentFormat: 'structured',
+    contentBody,
+    contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
     metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
-    visibility: json.visibility || 'public',
+    reach: json.visibility || 'public',
     tags: json.tags || [],
-    chapters,
   };
 }
 
@@ -830,27 +798,14 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
   return response.json();
 }
 
-// TODO: Legacy seeder still calls /db/paths/bulk which no longer exists.
-// Paths are now ContentNodes — this function needs to be updated to use
-// /db/content/bulk with contentType: 'path' and relationships for steps.
-// See genesis/seeder/src/seed-content.ts for the new pattern.
-async function seedPaths(items: CreatePathInput[]): Promise<{ inserted: number; skipped: number; errors: string[] }> {
-  if (DRY_RUN) {
-    console.log(`   [DRY RUN] Would seed ${items.length} paths`);
-    return { inserted: items.length, skipped: 0, errors: [] };
+/** Count total items across a sections tree (for logging) */
+function countItems(sections: SectionNode[]): number {
+  let count = 0;
+  for (const s of sections) {
+    count += s.items?.length ?? 0;
+    if (s.sections) count += countItems(s.sections);
   }
-
-  const response = await fetch(`${STORAGE_URL}/db/paths/bulk`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(items),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-
-  return response.json();
+  return count;
 }
 
 async function getStats(): Promise<{ contentCount: number; uniqueTags: number }> {
@@ -1094,7 +1049,7 @@ async function main() {
   // ========================================
   if (!CONTENT_ONLY) {
     console.log(`\n${'='.repeat(70)}`);
-    console.log(`Phase 2: Seeding Paths`);
+    console.log(`Phase 2: Seeding Paths as Content`);
     console.log(`${'='.repeat(70)}`);
 
     const pathTimer = new Timer();
@@ -1107,27 +1062,34 @@ async function main() {
       paths = paths.slice(0, LIMIT);
     }
 
-    console.log(`\nTransforming paths...`);
-    const pathInputs = paths.map(p => {
-      const input = transformPath(p);
-      // Update thumbnail_url to blob reference if we uploaded one
+    console.log(`\nTransforming paths to content nodes...`);
+    const pathContentInputs = paths.map(p => {
+      const input = transformPathToContent(p);
+      // Update thumbnailUrl to blob reference if we uploaded one
       if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
         const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
-        input.thumbnailUrl = `/blob/${blobHash}`;
+        const meta = input.metadataJson ? JSON.parse(input.metadataJson) : {};
+        meta.thumbnailUrl = `/blob/${blobHash}`;
+        input.metadataJson = JSON.stringify(meta);
       }
       return input;
     });
-    const totalSteps = pathInputs.reduce((sum, p) =>
-      sum + p.chapters.reduce((csum, c) => csum + c.steps.length, 0), 0);
-    console.log(`   Transformed ${formatCount(pathInputs.length)} paths with ${formatCount(totalSteps)} steps`);
+
+    // Count steps for logging
+    const totalSteps = pathContentInputs.reduce((sum, p) => {
+      try {
+        const body = JSON.parse(p.contentBody || '{}');
+        return sum + countItems(body.sections || []);
+      } catch { return sum; }
+    }, 0);
+    console.log(`   Transformed ${formatCount(pathContentInputs.length)} paths with ${formatCount(totalSteps)} steps`);
 
     console.log(`\nSeeding paths to database...`);
     try {
-      const result = await seedPaths(pathInputs);
+      const result = await seedContent(pathContentInputs);
       totalInserted += result.inserted;
       totalSkipped += result.skipped;
       totalErrors.push(...result.errors);
-
       console.log(`   ${result.inserted} paths inserted, ${result.skipped} skipped`);
     } catch (err) {
       console.error(`   Path seeding failed: ${err}`);
