@@ -472,13 +472,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             echo "🔍 Checking SQLite database availability..."
                             STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}"
                             DB_STATS=\$(curl -sf "\$STORAGE_URL/db/stats" 2>/dev/null || echo '{}')
-                            DB_READY=\$(echo "\$DB_STATS" | jq -r 'has("content_count")' 2>/dev/null || echo 'false')
+                            DB_READY=\$(echo "\$DB_STATS" | jq -r 'has("contentCount")' 2>/dev/null || echo 'false')
 
                             if [ "\$DB_READY" = "true" ]; then
                                 echo "✅ SQLite database ready at \$STORAGE_URL"
-                                CURRENT_CONTENT=\$(echo "\$DB_STATS" | jq -r '.content_count // 0')
-                                CURRENT_PATHS=\$(echo "\$DB_STATS" | jq -r '.path_count // 0')
-                                echo "   Current state: \$CURRENT_CONTENT content, \$CURRENT_PATHS paths"
+                                CURRENT_CONTENT=\$(echo "\$DB_STATS" | jq -r '.contentCount // 0')
+                                CURRENT_TAGS=\$(echo "\$DB_STATS" | jq -r '.uniqueTags // 0')
+                                echo "   Current state: \$CURRENT_CONTENT content, \$CURRENT_TAGS tags"
                             else
                                 echo "❌ SQLite database not available at \$STORAGE_URL"
                                 echo "   Ensure ENABLE_CONTENT_DB=true is set on elohim-storage"
@@ -547,7 +547,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             for (human in humans) {
                                 sh """#!/bin/bash
                                     STATS=\$(curl -sf "http://${human.storageUrl}/db/stats" 2>/dev/null || echo '{}')
-                                    COUNT=\$(echo "\$STATS" | jq -r '.content_count // 0')
+                                    COUNT=\$(echo "\$STATS" | jq -r '.contentCount // 0')
                                     echo "   ${human.humanId}: \$COUNT content nodes"
                                 """
                             }
@@ -580,9 +580,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             sh """#!/bin/bash
                                 set -euo pipefail
                                 STATS=\$(curl -sf "http://${human.storageUrl}/db/stats")
-                                CONTENT=\$(echo "\$STATS" | jq -r '.content_count // 0')
-                                PATHS=\$(echo "\$STATS" | jq -r '.path_count // 0')
-                                echo "   ${human.humanId}: \$CONTENT content, \$PATHS paths"
+                                CONTENT=\$(echo "\$STATS" | jq -r '.contentCount // 0')
+                                echo "   ${human.humanId}: \$CONTENT content"
                                 if [ "\$CONTENT" -eq 0 ]; then
                                     echo "❌ ${human.humanId} has no content!"
                                     exit 1
