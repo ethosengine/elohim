@@ -16,7 +16,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-import { CONTENT_FORMATS, CONTENT_TYPES } from '../validation-constants.js';
+import { CONTENT_FORMATS, CONTENT_TYPES, REACH_LEVELS } from '../validation-constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -191,7 +191,18 @@ describe('Constants Sync: content JSONs ↔ CONTENT_FORMATS', () => {
   });
 });
 
-describe('Constants Sync: seeder generated ↔ app generated', () => {
+const LIBRARY_GENERATED = path.join(
+  REPO_ROOT,
+  'app',
+  'elohim-library',
+  'projects',
+  'elohim-service',
+  'src',
+  'generated',
+  'schema-enums.ts',
+);
+
+describe('Constants Sync: seeder generated ↔ app generated ↔ library generated', () => {
   it('app-side schema-enums.ts should match seeder-side schema-enums.ts', () => {
     if (!fs.existsSync(APP_GENERATED)) {
       throw new Error(
@@ -207,5 +218,126 @@ describe('Constants Sync: seeder generated ↔ app generated', () => {
     const seederContent = fs.readFileSync(SEEDER_GENERATED, 'utf8');
 
     expect(appContent).toEqual(seederContent);
+  });
+
+  it('library-side schema-enums.ts should match seeder-side schema-enums.ts', () => {
+    if (!fs.existsSync(LIBRARY_GENERATED)) {
+      throw new Error(
+        `Library-side generated file not found at ${LIBRARY_GENERATED}. ` +
+          'Run: pnpm run schema:codegen:ts',
+      );
+    }
+    if (!fs.existsSync(SEEDER_GENERATED)) {
+      throw new Error(`Seeder-side generated file not found at ${SEEDER_GENERATED}`);
+    }
+
+    const libraryContent = fs.readFileSync(LIBRARY_GENERATED, 'utf8');
+    const seederContent = fs.readFileSync(SEEDER_GENERATED, 'utf8');
+
+    expect(libraryContent).toEqual(seederContent);
+  });
+});
+
+// =============================================================================
+// Constants Sync: hardcoded enum values in TypeScript source code
+//
+// This catches the class of bug where TypeScript code hardcodes an enum value
+// (e.g. contentFormat: 'structured') that is not in the protocol schema.
+// JSON files are validated above; this validates the CODE itself.
+// =============================================================================
+
+const SEEDER_SRC = path.join(REPO_ROOT, 'genesis', 'seeder', 'src');
+
+/** Scan TypeScript source files for hardcoded string literals assigned to enum fields */
+function collectHardcodedEnumValues(
+  fieldName: string,
+  dir: string,
+): { file: string; line: number; value: string }[] {
+  const results: { file: string; line: number; value: string }[] = [];
+
+  function walk(d: string) {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      if (entry.name === 'generated' || entry.name === 'node_modules') continue;
+      const full = path.join(d, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+        const content = fs.readFileSync(full, 'utf8');
+        const lines = content.split('\n');
+        // Match: fieldName: 'value' or fieldName: "value"
+        // Also match inside object literals and function returns
+        const pattern = new RegExp(`\\b${fieldName}:\\s*['"]([^'"]+)['"]`);
+        for (let i = 0; i < lines.length; i++) {
+          const match = lines[i].match(pattern);
+          if (match) {
+            results.push({
+              file: path.relative(REPO_ROOT, full),
+              line: i + 1,
+              value: match[1],
+            });
+          }
+        }
+      }
+    }
+  }
+
+  walk(dir);
+  return results;
+}
+
+describe('Constants Sync: hardcoded enum values in TypeScript code', () => {
+  it('every hardcoded contentFormat in TS code should be a valid schema value', () => {
+    const hardcoded = collectHardcodedEnumValues('contentFormat', SEEDER_SRC);
+    const allFormats = CONTENT_FORMATS as readonly string[];
+    const allMapped = Object.keys(FORMAT_MAPPINGS);
+    const invalid: string[] = [];
+
+    for (const { file, line, value } of hardcoded) {
+      const normalized = value.toLowerCase();
+      if (!allFormats.includes(normalized) && !allMapped.includes(normalized)) {
+        invalid.push(`${file}:${line} — contentFormat: '${value}'`);
+      }
+    }
+
+    expect(
+      invalid,
+      `Invalid contentFormat literals found in TypeScript source:\n${invalid.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('every hardcoded contentType in TS code should be a valid schema value', () => {
+    const hardcoded = collectHardcodedEnumValues('contentType', SEEDER_SRC);
+    const allTypes = CONTENT_TYPES as readonly string[];
+    const invalid: string[] = [];
+
+    for (const { file, line, value } of hardcoded) {
+      if (!allTypes.includes(value.toLowerCase())) {
+        invalid.push(`${file}:${line} — contentType: '${value}'`);
+      }
+    }
+
+    expect(
+      invalid,
+      `Invalid contentType literals found in TypeScript source:\n${invalid.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('every hardcoded reach in TS code should be a valid schema value', () => {
+    const hardcoded = collectHardcodedEnumValues('reach', SEEDER_SRC);
+    const allReach = REACH_LEVELS as readonly string[];
+    // Storage also accepts legacy reach values
+    const legacyReach = ['regional', 'local', 'invited', 'federated'];
+    const invalid: string[] = [];
+
+    for (const { file, line, value } of hardcoded) {
+      if (!allReach.includes(value.toLowerCase()) && !legacyReach.includes(value.toLowerCase())) {
+        invalid.push(`${file}:${line} — reach: '${value}'`);
+      }
+    }
+
+    expect(
+      invalid,
+      `Invalid reach literals found in TypeScript source:\n${invalid.join('\n')}`,
+    ).toEqual([]);
   });
 });

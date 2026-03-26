@@ -47,6 +47,10 @@ import type {
   ContentMasteryView,
   StewardshipAllocationView,
 } from '@elohim/storage-client/generated';
+// TODO: MasteryLevel and EngagementType need reconciliation between
+// mastery.service.ts values (aware/understanding/applying) and schema
+// values (seen/remember/understand). Discovered during schema IoC enforcement.
+// Until reconciled, these stay as string at this boundary.
 
 // ============================================================================
 // Input Types (moved from storage-api.service.ts)
@@ -67,8 +71,8 @@ export interface CreatePresenceInput {
 export interface CreateMasteryInput {
   humanId: string;
   contentId: string;
-  masteryLevel?: string;
-  engagementType?: string;
+  masteryLevel?: string; // TODO: reconcile with schema MasteryLevel
+  engagementType?: string; // TODO: reconcile with schema EngagementType
 }
 
 /**

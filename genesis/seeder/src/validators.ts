@@ -26,6 +26,11 @@ import {
   ENGAGEMENT_TYPES,
 } from './validation-constants.js';
 
+/** Type-safe enum membership check — replaces `as any` casts */
+function isValidEnum(value: string, values: readonly string[]): boolean {
+  return values.includes(value);
+}
+
 // =============================================================================
 // Input Types (matching seed.ts CreateContentInput)
 // =============================================================================
@@ -120,19 +125,19 @@ export function validateContent(content: CreateContentInput): ValidationResult {
   }
 
   // Enum validation (deterministic)
-  if (content.contentType && !CONTENT_TYPES.includes(content.contentType as any)) {
+  if (content.contentType && !isValidEnum(content.contentType, CONTENT_TYPES)) {
     errors.push(
       `Invalid contentType '${content.contentType}'. Must be one of: ${CONTENT_TYPES.join(', ')}`
     );
   }
 
-  if (content.reach && !REACH_LEVELS.includes(content.reach as any)) {
+  if (content.reach && !isValidEnum(content.reach, REACH_LEVELS)) {
     errors.push(
       `Invalid reach '${content.reach}'. Must be one of: ${REACH_LEVELS.join(', ')}`
     );
   }
 
-  if (content.contentFormat && !CONTENT_FORMATS.includes(content.contentFormat as any)) {
+  if (content.contentFormat && !isValidEnum(content.contentFormat, CONTENT_FORMATS)) {
     errors.push(
       `Invalid contentFormat '${content.contentFormat}'. Must be one of: ${CONTENT_FORMATS.join(', ')}`
     );
@@ -175,7 +180,7 @@ export function validateLearningPath(path: CreateLearningPathInput): ValidationR
   }
 
   // Enum validation
-  if (path.visibility && !PATH_VISIBILITIES.includes(path.visibility as any)) {
+  if (path.visibility && !isValidEnum(path.visibility, PATH_VISIBILITIES)) {
     errors.push(
       `Invalid visibility '${path.visibility}'. Must be one of: ${PATH_VISIBILITIES.join(', ')}`
     );
@@ -211,7 +216,7 @@ export function validatePathStep(step: CreatePathStepInput): ValidationResult {
   }
 
   // Enum validation
-  if (step.stepType && !STEP_TYPES.includes(step.stepType as any)) {
+  if (step.stepType && !isValidEnum(step.stepType, STEP_TYPES)) {
     errors.push(
       `Invalid stepType '${step.stepType}'. Must be one of: ${STEP_TYPES.join(', ')}`
     );
@@ -247,7 +252,7 @@ export function validateContentMastery(mastery: CreateContentMasteryInput): Vali
   }
 
   // Enum validation
-  if (mastery.masteryLevel && !MASTERY_LEVELS.includes(mastery.masteryLevel as any)) {
+  if (mastery.masteryLevel && !isValidEnum(mastery.masteryLevel, MASTERY_LEVELS)) {
     errors.push(
       `Invalid masteryLevel '${mastery.masteryLevel}'. Must be one of: ${MASTERY_LEVELS.join(', ')}`
     );
@@ -261,7 +266,7 @@ export function validateContentMastery(mastery: CreateContentMasteryInput): Vali
   }
 
   // Engagement type validation
-  if (mastery.lastEngagementType && !ENGAGEMENT_TYPES.includes(mastery.lastEngagementType as any)) {
+  if (mastery.lastEngagementType && !isValidEnum(mastery.lastEngagementType, ENGAGEMENT_TYPES)) {
     errors.push(
       `Invalid lastEngagementType '${mastery.lastEngagementType}'. Must be one of: ${ENGAGEMENT_TYPES.join(', ')}`
     );
@@ -269,7 +274,7 @@ export function validateContentMastery(mastery: CreateContentMasteryInput): Vali
 
   // Cross-field validation: masteryLevelIndex should match mastery_level
   if (mastery.masteryLevel) {
-    const expectedIndex = MASTERY_LEVELS.indexOf(mastery.masteryLevel as any);
+    const expectedIndex = (MASTERY_LEVELS as readonly string[]).indexOf(mastery.masteryLevel);
     if (expectedIndex !== -1 && mastery.masteryLevelIndex !== expectedIndex) {
       errors.push(
         `masteryLevelIndex ${mastery.masteryLevelIndex} doesn't match masteryLevel '${mastery.masteryLevel}' (expected ${expectedIndex})`

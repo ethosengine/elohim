@@ -32,7 +32,7 @@ import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 
 import { ContentNode } from '../../lamad/models/content-node.model';
 
-import { StorageClientService } from './storage-client.service';
+import { StorageClientService, type StorageContentNode } from './storage-client.service';
 import {
   WriteBufferService,
   WritePriority,
@@ -288,17 +288,18 @@ export class SeedingService implements OnDestroy {
         }
         const parsed = JSON.parse(op.payload) as ParsedContent;
         // Transform to backend format: content → contentBody
+        // Cast parsed JSON strings to schema types at the trust boundary
         return {
           id: parsed.id,
           contentType: parsed.contentType,
           title: parsed.title,
           description: parsed.description,
-          contentBody: parsed.content, // Backend expects contentBody, not content
+          contentBody: parsed.content,
           contentFormat: parsed.contentFormat,
           tags: parsed.tags ?? [],
           metadataJson: parsed.metadataJson ? JSON.stringify(parsed.metadataJson) : null,
           reach: 'public',
-        };
+        } as Partial<StorageContentNode>;
       });
 
       // Call bulk create via HTTP (through Doorway)

@@ -445,16 +445,15 @@ export interface ContentFlag {
  * App-layer extensions add types needed only by the frontend.
  */
 
-/** App-layer content type extensions beyond protocol primitives */
+/** App-layer content type extensions beyond protocol primitives.
+ * Values here are frontend-only — not in the protocol schema.
+ * When a type moves to the schema's extensible tier, remove it from here. */
 type AppContentTypeExtension =
   | 'community' // Community group or collective
   | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.)
   | 'instrument' // Psychometric instrument definition (subscales, scoring, display)
   | 'tool' // External tools and utilities
-  | 'path' // Learning path - curated journey through content nodes
-  | 'placeholder' // Missing/errored content - shown when content can't be loaded
-  | 'work-story' // Work management story/task (EPR ContentNode)
-  | 'work-project'; // Work management project container
+  | 'placeholder'; // Missing/errored content - shown when content can't be loaded
 
 export type ContentType = WireContentType | AppContentTypeExtension;
 
@@ -465,10 +464,7 @@ export const ALL_CONTENT_TYPES = [
   'discovery-assessment',
   'instrument',
   'tool',
-  'path',
   'placeholder',
-  'work-story',
-  'work-project',
 ] as const;
 
 /**

@@ -344,6 +344,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         sh '''#!/bin/bash
                             set -euo pipefail
 
+                            echo "Type-checking seeder (compile-time enum enforcement)..."
+                            npx tsc --noEmit 2>&1 || {
+                                echo "❌ TypeScript type errors found — fix before seeding"
+                                exit 1
+                            }
+                            echo "✅ Type check passed"
+
                             echo "Running constants sync tests..."
                             npx vitest run --reporter=verbose
 

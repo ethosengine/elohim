@@ -44,6 +44,7 @@
     "seed:nodes:dev": "STORAGE_URL='https://storage-alpha.elohim.host' npx tsx src/seed-nodes.ts",
     "seed:test-admin": "npx tsx src/seed-test-admin.ts",
     "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

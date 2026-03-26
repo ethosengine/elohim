@@ -14,7 +14,13 @@
  *   await seedInitialMastery(client, 'test-human-001', contentIds);
  */
 
-import type { Content } from './generated/index.js';
+import type { MasteryLevel } from './generated/schema-enums.js';
+
+/** Minimal content shape used by entity seeder (metadata_json + id) */
+interface Content {
+  id: string;
+  metadata_json?: string | Record<string, unknown>;
+}
 import type {
   BulkPresenceResult,
   BulkMasteryResult,
@@ -44,7 +50,7 @@ export interface CreateMasteryInput {
   schemaVersion?: number;
   humanId: string;
   contentId: string;
-  masteryLevel?: string;
+  masteryLevel?: MasteryLevel;
   masteryLevelIndex?: number;
   freshnessScore?: number;
   engagementCount?: number;

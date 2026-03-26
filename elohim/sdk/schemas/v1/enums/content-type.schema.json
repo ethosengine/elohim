@@ -12,7 +12,9 @@
     "feature", "practice", "contributor",
     "video", "audio", "book", "book-chapter", "documentary",
     "bible-verse", "activity", "narrative", "course-module",
-    "module", "quiz", "podcast", "simulation"
+    "module", "quiz", "podcast", "simulation",
+    "node-context", "stewardship-context",
+    "work-story", "work-project", "issue-report"
   ],
   "_tiers": {
     "core": {
@@ -28,7 +30,9 @@
       "values": ["example", "reference", "feature", "practice", "contributor",
                  "video", "audio", "book", "book-chapter", "documentary",
                  "bible-verse", "activity", "narrative", "course-module",
-                 "module", "quiz", "podcast", "simulation"],
+                 "module", "quiz", "podcast", "simulation",
+                 "node-context", "stewardship-context",
+                 "work-story", "work-project", "issue-report"],
       "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes."
     }
   },

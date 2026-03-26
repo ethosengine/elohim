@@ -25,6 +25,7 @@ const VERIFY = process.argv.includes('--verify');
 const ENUM_OUTPUT_PATHS = [
   resolve(REPO_ROOT, 'genesis/seeder/src/generated/schema-enums.ts'),
   resolve(REPO_ROOT, 'app/elohim-app/src/app/generated/schema-enums.ts'),
+  resolve(REPO_ROOT, 'app/elohim-library/projects/elohim-service/src/generated/schema-enums.ts'),
 ];
 
 /**

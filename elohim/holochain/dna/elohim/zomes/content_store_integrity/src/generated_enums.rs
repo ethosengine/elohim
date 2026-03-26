@@ -93,6 +93,11 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
     "quiz",
     "podcast",
     "simulation",
+    "node-context",
+    "stewardship-context",
+    "work-story",
+    "work-project",
+    "issue-report",
 ];
 
 /// Core engagementtype — All engagement types are protocol-level — they drive recognition flows and couple knowledge+value+governance.

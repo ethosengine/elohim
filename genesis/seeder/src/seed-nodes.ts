@@ -21,6 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 
 // =============================================================================
 // Types (mirrors nodes.json schema)
@@ -66,25 +67,33 @@ async function createContextContent(
   id: string,
   title: string,
   body: string,
-  contentType: string,
+  contentType: ContentType,
 ): Promise<'created' | 'exists' | 'failed'> {
   try {
+    const payload: Array<{
+      id: string;
+      title: string;
+      contentType: ContentType;
+      contentFormat: ContentFormat;
+      contentBody: string;
+      reach: Reach;
+    }> = [
+      {
+        id,
+        title,
+        contentType,
+        contentFormat: 'text',
+        contentBody: body,
+        reach: 'intimate',
+      },
+    ];
     const res = await fetch(`${storageUrl}/db/content/bulk`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Schema-Version': '1',
       },
-      body: JSON.stringify([
-        {
-          id,
-          title,
-          contentType,
-          contentFormat: 'text',
-          contentBody: body,
-          reach: 'intimate',
-        },
-      ]),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

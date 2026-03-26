@@ -16,6 +16,7 @@ import * as path from 'path';
 import { DoorwayClient } from '../../doorway-client.js';
 import { ProgressClient } from '../../progress-client.js';
 import { StorageClient } from '../../storage-client.js';
+import type { ContentFormat, ContentType, Reach } from '../../generated/schema-enums.js';
 
 // =============================================================================
 // Test Fixtures
@@ -156,8 +157,8 @@ describe('Content Import Pipeline Integration', () => {
     });
 
     progressClient = new ProgressClient({
-      baseUrl: DOORWAY_URL,
-      timeout: 10000,
+      doorwayUrl: DOORWAY_URL,
+      connectTimeout: 10000,
     });
   });
 
@@ -220,12 +221,12 @@ describe('Content Import Pipeline Integration', () => {
       const item = {
         id: `test-${node.id}-${Date.now()}`,
         title: node.title,
-        contentType: node.contentType,
-        contentFormat: node.contentFormat,
+        contentType: node.contentType as ContentType,
+        contentFormat: node.contentFormat as ContentFormat,
         contentBody: node.contentBody,
         description: node.description,
         tags: node.tags,
-        reach: node.reach,
+        reach: node.reach as Reach,
         metadataJson: JSON.stringify({
           relatedNodeIds: node.relatedNodeIds,
           source: 'integration-test',
@@ -255,12 +256,12 @@ describe('Content Import Pipeline Integration', () => {
       const items = [node1, node2].map((node, idx) => ({
         id: `test-batch-${timestamp}-${idx}`,
         title: node.title,
-        contentType: node.contentType,
-        contentFormat: node.contentFormat,
+        contentType: node.contentType as ContentType,
+        contentFormat: node.contentFormat as ContentFormat,
         contentBody: node.contentBody,
         description: node.description,
         tags: node.tags,
-        reach: node.reach,
+        reach: node.reach as Reach,
         metadataJson: JSON.stringify({ source: 'batch-test' }),
       }));
 
@@ -285,11 +286,11 @@ describe('Content Import Pipeline Integration', () => {
       const item = {
         id: testId,
         title: node.title,
-        contentType: node.contentType,
-        contentFormat: node.contentFormat,
+        contentType: node.contentType as ContentType,
+        contentFormat: node.contentFormat as ContentFormat,
         contentBody: node.contentBody,
         tags: node.tags,
-        reach: node.reach,
+        reach: node.reach as Reach,
       };
 
       // Write
@@ -365,19 +366,17 @@ describe('Content Import Pipeline Integration', () => {
       expect(pushResult.manifest!.blob_hash).toBeDefined();
 
       // Create content referencing blob
-      const item = {
+      const result = await doorwayClient.bulkCreateContent([{
         id: `test-blob-${Date.now()}`,
         title: 'Large Content Test',
         contentType: 'concept',
         contentFormat: 'markdown',
         blobHash: pushResult.manifest!.blob_hash,
-        blobCid: pushResult.manifest!.blob_hash, // Same for now
+        blobCid: pushResult.manifest!.blob_hash,
         description: 'Large content stored as blob',
         tags: ['test', 'blob'],
         reach: 'commons',
-      };
-
-      const result = await doorwayClient.bulkCreateContent([item]);
+      }]);
       expect(result.inserted).toBe(1);
     }, 60000);
   });

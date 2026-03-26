@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 
 import { CONTENT_FORMATS } from './validation-constants.js';
 import { ALL_STEP_TYPES } from './generated/schema-enums.js';
+import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -66,13 +67,13 @@ const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
 // ============================================================================
 
 /** Map legacy/variant content formats to canonical values accepted by elohim-storage */
-function normalizeContentFormat(format: string | undefined): string {
+function normalizeContentFormat(format: string | undefined): ContentFormat {
   if (!format) return 'markdown';
 
   const normalized = format.toLowerCase();
 
   // Map variants to canonical values
-  const mappings: Record<string, string> = {
+  const mappings: Record<string, ContentFormat> = {
     'perseus-quiz-json': 'perseus',
     'perseus-quiz': 'perseus',
     'quiz-json': 'perseus',
@@ -87,7 +88,7 @@ function normalizeContentFormat(format: string | undefined): string {
 
   if (mappings[normalized]) return mappings[normalized];
   // Validate against the auto-generated constants from healing.rs
-  if ((CONTENT_FORMATS as readonly string[]).includes(normalized)) return normalized;
+  if ((CONTENT_FORMATS as readonly string[]).includes(normalized)) return normalized as ContentFormat;
 
   // Default to markdown for unknown formats
   console.warn(`   ⚠️ Unknown contentFormat '${format}', defaulting to 'markdown'`);
@@ -129,15 +130,15 @@ interface CreateContentInput {
   id: string;
   title: string;
   description?: string;
-  contentType: string;
-  contentFormat: string;
+  contentType: ContentType;
+  contentFormat: ContentFormat;
   /** Inline content body (markdown, JSON quiz data, etc.) */
   contentBody?: string;
   blobHash?: string;
   blobCid?: string;
   contentSizeBytes?: number;
   metadataJson?: string;
-  reach: string;
+  reach: Reach;
   createdBy?: string;
   tags: string[];
 }
@@ -164,6 +165,7 @@ interface ConceptJson {
   blobHash?: string;       // Pre-computed hash (camelCase from JSON)
   blob_hash?: string;      // Alternative snake_case format
   entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
+  stewardedBy?: StewardAnnotation[];
 }
 
 interface PathJson {
@@ -422,9 +424,7 @@ function filterBySteward(
   operatorId: string = 'human-matthew-manager',
 ): ConceptJson[] {
   return concepts.filter(concept => {
-    const stewards = (concept as Record<string, unknown>).stewardedBy as
-      | StewardAnnotation[]
-      | undefined;
+    const stewards = concept.stewardedBy;
 
     if (!stewards || stewards.length === 0) {
       return humanId === operatorId;
@@ -537,7 +537,7 @@ function loadReachOverrides(): Map<string, string> {
 /** Global reach overrides — loaded once if --use-account-packages is set */
 let reachOverrides: Map<string, string> | null = null;
 
-function getReachForContent(contentId: string): string {
+function getReachForContent(contentId: string): Reach {
   if (!USE_ACCOUNT_PACKAGES) return 'public';
 
   if (!reachOverrides) {
@@ -555,7 +555,7 @@ function getReachForContent(contentId: string): string {
     }
   }
 
-  return reachOverrides.get(contentId) || 'commons';
+  return (reachOverrides.get(contentId) as Reach | undefined) ?? 'commons';
 }
 
 function transformContent(json: ConceptJson): CreateContentInput {
@@ -581,7 +581,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     id: json.id,
     title: json.title,
     description: json.description || undefined,
-    contentType: json.contentType || 'concept',
+    contentType: (json.contentType ?? 'concept') as ContentType,
     contentFormat: normalizeContentFormat(json.contentFormat),
     contentBody: contentBody,
     contentSizeBytes: contentSizeBytes,
@@ -710,9 +710,9 @@ function chaptersToSections(json: PathJson): SectionNode[] {
     if (chapter.steps?.length) {
       section.items = chapter.steps.map(step => {
         const item: SectionItem = {
-          ref: step.resourceId,
+          ref: step.resourceId ?? '',
           role: normalizeStepType(step.stepType),
-          title: step.stepTitle || step.title || formatConceptTitle(step.resourceId),
+          title: step.stepTitle || step.title || formatConceptTitle(step.resourceId ?? ''),
         };
         if (step.stepNarrative) item.narrative = step.stepNarrative;
         if (step.learningObjectives) item.learningObjectives = step.learningObjectives;
@@ -766,11 +766,11 @@ function transformPathToContent(json: PathJson): CreateContentInput {
     title: json.title,
     description: json.description,
     contentType: 'path',
-    contentFormat: 'structured',
+    contentFormat: 'json',
     contentBody,
     contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
     metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
-    reach: json.visibility || 'public',
+    reach: (json.visibility as Reach | undefined) ?? 'public',
     tags: json.tags || [],
   };
 }
@@ -981,7 +981,7 @@ async function main() {
     if (VALID_HUMAN_IDS.size > 0) {
       const invalidIds = new Map<string, number>();
       for (const concept of content) {
-        const stewards = (concept as Record<string, unknown>).stewardedBy as StewardAnnotation[] | undefined;
+        const stewards = concept.stewardedBy;
         if (stewards) {
           for (const s of stewards) {
             if (!VALID_HUMAN_IDS.has(s.humanId)) {

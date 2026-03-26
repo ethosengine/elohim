@@ -478,7 +478,7 @@ function buildContentAssignments(
     if (category && affinityCategories.has(category)) {
       assignments.set(contentId, {
         contentId,
-        reach: 'neighborhood',
+        reach: 'familiar',
         reason: 'affinity',
         stewardRatio: null,
       });
@@ -489,7 +489,7 @@ function buildContentAssignments(
     if (category && relationshipCategories.has(category)) {
       assignments.set(contentId, {
         contentId,
-        reach: 'municipal',
+        reach: 'community',
         reason: 'relationship',
         stewardRatio: null,
       });

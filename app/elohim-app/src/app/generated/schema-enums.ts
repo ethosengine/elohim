@@ -96,6 +96,11 @@ export const ALL_CONTENT_TYPES = [
   'quiz',
   'podcast',
   'simulation',
+  'node-context',
+  'stewardship-context',
+  'work-story',
+  'work-project',
+  'issue-report',
 ] as const;
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];

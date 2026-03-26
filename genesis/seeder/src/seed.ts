@@ -38,6 +38,7 @@ import DoorwayClient from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash (thumbnails, HTML5 apps)
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
+import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -480,15 +481,15 @@ function cleanErrorMessage(error: any): string {
  *
  * Valid formats: markdown, html, json, text, perseus, gherkin, yaml, toml, latex, asciidoc, html5-app, iframe, embed
  */
-function normalizeContentFormat(format: string | undefined): string {
+function normalizeContentFormat(format: string | undefined): ContentFormat {
   if (!format) return 'markdown';
-  const formatMap: Record<string, string> = {
+  const formatMap: Record<string, ContentFormat> = {
     'perseus-quiz-json': 'perseus',  // Perseus quiz format
     'plaintext': 'text',             // Plain text
     'plain': 'text',
     'txt': 'text',
   };
-  return formatMap[format.toLowerCase()] || format.toLowerCase();
+  return formatMap[format.toLowerCase()] || format.toLowerCase() as ContentFormat;
 }
 
 /**
@@ -522,19 +523,19 @@ function normalizePathType(pathType: string | undefined): string {
   return normalized;
 }
 
-// Types matching the Holochain zome
+// Types matching the Holochain zome — enum fields use schema-generated union types
 interface CreateContentInput {
   id: string;
-  contentType: string;
+  contentType: ContentType;
   title: string;
   description: string;
   summary: string | null;           // Short preview text for cards/lists
   content: string;                  // Legacy: full body. New: empty/hash if blob_cid set
-  contentFormat: string;
+  contentFormat: ContentFormat;
   tags: string[];
   sourcePath: string | null;
   relatedNodeIds: string[];
-  reach: string;
+  reach: Reach;
   estimatedMinutes: number | null; // Reading/viewing time
   thumbnailUrl: string | null;     // Preview image for visual cards
   metadataJson: string;
@@ -790,7 +791,7 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 
   return {
     id: concept.id,
-    contentType: concept.contentType || 'concept',
+    contentType: (concept.contentType ?? 'concept') as ContentType,
     title: concept.title,
     description: description,
     summary: summary,
@@ -1285,18 +1286,19 @@ async function seedViaDoorway(): Promise<SeedResult> {
     // Transform items to backend format (content → contentBody)
     // Backend uses serde rename_all = "camelCase" so expects camelCase field names
     // Coerce null values to undefined for optional fields (TypeScript compatibility)
+    // Cast validated string fields to schema types — validator already checked membership
     const transformedItems = itemsToSeed.map(item => ({
       schemaVersion: 1,
       id: item.id,
       title: item.title,
       description: item.description,
-      contentType: item.contentType,
-      contentFormat: normalizeContentFormat(item.contentFormat),  // Ensure valid format
-      contentBody: item.content,  // Backend expects contentBody (camelCase)
+      contentType: item.contentType as ContentType,
+      contentFormat: normalizeContentFormat(item.contentFormat),
+      contentBody: item.content,
       blobHash: item.blobHash ?? undefined,
       blobCid: item.blobCid ?? undefined,
       metadataJson: item.metadataJson,
-      reach: item.reach || 'public',
+      reach: (item.reach || 'public') as Reach,
       tags: item.tags || [],
     }));
 
@@ -1675,11 +1677,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
       id: string;
       title: string;
       description: string;
-      contentType: string;
-      contentFormat: string;
+      contentType: ContentType;
+      contentFormat: ContentFormat;
       contentBody: string;
       metadataJson: string;
-      reach: string;
+      reach: Reach;
       tags: string[];
     } {
       // Build epr-composite sections from chapters (or wrap flat steps in a default section)
@@ -1850,7 +1852,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           pathType,
           ...pathData.metadata, // preserve any extra metadata
         }),
-        reach: pathData.visibility || 'public',
+        reach: (pathData.visibility as Reach | undefined) ?? 'public',
         tags: pathData.tags || [],
       };
     }

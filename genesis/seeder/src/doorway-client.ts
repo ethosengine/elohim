@@ -24,6 +24,7 @@
  */
 
 import { BlobMetadata } from './blob-manager.js';
+import type { ContentFormat, ContentType, MasteryLevel, Reach } from './generated/schema-enums.js';
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
 import * as raw from 'multiformats/codecs/raw';
@@ -796,14 +797,14 @@ export class DoorwayClient {
       schemaVersion?: number;
       id: string;
       title: string;
-      contentType?: string;
-      contentFormat?: string;
+      contentType?: ContentType;
+      contentFormat?: ContentFormat;
       contentBody?: string;
       description?: string;
       blobHash?: string;
       blobCid?: string;
       metadataJson?: string;
-      reach?: string;
+      reach?: Reach;
       tags?: string[];
     }>
   ): Promise<BulkCreateResult> {
@@ -969,7 +970,7 @@ export class DoorwayClient {
     items: Array<{
       humanId: string;
       contentId: string;
-      masteryLevel?: string;
+      masteryLevel?: MasteryLevel;
       masteryLevelIndex?: number;
       freshnessScore?: number;
       engagementCount?: number;

@@ -27,6 +27,7 @@ import { Observable } from 'rxjs';
 
 import { StorageApiService } from '../services/storage-api.service';
 
+import type { ContentFormat, ContentType, Reach } from '@app/generated/schema-enums';
 import type {
   ContentMasteryView,
   ContentStewardshipView,
@@ -41,9 +42,9 @@ import type {
  * Maps to the /db/content endpoint query parameters.
  */
 export interface ContentFilters {
-  contentType?: string;
+  contentType?: ContentType;
   tags?: string[];
-  reach?: string;
+  reach?: Reach;
   search?: string;
   limit?: number;
   offset?: number;
@@ -74,12 +75,12 @@ export interface UpdateContentPatch {
   title?: string;
   description?: string | null;
   contentBody?: string;
-  contentFormat?: string;
+  contentFormat?: ContentFormat;
   /** Shallow-merged server-side — only the keys you provide are overwritten. */
   metadata?: Record<string, unknown>;
   /** If provided, replaces all existing tags. */
   tags?: string[];
-  reach?: string;
+  reach?: Reach;
 }
 
 /**

@@ -31,7 +31,7 @@ export type {
   EngagementType,
   MasteryLevel,
   PathVisibility,
-  ReachLevel,
+  Reach,
   StepType,
 } from './generated/schema-enums.js';
 
@@ -43,7 +43,7 @@ import type {
   EngagementType as EngagementTypeAlias,
   MasteryLevel as MasteryLevelAlias,
   PathVisibility as PathVisibilityAlias,
-  ReachLevel as ReachLevelAlias,
+  Reach as ReachAlias,
   StepType as StepTypeAlias,
 } from './generated/schema-enums.js';
 
@@ -52,5 +52,7 @@ export type ContentTypes = ContentTypeAlias;
 export type EngagementTypes = EngagementTypeAlias;
 export type MasteryLevels = MasteryLevelAlias;
 export type PathVisibilities = PathVisibilityAlias;
-export type ReachLevels = ReachLevelAlias;
+/** @deprecated Use Reach instead */
+export type ReachLevel = ReachAlias;
+export type ReachLevels = ReachAlias;
 export type StepTypes = StepTypeAlias;

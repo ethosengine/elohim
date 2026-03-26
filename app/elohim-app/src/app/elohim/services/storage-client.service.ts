@@ -24,15 +24,16 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import type { ConnectionConfig } from '@elohim/service/connection';
+import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
 
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
   id: string;
-  contentType: string;
+  contentType: ContentType;
   title: string;
   description: string;
   contentBody: string | null;
-  contentFormat: string;
+  contentFormat: ContentFormat;
   blobHash: string | null;
   blobCid: string | null;
   metadataJson: string | null;
@@ -40,16 +41,16 @@ export interface StorageContentNode {
   createdAt: string;
   updatedAt: string;
   // Additional fields from backend
-  reach?: string; // visibility scope (commons, private, etc.)
-  validationStatus?: string; // draft, approved, etc.
-  createdBy?: string; // agent who created the content
-  contentSizeBytes?: number; // size of blob content
+  reach?: Reach;
+  validationStatus?: string;
+  createdBy?: string;
+  contentSizeBytes?: number;
 }
 
 /** Content query filter */
 export interface ContentFilter {
-  contentType?: string;
-  contentFormat?: string;
+  contentType?: ContentType;
+  contentFormat?: ContentFormat;
   tags?: string[];
   limit?: number;
   offset?: number;

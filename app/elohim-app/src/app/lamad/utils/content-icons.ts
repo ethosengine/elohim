@@ -47,6 +47,11 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   quiz: '📝',
   podcast: '🎧',
   simulation: '🎮',
+  'node-context': '🖥️',
+  'stewardship-context': '🤝',
+  'work-story': '📋',
+  'work-project': '🗂️',
+  'issue-report': '🐛',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',
@@ -54,9 +59,6 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   tool: '🛠️',
   path: '🛤️',
   placeholder: '⚠️',
-  // Avodah work management types
-  'work-story': '📋',
-  'work-project': '🗂️',
 };
 
 /**
