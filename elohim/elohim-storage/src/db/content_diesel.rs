@@ -74,7 +74,24 @@ fn default_reach() -> String {
     "public".to_string()
 }
 
-/// Query parameters for listing content - camelCase for URL params
+/// Deserialize a comma-separated string into a Vec<String>.
+/// Handles `?tags=a,b,c` (Angular convention) via serde_urlencoded.
+fn deserialize_comma_separated<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    Ok(s.map(|s| {
+        s.split(',')
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .collect()
+    })
+    .unwrap_or_default())
+}
+
+/// Query parameters for listing content - camelCase for URL params.
+/// Deserialized via `serde_urlencoded::from_str()` in the HTTP handler.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentQuery {
@@ -82,7 +99,7 @@ pub struct ContentQuery {
     pub content_type: Option<String>,
     #[serde(default)]
     pub content_format: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_comma_separated")]
     pub tags: Vec<String>,
     #[serde(default)]
     pub search: Option<String>,

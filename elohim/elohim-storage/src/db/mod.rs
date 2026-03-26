@@ -79,6 +79,7 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 /// Database statistics
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DbStats {
     pub content_count: u64,
     pub unique_tags: u64,

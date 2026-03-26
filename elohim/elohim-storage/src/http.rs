@@ -686,8 +686,8 @@ impl HttpServer {
 
         let body = serde_json::json!({
             "hash": result.hash,
-            "size_bytes": result.size_bytes,
-            "already_existed": result.already_existed,
+            "sizeBytes": result.size_bytes,
+            "alreadyExisted": result.already_existed,
         });
 
         Ok(Response::builder()
@@ -1217,17 +1217,17 @@ impl HttpServer {
                     .into_iter()
                     .map(|d| {
                         serde_json::json!({
-                            "doc_id": d.doc_id,
-                            "doc_type": d.doc_type,
-                            "change_count": d.change_count,
-                            "last_modified": d.last_modified,
+                            "docId": d.doc_id,
+                            "docType": d.doc_type,
+                            "changeCount": d.change_count,
+                            "lastModified": d.last_modified,
                             "heads": d.heads,
                         })
                     })
                     .collect();
 
                 let body = serde_json::json!({
-                    "app_id": app_id,
+                    "appId": app_id,
                     "documents": documents,
                     "total": total,
                     "offset": offset,
@@ -1277,8 +1277,8 @@ impl HttpServer {
                         }
 
                         let body = serde_json::json!({
-                            "app_id": app_id,
-                            "doc_id": doc_id,
+                            "appId": app_id,
+                            "docId": doc_id,
                             "heads": heads,
                         });
 
@@ -1325,8 +1325,8 @@ impl HttpServer {
         match sync_manager.get_heads(app_id, doc_id).await {
             Ok(heads) => {
                 let body = serde_json::json!({
-                    "app_id": app_id,
-                    "doc_id": doc_id,
+                    "appId": app_id,
+                    "docId": doc_id,
                     "heads": heads,
                 });
 
@@ -1388,10 +1388,10 @@ impl HttpServer {
                             .collect();
 
                         let body = serde_json::json!({
-                            "app_id": app_id,
-                            "doc_id": doc_id,
+                            "appId": app_id,
+                            "docId": doc_id,
                             "changes": changes_b64,
-                            "new_heads": new_heads,
+                            "newHeads": new_heads,
                         });
 
                         Ok(Response::builder()
@@ -1448,9 +1448,9 @@ impl HttpServer {
                         info!(app_id = %app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
 
                         let body = serde_json::json!({
-                            "app_id": app_id,
-                            "doc_id": doc_id,
-                            "new_heads": new_heads,
+                            "appId": app_id,
+                            "docId": doc_id,
+                            "newHeads": new_heads,
                         });
 
                         Ok(Response::builder()
@@ -1839,36 +1839,10 @@ impl HttpServer {
             .as_ref()
             .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
 
-        // Parse query params
+        // Parse query params via serde — ContentQuery has #[serde(rename_all = "camelCase")]
+        // so the compiler enforces camelCase param names (contentType, contentFormat, etc.)
         let query_str = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query_str.as_bytes())
-                .into_owned()
-                .collect();
-
-        let query = ContentQuery {
-            content_type: params
-                .get("contentType")
-                .or_else(|| params.get("content_type"))
-                .cloned(),
-            content_format: params
-                .get("contentFormat")
-                .or_else(|| params.get("content_format"))
-                .cloned(),
-            tags: params
-                .get("tags")
-                .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
-                .unwrap_or_default(),
-            search: params.get("search").cloned(),
-            limit: params
-                .get("limit")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(100),
-            offset: params
-                .get("offset")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        };
+        let query: ContentQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
         match method {
             Method::GET => match services.content.list(&query) {
@@ -2421,27 +2395,8 @@ impl HttpServer {
             .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
 
         let query_str = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query_str.as_bytes())
-                .into_owned()
-                .collect();
-
-        let query = db::relationships_diesel::RelationshipQuery {
-            content_id: params.get("content_id").cloned(),
-            direction: params.get("direction").cloned(),
-            relationship_type: params.get("relationship_type").cloned(),
-            inference_source: None,
-            governance_layer: None,
-            min_confidence: None,
-            limit: params
-                .get("limit")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(100),
-            offset: params
-                .get("offset")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        };
+        let query: db::relationships_diesel::RelationshipQuery =
+            serde_urlencoded::from_str(query_str).unwrap_or_default();
 
         match method {
             Method::GET => match services.relationship.list(&query) {
@@ -2598,25 +2553,8 @@ impl HttpServer {
             .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
 
         let query_str = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query_str.as_bytes())
-                .into_owned()
-                .collect();
-
-        let query = db::knowledge_maps_diesel::KnowledgeMapQuery {
-            owner_id: params.get("owner_id").cloned(),
-            map_type: params.get("map_type").cloned(),
-            subject_id: params.get("subject_id").cloned(),
-            visibility: params.get("visibility").cloned(),
-            limit: params
-                .get("limit")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(100),
-            offset: params
-                .get("offset")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        };
+        let query: db::knowledge_maps_diesel::KnowledgeMapQuery =
+            serde_urlencoded::from_str(query_str).unwrap_or_default();
 
         match method {
             Method::GET => match services.knowledge.list_knowledge_maps(&query) {
@@ -3622,21 +3560,9 @@ impl HttpServer {
 
         match method {
             Method::GET => {
-                // Parse query params
                 let query_str = req.uri().query().unwrap_or("");
-                let params: std::collections::HashMap<String, String> =
-                    url::form_urlencoded::parse(query_str.as_bytes())
-                        .into_owned()
-                        .collect();
-
-                let query = stewardship_allocations::AllocationQuery {
-                    content_id: params.get("content_id").cloned(),
-                    steward_presence_id: params.get("steward_presence_id").cloned(),
-                    governance_state: params.get("governance_state").cloned(),
-                    active_only: params.get("active_only").map(|s| s == "true"),
-                    limit: params.get("limit").and_then(|s| s.parse().ok()),
-                    offset: params.get("offset").and_then(|s| s.parse().ok()),
-                };
+                let query: stewardship_allocations::AllocationQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
 
                 match stewardship_allocations::list_allocations(&mut conn, app_ctx, &query) {
                     Ok(allocations) => {
@@ -4192,7 +4118,7 @@ impl HttpServer {
             info!(session_id = %session.id, "Deleted local session");
             Ok(response::ok(&serde_json::json!({
                 "deleted": true,
-                "session_id": session.id
+                "sessionId": session.id
             })))
         } else {
             Ok(response::ok(&serde_json::json!({

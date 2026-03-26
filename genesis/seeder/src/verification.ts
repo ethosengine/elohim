@@ -46,7 +46,6 @@ export interface ContentStats {
 export interface PathSummary {
   id: string;
   title: string;
-  step_count: number;
 }
 
 export interface PathIndex {

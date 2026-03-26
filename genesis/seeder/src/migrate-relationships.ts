@@ -426,17 +426,17 @@ async function createRelationship(input: {
   }
 
   try {
-    const response = await fetch(`${STORAGE_URL}/db/relationships?app_id=lamad`, {
+    const response = await fetch(`${STORAGE_URL}/db/relationships?appId=lamad`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        source_id: input.sourceId,
-        target_id: input.targetId,
-        relationship_type: input.relationshipType,
+        sourceId: input.sourceId,
+        targetId: input.targetId,
+        relationshipType: input.relationshipType,
         confidence: input.confidence,
-        inference_source: input.inferenceSource,
-        create_inverse: input.createInverse || false,
-        metadata_json: input.metadata ? JSON.stringify(input.metadata) : null,
+        inferenceSource: input.inferenceSource,
+        createInverse: input.createInverse || false,
+        metadata: input.metadata || null,
       }),
     });
 
