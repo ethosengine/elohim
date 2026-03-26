@@ -47,7 +47,9 @@
     "manifest:test": "node elohim/sdk/schemas/scripts/test-manifest-schema.mjs",
     "schema:validate": "node elohim/sdk/schemas/scripts/validate-seeds.mjs",
     "schema:codegen:ts": "node elohim/sdk/schemas/scripts/codegen-ts.mjs",
-    "schema:codegen:rs": "node elohim/sdk/schemas/scripts/codegen-rs.mjs"
+    "schema:codegen:rs": "node elohim/sdk/schemas/scripts/codegen-rs.mjs",
+    "manifest:codegen": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs app/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts",
+    "manifest:codegen:verify": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs --verify app/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts"
   },
   "dependencies": {
   }
