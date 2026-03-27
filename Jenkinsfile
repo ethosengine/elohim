@@ -577,13 +577,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'pnpm install --frozen-lockfile && pnpm run build'
                             sh 'ls -la dist/ dist/generated/'
                             // Publish to Nexus so downstream pipelines (genesis) can resolve without workspace root
+                            // Only publish if this version doesn't already exist (prevents tarball overwrite + integrity mismatch)
                             sh '''#!/bin/bash
                                 set -euo pipefail
-                                echo "Publishing @elohim/storage-client to Nexus..."
-                                pnpm publish --no-git-checks 2>&1 || {
-                                    # 403 = version already exists (idempotent)
-                                    echo "ℹ️  Publish skipped (version may already exist)"
-                                }
+                                PKG_VERSION=$(node -p "require('./package.json').version")
+                                echo "Checking if @elohim/storage-client@${PKG_VERSION} exists on Nexus..."
+                                if npm view "@elohim/storage-client@${PKG_VERSION}" --registry=https://nexus.ethosengine.com/repository/npm/ version 2>/dev/null; then
+                                    echo "ℹ️  @elohim/storage-client@${PKG_VERSION} already published, skipping"
+                                else
+                                    echo "Publishing @elohim/storage-client@${PKG_VERSION} to Nexus..."
+                                    pnpm publish --no-git-checks
+                                    echo "✅ Published @elohim/storage-client@${PKG_VERSION}"
+                                fi
                             '''
                         }
                     }

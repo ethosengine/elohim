@@ -1730,7 +1730,7 @@ packages:
       stylelint: '>=16.0.0'
 
   '@elohim/storage-client@0.1.0':
-    resolution: {integrity: sha512-n4zSRK404FCQZfO/CVeYTK/83FpXByrKKPGyczLE5pnH62tIBgp11jhHQn68uwWL6sFCfyzSps/CsmwhjExb3A==}
+    resolution: {integrity: sha512-e73kDLNViFRn+fFqDWF+m2JZIkDOEuDYvH0h3LsNsX6TLW4uKyVCF0Bwc0o1uLBFHzIrTr5eJ+sKivqJyB+lXA==}
     engines: {node: '>=18.0.0'}
 
   '@emnapi/core@1.8.1':
