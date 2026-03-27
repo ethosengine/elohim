@@ -21,11 +21,19 @@ const ENUM_DIR = resolve(__dirname, '../v1/enums');
 
 const VERIFY = process.argv.includes('--verify');
 
-// Both locations get identical schema-enums.ts
-const ENUM_OUTPUT_PATHS = [
-  resolve(REPO_ROOT, 'genesis/seeder/src/generated/schema-enums.ts'),
-  resolve(REPO_ROOT, 'app/elohim-app/src/app/generated/schema-enums.ts'),
-  resolve(REPO_ROOT, 'app/elohim-library/projects/elohim-service/src/generated/schema-enums.ts'),
+// All locations get identical copies of generated files
+const GENERATED_OUTPUT_DIRS = [
+  resolve(REPO_ROOT, 'genesis/seeder/src/generated'),
+  resolve(REPO_ROOT, 'app/elohim-app/src/app/generated'),
+  resolve(REPO_ROOT, 'app/elohim-library/projects/elohim-service/src/generated'),
+];
+
+const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums.ts'));
+
+// Interface files to distribute alongside schema-enums.ts
+const INTERFACE_FILES = [
+  { src: 'inputs/create-content-input.ts', dest: 'create-content-input.ts' },
+  { src: 'views/content-view.ts', dest: 'content-view.ts' },
 ];
 
 /**
@@ -201,8 +209,18 @@ async function main() {
   // --- Part 2: Enum constant generation ---
   const enumContent = await generateEnumConstants();
 
+  // --- Part 3: Interface file distribution ---
+  // Read canonical interface files from generated-ts/
+  const interfaceContents = new Map();
+  for (const { src, dest } of INTERFACE_FILES) {
+    const content = await readFile(join(OUTPUT_DIR, src), 'utf8');
+    interfaceContents.set(dest, content);
+  }
+
   if (VERIFY) {
     let hasFailure = false;
+
+    // Verify enum files
     for (const outPath of ENUM_OUTPUT_PATHS) {
       let existing;
       try {
@@ -217,20 +235,51 @@ async function main() {
         hasFailure = true;
       }
     }
+
+    // Verify interface files
+    for (const dir of GENERATED_OUTPUT_DIRS) {
+      for (const [dest, content] of interfaceContents) {
+        const outPath = join(dir, dest);
+        let existing;
+        try {
+          existing = await readFile(outPath, 'utf8');
+        } catch {
+          console.error(`FAIL: Generated file does not exist: ${outPath}`);
+          hasFailure = true;
+          continue;
+        }
+        if (existing !== content) {
+          console.error(`FAIL: ${outPath} is stale. Run: pnpm run schema:codegen:ts`);
+          hasFailure = true;
+        }
+      }
+    }
+
     if (hasFailure) {
       process.exit(1);
     }
-    console.log('TypeScript enum codegen is up to date.');
+    console.log('TypeScript codegen is up to date.');
     return;
   }
 
+  // Distribute enum files
   for (const outPath of ENUM_OUTPUT_PATHS) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, enumContent);
-    console.log(`Generated: ${outPath}`);
+    console.log(`Distributed: ${outPath}`);
   }
 
-  console.log('TypeScript enum generation complete.');
+  // Distribute interface files
+  for (const dir of GENERATED_OUTPUT_DIRS) {
+    await mkdir(dir, { recursive: true });
+    for (const [dest, content] of interfaceContents) {
+      const outPath = join(dir, dest);
+      await writeFile(outPath, content);
+      console.log(`Distributed: ${outPath}`);
+    }
+  }
+
+  console.log('TypeScript generation and distribution complete.');
 }
 
 main().catch((err) => {

@@ -238,6 +238,42 @@ describe('Constants Sync: seeder generated ↔ app generated ↔ library generat
   });
 });
 
+describe('Constants Sync: schema-generated interface files across distribution locations', () => {
+  const GENERATED_DIR = path.join(REPO_ROOT, 'elohim', 'sdk', 'schemas', 'generated-ts');
+  const INTERFACE_FILES = [
+    { src: 'inputs/create-content-input.ts', dest: 'create-content-input.ts' },
+    { src: 'views/content-view.ts', dest: 'content-view.ts' },
+  ];
+  const OUTPUT_DIRS = [
+    path.join(REPO_ROOT, 'genesis', 'seeder', 'src', 'generated'),
+    path.join(REPO_ROOT, 'app', 'elohim-app', 'src', 'app', 'generated'),
+    path.join(REPO_ROOT, 'app', 'elohim-library', 'projects', 'elohim-service', 'src', 'generated'),
+  ];
+
+  for (const { src, dest } of INTERFACE_FILES) {
+    it(`${dest} should match canonical ${src} at all distribution locations`, () => {
+      const canonicalPath = path.join(GENERATED_DIR, src);
+      if (!fs.existsSync(canonicalPath)) {
+        throw new Error(
+          `Canonical file not found at ${canonicalPath}. Run: pnpm run schema:codegen:ts`,
+        );
+      }
+      const canonical = fs.readFileSync(canonicalPath, 'utf8');
+
+      for (const dir of OUTPUT_DIRS) {
+        const distPath = path.join(dir, dest);
+        if (!fs.existsSync(distPath)) {
+          throw new Error(
+            `Distributed file not found at ${distPath}. Run: pnpm run schema:codegen:ts`,
+          );
+        }
+        const distributed = fs.readFileSync(distPath, 'utf8');
+        expect(distributed).toEqual(canonical);
+      }
+    });
+  }
+});
+
 // =============================================================================
 // Constants Sync: hardcoded enum values in TypeScript source code
 //

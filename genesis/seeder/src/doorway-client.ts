@@ -25,6 +25,7 @@
 
 import { BlobMetadata } from './blob-manager.js';
 import type { ContentFormat, ContentType, MasteryLevel, Reach } from './generated/schema-enums.js';
+import type { CreateContentInput } from './generated/create-content-input.js';
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
 import * as raw from 'multiformats/codecs/raw';
@@ -793,20 +794,7 @@ export class DoorwayClient {
    * @returns BulkCreateResult with inserted/skipped counts
    */
   async bulkCreateContent(
-    items: Array<{
-      schemaVersion?: number;
-      id: string;
-      title: string;
-      contentType?: ContentType;
-      contentFormat?: ContentFormat;
-      contentBody?: string;
-      description?: string;
-      blobHash?: string;
-      blobCid?: string;
-      metadataJson?: string;
-      reach?: Reach;
-      tags?: string[];
-    }>
+    items: Array<CreateContentInput>
   ): Promise<BulkCreateResult> {
     if (this.config.dryRun) {
       console.log(`[DRY RUN] Would bulk create ${items.length} content items`);

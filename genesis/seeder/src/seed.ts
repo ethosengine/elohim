@@ -39,6 +39,7 @@ import StorageClient from './storage-client.js'; // Used for computing blob hash
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
+import type { CreateContentInput } from './generated/create-content-input.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -523,29 +524,8 @@ function normalizePathType(pathType: string | undefined): string {
   return normalized;
 }
 
-// Types matching the Holochain zome — enum fields use schema-generated union types
-interface CreateContentInput {
-  id: string;
-  contentType: ContentType;
-  title: string;
-  description: string;
-  summary: string | null;           // Short preview text for cards/lists
-  content: string;                  // Legacy: full body. New: empty/hash if blob_cid set
-  contentFormat: ContentFormat;
-  tags: string[];
-  sourcePath: string | null;
-  relatedNodeIds: string[];
-  reach: Reach;
-  estimatedMinutes: number | null; // Reading/viewing time
-  thumbnailUrl: string | null;     // Preview image for visual cards
-  metadataJson: string;
-  // Content manifest fields (Phase 0 refactor - sparse DHT)
-  blobCid: string | null;          // CID pointing to elohim-storage blob
-  contentSizeBytes: number | null; // Size of content body
-  contentHash: string | null;      // SHA256 of content body
-  // HTML5 app blob reference (ZIP stored in elohim-storage)
-  blobHash?: string;               // SHA256 hash of ZIP blob for html5-app content
-}
+// CreateContentInput imported from ./generated/create-content-input.js
+// Schema-generated: uses contentBody (not content), metadata (object, not metadataJson string)
 
 interface ContentOutput {
   actionHash: Uint8Array;
@@ -789,35 +769,42 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
   const isHtml5App = concept.contentFormat === 'html5-app';
   const useSparsePattern = blobEntry !== undefined && !isHtml5App;
 
+  // Build metadata object (parsed, not stringified — matches Rust JsonVal)
+  const metadata: Record<string, unknown> = {
+    sourceDoc: concept.sourceDoc,
+    sourcePath: concept.sourcePath || sourcePathValue,
+    relationships: concept.relationships,
+    did: concept.did,
+    openGraphMetadata: concept.openGraphMetadata,
+    linkedData: concept.linkedData,
+    ...concept.metadata,
+  };
+  // Fields that were previously top-level now live in metadata
+  if (summary) metadata.summary = summary;
+  if (relatedIds.length) metadata.relatedNodeIds = relatedIds;
+  if (concept.estimatedMinutes) metadata.estimatedMinutes = concept.estimatedMinutes;
+  if (concept.thumbnailUrl) metadata.thumbnailUrl = concept.thumbnailUrl;
+
+  // Strip undefined values from metadata
+  for (const key of Object.keys(metadata)) {
+    if (metadata[key] === undefined || metadata[key] === null) delete metadata[key];
+  }
+
   return {
     id: concept.id,
     contentType: (concept.contentType ?? 'concept') as ContentType,
     title: concept.title,
     description: description,
-    summary: summary,
     // Sparse: store hash reference, Full: store entire content
     // html5-app: always store the content object with appId/entryPoint
-    content: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
+    contentBody: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat),
     tags: concept.tags || [],
-    sourcePath: sourcePathValue,
-    relatedNodeIds: relatedIds,
     reach: 'public',
-    estimatedMinutes: concept.estimatedMinutes || null,
-    thumbnailUrl: concept.thumbnailUrl || null,
-    metadataJson: JSON.stringify({
-      sourceDoc: concept.sourceDoc,
-      sourcePath: concept.sourcePath,
-      relationships: concept.relationships,
-      did: concept.did,
-      openGraphMetadata: concept.openGraphMetadata,
-      linkedData: concept.linkedData,
-      ...concept.metadata,
-    }),
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     // Content manifest fields for sparse DHT
-    blobCid: blobEntry?.cid ?? null,
-    contentSizeBytes: blobEntry?.sizeBytes ?? null,
-    contentHash: blobEntry?.hash ?? null,
+    blobCid: blobEntry?.cid ?? undefined,
+    contentSizeBytes: blobEntry?.sizeBytes ?? undefined,
   };
 }
 
@@ -1238,11 +1225,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
         // Set blob_hash to point to the uploaded ZIP
         input.blobHash = appInfo.hash;
 
-        // Add appId to metadata_json so elohim-storage can look it up
-        const metadata = input.metadataJson ? JSON.parse(input.metadataJson) : {};
-        metadata.appId = appInfo.appId;
-        metadata.entryPoint = appInfo.entryPoint;
-        input.metadataJson = JSON.stringify(metadata);
+        // Add appId to metadata so elohim-storage can look it up
+        const meta = (input.metadata ?? {}) as Record<string, unknown>;
+        meta.appId = appInfo.appId;
+        meta.entryPoint = appInfo.entryPoint;
+        input.metadata = meta;
       }
 
       return input;
@@ -1283,23 +1270,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
     ].filter((i, idx, arr) => i < itemsToSeed.length && arr.indexOf(i) === idx);  // dedupe
     result.sampleIds = sampleIndices.map(i => itemsToSeed[i].id);
 
-    // Transform items to backend format (content → contentBody)
-    // Backend uses serde rename_all = "camelCase" so expects camelCase field names
-    // Coerce null values to undefined for optional fields (TypeScript compatibility)
-    // Cast validated string fields to schema types — validator already checked membership
+    // Items are already in schema wire format (contentBody, metadata as object)
+    // Just ensure schemaVersion is set
     const transformedItems = itemsToSeed.map(item => ({
+      ...item,
       schemaVersion: 1,
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      contentType: item.contentType as ContentType,
-      contentFormat: normalizeContentFormat(item.contentFormat),
-      contentBody: item.content,
-      blobHash: item.blobHash ?? undefined,
-      blobCid: item.blobCid ?? undefined,
-      metadataJson: item.metadataJson,
-      reach: (item.reach || 'public') as Reach,
-      tags: item.tags || [],
     }));
 
     // Bulk create content via direct HTTP call (through Doorway's /api/db proxy)
@@ -1357,9 +1332,12 @@ async function seedViaDoorway(): Promise<SeedResult> {
       const seen = new Set<string>();
 
       for (const item of itemsToSeed) {
-        // Extract from relatedNodeIds array (simple RELATES_TO relationships)
-        if (item.relatedNodeIds && item.relatedNodeIds.length > 0) {
-          for (const targetId of item.relatedNodeIds) {
+        const meta = (item.metadata ?? {}) as Record<string, unknown>;
+
+        // Extract from relatedNodeIds in metadata (simple RELATES_TO relationships)
+        const relatedNodeIds = meta.relatedNodeIds as string[] | undefined;
+        if (relatedNodeIds && relatedNodeIds.length > 0) {
+          for (const targetId of relatedNodeIds) {
             const key = `${item.id}:${targetId}:RELATES_TO`;
             if (!seen.has(key) && item.id !== targetId) {
               seen.add(key);
@@ -1376,31 +1354,24 @@ async function seedViaDoorway(): Promise<SeedResult> {
         }
 
         // Extract from relationships array in metadata (typed relationships)
-        if (item.metadataJson) {
-          try {
-            const metadata = JSON.parse(item.metadataJson);
-            if (metadata.relationships && Array.isArray(metadata.relationships)) {
-              for (const rel of metadata.relationships) {
-                const targetId = rel.target || rel.targetId || rel.target_id;
-                const relType = rel.type || rel.relationship_type || 'RELATES_TO';
-                if (targetId && item.id !== targetId) {
-                  const key = `${item.id}:${targetId}:${relType}`;
-                  if (!seen.has(key)) {
-                    seen.add(key);
-                    relationships.push({
-                      schemaVersion: 1,
-                      sourceId: item.id,
-                      targetId: targetId,
-                      relationshipType: relType.toUpperCase(),
-                      confidence: rel.confidence ?? 1.0,
-                      inferenceSource: rel.inference_source || 'explicit',
-                    });
-                  }
-                }
+        if (Array.isArray(meta.relationships)) {
+          for (const rel of meta.relationships as Array<Record<string, unknown>>) {
+            const targetId = (rel.target || rel.targetId || rel.target_id) as string | undefined;
+            const relType = ((rel.type || rel.relationship_type || 'RELATES_TO') as string);
+            if (targetId && item.id !== targetId) {
+              const key = `${item.id}:${targetId}:${relType}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                relationships.push({
+                  schemaVersion: 1,
+                  sourceId: item.id,
+                  targetId: targetId,
+                  relationshipType: relType.toUpperCase(),
+                  confidence: (rel.confidence as number) ?? 1.0,
+                  inferenceSource: (rel.inference_source as string) || 'explicit',
+                });
               }
             }
-          } catch {
-            // Ignore JSON parse errors
           }
         }
       }

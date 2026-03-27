@@ -26,35 +26,12 @@ import {
   ENGAGEMENT_TYPES,
 } from './validation-constants.js';
 
+import type { CreateContentInput } from './generated/create-content-input.js';
+export type { CreateContentInput };
+
 /** Type-safe enum membership check — replaces `as any` casts */
 function isValidEnum(value: string, values: readonly string[]): boolean {
   return values.includes(value);
-}
-
-// =============================================================================
-// Input Types (matching seed.ts CreateContentInput)
-// =============================================================================
-
-export interface CreateContentInput {
-  id: string;
-  contentType: string;
-  title: string;
-  description: string;
-  summary: string | null;
-  content: string;
-  contentFormat: string;
-  tags: string[];
-  sourcePath: string | null;
-  relatedNodeIds: string[];
-  reach: string;
-  estimatedMinutes: number | null;
-  thumbnailUrl: string | null;
-  metadataJson: string;
-  // Content manifest fields (sparse DHT - blob storage)
-  blobCid: string | null;           // CID pointing to elohim-storage blob
-  contentSizeBytes: number | null; // Size of content body
-  contentHash: string | null;       // SHA256 of content body
-  blobHash?: string;                // SHA256 hash of ZIP blob for html5-app content
 }
 
 export interface CreateLearningPathInput {
@@ -141,13 +118,6 @@ export function validateContent(content: CreateContentInput): ValidationResult {
     errors.push(
       `Invalid contentFormat '${content.contentFormat}'. Must be one of: ${CONTENT_FORMATS.join(', ')}`
     );
-  }
-
-  // Related ID validation (structure only, not existence)
-  for (const relatedId of content.relatedNodeIds || []) {
-    if (!relatedId || relatedId.trim() === '') {
-      errors.push('Related content ID cannot be empty');
-    }
   }
 
   return {

@@ -22,6 +22,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
+import type { CreateContentInput } from './generated/create-content-input.js';
 
 // =============================================================================
 // Types (mirrors nodes.json schema)
@@ -70,14 +71,7 @@ async function createContextContent(
   contentType: ContentType,
 ): Promise<'created' | 'exists' | 'failed'> {
   try {
-    const payload: Array<{
-      id: string;
-      title: string;
-      contentType: ContentType;
-      contentFormat: ContentFormat;
-      contentBody: string;
-      reach: Reach;
-    }> = [
+    const payload: Array<CreateContentInput> = [
       {
         id,
         title,
