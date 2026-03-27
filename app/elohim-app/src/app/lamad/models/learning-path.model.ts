@@ -616,7 +616,11 @@ export function parsePathView(node: ContentNode): PathView {
     pathType: (meta as Record<string, unknown>)['pathType'] as string ?? body['pathType'] as string ?? 'journey',
     difficulty: (meta as Record<string, unknown>)['difficulty'] as string ?? undefined,
     estimatedDuration: (meta as Record<string, unknown>)['estimatedDuration'] as string ?? undefined,
-    thumbnailUrl: (meta as Record<string, unknown>)['thumbnailUrl'] as string ?? undefined,
+    // Prefer resolved thumbnailUrl from ContentService (set at runtime on the node)
+    // over raw metadata value (which is an unresolved /blob/sha256-... path)
+    thumbnailUrl: (node as unknown as Record<string, unknown>)['thumbnailUrl'] as string
+      ?? (meta as Record<string, unknown>)['thumbnailUrl'] as string
+      ?? undefined,
     thumbnailAlt: (meta as Record<string, unknown>)['thumbnailAlt'] as string ?? undefined,
     sections,
 

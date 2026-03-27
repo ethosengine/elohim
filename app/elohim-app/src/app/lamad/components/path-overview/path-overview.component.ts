@@ -382,10 +382,17 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Start specific chapter
    */
   startChapter(chapterId: string): void {
-    this.pathService.getChapterFirstStep(this.pathId, chapterId).subscribe(step => {
-      if (step) {
-        void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.step.order]);
-      }
+    this.pathService.getChapterFirstStep(this.pathId, chapterId).subscribe({
+      next: step => {
+        if (step) {
+          void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.step.order]);
+        } else {
+          console.warn('[PathOverview] No first step found for chapter', chapterId);
+        }
+      },
+      error: err => {
+        console.error('[PathOverview] Error loading chapter first step', chapterId, err);
+      },
     });
   }
 
