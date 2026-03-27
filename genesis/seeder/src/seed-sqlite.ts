@@ -766,7 +766,7 @@ function transformPathToContent(json: PathJson): CreateContentInput {
     title: json.title,
     description: json.description,
     contentType: 'path',
-    contentFormat: 'json',
+    contentFormat: 'epr-composite',
     contentBody,
     contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
     metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
