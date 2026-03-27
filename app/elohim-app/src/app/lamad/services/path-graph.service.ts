@@ -10,6 +10,7 @@ import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 import { ContentNode, ContentMetadata } from '../models/content-node.model';
+import type { PathMetadata } from '../generated/metadata-types';
 import {
   LearningPath,
   PathStep,
@@ -83,7 +84,7 @@ export class PathGraphService {
       contentNodeIds,
       nestedPathIds: nestedPathIds.length > 0 ? nestedPathIds : undefined,
       creatorInfo: path.createdBy ? { presenceId: path.createdBy } : undefined,
-      forkedFromPathId: (path.node?.metadata as Record<string, unknown>)?.['forkedFrom'] as string | undefined,
+      forkedFromPathId: (path.node?.metadata as PathMetadata | undefined)?.['forkedFrom'] as string | undefined,
       canonicalStatus: 'draft', // New paths start as draft
       pathType: path.pathType as PathType | undefined,
       attestationsGranted: path.attestationsGranted,

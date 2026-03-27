@@ -1,0 +1,33 @@
+{
+  "$id": "lamad:schema:metadata:assessment",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AssessmentMetadata",
+  "description": "Metadata shape for contentType 'assessment' and 'discovery-assessment'. Stored in ContentView.metadata.",
+  "type": "object",
+  "properties": {
+    "instrument": { "type": "string", "description": "Reference to the psychometric instrument definition (content ID)" },
+    "mode": {
+      "type": "string",
+      "enum": ["mastery", "discovery", "reflection"],
+      "description": "Assessment mode determining scoring and feedback behavior"
+    },
+    "scoringRules": {
+      "type": "object",
+      "description": "Scoring configuration — instrument-specific rules for translating responses to scores",
+      "additionalProperties": true
+    },
+    "subscales": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "weight": { "type": "number" }
+        }
+      },
+      "description": "Subscale definitions for multi-dimensional assessments"
+    }
+  },
+  "additionalProperties": true
+}

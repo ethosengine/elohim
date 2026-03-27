@@ -1,0 +1,20 @@
+{
+  "$id": "lamad:schema:metadata:path",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PathMetadata",
+  "description": "Metadata shape for contentType 'path'. Stored in ContentView.metadata.",
+  "type": "object",
+  "properties": {
+    "pathType": { "type": "string", "description": "journey | guided | self-paced | assessment" },
+    "difficulty": { "type": "string", "description": "beginner | intermediate | advanced" },
+    "estimatedDuration": { "type": "string", "description": "Human-readable duration (e.g. '6-8 hours')" },
+    "version": { "type": "string" },
+    "purpose": { "type": "string" },
+    "thumbnailUrl": { "type": "string", "description": "Blob path or resolved URL for path thumbnail" },
+    "thumbnailAlt": { "type": "string" },
+    "contributors": { "type": "array", "items": { "type": "string" } },
+    "prerequisitePaths": { "type": "array", "items": { "type": "string" } },
+    "attestationsGranted": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

@@ -7,6 +7,7 @@
     "contentTypes": {
       "concept": {
         "description": "A fundamental idea or principle in the knowledge graph. Concepts are the atomic units of understanding that learners build mastery over.",
+        "metadataSchema": { "$ref": "./schemas/concept-metadata.schema.json" },
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -69,6 +70,7 @@
       },
       "assessment": {
         "description": "A graded evaluation of learner understanding. Produces mastery attestations and drives the mastery level progression.",
+        "metadataSchema": { "$ref": "./schemas/assessment-metadata.schema.json" },
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -207,6 +209,7 @@
       },
       "path": {
         "description": "A curated learning journey — an ordered sequence of steps through content. Paths are EPR composites that reference other content types.",
+        "metadataSchema": { "$ref": "./schemas/path-metadata.schema.json" },
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -601,7 +604,8 @@
       },
       "epr-composite": {
         "description": "EPR composite layout — a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",
-        "renderer": "path-renderer"
+        "renderer": "path-renderer",
+        "bodySchema": { "$ref": "./schemas/epr-composite-body.schema.json" }
       },
       "html": {
         "description": "HTML content rendered directly. Falls back to the markdown renderer for consistent styling.",
