@@ -404,6 +404,9 @@ export class GovernanceApiService implements IGovernance {
       entityId,
       clusters: [],
       bridgingStatements: [],
+      divisiveStatements: [],
+      statementMetrics: [],
+      participantPositions: [],
       totalParticipants: 0,
       totalStatements: 0,
     };
