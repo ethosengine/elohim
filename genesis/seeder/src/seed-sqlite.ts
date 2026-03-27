@@ -137,7 +137,7 @@ interface CreateContentInput {
   blobHash?: string;
   blobCid?: string;
   contentSizeBytes?: number;
-  metadataJson?: string;
+  metadata?: Record<string, unknown>;
   reach: Reach;
   createdBy?: string;
   tags: string[];
@@ -616,7 +616,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     contentFormat: normalizeContentFormat(json.contentFormat),
     contentBody: contentBody,
     contentSizeBytes: contentSizeBytes,
-    metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     reach: getReachForContent(json.id),
     tags: json.tags || [],
   };
@@ -800,7 +800,7 @@ function transformPathToContent(json: PathJson): CreateContentInput {
     contentFormat: 'epr-composite',
     contentBody,
     contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
-    metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     reach: (json.visibility as Reach | undefined) ?? 'public',
     tags: json.tags || [],
   };
@@ -1107,9 +1107,9 @@ async function main() {
       // Update thumbnailUrl to blob reference if we uploaded one
       if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
         const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
-        const meta = input.metadataJson ? JSON.parse(input.metadataJson) : {};
+        const meta = input.metadata ?? {};
         meta.thumbnailUrl = `/blob/${blobHash}`;
-        input.metadataJson = JSON.stringify(meta);
+        input.metadata = meta;
       }
       return input;
     });
