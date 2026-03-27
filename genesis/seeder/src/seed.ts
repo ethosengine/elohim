@@ -524,8 +524,7 @@ function normalizePathType(pathType: string | undefined): string {
   return normalized;
 }
 
-// CreateContentInput imported from ./generated/create-content-input.js
-// Schema-generated: uses contentBody (not content), metadata (object, not metadataJson string)
+// CreateContentInput imported from ./generated/create-content-input.js (protocol schema)
 
 interface ContentOutput {
   actionHash: Uint8Array;
