@@ -668,7 +668,9 @@ export class ContentService {
       reach: data.reach ?? 'commons',
       trustScore: data.trustScore,
       estimatedMinutes: data.estimatedMinutes,
-      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
+      thumbnailUrl: this.resolveBlobUrl(
+        data.thumbnailUrl ?? (data.metadata as Record<string, unknown> | undefined)?.['thumbnailUrl'] as string
+      ),
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     } as ContentNode;

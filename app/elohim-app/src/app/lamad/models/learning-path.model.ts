@@ -532,13 +532,17 @@ function enrichSection(raw: RawSection, index: number): PathSection {
 function sectionsToChapters(sections: PathSection[]): PathChapter[] {
   return sections.map((section, i) => {
     // Convert child sections to PathModule[]
+    // If a child section has no further sub-sections but has its own conceptIds/items,
+    // wrap it as its own section in the module so conceptIds are accessible.
     const modules: PathModule[] = (section.sections ?? []).map(
       (childSection, j): PathModule => ({
         id: childSection.id,
         title: childSection.title,
         description: childSection.description,
         order: j,
-        sections: childSection.sections ?? [],
+        sections: (childSection.sections?.length ?? 0) > 0
+          ? childSection.sections!
+          : [childSection],
         estimatedDuration: childSection.estimatedDuration,
         learningObjectives: [],
       })
