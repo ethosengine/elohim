@@ -87,6 +87,10 @@
         },
         "coupling": {
           "$ref": "#/$defs/ThreeLegCoupling"
+        },
+        "metadataSchema": {
+          "type": "object",
+          "description": "JSON Schema defining the metadata shape for this content type. Enables typed metadata access and codegen. Can be inline or use $ref to a companion schema file. The protocol validates this is a valid schema; the app validates its content."
         }
       },
       "additionalProperties": false
@@ -230,6 +234,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "bodySchema": {
+          "type": "object",
+          "description": "JSON Schema defining the contentBody shape for this format. Enables typed body parsing and codegen. Used to generate body interfaces (e.g. EprCompositeBody for epr-composite format)."
         }
       },
       "additionalProperties": false
@@ -276,9 +284,8 @@
           "description": "Human-readable description of what this signal represents."
         },
         "substrateSignal": {
-          "type": "string",
-          "description": "The substrate-level signal category this maps to. Determines which resource dimension is affected.",
-          "enum": ["attention", "compute", "storage", "bandwidth", "resource"]
+          "$ref": "../enums/substrate-signal.schema.json",
+          "description": "The substrate-level signal category this maps to. Determines which resource dimension is affected."
         },
         "economicAction": {
           "type": "string",

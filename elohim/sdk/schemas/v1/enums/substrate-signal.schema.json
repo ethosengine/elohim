@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:enum:substrate-signal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SubstrateSignal",
+  "description": "Protocol substrate signal categories. Every app signal maps to one of these primitives. These are the resource dimensions the protocol tracks and governs.",
+  "type": "string",
+  "enum": ["attention", "compute", "storage", "bandwidth", "energy", "time", "resource"],
+  "_tiers": {
+    "core": {
+      "values": ["attention", "compute", "storage", "bandwidth", "energy", "time", "resource"],
+      "rationale": "All substrate signals are protocol-level primitives. They are the dimensions through which value, governance, and knowledge couple to infrastructure."
+    }
+  },
+  "_dna": {
+    "constant": "SUBSTRATE_SIGNALS",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

@@ -134,6 +134,14 @@ function fullManifest() {
 async function main() {
   const ajv = new Ajv2020({ allErrors: true, strict: false });
 
+  // Load referenced schemas so AJV can resolve $ref
+  // AJV resolves $ref relative to the parent's $id (epr:schema:manifest:app-manifest),
+  // so "../enums/substrate-signal.schema.json" becomes "epr:enums/substrate-signal.schema.json"
+  const substrateSignalSchema = await loadJson(
+    resolve(__dirname, '../v1/enums/substrate-signal.schema.json'),
+  );
+  ajv.addSchema(substrateSignalSchema, 'epr:enums/substrate-signal.schema.json');
+
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
   );

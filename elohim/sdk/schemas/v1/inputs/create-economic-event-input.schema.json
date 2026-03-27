@@ -1,0 +1,36 @@
+{
+  "$id": "epr:schema:input:create-economic-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateEconomicEventInput",
+  "description": "Input for creating REA economic events. Must match Rust CreateEconomicEventInputView in views.rs. Economic events are Category A (DHT-notarized) — they are the protocol's value accounting layer.",
+  "type": "object",
+  "required": ["action", "provider", "receiver"],
+  "properties": {
+    "action": { "type": "string", "description": "REA economic action (use, consume, produce, transfer, cite)" },
+    "provider": { "type": "string", "description": "Agent providing the resource" },
+    "receiver": { "type": "string", "description": "Agent or content receiving the resource" },
+    "resourceConformsTo": { "type": "string", "description": "ResourceSpecification URI the affected resource conforms to" },
+    "resourceInventoriedAs": { "type": "string", "description": "EconomicResource being acted upon" },
+    "resourceClassifiedAs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Classification URIs for the resource"
+    },
+    "resourceQuantityValue": { "type": "number", "description": "Quantity of resource affected" },
+    "resourceQuantityUnit": { "type": "string", "description": "Unit of measure for resource quantity" },
+    "effortQuantityValue": { "type": "number", "description": "Effort expended (e.g. time spent)" },
+    "effortQuantityUnit": { "type": "string", "description": "Unit of measure for effort" },
+    "hasPointInTime": { "type": "string", "description": "ISO 8601 timestamp when event occurred" },
+    "hasDuration": { "type": "string", "description": "ISO 8601 duration of the event" },
+    "inputOf": { "type": "string", "description": "Process this event is an input to" },
+    "outputOf": { "type": "string", "description": "Process this event is an output of" },
+    "lamadEventType": { "type": "string", "description": "App-specific event classification (e.g. content-view, assessment-complete)" },
+    "contentId": { "type": "string", "description": "Content this event relates to" },
+    "contributorPresenceId": { "type": "string", "description": "Contributor presence this event relates to" },
+    "pathId": { "type": "string", "description": "Learning path this event relates to" },
+    "triggeredBy": { "type": "string", "description": "ID of the signal or event that triggered this" },
+    "note": { "type": "string", "description": "Human-readable note about the event" },
+    "metadata": { "type": "object", "description": "Domain-specific metadata (parsed object, not stringified)" },
+    "atLocation": { "type": "string", "description": "Place ID for spatial grounding of this event" }
+  }
+}

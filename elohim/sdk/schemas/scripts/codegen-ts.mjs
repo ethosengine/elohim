@@ -33,7 +33,10 @@ const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums
 // Interface files to distribute alongside schema-enums.ts
 const INTERFACE_FILES = [
   { src: 'inputs/create-content-input.ts', dest: 'create-content-input.ts' },
+  { src: 'inputs/create-economic-event-input.ts', dest: 'create-economic-event-input.ts' },
+  { src: 'inputs/create-attestation-input.ts', dest: 'create-attestation-input.ts' },
   { src: 'views/content-view.ts', dest: 'content-view.ts' },
+  { src: 'views/economic-event-view.ts', dest: 'economic-event-view.ts' },
 ];
 
 /**

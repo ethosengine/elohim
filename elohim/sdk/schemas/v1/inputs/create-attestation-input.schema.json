@@ -1,0 +1,16 @@
+{
+  "$id": "epr:schema:input:create-attestation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateAttestationInput",
+  "description": "Input for creating content attestations. Must match Rust CreateAttestationInputView in views.rs. Attestations are Category A (DHT-notarized) — they are the protocol's trust/reach mechanism.",
+  "type": "object",
+  "required": ["contentId", "attestorPresenceId", "scope", "attestationType"],
+  "properties": {
+    "contentId": { "type": "string", "description": "Content being attested" },
+    "attestorPresenceId": { "type": "string", "description": "ContributorPresence making the attestation" },
+    "scope": { "type": "string", "description": "Scope of attestation (e.g. quality, accuracy, relevance)" },
+    "attestationType": { "type": "string", "description": "Type of attestation (e.g. peer-review, steward-endorsement, community-validation)" },
+    "evidence": { "type": "object", "description": "Supporting evidence for the attestation (parsed object)" },
+    "grantor": { "type": "object", "description": "Grantor context — who authorized this attestation and under what governance model (parsed object)" }
+  }
+}

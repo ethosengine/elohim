@@ -1,0 +1,43 @@
+{
+  "$id": "epr:schema:view:economic-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EconomicEventView",
+  "description": "REA economic event as returned by the storage API. Category A (DHT-notarized). Source of truth: DHT anchor, projected to storage for query.",
+  "type": "object",
+  "required": ["id", "action", "provider", "receiver", "state", "createdAt"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique event identifier" },
+    "appId": { "type": "string", "description": "Application scope (e.g. lamad)" },
+    "action": { "type": "string", "description": "REA economic action (use, consume, produce, transfer, cite)" },
+    "provider": { "type": "string", "description": "Agent providing the resource" },
+    "receiver": { "type": "string", "description": "Agent or content receiving the resource" },
+    "resourceConformsTo": { "type": "string", "description": "ResourceSpecification URI" },
+    "resourceInventoriedAs": { "type": "string", "description": "EconomicResource being acted upon" },
+    "resourceClassifiedAs": {
+      "description": "Classification URIs for the resource",
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "object" }
+      ]
+    },
+    "resourceQuantityValue": { "type": "number" },
+    "resourceQuantityUnit": { "type": "string" },
+    "effortQuantityValue": { "type": "number" },
+    "effortQuantityUnit": { "type": "string" },
+    "hasPointInTime": { "type": "string", "description": "ISO 8601 timestamp" },
+    "hasDuration": { "type": "string", "description": "ISO 8601 duration" },
+    "inputOf": { "type": "string" },
+    "outputOf": { "type": "string" },
+    "lamadEventType": { "type": "string" },
+    "contentId": { "type": "string" },
+    "contributorPresenceId": { "type": "string" },
+    "pathId": { "type": "string" },
+    "triggeredBy": { "type": "string" },
+    "state": { "type": "string", "description": "Event lifecycle state (pending, committed, fulfilled)" },
+    "note": { "type": "string" },
+    "metadata": { "type": "object", "description": "Domain-specific metadata (parsed object)" },
+    "dhtAnchorHash": { "type": "string", "description": "DHT entry hash linking this projection to the notarized record" },
+    "createdAt": { "type": "string", "description": "ISO 8601 creation timestamp" },
+    "atLocation": { "type": "string", "description": "Place ID for spatial grounding" }
+  }
+}

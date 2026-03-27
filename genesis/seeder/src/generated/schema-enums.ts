@@ -200,3 +200,24 @@ export const ALL_STEP_TYPES = [
 ] as const;
 export const STEP_TYPES = ALL_STEP_TYPES;
 export type StepType = (typeof ALL_STEP_TYPES)[number];
+
+export const CORE_SUBSTRATE_SIGNALS = [
+  'attention',
+  'compute',
+  'storage',
+  'bandwidth',
+  'energy',
+  'time',
+  'resource',
+] as const;
+export const ALL_SUBSTRATE_SIGNALS = [
+  'attention',
+  'compute',
+  'storage',
+  'bandwidth',
+  'energy',
+  'time',
+  'resource',
+] as const;
+export const SUBSTRATE_SIGNALS = ALL_SUBSTRATE_SIGNALS;
+export type SubstrateSignal = (typeof ALL_SUBSTRATE_SIGNALS)[number];
