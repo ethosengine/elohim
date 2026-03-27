@@ -29,8 +29,8 @@ export interface InteractiveRenderer extends ContentRenderer {
  * Used to update affinity/mastery tracking.
  */
 export interface RendererCompletionEvent {
-  /** Type of completion (quiz, simulation, video, etc.) */
-  type: 'quiz' | 'simulation' | 'video' | 'exercise';
+  /** Type of completion (quiz, simulation, video, view, etc.) */
+  type: 'quiz' | 'simulation' | 'video' | 'exercise' | 'view';
 
   /** Whether the user passed/succeeded */
   passed: boolean;

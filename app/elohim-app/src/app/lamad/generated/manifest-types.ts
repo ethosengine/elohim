@@ -71,6 +71,8 @@ export const LAMAD_RENDERER_MAP: Record<string, string> = {
   'plaintext': 'MarkdownRendererComponent',
   'gherkin': 'GherkinRendererComponent',
   'sophia-quiz-json': 'SophiaRendererComponent',
+  'sophia': 'SophiaRendererComponent',
+  'perseus-quiz-json': 'SophiaRendererComponent',
   'html5-app': 'IframeRendererComponent',
   'video-embed': 'IframeRendererComponent',
   'epr-composite': 'PathViewerComponent',

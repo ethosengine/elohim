@@ -34,6 +34,7 @@ import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
+import { isAssessmentNode } from '../../../generated/content-node-types';
 import { AssessmentCompletionSummaryComponent } from '../../../quiz-engine/components/assessment-completion-summary/assessment-completion-summary.component';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import {
@@ -904,6 +905,17 @@ export class SophiaRendererComponent
   private initializeAssessmentMode(): void {
     if (this.moments.length === 0) return;
 
+    // Typed metadata override: if the node has AssessmentMetadata.mode, use it
+    if (isAssessmentNode(this.node)) {
+      const metadataMode = this.node.metadata.mode;
+      if (metadataMode) {
+        this.assessmentMode = metadataMode;
+        this.modeConfig = MODE_PRESETS[this.assessmentMode];
+        return;
+      }
+    }
+
+    // Fall back to detecting mode from the first moment's purpose field
     const firstMoment = this.moments[0];
     this.assessmentMode = this.detectModeFromPurpose(firstMoment.purpose);
     this.modeConfig = MODE_PRESETS[this.assessmentMode];

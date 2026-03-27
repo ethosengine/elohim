@@ -129,13 +129,21 @@ function generateManifestTypes(manifest) {
   const relationships = Object.keys(manifest.vocabulary?.relationships || {});
   const signals = Object.keys(manifest.vocabulary?.signals || {});
 
-  // Build renderer map: format -> component name
+  // Build renderer map: format -> component name (including aliases)
   const rendererMap = {};
   const rendering = manifest.rendering || {};
+  const formats = manifest.vocabulary?.contentFormats || {};
   for (const [, rendererDef] of Object.entries(rendering)) {
     const component = rendererDef.component;
     for (const fmt of rendererDef.formats || []) {
       rendererMap[fmt] = component;
+      // Also register aliases for this format
+      const formatDef = formats[fmt];
+      if (formatDef?.aliases) {
+        for (const alias of formatDef.aliases) {
+          rendererMap[alias] = component;
+        }
+      }
     }
   }
 
@@ -181,6 +189,80 @@ function generateManifestTypes(manifest) {
 `;
 
   return header + '\n' + blocks.join('\n') + '\n';
+}
+
+// ---------------------------------------------------------------------------
+// Coupling map generation (for signal harness)
+// ---------------------------------------------------------------------------
+
+function generateCouplingMap(manifest) {
+  const contentTypes = manifest.vocabulary?.contentTypes || {};
+  const relManifestPath = relative(REPO_ROOT, MANIFEST_PATH);
+
+  const header = `// AUTO-GENERATED from app manifest: ${relManifestPath}
+// DO NOT EDIT — regenerate with: pnpm run lamad:codegen
+`;
+
+  const lines = [];
+
+  // Generate the ValueFlow interface
+  lines.push(`export interface ValueFlow {
+  action: string;
+  resourceConformsTo: string;
+  recognition: string;
+}
+
+export interface ContentTypeCoupling {
+  value: {
+    onConsume?: ValueFlow;
+    onComplete?: ValueFlow;
+    onContribute?: ValueFlow;
+  };
+  governance: {
+    defaultReach: string;
+    minimumReach: string;
+    governanceModel: string;
+    signalTypes: string[];
+  };
+}
+
+export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {`);
+
+  for (const [typeName, typeDef] of Object.entries(contentTypes)) {
+    const coupling = typeDef.coupling;
+    if (!coupling) continue;
+
+    const value = coupling.value || {};
+    const gov = coupling.governance || {};
+
+    const valueEntries = [];
+    for (const lifecycle of ['onConsume', 'onComplete', 'onContribute']) {
+      if (value[lifecycle]) {
+        const v = value[lifecycle];
+        valueEntries.push(
+          `      ${lifecycle}: { action: '${v.action}', resourceConformsTo: '${v.resourceConformsTo}', recognition: '${v.recognition}' },`,
+        );
+      }
+    }
+
+    const signalTypes = (gov.signalTypes || []).map((s) => `'${s}'`).join(', ');
+
+    lines.push(`  '${typeName}': {
+    value: {
+${valueEntries.join('\n')}
+    },
+    governance: {
+      defaultReach: '${gov.defaultReach || 'commons'}',
+      minimumReach: '${gov.minimumReach || 'community'}',
+      governanceModel: '${gov.governanceModel || 'steward-consent'}',
+      signalTypes: [${signalTypes}],
+    },
+  },`);
+  }
+
+  lines.push(`};`);
+
+  return header + '\n' + lines.join('\n') + '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -288,12 +370,16 @@ ${typeGuards.join('\n\n')}
   // --- Generate manifest-types.ts ---
   const manifestContent = generateManifestTypes(manifest);
 
+  // --- Generate coupling-map.ts ---
+  const couplingContent = generateCouplingMap(manifest);
+
   // --- Output ---
   // Files with identical content in both locations
   const sharedFiles = new Map([
     ['metadata-types.ts', metadataContent],
     ['body-types.ts', bodyContent],
     ['manifest-types.ts', manifestContent],
+    ['coupling-map.ts', couplingContent],
   ]);
 
   // Files with per-directory variants (different imports)

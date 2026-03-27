@@ -46,6 +46,7 @@ import {
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
+import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 import { SeoService } from '../../../services/seo.service';
@@ -152,6 +153,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly governanceService = inject(GovernanceService);
   private readonly signalService = inject(GovernanceSignalService);
   private readonly document = inject(DOCUMENT);
+  private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
 
   /** Default feedback profile type for learning content */
@@ -254,7 +256,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         instance['complete'] as {
           subscribe: (fn: (event: RendererCompletionEvent) => void) => Subscription;
         }
-      ).subscribe((event: RendererCompletionEvent) => this.onRendererComplete(event));
+      ).subscribe((event: RendererCompletionEvent) => {
+        // Manifest-driven: translate to REA economic event
+        if (this.node) {
+          void this.signalHarness.onRendererComplete(this.node, event);
+        }
+        // Existing UI handling (affinity, governance signals)
+        this.onRendererComplete(event);
+      });
     }
   }
 
@@ -333,6 +342,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
           // Auto-track view (increment if first time)
           this.affinityService.trackView(nodeId);
+
+          // Manifest-driven attention signal (onConsume economic event)
+          void this.signalHarness.onRendererComplete(contentNode, {
+            type: 'view',
+            passed: false,
+            score: 0,
+          });
 
           // Mark content as "seen" for mastery tracking
           this.agentService.markContentSeen(nodeId).pipe(takeUntil(this.destroy$)).subscribe();

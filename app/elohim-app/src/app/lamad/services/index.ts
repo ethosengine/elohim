@@ -87,3 +87,6 @@ export { StewardApiService } from './steward-api.service';
 
 // Scope & Sequence lens (path hierarchy for resource explorer)
 export { ScopeSequenceLensProvider } from './scope-sequence-lens.provider';
+
+// Signal harness (manifest-driven renderer → REA economic event bridge)
+export { SignalHarnessService } from './signal-harness.service';

@@ -171,7 +171,7 @@ export interface InteractiveRenderer extends ContentRenderer {
  * Event emitted when a renderer completes an interactive action.
  */
 export interface RendererCompletionEvent {
-  type: 'quiz' | 'simulation' | 'video' | 'exercise';
+  type: 'quiz' | 'simulation' | 'video' | 'exercise' | 'view';
   passed: boolean;
   score: number;
   details?: Record<string, unknown>;
