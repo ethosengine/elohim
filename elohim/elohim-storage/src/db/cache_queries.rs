@@ -10,7 +10,7 @@ use super::diesel_schema::{content, humans, relationships};
 use super::models::{Content, Human, Relationship};
 use crate::error::StorageError;
 
-/// List content with reach = 'commons' (cacheable for projection).
+/// List content with reach = 'commons' or 'public' (cacheable for projection).
 /// This now includes paths (contentType = 'path') since paths are content rows.
 pub fn list_cacheable_content(
     conn: &mut SqliteConnection,
@@ -20,7 +20,7 @@ pub fn list_cacheable_content(
 ) -> Result<Vec<Content>, StorageError> {
     content::table
         .filter(content::app_id.eq(&ctx.app_id))
-        .filter(content::reach.eq("commons"))
+        .filter(content::reach.eq_any(["commons", "public"]))
         .order(content::updated_at.asc())
         .limit(limit)
         .offset(offset)
@@ -45,7 +45,7 @@ pub fn list_cacheable_humans(
         .map_err(|e| StorageError::Internal(format!("Cacheable humans query failed: {e}")))
 }
 
-/// List relationships with reach = 'commons'
+/// List relationships with reach = 'commons' or 'public'
 pub fn list_cacheable_relationships(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -54,7 +54,7 @@ pub fn list_cacheable_relationships(
 ) -> Result<Vec<Relationship>, StorageError> {
     relationships::table
         .filter(relationships::app_id.eq(&ctx.app_id))
-        .filter(relationships::reach.eq("commons"))
+        .filter(relationships::reach.eq_any(["commons", "public"]))
         .order(relationships::updated_at.asc())
         .limit(limit)
         .offset(offset)

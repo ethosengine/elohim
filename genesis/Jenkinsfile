@@ -732,6 +732,42 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Warm Projection Cache') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        sh """#!/bin/bash
+                            set -euo pipefail
+
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "🔄 WARMING PROJECTION CACHE"
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "Doorway: ${doorwayHost}"
+                            echo ""
+
+                            RESP=\$(curl -sf -X POST "${doorwayHost}/admin/cache/warm" || echo '{}')
+                            STATUS=\$(echo "\$RESP" | jq -r '.status // "error"')
+                            PEERS=\$(echo "\$RESP" | jq -r '.peers // 0')
+
+                            if [ "\$STATUS" = "warming" ]; then
+                                echo "   ✅ Cache warm-up triggered (\$PEERS peer(s))"
+                                echo "   ⏳ Waiting 10s for warm-up to complete..."
+                                sleep 10
+                            else
+                                echo "   ⚠️ Cache warm-up returned: \$RESP"
+                                echo "   Doorway may need restart to refresh projection cache"
+                            fi
+                        """
+                    }
+                }
+            }
+        }
+
         stage('E2E Verification') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
