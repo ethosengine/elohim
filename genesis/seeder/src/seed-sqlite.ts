@@ -242,8 +242,8 @@ class Timer {
   }
 }
 
-function formatCount(n: number): string {
-  return n.toLocaleString();
+function formatCount(n: number | undefined): string {
+  return n != null ? n.toLocaleString() : '0';
 }
 
 /**
@@ -813,7 +813,12 @@ async function getStats(): Promise<{ contentCount: number; uniqueTags: number }>
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
-  return response.json();
+  const data = await response.json();
+  // Handle both camelCase (new) and snake_case (legacy) stats responses
+  return {
+    contentCount: data.contentCount ?? data.content_count ?? 0,
+    uniqueTags: data.uniqueTags ?? data.unique_tags ?? 0,
+  };
 }
 
 // ============================================================================
