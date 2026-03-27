@@ -68,6 +68,19 @@ import { BracketSynthesisService } from '../../services/bracket-synthesis.servic
             </button>
           }
         </section>
+
+        <!-- Divisive statements (need more dialogue) -->
+        @if (divisiveStatements().length > 0) {
+          <section class="divisive-section">
+            <h3>Needs More Dialogue</h3>
+            @for (statement of divisiveStatements(); track statement.id) {
+              <div class="divisive-card">
+                <span class="badge badge-divisive">Divisive</span>
+                <p>{{ statement.text }}</p>
+              </div>
+            }
+          </section>
+        }
       } @else {
         <div class="missing-context">
           <p>Missing entity context. Please navigate here from a content item.</p>
@@ -176,8 +189,31 @@ import { BracketSynthesisService } from '../../services/bracket-synthesis.servic
       text-decoration: underline;
     }
 
+    .divisive-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color, #e0e0e0);
+      border-radius: 0.5rem;
+      background: var(--surface-color, #fff);
+    }
+
+    .divisive-card p {
+      margin: 0;
+      line-height: 1.5;
+      font-size: 0.9375rem;
+    }
+
+    .badge-divisive {
+      background: var(--warning-bg, #fef3c7);
+      color: var(--warning-fg, #92400e);
+    }
+
     @media (prefers-color-scheme: dark) {
-      .bridging-card {
+      .bridging-card,
+      .divisive-card {
         background: var(--surface-color, #1a1a1a);
         border-color: var(--border-color, #333);
       }
@@ -185,6 +221,11 @@ import { BracketSynthesisService } from '../../services/bracket-synthesis.servic
       .badge {
         background: var(--settled-bg, #14432a);
         color: var(--settled-fg, #6ee7b7);
+      }
+
+      .badge-divisive {
+        background: var(--warning-bg, #451a03);
+        color: var(--warning-fg, #fcd34d);
       }
     }
   `,
@@ -206,6 +247,11 @@ export class SensemakingPageComponent implements OnInit {
   /** Bridging statements extracted from the sensemaking result. */
   readonly bridgingStatements = computed<StatementView[]>(
     () => this.sensemakingResult()?.bridgingStatements ?? [],
+  );
+
+  /** Divisive statements that split clusters. */
+  readonly divisiveStatements = computed<StatementView[]>(
+    () => this.sensemakingResult()?.divisiveStatements ?? [],
   );
 
   /** Whether bracket synthesis is in progress. */

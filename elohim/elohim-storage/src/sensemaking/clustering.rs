@@ -10,7 +10,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::db::models::{Statement, StatementVote};
-use crate::views::{OpinionClusterView, SensemakingResultView, StatementView};
+use crate::views::{
+    OpinionClusterView, ParticipantPositionView, SensemakingResultView, StatementMetricsView,
+    StatementView,
+};
+
+use super::pca;
 
 /// Similarity threshold below which clusters stop merging
 const MERGE_THRESHOLD: f64 = 0.3;
@@ -21,7 +26,13 @@ const CHARACTERISTIC_THRESHOLD: f64 = 0.7;
 /// Minimum agreement ratio across ALL clusters for a statement to be bridging
 const BRIDGING_THRESHOLD: f64 = 0.6;
 
+/// Minimum cross-cluster variance for a statement to be classified as divisive
+const DIVISIVE_THRESHOLD: f64 = 0.15;
+
 /// Run opinion clustering on statements and votes for an entity.
+///
+/// Returns clusters, bridging/divisive statements, per-statement metrics,
+/// and PCA-projected 2D positions for visualization.
 pub fn cluster_opinions(
     entity_type: &str,
     entity_id: &str,
@@ -34,6 +45,9 @@ pub fn cluster_opinions(
             entity_id: entity_id.to_string(),
             clusters: Vec::new(),
             bridging_statements: Vec::new(),
+            divisive_statements: Vec::new(),
+            statement_metrics: Vec::new(),
+            participant_positions: Vec::new(),
             total_participants: 0,
             total_statements: statements.len(),
         };
@@ -55,12 +69,19 @@ pub fn cluster_opinions(
         .collect();
 
     if human_ids.len() < 2 {
-        // Single participant — one cluster with all statements as characteristic
+        // Single participant — one cluster, no meaningful projection
         let characteristic: Vec<StatementView> = statements
             .iter()
             .cloned()
             .map(StatementView::from)
             .collect();
+        let positions = vec![ParticipantPositionView {
+            human_id: human_ids[0].clone(),
+            x: 0.0,
+            y: 0.0,
+            cluster_id: "cluster-0".to_string(),
+        }];
+        let metrics = compute_statement_metrics_single(&stmt_ids, statements);
         return SensemakingResultView {
             entity_type: entity_type.to_string(),
             entity_id: entity_id.to_string(),
@@ -71,6 +92,9 @@ pub fn cluster_opinions(
                 internal_agreement: 1.0,
             }],
             bridging_statements: Vec::new(),
+            divisive_statements: Vec::new(),
+            statement_metrics: metrics,
+            participant_positions: positions,
             total_participants: human_ids.len(),
             total_statements: statements.len(),
         };
@@ -123,9 +147,18 @@ pub fn cluster_opinions(
     let mut cluster_ids_sorted: Vec<usize> = cluster_members.keys().cloned().collect();
     cluster_ids_sorted.sort();
 
+    // Build a map from human_index -> cluster view index (for positions)
+    let mut human_to_cluster_view: Vec<String> = vec![String::new(); n_humans];
+
     for (idx, &cid) in cluster_ids_sorted.iter().enumerate() {
         let members = &cluster_members[&cid];
         let member_count = members.len();
+        let cluster_view_id = format!("cluster-{}", idx);
+
+        // Record cluster assignment for each member
+        for &hi in members {
+            human_to_cluster_view[hi] = cluster_view_id.clone();
+        }
 
         // Compute characteristic statements (>70% agreement within cluster)
         let mut characteristic: Vec<StatementView> = Vec::new();
@@ -159,39 +192,161 @@ pub fn cluster_opinions(
         };
 
         clusters.push(OpinionClusterView {
-            id: format!("cluster-{}", idx),
+            id: cluster_view_id,
             member_count,
             characteristic_statements: characteristic,
             internal_agreement,
         });
     }
 
-    // Find bridging statements (>60% agreement in EVERY cluster)
-    let mut bridging: Vec<StatementView> = Vec::new();
-    if clusters.len() >= 2 {
-        for (si, stmt_id) in stmt_ids.iter().enumerate() {
-            let bridges_all = cluster_ids_sorted.iter().all(|&cid| {
-                let members = &cluster_members[&cid];
-                let agree_count = members.iter().filter(|&&hi| matrix[hi][si] > 0.5).count();
-                let ratio = agree_count as f64 / members.len() as f64;
-                ratio >= BRIDGING_THRESHOLD
-            });
-            if bridges_all {
-                if let Some(&stmt) = stmt_map.get(stmt_id.as_str()) {
-                    bridging.push(StatementView::from(stmt.clone()));
-                }
-            }
-        }
-    }
+    // Compute per-statement metrics and classify
+    let (metrics, bridging, divisive) = compute_statement_metrics(
+        &stmt_ids,
+        &matrix,
+        &cluster_ids_sorted,
+        &cluster_members,
+        &stmt_map,
+    );
+
+    // PCA projection for 2D visualization
+    let projections = pca::project_2d(&matrix);
+    let participant_positions: Vec<ParticipantPositionView> = human_ids
+        .iter()
+        .enumerate()
+        .map(|(i, hid)| ParticipantPositionView {
+            human_id: hid.clone(),
+            x: projections.get(i).map_or(0.0, |p| p.0),
+            y: projections.get(i).map_or(0.0, |p| p.1),
+            cluster_id: human_to_cluster_view[i].clone(),
+        })
+        .collect();
 
     SensemakingResultView {
         entity_type: entity_type.to_string(),
         entity_id: entity_id.to_string(),
         clusters,
         bridging_statements: bridging,
+        divisive_statements: divisive,
+        statement_metrics: metrics,
+        participant_positions,
         total_participants: n_humans,
         total_statements: statements.len(),
     }
+}
+
+/// Compute per-statement metrics for the single-participant case.
+fn compute_statement_metrics_single(
+    stmt_ids: &[String],
+    statements: &[Statement],
+) -> Vec<StatementMetricsView> {
+    let stmt_map: HashMap<&str, &Statement> =
+        statements.iter().map(|s| (s.id.as_str(), s)).collect();
+    stmt_ids
+        .iter()
+        .filter_map(|sid| {
+            stmt_map.get(sid.as_str()).map(|_| StatementMetricsView {
+                statement_id: sid.clone(),
+                overall_agreement: 0.0,
+                cross_cluster_variance: 0.0,
+                classification: "neutral".to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Compute per-statement metrics, and return classified bridging + divisive statements.
+///
+/// For each statement:
+/// - `overall_agreement`: mean vote value across all participants (-1 to 1)
+/// - `cross_cluster_variance`: variance of per-cluster agreement ratios
+///   - Low variance + high agreement across clusters → bridging
+///   - High variance → divisive (clusters disagree about this statement)
+/// - `classification`: "bridging", "divisive", "characteristic", or "neutral"
+fn compute_statement_metrics(
+    stmt_ids: &[String],
+    matrix: &[Vec<f64>],
+    cluster_ids_sorted: &[usize],
+    cluster_members: &HashMap<usize, Vec<usize>>,
+    stmt_map: &HashMap<&str, &Statement>,
+) -> (
+    Vec<StatementMetricsView>,
+    Vec<StatementView>,
+    Vec<StatementView>,
+) {
+    let n_clusters = cluster_ids_sorted.len();
+    let mut metrics = Vec::with_capacity(stmt_ids.len());
+    let mut bridging = Vec::new();
+    let mut divisive = Vec::new();
+
+    for (si, stmt_id) in stmt_ids.iter().enumerate() {
+        // Overall agreement: mean vote value across all humans
+        let all_votes: Vec<f64> = matrix.iter().map(|row| row[si]).collect();
+        let overall_agreement = if all_votes.is_empty() {
+            0.0
+        } else {
+            all_votes.iter().sum::<f64>() / all_votes.len() as f64
+        };
+
+        // Per-cluster agreement ratio (fraction who agree)
+        let cluster_ratios: Vec<f64> = cluster_ids_sorted
+            .iter()
+            .map(|&cid| {
+                let members = &cluster_members[&cid];
+                if members.is_empty() {
+                    return 0.0;
+                }
+                let agree_count = members.iter().filter(|&&hi| matrix[hi][si] > 0.5).count();
+                agree_count as f64 / members.len() as f64
+            })
+            .collect();
+
+        // Cross-cluster variance of agreement ratios
+        let cross_cluster_variance = if n_clusters < 2 {
+            0.0
+        } else {
+            let mean_ratio = cluster_ratios.iter().sum::<f64>() / n_clusters as f64;
+            cluster_ratios
+                .iter()
+                .map(|r| (r - mean_ratio).powi(2))
+                .sum::<f64>()
+                / n_clusters as f64
+        };
+
+        // Classify the statement
+        let is_bridging = n_clusters >= 2
+            && cluster_ratios
+                .iter()
+                .all(|&ratio| ratio >= BRIDGING_THRESHOLD);
+        let is_divisive = n_clusters >= 2 && cross_cluster_variance >= DIVISIVE_THRESHOLD;
+
+        let classification = if is_bridging {
+            "bridging"
+        } else if is_divisive {
+            "divisive"
+        } else {
+            "neutral"
+        };
+
+        if is_bridging {
+            if let Some(&stmt) = stmt_map.get(stmt_id.as_str()) {
+                bridging.push(StatementView::from(stmt.clone()));
+            }
+        }
+        if is_divisive {
+            if let Some(&stmt) = stmt_map.get(stmt_id.as_str()) {
+                divisive.push(StatementView::from(stmt.clone()));
+            }
+        }
+
+        metrics.push(StatementMetricsView {
+            statement_id: stmt_id.clone(),
+            overall_agreement,
+            cross_cluster_variance,
+            classification: classification.to_string(),
+        });
+    }
+
+    (metrics, bridging, divisive)
 }
 
 /// Compute pairwise cosine similarity matrix between human vote vectors.
@@ -362,6 +517,41 @@ mod tests {
         for c in &result.clusters {
             assert_eq!(c.member_count, 2);
         }
+
+        // Participant positions should exist for all 4
+        assert_eq!(result.participant_positions.len(), 4);
+        // Members of same cluster should have same cluster_id
+        let alice_pos = result
+            .participant_positions
+            .iter()
+            .find(|p| p.human_id == "alice")
+            .unwrap();
+        let bob_pos = result
+            .participant_positions
+            .iter()
+            .find(|p| p.human_id == "bob")
+            .unwrap();
+        assert_eq!(alice_pos.cluster_id, bob_pos.cluster_id);
+
+        // Both statements should be divisive (each cluster disagrees with the other)
+        assert!(
+            !result.divisive_statements.is_empty(),
+            "Polarized statements should be divisive"
+        );
+
+        // Statement metrics should classify correctly
+        assert_eq!(result.statement_metrics.len(), 2);
+        for m in &result.statement_metrics {
+            assert_eq!(
+                m.classification, "divisive",
+                "Stmt {} should be divisive",
+                m.statement_id
+            );
+            assert!(
+                m.cross_cluster_variance > 0.1,
+                "Divisive stmt should have high cross-cluster variance"
+            );
+        }
     }
 
     #[test]
@@ -389,6 +579,9 @@ mod tests {
         assert_eq!(result.clusters[0].member_count, 3);
         // With only one cluster, bridging is not computed (requires >=2 clusters)
         assert!(result.bridging_statements.is_empty());
+
+        // Positions should exist
+        assert_eq!(result.participant_positions.len(), 3);
     }
 
     #[test]
@@ -401,6 +594,8 @@ mod tests {
         assert_eq!(result.total_statements, 1);
         assert!(result.clusters.is_empty());
         assert!(result.bridging_statements.is_empty());
+        assert!(result.participant_positions.is_empty());
+        assert!(result.statement_metrics.is_empty());
     }
 
     #[test]
@@ -419,6 +614,11 @@ mod tests {
         assert_eq!(result.clusters.len(), 1);
         assert_eq!(result.clusters[0].member_count, 1);
         assert_eq!(result.clusters[0].internal_agreement, 1.0);
+
+        // Single participant gets position at origin
+        assert_eq!(result.participant_positions.len(), 1);
+        assert_eq!(result.participant_positions[0].human_id, "alice");
+        assert_eq!(result.participant_positions[0].cluster_id, "cluster-0");
     }
 
     #[test]
@@ -469,5 +669,85 @@ mod tests {
             "s3 should be a bridging statement"
         );
         assert!(result.bridging_statements.iter().any(|s| s.id == "s3"));
+
+        // s3 should be classified as bridging in metrics
+        let s3_metrics = result
+            .statement_metrics
+            .iter()
+            .find(|m| m.statement_id == "s3")
+            .unwrap();
+        assert_eq!(s3_metrics.classification, "bridging");
+        assert!(
+            s3_metrics.cross_cluster_variance < DIVISIVE_THRESHOLD,
+            "Bridging statement should have low cross-cluster variance"
+        );
+
+        // s1 and s2 should be divisive (each cluster splits on them)
+        let s1_metrics = result
+            .statement_metrics
+            .iter()
+            .find(|m| m.statement_id == "s1")
+            .unwrap();
+        assert_eq!(s1_metrics.classification, "divisive");
+
+        // Positions should separate the two groups
+        assert_eq!(result.participant_positions.len(), 4);
+    }
+
+    #[test]
+    fn participant_positions_from_pca_separate_groups() {
+        let stmts = vec![
+            make_statement("s1", "proposal", "p1"),
+            make_statement("s2", "proposal", "p1"),
+            make_statement("s3", "proposal", "p1"),
+        ];
+        let votes = vec![
+            // Group A: all agree
+            make_vote("s1", "alice", "agree"),
+            make_vote("s2", "alice", "agree"),
+            make_vote("s3", "alice", "agree"),
+            make_vote("s1", "bob", "agree"),
+            make_vote("s2", "bob", "agree"),
+            make_vote("s3", "bob", "agree"),
+            // Group B: all disagree
+            make_vote("s1", "carol", "disagree"),
+            make_vote("s2", "carol", "disagree"),
+            make_vote("s3", "carol", "disagree"),
+            make_vote("s1", "dave", "disagree"),
+            make_vote("s2", "dave", "disagree"),
+            make_vote("s3", "dave", "disagree"),
+        ];
+
+        let result = cluster_opinions("proposal", "p1", &stmts, &votes);
+
+        // Participants in same group should be at the same position
+        let alice = result
+            .participant_positions
+            .iter()
+            .find(|p| p.human_id == "alice")
+            .unwrap();
+        let bob = result
+            .participant_positions
+            .iter()
+            .find(|p| p.human_id == "bob")
+            .unwrap();
+        let carol = result
+            .participant_positions
+            .iter()
+            .find(|p| p.human_id == "carol")
+            .unwrap();
+
+        assert!(
+            (alice.x - bob.x).abs() < 1e-10 && (alice.y - bob.y).abs() < 1e-10,
+            "Same-group members should be at same position"
+        );
+
+        // Different groups should be separated
+        let dist = ((alice.x - carol.x).powi(2) + (alice.y - carol.y).powi(2)).sqrt();
+        assert!(
+            dist > 0.5,
+            "Different groups should be separated in 2D, dist={}",
+            dist
+        );
     }
 }

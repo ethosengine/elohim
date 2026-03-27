@@ -4508,6 +4508,9 @@ pub struct SensemakingResultView {
     pub entity_id: String,
     pub clusters: Vec<OpinionClusterView>,
     pub bridging_statements: Vec<StatementView>,
+    pub divisive_statements: Vec<StatementView>,
+    pub statement_metrics: Vec<StatementMetricsView>,
+    pub participant_positions: Vec<ParticipantPositionView>,
     pub total_participants: usize,
     pub total_statements: usize,
 }
@@ -4521,6 +4524,31 @@ pub struct OpinionClusterView {
     pub member_count: usize,
     pub characteristic_statements: Vec<StatementView>,
     pub internal_agreement: f64,
+}
+
+/// 2D position of a participant in the PCA-projected opinion landscape
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ParticipantPositionView {
+    pub human_id: String,
+    pub x: f64,
+    pub y: f64,
+    pub cluster_id: String,
+}
+
+/// Per-statement metrics for sensemaking visualization
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StatementMetricsView {
+    pub statement_id: String,
+    /// Overall agreement across all participants (-1.0 = all disagree, 1.0 = all agree)
+    pub overall_agreement: f64,
+    /// Variance of agreement ratios across clusters (0 = uniform, high = divisive)
+    pub cross_cluster_variance: f64,
+    /// Classification: "bridging", "divisive", "characteristic", or "neutral"
+    pub classification: String,
 }
 
 // ============================================================================
