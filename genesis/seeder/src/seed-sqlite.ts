@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url';
 import { CONTENT_FORMATS } from './validation-constants.js';
 import { ALL_STEP_TYPES } from './generated/schema-enums.js';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
+import type { CreateContentInputView, JsonValue } from '@elohim/storage-client/generated';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -123,25 +124,21 @@ function normalizeStepType(stepType: string | undefined): string {
 }
 
 // ============================================================================
-// Types (matching elohim-storage db schema)
+// Types — imported from @elohim/storage-client (generated from Rust views.rs)
 // ============================================================================
 
-interface CreateContentInput {
-  id: string;
-  title: string;
-  description?: string;
+/**
+ * Seeder content input — narrows the generated CreateContentInputView with
+ * schema-enforced enum types. The generated type uses `string | null` for
+ * contentType/contentFormat/reach because Rust uses String. We tighten these
+ * to the protocol union types so tsc catches invalid values at compile time.
+ */
+type CreateContentInput = Omit<CreateContentInputView, 'contentType' | 'contentFormat' | 'reach' | 'contentSizeBytes'> & {
   contentType: ContentType;
   contentFormat: ContentFormat;
-  /** Inline content body (markdown, JSON quiz data, etc.) */
-  contentBody?: string;
-  blobHash?: string;
-  blobCid?: string;
-  contentSizeBytes?: number;
-  metadata?: Record<string, unknown>;
   reach: Reach;
-  createdBy?: string;
-  tags: string[];
-}
+  contentSizeBytes?: number; // Narrow from bigint | null to number for seeder convenience
+};
 
 // ============================================================================
 // JSON file types from data/lamad/
@@ -600,8 +597,8 @@ function transformContent(json: ConceptJson): CreateContentInput {
     contentSizeBytes = Buffer.byteLength(contentBody, 'utf-8');
   }
 
-  // Build metadata JSON
-  const metadata: Record<string, unknown> = {};
+  // Build metadata object (matches Rust JsonVal — parsed, not stringified)
+  const metadata: Record<string, JsonValue> = {};
   if (json.metadata) Object.assign(metadata, json.metadata);
   if (json.estimatedMinutes) metadata.estimatedMinutes = json.estimatedMinutes;
   if (json.thumbnailUrl) metadata.thumbnailUrl = json.thumbnailUrl;
@@ -611,13 +608,17 @@ function transformContent(json: ConceptJson): CreateContentInput {
   return {
     id: json.id,
     title: json.title,
-    description: json.description || undefined,
+    schemaVersion: 1,
+    description: json.description || null,
     contentType: (json.contentType ?? 'concept') as ContentType,
     contentFormat: normalizeContentFormat(json.contentFormat),
-    contentBody: contentBody,
+    contentBody: contentBody ?? null,
+    blobHash: json.blobHash ?? json.blob_hash ?? null,
+    blobCid: null,
     contentSizeBytes: contentSizeBytes,
-    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    metadata: Object.keys(metadata).length > 0 ? metadata : null,
     reach: getReachForContent(json.id),
+    createdBy: null,
     tags: json.tags || [],
   };
 }
@@ -780,7 +781,7 @@ function transformPathToContent(json: PathJson): CreateContentInput {
   const sections = chaptersToSections(json);
 
   // Build metadata
-  const metadata: Record<string, unknown> = {};
+  const metadata: Record<string, JsonValue> = {};
   if (json.pathType) metadata.pathType = json.pathType;
   if (json.difficulty) metadata.difficulty = json.difficulty;
   if (json.estimatedDuration) metadata.estimatedDuration = json.estimatedDuration;
@@ -795,13 +796,17 @@ function transformPathToContent(json: PathJson): CreateContentInput {
   return {
     id: json.id,
     title: json.title,
-    description: json.description,
+    schemaVersion: 1,
+    description: json.description || null,
     contentType: 'path',
     contentFormat: 'epr-composite',
     contentBody,
+    blobHash: null,
+    blobCid: null,
     contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
-    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    metadata: Object.keys(metadata).length > 0 ? metadata : null,
     reach: (json.visibility as Reach | undefined) ?? 'public',
+    createdBy: null,
     tags: json.tags || [],
   };
 }
@@ -1107,7 +1112,7 @@ async function main() {
       // Update thumbnailUrl to blob reference if we uploaded one
       if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
         const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
-        const meta = input.metadata ?? {};
+        const meta = (typeof input.metadata === 'object' && input.metadata !== null ? input.metadata : {}) as Record<string, JsonValue>;
         meta.thumbnailUrl = `/blob/${blobHash}`;
         input.metadata = meta;
       }
