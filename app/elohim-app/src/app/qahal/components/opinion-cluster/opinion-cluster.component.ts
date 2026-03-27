@@ -23,7 +23,14 @@ import {
   OpinionCluster,
 } from '@app/elohim/services/governance-signal.service';
 
-import type { StatementView, StatementVoteView, OpinionClusterView } from '@elohim/storage-client/generated';
+import type {
+  StatementView,
+  StatementVoteView,
+  OpinionClusterView,
+  ParticipantPositionView,
+  SensemakingResultView,
+  StatementMetricsView,
+} from '@elohim/storage-client/generated';
 
 /**
  * OpinionClusterComponent - Polis-style 2D Opinion Visualization
@@ -133,44 +140,40 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
   /**
    * Load sensemaking data from the governance backend.
-   * Uses two parallel requests: statements + votes, then feeds
-   * them into the same recalculation pipeline as input-driven data.
-   * Also loads pre-computed clusters from the backend as a fallback
-   * to enrich the visualization if local PCA yields no clusters.
+   *
+   * The backend computes real PCA projections and agglomerative clustering,
+   * returning participant 2D positions, cluster assignments, bridging/divisive
+   * statements, and per-statement metrics. We use these directly rather than
+   * running a local approximation.
    */
   private loadFromBackend(entityType: string, entityId: string): void {
-    // Load statements and votes in parallel, then recalculate locally
-    from(
-      Promise.all([
-        this.governanceApi.getStatements(entityType, entityId),
-        this.governanceApi.getStatementVotes(entityType, entityId),
-        this.governanceApi.getClusters(entityType, entityId),
-      ])
-    ).subscribe(([backendStatements, backendVotes, sensemakingResult]) => {
-      // Map backend types to the component's internal types
-      this.statements = backendStatements.map(mapStatementViewToStatement);
-      this.votes = backendVotes.map(mapStatementVoteViewToVote);
-
-      // If we have enough data for local computation, use it
-      if (this.statements.length > 0 && this.votes.length > 0) {
-        this.recalculateClusters();
-      }
-
-      // Overlay pre-computed clusters from backend if local computation
-      // produced no clusters (e.g. too few votes for local PCA)
-      if (this.clusters.length === 0 && sensemakingResult.clusters.length > 0) {
-        this.clusters = sensemakingResult.clusters.map(mapOpinionClusterViewToCluster);
+    from(this.governanceApi.getClusters(entityType, entityId)).subscribe(
+      (result: SensemakingResultView) => {
+        // Map backend clusters to component's OpinionCluster type
+        this.clusters = result.clusters.map(mapOpinionClusterViewToCluster);
         this.clusterCount = this.clusters.length;
-        this.totalParticipants = sensemakingResult.totalParticipants;
+        this.totalParticipants = result.totalParticipants;
 
-        // Use bridging statements as consensus statements
-        this.consensusStatements = sensemakingResult.bridgingStatements.map(
+        // Use PCA-projected positions from backend
+        this.participants = result.participantPositions.map(p =>
+          mapParticipantPositionToLocal(p)
+        );
+
+        // Also load statements/votes for the statement list display
+        this.statements = result.bridgingStatements
+          .concat(result.divisiveStatements)
+          .map(mapStatementViewToStatement);
+
+        // Use backend classifications for consensus/divisive
+        this.consensusStatements = result.bridgingStatements.map(mapStatementViewToStatement);
+        this.divisiveStatements = (result.divisiveStatements ?? []).map(
           mapStatementViewToStatement
         );
-      }
 
-      this.render();
-    });
+        this.updateStats();
+        this.render();
+      }
+    );
   }
 
   /**
@@ -187,7 +190,10 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
   /**
    * Compute 2D positions for participants based on their votes.
-   * This simulates PCA - in production would use actual dimensionality reduction.
+   *
+   * Local fallback used when statements/votes are passed via @Input()
+   * rather than loaded from the backend (which computes real PCA).
+   * Uses mean vote value as a simple 1D projection.
    */
   private computeParticipantPositions(): ParticipantPosition[] {
     if (this.statements.length === 0 || this.votes.length === 0) {
@@ -196,7 +202,6 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
     // Group votes by participant
     const votesByParticipant = new Map<string, Map<string, number>>();
-
     for (const vote of this.votes) {
       if (!votesByParticipant.has(vote.participantId)) {
         votesByParticipant.set(vote.participantId, new Map());
@@ -204,41 +209,20 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
       votesByParticipant.get(vote.participantId)!.set(vote.statementId, vote.value);
     }
 
-    // Simple 2D projection (simulating PCA)
-    // In production: use actual PCA/t-SNE/UMAP
     const positions: ParticipantPosition[] = [];
-
     votesByParticipant.forEach((votes, participantId) => {
-      // Create feature vector from votes (used implicitly in projection below)
-
-      // Project to 2D using simplified approach
-      // Split statements into two groups for x/y axes
-      const midpoint = Math.floor(this.statements.length / 2);
-      const xStatements = this.statements.slice(0, midpoint);
-      const yStatements = this.statements.slice(midpoint);
-
-      const x =
-        xStatements.reduce((sum, s, i) => {
-          const v = votes.get(s.id) ?? 0;
-          return sum + v * Math.cos((i / xStatements.length) * Math.PI);
-        }, 0) / Math.max(xStatements.length, 1);
-
-      const y =
-        yStatements.reduce((sum, s, i) => {
-          const v = votes.get(s.id) ?? 0;
-          return sum + v * Math.sin((i / yStatements.length) * Math.PI);
-        }, 0) / Math.max(yStatements.length, 1);
-
-      // Normalize to [-1, 1] range
-      const normalizedX = Math.max(-1, Math.min(1, x));
-      const normalizedY = Math.max(-1, Math.min(1, y));
+      // Simple projection: mean agreement as x, vote diversity as y
+      const values = [...votes.values()];
+      const mean = values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
+      const variance =
+        values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / Math.max(values.length, 1);
 
       positions.push({
         participantId,
-        x: normalizedX,
-        y: normalizedY,
-        cluster: null, // Will be assigned
-        isCurrentUser: participantId === 'current-user', // MVP: hardcoded
+        x: Math.max(-1, Math.min(1, mean)),
+        y: Math.max(-1, Math.min(1, Math.sqrt(variance) * 2 - 1)),
+        cluster: null,
+        isCurrentUser: participantId === 'current-user',
         voteCount: votes.size,
       });
     });
@@ -248,70 +232,78 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   }
 
   /**
-   * Compute clusters using k-means-like approach.
+   * Compute clusters from participant positions using simple k-means.
+   *
+   * Local fallback when backend clusters aren't available. Dynamically
+   * determines cluster count rather than using hardcoded quadrants.
    */
   private computeClusters(): OpinionCluster[] {
     if (this.participants.length < 3) {
       return [];
     }
 
-    // Simple clustering: divide space into quadrants + center
-    const clusters: OpinionCluster[] = [
-      {
-        id: 'progressive',
-        label: 'Progressive',
-        color: '#3498db',
-        centroid: [0.5, 0.5],
-        memberCount: 0,
-        averagePosition: 0.5,
-      },
-      {
-        id: 'conservative',
-        label: 'Traditionalist',
-        color: '#9b59b6',
-        centroid: [-0.5, 0.5],
-        memberCount: 0,
-        averagePosition: -0.5,
-      },
-      {
-        id: 'pragmatic',
-        label: 'Pragmatic',
-        color: '#27ae60',
-        centroid: [0, -0.5],
-        memberCount: 0,
-        averagePosition: 0,
-      },
-      {
-        id: 'center',
-        label: 'Centrist',
-        color: '#f39c12',
-        centroid: [0, 0],
-        memberCount: 0,
-        averagePosition: 0,
-      },
-    ];
+    // Determine k: 2-4 clusters based on data spread
+    const k = Math.min(4, Math.max(2, Math.ceil(this.participants.length / 5)));
 
-    // Assign participants to nearest cluster
-    for (const p of this.participants) {
-      let nearestCluster = clusters[0];
-      let minDist = Infinity;
+    // Initialize centroids using k-means++ style: spread evenly
+    const centroids: [number, number][] = [];
+    for (let i = 0; i < k; i++) {
+      const angle = (i / k) * Math.PI * 2;
+      centroids.push([Math.cos(angle) * 0.5, Math.sin(angle) * 0.5]);
+    }
 
-      for (const cluster of clusters) {
-        const dist = Math.sqrt(
-          Math.pow(p.x - cluster.centroid[0], 2) + Math.pow(p.y - cluster.centroid[1], 2)
-        );
-        if (dist < minDist) {
-          minDist = dist;
-          nearestCluster = cluster;
+    // Run k-means for a few iterations
+    for (let iter = 0; iter < 10; iter++) {
+      // Assign each participant to nearest centroid
+      const assignments = this.participants.map(p => {
+        let best = 0;
+        let bestDist = Infinity;
+        for (let c = 0; c < k; c++) {
+          const dist = (p.x - centroids[c][0]) ** 2 + (p.y - centroids[c][1]) ** 2;
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = c;
+          }
+        }
+        return best;
+      });
+
+      // Update centroids
+      for (let c = 0; c < k; c++) {
+        const members = this.participants.filter((_, i) => assignments[i] === c);
+        if (members.length > 0) {
+          centroids[c] = [
+            members.reduce((s, p) => s + p.x, 0) / members.length,
+            members.reduce((s, p) => s + p.y, 0) / members.length,
+          ];
         }
       }
 
-      p.cluster = nearestCluster.id;
-      nearestCluster.memberCount++;
+      // Final iteration: apply assignments
+      if (iter === 9) {
+        this.participants.forEach((p, i) => {
+          p.cluster = `cluster-${assignments[i]}`;
+        });
+      }
     }
 
-    // Filter empty clusters
-    return clusters.filter(c => c.memberCount > 0);
+    // Build cluster objects
+    const clusters: OpinionCluster[] = [];
+    for (let c = 0; c < k; c++) {
+      const members = this.participants.filter(p => p.cluster === `cluster-${c}`);
+      if (members.length > 0) {
+        clusters.push({
+          id: `cluster-${c}`,
+          label: `Group ${c + 1}`,
+          color: CLUSTER_COLORS[c % CLUSTER_COLORS.length],
+          centroid: centroids[c],
+          memberCount: members.length,
+          averagePosition: centroids[c][0],
+        });
+      }
+    }
+
+    return clusters;
   }
 
   /**
@@ -570,17 +562,17 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = '#666';
 
-    // X-axis labels
+    // X-axis labels (PCA axes represent emergent opinion dimensions, not political labels)
     ctx.textAlign = 'center';
-    ctx.fillText('← More Traditional', this.padding + 60, height - 10);
-    ctx.fillText('More Progressive →', width - this.padding - 60, height - 10);
+    ctx.fillText('← Opinion Axis 1', this.padding + 60, height - 10);
+    ctx.fillText('Opinion Axis 1 →', width - this.padding - 60, height - 10);
 
     // Y-axis labels
     ctx.save();
     ctx.translate(12, height / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText('← More Pragmatic', 60, 0);
-    ctx.fillText('More Idealistic →', -60, 0);
+    ctx.fillText('← Opinion Axis 2', 60, 0);
+    ctx.fillText('Opinion Axis 2 →', -60, 0);
     ctx.restore();
   }
 
@@ -836,5 +828,22 @@ function mapOpinionClusterViewToCluster(cv: OpinionClusterView, index: number): 
     ],
     averagePosition: cv.internalAgreement,
     color: CLUSTER_COLORS[index % CLUSTER_COLORS.length],
+  };
+}
+
+/**
+ * Map a ParticipantPositionView (PCA-projected by the backend) to the
+ * component's local ParticipantPosition type.
+ */
+function mapParticipantPositionToLocal(
+  pp: ParticipantPositionView,
+): ParticipantPosition {
+  return {
+    participantId: pp.humanId,
+    x: pp.x,
+    y: pp.y,
+    cluster: pp.clusterId,
+    isCurrentUser: false, // Resolved by updateStats after session context is available
+    voteCount: 0, // Not tracked in position view; available from votes if needed
   };
 }
