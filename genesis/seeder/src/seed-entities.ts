@@ -16,10 +16,10 @@
 
 import type { MasteryLevel } from './generated/schema-enums.js';
 
-/** Minimal content shape used by entity seeder (metadata_json + id) */
+/** Minimal content shape used by entity seeder (metadata + id) */
 interface Content {
   id: string;
-  metadata_json?: string | Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 import type {
   BulkPresenceResult,
@@ -32,13 +32,13 @@ import { DoorwayClient } from './doorway-client.js';
 // Types
 // =============================================================================
 
-/** Input for creating a contributor presence */
+/** Input for creating a contributor presence — matches Rust CreateContributorPresenceInputView */
 export interface CreatePresenceInput {
   schemaVersion?: number;
   displayName: string;
   presenceState?: string;
-  externalIdentifiersJson?: string;
-  establishingContentIdsJson: string;
+  externalIdentifiers?: unknown;
+  establishingContentIds: string[];
   affinityTotal?: number;
   uniqueEngagers?: number;
   citationCount?: number;
@@ -56,7 +56,7 @@ export interface CreateMasteryInput {
   engagementCount?: number;
 }
 
-/** Input for creating an economic event */
+/** Input for creating an economic event — matches Rust CreateEconomicEventInputView */
 export interface CreateEventInput {
   schemaVersion?: number;
   action: string;
@@ -69,7 +69,7 @@ export interface CreateEventInput {
   contentId?: string;
   contributorPresenceId?: string;
   pathId?: string;
-  metadataJson?: string;
+  metadata?: Record<string, unknown>;
 }
 
 // =============================================================================
@@ -80,31 +80,26 @@ export interface CreateEventInput {
  * Extract author information from content metadata.
  *
  * Looks for author in various places:
- * - metadataJson.author
- * - metadataJson.creator
- * - metadataJson.contributors[]
+ * - metadata.author
+ * - metadata.creator
+ * - metadata.contributors[]
  */
 function extractAuthor(content: Content): string | null {
-  if (!content.metadata_json) return null;
+  if (!content.metadata) return null;
 
-  try {
-    const metadata = typeof content.metadata_json === 'string'
-      ? JSON.parse(content.metadata_json)
-      : content.metadata_json;
+  const metadata = content.metadata;
 
-    // Direct author field
-    if (metadata.author) return metadata.author;
-    if (metadata.creator) return metadata.creator;
+  // Direct author field
+  if (metadata.author) return metadata.author as string;
+  if (metadata.creator) return metadata.creator as string;
 
-    // First contributor
-    if (metadata.contributors && Array.isArray(metadata.contributors) && metadata.contributors.length > 0) {
-      return metadata.contributors[0];
-    }
-
-    return null;
-  } catch {
-    return null;
+  // First contributor
+  const contributors = metadata.contributors;
+  if (Array.isArray(contributors) && contributors.length > 0) {
+    return contributors[0] as string;
   }
+
+  return null;
 }
 
 /**
@@ -134,7 +129,7 @@ export function buildContributorPresences(contentItems: Content[]): CreatePresen
       schemaVersion: 1,
       displayName: author,
       presenceState: 'unclaimed',
-      establishingContentIdsJson: JSON.stringify([...contentIds]),
+      establishingContentIds: [...contentIds],
       affinityTotal: 0.0,
       uniqueEngagers: 0,
       citationCount: contentIds.size,

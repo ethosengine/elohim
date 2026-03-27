@@ -34,6 +34,12 @@ function isValidEnum(value: string, values: readonly string[]): boolean {
   return values.includes(value);
 }
 
+// ---------------------------------------------------------------------------
+// Hand-written types below await protocol schema migration.
+// When schema equivalents exist, import from ./generated/ instead.
+// See CreateContentInput (above) for the migrated pattern.
+// ---------------------------------------------------------------------------
+
 export interface CreateLearningPathInput {
   id: string;
   title: string;

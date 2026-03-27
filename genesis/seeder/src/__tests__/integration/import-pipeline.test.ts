@@ -217,7 +217,7 @@ describe('Content Import Pipeline Integration', () => {
       const content = await fs.readFile(TEST_CONTENT_MD, 'utf-8');
       const node = parseMarkdownToNode(TEST_CONTENT_MD, content);
 
-      // Transform to storage format
+      // Transform to storage format (metadata as parsed object, not stringified)
       const item = {
         id: `test-${node.id}-${Date.now()}`,
         title: node.title,
@@ -227,10 +227,10 @@ describe('Content Import Pipeline Integration', () => {
         description: node.description,
         tags: node.tags,
         reach: node.reach as Reach,
-        metadataJson: JSON.stringify({
+        metadata: {
           relatedNodeIds: node.relatedNodeIds,
           source: 'integration-test',
-        }),
+        },
       };
 
       // Write to database
@@ -262,7 +262,7 @@ describe('Content Import Pipeline Integration', () => {
         description: node.description,
         tags: node.tags,
         reach: node.reach as Reach,
-        metadataJson: JSON.stringify({ source: 'batch-test' }),
+        metadata: { source: 'batch-test' },
       }));
 
       const result = await doorwayClient.bulkCreateContent(items);

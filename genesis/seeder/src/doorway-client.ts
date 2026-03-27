@@ -834,7 +834,7 @@ export class DoorwayClient {
       relationshipType: string;
       confidence?: number;
       inferenceSource?: string;
-      metadataJson?: string;
+      metadata?: Record<string, unknown>;
     }>
   ): Promise<BulkRelationshipResult> {
     if (this.config.dryRun) {
@@ -871,8 +871,8 @@ export class DoorwayClient {
     items: Array<{
       displayName: string;
       presenceState?: string;
-      externalIdentifiersJson?: string;
-      establishingContentIdsJson: string;
+      externalIdentifiers?: unknown;
+      establishingContentIds: string[];
       affinityTotal?: number;
       uniqueEngagers?: number;
       citationCount?: number;
@@ -921,7 +921,7 @@ export class DoorwayClient {
       contentId?: string;
       contributorPresenceId?: string;
       pathId?: string;
-      metadataJson?: string;
+      metadata?: Record<string, unknown>;
     }>
   ): Promise<BulkEventResult> {
     if (this.config.dryRun) {

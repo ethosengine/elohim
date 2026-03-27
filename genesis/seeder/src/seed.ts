@@ -533,24 +533,8 @@ interface ContentOutput {
   content: any;
 }
 
-interface CreatePathInput {
-  id: string;
-  version: string;
-  title: string;
-  description: string;
-  purpose: string | null;
-  difficulty: string;
-  estimatedDuration: string | null;
-  visibility: string;
-  pathType: string;
-  tags: string[];
-  /** Extensible metadata JSON (stores chapters for hierarchical paths) */
-  metadataJson: string | null;
-  /** Thumbnail image URL (relative path or blob reference) */
-  thumbnailUrl?: string;
-  /** SHA256 hash of thumbnail blob in elohim-storage */
-  thumbnailBlobHash?: string;
-}
+// CreatePathInput removed — paths are now seeded as ContentNodes via CreateContentInput
+// (contentType: 'path', contentFormat: 'epr-composite')
 
 interface AddPathStepInput {
   pathId: string;
@@ -1644,17 +1628,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
      * Paths become ContentNodes with contentType 'path' and contentFormat 'epr-composite'.
      * The contentBody holds a structured JSON layout of EPR references.
      */
-    function pathToContent(pathData: any, thumbnailHash: string | undefined): {
-      id: string;
-      title: string;
-      description: string;
-      contentType: ContentType;
-      contentFormat: ContentFormat;
-      contentBody: string;
-      metadataJson: string;
-      reach: Reach;
-      tags: string[];
-    } {
+    function pathToContent(pathData: any, thumbnailHash: string | undefined): CreateContentInput {
       // Build epr-composite sections from chapters (or wrap flat steps in a default section)
       let sections: any[];
 
@@ -1814,7 +1788,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           layout: 'sequential',
           sections,
         }),
-        metadataJson: JSON.stringify({
+        metadata: {
           difficulty: pathData.difficulty || 'beginner',
           estimatedDuration: pathData.estimatedMinutes ? `${pathData.estimatedMinutes}m`
             : pathData.estimatedDuration || undefined,
@@ -1822,7 +1796,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           thumbnailAlt: pathData.thumbnailAlt,
           pathType,
           ...pathData.metadata, // preserve any extra metadata
-        }),
+        },
         reach: (pathData.visibility as Reach | undefined) ?? 'public',
         tags: pathData.tags || [],
       };
@@ -1838,7 +1812,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       relationshipType: string;
       confidence: number;
       inferenceSource: string;
-      metadataJson: string;
+      metadata: Record<string, unknown>;
     }> {
       const stepRefs = extractFlatStepRefs(pathData);
       return stepRefs.map((ref, globalIndex) => ({
@@ -1847,7 +1821,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         relationshipType: 'step',
         confidence: 1.0,
         inferenceSource: 'explicit',
-        metadataJson: JSON.stringify({ orderIndex: globalIndex }),
+        metadata: { orderIndex: globalIndex },
       }));
     }
 
