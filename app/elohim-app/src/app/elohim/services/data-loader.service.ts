@@ -2,7 +2,7 @@ import { Injectable, inject, afterNextRender } from '@angular/core';
 
 // @coverage: 20.6% (2026-02-24)
 
-import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
+import { catchError, finalize, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
 import { Observable, of, from, defer, forkJoin } from 'rxjs';
 
@@ -296,7 +296,12 @@ export class DataLoaderService {
    * Read path: getContent() (projection → ContentService fallback) → parsePathView.
    */
   getPath(pathId: string): Observable<LearningPath> {
-    return this.getContent(pathId).pipe(
+    const cached = this.pathCache.get(pathId);
+    if (cached) {
+      return cached;
+    }
+
+    const path$ = this.getContent(pathId).pipe(
       map(node => {
         if (!node || node.contentType === 'placeholder') {
           // Distinguish true 404 from network-error placeholders:
@@ -348,8 +353,13 @@ export class DataLoaderService {
             throw err;
           })
         );
-      })
+      }),
+      shareReplay(1),
+      finalize(() => this.pathCache.delete(pathId))
     );
+
+    this.pathCache.set(pathId, path$);
+    return path$;
   }
 
   /**

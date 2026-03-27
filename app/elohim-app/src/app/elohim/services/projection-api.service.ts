@@ -530,13 +530,18 @@ export class ProjectionAPIService implements IStorageApi {
     // Rust API now returns parsed metadata directly
     const metadata = (data['metadata'] ?? {}) as Record<string, unknown>;
 
+    // Resolve blob references in metadata thumbnailUrl
+    if (metadata['thumbnailUrl'] && typeof metadata['thumbnailUrl'] === 'string') {
+      metadata['thumbnailUrl'] = this.resolveBlobUrl(metadata['thumbnailUrl'] as string);
+    }
+
     // Projection data may have slightly different field names
     return {
       id: (data['id'] ?? data['docId']) as string,
       contentType: data['contentType'] as string,
       title: (data['title'] ?? '') as string,
       description: (data['description'] ?? '') as string,
-      content: (data['content'] ?? '') as string,
+      content: (data['content'] ?? data['contentBody'] ?? '') as string,
       contentFormat: (data['contentFormat'] ?? 'markdown') as string,
       tags: (data['tags'] ?? []) as string[],
       relatedNodeIds: (data['relatedNodeIds'] ?? []) as string[],
@@ -573,7 +578,10 @@ export class ProjectionAPIService implements IStorageApi {
         pathType: (d['pathType'] ?? 'course') as string,
         difficulty: (d['difficulty'] ?? 'beginner') as string,
         estimatedDuration: d['estimatedDuration'] as string | undefined,
-        thumbnailUrl: this.resolveBlobUrl(d['thumbnailUrl'] as string | null | undefined),
+        thumbnailUrl: this.resolveBlobUrl(
+          ((d['metadata'] as Record<string, unknown> | undefined)?.['thumbnailUrl'] as string | undefined)
+            ?? d['thumbnailUrl'] as string | null | undefined
+        ),
         thumbnailAlt: d['thumbnailAlt'] as string | undefined,
         version: (d['version'] ?? '1.0.0') as string,
         purpose: (d['purpose'] ?? '') as string,
