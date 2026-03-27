@@ -9,6 +9,8 @@
  */
 
 import { ContentNode, ContentMetadata } from './content-node.model';
+import type { Section as RawSection, Item as RawItem, EprCompositeBody } from '../generated/body-types';
+import type { PathMetadata } from '../generated/metadata-types';
 
 // =========================================================================
 // Core PathView Types (new canonical model)
@@ -156,7 +158,7 @@ export interface PathItem {
   /** Learning objectives */
   learningObjectives?: string[];
   /** Completion criteria */
-  completionCriteria?: { type: string; threshold?: number };
+  completionCriteria?: { type?: string; threshold?: number };
 }
 
 // =========================================================================
@@ -562,27 +564,8 @@ function sectionsToChapters(sections: PathSection[]): PathChapter[] {
   });
 }
 
-/** Raw section shape from JSON body */
-interface RawSection {
-  id?: string;
-  title?: string;
-  description?: string;
-  level?: string;
-  sections?: RawSection[];
-  items?: RawItem[];
-  estimatedDuration?: string;
-  optional?: boolean;
-}
-
-/** Raw item shape from JSON body */
-interface RawItem {
-  ref: string;
-  role?: string;
-  title?: string;
-  narrative?: string;
-  learningObjectives?: string[];
-  completionCriteria?: { type: string; threshold?: number };
-}
+// RawSection and RawItem replaced by generated types from body-types.ts
+// imported as: Section as RawSection, Item as RawItem
 
 /**
  * Parse a ContentNode into a PathView.
@@ -592,21 +575,21 @@ interface RawItem {
  */
 export function parsePathView(node: ContentNode): PathView {
   // Parse body — may be string JSON or already-parsed object
-  let body: Record<string, unknown>;
+  let body: EprCompositeBody;
   if (typeof node.content === 'string') {
     try {
-      body = JSON.parse(node.content) as Record<string, unknown>;
+      body = JSON.parse(node.content) as EprCompositeBody;
     } catch {
-      body = {};
+      body = { sections: [] };
     }
   } else {
-    body = (node.content as Record<string, unknown>) ?? {};
+    body = (node.content as EprCompositeBody) ?? { sections: [] };
   }
 
-  const meta: ContentMetadata = node.metadata ?? {};
+  const meta = (node.metadata ?? {}) as PathMetadata;
 
   // Parse sections from body
-  const rawSections = (body['sections'] as RawSection[]) ?? [];
+  const rawSections = body.sections ?? [];
   const sections = rawSections.map((s, i) => enrichSection(s, i));
 
   // Synthesize flat steps from sections tree
@@ -617,33 +600,33 @@ export function parsePathView(node: ContentNode): PathView {
 
   return {
     node,
-    pathType: (meta as Record<string, unknown>)['pathType'] as string ?? body['pathType'] as string ?? 'journey',
-    difficulty: (meta as Record<string, unknown>)['difficulty'] as string ?? undefined,
-    estimatedDuration: (meta as Record<string, unknown>)['estimatedDuration'] as string ?? undefined,
+    pathType: meta.pathType ?? body.pathType ?? 'journey',
+    difficulty: meta.difficulty ?? undefined,
+    estimatedDuration: meta.estimatedDuration ?? undefined,
     // Prefer resolved thumbnailUrl from ContentService (set at runtime on the node)
     // over raw metadata value (which is an unresolved /blob/sha256-... path)
-    thumbnailUrl: (node as unknown as Record<string, unknown>)['thumbnailUrl'] as string
-      ?? (meta as Record<string, unknown>)['thumbnailUrl'] as string
+    thumbnailUrl: (node as unknown as Record<string, string>)['thumbnailUrl']
+      ?? meta.thumbnailUrl
       ?? undefined,
-    thumbnailAlt: (meta as Record<string, unknown>)['thumbnailAlt'] as string ?? undefined,
+    thumbnailAlt: meta.thumbnailAlt ?? undefined,
     sections,
 
     // Convenience accessors for backward compat
     id: node.id,
     title: node.title,
     description: node.description,
-    version: ((meta as Record<string, unknown>)['version'] as string) ?? '1.0.0',
+    version: meta.version ?? '1.0.0',
     tags: node.tags ?? [],
     visibility: reachToVisibility(node.reach),
     createdBy: node.authorId ?? '',
-    contributors: ((meta as Record<string, unknown>)['contributors'] as string[]) ?? [],
+    contributors: meta.contributors ?? [],
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     steps,
     chapters,
-    purpose: ((meta as Record<string, unknown>)['purpose'] as string) ?? node.description,
-    prerequisitePaths: (meta as Record<string, unknown>)['prerequisitePaths'] as string[] | undefined,
-    attestationsGranted: (meta as Record<string, unknown>)['attestationsGranted'] as string[] | undefined,
+    purpose: meta.purpose ?? node.description,
+    prerequisitePaths: meta.prerequisitePaths,
+    attestationsGranted: meta.attestationsGranted,
     stepCount: steps.length,
     chapterCount: chapters?.length,
   };

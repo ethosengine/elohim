@@ -1,0 +1,43 @@
+{
+  "$id": "lamad:schema:metadata:concept",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConceptMetadata",
+  "description": "Metadata shape for contentType 'concept'. Stored in ContentView.metadata.",
+  "type": "object",
+  "properties": {
+    "summary": { "type": "string", "description": "Brief summary of the concept" },
+    "sourcePath": { "type": "string", "description": "Original file path from import pipeline" },
+    "relatedNodeIds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs of related content nodes"
+    },
+    "estimatedMinutes": { "type": "number", "description": "Estimated time to consume in minutes" },
+    "thumbnailUrl": { "type": "string", "description": "Blob path or resolved URL for concept thumbnail" },
+    "bloomsLevel": { "type": "string", "description": "Bloom's taxonomy level (remember, understand, apply, analyze, evaluate, create)" },
+    "sourceDoc": { "type": "string", "description": "Reference to source document" },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "targetId": { "type": "string" }
+        }
+      },
+      "description": "Inline relationship declarations from import"
+    },
+    "did": { "type": "string", "description": "Decentralized identifier for the concept" },
+    "openGraphMetadata": {
+      "type": "object",
+      "description": "Open Graph metadata for social sharing",
+      "additionalProperties": true
+    },
+    "linkedData": {
+      "type": "object",
+      "description": "JSON-LD or schema.org structured data",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

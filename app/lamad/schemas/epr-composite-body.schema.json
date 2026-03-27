@@ -1,0 +1,51 @@
+{
+  "$id": "lamad:schema:body:epr-composite",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprCompositeBody",
+  "description": "Body shape for contentFormat 'epr-composite'. Parsed from ContentView.contentBody.",
+  "type": "object",
+  "required": ["sections"],
+  "properties": {
+    "schemaVersion": { "type": "number" },
+    "pathType": { "type": "string" },
+    "layout": { "type": "string", "enum": ["sequential", "branching", "exploratory"] },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Section" }
+    }
+  },
+  "$defs": {
+    "Section": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "level": { "type": "string", "enum": ["course", "unit", "lesson", "item"] },
+        "estimatedDuration": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/Item" } },
+        "sections": { "type": "array", "items": { "$ref": "#/$defs/Section" } }
+      }
+    },
+    "Item": {
+      "type": "object",
+      "required": ["ref"],
+      "properties": {
+        "ref": { "type": "string", "description": "EPR reference (e.g. 'epr:concept-id' or bare 'concept-id')" },
+        "role": { "type": "string", "enum": ["step", "checkpoint", "optional", "reflection"] },
+        "title": { "type": "string" },
+        "narrative": { "type": "string" },
+        "learningObjectives": { "type": "array", "items": { "type": "string" } },
+        "completionCriteria": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["view", "score", "time", "interaction"] },
+            "threshold": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
