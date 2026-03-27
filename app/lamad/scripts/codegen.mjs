@@ -1,15 +1,20 @@
 #!/usr/bin/env node
 /**
- * Generates TypeScript domain types from lamad manifest + companion schemas.
+ * Lamad codegen — single entry point for ALL lamad generated types.
  *
- * Produces:
+ * Reads:
+ *   - Lamad manifest (app/lamad/manifest.json)
+ *   - Lamad companion schemas (app/lamad/schemas/*.schema.json)
+ *
+ * Produces (to BOTH app/elohim-app/src/app/lamad/generated/ AND genesis/seeder/src/generated/):
  *   - metadata-types.ts — PathMetadata, ConceptMetadata, AssessmentMetadata interfaces
  *   - body-types.ts — EprCompositeBody, Section, Item interfaces
- *   - content-node-types.ts — discriminated TypedContentNode union + type guards
+ *   - content-node-types.ts — discriminated TypedContentNode union + generic type guards
+ *   - manifest-types.ts — content type lists, format lists, renderer map, signal map
  *
  * Usage:
- *   node codegen-types.mjs           # Generate all
- *   node codegen-types.mjs --verify  # Check if generated files are stale
+ *   node codegen.mjs           # Generate all
+ *   node codegen.mjs --verify  # Check if generated files are stale
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
@@ -23,13 +28,13 @@ const VERIFY = process.argv.includes('--verify');
 
 const MANIFEST_PATH = resolve(LAMAD_DIR, 'manifest.json');
 
-// Output locations (identical copies)
+// Output locations (identical copies, except content-node-types.ts imports)
 const OUTPUT_DIRS = [
   resolve(REPO_ROOT, 'app/elohim-app/src/app/lamad/generated'),
   resolve(REPO_ROOT, 'genesis/seeder/src/generated'),
 ];
 
-const HEADER = `// AUTO-GENERATED from lamad manifest + companion schemas.
+const DOMAIN_HEADER = `// AUTO-GENERATED from lamad manifest + companion schemas.
 // DO NOT EDIT — regenerate with: pnpm run lamad:codegen
 `;
 
@@ -75,7 +80,6 @@ function schemaTypeToTs(prop) {
   }
   if (prop.type === 'object') {
     if (prop.properties) {
-      // Inline object with known properties → emit inline type
       const entries = Object.entries(prop.properties).map(([k, v]) => {
         const req = (prop.required || []).includes(k);
         return `${k}${req ? '' : '?'}: ${schemaTypeToTs(v)}`;
@@ -101,6 +105,82 @@ function generateInterfacesFromSchema(schema) {
   // Generate main interface
   blocks.push(schemaToInterface(schema, title));
   return blocks.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------
+// Manifest constants generation (absorbed from codegen-manifest.mjs)
+// ---------------------------------------------------------------------------
+
+function formatTsConst(name, values) {
+  const singleLine = `export const ${name} = [${values.map((v) => `'${v}'`).join(', ')}] as const;`;
+  if (singleLine.length <= 100) return singleLine;
+  const items = values.map((v) => `  '${v}',`).join('\n');
+  return `export const ${name} = [\n${items}\n] as const;`;
+}
+
+function generateManifestTypes(manifest) {
+  const appName = manifest.name; // "lamad"
+  const prefix = appName.toUpperCase(); // LAMAD
+  const titlePrefix = capitalize(appName); // Lamad
+  const relManifestPath = relative(REPO_ROOT, MANIFEST_PATH);
+
+  const contentTypes = Object.keys(manifest.vocabulary?.contentTypes || {});
+  const contentFormats = Object.keys(manifest.vocabulary?.contentFormats || {});
+  const relationships = Object.keys(manifest.vocabulary?.relationships || {});
+  const signals = Object.keys(manifest.vocabulary?.signals || {});
+
+  // Build renderer map: format -> component name
+  const rendererMap = {};
+  const rendering = manifest.rendering || {};
+  for (const [, rendererDef] of Object.entries(rendering)) {
+    const component = rendererDef.component;
+    for (const fmt of rendererDef.formats || []) {
+      rendererMap[fmt] = component;
+    }
+  }
+
+  const blocks = [];
+
+  // Content types
+  blocks.push(formatTsConst(`${prefix}_CONTENT_TYPES`, contentTypes));
+  blocks.push(`export type ${titlePrefix}ContentType = (typeof ${prefix}_CONTENT_TYPES)[number];`);
+  blocks.push('');
+
+  // Content formats
+  blocks.push(formatTsConst(`${prefix}_CONTENT_FORMATS`, contentFormats));
+  blocks.push(
+    `export type ${titlePrefix}ContentFormat = (typeof ${prefix}_CONTENT_FORMATS)[number];`,
+  );
+  blocks.push('');
+
+  // Relationships
+  blocks.push(formatTsConst(`${prefix}_RELATIONSHIPS`, relationships));
+  blocks.push(
+    `export type ${titlePrefix}Relationship = (typeof ${prefix}_RELATIONSHIPS)[number];`,
+  );
+  blocks.push('');
+
+  // Signals
+  blocks.push(formatTsConst(`${prefix}_SIGNALS`, signals));
+  blocks.push(`export type ${titlePrefix}Signal = (typeof ${prefix}_SIGNALS)[number];`);
+  blocks.push('');
+
+  // Renderer map
+  const rendererEntries = Object.entries(rendererMap)
+    .map(([fmt, comp]) => `  '${fmt}': '${comp}',`)
+    .join('\n');
+  blocks.push(
+    `export const ${prefix}_RENDERER_MAP: Record<string, string> = {\n${rendererEntries}\n};`,
+  );
+
+  // Remove trailing empty blocks
+  while (blocks.length > 0 && blocks[blocks.length - 1] === '') blocks.pop();
+
+  const header = `// AUTO-GENERATED from app manifest: ${relManifestPath}
+// DO NOT EDIT — regenerate with: pnpm run lamad:codegen
+`;
+
+  return header + '\n' + blocks.join('\n') + '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +221,7 @@ async function main() {
     metadataBlocks.push(generateInterfacesFromSchema(schema));
   }
   const metadataContent =
-    HEADER +
+    DOMAIN_HEADER +
     '\n' +
     metadataBlocks.join('\n\n') +
     '\n';
@@ -152,19 +232,21 @@ async function main() {
     bodyBlocks.push(generateInterfacesFromSchema(schema));
   }
   const bodyContent =
-    HEADER +
+    DOMAIN_HEADER +
     '\n' +
     bodyBlocks.join('\n\n') +
     '\n';
 
   // --- Generate content-node-types.ts ---
+  // Generic type guards: work with ContentView, ContentNode, or any type with contentType
+  const metadataImports = [...metadataSchemas.values()].map((v) => v.title).join(', ');
+
   const unionMembers = [];
   for (const [typeName, { title }] of metadataSchemas) {
     unionMembers.push(
       `  | (ContentView & { contentType: '${typeName}'; metadata: ${title} })`,
     );
   }
-  // Fallback for untyped content types
   unionMembers.push(
     `  | (ContentView & { contentType: string; metadata: Record<string, unknown> })`,
   );
@@ -173,17 +255,17 @@ async function main() {
   for (const [typeName, { title }] of metadataSchemas) {
     const guardName = `is${capitalize(typeName)}Node`;
     typeGuards.push(
-      `export function ${guardName}(node: ContentView): node is ContentView & { contentType: '${typeName}'; metadata: ${title} } {
+      `export function ${guardName}<T extends { contentType: string }>(node: T): node is T & { contentType: '${typeName}'; metadata: ${title} } {
   return node.contentType === '${typeName}';
 }`,
     );
   }
 
   const contentNodeContent =
-    HEADER +
+    DOMAIN_HEADER +
     `
 import type { ContentView } from '../../generated/content-view';
-import type { ${[...metadataSchemas.values()].map((v) => v.title).join(', ')} } from './metadata-types';
+import type { ${metadataImports} } from './metadata-types';
 
 export type TypedContentNode =
 ${unionMembers.join('\n')};
@@ -191,37 +273,47 @@ ${unionMembers.join('\n')};
 ${typeGuards.join('\n\n')}
 `;
 
-  // Also generate a seeder-compatible version without the @app/ import
   const seederContentNodeContent =
-    HEADER +
+    DOMAIN_HEADER +
     `
-import type { ContentView } from './content-view';
-import type { ${[...metadataSchemas.values()].map((v) => v.title).join(', ')} } from './metadata-types';
+import type { ContentView } from './content-view.js';
+import type { ${metadataImports} } from './metadata-types.js';
 
 export type TypedContentNode =
 ${unionMembers.join('\n')};
 
 ${typeGuards.join('\n\n')}
 `;
+
+  // --- Generate manifest-types.ts ---
+  const manifestContent = generateManifestTypes(manifest);
 
   // --- Output ---
-  const files = new Map([
+  // Files with identical content in both locations
+  const sharedFiles = new Map([
     ['metadata-types.ts', metadataContent],
     ['body-types.ts', bodyContent],
-    ['content-node-types.ts', null], // handled per-directory
+    ['manifest-types.ts', manifestContent],
   ]);
+
+  // Files with per-directory variants (different imports)
+  const variantFiles = new Map([
+    ['content-node-types.ts', { app: contentNodeContent, seeder: seederContentNodeContent }],
+  ]);
+
+  const allFilenames = [...sharedFiles.keys(), ...variantFiles.keys()];
 
   if (VERIFY) {
     let hasFailure = false;
     for (const dir of OUTPUT_DIRS) {
       const isSeeder = dir.includes('seeder');
-      for (const [filename, content] of files) {
-        const fileContent =
-          filename === 'content-node-types.ts'
-            ? isSeeder
-              ? seederContentNodeContent
-              : contentNodeContent
-            : content;
+      for (const filename of allFilenames) {
+        const fileContent = sharedFiles.has(filename)
+          ? sharedFiles.get(filename)
+          : isSeeder
+            ? variantFiles.get(filename).seeder
+            : variantFiles.get(filename).app;
+
         const outPath = resolve(dir, filename);
         let existing;
         try {
@@ -240,20 +332,20 @@ ${typeGuards.join('\n\n')}
       }
     }
     if (hasFailure) process.exit(1);
-    console.log('Lamad domain type codegen is up to date.');
+    console.log('Lamad codegen is up to date.');
     return;
   }
 
   for (const dir of OUTPUT_DIRS) {
     await mkdir(dir, { recursive: true });
     const isSeeder = dir.includes('seeder');
-    for (const [filename, content] of files) {
-      const fileContent =
-        filename === 'content-node-types.ts'
-          ? isSeeder
-            ? seederContentNodeContent
-            : contentNodeContent
-          : content;
+    for (const filename of allFilenames) {
+      const fileContent = sharedFiles.has(filename)
+        ? sharedFiles.get(filename)
+        : isSeeder
+          ? variantFiles.get(filename).seeder
+          : variantFiles.get(filename).app;
+
       const outPath = resolve(dir, filename);
       await writeFile(outPath, fileContent);
       console.log(`Generated: ${relative(REPO_ROOT, outPath)}`);
@@ -261,7 +353,7 @@ ${typeGuards.join('\n\n')}
   }
 
   console.log(
-    `\nLamad domain type codegen complete: ${files.size} files × ${OUTPUT_DIRS.length} locations`,
+    `\nLamad codegen complete: ${allFilenames.length} files × ${OUTPUT_DIRS.length} locations`,
   );
 }
 

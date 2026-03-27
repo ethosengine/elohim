@@ -9,7 +9,7 @@
  */
 
 import { ContentNode, ContentMetadata } from './content-node.model';
-import type { Section as RawSection, Item as RawItem, EprCompositeBody } from '../generated/body-types';
+import type { Section, Item, EprCompositeBody } from '../generated/body-types';
 import type { PathMetadata } from '../generated/metadata-types';
 
 // =========================================================================
@@ -475,9 +475,9 @@ function collectSteps(sections: PathSection[], stepOffset: number): PathStep[] {
 /**
  * Enrich a raw section from JSON body with backward-compat fields.
  */
-function enrichSection(raw: RawSection, index: number): PathSection {
+function enrichSection(raw: Section, index: number): PathSection {
   const items = (raw.items ?? []).map(
-    (item: RawItem): PathItem => ({
+    (item: Item): PathItem => ({
       ref: item.ref,
       role: item.role ?? 'step',
       title: item.title,
@@ -487,7 +487,7 @@ function enrichSection(raw: RawSection, index: number): PathSection {
     })
   );
 
-  const childSections = (raw.sections ?? []).map((s: RawSection, i: number) =>
+  const childSections = (raw.sections ?? []).map((s: Section, i: number) =>
     enrichSection(s, i)
   );
 
@@ -564,8 +564,7 @@ function sectionsToChapters(sections: PathSection[]): PathChapter[] {
   });
 }
 
-// RawSection and RawItem replaced by generated types from body-types.ts
-// imported as: Section as RawSection, Item as RawItem
+// Section and Item imported from generated body-types.ts
 
 /**
  * Parse a ContentNode into a PathView.

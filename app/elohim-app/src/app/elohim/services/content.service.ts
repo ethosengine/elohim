@@ -647,11 +647,16 @@ export class ContentService {
   // =========================================================================
 
   /**
-   * Transform raw data to ContentNode model
+   * Transform raw data to ContentNode model.
+   *
+   * Metadata is typed at consumption, not construction — consumers use
+   * isConceptNode()/isPathNode()/isAssessmentNode() type guards to narrow
+   * metadata to ConceptMetadata/PathMetadata/AssessmentMetadata.
    */
   private transformContent(data: RawContentData): ContentNode {
     const contentFormat = data.contentFormat ?? 'markdown';
     const rawContent = data.contentBody ?? data.content ?? '';
+    const metadata = (data.metadata ?? {}) as Record<string, unknown>;
 
     return {
       id: data.id ?? data.docId,
@@ -663,13 +668,13 @@ export class ContentService {
       contentFormat,
       tags: data.tags ?? [],
       relatedNodeIds: data.relatedNodeIds ?? [],
-      metadata: data.metadata ?? {},
+      metadata,
       authorId: data.authorId,
       reach: data.reach ?? 'commons',
       trustScore: data.trustScore,
-      estimatedMinutes: data.estimatedMinutes,
+      // Resolve thumbnailUrl from wire data or typed metadata (PathMetadata/ConceptMetadata)
       thumbnailUrl: this.resolveBlobUrl(
-        data.thumbnailUrl ?? (data.metadata as Record<string, unknown> | undefined)?.['thumbnailUrl'] as string
+        data.thumbnailUrl ?? (metadata['thumbnailUrl'] as string | undefined)
       ),
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,

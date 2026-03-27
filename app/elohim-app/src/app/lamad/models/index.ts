@@ -37,6 +37,17 @@ export {
   ContentRelationshipType,
   ALL_CONTENT_TYPES,
   ALL_CONTENT_FORMATS,
+  isConceptNode,
+  isAssessmentNode,
+  isPathNode,
+} from './content-node.model';
+
+// Generated typed metadata (from lamad companion schemas)
+export type {
+  TypedContentNode,
+  ConceptMetadata,
+  AssessmentMetadata,
+  PathMetadata,
 } from './content-node.model';
 
 // Content Attestation models (Trust credentials granted TO content)

@@ -24,6 +24,8 @@ import { CONTENT_FORMATS } from './validation-constants.js';
 import { ALL_STEP_TYPES } from './generated/schema-enums.js';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
+import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
+import type { Section, Item } from './generated/body-types.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +96,22 @@ function normalizeContentFormat(format: string | undefined): ContentFormat {
   // Default to markdown for unknown formats
   console.warn(`   ⚠️ Unknown contentFormat '${format}', defaulting to 'markdown'`);
   return 'markdown';
+}
+
+/** Map a step type to an Item role for the epr-composite body schema.
+ * Step types (content, assess, video, etc.) are a different concept from
+ * Item roles (step, checkpoint, optional, reflection). */
+function stepTypeToItemRole(stepType: string | undefined): Item['role'] {
+  switch (stepType) {
+    case 'assess':
+    case 'quiz':
+      return 'checkpoint';
+    case 'reflection':
+    case 'discuss':
+      return 'reflection';
+    default:
+      return 'step';
+  }
 }
 
 /** Map legacy/variant step types to schema-canonical values.
@@ -586,8 +604,8 @@ function transformContent(json: ConceptJson): CreateContentInput {
     contentSizeBytes = Buffer.byteLength(contentBody, 'utf-8');
   }
 
-  // Build metadata object (matches Rust JsonVal — parsed, not stringified)
-  const metadata: Record<string, unknown> = {};
+  // Build typed metadata (ConceptMetadata from generated schema types)
+  const metadata: ConceptMetadata = {};
   if (json.metadata) Object.assign(metadata, json.metadata);
   if (json.estimatedMinutes) metadata.estimatedMinutes = json.estimatedMinutes;
   if (json.thumbnailUrl) metadata.thumbnailUrl = json.thumbnailUrl;
@@ -650,25 +668,8 @@ function loadPathFiles(): PathJson[] {
   return paths;
 }
 
-interface SectionNode {
-  id?: string;
-  title?: string;
-  description?: string;
-  level?: string;
-  sections?: SectionNode[];
-  items?: SectionItem[];
-  estimatedDuration?: string;
-  optional?: boolean;
-}
-
-interface SectionItem {
-  ref: string;
-  role?: string;
-  title?: string;
-  narrative?: string;
-  learningObjectives?: string[];
-  completionCriteria?: { type: string; threshold?: number };
-}
+// Section/Item replaced by generated Section/Item from body-types.ts.
+// Both seeder and Angular use the same types from epr-composite-body.schema.json.
 
 /**
  * Convert path JSON chapters into the sections tree format.
@@ -677,7 +678,7 @@ interface SectionItem {
  * 2. chapters -> steps (governance paths, bdd-smoke-tests)
  * 3. flat conceptIds (no chapters)
  */
-function chaptersToSections(json: PathJson): SectionNode[] {
+function chaptersToSections(json: PathJson): Section[] {
   // Handle flat conceptIds (no chapters)
   if ((!json.chapters || json.chapters.length === 0) && json.conceptIds?.length) {
     return [{
@@ -696,7 +697,7 @@ function chaptersToSections(json: PathJson): SectionNode[] {
   if (!json.chapters) return [];
 
   return json.chapters.map((chapter, ci) => {
-    const section: SectionNode = {
+    const section: Section = {
       id: chapter.id,
       title: chapter.title,
       description: chapter.description,
@@ -730,17 +731,18 @@ function chaptersToSections(json: PathJson): SectionNode[] {
     // Shape 2: chapters -> steps (flat)
     if (chapter.steps?.length) {
       section.items = chapter.steps.map(step => {
-        const item: SectionItem = {
+        const item: Item = {
           ref: step.resourceId ?? '',
-          role: normalizeStepType(step.stepType),
+          role: stepTypeToItemRole(normalizeStepType(step.stepType)),
           title: step.stepTitle || step.title || formatConceptTitle(step.resourceId ?? ''),
         };
         if (step.stepNarrative) item.narrative = step.stepNarrative;
         if (step.learningObjectives) item.learningObjectives = step.learningObjectives;
         if (step.completionCriteria) {
+          // Legacy step data stores completionCriteria as string[]; map first to body schema shape
           item.completionCriteria = Array.isArray(step.completionCriteria)
-            ? { type: step.completionCriteria.join(', ') }
-            : step.completionCriteria;
+            ? { type: step.completionCriteria[0] as 'view' | 'score' | 'time' | 'interaction' }
+            : step.completionCriteria as unknown as Item['completionCriteria'];
         }
         return item;
       });
@@ -769,8 +771,8 @@ function chaptersToSections(json: PathJson): SectionNode[] {
 function transformPathToContent(json: PathJson): CreateContentInput {
   const sections = chaptersToSections(json);
 
-  // Build metadata
-  const metadata: Record<string, unknown> = {};
+  // Build typed metadata (PathMetadata from generated schema types)
+  const metadata: PathMetadata = {};
   if (json.pathType) metadata.pathType = json.pathType;
   if (json.difficulty) metadata.difficulty = json.difficulty;
   if (json.estimatedDuration) metadata.estimatedDuration = json.estimatedDuration;
@@ -825,7 +827,7 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
 }
 
 /** Count total items across a sections tree (for logging) */
-function countItems(sections: SectionNode[]): number {
+function countItems(sections: Section[]): number {
   let count = 0;
   for (const s of sections) {
     count += s.items?.length ?? 0;

@@ -10,14 +10,14 @@ export type TypedContentNode =
   | (ContentView & { contentType: 'path'; metadata: PathMetadata })
   | (ContentView & { contentType: string; metadata: Record<string, unknown> });
 
-export function isConceptNode(node: ContentView): node is ContentView & { contentType: 'concept'; metadata: ConceptMetadata } {
+export function isConceptNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'concept'; metadata: ConceptMetadata } {
   return node.contentType === 'concept';
 }
 
-export function isAssessmentNode(node: ContentView): node is ContentView & { contentType: 'assessment'; metadata: AssessmentMetadata } {
+export function isAssessmentNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'assessment'; metadata: AssessmentMetadata } {
   return node.contentType === 'assessment';
 }
 
-export function isPathNode(node: ContentView): node is ContentView & { contentType: 'path'; metadata: PathMetadata } {
+export function isPathNode<T extends { contentType: string }>(node: T): node is T & { contentType: 'path'; metadata: PathMetadata } {
   return node.contentType === 'path';
 }

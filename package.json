@@ -50,8 +50,8 @@
     "schema:codegen:rs": "node elohim/sdk/schemas/scripts/codegen-rs.mjs",
     "manifest:codegen": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs app/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts",
     "manifest:codegen:verify": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs --verify app/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts",
-    "lamad:codegen": "node app/lamad/scripts/codegen-types.mjs",
-    "lamad:codegen:verify": "node app/lamad/scripts/codegen-types.mjs --verify"
+    "lamad:codegen": "node app/lamad/scripts/codegen.mjs",
+    "lamad:codegen:verify": "node app/lamad/scripts/codegen.mjs --verify"
   },
   "dependencies": {
   }
