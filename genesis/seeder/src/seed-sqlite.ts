@@ -247,6 +247,37 @@ function formatCount(n: number | undefined): string {
 }
 
 /**
+ * Validate HTTP response shape at the wire boundary.
+ * TypeScript types disappear at runtime — this catches snake_case, missing fields,
+ * and unexpected shapes before they cause cryptic errors downstream.
+ */
+function assertResponseShape<T>(
+  data: unknown,
+  requiredFields: (keyof T)[],
+  endpoint: string,
+): asserts data is T {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error(
+      `[${endpoint}] Expected object, got ${typeof data}. ` +
+      `Response: ${JSON.stringify(data).slice(0, 200)}`
+    );
+  }
+  const obj = data as Record<string, unknown>;
+  const missing = requiredFields.filter(f => !(f as string in obj));
+  if (missing.length > 0) {
+    const snakeCase = missing.map(f => String(f).replace(/[A-Z]/g, c => `_${c.toLowerCase()}`));
+    const hasSnake = snakeCase.some(s => s in obj);
+    const hint = hasSnake
+      ? ` (found snake_case equivalents — storage may need updating to camelCase)`
+      : '';
+    throw new Error(
+      `[${endpoint}] Response missing required fields: ${missing.join(', ')}${hint}. ` +
+      `Got keys: ${Object.keys(obj).join(', ')}`
+    );
+  }
+}
+
+/**
  * Compute SHA256 hash of data (matching elohim-storage format).
  */
 function computeHash(data: Buffer): string {
@@ -795,7 +826,11 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  assertResponseShape<{ inserted: number; skipped: number; errors: string[] }>(
+    data, ['inserted', 'skipped', 'errors'], '/db/content/bulk'
+  );
+  return data;
 }
 
 /** Count total items across a sections tree (for logging) */
@@ -814,11 +849,10 @@ async function getStats(): Promise<{ contentCount: number; uniqueTags: number }>
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
   const data = await response.json();
-  // Handle both camelCase (new) and snake_case (legacy) stats responses
-  return {
-    contentCount: data.contentCount ?? data.content_count ?? 0,
-    uniqueTags: data.uniqueTags ?? data.unique_tags ?? 0,
-  };
+  assertResponseShape<{ contentCount: number; uniqueTags: number }>(
+    data, ['contentCount', 'uniqueTags'], '/db/stats'
+  );
+  return data;
 }
 
 // ============================================================================
