@@ -68,10 +68,10 @@ def resolveInternalStorageUrl(String doorwayHost) {
  * is missing or unparseable.
  */
 def getHumanStorageUrls(String ignored) {
-    def topoFile = new File("${env.WORKSPACE}/genesis/orchestrator/environments/topology.json")
-    if (topoFile.exists()) {
+    def topoPath = "genesis/orchestrator/environments/topology.json"
+    if (fileExists(topoPath)) {
         try {
-            def topo = new groovy.json.JsonSlurper().parse(topoFile)
+            def topo = new groovy.json.JsonSlurper().parseText(readFile(topoPath))
             return topo.humans.collect { h ->
                 [
                     humanId:    h.humanId,
