@@ -43,6 +43,11 @@
       "humanId": "human-timothy-tutor",
       "affinity": 0.7,
       "role": "author"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.9,
+      "role": "curator"
     }
   ]
 }
