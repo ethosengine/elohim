@@ -80,7 +80,10 @@ describe('ContentViewerComponent', () => {
       }),
     };
 
-    const agentSpyObj = { markContentSeen: vi.fn().mockReturnValue(of(undefined)) };
+    const agentSpyObj = {
+      markContentSeen: vi.fn().mockReturnValue(of(undefined)),
+      getCurrentAgentId: vi.fn().mockReturnValue('test-agent-id'),
+    };
     const contentSpyObj = { getContainingPathsSummary: vi.fn().mockReturnValue(of([])) };
     const dataLoaderSpyObj = {
       getContent: vi.fn().mockReturnValue(of(mockContentNode)),
