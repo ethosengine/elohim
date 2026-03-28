@@ -50,6 +50,11 @@ interface Manifest {
       economicAction: string;
       resourceType: string;
     }>;
+    observations: Record<string, {
+      description: string;
+      instrument: string;
+      polarity: string;
+    }>;
   };
   rendering: Record<string, {
     component: string;
@@ -275,5 +280,82 @@ describe('Lamad manifest: relationships', () => {
       }
     }
     expect(broken, `Broken inverse relationships: ${broken.join('; ')}`).toEqual([]);
+  });
+});
+
+describe('observations vocabulary', () => {
+  it('should declare observations', () => {
+    expect(manifest.vocabulary.observations).toBeDefined();
+    expect(Object.keys(manifest.vocabulary.observations).length).toBeGreaterThan(0);
+  });
+
+  it('should include at least one negative-polarity observation', () => {
+    const observations = manifest.vocabulary.observations;
+    const hasNegative = Object.values(observations).some(
+      (obs: any) => obs.polarity === 'negative',
+    );
+    expect(hasNegative).toBe(true);
+  });
+
+  it('should reference valid instrument archetypes', () => {
+    const validArchetypes = [
+      'retention-check',
+      'outcome-correlation',
+      'distribution-health',
+      'cost-accumulation',
+      'outcome-divergence',
+      'community-report',
+    ];
+    const observations = manifest.vocabulary.observations;
+    for (const [name, obs] of Object.entries(observations)) {
+      expect(validArchetypes).toContain((obs as any).instrument);
+    }
+  });
+});
+
+describe('claims on content types', () => {
+  it('every content type should have at least one claim', () => {
+    const types = manifest.vocabulary.contentTypes;
+    for (const [name, decl] of Object.entries(types)) {
+      expect((decl as any).coupling.claims, `${name} missing claims`).toBeDefined();
+      expect(
+        (decl as any).coupling.claims.length,
+        `${name} has empty claims`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it('every claim should reference a declared observation', () => {
+    const types = manifest.vocabulary.contentTypes;
+    const observations = Object.keys(manifest.vocabulary.observations);
+    for (const [name, decl] of Object.entries(types)) {
+      const claims = (decl as any).coupling.claims || [];
+      for (const claim of claims) {
+        expect(
+          observations,
+          `${name} claim asserts unknown observation: ${claim.asserts}`,
+        ).toContain(claim.asserts);
+        expect(
+          observations,
+          `${name} claim contradictedBy unknown observation: ${claim.contradictedBy}`,
+        ).toContain(claim.contradictedBy);
+      }
+    }
+  });
+
+  it('every claim should have a valid ISO 8601 duration', () => {
+    const types = manifest.vocabulary.contentTypes;
+    for (const [name, decl] of Object.entries(types)) {
+      const claims = (decl as any).coupling.claims || [];
+      for (const claim of claims) {
+        expect(
+          claim.validityHorizon,
+          `${name} claim missing validityHorizon`,
+        ).toBeDefined();
+        expect(claim.validityHorizon, `${name} validityHorizon not ISO 8601`).toMatch(
+          /^P/,
+        );
+      }
+    }
   });
 });

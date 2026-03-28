@@ -34,7 +34,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" },
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
         }
       },
       "lesson": {
@@ -65,7 +69,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" },
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
         }
       },
       "assessment": {
@@ -96,7 +104,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["assessment-completed", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" },
+            { "asserts": "mastery-attestation-meaningful", "contradictedBy": "downstream-prerequisite-failure", "validityHorizon": "P90D", "leg": "value" }
+          ]
         }
       },
       "exercise": {
@@ -121,7 +133,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["practice-engagement", "learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" }
+          ]
         }
       },
       "reflection": {
@@ -145,7 +160,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
         }
       },
       "discussion": {
@@ -174,7 +192,10 @@
             "minimumReach": "intimate",
             "governanceModel": "community-vote",
             "signalTypes": ["learning-signal", "contribution-created"]
-          }
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P90D", "leg": "value" }
+          ]
         }
       },
       "article": {
@@ -204,7 +225,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal", "contribution-created"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" },
+            { "asserts": "stewardship-distributed", "contradictedBy": "stewardship-concentrated", "validityHorizon": "P180D", "leg": "governance" }
+          ]
         }
       },
       "path": {
@@ -240,7 +265,12 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["path-completed", "learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "learning-outcome-achieved", "contradictedBy": "path-completion-without-retention", "validityHorizon": "P90D", "leg": "knowledge" },
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" },
+            { "asserts": "stewardship-distributed", "contradictedBy": "stewardship-concentrated", "validityHorizon": "P180D", "leg": "governance" }
+          ]
         }
       },
       "epic": {
@@ -265,7 +295,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "scenario": {
@@ -290,7 +323,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "discovery-assessment": {
@@ -319,7 +355,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["assessment-completed", "learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "instrument": {
@@ -343,7 +382,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["contribution-created"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "quiz": {
@@ -372,7 +414,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["assessment-completed", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" },
+            { "asserts": "mastery-attestation-meaningful", "contradictedBy": "downstream-prerequisite-failure", "validityHorizon": "P90D", "leg": "value" }
+          ]
         }
       },
       "course-module": {
@@ -403,7 +449,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "learning-outcome-achieved", "contradictedBy": "path-completion-without-retention", "validityHorizon": "P90D", "leg": "knowledge" },
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
         }
       },
       "module": {
@@ -428,7 +478,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "learning-outcome-achieved", "contradictedBy": "path-completion-without-retention", "validityHorizon": "P90D", "leg": "knowledge" },
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
         }
       },
       "community": {
@@ -452,7 +506,10 @@
             "minimumReach": "intimate",
             "governanceModel": "community-vote",
             "signalTypes": ["contribution-created"]
-          }
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P90D", "leg": "value" }
+          ]
         }
       },
       "tool": {
@@ -476,7 +533,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "placeholder": {
@@ -487,7 +547,10 @@
             "defaultReach": "private",
             "minimumReach": "private",
             "governanceModel": "steward-consent"
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P1D", "leg": "knowledge" }
+          ]
         }
       },
       "simulation": {
@@ -517,7 +580,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["practice-engagement", "learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" }
+          ]
         }
       },
       "feature": {
@@ -542,7 +608,10 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["learning-signal"]
-          }
+          },
+          "claims": [
+            { "asserts": "content-relevant", "contradictedBy": "content-outdated", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
         }
       },
       "practice": {
@@ -572,7 +641,11 @@
             "minimumReach": "community",
             "governanceModel": "steward-consent",
             "signalTypes": ["practice-engagement", "mastery-achieved"]
-          }
+          },
+          "claims": [
+            { "asserts": "knowledge-retention", "contradictedBy": "retention-failure", "validityHorizon": "P30D", "leg": "knowledge" },
+            { "asserts": "mastery-attestation-meaningful", "contradictedBy": "downstream-prerequisite-failure", "validityHorizon": "P90D", "leg": "value" }
+          ]
         }
       }
     },
