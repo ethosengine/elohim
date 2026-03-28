@@ -450,7 +450,7 @@ interface StewardAnnotation {
 
 /**
  * Filter content nodes to those stewarded by a specific human.
- * Returns content where the given humanId appears anywhere in the steward list.
+ * Returns content where the given humanId is the highest-affinity steward.
  * If no stewardedBy field exists, defaults to the operator (backwards compat).
  */
 function filterBySteward(
@@ -465,7 +465,8 @@ function filterBySteward(
       return humanId === operatorId;
     }
 
-    return stewards.some(s => s.humanId === humanId);
+    const primary = stewards.reduce((max, s) => (s.affinity > max.affinity ? s : max), stewards[0]);
+    return primary.humanId === humanId;
   });
 }
 
