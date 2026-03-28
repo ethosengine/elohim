@@ -76,11 +76,10 @@ export class MarkdownParser {
       title,
       description: this.generateDescription(sections),
       tags,
-      sourcePath,
       content, // Keep full content
       contentFormat: 'markdown',
       relatedNodeIds: [...featureIds, ...relatedEpicIds],
-      metadata,
+      metadata: { ...metadata, sourcePath },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
