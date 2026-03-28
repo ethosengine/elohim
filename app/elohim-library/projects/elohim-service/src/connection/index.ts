@@ -68,3 +68,12 @@ export {
 
 // Re-export SourceTier from content-resolver for convenience
 export { SourceTier } from '../cache/content-resolver';
+
+// Conductor content normalizer (for conductor → ContentView normalization)
+export {
+  normalizeConductorContent,
+  normalizeConductorContentBatch,
+  isConductorResponse,
+  ensureContentView,
+  type ConductorContentResponse,
+} from '../adapters/conductor-normalizer';

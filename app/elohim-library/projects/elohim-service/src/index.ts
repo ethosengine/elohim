@@ -33,6 +33,9 @@ export * from './parsers/gherkin-parser';
 // Transformers
 export * from './transformers';
 
+// Adapters (wire format normalization for multi-transport content pipeline)
+export * from './adapters';
+
 // Services
 export * from './services/relationship-extractor.service';
 export * from './services/manifest.service';
