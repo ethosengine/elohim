@@ -37,6 +37,16 @@ function minimalCoupling() {
       minimumReach: 'community',
       governanceModel: 'steward-consent',
     },
+    claims: [
+      { asserts: 'comprehension', contradictedBy: 'comprehension-failure', validityHorizon: 'P30D' },
+    ],
+  };
+}
+
+function minimalObservations() {
+  return {
+    comprehension: { description: 'Learner demonstrated comprehension', instrument: 'retention-check', polarity: 'positive' },
+    'comprehension-failure': { description: 'Learner failed to demonstrate comprehension', instrument: 'retention-check', polarity: 'negative' },
   };
 }
 
@@ -52,6 +62,7 @@ function minimalManifest() {
           coupling: minimalCoupling(),
         },
       },
+      observations: minimalObservations(),
     },
   };
 }
@@ -83,6 +94,9 @@ function fullManifest() {
               governanceModel: 'steward-consent',
               signalTypes: ['view', 'bookmark'],
             },
+            claims: [
+              { asserts: 'comprehension', contradictedBy: 'comprehension-failure', validityHorizon: 'P30D', leg: 'knowledge' },
+            ],
           },
         },
         section: {
@@ -120,6 +134,7 @@ function fullManifest() {
           economicAction: 'consume',
         },
       },
+      observations: minimalObservations(),
     },
     rendering: {
       'markdown-renderer': {
@@ -141,6 +156,16 @@ async function main() {
     resolve(__dirname, '../v1/enums/substrate-signal.schema.json'),
   );
   ajv.addSchema(substrateSignalSchema, 'epr:enums/substrate-signal.schema.json');
+
+  const instrumentArchetypeSchema = await loadJson(
+    resolve(__dirname, '../v1/enums/instrument-archetype.schema.json'),
+  );
+  ajv.addSchema(instrumentArchetypeSchema, 'epr:enums/instrument-archetype.schema.json');
+
+  const observationPolaritySchema = await loadJson(
+    resolve(__dirname, '../v1/enums/observation-polarity.schema.json'),
+  );
+  ajv.addSchema(observationPolaritySchema, 'epr:enums/observation-polarity.schema.json');
 
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
@@ -212,6 +237,76 @@ async function main() {
       },
     };
     assert(!validate(m), 'rejects signal with invalid substrate');
+  }
+
+  // 9. Should reject content type without claims
+  {
+    const noClaims = {
+      id: 'test', name: 'test', version: '1.0.0',
+      vocabulary: {
+        contentTypes: {
+          thing: {
+            description: 'test',
+            coupling: {
+              value: { onConsume: { action: 'use' } },
+              governance: { defaultReach: 'commons', minimumReach: 'community', governanceModel: 'steward-consent' }
+            }
+          }
+        },
+        observations: {
+          'good-thing': { description: 'test', instrument: 'retention-check', polarity: 'positive' },
+          'bad-thing': { description: 'test', instrument: 'retention-check', polarity: 'negative' }
+        }
+      }
+    };
+    const valid = validate(noClaims);
+    assert(!valid, 'Should reject content type without claims');
+  }
+
+  // 10. Should accept content type with valid claims + observations
+  {
+    const validClaims = {
+      id: 'test', name: 'test', version: '1.0.0',
+      vocabulary: {
+        contentTypes: {
+          thing: {
+            description: 'test',
+            coupling: {
+              value: { onConsume: { action: 'use' } },
+              governance: { defaultReach: 'commons', minimumReach: 'community', governanceModel: 'steward-consent' },
+              claims: [{ asserts: 'good-thing', contradictedBy: 'bad-thing', validityHorizon: 'P30D' }]
+            }
+          }
+        },
+        observations: {
+          'good-thing': { description: 'test', instrument: 'retention-check', polarity: 'positive' },
+          'bad-thing': { description: 'test', instrument: 'retention-check', polarity: 'negative' }
+        }
+      }
+    };
+    const valid = validate(validClaims);
+    assert(valid, `Should accept content type with valid claims + observations: ${JSON.stringify(validate.errors)}`);
+  }
+
+  // 11. Should reject manifest without observations
+  {
+    const noObservations = {
+      id: 'test', name: 'test', version: '1.0.0',
+      vocabulary: {
+        contentTypes: {
+          thing: {
+            description: 'test',
+            coupling: {
+              value: { onConsume: { action: 'use' } },
+              governance: { defaultReach: 'commons', minimumReach: 'community', governanceModel: 'steward-consent' },
+              claims: [{ asserts: 'good', contradictedBy: 'bad', validityHorizon: 'P30D' }]
+            }
+          }
+        }
+      }
+    };
+    const valid = validate(noObservations);
+    assert(!valid, 'Should reject manifest without observations');
   }
 
   console.log(`\n${passes} passed, ${failures} failed`);

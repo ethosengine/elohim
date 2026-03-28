@@ -41,7 +41,7 @@
       "title": "Vocabulary",
       "description": "The app's content vocabulary — the types, formats, relationships, and signals it declares. The protocol validates structural coupling; the app owns the semantic meaning of each entry.",
       "type": "object",
-      "required": ["contentTypes"],
+      "required": ["contentTypes", "observations"],
       "properties": {
         "contentTypes": {
           "type": "object",
@@ -71,6 +71,14 @@
           "additionalProperties": {
             "$ref": "#/$defs/SignalDeclaration"
           }
+        },
+        "observations": {
+          "type": "object",
+          "description": "Map of observation name to ObservationDeclaration. Declares the feedback evidence vocabulary. Must include at least one negative-polarity observation — systems cannot ship positive-only feedback.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ObservationDeclaration"
+          },
+          "minProperties": 1
         }
       },
       "additionalProperties": false
@@ -97,9 +105,9 @@
     },
     "ThreeLegCoupling": {
       "title": "ThreeLegCoupling",
-      "description": "The three-leg coupling contract for a content type. Every EPR carries lamad (knowledge) + shefa (value) + qahal (governance) dimensions. No value-blind content. No governance-free content.",
+      "description": "The three-leg coupling contract for a content type, with required feedback claims. Every EPR carries lamad (knowledge) + shefa (value) + qahal (governance) dimensions, and must declare what outcomes it claims to produce. No value-blind content. No governance-free content. No unobserved claims.",
       "type": "object",
-      "required": ["value", "governance"],
+      "required": ["value", "governance", "claims"],
       "properties": {
         "knowledge": {
           "$ref": "#/$defs/KnowledgeLeg"
@@ -109,6 +117,14 @@
         },
         "governance": {
           "$ref": "#/$defs/GovernanceLeg"
+        },
+        "claims": {
+          "type": "array",
+          "description": "Claims about what outcomes this content type produces. Every content type must assert at least one outcome and declare what would contradict it.",
+          "items": {
+            "$ref": "#/$defs/ClaimDeclaration"
+          },
+          "minItems": 1
         }
       },
       "additionalProperties": false
@@ -196,6 +212,54 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClaimDeclaration": {
+      "title": "ClaimDeclaration",
+      "description": "A claim about what outcome a content type produces. Every claim declares what it asserts, what would contradict it, and how long it's presumed valid. Accumulated positive observations extend the validity horizon; accumulated negative observations shorten it.",
+      "type": "object",
+      "required": ["asserts", "contradictedBy", "validityHorizon"],
+      "properties": {
+        "asserts": {
+          "type": "string",
+          "description": "Observation term this content type claims to produce. References an observation name in vocabulary.observations."
+        },
+        "contradictedBy": {
+          "type": "string",
+          "description": "Observation term that would undermine this claim. References an observation name in vocabulary.observations. Should have negative polarity."
+        },
+        "validityHorizon": {
+          "type": "string",
+          "description": "ISO 8601 duration. How long the claim is presumed valid without fresh evidence.",
+          "pattern": "^P"
+        },
+        "leg": {
+          "type": "string",
+          "enum": ["knowledge", "value", "governance"],
+          "description": "Which coupling leg this claim relates to. Optional — for documentation and query filtering."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObservationDeclaration": {
+      "title": "ObservationDeclaration",
+      "description": "Declaration of an observation term — something the system watches for. Observations have polarity: positive observations extend claim validity horizons, negative observations shorten them. The protocol requires at least one negative-polarity observation per manifest.",
+      "type": "object",
+      "required": ["description", "instrument", "polarity"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this observation means."
+        },
+        "instrument": {
+          "$ref": "../enums/instrument-archetype.schema.json",
+          "description": "Instrument archetype that produces this observation. References a protocol-defined archetype."
+        },
+        "polarity": {
+          "$ref": "../enums/observation-polarity.schema.json",
+          "description": "Positive observations extend claim validity. Negative observations shorten it."
         }
       },
       "additionalProperties": false
