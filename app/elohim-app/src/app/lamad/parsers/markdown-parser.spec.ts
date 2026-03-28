@@ -15,7 +15,7 @@ Content for section 1.`;
 
       expect(result.contentType).toBe('epic');
       expect(result.title).toBe('Test Epic');
-      expect(result.sourcePath).toBe('test-epic.md');
+      expect(result.metadata.sourcePath).toBe('test-epic.md');
       expect(result.content).toBe(content);
       const sections = result.metadata?.['sections'] as any[];
       expect(sections.length).toBe(2);

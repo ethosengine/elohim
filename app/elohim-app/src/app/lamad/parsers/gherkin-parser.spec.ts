@@ -461,8 +461,8 @@ Feature: Authentication feature
 
         const result = GherkinParser.parseFeature(content, 'features/auth/login.feature', 'test');
 
-        expect(result.feature.sourcePath).toBe('features/auth/login.feature');
-        expect(result.scenarios[0].sourcePath).toBe('features/auth/login.feature');
+        expect(result.feature.metadata.sourcePath).toBe('features/auth/login.feature');
+        expect(result.scenarios[0].metadata.sourcePath).toBe('features/auth/login.feature');
       });
     });
 
