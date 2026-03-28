@@ -112,7 +112,7 @@ export interface CreateContentInput {
   /**
    * Domain-specific metadata
    */
-  metadata?: {};
+  metadata?: Record<string, unknown>;
   reach?: Reach;
   /**
    * Creator agent ID

@@ -23,9 +23,9 @@ export interface CreateAttestationInput {
   /**
    * Supporting evidence for the attestation (parsed object)
    */
-  evidence?: {};
+  evidence?: Record<string, unknown>;
   /**
    * Grantor context — who authorized this attestation and under what governance model (parsed object)
    */
-  grantor?: {};
+  grantor?: Record<string, unknown>;
 }

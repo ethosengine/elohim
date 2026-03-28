@@ -107,9 +107,7 @@ export function normalizeConductorContent(raw: ConductorContentResponse): Conten
 /**
  * Normalize an array of conductor content responses.
  */
-export function normalizeConductorContentBatch(
-  items: ConductorContentResponse[]
-): ContentView[] {
+export function normalizeConductorContentBatch(items: ConductorContentResponse[]): ContentView[] {
   return items.map(normalizeConductorContent);
 }
 
@@ -127,9 +125,7 @@ export function normalizeConductorContentBatch(
  * Useful when doorway falls back to conductor — the same HTTP endpoint can
  * return either format depending on which tier served the response.
  */
-export function isConductorResponse(
-  response: unknown
-): response is ConductorContentResponse {
+export function isConductorResponse(response: unknown): response is ConductorContentResponse {
   if (response === null || response === undefined || typeof response !== 'object') {
     return false;
   }

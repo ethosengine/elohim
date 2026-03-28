@@ -87,7 +87,7 @@ export interface CreateEconomicEventInput {
   /**
    * Domain-specific metadata (parsed object, not stringified)
    */
-  metadata?: {};
+  metadata?: Record<string, unknown>;
   /**
    * Place ID for spatial grounding of this event
    */

@@ -35,7 +35,7 @@ export interface EconomicEventView {
   /**
    * Classification URIs for the resource
    */
-  resourceClassifiedAs?: string[] | {};
+  resourceClassifiedAs?: string[] | Record<string, unknown>;
   resourceQuantityValue?: number;
   resourceQuantityUnit?: string;
   effortQuantityValue?: number;
@@ -63,7 +63,7 @@ export interface EconomicEventView {
   /**
    * Domain-specific metadata (parsed object)
    */
-  metadata?: {};
+  metadata?: Record<string, unknown>;
   /**
    * DHT entry hash linking this projection to the notarized record
    */
