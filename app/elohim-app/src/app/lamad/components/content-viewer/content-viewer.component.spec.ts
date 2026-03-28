@@ -16,6 +16,7 @@ import { RendererRegistryService } from '../../renderers/renderer-registry.servi
 import { ContentNode } from '../../models/content-node.model';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
+import { SignalHarnessService } from '../../services/signal-harness.service';
 import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
@@ -155,6 +156,7 @@ describe('ContentViewerComponent', () => {
         { provide: SeoService, useValue: seoServiceSpyObj },
         { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
         { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
+        { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
         {
           provide: ActivatedRoute,
           useValue: {
