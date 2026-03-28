@@ -1,0 +1,34 @@
+{
+  "$id": "epr:schema:enum:instrument-archetype",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InstrumentArchetype",
+  "description": "Protocol-level instrument archetypes for feedback observation. Each archetype is a named pattern for how observations are produced — apps reference these in their observation declarations.",
+  "type": "string",
+  "enum": [
+    "retention-check",
+    "outcome-correlation",
+    "distribution-health",
+    "cost-accumulation",
+    "outcome-divergence",
+    "community-report"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "retention-check",
+        "outcome-correlation",
+        "distribution-health",
+        "cost-accumulation",
+        "outcome-divergence",
+        "community-report"
+      ],
+      "rationale": "All six archetypes are protocol primitives — they define the categories of questions a system must ask about itself."
+    }
+  },
+  "_dna": {
+    "constant": "INSTRUMENT_ARCHETYPES",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:enum:observation-polarity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObservationPolarity",
+  "description": "Polarity of a feedback observation. Positive observations extend claim validity horizons. Negative observations shorten them. The protocol requires at least one negative-polarity observation per manifest — systems cannot ship positive-only feedback.",
+  "type": "string",
+  "enum": ["positive", "negative"],
+  "_tiers": {
+    "core": {
+      "values": ["positive", "negative"],
+      "rationale": "Binary polarity is a protocol invariant — every observation either supports or strains a claim."
+    }
+  },
+  "_dna": {
+    "constant": "OBSERVATION_POLARITIES",
+    "zome": "content_store_integrity",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}
