@@ -110,6 +110,26 @@ pub const ALL_ENGAGEMENT_TYPES: &[&str] = &[
     "view", "quiz", "practice", "discuss", "create", "peer", "teach", "apply",
 ];
 
+/// Core instrumentarchetype — All six archetypes are protocol primitives — they define the categories of questions a system must ask about itself.
+pub const CORE_INSTRUMENT_ARCHETYPES: &[&str] = &[
+    "retention-check",
+    "outcome-correlation",
+    "distribution-health",
+    "cost-accumulation",
+    "outcome-divergence",
+    "community-report",
+];
+
+/// All instrumentarchetype — includes storage-only and extensible.
+pub const ALL_INSTRUMENT_ARCHETYPES: &[&str] = &[
+    "retention-check",
+    "outcome-correlation",
+    "distribution-health",
+    "cost-accumulation",
+    "outcome-divergence",
+    "community-report",
+];
+
 /// Core masterylevel — Bloom's taxonomy levels. DNA-notarized. Level 4 (apply) is the attestation gate for governance participation.
 pub const CORE_MASTERY_LEVELS: &[&str] = &[
     "not_started",
@@ -136,6 +156,12 @@ pub const ALL_MASTERY_LEVELS: &[&str] = &[
     "recall",
     "synthesize",
 ];
+
+/// Core observationpolarity — Binary polarity is a protocol invariant — every observation either supports or strains a claim.
+pub const CORE_OBSERVATION_POLARITIES: &[&str] = &["positive", "negative"];
+
+/// All observationpolarity — includes storage-only and extensible.
+pub const ALL_OBSERVATION_POLARITIES: &[&str] = &["positive", "negative"];
 
 /// Core pathvisibility — DNA-notarized visibility. Gates content distribution.
 pub const CORE_PATH_VISIBILITIES: &[&str] = &["private", "unlisted", "community", "public"];
@@ -191,33 +217,7 @@ pub const ALL_STEP_TYPES: &[&str] = &[
     "reflection",
 ];
 
-/// Core instrumentarchetype — All six archetypes are protocol primitives — they define the categories of questions a system must ask about itself.
-pub const CORE_INSTRUMENT_ARCHETYPES: &[&str] = &[
-    "retention-check",
-    "outcome-correlation",
-    "distribution-health",
-    "cost-accumulation",
-    "outcome-divergence",
-    "community-report",
-];
-
-/// All instrumentarchetype — includes storage-only and extensible.
-pub const ALL_INSTRUMENT_ARCHETYPES: &[&str] = &[
-    "retention-check",
-    "outcome-correlation",
-    "distribution-health",
-    "cost-accumulation",
-    "outcome-divergence",
-    "community-report",
-];
-
-/// Core observationpolarity — Binary polarity is a protocol invariant — every observation either supports or strains a claim.
-pub const CORE_OBSERVATION_POLARITIES: &[&str] = &["positive", "negative"];
-
-/// All observationpolarity — includes storage-only and extensible.
-pub const ALL_OBSERVATION_POLARITIES: &[&str] = &["positive", "negative"];
-
-/// Core substratesignal — Protocol-level resource dimensions that all app-specific signals map to.
+/// Core substratesignal — All substrate signals are protocol-level primitives. They are the dimensions through which value, governance, and knowledge couple to infrastructure.
 pub const CORE_SUBSTRATE_SIGNALS: &[&str] = &[
     "attention",
     "compute",
