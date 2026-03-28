@@ -173,6 +173,35 @@ Before proposing design approaches for ANY feature involving data entities (tabl
 
 **If you're about to write "Option A: `GET /api/v1/thing`" without having answered these questions, STOP and invoke the skill.**
 
+## Schema & Manifest Sources of Truth
+
+Two authoritative schemas govern content types and formats. All generated artifacts derive from these — never hand-edit generated files.
+
+| Source of Truth | Path | Governs | Generates |
+|----------------|------|---------|-----------|
+| **Protocol Schema** | `elohim/sdk/schemas/v1/` | DNA-notarized enums (ContentFormat, ContentType, etc.) — the protocol's law | `schema-enums.ts` via `pnpm run schema:codegen:ts`, Rust constants via `pnpm run schema:codegen:rs` |
+| **Lamad Manifest** | `app/lamad/manifest.json` | App vocabulary: content types, content formats, renderer mappings, relationships, signals, coupling rules | `manifest-types.ts` via `pnpm run lamad:codegen` |
+
+### Key distinction: core vs extensible formats
+
+The protocol schema defines **broad core formats** (`markdown`, `html`, `interactive`, `video`, `audio`, `external`, `epr-composite`) that are DNA-notarized. The lamad manifest defines **specific extensible formats** (`sophia-quiz-json`, `html5-app`, `gherkin`, etc.) that map to Angular renderers.
+
+**Seed data must use lamad manifest formats, not core protocol formats.** The renderer map only knows about formats declared in the lamad manifest. Using a core format like `interactive` (which has no renderer) causes content to fall through to the raw JSON fallback.
+
+| Content | Correct `contentFormat` | Wrong |
+|---------|------------------------|-------|
+| Sophia quiz/assessment | `sophia-quiz-json` | `interactive` |
+| HTML5 simulation | `html5-app` | `interactive` |
+| Discovery assessment | `sophia-quiz-json` | `interactive` |
+
+### Validation commands
+```bash
+pnpm run schema:validate         # Validate seed JSON against protocol schemas
+pnpm run schema:check-dna        # Verify DNA constants match schema enums
+pnpm run schema:codegen:ts       # Regenerate TS from protocol schemas (verification mode)
+pnpm run lamad:codegen            # Regenerate manifest-types.ts from lamad manifest
+```
+
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required

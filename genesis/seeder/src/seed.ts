@@ -480,16 +480,27 @@ function cleanErrorMessage(error: any): string {
 /**
  * Normalize content format to storage-accepted values.
  *
- * Valid formats: markdown, html, json, text, perseus, gherkin, yaml, toml, latex, asciidoc, html5-app, iframe, embed
+ * Core protocol formats (e.g. "interactive") are broad categories.
+ * The renderer needs specific extensible formats (e.g. "sophia-quiz-json").
+ * This function refines core formats using contentType as a disambiguation hint.
  */
-function normalizeContentFormat(format: string | undefined): ContentFormat {
+function normalizeContentFormat(format: string | undefined, contentType?: string): ContentFormat {
   if (!format) return 'markdown';
   const formatMap: Record<string, ContentFormat> = {
-    'perseus-quiz-json': 'perseus',  // Perseus quiz format
     'plaintext': 'text',             // Plain text
     'plain': 'text',
     'txt': 'text',
   };
+
+  // Refine core "interactive" format to specific renderer format
+  if (format.toLowerCase() === 'interactive') {
+    if (contentType === 'simulation' || contentType === 'collective') {
+      return 'html5-app' as ContentFormat;
+    }
+    // Default: assessments, quizzes, discovery-assessments → sophia renderer
+    return 'sophia-quiz-json' as ContentFormat;
+  }
+
   return formatMap[format.toLowerCase()] || format.toLowerCase() as ContentFormat;
 }
 
@@ -781,7 +792,7 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     // Sparse: store hash reference, Full: store entire content
     // html5-app: always store the content object with appId/entryPoint
     contentBody: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
-    contentFormat: normalizeContentFormat(concept.contentFormat),
+    contentFormat: normalizeContentFormat(concept.contentFormat, concept.contentType),
     tags: concept.tags || [],
     reach: 'public',
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,

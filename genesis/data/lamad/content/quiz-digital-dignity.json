@@ -185,7 +185,7 @@
       }
     }
   ],
-  "contentFormat": "interactive",
+  "contentFormat": "sophia-quiz-json",
   "tags": [
     "assessment",
     "social-medium",

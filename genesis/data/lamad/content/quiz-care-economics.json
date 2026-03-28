@@ -186,7 +186,7 @@
       }
     }
   ],
-  "contentFormat": "interactive",
+  "contentFormat": "sophia-quiz-json",
   "tags": [
     "assessment",
     "value-scanner",
