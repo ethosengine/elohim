@@ -124,6 +124,25 @@ export const ALL_ENGAGEMENT_TYPES = [
 export const ENGAGEMENT_TYPES = ALL_ENGAGEMENT_TYPES;
 export type EngagementType = (typeof ALL_ENGAGEMENT_TYPES)[number];
 
+export const CORE_INSTRUMENT_ARCHETYPES = [
+  'retention-check',
+  'outcome-correlation',
+  'distribution-health',
+  'cost-accumulation',
+  'outcome-divergence',
+  'community-report',
+] as const;
+export const ALL_INSTRUMENT_ARCHETYPES = [
+  'retention-check',
+  'outcome-correlation',
+  'distribution-health',
+  'cost-accumulation',
+  'outcome-divergence',
+  'community-report',
+] as const;
+export const INSTRUMENT_ARCHETYPES = ALL_INSTRUMENT_ARCHETYPES;
+export type InstrumentArchetype = (typeof ALL_INSTRUMENT_ARCHETYPES)[number];
+
 export const CORE_MASTERY_LEVELS = [
   'not_started',
   'seen',
@@ -149,6 +168,11 @@ export const ALL_MASTERY_LEVELS = [
 ] as const;
 export const MASTERY_LEVELS = ALL_MASTERY_LEVELS;
 export type MasteryLevel = (typeof ALL_MASTERY_LEVELS)[number];
+
+export const CORE_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
+export const ALL_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
+export const OBSERVATION_POLARITIES = ALL_OBSERVATION_POLARITIES;
+export type ObservationPolarity = (typeof ALL_OBSERVATION_POLARITIES)[number];
 
 export const CORE_PATH_VISIBILITIES = ['private', 'unlisted', 'community', 'public'] as const;
 export const ALL_PATH_VISIBILITIES = [
