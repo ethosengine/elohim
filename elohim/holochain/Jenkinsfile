@@ -221,6 +221,279 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${deployVersion} ${componentName} || true"
 }
 
+// ============================================================================
+// TOPOLOGY-AWARE DEPLOYMENT HELPERS
+// ============================================================================
+
+/**
+ * Fixed identity attributes for all 5 protocol humans.
+ * Human-intrinsic values that never change regardless of deployment topology.
+ */
+def getHumanRegistry() {
+    return [
+        [name: 'matthew', role: 'manager', humanLabel: 'matthew-manager', humanId: 'human-matthew-manager',
+         manifest: 'genesis/orchestrator/manifests/humans/matthew-manager.yaml'],
+        [name: 'jessica', role: 'spouse', humanLabel: 'jessica-spouse', humanId: 'human-jessica-spouse',
+         manifest: 'genesis/orchestrator/manifests/humans/jessica-spouse.yaml'],
+        [name: 'pete', role: 'pastor', humanLabel: 'pete-pastor', humanId: 'human-pete-pastor',
+         manifest: 'genesis/orchestrator/manifests/humans/pete-pastor.yaml'],
+        [name: 'timothy', role: 'tutor', humanLabel: 'timothy-tutor', humanId: 'human-timothy-tutor',
+         manifest: 'genesis/orchestrator/manifests/humans/timothy-tutor.yaml'],
+        [name: 'frank', role: 'farmer', humanLabel: 'frank-farmer', humanId: 'human-frank-farmer',
+         manifest: 'genesis/orchestrator/manifests/humans/frank-farmer.yaml'],
+    ]
+}
+
+/**
+ * Resolve deployment strategy to concrete human-environment assignments.
+ * Returns list of maps with both identity and topology fields.
+ */
+def resolveHumanAssignments(String strategy, String customAssignments) {
+    def registry = getHumanRegistry()
+    def assignments = [:]
+
+    switch (strategy) {
+        case 'alpha-concentration':
+            registry.each { h -> assignments[h.name] = 'alpha' }
+            break
+        case 'distributed':
+            assignments = [matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
+            break
+        case 'custom':
+            customAssignments.split(',').each { pair ->
+                def parts = pair.trim().split(':')
+                if (parts.length == 2) {
+                    assignments[parts[0].trim()] = parts[1].trim()
+                }
+            }
+            break
+        default:
+            error "Unknown deploy strategy: ${strategy}"
+    }
+
+    return registry.collect { h ->
+        def targetEnv = assignments[h.name]
+        if (!targetEnv) error "No environment assigned for human: ${h.name}"
+        def namespace = "elohim-${targetEnv}"
+        def resourcePrefix = "elohim-${h.name}-${targetEnv}"
+        def instance = "${h.name}-${targetEnv}"
+        h + [env: targetEnv, namespace: namespace, resourcePrefix: resourcePrefix, instance: instance]
+    }
+}
+
+/**
+ * Per-environment configuration (doorway URLs, manifest paths, env files).
+ */
+def getEnvConfig() {
+    return [
+        alpha: [
+            bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
+            signalUrl: 'wss://signal.doorway-alpha.elohim.host',
+            doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
+            envFile: 'genesis/orchestrator/environments/alpha.env',
+            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml'],
+            healthUrl: 'https://doorway-alpha.elohim.host',
+        ],
+        staging: [
+            bootstrapUrl: 'https://doorway-staging.elohim.host/bootstrap',
+            signalUrl: 'wss://signal.doorway-staging.elohim.host',
+            doorwayManifest: 'genesis/orchestrator/manifests/doorway/staging.yaml',
+            envFile: 'genesis/orchestrator/environments/staging.env',
+            infraManifests: ['genesis/orchestrator/manifests/infra/staging-mongodb.yaml', 'genesis/orchestrator/manifests/infra/staging-nats.yaml'],
+            healthUrl: 'https://doorway-staging.elohim.host',
+        ],
+        prod: [
+            bootstrapUrl: 'https://doorway.elohim.host/bootstrap',
+            signalUrl: 'wss://signal.doorway.elohim.host',
+            doorwayManifest: 'genesis/orchestrator/manifests/doorway/prod.yaml',
+            envFile: 'genesis/orchestrator/environments/prod.env',
+            infraManifests: [],
+            healthUrl: 'https://doorway.elohim.host',
+        ],
+    ]
+}
+
+/**
+ * Compute P2P bootstrap nodes for a given human based on current topology.
+ * Full mesh within same namespace; 1 bridge peer per other active namespace.
+ */
+def computeP2PBootstrapNodes(Map currentHuman, List allHumans) {
+    def peers = allHumans.findAll { it.name != currentHuman.name }
+    def sameNs = peers.findAll { it.namespace == currentHuman.namespace }
+    def otherNs = peers.findAll { it.namespace != currentHuman.namespace }
+
+    // Full mesh for same-namespace peers
+    def nodes = sameNs.collect { peer ->
+        "/dns4/${peer.resourcePrefix}-0.${peer.resourcePrefix}-headless.${peer.namespace}.svc.cluster.local/tcp/9876"
+    }
+
+    // One bridge peer per other namespace
+    def seenNamespaces = [] as Set
+    otherNs.each { peer ->
+        if (!seenNamespaces.contains(peer.namespace)) {
+            nodes.add("/dns4/${peer.resourcePrefix}-0.${peer.resourcePrefix}-headless.${peer.namespace}.svc.cluster.local/tcp/9876")
+            seenNamespaces.add(peer.namespace)
+        }
+    }
+
+    return nodes.join(',')
+}
+
+/**
+ * Compute conductor WebSocket URLs for a doorway in a given environment.
+ */
+def computeConductorUrls(String targetEnv, List allHumans) {
+    def envHumans = allHumans.findAll { it.env == targetEnv }
+    return envHumans.collect { h ->
+        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:8445"
+    }.join(',')
+}
+
+/**
+ * Compute storage HTTP URLs for a doorway in a given environment.
+ */
+def computeStorageUrls(String targetEnv, List allHumans) {
+    def envHumans = allHumans.findAll { it.env == targetEnv }
+    return envHumans.collect { h ->
+        "http://${h.resourcePrefix}.elohim-${targetEnv}.svc.cluster.local:8090"
+    }.join(',')
+}
+
+/**
+ * Scale orphaned StatefulSets to 0 replicas when topology changes.
+ * Preserves PVCs for rollback.
+ */
+def cleanupOrphanedHumans(List allHumans) {
+    def namespaces = ['elohim-alpha', 'elohim-staging', 'elohim-prod']
+    def activeResources = allHumans.collect { "${it.namespace}/${it.resourcePrefix}" } as Set
+
+    namespaces.each { ns ->
+        def existing = sh(
+            script: "kubectl get statefulset -n ${ns} -l app=elohim-edgenode -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true",
+            returnStdout: true
+        ).trim()
+
+        if (existing) {
+            existing.split(/\s+/).each { stsName ->
+                if (!activeResources.contains("${ns}/${stsName}")) {
+                    echo "Scaling orphaned StatefulSet to 0: ${ns}/${stsName}"
+                    sh "kubectl scale statefulset/${stsName} -n ${ns} --replicas=0 || true"
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Deploy a human manifest with topology-aware placeholder substitution.
+ * Uses | as sed delimiter because URLs contain /.
+ */
+def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
+    def versions = readProperties(file: envFile)
+    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    def envConfig = getEnvConfig()[humanConfig.env]
+    def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
+
+    def sedArgs = [
+        // Image tag placeholders (existing)
+        "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
+        "s|DOORWAY_TAG_PLACEHOLDER|${versions.DOORWAY_TAG}|g",
+        "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
+        "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
+        "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
+        "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
+        "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
+        "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
+        // Topology placeholders (new)
+        "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
+        "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
+        "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
+        "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
+        "s|BOOTSTRAP_URL_PLACEHOLDER|${envConfig.bootstrapUrl}|g",
+        "s|SIGNAL_URL_PLACEHOLDER|${envConfig.signalUrl}|g",
+        "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
+    ].collect { "-e '${it}'" }.join(' ')
+
+    def outputFile = humanConfig.manifest.replace('.yaml', "-rendered.yaml")
+    sh "sed ${sedArgs} ${humanConfig.manifest} > ${outputFile}"
+
+    // Fail fast if any placeholders remain
+    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    if (remaining != '0') {
+        sh "grep '_PLACEHOLDER' ${outputFile} || true"
+        error "Unresolved placeholders in ${outputFile}!"
+    }
+
+    sh """
+        echo '==== Manifest preview: ${humanConfig.resourcePrefix} ===='
+        grep 'image:\\|happ-version:\\|app.kubernetes.io/version:\\|namespace:\\|P2P_BOOTSTRAP' ${outputFile} | head -8
+        echo '==============================='
+    """
+
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
+
+    def resetHumans = (params.RESET_HUMANS ?: false) == true
+    if (resetHumans) {
+        echo "RESET_HUMANS: deleting StatefulSet ${humanConfig.resourcePrefix} before reapply"
+        sh "kubectl delete statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --ignore-not-found=true"
+    }
+
+    sh "kubectl apply -f ${outputFile}"
+    sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
+    sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
+
+    def componentName = humanConfig.resourcePrefix.replace('elohim-', '')
+    sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${humanConfig.namespace} ${deployVersion} ${componentName} || true"
+}
+
+/**
+ * Deploy doorway manifest with topology-computed conductor/storage URLs.
+ * Includes explicit rollout restart for doorway to pick up new env vars.
+ * Optional manifestOverride and deploymentName for read replicas.
+ */
+def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, String manifestOverride = null, String deploymentName = null) {
+    def envConfig = getEnvConfig()[targetEnv]
+    def manifest = manifestOverride ?: envConfig.doorwayManifest
+    def depName = deploymentName ?: "elohim-doorway-${targetEnv}"
+    def conductorUrls = computeConductorUrls(targetEnv, allHumans)
+    def storageUrls = computeStorageUrls(targetEnv, allHumans)
+    def versions = readProperties(file: envFile)
+    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+
+    def sedArgs = [
+        "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
+        "s|DOORWAY_TAG_PLACEHOLDER|${versions.DOORWAY_TAG}|g",
+        "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
+        "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
+        "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
+        "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
+        "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
+        "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
+        "s|CONDUCTOR_URLS_PLACEHOLDER|${conductorUrls}|g",
+        "s|STORAGE_URLS_PLACEHOLDER|${storageUrls}|g",
+    ].collect { "-e '${it}'" }.join(' ')
+
+    def outputFile = manifest.replace('.yaml', "-rendered.yaml")
+    sh "sed ${sedArgs} ${manifest} > ${outputFile}"
+
+    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    if (remaining != '0') {
+        sh "grep '_PLACEHOLDER' ${outputFile} || true"
+        error "Unresolved placeholders in ${outputFile}!"
+    }
+
+    sh """
+        echo '==== Doorway preview: ${depName} ===='
+        grep 'image:\\|CONDUCTOR_URLS\\|STORAGE_URLS\\|app.kubernetes.io/version:' ${outputFile} | head -6
+        echo '==============================='
+    """
+
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} elohim-${targetEnv}"
+    sh "kubectl apply -f ${outputFile}"
+    sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
+    sh "kubectl rollout status deployment/${depName} -n elohim-${targetEnv} --timeout=300s"
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -325,6 +598,21 @@ spec:
             name: 'FORCE_DEPLOY',
             defaultValue: false,
             description: 'Force deployment even if no new images (restarts pods with existing images)'
+        )
+        choice(
+            name: 'DEPLOY_STRATEGY',
+            choices: ['alpha-concentration', 'distributed', 'custom'],
+            description: 'alpha-concentration: all 5 in alpha. distributed: 2 alpha, 2 staging, 1 prod. custom: manual.'
+        )
+        string(
+            name: 'HUMAN_ASSIGNMENTS',
+            defaultValue: 'matthew:alpha,jessica:alpha,pete:alpha,timothy:alpha,frank:alpha',
+            description: 'name:env pairs. Only used when DEPLOY_STRATEGY=custom.'
+        )
+        booleanParam(
+            name: 'RESET_HUMANS',
+            defaultValue: false,
+            description: 'Delete and recreate human StatefulSets before deploying. Use when changing topology or for clean state.'
         )
     }
 
@@ -984,21 +1272,62 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 shouldDeploy = true
                             }
 
+                            def strategy = (params.DEPLOY_STRATEGY ?: 'alpha-concentration')
+                            def customAssignments = (params.HUMAN_ASSIGNMENTS ?: 'matthew:alpha,jessica:alpha,pete:alpha,timothy:alpha,frank:alpha')
+                            def allHumans = resolveHumanAssignments(strategy, customAssignments)
+                            def allEnvConfig = getEnvConfig()
+
                             echo """
                             ═══════════════════════════════════════════════════════════
-                            DEPLOYING EDGE NODE TO DEV
+                            DEPLOYING EDGE NODE TO DEV (Topology-Aware)
                             ═══════════════════════════════════════════════════════════
                             Image Tag: ${IMAGE_TAG}
                             Images Pushed: ${env.IMAGES_PUSHED}
                             Force Deploy: ${params.FORCE_DEPLOY}
+                            Deploy Strategy: ${strategy}
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            // Write environment manifest with current build tags
-                            // (preserve SITE_TAG from git — app pipeline manages that independently)
-                            def envFile = 'genesis/orchestrator/environments/alpha.env'
-                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
-                            writeFile file: envFile, text: """# Alpha Environment - auto-updated by pipeline after each deploy
+                            // Log resolved topology
+                            echo "Resolved topology (${strategy}):"
+                            allHumans.each { h ->
+                                echo "  ${h.name} (${h.humanLabel}) -> ${h.env} (${h.namespace}/${h.resourcePrefix})"
+                            }
+
+                            // Write topology.json for downstream pipelines (genesis seeder)
+                            def topologyJson = groovy.json.JsonOutput.prettyPrint(
+                                groovy.json.JsonOutput.toJson([
+                                    strategy: strategy,
+                                    generatedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+                                    generatedBy: "elohim-edge/${env.BUILD_NUMBER}",
+                                    humans: allHumans.collect { h -> [
+                                        name: h.name,
+                                        role: h.role,
+                                        humanId: h.humanId,
+                                        env: h.env,
+                                        namespace: h.namespace,
+                                        resourcePrefix: h.resourcePrefix,
+                                        storageUrl: "http://${h.resourcePrefix}.${h.namespace}.svc.cluster.local:8090",
+                                    ]}
+                                ])
+                            )
+                            writeFile file: 'genesis/orchestrator/environments/topology.json', text: topologyJson
+                            echo "Wrote topology.json"
+
+                            // Group humans by environment and deploy each active env
+                            def humansByEnv = allHumans.groupBy { it.env }
+
+                            humansByEnv.each { targetEnv, envHumans ->
+                                def ec = allEnvConfig[targetEnv]
+                                if (!ec) {
+                                    error "Unknown environment: ${targetEnv}"
+                                }
+
+                                echo "=== Deploying ${envHumans.size()} humans to ${targetEnv} ==="
+
+                                // Write env file with current build tags (preserve SITE_TAG)
+                                def currentSiteTag = readProperties(file: ec.envFile).SITE_TAG ?: 'dev-latest'
+                                writeFile file: ec.envFile, text: """# ${targetEnv.capitalize()} Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -1009,22 +1338,33 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
-                            // Deploy infra (MongoDB + NATS) — idempotent
-                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-mongodb.yaml"
-                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-nats.yaml"
 
-                            // Per-human manifests — each human gets named services (elohim-matthew-alpha, etc.)
-                            // so doorway can route to the correct conductor/storage by name
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/humans/matthew-manager.yaml', envFile, 'elohim-matthew')
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/humans/jessica-spouse.yaml', envFile, 'elohim-jessica')
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
+                                // Deploy infra (idempotent)
+                                ec.infraManifests.each { manifest ->
+                                    sh "kubectl apply -f ${manifest}"
+                                }
+
+                                // Deploy each human
+                                envHumans.each { humanConfig ->
+                                    deployHumanManifest(humanConfig, ec.envFile, allHumans)
+                                }
+
+                                // Deploy doorway with computed URLs
+                                deployDoorwayManifest(targetEnv, ec.envFile, allHumans)
+                            }
+
+                            // Cleanup orphaned StatefulSets from previous topology
+                            cleanupOrphanedHumans(allHumans)
 
                             sh 'sleep 15'
 
-                            def healthy = checkEdgeNodeHealth('https://doorway-alpha.elohim.host')
+                            // Health check on primary environment
+                            def primaryEnv = humansByEnv.keySet().first()
+                            def primaryConfig = allEnvConfig[primaryEnv]
+                            def healthy = checkEdgeNodeHealth(primaryConfig.healthUrl)
                             if (healthy) {
                                 env.EDGE_NODE_HEALTHY = 'true'
-                                echo "Edge Node Alpha deployed and healthy: https://doorway-alpha.elohim.host"
+                                echo "Edge Node deployed and healthy: ${primaryConfig.healthUrl}"
                             } else {
                                 echo "Edge Node deployed but health check failed - may need more time"
                             }
@@ -1051,6 +1391,11 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                         withBuildVars(props) {
                             echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
+
+                            // Resolve topology: staging branch uses distributed strategy
+                            def allHumans = resolveHumanAssignments('distributed', '')
+                            def stagingHumans = allHumans.findAll { it.env == 'staging' }
+
                             def envFile = 'genesis/orchestrator/environments/staging.env'
                             def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
                             writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
@@ -1062,16 +1407,21 @@ STORAGE_TAG=${STORAGE_TAG}
 HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
+AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
                             // Deploy infra (MongoDB + NATS) — idempotent
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-nats.yaml"
 
-                            // Per-human manifests — Pete is the staging human
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/humans/pete-pastor.yaml', envFile, 'elohim-pete')
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/humans/timothy-tutor.yaml', envFile, 'elohim-timothy')
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
+                            // Per-human manifests — topology-aware
+                            stagingHumans.each { humanConfig ->
+                                deployHumanManifest(humanConfig, envFile, allHumans)
+                            }
+
+                            // Doorway + read replica — topology-aware
+                            deployDoorwayManifest('staging', envFile, allHumans)
+                            deployDoorwayManifest('staging', envFile, allHumans, 'genesis/orchestrator/manifests/doorway/staging-read.yaml', 'elohim-doorway-read-staging')
+
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"
@@ -1149,6 +1499,10 @@ HAPP_TAG=${HAPP_TAG}
                             ═══════════════════════════════════════════════════════════
                             """
 
+                            // Resolve topology: main branch uses distributed strategy
+                            def allHumans = resolveHumanAssignments('distributed', '')
+                            def prodHumans = allHumans.findAll { it.env == 'prod' }
+
                             def envFile = 'genesis/orchestrator/environments/prod.env'
                             def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
                             writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
@@ -1160,9 +1514,15 @@ STORAGE_TAG=${STORAGE_TAG}
 HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
+AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
-                            // Per-human manifests — Frank is the prod human
-                            deployEdgeWithManifest('prod', 'elohim-prod', 'genesis/orchestrator/manifests/humans/frank-farmer.yaml', envFile, 'elohim-frank')
+                            // Per-human manifests — topology-aware
+                            prodHumans.each { humanConfig ->
+                                deployHumanManifest(humanConfig, envFile, allHumans)
+                            }
+
+                            // Doorway — topology-aware
+                            deployDoorwayManifest('prod', envFile, allHumans)
 
                             sh 'sleep 15'
 
@@ -1225,6 +1585,8 @@ HAPP_TAG=${HAPP_TAG}
                 Parameters Used:
                   - Force Build: ${params.FORCE_BUILD}
                   - Force Deploy: ${params.FORCE_DEPLOY}
+                  - Deploy Strategy: ${params.DEPLOY_STRATEGY ?: 'alpha-concentration'}
+                  - Reset Humans: ${params.RESET_HUMANS ?: false}
 
                 Note: Seeding handled by genesis/Jenkinsfile
                 ═══════════════════════════════════════════════════════════

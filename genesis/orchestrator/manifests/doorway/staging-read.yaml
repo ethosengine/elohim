@@ -90,13 +90,13 @@ spec:
               value: "false"
             # Staging read-replica: same Pete + Timothy backends
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-pete-staging-0.elohim-pete-staging-headless.elohim-staging.svc.cluster.local:8445,ws://elohim-timothy-staging-0.elohim-timothy-staging-headless.elohim-staging.svc.cluster.local:8445"
+              value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-pete-staging:4444"
             - name: STORAGE_URL
               value: "http://elohim-pete-staging.elohim-staging.svc.cluster.local:8090"
             - name: STORAGE_URLS
-              value: "http://elohim-pete-staging.elohim-staging.svc.cluster.local:8090,http://elohim-timothy-staging.elohim-staging.svc.cluster.local:8090"
+              value: "STORAGE_URLS_PLACEHOLDER"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
             - name: NATS_URL

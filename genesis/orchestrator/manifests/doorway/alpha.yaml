@@ -120,13 +120,13 @@ spec:
               value: "true"
             # Alpha hosts Matthew (founder) + Jessica (household)
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local:8445,ws://elohim-jessica-alpha-0.elohim-jessica-alpha-headless.elohim-alpha.svc.cluster.local:8445"
+              value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-matthew-alpha:4444"
             - name: STORAGE_URL
               value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
             - name: STORAGE_URLS
-              value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090"
+              value: "STORAGE_URLS_PLACEHOLDER"
             # Elohim Agent SDK sidecar (runs in same pod)
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"

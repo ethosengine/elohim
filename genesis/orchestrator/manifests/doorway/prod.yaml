@@ -121,11 +121,13 @@ spec:
               value: "true"
             # Prod hosts Frank (farmer) — independent economy node
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-frank-prod-0.elohim-frank-prod-headless.elohim-prod.svc.cluster.local:8445"
+              value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-frank-prod:4444"
             - name: STORAGE_URL
               value: "http://elohim-frank-prod.elohim-prod.svc.cluster.local:8090"
+            - name: STORAGE_URLS
+              value: "STORAGE_URLS_PLACEHOLDER"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
             - name: NATS_URL

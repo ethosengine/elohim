@@ -7,14 +7,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: elohim-frank-prod-config
-  namespace: elohim-prod
+  name: RESOURCE_PREFIX_PLACEHOLDER-config
+  namespace: NAMESPACE_PLACEHOLDER
   labels:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
-    app.kubernetes.io/instance: frank-prod
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -33,9 +33,9 @@ data:
           allowed_origins: "*"
     network:
       # Bootstrap served by Doorway gateway
-      bootstrap_url: "https://doorway.elohim.host/bootstrap"
+      bootstrap_url: "BOOTSTRAP_URL_PLACEHOLDER"
       # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "wss://signal.doorway.elohim.host"
+      signal_url: "SIGNAL_URL_PLACEHOLDER"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
@@ -50,20 +50,20 @@ data:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: elohim-frank-prod
-  namespace: elohim-prod
+  name: RESOURCE_PREFIX_PLACEHOLDER
+  namespace: NAMESPACE_PLACEHOLDER
   labels:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
-    app.kubernetes.io/instance: frank-prod
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
 spec:
-  serviceName: elohim-frank-prod-headless
+  serviceName: RESOURCE_PREFIX_PLACEHOLDER-headless
   replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
@@ -72,15 +72,15 @@ spec:
     matchLabels:
       app: elohim-edgenode
       elohim-human: frank-farmer
-      environment: prod
+      environment: ENV_PLACEHOLDER
   template:
     metadata:
       labels:
         app: elohim-edgenode
         elohim-human: frank-farmer
-        environment: prod
+        environment: ENV_PLACEHOLDER
         app.kubernetes.io/name: edgenode
-        app.kubernetes.io/instance: frank-prod
+        app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
         app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
         app.kubernetes.io/component: data
         app.kubernetes.io/part-of: elohim
@@ -130,7 +130,7 @@ spec:
             - name: HAPP_VERSION
               valueFrom:
                 configMapKeyRef:
-                  name: elohim-frank-prod-config
+                  name: RESOURCE_PREFIX_PLACEHOLDER-config
                   key: happ-version
           volumeMounts:
             - name: happ-volume
@@ -247,9 +247,9 @@ spec:
               value: "9876"
             - name: DISABLE_MDNS
               value: "true"
-            # Cross-env trust topology: Pete (staging) + Matthew (alpha)
+            # Peer mesh — computed by deployHumanManifest from topology
             - name: P2P_BOOTSTRAP_NODES
-              value: "/dns4/elohim-pete-staging-0.elohim-pete-staging-headless.elohim-staging.svc.cluster.local/tcp/9876,/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+              value: "P2P_BOOTSTRAP_NODES_PLACEHOLDER"
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"
@@ -316,7 +316,7 @@ spec:
         # Conductor config from ConfigMap
         - name: conductor-config
           configMap:
-            name: elohim-frank-prod-config
+            name: RESOURCE_PREFIX_PLACEHOLDER-config
   # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
   volumeClaimTemplates:
     - metadata:
@@ -335,18 +335,18 @@ spec:
             storage: 5Gi
 ---
 # Headless service for StatefulSet DNS-based peer discovery
-# Each pod gets a stable DNS name: elohim-frank-prod-0.elohim-frank-prod-headless.elohim-prod.svc.cluster.local
+# Each pod gets a stable DNS name: RESOURCE_PREFIX_PLACEHOLDER-{N}.RESOURCE_PREFIX_PLACEHOLDER-headless.NAMESPACE_PLACEHOLDER.svc.cluster.local
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-frank-prod-headless
-  namespace: elohim-prod
+  name: RESOURCE_PREFIX_PLACEHOLDER-headless
+  namespace: NAMESPACE_PLACEHOLDER
   labels:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
-    app.kubernetes.io/instance: frank-prod
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -356,7 +356,7 @@ spec:
   selector:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER
   ports:
     - name: admin-ws
       port: 4444
@@ -374,14 +374,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-frank-prod
-  namespace: elohim-prod
+  name: RESOURCE_PREFIX_PLACEHOLDER
+  namespace: NAMESPACE_PLACEHOLDER
   labels:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
-    app.kubernetes.io/instance: frank-prod
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
     app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
@@ -412,4 +412,4 @@ spec:
   selector:
     app: elohim-edgenode
     elohim-human: frank-farmer
-    environment: prod
+    environment: ENV_PLACEHOLDER

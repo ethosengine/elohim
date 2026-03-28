@@ -63,11 +63,29 @@ def resolveInternalStorageUrl(String doorwayHost) {
  * Per-human storage endpoints across environments.
  * Each human has a dedicated StatefulSet in their assigned environment.
  *
- * All 5 agents run in alpha for now — focus on data sync/replication
- * before splitting across environments. Version bridging is a later sprint.
+ * Reads topology from genesis/orchestrator/environments/topology.json when available.
+ * Falls back to alpha-concentration default (all 5 agents in alpha) if the file
+ * is missing or unparseable.
  */
 def getHumanStorageUrls(String ignored) {
-    // All humans in alpha — proper replication before environment splitting
+    def topoFile = new File("${env.WORKSPACE}/genesis/orchestrator/environments/topology.json")
+    if (topoFile.exists()) {
+        try {
+            def topo = new groovy.json.JsonSlurper().parse(topoFile)
+            return topo.humans.collect { h ->
+                [
+                    humanId:    h.humanId,
+                    service:    h.resourcePrefix,
+                    namespace:  h.namespace,
+                    storageUrl: h.storageUrl.replaceFirst('^https?://', ''),
+                ]
+            }
+        } catch (Exception e) {
+            echo "WARN: Failed to parse topology.json, using alpha-concentration fallback: ${e.message}"
+        }
+    }
+
+    // Fallback: all humans in alpha — proper replication before environment splitting
     def humans = [
         [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha'],
         [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha'],

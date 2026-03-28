@@ -785,10 +785,11 @@ spec:
                             // Propagate: if a dependency is building, auto-include its dependents
                             pipelines = propagateDependencies(pipelines, analysis)
 
-                            // Safety net: auto-include genesis if any triggering pipeline builds
+                            // Safety net: auto-include genesis if any triggering pipeline builds (dev branches only)
                             if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
                                 def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
-                                if (triggeringPipeline) {
+                                if (triggeringPipeline && isDevBranch) {
                                     pipelines.add('elohim-genesis')
                                     analysis['elohim-genesis'].shouldRun = true
                                     analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
