@@ -61,21 +61,19 @@ def resolveInternalStorageUrl(String doorwayHost) {
 
 /**
  * Per-human storage endpoints across environments.
- * Each human has a dedicated StatefulSet in their assigned environment:
- *   alpha:   Matthew (founder) + Jessica (household)
- *   staging: Pete (pastor) + Timothy (tutor)
- *   prod:    Frank (farmer)
+ * Each human has a dedicated StatefulSet in their assigned environment.
  *
- * Cross-env P2P topology simulates WAN; household members colocate.
+ * All 5 agents run in alpha for now — focus on data sync/replication
+ * before splitting across environments. Version bridging is a later sprint.
  */
 def getHumanStorageUrls(String ignored) {
-    // Human-to-environment mapping (each human lives in one env)
+    // All humans in alpha — proper replication before environment splitting
     def humans = [
         [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha'],
         [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha'],
-        [humanId: 'human-pete-pastor',      service: 'elohim-pete-staging',    namespace: 'elohim-staging'],
-        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-staging', namespace: 'elohim-staging'],
-        [humanId: 'human-frank-farmer',     service: 'elohim-frank-prod',      namespace: 'elohim-prod'],
+        [humanId: 'human-pete-pastor',      service: 'elohim-pete-alpha',      namespace: 'elohim-alpha'],
+        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-alpha',   namespace: 'elohim-alpha'],
+        [humanId: 'human-frank-farmer',     service: 'elohim-frank-alpha',     namespace: 'elohim-alpha'],
     ]
     return humans.collect { h ->
         h + [storageUrl: "${h.service}.${h.namespace}.svc.cluster.local:8090"]
