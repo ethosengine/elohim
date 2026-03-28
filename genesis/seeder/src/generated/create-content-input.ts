@@ -69,7 +69,15 @@ export type ContentFormat =
 /**
  * Visibility/access level
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 
 /**
  * Input for creating content records. Must match Rust CreateContentInputView in views.rs.

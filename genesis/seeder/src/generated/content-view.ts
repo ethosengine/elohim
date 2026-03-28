@@ -69,7 +69,15 @@ export type ContentFormat =
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open.
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 /**
  * Schema migration status for records. Defined in views.rs.
  */

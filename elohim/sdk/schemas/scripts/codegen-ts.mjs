@@ -11,6 +11,7 @@
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { compile } from 'json-schema-to-typescript';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -112,11 +113,16 @@ async function generateFromDir(subdir, refMap) {
     const schema = inlineRefs(schemaRaw, refMap);
 
     try {
-      const ts = await compile(schema, schema.title || name, {
+      let ts = await compile(schema, schema.title || name, {
         bannerComment: `/* Generated from protocol schema: ${subdir}/${file} -- DO NOT EDIT */`,
         additionalProperties: false,
         style: { singleQuote: true, trailingComma: 'all' },
       });
+
+      // Post-process: replace {} empty object type with Record<string, unknown>
+      // to satisfy @typescript-eslint/no-empty-object-type rule
+      ts = ts.replace(/\?: \{\}/g, '?: Record<string, unknown>');
+      ts = ts.replace(/\| \{\}/g, '| Record<string, unknown>');
 
       const outFile = `${name}.ts`;
       await writeFile(join(outDir, outFile), ts);
@@ -205,6 +211,17 @@ async function main() {
       ({ dir, file }) => `export * from './${dir}/${basename(file, '.ts')}';`,
     );
     await writeFile(join(OUTPUT_DIR, 'index.ts'), exports.join('\n') + '\n');
+
+    // Run prettier on generated files using elohim-app config (single quotes, 100-char width)
+    const prettierConfig = join(REPO_ROOT, 'app/elohim-app/.prettierrc.js');
+    try {
+      execSync(
+        `pnpm exec prettier --write --config "${prettierConfig}" "${OUTPUT_DIR}/**/*.ts"`,
+        { cwd: REPO_ROOT, stdio: 'pipe' },
+      );
+    } catch {
+      // prettier not available — generated files remain as-is
+    }
 
     console.log(`\nTypeScript interface generation complete: ${allGenerated.length} files`);
   }
