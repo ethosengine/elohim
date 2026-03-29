@@ -359,8 +359,11 @@ impl HttpServer {
             // CORS preflight for all routes
             (Method::OPTIONS, _) => Ok(Self::cors_preflight()),
 
-            // Health check
-            (Method::GET, "/health") => self.handle_health().await,
+            // Health check (supports ?detail=error|warn|info|debug|trace)
+            (Method::GET, "/health") => {
+                let query = req.uri().query().unwrap_or("");
+                self.handle_health(query).await
+            }
 
             // Build/version info
             (Method::GET, "/version") => {
@@ -692,18 +695,50 @@ impl HttpServer {
         }
     }
 
-    /// Health check endpoint
-    async fn handle_health(&self) -> Result<Response<Full<Bytes>>, StorageError> {
-        let stats = self.blob_store.stats().await?;
+    /// Health check endpoint with tiered detail via `?detail=` query parameter.
+    ///
+    /// Detail levels (cumulative):
+    /// - `error` / `warn`: status + build info only
+    /// - `info` (default): adds blob stats and import status
+    /// - `debug`: adds manifest count, concurrency limit, app index size
+    /// - `trace`: adds semaphore permits, db pool, extraction cache status
+    async fn handle_health(&self, query: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+        let detail = query
+            .split('&')
+            .find_map(|p| p.strip_prefix("detail="))
+            .and_then(|v| v.parse::<elohim_compute::DetailLevel>().ok())
+            .unwrap_or_default();
+
         let build = elohim_compute::BuildInfo::new("elohim-storage");
-        let body = serde_json::json!({
+
+        // error + warn level: always present
+        let mut body = serde_json::json!({
             "status": "ok",
             "build": build,
-            "blobs": stats.total_blobs,
-            "bytes": stats.total_bytes,
-            "manifests": self.manifests.read().await.len(),
-            "import_enabled": self.import_api.is_some(),
         });
+
+        // info level (default): basic operational data
+        if detail >= elohim_compute::DetailLevel::Info {
+            let stats = self.blob_store.stats().await?;
+            body["blobs"] = serde_json::json!(stats.total_blobs);
+            body["bytes"] = serde_json::json!(stats.total_bytes);
+            body["importEnabled"] = serde_json::json!(self.import_api.is_some());
+        }
+
+        // debug level: resource details
+        if detail >= elohim_compute::DetailLevel::Debug {
+            body["manifests"] = serde_json::json!(self.manifests.read().await.len());
+            body["concurrencyLimit"] = serde_json::json!(MAX_CONCURRENT_REQUESTS);
+            body["appIndex"] = serde_json::json!(self.app_index.read().await.len());
+        }
+
+        // trace level: full internal state
+        if detail >= elohim_compute::DetailLevel::Trace {
+            body["semaphorePermits"] =
+                serde_json::json!(self.request_semaphore.available_permits());
+            body["dbPoolEnabled"] = serde_json::json!(self.db_pool.is_some());
+            body["extractionCacheEnabled"] = serde_json::json!(self.extraction_cache.is_some());
+        }
 
         Ok(Response::builder()
             .status(StatusCode::OK)
