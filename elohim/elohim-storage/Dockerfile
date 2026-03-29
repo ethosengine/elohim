@@ -20,10 +20,12 @@ RUN apt-get update && apt-get install -y \
 COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
 COPY crates ./crates
 COPY elohim/constitution ./constitution
+COPY elohim/elohim-cache-core ./elohim-cache-core
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
-    sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml
+    sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml
 
 # Constitution crate uses workspace inheritance — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't copied into the build context
