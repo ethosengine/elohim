@@ -227,7 +227,7 @@ export class ProjectBoardComponent implements OnInit {
     this.project = projects.find(p => p.id === projectId) ?? null;
     if (this.project) {
       const meta = parseWorkProjectMeta(this.project.metadata as Record<string, unknown>);
-      this.columns = meta.columns;
+      this.columns = (meta.columns ?? DEFAULT_BOARD_COLUMNS) as BoardColumn[];
     }
     this.stories = await this.api.getStoriesForProject(projectId);
   }

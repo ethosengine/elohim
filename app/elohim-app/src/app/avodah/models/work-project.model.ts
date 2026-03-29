@@ -1,16 +1,14 @@
+// Re-export WorkProjectMeta from generated types (schema is source of truth)
+export type { WorkProjectMeta } from '../generated/metadata-types';
+
+import type { WorkProjectMeta } from '../generated/metadata-types';
+
 export interface BoardColumn {
   id: string;
   name: string;
   color?: string;
   /** Terminal columns trigger cadence reset when story moves here */
   isTerminal?: boolean;
-}
-
-/** Structured payload stored in ContentNode.metadata for work-project nodes */
-export interface WorkProjectMeta {
-  columns: BoardColumn[];
-  visibility: 'private' | 'community';
-  memberIds?: string[];
 }
 
 export const DEFAULT_BOARD_COLUMNS: BoardColumn[] = [

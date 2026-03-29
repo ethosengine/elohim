@@ -4,20 +4,20 @@
   "description": "Metadata for work-project content type. Container for work stories with board configuration.",
   "type": "object",
   "properties": {
-    "visibility": { "type": "string", "enum": ["private", "community"] },
     "columns": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "id": { "type": "string" },
-          "label": { "type": "string" },
-          "isTerminal": { "type": "boolean" }
+          "name": { "type": "string" },
+          "color": { "type": "string" },
+          "isTerminal": { "type": "boolean", "description": "Terminal columns trigger cadence reset when story moves here" }
         }
       }
     },
-    "members": { "type": "array", "items": { "type": "string" } },
-    "defaultCadence": { "type": "string" }
+    "visibility": { "type": "string", "enum": ["private", "community"] },
+    "memberIds": { "type": "array", "items": { "type": "string" } }
   },
   "additionalProperties": true
 }

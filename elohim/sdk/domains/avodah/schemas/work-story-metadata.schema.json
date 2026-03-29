@@ -4,24 +4,27 @@
   "description": "Metadata for work-story content type. Project task with cadence and attestation gates.",
   "type": "object",
   "properties": {
+    "projectId": { "type": "string" },
     "status": { "type": "string", "enum": ["backlog", "todo", "in-progress", "review", "done"] },
-    "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
     "visibility": { "type": "string", "enum": ["private", "community", "exchange"] },
-    "cadence": {
-      "type": "object",
-      "properties": {
-        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly", "custom"] },
-        "resetBehavior": { "type": "string", "enum": ["reset-to-backlog", "reset-to-todo", "archive"] }
-      }
-    },
+    "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+    "storyPoints": { "type": "number" },
+    "assigneeId": { "type": "string" },
     "attestationGates": {
       "type": "array",
       "description": "Lamad content IDs that must be mastered before this task can be started",
       "items": { "type": "string" }
     },
-    "exchangePublish": { "type": "boolean", "description": "Whether to publish to shefa exchange as a service request" },
-    "projectId": { "type": "string" },
-    "assignedTo": { "type": "string" }
+    "exchangeRequestId": { "type": "string", "description": "Shefa ServiceRequest ID — set when published to exchange" },
+    "cadence": {
+      "type": "object",
+      "properties": {
+        "interval": { "type": "string", "enum": ["daily", "weekly", "monthly", "custom"] },
+        "customIntervalDays": { "type": "number" },
+        "resetToStatus": { "type": "string", "enum": ["backlog", "todo"] },
+        "nextOccurrence": { "type": "string", "description": "ISO date of next cadence reset" }
+      }
+    }
   },
   "additionalProperties": true
 }

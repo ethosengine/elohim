@@ -223,6 +223,6 @@ export class ProjectListComponent implements OnInit {
 
   projectVisibility(project: ContentNode): string {
     const meta = parseWorkProjectMeta(project.metadata as Record<string, unknown>);
-    return meta.visibility;
+    return meta.visibility ?? 'private';
   }
 }

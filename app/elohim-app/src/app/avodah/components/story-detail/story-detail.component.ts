@@ -142,7 +142,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
             @if (meta().cadence) {
               <span class="meta-value">
                 {{ meta().cadence!.interval }}
-                — next: {{ formatDate(meta().cadence!.nextOccurrence) }}
+                — next: {{ meta().cadence!.nextOccurrence ? formatDate(meta().cadence!.nextOccurrence!) : '—' }}
               </span>
             } @else {
               <span class="empty-hint">One-time story (no recurrence)</span>
