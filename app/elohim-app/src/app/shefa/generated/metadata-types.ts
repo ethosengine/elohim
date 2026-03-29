@@ -42,5 +42,7 @@ export interface AgreementMetadata {
   fulfillmentCriteria?: string;
   /** Current agreement lifecycle state */
   state?: 'proposed' | 'active' | 'fulfilled' | 'cancelled' | 'disputed';
+  /** REA Measure representing maximum coverage amount for insurance agreements */
+  coverageLimit?: { hasNumericalValue?: number; hasUnit?: string };
   [key: string]: unknown;
 }

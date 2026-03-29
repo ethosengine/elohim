@@ -32,6 +32,14 @@
       "type": "string",
       "description": "Current agreement lifecycle state",
       "enum": ["proposed", "active", "fulfilled", "cancelled", "disputed"]
+    },
+    "coverageLimit": {
+      "type": "object",
+      "description": "REA Measure representing maximum coverage amount for insurance agreements",
+      "properties": {
+        "hasNumericalValue": { "type": "number" },
+        "hasUnit": { "type": "string" }
+      }
     }
   },
   "additionalProperties": true

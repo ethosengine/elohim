@@ -39,6 +39,7 @@ import {
 } from '@app/shefa/models/insurance-mutual.model';
 
 import { ECONOMIC_EVENT_FACTORY, type IEconomicEventFactory } from '../interfaces';
+import type { AgreementMetadata } from '../generated/metadata-types';
 
 /**
  * Reasons for flagging a claim for governance review.
@@ -848,15 +849,15 @@ export class InsuranceMutualService {
 
     // Flag if: large approval (>80% of coverage limit)
     const finalApprovedAmount = adjustmentReasoning.determinations?.finalApprovedAmount;
+    const agreementMeta = claim.metadata as AgreementMetadata | undefined;
+    const coverageLimit = agreementMeta?.coverageLimit;
     if (
       reasoning.determinations.coverageApplies &&
-      claim.metadata?.['coverageLimit'] &&
+      coverageLimit &&
       finalApprovedAmount &&
-      typeof claim.metadata['coverageLimit'] === 'object' &&
-      'hasNumericalValue' in claim.metadata['coverageLimit'] &&
-      typeof claim.metadata['coverageLimit'].hasNumericalValue === 'number' &&
+      typeof coverageLimit.hasNumericalValue === 'number' &&
       finalApprovedAmount.hasNumericalValue >
-        claim.metadata['coverageLimit'].hasNumericalValue * 0.8
+        coverageLimit.hasNumericalValue * 0.8
     ) {
       flagForGovernance = true;
       flagReason = 'large-claim';
