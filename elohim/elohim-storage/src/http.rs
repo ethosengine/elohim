@@ -33,6 +33,7 @@
 //! ```
 
 use crate::blob_store::BlobStore;
+use elohim_cache_core::extraction::ExtractionCache;
 use crate::db::content_diesel::ContentQuery;
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
@@ -135,6 +136,10 @@ pub struct HttpServer {
     /// P2P handle for status endpoint (Send+Sync safe)
     #[cfg(feature = "p2p")]
     p2p_handle: Option<crate::p2p::P2PHandle>,
+    /// Extraction cache for HTML5 app files (None = disabled)
+    extraction_cache: Option<Arc<ExtractionCache>>,
+    /// In-memory index: appId -> blobHash (avoids per-request SQLite scan)
+    app_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -178,6 +183,8 @@ impl HttpServer {
             node_registry_api: None,
             #[cfg(feature = "p2p")]
             p2p_handle: None,
+            extraction_cache: None,
+            app_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
         }
     }
 
@@ -231,6 +238,53 @@ impl HttpServer {
     pub fn with_p2p_handle(mut self, handle: crate::p2p::P2PHandle) -> Self {
         self.p2p_handle = Some(handle);
         self
+    }
+
+    /// Set the extraction cache
+    pub fn with_extraction_cache(mut self, cache: Arc<ExtractionCache>) -> Self {
+        self.extraction_cache = Some(cache);
+        self
+    }
+
+    /// Load the app index from database (call after db_pool is set)
+    pub async fn load_app_index(&self) {
+        let mut conn = match self.get_conn() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to get DB connection for app index: {}", e);
+                return;
+            }
+        };
+        let app_ctx = db::AppContext::default_lamad();
+        let query = ContentQuery {
+            content_format: Some("html5-app".to_string()),
+            limit: 100,
+            ..Default::default()
+        };
+
+        match db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+            Ok(items) => {
+                let mut index = self.app_index.write().await;
+                index.clear();
+                for item in items {
+                    if let Some(ref content_body) = item.content.content_body {
+                        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
+                            if let Some(app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                                let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
+                                if !blob_hash.is_empty() {
+                                    info!(app_id = %app_id, blob_hash = %blob_hash, "Indexed HTML5 app");
+                                    index.insert(app_id.to_string(), blob_hash);
+                                }
+                            }
+                        }
+                    }
+                }
+                info!(count = index.len(), "App index loaded");
+            }
+            Err(e) => {
+                warn!("Failed to load app index: {}", e);
+            }
+        }
     }
 
     /// Get a connection from the Diesel pool
@@ -2638,11 +2692,8 @@ impl HttpServer {
     ///
     /// Route: GET /apps/{app_id}/{file_path}
     ///
-    /// 1. Look up content by appId (contentFormat=html5-app)
-    /// 2. Get blob_hash from content record
-    /// 3. Fetch ZIP from blob store
-    /// 4. Extract requested file
-    /// 5. Return with appropriate Content-Type
+    /// Fast path (cache hit): O(1) index lookup + disk read. No DB, no ZIP, no pool.
+    /// Slow path (cache miss): DB query + ZIP extract + cache all files + serve.
     async fn handle_app_request(&self, path: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         use std::io::Read;
         use zip::ZipArchive;
@@ -2662,7 +2713,6 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Validate file_path for path traversal
         if file_path.contains("..") || file_path.contains('\0') || file_path.starts_with('/') {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -2673,91 +2723,58 @@ impl HttpServer {
 
         debug!(app_id = %app_id, file_path = %file_path, "App file request");
 
-        // Query content by appId (look for html5-app with matching content.appId)
-        let mut conn = self.get_conn()?;
-        let app_ctx = db::AppContext::default_lamad();
-        let query = ContentQuery {
-            content_format: Some("html5-app".to_string()),
-            limit: 100,
-            ..Default::default()
+        // --- Fast path: check extraction cache ---
+        let cached_blob_hash = {
+            let index = self.app_index.read().await;
+            index.get(app_id).cloned()
         };
 
-        let content_record = {
-            let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query)?;
-            let mut found = None;
-            for item in items {
-                // Parse content_body field as JSON and check appId
-                if let Some(ref content_body) = item.content.content_body {
-                    if let Ok(content_obj) = serde_json::from_str::<serde_json::Value>(content_body)
-                    {
-                        if let Some(content_app_id) =
-                            content_obj.get("appId").and_then(|v| v.as_str())
-                        {
-                            if content_app_id == app_id {
-                                found = Some(item.content);
-                                break;
-                            }
-                        }
-                    }
+        if let (Some(ref cache), Some(ref hash)) = (&self.extraction_cache, &cached_blob_hash) {
+            if cache.is_current(app_id, hash).await {
+                if let Some(data) = cache.get_file(app_id, file_path).await {
+                    let content_type = Self::get_mime_type(file_path);
+                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT");
+                    return Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, content_type)
+                        .header(header::CONTENT_LENGTH, data.len())
+                        .header(header::CACHE_CONTROL, "public, max-age=3600")
+                        .header("X-App-Id", app_id)
+                        .header("X-Cache", "HIT")
+                        .body(Full::new(Bytes::from(data)))
+                        .unwrap());
                 }
             }
-            found
-        };
+        }
 
-        let content = match content_record {
-            Some(c) => c,
+        // --- Slow path: DB lookup + ZIP extraction ---
+        debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
+
+        let blob_hash = match cached_blob_hash {
+            Some(h) => h,
             None => {
-                return Ok(Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "App not found: {}"}}"#,
-                        app_id
-                    ))))
-                    .unwrap());
-            }
-        };
-
-        // Get blob_hash from content record
-        let blob_hash = match &content.blob_hash {
-            Some(hash) if !hash.is_empty() => hash.clone(),
-            _ => {
-                // Try metadata.blobHash or metadata.blob_hash
-                let metadata: serde_json::Value = content
-                    .metadata_json
-                    .as_ref()
-                    .and_then(|s| serde_json::from_str(s).ok())
-                    .unwrap_or(serde_json::json!({}));
-
-                metadata
-                    .get("blobHash")
-                    .or_else(|| metadata.get("blob_hash"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
+                match self.lookup_app_blob_hash(app_id).await? {
+                    Some(h) => h,
+                    None => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "App not found: {}"}}"#, app_id
+                            ))))
+                            .unwrap());
+                    }
+                }
             }
         };
 
         if blob_hash.is_empty() {
-            // Get fallback URL if available
-            let content_obj: serde_json::Value = content
-                .content_body
-                .as_ref()
-                .and_then(|s| serde_json::from_str(s).ok())
-                .unwrap_or(serde_json::json!({}));
-            let fallback = content_obj.get("fallbackUrl").and_then(|v| v.as_str());
-
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(if let Some(url) = fallback {
-                    format!(
-                        r#"{{"error": "App ZIP not available", "fallback": "{}"}}"#,
-                        url
-                    )
-                } else {
-                    r#"{"error": "App ZIP not available (no blob_hash)"}"#.to_string()
-                })))
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "App ZIP not available (no blob_hash)"}"#
+                )))
                 .unwrap());
         }
 
@@ -2771,8 +2788,7 @@ impl HttpServer {
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "App ZIP blob not found: {}"}}"#,
-                        blob_hash
+                        r#"{{"error": "App ZIP blob not found: {}"}}"#, blob_hash
                     ))))
                     .unwrap());
             }
@@ -2781,7 +2797,7 @@ impl HttpServer {
 
         debug!(app_id = %app_id, zip_size = zip_data.len(), "Fetched ZIP blob");
 
-        // Extract file from ZIP
+        // Extract ALL files from ZIP
         let cursor = std::io::Cursor::new(&zip_data);
         let mut archive = match ZipArchive::new(cursor) {
             Ok(a) => a,
@@ -2791,83 +2807,58 @@ impl HttpServer {
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Invalid ZIP archive: {}"}}"#,
-                        e
+                        r#"{{"error": "Invalid ZIP archive: {}"}}"#, e
                     ))))
                     .unwrap());
             }
         };
 
-        // Normalize file path
+        let mut all_files: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut requested_file_data: Option<Vec<u8>> = None;
         let normalized_path = file_path.trim_start_matches('/');
 
-        // Find the file in the archive
-        // First, try to find an exact match or a suffix match in the file list
-        let file_index = {
-            let mut exact_idx = None;
-            let mut suffix_idx = None;
-
-            for i in 0..archive.len() {
-                if let Ok(f) = archive.by_index(i) {
-                    let name = f.name();
-                    if name == normalized_path {
-                        exact_idx = Some(i);
-                        break;
-                    }
-                    if suffix_idx.is_none()
-                        && (name.ends_with(normalized_path)
+        for i in 0..archive.len() {
+            if let Ok(mut f) = archive.by_index(i) {
+                if f.is_dir() {
+                    continue;
+                }
+                let name = f.name().to_string();
+                let mut contents = Vec::new();
+                if f.read_to_end(&mut contents).is_ok() {
+                    // Check if this is the requested file (exact or suffix match)
+                    if requested_file_data.is_none()
+                        && (name == normalized_path
+                            || name.ends_with(normalized_path)
                             || name.ends_with(&format!("/{}", normalized_path)))
                     {
-                        suffix_idx = Some(i);
+                        requested_file_data = Some(contents.clone());
                     }
+                    all_files.push((name, contents));
                 }
             }
+        }
 
-            exact_idx.or(suffix_idx)
-        };
+        // Cache the extracted files (non-fatal if caching fails)
+        if let Some(ref cache) = self.extraction_cache {
+            if let Err(e) = cache.put_app(app_id, &blob_hash, all_files).await {
+                warn!(error = %e, app_id = %app_id, "Failed to cache extraction (non-fatal)");
+            }
+        }
 
-        let file_index = match file_index {
-            Some(idx) => idx,
+        // Serve the requested file
+        let contents = match requested_file_data {
+            Some(data) => data,
             None => {
                 return Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "File not found in app: {}"}}"#,
-                        normalized_path
+                        r#"{{"error": "File not found in app: {}"}}"#, normalized_path
                     ))))
                     .unwrap());
             }
         };
 
-        let mut file = match archive.by_index(file_index) {
-            Ok(f) => f,
-            Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Failed to read file from ZIP: {}"}}"#,
-                        e
-                    ))))
-                    .unwrap());
-            }
-        };
-
-        // Read file contents
-        let mut contents = Vec::new();
-        if let Err(e) = file.read_to_end(&mut contents) {
-            return Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to read file contents: {}"}}"#,
-                    e
-                ))))
-                .unwrap());
-        }
-
-        // Determine content type from file extension
         let content_type = Self::get_mime_type(file_path);
 
         info!(
@@ -2875,7 +2866,7 @@ impl HttpServer {
             file_path = %file_path,
             content_type = %content_type,
             size = contents.len(),
-            "Serving app file"
+            "Serving app file (extracted + cached)"
         );
 
         Ok(Response::builder()
@@ -2884,8 +2875,42 @@ impl HttpServer {
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
             .header("X-App-Id", app_id)
+            .header("X-Cache", "MISS")
             .body(Full::new(Bytes::from(contents)))
             .unwrap())
+    }
+
+    /// Look up blob hash for an app by querying DB and updating app_index.
+    async fn lookup_app_blob_hash(&self, app_id: &str) -> Result<Option<String>, StorageError> {
+        let mut conn = self.get_conn()?;
+        let app_ctx = db::AppContext::default_lamad();
+        let query = ContentQuery {
+            content_format: Some("html5-app".to_string()),
+            limit: 100,
+            ..Default::default()
+        };
+
+        let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query)?;
+        let mut found_hash = None;
+
+        for item in items {
+            if let Some(ref content_body) = item.content.content_body {
+                if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
+                    if let Some(content_app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                        let hash = item.content.blob_hash.clone().unwrap_or_default();
+                        if !hash.is_empty() {
+                            let mut index = self.app_index.write().await;
+                            index.insert(content_app_id.to_string(), hash.clone());
+                        }
+                        if content_app_id == app_id {
+                            found_hash = item.content.blob_hash.clone();
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(found_hash)
     }
 
     // ========================================================================
