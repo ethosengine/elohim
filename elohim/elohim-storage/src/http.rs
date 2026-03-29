@@ -362,6 +362,18 @@ impl HttpServer {
             // Health check
             (Method::GET, "/health") => self.handle_health().await,
 
+            // Build/version info
+            (Method::GET, "/version") => {
+                let info = elohim_compute::BuildInfo::new("elohim-storage");
+                let body = serde_json::to_string(&info)
+                    .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(body)))
+                    .unwrap())
+            }
+
             // Shard API
             (Method::PUT, p) if p.starts_with("/shard/") => {
                 let hash = p.strip_prefix("/shard/").unwrap_or("");
@@ -683,8 +695,10 @@ impl HttpServer {
     /// Health check endpoint
     async fn handle_health(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         let stats = self.blob_store.stats().await?;
+        let build = elohim_compute::BuildInfo::new("elohim-storage");
         let body = serde_json::json!({
             "status": "ok",
+            "build": build,
             "blobs": stats.total_blobs,
             "bytes": stats.total_bytes,
             "manifests": self.manifests.read().await.len(),

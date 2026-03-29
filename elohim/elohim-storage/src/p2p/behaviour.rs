@@ -261,7 +261,7 @@ impl ElohimStorageBehaviour {
         // Identify protocol — advertise who we are and what we support
         let identify = identify::Behaviour::new(
             identify::Config::new("/elohim/id/1.0.0".to_string(), keypair.public())
-                .with_agent_version(format!("elohim-storage/{}", env!("CARGO_PKG_VERSION"))),
+                .with_agent_version(elohim_compute::BuildInfo::new("elohim-storage").user_agent()),
         );
 
         // AutoNAT — probe peers to detect NAT status
