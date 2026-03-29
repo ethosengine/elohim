@@ -111,8 +111,13 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Semaphore};
 use tracing::{debug, error, info, warn};
+
+/// Maximum number of concurrent HTTP requests the server will handle.
+/// Excess requests wait for a permit, preventing OOM under burst traffic
+/// (e.g., HTML5 app iframe loading 30+ assets simultaneously).
+const MAX_CONCURRENT_REQUESTS: usize = 64;
 
 /// HTTP server state
 pub struct HttpServer {
@@ -140,6 +145,8 @@ pub struct HttpServer {
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// In-memory index: appId -> blobHash (avoids per-request SQLite scan)
     app_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
+    /// Concurrency limiter: prevents OOM under burst traffic (e.g., HTML5 app loads)
+    request_semaphore: Arc<Semaphore>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -185,6 +192,7 @@ impl HttpServer {
             p2p_handle: None,
             extraction_cache: None,
             app_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
         }
     }
 
@@ -299,14 +307,26 @@ impl HttpServer {
     /// Run the HTTP server
     pub async fn run(self: Arc<Self>) -> Result<(), StorageError> {
         let listener = TcpListener::bind(self.bind_addr).await?;
-        info!(addr = %self.bind_addr, "HTTP server listening");
+        info!(
+            addr = %self.bind_addr,
+            max_concurrent = MAX_CONCURRENT_REQUESTS,
+            "HTTP server listening"
+        );
 
         loop {
             let (stream, remote_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
             let server = self.clone();
+            let semaphore = self.request_semaphore.clone();
 
             tokio::spawn(async move {
+                // Acquire a permit before processing — back-pressures under burst
+                // traffic (e.g., 30+ concurrent HTML5 app asset requests).
+                let _permit = match semaphore.acquire().await {
+                    Ok(permit) => permit,
+                    Err(_) => return, // semaphore closed — shutting down
+                };
+
                 let service = service_fn(move |req| {
                     let server = server.clone();
                     async move { server.handle_request(req).await }
