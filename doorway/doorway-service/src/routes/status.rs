@@ -611,9 +611,14 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         "hotCacheEntries": hot_cache_entries,
         "cacheHitRate": cache_stats.hit_rate(),
     });
-    let mut compute =
-        elohim_compute::ComputeReport::build(&reporter, resources, compute_peers, extensions);
-    compute.version = env!("CARGO_PKG_VERSION").to_string();
+    let build_info = elohim_compute::BuildInfo::new("elohim-doorway");
+    let compute = elohim_compute::ComputeReport::build(
+        &reporter,
+        &build_info,
+        resources,
+        compute_peers,
+        extensions,
+    );
 
     StatusResponse {
         service: "doorway",
@@ -1190,7 +1195,14 @@ mod tests {
             },
             compute: elohim_compute::ComputeReport {
                 service_id: "doorway".to_string(),
-                version: "0.1.0".to_string(),
+                build: elohim_compute::BuildInfo {
+                    version: "0.1.0".to_string(),
+                    commit: "unknown".to_string(),
+                    commit_full: "unknown".to_string(),
+                    build_time: "unknown".to_string(),
+                    rustc_version: "unknown".to_string(),
+                    service: "elohim-doorway".to_string(),
+                },
                 health: elohim_compute::ServiceHealth::Healthy,
                 health_reason: "all systems go".to_string(),
                 started_at: chrono::Utc::now(),
