@@ -2771,8 +2771,11 @@ impl HttpServer {
                 }
                 // Extraction failed or file not found — fall through to extract ourselves
             }
-            // We're first — proceed with extraction (finish_extraction called below)
+            // We're first — create drop guard that calls finish_extraction on ALL exit paths
+            // (including early returns for 404, empty hash, corrupt ZIP, etc.)
         }
+        // Guard lives until end of function — any return triggers finish_extraction
+        let _extraction_guard = self.extraction_cache.as_ref().map(|c| c.extraction_guard(app_id));
 
         debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
 
@@ -2869,8 +2872,7 @@ impl HttpServer {
             if let Err(e) = cache.put_app(app_id, &blob_hash, all_files).await {
                 warn!(error = %e, app_id = %app_id, "Failed to cache extraction (non-fatal)");
             }
-            // Signal waiters that extraction is complete
-            cache.finish_extraction(app_id);
+            // Guard drop handles finish_extraction — no explicit call needed
         }
 
         // Serve the requested file

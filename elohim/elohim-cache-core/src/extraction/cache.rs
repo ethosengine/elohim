@@ -103,11 +103,20 @@ impl ExtractionCache {
     }
 
     /// Signal that extraction is complete. All waiters receive the notification.
-    pub fn finish_extraction(&self, app_id: &str) {
+    fn finish_extraction(&self, app_id: &str) {
         let mut in_flight = self.in_flight.lock().unwrap();
         if let Some(tx) = in_flight.remove(app_id) {
             // Notify all waiters — ignore errors (no receivers is fine)
             let _ = tx.send(());
+        }
+    }
+
+    /// Create a drop guard that calls finish_extraction on all exit paths.
+    /// Prevents deadlock when early returns skip explicit cleanup.
+    pub fn extraction_guard(&self, app_id: &str) -> ExtractionGuard<'_> {
+        ExtractionGuard {
+            cache: self,
+            app_id: app_id.to_string(),
         }
     }
 
@@ -266,6 +275,19 @@ pub struct ExtractionCacheStats {
     pub total_cached_bytes: u64,
     pub budget_bytes: u64,
     pub ttl_secs: u64,
+}
+
+/// Drop guard that ensures finish_extraction is called on all exit paths.
+/// Prevents deadlock when early returns skip explicit cleanup.
+pub struct ExtractionGuard<'a> {
+    cache: &'a ExtractionCache,
+    app_id: String,
+}
+
+impl Drop for ExtractionGuard<'_> {
+    fn drop(&mut self) {
+        self.cache.finish_extraction(&self.app_id);
+    }
 }
 
 fn now_secs() -> u64 {

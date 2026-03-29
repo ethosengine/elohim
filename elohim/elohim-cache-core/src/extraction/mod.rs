@@ -9,5 +9,5 @@ mod error;
 
 pub use backend::CacheBackend;
 pub use disk::DiskBackend;
-pub use cache::{ExtractionCache, ExtractionCacheConfig, AppCacheEntry, ExtractionCacheStats};
+pub use cache::{ExtractionCache, ExtractionCacheConfig, AppCacheEntry, ExtractionCacheStats, ExtractionGuard};
 pub use error::CacheError;
