@@ -2748,6 +2748,32 @@ impl HttpServer {
         }
 
         // --- Slow path: DB lookup + ZIP extraction ---
+        // Thundering herd protection: if another request is already extracting
+        // this app, wait for it to finish then retry from cache.
+        if let Some(ref cache) = self.extraction_cache {
+            if let Some(mut rx) = cache.begin_extraction(app_id) {
+                // Another request is extracting — wait for it
+                debug!(app_id = %app_id, "Waiting for in-flight extraction");
+                let _ = rx.recv().await; // ignore errors — extractor may have finished
+                // Retry from cache
+                if let Some(data) = cache.get_file(app_id, file_path).await {
+                    let content_type = Self::get_mime_type(file_path);
+                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT (after wait)");
+                    return Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, content_type)
+                        .header(header::CONTENT_LENGTH, data.len())
+                        .header(header::CACHE_CONTROL, "public, max-age=3600")
+                        .header("X-App-Id", app_id)
+                        .header("X-Cache", "HIT-COALESCED")
+                        .body(Full::new(Bytes::from(data)))
+                        .unwrap());
+                }
+                // Extraction failed or file not found — fall through to extract ourselves
+            }
+            // We're first — proceed with extraction (finish_extraction called below)
+        }
+
         debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
 
         let blob_hash = match cached_blob_hash {
@@ -2843,6 +2869,8 @@ impl HttpServer {
             if let Err(e) = cache.put_app(app_id, &blob_hash, all_files).await {
                 warn!(error = %e, app_id = %app_id, "Failed to cache extraction (non-fatal)");
             }
+            // Signal waiters that extraction is complete
+            cache.finish_extraction(app_id);
         }
 
         // Serve the requested file

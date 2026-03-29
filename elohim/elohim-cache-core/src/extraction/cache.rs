@@ -7,7 +7,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tokio::sync::RwLock;
+use std::sync::Mutex;
+use tokio::sync::{broadcast, RwLock};
 use serde::{Deserialize, Serialize};
 
 use super::backend::CacheBackend;
@@ -66,6 +67,10 @@ pub struct ExtractionCache {
     backend: Box<dyn CacheBackend>,
     index: RwLock<HashMap<String, AppCacheEntry>>,
     config: ExtractionCacheConfig,
+    /// In-flight extractions: app_id → broadcast sender.
+    /// First request extracts, concurrent requests wait on the broadcast.
+    /// Uses std::sync::Mutex (not tokio) because held only for HashMap insert/remove.
+    in_flight: Mutex<HashMap<String, broadcast::Sender<()>>>,
 }
 
 impl ExtractionCache {
@@ -75,6 +80,34 @@ impl ExtractionCache {
             backend,
             index: RwLock::new(HashMap::new()),
             config,
+            in_flight: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Acquire extraction rights for an app_id.
+    ///
+    /// Returns `Ok(None)` if this caller is the first (should extract).
+    /// Returns `Ok(Some(receiver))` if another caller is already extracting (wait on it).
+    /// The caller who gets None MUST call `finish_extraction()` when done.
+    pub fn begin_extraction(&self, app_id: &str) -> Option<broadcast::Receiver<()>> {
+        let mut in_flight = self.in_flight.lock().unwrap();
+        if let Some(tx) = in_flight.get(app_id) {
+            // Someone is already extracting — subscribe to their broadcast
+            Some(tx.subscribe())
+        } else {
+            // We're first — register ourselves
+            let (tx, _) = broadcast::channel(1);
+            in_flight.insert(app_id.to_string(), tx);
+            None
+        }
+    }
+
+    /// Signal that extraction is complete. All waiters receive the notification.
+    pub fn finish_extraction(&self, app_id: &str) {
+        let mut in_flight = self.in_flight.lock().unwrap();
+        if let Some(tx) = in_flight.remove(app_id) {
+            // Notify all waiters — ignore errors (no receivers is fine)
+            let _ = tx.send(());
         }
     }
 
@@ -144,9 +177,9 @@ impl ExtractionCache {
         self.evict_app(app_id).await?;
 
         // Write all files
-        for (path, data) in &files {
+        for (path, data) in files {
             let key = format!("{}/{}", app_id, path);
-            self.backend.put(&key, data.clone()).await?;
+            self.backend.put(&key, data).await?;
         }
 
         // Update index
@@ -348,6 +381,38 @@ mod tests {
         let files = vec![("data.bin".into(), vec![0u8; 100])];
         let result = cache.put_app("app1", "h1", files).await;
         assert!(matches!(result, Err(CacheError::BudgetExceeded { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_ttl_expiry() {
+        // TTL of 1 second
+        let (cache, _tmp) = test_cache(1, 1024 * 1024).await;
+        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+
+        // Force the entry to look old by backdating last_accessed
+        {
+            let mut index = cache.index.write().await;
+            if let Some(entry) = index.get_mut("app1") {
+                entry.last_accessed = entry.last_accessed.saturating_sub(10);
+            }
+        }
+
+        // is_current should return false (expired)
+        assert!(!cache.is_current("app1", "hash-abc").await);
+
+        // get_file should return None (expired)
+        assert_eq!(cache.get_file("app1", "index.html").await, None);
+    }
+
+    #[tokio::test]
+    async fn test_ttl_not_expired() {
+        // TTL of 3600 seconds — entries stay alive
+        let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
+        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+
+        // Should still be current
+        assert!(cache.is_current("app1", "hash-abc").await);
+        assert!(cache.get_file("app1", "index.html").await.is_some());
     }
 
     #[tokio::test]
