@@ -76,14 +76,46 @@ async function installHapp(adminWs) {
   if (existingApp) {
     console.log(`App '${APP_ID}' is already installed (status: ${JSON.stringify(existingApp.status)})`);
 
-    // Check for stale install — if installed app is missing expected roles, reinstall
+    // Check for stale install — verify all expected roles have provisioned cells
     const expectedRoles = ['lamad', 'infrastructure', 'imagodei', 'mishpat', 'node_registry'];
-    const installedRoles = Object.keys(existingApp.cell_info || {});
+    const cellInfo = existingApp.cell_info || {};
+    const installedRoles = Object.keys(cellInfo);
+
+    // Log full cell_info structure for debugging
+    console.log(`Installed roles: [${installedRoles.join(', ')}]`);
+    console.log(`Expected roles: [${expectedRoles.join(', ')}]`);
+    for (const [role, cells] of Object.entries(cellInfo)) {
+      const cellCount = Array.isArray(cells) ? cells.length : (cells ? 1 : 0);
+      console.log(`  ${role}: ${cellCount} cell(s)`);
+    }
+
+    // Check 1: All expected roles must be present as keys
     const missingRoles = expectedRoles.filter(r => !installedRoles.includes(r));
 
-    if (missingRoles.length > 0) {
-      console.log(`Stale hApp detected — missing roles: ${missingRoles.join(', ')}`);
-      console.log(`Installed roles: ${installedRoles.join(', ')}`);
+    // Check 2: Each role must have at least one provisioned cell
+    const emptyRoles = installedRoles.filter(r => {
+      const cells = cellInfo[r];
+      return !cells || (Array.isArray(cells) && cells.length === 0);
+    });
+
+    // Check 3: Total cell count should match expected DNA count
+    let totalCells = 0;
+    for (const cells of Object.values(cellInfo)) {
+      totalCells += Array.isArray(cells) ? cells.length : (cells ? 1 : 0);
+    }
+
+    const isStale = missingRoles.length > 0 || emptyRoles.length > 0 || totalCells < expectedRoles.length;
+
+    if (isStale) {
+      if (missingRoles.length > 0) {
+        console.log(`Stale hApp detected — missing roles: ${missingRoles.join(', ')}`);
+      }
+      if (emptyRoles.length > 0) {
+        console.log(`Stale hApp detected — roles with no cells: ${emptyRoles.join(', ')}`);
+      }
+      if (totalCells < expectedRoles.length) {
+        console.log(`Stale hApp detected — only ${totalCells} cells, expected ${expectedRoles.length}`);
+      }
       console.log(`Uninstalling stale hApp '${APP_ID}'...`);
       await adminWs.uninstallApp({ installed_app_id: APP_ID });
       console.log(`Stale hApp removed. Will reinstall with full bundle.`);
