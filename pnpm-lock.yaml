@@ -89,9 +89,9 @@ importers:
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
-      holochain-cache-core:
-        specifier: file:../../elohim/holochain/holochain-cache-core/pkg
-        version: file:elohim/holochain/holochain-cache-core/pkg
+      elohim-cache-core:
+        specifier: file:../../elohim/elohim-cache-core/pkg
+        version: file:elohim/elohim-cache-core/pkg
       maplibre-gl:
         specifier: ^5.20.2
         version: 5.20.2
@@ -6732,8 +6732,8 @@ packages:
     resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
     engines: {node: '>=12.0.0'}
 
-  holochain-cache-core@file:elohim/holochain/holochain-cache-core/pkg:
-    resolution: {directory: elohim/holochain/holochain-cache-core/pkg, type: directory}
+  elohim-cache-core@file:elohim/elohim-cache-core/pkg:
+    resolution: {directory: elohim/elohim-cache-core/pkg, type: directory}
 
   hono@4.12.3:
     resolution: {integrity: sha512-SFsVSjp8sj5UumXOOFlkZOG6XS9SJDKw0TbwFeV+AJ8xlST8kxK5Z/5EYa111UY8732lK2S/xB653ceuaoGwpg==}
@@ -18577,7 +18577,7 @@ snapshots:
 
   highlight.js@11.11.1: {}
 
-  holochain-cache-core@file:elohim/holochain/holochain-cache-core/pkg: {}
+  elohim-cache-core@file:elohim/elohim-cache-core/pkg: {}
 
   hono@4.12.3: {}
 

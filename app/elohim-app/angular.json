@@ -47,8 +47,8 @@
               },
               {
                 "glob": "**/*",
-                "input": "node_modules/holochain-cache-core",
-                "output": "/wasm/holochain-cache-core"
+                "input": "node_modules/elohim-cache-core",
+                "output": "/wasm/elohim-cache-core"
               }
             ],
             "styles": [

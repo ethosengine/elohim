@@ -5,7 +5,7 @@
  *
  * Content Architecture:
  * - DNA stores metadata with blobHash references
- * - holochain-cache-core stores and serves actual blob content
+ * - elohim-cache-core stores and serves actual blob content
  * - Clients use ContentResolver to find content across tiers
  *
  * Blob-extractable formats:

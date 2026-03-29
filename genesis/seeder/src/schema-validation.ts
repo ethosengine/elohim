@@ -32,7 +32,7 @@ const VALID_CONTENT_TYPES = [
 // Content Format Architecture:
 // - DNA stores metadata including `contentFormat` as a hint for clients
 // - DNA does NOT validate the actual format (intentionally flexible)
-// - holochain-cache-core handles content resolution and delivery
+// - elohim-cache-core handles content resolution and delivery
 // - Clients use format to determine rendering strategy
 //
 // This means ANY format string is valid at the DNA level.

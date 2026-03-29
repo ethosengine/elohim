@@ -4,7 +4,7 @@
  * Framework-agnostic interfaces for reach-aware content caching.
  * Compatible with Angular, Svelte, React, Vue, or vanilla TypeScript.
  *
- * These interfaces mirror the WASM holochain-cache-core module,
+ * These interfaces mirror the WASM elohim-cache-core module,
  * allowing seamless switching between WASM and pure TypeScript implementations.
  */
 
