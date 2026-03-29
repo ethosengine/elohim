@@ -242,7 +242,7 @@ export class ProjectionAPIService implements IStorageApi {
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
       map(data => {
-        const node = this.transformContent(data);
+        const node = this.contentService.transformRawContent(data);
         this.recordSuccess();
         return node;
       }),
@@ -277,7 +277,7 @@ export class ProjectionAPIService implements IStorageApi {
 
     return this.http.get<Record<string, unknown>[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
-      map(data => (data ?? []).map(c => this.transformContent(c))),
+      map(data => (data ?? []).map(c => this.contentService.transformRawContent(c))),
       // Apply client-side filters
       map(contents => this.applyContentFilters(contents, filters)),
       catchError((err: HttpErrorResponse) => this.handleContentArrayError(err, 'queryContent'))
@@ -486,7 +486,7 @@ export class ProjectionAPIService implements IStorageApi {
       >(`${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`, { params })
       .pipe(
         timeout(this.defaultTimeout),
-        map(response => (response.data ?? []).map(c => this.transformContent(c))),
+        map(response => (response.data ?? []).map(c => this.contentService.transformRawContent(c))),
         catchError((err: HttpErrorResponse) =>
           this.handleContentArrayError(err, `getRelated(${nodeId})`)
         )
@@ -524,14 +524,6 @@ export class ProjectionAPIService implements IStorageApi {
   // =========================================================================
   // Private Helpers
   // =========================================================================
-
-  /**
-   * Transform projected content to ContentNode model.
-   * Delegates to ContentService.transformRawContent() — single typed pipeline.
-   */
-  private transformContent(data: Record<string, unknown>): ContentNode {
-    return this.contentService.transformRawContent(data);
-  }
 
   /**
    * Transform projected path to LearningPath (PathView) model.
