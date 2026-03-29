@@ -1,6 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
+import { ContentService } from './content.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType } from '../../lamad/models/content-node.model';
@@ -24,6 +25,7 @@ describe('ProjectionAPIService', () => {
   let service: ProjectionAPIService;
   let httpMock: HttpTestingController;
   let mockStorageClient: any;
+  let mockContentService: any;
 
   const mockContentData = {
     id: 'content-1',
@@ -76,11 +78,36 @@ describe('ProjectionAPIService', () => {
       (hash: string) => `https://blob.example.com/${hash}`
     );
 
+    // Mock ContentService (ProjectionApiService delegates transformContent to it)
+    mockContentService = {
+      transformRawContent: vi.fn().mockImplementation((data: Record<string, unknown>) => ({
+        id: data['id'] ?? data['docId'] ?? '',
+        contentType: data['contentType'] ?? '',
+        title: data['title'] ?? '',
+        description: data['description'] ?? '',
+        content: data['content'] ?? data['contentBody'] ?? '',
+        contentFormat: data['contentFormat'] ?? 'markdown',
+        tags: data['tags'] ?? [],
+        relatedNodeIds: data['relatedNodeIds'] ?? [],
+        metadata: data['metadata'] ?? {},
+        authorId: data['authorId'] ?? data['author'],
+        reach: data['reach'] ?? 'commons',
+        trustScore: data['trustScore'],
+        thumbnailUrl: data['thumbnailUrl'] ? `https://blob.example.com/${data['thumbnailUrl']}` : undefined,
+        createdAt: data['createdAt'],
+        updatedAt: data['updatedAt'],
+      })),
+      resolveBlobReference: vi.fn().mockImplementation(
+        (value: string | null | undefined) => value ? `https://blob.example.com/${value}` : undefined
+      ),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         ProjectionAPIService,
+        { provide: ContentService, useValue: mockContentService },
         { provide: StorageClientService, useValue: mockStorageClient },
       ],
     });
@@ -152,7 +179,7 @@ describe('ProjectionAPIService', () => {
       expect((result as any)?.reach).toBe('commons');
     }));
 
-    it('should resolve blob URLs via StorageClientService', fakeAsync(() => {
+    it('should delegate content transform to ContentService', fakeAsync(() => {
       let result: ContentNode | null = null;
       service.getContentNode('content-1').subscribe(data => {
         result = data;
@@ -162,11 +189,12 @@ describe('ProjectionAPIService', () => {
       req.flush(mockContentData);
       tick();
 
-      expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith('sha256-thumb123');
-      expect((result as any)?.thumbnailUrl).toBe('https://blob.example.com/sha256-thumb123');
+      expect(mockContentService.transformRawContent).toHaveBeenCalledWith(mockContentData);
+      expect(result).not.toBeNull();
+      expect((result as any)?.id).toBe('content-1');
     }));
 
-    it('should handle full URLs without transformation', fakeAsync(() => {
+    it('should pass full URLs through via ContentService transform', fakeAsync(() => {
       const dataWithFullUrl = {
         ...mockContentData,
         thumbnailUrl: 'https://external.com/image.jpg',
@@ -181,7 +209,7 @@ describe('ProjectionAPIService', () => {
       req.flush(dataWithFullUrl);
       tick();
 
-      expect((result as any)?.thumbnailUrl).toBe('https://external.com/image.jpg');
+      expect(mockContentService.transformRawContent).toHaveBeenCalledWith(dataWithFullUrl);
     }));
 
     it('should handle 404 errors gracefully', fakeAsync(() => {
@@ -813,7 +841,7 @@ describe('ProjectionAPIService', () => {
       expect((result as any)?.authorId).toBe('author-2');
     }));
 
-    it('should provide default values for missing fields', fakeAsync(() => {
+    it('should delegate default values to ContentService transform', fakeAsync(() => {
       const minimalData = {
         id: 'minimal-1',
       };
@@ -827,11 +855,9 @@ describe('ProjectionAPIService', () => {
       req.flush(minimalData);
       tick();
 
-      expect((result as any)?.title).toBe('');
-      expect((result as any)?.description).toBe('');
-      expect((result as any)?.contentFormat).toBe('markdown');
-      expect((result as any)?.tags).toEqual([]);
-      expect((result as any)?.reach).toBe('private');
+      // Defaults now come from ContentService.transformRawContent
+      expect(mockContentService.transformRawContent).toHaveBeenCalledWith(minimalData);
+      expect((result as any)?.reach).toBe('commons');
     }));
 
     it('should handle null thumbnailUrl', fakeAsync(() => {
@@ -849,29 +875,21 @@ describe('ProjectionAPIService', () => {
       expect((result as any)?.thumbnailUrl).toBeUndefined();
     }));
 
-    it('should handle various blob URL formats', fakeAsync(() => {
-      const testCases = [
-        { input: '/blob/sha256-abc', expected: 'sha256-abc' },
-        { input: 'blob/sha256-def', expected: 'sha256-def' },
-        { input: 'sha256-ghi', expected: 'sha256-ghi' },
-      ];
+    it('should delegate blob URL handling to ContentService transform', fakeAsync(() => {
+      const data = { ...mockContentData, thumbnailUrl: '/blob/sha256-abc' };
+      let result: ContentNode | null = null;
 
-      testCases.forEach(testCase => {
-        mockStorageClient.getBlobUrl.mockClear();
-
-        const data = { ...mockContentData, thumbnailUrl: testCase.input };
-        let result: ContentNode | null = null;
-
-        service.getContentNode('test').subscribe(d => {
-          result = d;
-        });
-
-        const req = httpMock.expectOne(request => request.url.includes('/Content/test'));
-        req.flush(data);
-        tick();
-
-        expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith(testCase.expected);
+      service.getContentNode('test').subscribe(d => {
+        result = d;
       });
+
+      const req = httpMock.expectOne(request => request.url.includes('/Content/test'));
+      req.flush(data);
+      tick();
+
+      // Blob URL resolution is now ContentService's responsibility
+      expect(mockContentService.transformRawContent).toHaveBeenCalledWith(data);
+      expect(result).not.toBeNull();
     }));
   });
 
