@@ -915,6 +915,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build --no-cache \\
                                     --build-arg CACHE_BUST=${GIT_COMMIT_HASH} \\
+                                    --build-arg GIT_COMMIT_SHORT=\$(echo ${GIT_COMMIT_HASH} | cut -c1-7) \\
+                                    --build-arg GIT_COMMIT_FULL=${GIT_COMMIT_HASH} \\
+                                    --build-arg BUILD_TIMESTAMP=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \\
+                                    --build-arg RUSTC_VERSION=\$(rustc --version 2>/dev/null | head -1 || echo unknown) \\
                                     -t elohim-storage:${IMAGE_TAG} \\
                                     -f elohim/elohim-storage/Dockerfile .
 

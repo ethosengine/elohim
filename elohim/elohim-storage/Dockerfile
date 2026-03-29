@@ -67,6 +67,10 @@ RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
 # Cache buster — pass --build-arg CACHE_BUST=$(git rev-parse HEAD) to invalidate
 # when source changes but Docker thinks COPY layers are identical
 ARG CACHE_BUST=unknown
+ARG GIT_COMMIT_SHORT=unknown
+ARG GIT_COMMIT_FULL=unknown
+ARG BUILD_TIMESTAMP=unknown
+ARG RUSTC_VERSION=unknown
 
 # Copy actual source and migrations (embed_migrations! needs them at compile time)
 # Migrations must be present for diesel embed_migrations! proc macro
@@ -76,7 +80,12 @@ COPY elohim/elohim-storage/src ./src
 # Build the release binary
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
 # when the value changes (ARG alone is insufficient for BuildKit cache invalidation)
-RUN echo "Building at ${CACHE_BUST}" && cargo build --release
+RUN echo "Building at ${CACHE_BUST}" && \
+    GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT} \
+    GIT_COMMIT_FULL=${GIT_COMMIT_FULL} \
+    BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+    RUSTC_VERSION=${RUSTC_VERSION} \
+    cargo build --release
 
 # Verify migrations are actually embedded in the binary.
 # The binary prints migration count on --help stderr or we check the strings.
