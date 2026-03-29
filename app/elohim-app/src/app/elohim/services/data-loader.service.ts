@@ -1447,7 +1447,8 @@ export class DataLoaderService {
       hcRel.metadata && typeof hcRel.metadata === 'object' ? hcRel.metadata : {}
     ) as Record<string, unknown>;
 
-    // Store confidence in metadata since ContentRelationship doesn't have a confidence field
+    // Intentionally untyped: relationship metadata, not domain content metadata.
+    // ContentRelationship.metadata is Record<string, unknown> by design.
     metadata['confidence'] = hcRel.confidence;
 
     return {

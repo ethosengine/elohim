@@ -237,6 +237,7 @@ export class SlaMonitorService implements OnDestroy {
     sla.currentEscalationLevel++;
     sla.status = 'escalated';
     sla.assignedTo = sla.escalationPath[sla.currentEscalationLevel];
+    // Intentionally untyped: SLA metadata is governance-internal, not domain content metadata
     sla.metadata = {
       ...sla.metadata,
       escalationHistory: [

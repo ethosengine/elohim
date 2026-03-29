@@ -697,7 +697,8 @@ export class ContentService {
       authorId: data.authorId ?? data.author,
       reach: data.reach ?? 'commons',
       trustScore: data.trustScore,
-      // Resolve thumbnailUrl from wire data or typed metadata (PathMetadata/ConceptMetadata)
+      // Intentionally untyped: pre-narrowing access — metadata is generic Record here,
+      // typed at consumption via isConceptNode()/isPathNode() type guards
       thumbnailUrl: this.resolveBlobUrl(
         data.thumbnailUrl ?? (metadata['thumbnailUrl'] as string | undefined)
       ),
