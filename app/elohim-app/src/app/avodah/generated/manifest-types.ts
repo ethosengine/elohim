@@ -1,4 +1,4 @@
-// AUTO-GENERATED from app manifest: app/avodah/manifest.json
+// AUTO-GENERATED from app manifest: elohim/sdk/domains/avodah/manifest.json
 // DO NOT EDIT — regenerate with: pnpm run avodah:codegen
 
 export const AVODAH_CONTENT_TYPES = ['work-story', 'work-project'] as const;

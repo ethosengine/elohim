@@ -58,8 +58,8 @@
     "shefa:codegen:verify": "node elohim/sdk/domains/shefa/scripts/codegen.mjs --verify",
     "qahal:codegen": "node elohim/sdk/domains/qahal/scripts/codegen.mjs",
     "qahal:codegen:verify": "node elohim/sdk/domains/qahal/scripts/codegen.mjs --verify",
-    "avodah:codegen": "node app/avodah/scripts/codegen.mjs",
-    "avodah:codegen:verify": "node app/avodah/scripts/codegen.mjs --verify"
+    "avodah:codegen": "node elohim/sdk/domains/avodah/scripts/codegen.mjs",
+    "avodah:codegen:verify": "node elohim/sdk/domains/avodah/scripts/codegen.mjs --verify"
   },
   "dependencies": {
   }

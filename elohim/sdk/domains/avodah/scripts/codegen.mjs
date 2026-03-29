@@ -3,8 +3,8 @@
  * Avodah codegen — generates TypeScript types from the avodah app manifest.
  *
  * Reads:
- *   - Avodah manifest (app/avodah/manifest.json)
- *   - Avodah companion schemas (app/avodah/schemas/*.schema.json)
+ *   - Avodah manifest (elohim/sdk/domains/avodah/manifest.json)
+ *   - Avodah companion schemas (elohim/sdk/domains/avodah/schemas/*.schema.json)
  *
  * Produces (to app/elohim-app/src/app/avodah/generated/):
  *   - metadata-types.ts — WorkStoryMeta, WorkProjectMeta
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_DIR = resolve(__dirname, '..');
-const REPO_ROOT = resolve(__dirname, '../../../');
+const REPO_ROOT = resolve(__dirname, '../../../../../');
 
 const VERIFY = process.argv.includes('--verify');
 
