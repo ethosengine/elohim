@@ -2,15 +2,15 @@
  * Elohim DNA Pipeline (elohim-holochain)
  *
  * Builds DNA/hApp artifacts only - NO container images, NO deployments.
- * Triggered by orchestrator when elohim/holochain/dna/ or elohim/holochain/holochain-cache-core/ change.
+ * Triggered by orchestrator when elohim/holochain/dna/ or elohim/elohim-cache-core/ change.
  *
  * Artifacts produced:
  *   - elohim.happ (multi-DNA bundle: lamad + imagodei + infrastructure)
- *   - holochain-cache-core WASM module (for elohim-app)
+ *   - elohim-cache-core WASM module (for elohim-app)
  *
  * Downstream consumers:
  *   - elohim-edge (fetches hApp for container images)
- *   - elohim-app (fetches holochain-cache-core WASM)
+ *   - elohim-app (fetches elohim-cache-core WASM)
  *   - genesis (requires hApp to be deployed before seeding)
  *   - steward (fetches hApp for desktop builds)
  *

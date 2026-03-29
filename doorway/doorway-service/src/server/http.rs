@@ -72,7 +72,7 @@ pub struct AppState {
     /// Content resolver with tiered fallback (Projection → Conductor)
     pub resolver: Arc<DoorwayResolver>,
     /// Delivery relay for CDN-style content delivery (request coalescing, shard caching)
-    /// Note: Write batching is handled by agent-side holochain-cache-core, NOT here
+    /// Note: Write batching is handled by agent-side elohim-cache-core, NOT here
     pub delivery_relay: Arc<DeliveryRelay>,
     /// Import config discovered from DNAs (zome-declared routes)
     pub import_config_store: Option<Arc<crate::services::ImportConfigStore>>,
@@ -324,7 +324,7 @@ impl AppState {
         ));
 
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
-        // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
+        // Note: Write batching is handled by agent's elohim-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
         let peer_url_list =
@@ -415,7 +415,7 @@ impl AppState {
         let resolver = Arc::new(DoorwayResolver::new(projection.clone(), pool.clone(), None));
 
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
-        // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
+        // Note: Write batching is handled by agent's elohim-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
         let peer_url_list =

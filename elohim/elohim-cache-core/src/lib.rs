@@ -1,7 +1,7 @@
-//! Holochain Cache Core - High-Performance Content-Reach Aware Cache
+//! Elohim Cache Core - High-Performance Content-Reach Aware Cache
 //!
 //! Provides O(log n) eviction and cleanup operations instead of O(n).
-//! Compiled to WebAssembly for use in Holochain/Elohim client applications.
+//! Compiled to WebAssembly for use in Elohim Protocol client applications.
 //!
 //! # Key Features
 //! - Reach-level isolation (private → commons): 8 independent LRU caches

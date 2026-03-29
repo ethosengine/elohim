@@ -1,6 +1,6 @@
 //! Content Resolution - Tiered source routing for content fetching
 //!
-//! Wraps holochain-cache-core's ContentResolver to provide doorway with
+//! Wraps elohim-cache-core's ContentResolver to provide doorway with
 //! proper fallback chain: Projection → Conductor → External.
 //!
 //! ## Purpose
@@ -32,7 +32,7 @@
 //! let custom = resolver.resolve("MyCustomType", "my-id").await?;
 //! ```
 
-use holochain_cache_core::{ContentResolver, SourceTier};
+use elohim_cache_core::{ContentResolver, SourceTier};
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
@@ -87,7 +87,7 @@ pub struct ResolutionStats {
 ///
 /// Provides projection → conductor fallback for content resolution.
 pub struct DoorwayResolver {
-    /// holochain-cache-core resolver for source routing (wrapped for async mutation)
+    /// elohim-cache-core resolver for source routing (wrapped for async mutation)
     resolver: RwLock<ContentResolver>,
     /// Projection store (MongoDB cache)
     projection: Option<Arc<ProjectionStore>>,
@@ -207,7 +207,7 @@ impl DoorwayResolver {
             let mut resolver = self.resolver.write().await;
             resolver.resolve(content_type, id)
         };
-        let parsed: holochain_cache_core::ResolutionResult = serde_json::from_str(&resolution)
+        let parsed: elohim_cache_core::ResolutionResult = serde_json::from_str(&resolution)
             .map_err(|_| DoorwayError::Internal("Failed to parse resolution result".into()))?;
 
         // Try sources in order, passing identity for access control
@@ -241,7 +241,7 @@ impl DoorwayResolver {
         &self,
         content_type: &str,
         id: &str,
-        initial: &holochain_cache_core::ResolutionResult,
+        initial: &elohim_cache_core::ResolutionResult,
         requester: Option<RequesterIdentity>,
     ) -> Result<(serde_json::Value, String, SourceTier, bool)> {
         // Try projection first

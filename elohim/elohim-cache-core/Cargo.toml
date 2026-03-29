@@ -1,9 +1,9 @@
 [package]
-name = "holochain-cache-core"
+name = "elohim-cache-core"
 version = "0.1.0"
 edition = "2021"
 authors = ["Elohim Protocol"]
-description = "High-performance O(log n) cache for Holochain/Elohim applications"
+description = "High-performance O(log n) cache for Elohim Protocol applications"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

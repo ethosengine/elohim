@@ -1,7 +1,7 @@
 //! Cache store implementation
 //!
 //! In-memory LRU cache with TTL support, ETag generation, and pattern-based invalidation.
-//! Uses holochain-cache-core for O(log n) eviction operations.
+//! Uses elohim-cache-core for O(log n) eviction operations.
 //!
 //! ## Streaming Support
 //!
@@ -13,8 +13,8 @@
 use super::CacheConfig;
 use bytes::Bytes;
 use dashmap::DashMap;
+use elohim_cache_core::BlobCache;
 use futures::stream::{self, Stream};
-use holochain_cache_core::BlobCache;
 use sha2::{Digest, Sha256};
 use std::ops::Range;
 use std::pin::Pin;
@@ -142,7 +142,7 @@ impl CacheStats {
 
 /// In-memory content cache with O(log n) LRU eviction.
 ///
-/// Uses holochain-cache-core's BlobCache for efficient eviction decisions
+/// Uses elohim-cache-core's BlobCache for efficient eviction decisions
 /// while maintaining DashMap for concurrent access to actual content.
 pub struct ContentCache {
     /// The cache storage: storage_key -> entry
@@ -161,7 +161,7 @@ pub struct ContentCache {
 
 impl ContentCache {
     /// Create a new content cache with configuration.
-    /// Initializes holochain-cache-core's BlobCache for O(log n) eviction.
+    /// Initializes elohim-cache-core's BlobCache for O(log n) eviction.
     pub fn new(config: CacheConfig) -> Self {
         // Calculate max size: assume average entry is ~10KB
         let estimated_max_bytes = (config.max_entries as u64) * 10 * 1024;
@@ -169,7 +169,7 @@ impl ContentCache {
 
         info!(
             max_entries = config.max_entries,
-            "ContentCache initialized with holochain-cache-core O(log n) eviction"
+            "ContentCache initialized with elohim-cache-core O(log n) eviction"
         );
 
         Self {

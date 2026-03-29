@@ -1,7 +1,7 @@
 //! Delivery Relay - CDN-style content delivery assistance
 //!
 //! This module provides CDN-like functionality that COMPLEMENTS (not replaces)
-//! the agent-side `holochain-cache-core` and `elohim-storage`.
+//! the agent-side `elohim-cache-core` and `elohim-storage`.
 //!
 //! ## Architecture Position
 //!
@@ -21,7 +21,7 @@
 //!       │
 //!       ▼ (proxies to / caches from)
 //! ┌─────────────────────────────────────────────────────────────┐
-//! │  AGENT (holochain-cache-core + elohim-storage)              │
+//! │  AGENT (elohim-cache-core + elohim-storage)              │
 //! │  - Primary blob storage                                     │
 //! │  - WriteBuffer for conductor protection                     │
 //! │  - Reed-Solomon encoding/decoding                           │
@@ -126,7 +126,7 @@ pub struct DeliveryRelay {
     /// In-flight requests being coalesced (hash -> broadcast channel)
     in_flight: RwLock<HashMap<String, InFlightRequest>>,
     /// Simple shard cache (hash -> (data, cached_at))
-    /// TODO: Replace with proper LRU from holochain-cache-core
+    /// TODO: Replace with proper LRU from elohim-cache-core
     shard_cache: RwLock<HashMap<String, (Vec<u8>, Instant)>>,
     /// Total cached bytes
     cached_bytes: RwLock<u64>,
