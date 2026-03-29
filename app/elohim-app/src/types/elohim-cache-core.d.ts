@@ -1,7 +1,7 @@
 /**
- * Type declarations for holochain-cache-core WASM module.
+ * Type declarations for elohim-cache-core WASM module.
  *
- * This module is built from holochain/holochain-cache-core using wasm-pack.
+ * This module is built from elohim/elohim-cache-core using wasm-pack.
  * If the WASM module is not available, the reach-aware-cache service
  * will gracefully fall back to the TypeScript implementation.
  *
@@ -9,12 +9,12 @@
  */
 
 // Allow URL-based imports for runtime WASM loading
-declare module '/wasm/holochain-cache-core/holochain_cache_core.js' {
-  export * from 'holochain-cache-core';
-  export { default } from 'holochain-cache-core';
+declare module '/wasm/elohim-cache-core/elohim_cache_core.js' {
+  export * from 'elohim-cache-core';
+  export { default } from 'elohim-cache-core';
 }
 
-declare module 'holochain-cache-core' {
+declare module 'elohim-cache-core' {
   /**
    * Initialize the WASM module.
    * Must be called before using other functions.

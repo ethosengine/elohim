@@ -28,7 +28,7 @@ import groovy.transform.Field
 @Field def PIPELINES = [
     'elohim-holochain': [
         jenkinsPath: 'elohim/holochain/dna/Jenkinsfile',
-        changePatterns: ['elohim/holochain/dna/', 'elohim/holochain/holochain-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
+        changePatterns: ['elohim/holochain/dna/', 'elohim/elohim-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
         cascades: false,      // Sprint 5: DNA changes don't auto-trigger Edge rebuilds
@@ -37,7 +37,7 @@ import groovy.transform.Field
     ],
     'elohim-edge': [
         jenkinsPath: 'elohim/holochain/Jenkinsfile',
-        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'crates/', 'VERSION'],
+        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'VERSION'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-agent-sdk', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,

@@ -762,7 +762,7 @@ async function loadWasmModule(wasmPath?: string): Promise<WasmModule | null> {
   wasmLoadAttempted = true;
 
   try {
-    const path = wasmPath || '/wasm/holochain-cache-core/holochain_cache_core.js';
+    const path = wasmPath || '/wasm/elohim-cache-core/elohim_cache_core.js';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const module: any = await import(/* webpackIgnore: true */ path);
     await module.default();

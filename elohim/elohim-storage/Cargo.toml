@@ -13,6 +13,9 @@ constitution = { path = "../constitution" }
 # Doorway route registration
 doorway-client = { path = "../../crates/doorway-client" }
 
+# Protocol cache substrate
+elohim-cache-core = { path = "../elohim-cache-core", features = ["native"] }
+
 # Async runtime
 tokio = { version = "1", features = ["full", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync", "time"] }

@@ -1079,13 +1079,13 @@ dependencies = [
  "doorway-client",
  "dotenvy",
  "ed25519-dalek",
+ "elohim-cache-core",
  "elohim-compute",
  "futures",
  "futures-util",
  "getrandom 0.3.4",
  "hex",
  "holo_hash",
- "holochain-cache-core",
  "holochain_client",
  "holochain_conductor_api",
  "holochain_serialized_bytes",
@@ -1178,6 +1178,16 @@ name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
+name = "elohim-cache-core"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "elohim-compute"
@@ -1666,16 +1676,6 @@ dependencies = [
  "serde_bytes",
  "sha2",
  "thiserror 2.0.17",
-]
-
-[[package]]
-name = "holochain-cache-core"
-version = "0.1.0"
-dependencies = [
- "js-sys",
- "serde",
- "serde_json",
- "wasm-bindgen",
 ]
 
 [[package]]

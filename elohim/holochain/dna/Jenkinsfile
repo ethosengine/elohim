@@ -2,15 +2,15 @@
  * Elohim DNA Pipeline (elohim-holochain)
  *
  * Builds DNA/hApp artifacts only - NO container images, NO deployments.
- * Triggered by orchestrator when elohim/holochain/dna/ or elohim/holochain/holochain-cache-core/ change.
+ * Triggered by orchestrator when elohim/holochain/dna/ or elohim/elohim-cache-core/ change.
  *
  * Artifacts produced:
  *   - elohim.happ (multi-DNA bundle: lamad + imagodei + infrastructure)
- *   - holochain-cache-core WASM module (for elohim-app)
+ *   - elohim-cache-core WASM module (for elohim-app)
  *
  * Downstream consumers:
  *   - elohim-edge (fetches hApp for container images)
- *   - elohim-app (fetches holochain-cache-core WASM)
+ *   - elohim-app (fetches elohim-cache-core WASM)
  *   - genesis (requires hApp to be deployed before seeding)
  *   - steward (fetches hApp for desktop builds)
  *
@@ -242,7 +242,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder') {
                     dir('elohim/holochain/dna/elohim') {
                         script {
-                            echo 'Building holochain-cache-core WASM module...'
+                            echo 'Building elohim-cache-core WASM module...'
 
                             sh '''#!/usr/bin/env bash
                                 set -euo pipefail
@@ -264,8 +264,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     wasm-pack --version
 
                                     echo ""
-                                    echo "=== Building holochain-cache-core WASM ==="
-                                    cd ../../holochain-cache-core
+                                    echo "=== Building elohim-cache-core WASM ==="
+                                    cd ../../../elohim-cache-core
                                     wasm-pack build --target web --release
 
                                     echo ""
@@ -275,10 +275,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
                         }
                     }
-                    dir('elohim/holochain/holochain-cache-core') {
+                    dir('elohim/elohim-cache-core') {
                         archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
                         stash name: 'wasm-cache-core', includes: 'pkg/**'
-                        echo "holochain-cache-core WASM module built and archived"
+                        echo "elohim-cache-core WASM module built and archived"
                     }
                 }
             }
@@ -438,20 +438,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         elohim.happ:application/octet-stream
 
                                     echo "Pushing WASM cache core to Harbor..."
-                                    cd ../../holochain-cache-core/pkg
+                                    cd ../../../elohim-cache-core/pkg
                                     oras push harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${version} \\
-                                        holochain_cache_core_bg.wasm:application/wasm \\
-                                        holochain_cache_core.js:application/javascript \\
-                                        holochain_cache_core.d.ts:text/plain \\
-                                        holochain_cache_core_bg.wasm.d.ts:text/plain \\
+                                        elohim_cache_core_bg.wasm:application/wasm \\
+                                        elohim_cache_core.js:application/javascript \\
+                                        elohim_cache_core.d.ts:text/plain \\
+                                        elohim_cache_core_bg.wasm.d.ts:text/plain \\
                                         package.json:application/json
 
                                     echo "Pushing WASM floating tag: ${floatingTag}..."
                                     oras push harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${floatingTag} \\
-                                        holochain_cache_core_bg.wasm:application/wasm \\
-                                        holochain_cache_core.js:application/javascript \\
-                                        holochain_cache_core.d.ts:text/plain \\
-                                        holochain_cache_core_bg.wasm.d.ts:text/plain \\
+                                        elohim_cache_core_bg.wasm:application/wasm \\
+                                        elohim_cache_core.js:application/javascript \\
+                                        elohim_cache_core.d.ts:text/plain \\
+                                        elohim_cache_core_bg.wasm.d.ts:text/plain \\
                                         package.json:application/json
                                 """
                             }

@@ -82,7 +82,7 @@
     "classnames": "^2.5.1",
     "d3": "^7.9.0",
     "highlight.js": "^11.11.1",
-    "holochain-cache-core": "file:../../elohim/holochain/holochain-cache-core/pkg",
+    "elohim-cache-core": "file:../../elohim/elohim-cache-core/pkg",
     "maplibre-gl": "^5.20.2",
     "marked": "^17.0.1",
     "marked-highlight": "^2.2.3",

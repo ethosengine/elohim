@@ -1,0 +1,7 @@
+{
+  "name": "elohim-cache-core",
+  "version": "0.1.0",
+  "description": "Stub - built by wasm-pack from elohim-cache-core crate",
+  "main": "elohim_cache_core.js",
+  "types": "elohim_cache_core.d.ts"
+}

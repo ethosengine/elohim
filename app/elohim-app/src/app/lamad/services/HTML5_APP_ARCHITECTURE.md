@@ -11,7 +11,7 @@ serves extracted files on demand.
 
 **Pattern**: Layered architecture:
 - **doorway-client crate**: Publishing traits (Publishable, ContentServer, PublishSignal)
-- **holochain-cache-core**: Zip extraction, file serving, content resolution (TODO)
+- **elohim-cache-core**: Zip extraction, file serving, content resolution (TODO)
 - **doorway**: Host registry (like DNS) - registers hosts that serve Holochain content
   - Enables Web2.0 clients to access Holochain graph
   - Validation happens in Holochain, not doorway
@@ -26,7 +26,7 @@ holochain/
 │       ├── lib.rs              # Caching traits (Cacheable, CacheRule)
 │       └── publish.rs          # Publishing traits (Publishable, ContentServer, PublishSignal)
 │
-├── holochain-cache-core/       # TODO: Move app serving here
+├── elohim-cache-core/       # TODO: Move app serving here
 │   └── src/
 │       └── app_server.rs       # Zip extraction, file serving (to be implemented)
 │
@@ -59,7 +59,7 @@ elohim-app/
               │ (online/offline/heartbeat)               │ entries by hash
               ▼                                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                 holochain-cache-core (Content Layer)                 │
+│                 elohim-cache-core (Content Layer)                 │
 │  ┌───────────────────────────────────────────────────────────┐      │
 │  │  app_server (TODO)                                         │      │
 │  │  - GET /apps/{app-id}/{path}                               │      │
@@ -262,11 +262,11 @@ Doorway adds CSP headers for HTML files:
 10. Added `Html5AppFormatPlugin` with import/export/validate/render capabilities
 11. Registered plugin in `ContentIOModule`
 
-### 🔲 Phase 4: holochain-cache-core App Server (TODO - Next Sprint)
+### 🔲 Phase 4: elohim-cache-core App Server (TODO - Next Sprint)
 **This is where HTML5 app serving belongs, NOT in doorway routes.**
 
 Tasks for next sprint:
-12. Create `app_server.rs` in holochain-cache-core
+12. Create `app_server.rs` in elohim-cache-core
 13. Implement AppCache with LRU eviction
 14. Add zip extraction and file serving
 15. Implement AsyncPublisherFetch for DHT queries

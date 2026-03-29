@@ -2,14 +2,14 @@
 //!
 //! Doorway is a thin web2 gateway (like Cloudflare) that COMPLEMENTS the P2P
 //! performance layer, not replaces it. Primary caching happens at the agent
-//! level via `holochain-cache-core` and `elohim-storage`.
+//! level via `elohim-cache-core` and `elohim-storage`.
 //!
 //! ## Doorway's Role
 //!
 //! - **CDN-style read caching**: Cache blob/shard reads for external clients
 //! - **Request coalescing**: Dedupe multiple clients requesting same content
 //! - **DDoS protection**: Rate limiting, auth for external requests
-//! - **NOT write batching**: That's the agent's job via holochain-cache-core
+//! - **NOT write batching**: That's the agent's job via elohim-cache-core
 //!
 //! ## Cache Rule Discovery
 //!
@@ -34,7 +34,7 @@
 //! - Request coalescing (dedupe concurrent requests)
 //! - Geographic routing hints
 //!
-//! This COMPLEMENTS agent-side `holochain-cache-core` - it does NOT replace it.
+//! This COMPLEMENTS agent-side `elohim-cache-core` - it does NOT replace it.
 
 pub mod access_control;
 pub mod delivery_relay;

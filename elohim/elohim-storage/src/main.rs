@@ -383,10 +383,44 @@ async fn async_main(
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
 
+    // Initialize extraction cache if enabled
+    let extraction_cache = if config.extraction_cache.enabled {
+        let cache_dir = config.extraction_cache_dir();
+        tokio::fs::create_dir_all(&cache_dir).await?;
+
+        match elohim_cache_core::extraction::DiskBackend::new(cache_dir.clone()).await {
+            Ok(backend) => {
+                let mut cache_config = config.extraction_cache.clone();
+                cache_config.cache_dir = cache_dir;
+                let cache = Arc::new(elohim_cache_core::extraction::ExtractionCache::new(
+                    Box::new(backend),
+                    cache_config,
+                ));
+                info!(
+                    budget_mb = config.extraction_cache.budget_bytes / (1024 * 1024),
+                    ttl_secs = config.extraction_cache.ttl_secs,
+                    "Extraction cache enabled"
+                );
+                Some(cache)
+            }
+            Err(e) => {
+                warn!("Failed to create extraction cache backend: {} (continuing without cache)", e);
+                None
+            }
+        }
+    } else {
+        info!("Extraction cache disabled");
+        None
+    };
+
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
     let mut http_server =
         HttpServer::new(blob_store.clone(), http_addr).with_progress_hub(Arc::clone(&progress_hub));
+
+    if let Some(ref cache) = extraction_cache {
+        http_server = http_server.with_extraction_cache(Arc::clone(cache));
+    }
 
     info!("HTTP API available at http://{}", http_addr);
     info!("Endpoints:");
@@ -545,6 +579,9 @@ async fn async_main(
         http_server = http_server.with_p2p_handle(node.handle());
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
     }
+
+    // Load app index for HTML5 app caching
+    http_server.load_app_index().await;
 
     let http_server = Arc::new(http_server);
 

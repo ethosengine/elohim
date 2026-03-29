@@ -65,6 +65,10 @@ pub struct Config {
     /// Enable mDNS for local network discovery
     #[serde(default = "default_true")]
     pub enable_mdns: bool,
+
+    /// Extraction cache for HTML5 apps and rendered content
+    #[serde(default)]
+    pub extraction_cache: elohim_cache_core::extraction::ExtractionCacheConfig,
 }
 
 fn default_http_port() -> u16 {
@@ -119,6 +123,7 @@ impl Default for Config {
             http_port: 8090,
             p2p_bootstrap_nodes: Vec::new(),
             enable_mdns: true,
+            extraction_cache: elohim_cache_core::extraction::ExtractionCacheConfig::default(),
         }
     }
 }
@@ -151,5 +156,14 @@ impl Config {
     /// Get config file path
     pub fn config_path(&self) -> PathBuf {
         self.storage_dir.join("config.toml")
+    }
+
+    /// Get extraction cache directory (defaults to {storage_dir}/cache/extractions)
+    pub fn extraction_cache_dir(&self) -> PathBuf {
+        if self.extraction_cache.cache_dir.as_os_str().is_empty() {
+            self.storage_dir.join("cache").join("extractions")
+        } else {
+            self.extraction_cache.cache_dir.clone()
+        }
     }
 }

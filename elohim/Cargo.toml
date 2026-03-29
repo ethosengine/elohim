@@ -8,6 +8,7 @@ members = [
 ]
 exclude = [
     "elohim-bitswap",
+    "elohim-cache-core",
     "elohim-storage",
     "holochain",
     "rust-ipfs",

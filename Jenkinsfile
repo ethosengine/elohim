@@ -18,7 +18,7 @@
  *   - Shows NOT_BUILT when triggered directly by webhook
  *
  * Artifact dependency:
- *   - Fetches holochain-cache-core WASM from elohim-holochain pipeline
+ *   - Fetches elohim-cache-core WASM from elohim-holochain pipeline
  *
  * @see genesis/orchestrator/Jenkinsfile for central trigger logic
  */
@@ -480,9 +480,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
-                        echo 'Fetching holochain-cache-core WASM module from Harbor...'
+                        echo 'Fetching elohim-cache-core WASM module from Harbor...'
 
-                        def wasmDir = 'elohim/holochain/holochain-cache-core/pkg'
+                        def wasmDir = 'elohim/elohim-cache-core/pkg'
 
                         // Read HAPP_VERSION from VERSION file
                         def versionContent = readFile('VERSION').trim()
@@ -537,12 +537,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         if (!fetched) {
                             echo """
-                            ⚠️ Could not fetch holochain-cache-core WASM from Harbor.
+                            ⚠️ Could not fetch elohim-cache-core WASM from Harbor.
                             App will use TypeScript fallback (slightly slower but functional).
                             To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
                             """
                             // TODO: Make WASM deployment more reliable for alpha/staging.
-                            // The 404 on /wasm/holochain-cache-core/holochain_cache_core.js
+                            // The 404 on /wasm/elohim-cache-core/elohim_cache_core.js
                             // is harmless (TS fallback works) but creates console noise that
                             // obscures real errors and mismatches production expectations.
                             // Options: (1) pre-seed Harbor with a known-good WASM artifact,
@@ -550,8 +550,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // (3) make DNA pipeline a dependency of alpha deploys.
                         }
 
-                        if (fileExists("${wasmDir}/holochain_cache_core.js")) {
-                            echo "✅ holochain-cache-core WASM module ready"
+                        if (fileExists("${wasmDir}/elohim_cache_core.js")) {
+                            echo "✅ elohim-cache-core WASM module ready"
                             sh "ls -lh ${wasmDir}/"
                         } else {
                             echo "⚠️ WASM module not available - TypeScript fallback will be used"
@@ -598,11 +598,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'pnpm install --frozen-lockfile'
 
                             // Copy WASM files from fetched location to node_modules
-                            // This is needed because Angular expects WASM in node_modules/holochain-cache-core
-                            def wasmSrc = '../../elohim/holochain/holochain-cache-core/pkg'
-                            def wasmDest = 'node_modules/holochain-cache-core'
+                            // This is needed because Angular expects WASM in node_modules/elohim-cache-core
+                            def wasmSrc = '../../elohim/elohim-cache-core/pkg'
+                            def wasmDest = 'node_modules/elohim-cache-core'
                             if (fileExists(wasmSrc)) {
-                                echo 'Copying holochain-cache-core WASM to node_modules...'
+                                echo 'Copying elohim-cache-core WASM to node_modules...'
                                 sh """
                                     mkdir -p '${wasmDest}'
                                     cp -v '${wasmSrc}'/*.js '${wasmDest}/' 2>/dev/null || true

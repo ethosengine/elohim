@@ -94,7 +94,7 @@ serde_urlencoded = "0.7"
 
 # Caching
 sha2 = "0.10"
-holochain-cache-core = { path = "../../elohim/holochain/holochain-cache-core" }
+elohim-cache-core = { path = "../../elohim/elohim-cache-core" }
 
 # CID (Content Identifiers) - IPFS-compatible content addressing
 cid = "0.11"
