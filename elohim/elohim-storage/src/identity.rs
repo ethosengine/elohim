@@ -43,7 +43,7 @@ impl Default for NodeCapabilities {
             storage: true,
             always_on: false,
             max_storage_bytes: 10 * 1024 * 1024 * 1024, // 10 GB default
-            cache_budget_bytes: 512 * 1024 * 1024, // 512 MB default
+            cache_budget_bytes: 512 * 1024 * 1024,      // 512 MB default
             serve_family: false,
             serve_public: false,
         }
@@ -57,7 +57,7 @@ impl NodeCapabilities {
             storage: true,
             always_on: false,
             max_storage_bytes: 10 * 1024 * 1024 * 1024, // 10 GB
-            cache_budget_bytes: 200 * 1024 * 1024, // 200 MB
+            cache_budget_bytes: 200 * 1024 * 1024,      // 200 MB
             serve_family: false,
             serve_public: false,
         }
@@ -69,7 +69,7 @@ impl NodeCapabilities {
             storage: true,
             always_on: true,
             max_storage_bytes: 100 * 1024 * 1024 * 1024, // 100 GB
-            cache_budget_bytes: 2 * 1024 * 1024 * 1024, // 2 GB
+            cache_budget_bytes: 2 * 1024 * 1024 * 1024,  // 2 GB
             serve_family: true,
             serve_public: false,
         }

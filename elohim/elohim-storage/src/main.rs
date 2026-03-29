@@ -404,7 +404,10 @@ async fn async_main(
                 Some(cache)
             }
             Err(e) => {
-                warn!("Failed to create extraction cache backend: {} (continuing without cache)", e);
+                warn!(
+                    "Failed to create extraction cache backend: {} (continuing without cache)",
+                    e
+                );
                 None
             }
         }

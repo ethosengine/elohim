@@ -33,7 +33,6 @@
 //! ```
 
 use crate::blob_store::BlobStore;
-use elohim_cache_core::extraction::ExtractionCache;
 use crate::db::content_diesel::ContentQuery;
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
@@ -97,6 +96,7 @@ use crate::views::{
 };
 use bytes::Bytes;
 use doorway_client::{DoorwayRoutesBuilder, Route};
+use elohim_cache_core::extraction::ExtractionCache;
 use http_body_util::{BodyExt, Either, Full};
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
@@ -2755,7 +2755,7 @@ impl HttpServer {
                 // Another request is extracting — wait for it
                 debug!(app_id = %app_id, "Waiting for in-flight extraction");
                 let _ = rx.recv().await; // ignore errors — extractor may have finished
-                // Retry from cache
+                                         // Retry from cache
                 if let Some(data) = cache.get_file(app_id, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
                     debug!(app_id = %app_id, file_path = %file_path, "Cache HIT (after wait)");
@@ -2775,26 +2775,28 @@ impl HttpServer {
             // (including early returns for 404, empty hash, corrupt ZIP, etc.)
         }
         // Guard lives until end of function — any return triggers finish_extraction
-        let _extraction_guard = self.extraction_cache.as_ref().map(|c| c.extraction_guard(app_id));
+        let _extraction_guard = self
+            .extraction_cache
+            .as_ref()
+            .map(|c| c.extraction_guard(app_id));
 
         debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
 
         let blob_hash = match cached_blob_hash {
             Some(h) => h,
-            None => {
-                match self.lookup_app_blob_hash(app_id).await? {
-                    Some(h) => h,
-                    None => {
-                        return Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "App not found: {}"}}"#, app_id
-                            ))))
-                            .unwrap());
-                    }
+            None => match self.lookup_app_blob_hash(app_id).await? {
+                Some(h) => h,
+                None => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "App not found: {}"}}"#,
+                            app_id
+                        ))))
+                        .unwrap());
                 }
-            }
+            },
         };
 
         if blob_hash.is_empty() {
@@ -2802,7 +2804,7 @@ impl HttpServer {
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Full::new(Bytes::from(
-                    r#"{"error": "App ZIP not available (no blob_hash)"}"#
+                    r#"{"error": "App ZIP not available (no blob_hash)"}"#,
                 )))
                 .unwrap());
         }
@@ -2817,7 +2819,8 @@ impl HttpServer {
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "App ZIP blob not found: {}"}}"#, blob_hash
+                        r#"{{"error": "App ZIP blob not found: {}"}}"#,
+                        blob_hash
                     ))))
                     .unwrap());
             }
@@ -2836,7 +2839,8 @@ impl HttpServer {
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Invalid ZIP archive: {}"}}"#, e
+                        r#"{{"error": "Invalid ZIP archive: {}"}}"#,
+                        e
                     ))))
                     .unwrap());
             }
@@ -2883,7 +2887,8 @@ impl HttpServer {
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "File not found in app: {}"}}"#, normalized_path
+                        r#"{{"error": "File not found in app: {}"}}"#,
+                        normalized_path
                     ))))
                     .unwrap());
             }
