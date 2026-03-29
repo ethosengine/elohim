@@ -16,5 +16,10 @@
     "zome": "content_store_integrity",
     "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
     "tier": "core"
+  },
+  "_migration": {
+    "target": "domain:lamad",
+    "reason": "Lamad-specific vocabulary that leaked into protocol schemas during prototyping. Move to sdk/domains/lamad/ when DNA enum registration supports domain-scoped types.",
+    "tagged": "2026-03-29"
   }
 }
