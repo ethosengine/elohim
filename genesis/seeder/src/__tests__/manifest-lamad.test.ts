@@ -5,7 +5,7 @@
  * but that the manifest declares all expected content types, relationships,
  * signals, formats, and renderers for the learning pillar.
  *
- * Manifest: app/lamad/manifest.json
+ * Manifest: elohim/sdk/domains/lamad/manifest.json
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'fs';
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const MANIFEST_PATH = path.resolve(__dirname, '../../../../app/lamad/manifest.json');
+const MANIFEST_PATH = path.resolve(__dirname, '../../../../elohim/sdk/domains/lamad/manifest.json');
 
 interface Manifest {
   id: string;

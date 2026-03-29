@@ -3,8 +3,8 @@
  * Lamad codegen — single entry point for ALL lamad generated types.
  *
  * Reads:
- *   - Lamad manifest (app/lamad/manifest.json)
- *   - Lamad companion schemas (app/lamad/schemas/*.schema.json)
+ *   - Lamad manifest (elohim/sdk/domains/lamad/manifest.json)
+ *   - Lamad companion schemas (elohim/sdk/domains/lamad/schemas/*.schema.json)
  *
  * Produces (to BOTH app/elohim-app/src/app/lamad/generated/ AND genesis/seeder/src/generated/):
  *   - metadata-types.ts — PathMetadata, ConceptMetadata, AssessmentMetadata interfaces
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LAMAD_DIR = resolve(__dirname, '..');
-const REPO_ROOT = resolve(__dirname, '../../../');
+const REPO_ROOT = resolve(__dirname, '../../../../../');
 
 const VERIFY = process.argv.includes('--verify');
 

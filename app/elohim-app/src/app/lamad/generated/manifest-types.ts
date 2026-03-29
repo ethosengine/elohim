@@ -1,4 +1,4 @@
-// AUTO-GENERATED from app manifest: app/lamad/manifest.json
+// AUTO-GENERATED from app manifest: elohim/sdk/domains/lamad/manifest.json
 // DO NOT EDIT — regenerate with: pnpm run lamad:codegen
 
 export const LAMAD_CONTENT_TYPES = [

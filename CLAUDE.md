@@ -180,7 +180,7 @@ Two authoritative schemas govern content types and formats. All generated artifa
 | Source of Truth | Path | Governs | Generates |
 |----------------|------|---------|-----------|
 | **Protocol Schema** | `elohim/sdk/schemas/v1/` | DNA-notarized enums (ContentFormat, ContentType, etc.) — the protocol's law | `schema-enums.ts` via `pnpm run schema:codegen:ts`, Rust constants via `pnpm run schema:codegen:rs` |
-| **Lamad Manifest** | `app/lamad/manifest.json` | App vocabulary: content types, content formats, renderer mappings, relationships, signals, coupling rules | `manifest-types.ts` via `pnpm run lamad:codegen` |
+| **Lamad Manifest** | `elohim/sdk/domains/lamad/manifest.json` | App vocabulary: content types, content formats, renderer mappings, relationships, signals, coupling rules | `manifest-types.ts` via `pnpm run lamad:codegen` |
 
 ### Key distinction: core vs extensible formats
 
