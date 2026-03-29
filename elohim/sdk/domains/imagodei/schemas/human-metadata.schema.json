@@ -1,0 +1,26 @@
+{
+  "$id": "imagodei:schema:metadata:human",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HumanMetadata",
+  "description": "Metadata shape for contentType 'human'. Identity attributes stored in ContentView.metadata.",
+  "type": "object",
+  "properties": {
+    "displayName": { "type": "string", "description": "Human-readable display name" },
+    "bio": { "type": "string", "description": "Self-authored biography or description" },
+    "location": { "type": "string", "description": "Self-declared location (free text, not verified)" },
+    "agencyStage": { "type": "string", "description": "Current agency stage: visitor | observer | participant | steward | elder" },
+    "profileReach": { "type": "string", "description": "How visible this profile is (maps to protocol reach levels)" },
+    "category": { "type": "string", "description": "Identity category: person | organization | collective" },
+    "affinities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Content domains this human has demonstrated affinity with"
+    },
+    "externalIdentifiers": {
+      "type": "object",
+      "description": "External identity links (email, DID, social handles). Key is provider, value is identifier.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

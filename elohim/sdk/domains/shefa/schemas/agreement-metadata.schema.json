@@ -1,0 +1,38 @@
+{
+  "$id": "shefa:schema:metadata:agreement",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgreementMetadata",
+  "description": "Metadata for REA agreements between parties. Agreements are protocol-level primitives; this schema describes the metadata shape that shefa uses to track obligation state and fulfillment.",
+  "type": "object",
+  "properties": {
+    "parties": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Agent IDs of agreement parties"
+    },
+    "obligations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "obligor": { "type": "string", "description": "Agent ID of the party who must fulfill" },
+          "action": { "type": "string", "description": "REA action: produce | consume | transfer | use" },
+          "resourceConformsTo": { "type": "string", "description": "What resource specification this obligation targets" },
+          "dueDate": { "type": "string", "description": "ISO 8601 deadline" },
+          "fulfilled": { "type": "boolean", "description": "Whether this obligation has been fulfilled" }
+        }
+      },
+      "description": "Individual obligations within the agreement"
+    },
+    "fulfillmentCriteria": {
+      "type": "string",
+      "description": "Human-readable description of what constitutes fulfillment"
+    },
+    "state": {
+      "type": "string",
+      "description": "Current agreement lifecycle state",
+      "enum": ["proposed", "active", "fulfilled", "cancelled", "disputed"]
+    }
+  },
+  "additionalProperties": true
+}

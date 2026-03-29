@@ -1,0 +1,202 @@
+{
+  "id": "manifest-imagodei",
+  "name": "imagodei",
+  "version": "1.0.0",
+  "description": "Identity and presence — humans, attestations, agency, relationships. Grounds the protocol in demonstrated capability and community trust.",
+  "vocabulary": {
+    "contentTypes": {
+      "human": {
+        "description": "A person in the network. The foundational identity entity — every other identity concept (role, contributor, attestation) attaches to a human. Agent-scoped: each agent has exactly one human record.",
+        "metadataSchema": { "$ref": "./schemas/human-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "IDENTIFIES": ["contributor"],
+              "RELATES_TO": ["human"],
+              "PARTICIPATES_IN": ["collective"]
+            }
+          },
+          "value": {
+            "onConsume": {
+              "action": "use",
+              "resourceConformsTo": "identity",
+              "recognition": "presence-record"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "self",
+            "governanceModel": "self-sovereign",
+            "signalTypes": ["identity-created", "presence-established", "agency-progressed"]
+          },
+          "claims": [
+            { "asserts": "identity-retention", "contradictedBy": "identity-abandonment", "validityHorizon": "P90D", "leg": "value" },
+            { "asserts": "identity-retention", "contradictedBy": "identity-abandonment", "validityHorizon": "P365D", "leg": "knowledge" }
+          ]
+        }
+      },
+      "role": {
+        "description": "A functional role a human can hold — steward, elder, reviewer, facilitator. Roles are derived via link from identity to capability. They gate what actions are available and what governance weight a human carries.",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "ASSIGNED_TO": ["human"],
+              "GRANTS": ["contributor"],
+              "SCOPED_TO": ["collective"]
+            }
+          },
+          "value": {
+            "onConsume": {
+              "action": "use",
+              "resourceConformsTo": "capability-grant",
+              "recognition": "role-record"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["attestation-granted", "attestation-revoked"]
+          },
+          "claims": [
+            { "asserts": "attestation-accuracy", "contradictedBy": "attestation-inaccuracy", "validityHorizon": "P180D", "leg": "value" },
+            { "asserts": "identity-retention", "contradictedBy": "identity-abandonment", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
+        }
+      },
+      "contributor": {
+        "description": "A contributor presence in the content graph. When a human creates, curates, or reviews content, they establish presence as a contributor. Presence is the bridge between identity (imagodei) and stewardship standing (shefa). Notarized: contributor records are DHT-gossipped.",
+        "metadataSchema": { "$ref": "./schemas/presence-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "IDENTIFIED_BY": ["human"],
+              "STEWARDS": ["concept", "path", "article", "lesson"],
+              "ATTESTS": ["human", "contributor"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "contribution",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["presence-established", "attestation-granted", "relationship-formed"]
+          },
+          "claims": [
+            { "asserts": "attestation-accuracy", "contradictedBy": "attestation-inaccuracy", "validityHorizon": "P90D", "leg": "value" },
+            { "asserts": "identity-retention", "contradictedBy": "identity-abandonment", "validityHorizon": "P180D", "leg": "knowledge" }
+          ]
+        }
+      }
+    },
+    "relationships": {
+      "IDENTIFIES": {
+        "description": "A human identity identifies a contributor presence. The link between who you are and what you've done in the content graph.",
+        "sourceTypes": ["human"],
+        "targetTypes": ["contributor"]
+      },
+      "IDENTIFIED_BY": {
+        "description": "Reverse of IDENTIFIES — a contributor presence is identified by a human.",
+        "sourceTypes": ["contributor"],
+        "targetTypes": ["human"],
+        "inverse": "IDENTIFIES"
+      },
+      "ASSIGNED_TO": {
+        "description": "A role is assigned to a human. Grants capabilities within a scope.",
+        "sourceTypes": ["role"],
+        "targetTypes": ["human"]
+      },
+      "GRANTS": {
+        "description": "A role grants capability to a contributor. The mechanism by which roles expand what a contributor can do.",
+        "sourceTypes": ["role"],
+        "targetTypes": ["contributor"]
+      },
+      "SCOPED_TO": {
+        "description": "A role is scoped to a collective. Roles don't float — they exist within a governance context.",
+        "sourceTypes": ["role"],
+        "targetTypes": ["collective"]
+      },
+      "STEWARDS": {
+        "description": "A contributor stewards content. The curation relationship that builds affinity over time.",
+        "sourceTypes": ["contributor"],
+        "targetTypes": ["concept", "path", "article", "lesson"]
+      },
+      "ATTESTS": {
+        "description": "A contributor attests to the capability or identity of another. The trust primitive — community-verified claims replace institutional credentials.",
+        "sourceTypes": ["contributor"],
+        "targetTypes": ["human", "contributor"]
+      },
+      "PARTICIPATES_IN": {
+        "description": "A human participates in a collective. Membership in a governance community.",
+        "sourceTypes": ["human"],
+        "targetTypes": ["collective"]
+      }
+    },
+    "signals": {
+      "identity-created": {
+        "description": "Emitted when a new human identity is established in the network. The foundational event that makes all other protocol interactions possible.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "identity"
+      },
+      "presence-established": {
+        "description": "Emitted when a human establishes contributor presence by creating or claiming authorship. The bridge from identity to stewardship.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "presence"
+      },
+      "attestation-granted": {
+        "description": "Emitted when a contributor attests to another's capability or identity. The trust primitive — community verification replacing institutional credentials.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "attestation"
+      },
+      "attestation-revoked": {
+        "description": "Emitted when a previously granted attestation is revoked. Negative signal — reduces trust standing. Required for the system to self-correct.",
+        "substrateSignal": "compute",
+        "economicAction": "consume",
+        "resourceType": "attestation"
+      },
+      "agency-progressed": {
+        "description": "Emitted when a human advances in agency stage (visitor -> observer -> participant -> steward -> elder). Agency progression gates capability expansion.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "agency"
+      },
+      "relationship-formed": {
+        "description": "Emitted when a trust relationship is formed between humans or contributors. Relationships are the graph edges that carry attestations and governance weight.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "relationship"
+      }
+    },
+    "observations": {
+      "identity-retention": {
+        "description": "Human identity remains active — person continues to participate, contribute, or engage with the network over time",
+        "instrument": "retention-check",
+        "polarity": "positive"
+      },
+      "attestation-accuracy": {
+        "description": "Attested claims hold up over time — humans attested as capable demonstrate that capability in downstream work",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "identity-abandonment": {
+        "description": "Identity created but never meaningfully used — person registered but did not participate, contribute, or form relationships",
+        "instrument": "outcome-divergence",
+        "polarity": "negative"
+      },
+      "attestation-inaccuracy": {
+        "description": "Attested claims do not hold up — humans attested as capable fail in downstream work they were attested for. The negative feedback that keeps attestation gates honest.",
+        "instrument": "outcome-correlation",
+        "polarity": "negative"
+      }
+    }
+  }
+}

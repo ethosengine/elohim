@@ -1,0 +1,20 @@
+{
+  "$id": "imagodei:schema:metadata:presence",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PresenceMetadata",
+  "description": "Metadata shape for contentType 'contributor'. Contributor presence in the content graph — the bridge between identity and stewardship standing.",
+  "type": "object",
+  "properties": {
+    "presenceState": { "type": "string", "description": "Presence lifecycle: unclaimed | claimed | active | dormant" },
+    "establishingContentIds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Content IDs that established this contributor presence (first contributions)"
+    },
+    "affinityTotal": { "type": "number", "description": "Accumulated affinity score from curation acts (not attention)" },
+    "uniqueEngagers": { "type": "integer", "description": "Count of unique humans who have engaged with this contributor's content" },
+    "citationCount": { "type": "integer", "description": "Number of times this contributor's content has been cited or referenced" },
+    "recognitionScore": { "type": "number", "description": "Aggregate recognition from economic events flowing to this contributor" }
+  },
+  "additionalProperties": true
+}

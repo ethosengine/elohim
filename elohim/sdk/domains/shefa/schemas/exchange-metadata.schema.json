@@ -1,0 +1,41 @@
+{
+  "$id": "shefa:schema:metadata:exchange",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExchangeMetadata",
+  "description": "Metadata for exchange and marketplace interactions. Exchanges couple offers and requests through REA agreements with explicit terms and reciprocity expectations.",
+  "type": "object",
+  "properties": {
+    "offerType": {
+      "type": "string",
+      "description": "What is being offered — maps to REA resource specification"
+    },
+    "requestType": {
+      "type": "string",
+      "description": "What is being requested in return — maps to REA resource specification"
+    },
+    "terms": {
+      "type": "string",
+      "description": "Human-readable terms of the exchange"
+    },
+    "expiresAt": {
+      "type": "string",
+      "description": "ISO 8601 datetime when this offer/request expires"
+    },
+    "reciprocityExpected": {
+      "type": "boolean",
+      "description": "Whether reciprocal action is expected. False for gifts, true for trades."
+    },
+    "resourceNature": {
+      "type": "object",
+      "description": "REA resource nature dimensions for the exchanged resource",
+      "properties": {
+        "rivalry": { "type": "string", "description": "rival | non-rival | anti-rival" },
+        "excludability": { "type": "string", "description": "excludable | non-excludable | club" },
+        "depletability": { "type": "string", "description": "depletable | renewable | non-depletable" },
+        "fungibility": { "type": "string", "description": "fungible | semi-fungible | non-fungible" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

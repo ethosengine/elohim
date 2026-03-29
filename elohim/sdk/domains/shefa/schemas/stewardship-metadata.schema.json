@@ -1,0 +1,48 @@
+{
+  "$id": "shefa:schema:metadata:stewardship",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StewardshipMetadata",
+  "description": "Metadata for stewardship allocations and stewardship-context content. Stewardship standing is earned through sustained curation work (edits, reviews, dispute resolution), not granted by credential or attention.",
+  "type": "object",
+  "properties": {
+    "allocationStrategy": {
+      "type": "string",
+      "description": "How stewardship standing is distributed: equal (even split), weighted (by contribution), custodial (original creator priority)",
+      "enum": ["equal", "weighted", "custodial"]
+    },
+    "affinityScore": {
+      "type": "number",
+      "description": "0.0-1.0 stewardship affinity score. Accrues from curation acts, decays via demurrage. Attention does NOT increase this — only active curation work.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "custodianRole": {
+      "type": "string",
+      "description": "The steward's role in relation to the content",
+      "enum": ["original-creator", "curator", "reviewer", "community"]
+    },
+    "circulationRights": {
+      "type": "string",
+      "description": "What the steward can do with the content — governs reach expansion and derivative works"
+    },
+    "demurrageRate": {
+      "type": "number",
+      "description": "Rate at which standing decays without activity (0.0-1.0 per period). Ensures stewardship requires ongoing engagement, preventing dormant capture.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "curationHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "description": "edit | review | dispute-resolution | attestation" },
+          "timestamp": { "type": "string", "description": "ISO 8601" },
+          "eprId": { "type": "string", "description": "EPR reference to the curation act" }
+        }
+      },
+      "description": "Record of curation acts that built this steward's standing"
+    }
+  },
+  "additionalProperties": true
+}

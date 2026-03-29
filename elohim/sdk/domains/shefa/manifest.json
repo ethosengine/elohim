@@ -1,0 +1,251 @@
+{
+  "id": "manifest-shefa",
+  "name": "shefa",
+  "version": "1.0.0",
+  "description": "Economy domain — value accounting, stewardship, resource flows, and economic coupling. Shefa primarily wraps protocol REA primitives (EconomicEvent, Agreement, Commitment) with economic semantics rather than declaring many new content types.",
+  "vocabulary": {
+    "contentTypes": {
+      "stewardship-context": {
+        "description": "Narrative context for a stewardship relationship — why this steward cares about this content, what curation work they have done, and how their standing was earned. Category A2 (derived via link from stewardship allocation).",
+        "metadataSchema": { "$ref": "./schemas/stewardship-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "STEWARDS": ["concept", "lesson", "path", "article", "assessment"],
+              "RELATES_TO": ["stewardship-context"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "stewardship-standing",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["stewardship-allocated", "custodian-attestation"]
+          },
+          "claims": [
+            {
+              "asserts": "stewardship-distributed",
+              "contradictedBy": "stewardship-concentrated",
+              "validityHorizon": "P180D",
+              "leg": "governance"
+            },
+            {
+              "asserts": "curation-improves-content",
+              "contradictedBy": "curation-degrades-content",
+              "validityHorizon": "P90D",
+              "leg": "value"
+            }
+          ]
+        }
+      }
+    },
+    "protocolPrimitives": {
+      "_comment": "Shefa does not own these types — they are protocol-level REA primitives. Shefa declares the domain-specific coupling: what signals they produce in the economy context, and what observations the protocol should make.",
+      "economic-event": {
+        "description": "An REA economic event — a concrete action that changes resource state. Protocol-level (CreateEconomicEventInput). Shefa declares the coupling semantics: every economic event carries value + governance + feedback dimensions.",
+        "metadataSchema": { "$ref": "./schemas/exchange-metadata.schema.json" },
+        "signals": ["economic-event-recorded"],
+        "coupling": {
+          "value": {
+            "onRecord": {
+              "action": "produce",
+              "resourceConformsTo": "economic-trace",
+              "recognition": "value-accounting"
+            }
+          },
+          "governance": {
+            "signalTypes": ["economic-event-recorded"]
+          }
+        }
+      },
+      "agreement": {
+        "description": "An REA agreement between parties — commitments exchanged. Protocol-level. Shefa declares metadata shape and coupling: agreements produce obligation tracking and fulfillment signals.",
+        "metadataSchema": { "$ref": "./schemas/agreement-metadata.schema.json" },
+        "signals": ["obligation-fulfilled"],
+        "coupling": {
+          "value": {
+            "onFulfill": {
+              "action": "produce",
+              "resourceConformsTo": "fulfilled-obligation",
+              "recognition": "trust-standing"
+            }
+          },
+          "governance": {
+            "signalTypes": ["obligation-fulfilled"]
+          }
+        }
+      },
+      "commitment": {
+        "description": "An REA commitment — a promise to perform a future economic event. Protocol-level. Shefa declares how commitments produce obligation signals and how unfulfilled commitments accumulate as negative observations.",
+        "signals": ["obligation-fulfilled"],
+        "coupling": {
+          "value": {
+            "onFulfill": {
+              "action": "produce",
+              "resourceConformsTo": "fulfilled-obligation",
+              "recognition": "trust-standing"
+            }
+          },
+          "governance": {
+            "signalTypes": ["obligation-fulfilled"]
+          }
+        }
+      },
+      "resource": {
+        "description": "An REA resource — anything with economic value that can be produced, consumed, transferred, or stewarded. Protocol-level. Shefa declares resource nature dimensions (rivalry, excludability, depletability, fungibility, circularity).",
+        "signals": ["resource-transferred"],
+        "coupling": {
+          "value": {
+            "onTransfer": {
+              "action": "transfer",
+              "resourceConformsTo": "economic-resource",
+              "recognition": "value-accounting"
+            }
+          },
+          "governance": {
+            "signalTypes": ["resource-transferred"]
+          }
+        }
+      }
+    },
+    "crossPillarCoupling": {
+      "_comment": "The conversation between lamad (wisdom) and avodah (action) is where shefa value is created. These couplings declare how value flows across pillar boundaries.",
+      "lamad-to-shefa": {
+        "description": "Mastery attestations from lamad produce stewardship eligibility in shefa. You can steward content if you have the requisite wisdom. The attestation gate replaces institutional credentialing.",
+        "trigger": "mastery-achieved",
+        "produces": "stewardship-eligibility",
+        "gate": "mastery-level >= apply"
+      },
+      "shefa-to-lamad": {
+        "description": "Value flows back to content stewards who helped develop wisdom. Stewardship standing in shefa produces recognition flows that sustain the teaching economy.",
+        "trigger": "stewardship-allocated",
+        "produces": "steward-recognition",
+        "flow": "economic-event → steward-of-consumed-content"
+      },
+      "shefa-to-qahal": {
+        "description": "Economic standing informs governance weight. Stewards with demonstrated curation history have governance voice proportional to their contribution, not their attention or wealth.",
+        "trigger": "custodian-attestation",
+        "produces": "governance-standing",
+        "gate": "affinity-score > threshold"
+      },
+      "imagodei-to-shefa": {
+        "description": "Identity attestations establish economic agency. A verified identity (imagodei) is prerequisite for economic participation (shefa). The identity is the economic agent.",
+        "trigger": "identity-created",
+        "produces": "economic-agency",
+        "gate": "presence-established"
+      }
+    },
+    "relationships": {
+      "STEWARDS": {
+        "description": "The source stewards the target — curates, maintains, reviews, and governs the target content. Stewardship is earned through mastery and sustained curation, not granted by credential.",
+        "sourceTypes": ["stewardship-context"],
+        "targetTypes": ["concept", "lesson", "path", "article", "assessment", "exercise", "module", "course-module"],
+        "inverse": "STEWARDED_BY"
+      },
+      "STEWARDED_BY": {
+        "description": "Reverse of STEWARDS — the source content is stewarded by the target stewardship-context.",
+        "sourceTypes": ["concept", "lesson", "path", "article", "assessment", "exercise", "module", "course-module"],
+        "targetTypes": ["stewardship-context"],
+        "inverse": "STEWARDS"
+      },
+      "FUNDS": {
+        "description": "Economic flow relationship — the source economic activity funds or sustains the target. Value flows from consumption to stewardship.",
+        "sourceTypes": ["stewardship-context"],
+        "targetTypes": ["stewardship-context"]
+      },
+      "OBLIGATES": {
+        "description": "The source creates an obligation on the target. Agreements and commitments obligate parties to future economic events.",
+        "sourceTypes": ["stewardship-context"],
+        "targetTypes": ["stewardship-context"]
+      }
+    },
+    "signals": {
+      "economic-event-recorded": {
+        "description": "Emitted when an economic event is notarized on the DHT. The foundational signal for value accounting — every value-creating act in the protocol produces this signal.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "economic-trace"
+      },
+      "stewardship-allocated": {
+        "description": "Emitted when stewardship standing is allocated to a content steward. Standing accrues from curation acts (edits, reviews, dispute resolution), NOT from attention or consumption. This distinction is the anti-capture mechanism.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "stewardship-standing"
+      },
+      "resource-transferred": {
+        "description": "Emitted when a resource changes custodian. Transfer events track the flow of value through the network and drive circulation health observations.",
+        "substrateSignal": "resource",
+        "economicAction": "transfer",
+        "resourceType": "economic-resource"
+      },
+      "obligation-fulfilled": {
+        "description": "Emitted when a commitment or agreement obligation is fulfilled. Builds trust standing and drives obligation-fulfillment observations.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "fulfilled-obligation"
+      },
+      "custodian-attestation": {
+        "description": "Emitted when a custodian's stewardship is attested by the community. Peer attestation strengthens stewardship standing and gates governance participation.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "custodian-attestation"
+      },
+      "insurance-claim": {
+        "description": "Emitted when a resource insurance claim is filed. Insurance mutuals track claims as resource consumption events that trigger community response.",
+        "substrateSignal": "resource",
+        "economicAction": "consume",
+        "resourceType": "insurance-claim"
+      }
+    },
+    "observations": {
+      "distribution-health": {
+        "description": "Are value flows equitable? Measures whether economic activity is broadly distributed or concentrating in few hands. Negative polarity: the protocol watches for capture.",
+        "instrument": "distribution-health",
+        "polarity": "negative",
+        "archetype": "distribution-health"
+      },
+      "cost-accumulation": {
+        "description": "Are externalities building up? Tracks whether economic activity is creating unaccounted costs — environmental, social, or systemic. The circularity deficit accumulator drives infrastructure to close loops.",
+        "instrument": "cost-accumulation",
+        "polarity": "negative",
+        "archetype": "cost-accumulation"
+      },
+      "obligation-fulfillment": {
+        "description": "Are commitments being honored? Positive observation that tracks the rate of obligation completion across agreements.",
+        "instrument": "outcome-correlation",
+        "polarity": "positive",
+        "archetype": "outcome-correlation"
+      },
+      "stewardship-effectiveness": {
+        "description": "Does curation help or hurt? Negative polarity: the protocol watches for stewards whose curation degrades rather than improves content. Measured by downstream learner outcomes after steward edits.",
+        "instrument": "outcome-divergence",
+        "polarity": "negative",
+        "archetype": "outcome-divergence"
+      },
+      "stewardship-concentrated": {
+        "description": "Single steward controls disproportionate share of domain content. Anti-capture warning signal.",
+        "instrument": "distribution-health",
+        "polarity": "negative",
+        "archetype": "distribution-health"
+      },
+      "curation-improves-content": {
+        "description": "Steward curation correlates with improved learner outcomes on the content they curate.",
+        "instrument": "outcome-correlation",
+        "polarity": "positive",
+        "archetype": "outcome-correlation"
+      },
+      "curation-degrades-content": {
+        "description": "Steward curation correlates with worsened learner outcomes — content quality declining under their stewardship.",
+        "instrument": "outcome-divergence",
+        "polarity": "negative",
+        "archetype": "outcome-divergence"
+      }
+    }
+  }
+}
