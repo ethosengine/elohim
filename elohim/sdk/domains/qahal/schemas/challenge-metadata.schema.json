@@ -1,0 +1,15 @@
+{
+  "$id": "qahal:schema:metadata:challenge",
+  "title": "ChallengeMetadata",
+  "description": "Metadata for contentType 'challenge'. Constitutional challenge to a decision, manifest, or content.",
+  "type": "object",
+  "properties": {
+    "targetEprId": { "type": "string", "description": "EPR ID of the challenged artifact" },
+    "targetType": { "type": "string", "description": "What is being challenged (manifest | content | decision)" },
+    "reason": { "type": "string" },
+    "escalationPath": { "type": "string", "description": "Which constitutional layer to escalate to" },
+    "state": { "type": "string", "description": "filed | under-review | upheld | dismissed" },
+    "filedBy": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,14 @@
+{
+  "$id": "qahal:schema:metadata:statement",
+  "title": "StatementMetadata",
+  "description": "Metadata for contentType 'statement'. Polis-style sensemaking statement.",
+  "type": "object",
+  "properties": {
+    "polarity": { "type": "string", "description": "agree | disagree | pass" },
+    "bridgingScore": { "type": "number", "description": "How well this statement bridges opinion clusters (0.0-1.0)" },
+    "clusterAffinity": { "type": "string", "description": "Which opinion cluster this statement belongs to" },
+    "deliberationId": { "type": "string", "description": "Parent deliberation/proposal this statement belongs to" },
+    "isDivisive": { "type": "boolean", "description": "Whether this statement divides clusters" }
+  },
+  "additionalProperties": true
+}

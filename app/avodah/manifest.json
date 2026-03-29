@@ -1,0 +1,152 @@
+{
+  "id": "manifest-avodah",
+  "name": "avodah",
+  "version": "1.0.0",
+  "type": "app",
+  "description": "Work management built on shefa economic primitives. The conversation between lamad (wisdom) and avodah (action) is where value in shefa is created.",
+  "domain": "shefa",
+  "vocabulary": {
+    "contentTypes": {
+      "work-story": {
+        "description": "A work item in a project. Category C (operational, stored in projection only). Task completion produces economic events in shefa. Attestation gates reference lamad content that must be mastered before the task can be started.",
+        "metadataSchema": { "$ref": "./schemas/work-story-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["work-project"],
+              "DEPENDS_ON": ["work-story"],
+              "REQUIRES": ["concept", "path"]
+            }
+          },
+          "value": {
+            "onConsume": {
+              "action": "use",
+              "resourceConformsTo": "work-capacity",
+              "recognition": "work-credit"
+            },
+            "onComplete": {
+              "action": "produce",
+              "resourceConformsTo": "work-output",
+              "recognition": "work-credit"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "private",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["task-completed", "cadence-reset"]
+          },
+          "claims": [
+            { "asserts": "task-completes-within-cadence", "contradictedBy": "cadence-overrun", "validityHorizon": "P7D", "leg": "value" },
+            { "asserts": "work-produces-declared-value", "contradictedBy": "delivery-divergence", "validityHorizon": "P30D", "leg": "value" }
+          ]
+        }
+      },
+      "work-project": {
+        "description": "A container for work stories with board configuration and team membership. Category C (operational). Project milestones produce economic events.",
+        "metadataSchema": { "$ref": "./schemas/work-project-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "CONTAINS": ["work-story"],
+              "RELATES_TO": ["work-project"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "project-milestone",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "private",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["sprint-completed"]
+          },
+          "claims": [
+            { "asserts": "project-delivers-stated-purpose", "contradictedBy": "project-stalled", "validityHorizon": "P90D", "leg": "value" },
+            { "asserts": "cadence-sustainable", "contradictedBy": "cadence-burnout", "validityHorizon": "P30D", "leg": "value" }
+          ]
+        }
+      }
+    },
+    "relationships": {
+      "CONTAINS": {
+        "description": "Project contains work stories.",
+        "sourceTypes": ["work-project"],
+        "targetTypes": ["work-story"],
+        "inverse": "BELONGS_TO"
+      },
+      "BELONGS_TO": {
+        "description": "Work story belongs to a project.",
+        "sourceTypes": ["work-story"],
+        "targetTypes": ["work-project"],
+        "inverse": "CONTAINS"
+      },
+      "DEPENDS_ON": {
+        "description": "Work story depends on another work story for completion.",
+        "sourceTypes": ["work-story"],
+        "targetTypes": ["work-story"]
+      },
+      "REQUIRES": {
+        "description": "Work story requires mastery of lamad content (attestation gate).",
+        "sourceTypes": ["work-story"],
+        "targetTypes": ["concept", "path"]
+      }
+    },
+    "signals": {
+      "task-completed": {
+        "description": "Emitted when a work story transitions to done. Produces an economic event in shefa recording the work output.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "work-output"
+      },
+      "sprint-completed": {
+        "description": "Emitted when all stories in a sprint/cadence are completed. Produces a milestone economic event.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "project-milestone"
+      },
+      "cadence-reset": {
+        "description": "Emitted when a cadence cycle resets — incomplete stories move according to resetBehavior.",
+        "substrateSignal": "time",
+        "economicAction": "use",
+        "resourceType": "work-capacity"
+      }
+    },
+    "observations": {
+      "delivery-health": {
+        "description": "Tasks are completing on cadence with declared value delivered",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "delivery-divergence": {
+        "description": "Tasks are not completing on cadence or delivered value diverges from declared intent",
+        "instrument": "outcome-correlation",
+        "polarity": "negative"
+      },
+      "cadence-sustainability": {
+        "description": "Work pace is sustainable — no burnout signals, consistent throughput",
+        "instrument": "cost-accumulation",
+        "polarity": "positive"
+      },
+      "cadence-burnout": {
+        "description": "Work pace is unsustainable — overruns accumulating, team capacity declining",
+        "instrument": "cost-accumulation",
+        "polarity": "negative"
+      },
+      "task-completion-rate": {
+        "description": "Tasks completing at expected rate relative to capacity",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "cadence-overrun": {
+        "description": "Tasks consistently exceeding their cadence — planning or scoping problem",
+        "instrument": "outcome-correlation",
+        "polarity": "negative"
+      }
+    }
+  }
+}

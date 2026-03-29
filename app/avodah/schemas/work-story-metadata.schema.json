@@ -1,0 +1,27 @@
+{
+  "$id": "avodah:schema:metadata:work-story",
+  "title": "WorkStoryMeta",
+  "description": "Metadata for work-story content type. Project task with cadence and attestation gates.",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["backlog", "todo", "in-progress", "review", "done"] },
+    "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+    "visibility": { "type": "string", "enum": ["private", "community", "exchange"] },
+    "cadence": {
+      "type": "object",
+      "properties": {
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly", "custom"] },
+        "resetBehavior": { "type": "string", "enum": ["reset-to-backlog", "reset-to-todo", "archive"] }
+      }
+    },
+    "attestationGates": {
+      "type": "array",
+      "description": "Lamad content IDs that must be mastered before this task can be started",
+      "items": { "type": "string" }
+    },
+    "exchangePublish": { "type": "boolean", "description": "Whether to publish to shefa exchange as a service request" },
+    "projectId": { "type": "string" },
+    "assignedTo": { "type": "string" }
+  },
+  "additionalProperties": true
+}

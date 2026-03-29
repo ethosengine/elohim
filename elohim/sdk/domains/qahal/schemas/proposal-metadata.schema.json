@@ -1,0 +1,16 @@
+{
+  "$id": "qahal:schema:metadata:proposal",
+  "title": "ProposalMetadata",
+  "description": "Metadata for contentType 'proposal'. Governance proposal for collective decision-making.",
+  "type": "object",
+  "properties": {
+    "mechanism": { "type": "string", "description": "consent | ranked-choice | score | approval | plurality | quadratic" },
+    "quorum": { "type": "number", "description": "Minimum participation ratio (0.0-1.0)" },
+    "deadline": { "type": "string", "description": "ISO 8601 voting deadline" },
+    "collectiveId": { "type": "string", "description": "Collective this proposal belongs to" },
+    "options": { "type": "array", "items": { "type": "object" } },
+    "state": { "type": "string", "description": "draft | open | closed | ratified | rejected" },
+    "constitutionalLayer": { "type": "string" }
+  },
+  "additionalProperties": true
+}

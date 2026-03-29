@@ -51,7 +51,11 @@
     "manifest:codegen": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs elohim/sdk/domains/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts",
     "manifest:codegen:verify": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs --verify elohim/sdk/domains/lamad/manifest.json app/elohim-app/src/app/lamad/generated/manifest-types.ts",
     "lamad:codegen": "node elohim/sdk/domains/lamad/scripts/codegen.mjs",
-    "lamad:codegen:verify": "node elohim/sdk/domains/lamad/scripts/codegen.mjs --verify"
+    "lamad:codegen:verify": "node elohim/sdk/domains/lamad/scripts/codegen.mjs --verify",
+    "qahal:codegen": "node elohim/sdk/domains/qahal/scripts/codegen.mjs",
+    "qahal:codegen:verify": "node elohim/sdk/domains/qahal/scripts/codegen.mjs --verify",
+    "avodah:codegen": "node app/avodah/scripts/codegen.mjs",
+    "avodah:codegen:verify": "node app/avodah/scripts/codegen.mjs --verify"
   },
   "dependencies": {
   }

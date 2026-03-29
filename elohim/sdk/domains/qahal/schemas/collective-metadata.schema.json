@@ -1,0 +1,16 @@
+{
+  "$id": "qahal:schema:metadata:collective",
+  "title": "CollectiveMetadata",
+  "description": "Metadata for contentType 'collective'. Community identity and governance structure.",
+  "type": "object",
+  "properties": {
+    "memberCount": { "type": "integer" },
+    "governanceModel": { "type": "string", "description": "steward-consent | community-vote | constitutional | consensus" },
+    "constitutionalLayer": { "type": "string", "description": "individual | family | community | provincial | bioregional | global" },
+    "geoBoundary": { "type": "string", "description": "H3 cell or place ID for geographic grounding" },
+    "parentCollectiveId": { "type": "string", "description": "Parent collective in governance hierarchy" },
+    "description": { "type": "string" },
+    "visibility": { "type": "string", "description": "private | community | public" }
+  },
+  "additionalProperties": true
+}

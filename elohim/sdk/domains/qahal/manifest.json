@@ -1,0 +1,431 @@
+{
+  "id": "manifest-qahal",
+  "name": "qahal",
+  "version": "1.0.0",
+  "description": "Social layer and governance — collectives, proposals, deliberation, challenges, and future community networking. Governance today, social tomorrow.",
+  "vocabulary": {
+    "contentTypes": {
+      "collective": {
+        "description": "A community or group with governance structure. Category A (DHT-notarized). The organizational unit for governance, stewardship, and social belonging.",
+        "metadataSchema": { "$ref": "./schemas/collective-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "CONTAINS": ["proposal", "challenge", "statement", "collective"],
+              "RELATES_TO": ["collective"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "governance-structure",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["governance-decision", "community-report"]
+          },
+          "claims": [
+            { "asserts": "governance-health", "contradictedBy": "governance-outcome-divergence", "validityHorizon": "P90D", "leg": "governance" },
+            { "asserts": "participation-breadth", "contradictedBy": "participation-concentrated", "validityHorizon": "P90D", "leg": "governance" }
+          ]
+        }
+      },
+      "proposal": {
+        "description": "A governance proposal for collective decision-making. Category A (DHT-notarized). Supports multiple voting mechanisms: consent, ranked-choice, score, approval, plurality, quadratic.",
+        "metadataSchema": { "$ref": "./schemas/proposal-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["collective"],
+              "CONTAINS": ["statement"],
+              "RELATES_TO": ["challenge", "appeal"]
+            }
+          },
+          "value": {
+            "onConsume": {
+              "action": "use",
+              "resourceConformsTo": "governance-participation",
+              "recognition": "governance-credit"
+            },
+            "onComplete": {
+              "action": "produce",
+              "resourceConformsTo": "governance-decision",
+              "recognition": "governance-credit"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "community",
+            "governanceModel": "community-vote",
+            "signalTypes": ["governance-decision", "consensus-reached"]
+          },
+          "claims": [
+            { "asserts": "governance-health", "contradictedBy": "governance-outcome-divergence", "validityHorizon": "P90D", "leg": "governance" },
+            { "asserts": "decision-legitimacy", "contradictedBy": "decision-challenged", "validityHorizon": "P180D", "leg": "governance" }
+          ]
+        }
+      },
+      "challenge": {
+        "description": "A constitutional challenge to a decision, manifest, or content. Category A (DHT-notarized). Escalates to higher governance layers for review.",
+        "metadataSchema": { "$ref": "./schemas/challenge-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "CHALLENGES": ["proposal", "collective"],
+              "BELONGS_TO": ["collective"],
+              "RELATES_TO": ["appeal"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "constitutional-review",
+              "recognition": "governance-credit"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "community",
+            "governanceModel": "constitutional",
+            "signalTypes": ["challenge-filed", "governance-decision"]
+          },
+          "claims": [
+            { "asserts": "challenge-legitimate", "contradictedBy": "challenge-frivolous", "validityHorizon": "P30D", "leg": "governance" }
+          ]
+        }
+      },
+      "appeal": {
+        "description": "An appeal of a governance decision to a higher constitutional layer. Category A (DHT-notarized). The safety valve — ensures no decision is final without recourse.",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "APPEALS": ["challenge", "proposal"],
+              "BELONGS_TO": ["collective"],
+              "RELATES_TO": ["challenge"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "constitutional-review",
+              "recognition": "governance-credit"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "community",
+            "governanceModel": "constitutional",
+            "signalTypes": ["appeal-filed", "governance-decision"]
+          },
+          "claims": [
+            { "asserts": "appeal-legitimate", "contradictedBy": "appeal-frivolous", "validityHorizon": "P30D", "leg": "governance" }
+          ]
+        }
+      },
+      "statement": {
+        "description": "A sensemaking statement for Polis-style deliberation. Category B2 (agent-scoped with attestation). Enables opinion clustering and bridging across divides.",
+        "metadataSchema": { "$ref": "./schemas/statement-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["proposal", "collective"],
+              "RELATES_TO": ["statement"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "deliberation-input",
+              "recognition": "governance-credit"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "community",
+            "governanceModel": "community-vote",
+            "signalTypes": ["social-engagement", "consensus-reached"]
+          },
+          "claims": [
+            { "asserts": "bridges-clusters", "contradictedBy": "deepens-division", "validityHorizon": "P30D", "leg": "governance" }
+          ]
+        }
+      },
+      "post": {
+        "description": "A social post or status update. Future — declared for vocabulary, not yet implemented. Category B (agent-scoped).",
+        "status": "planned",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["collective"],
+              "RELATES_TO": ["post", "thread"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "social-content",
+              "recognition": "community-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["social-engagement"]
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P30D", "leg": "value" }
+          ]
+        }
+      },
+      "event": {
+        "description": "A community event — gathering, meetup, service, celebration. Future — declared for vocabulary, not yet implemented. Category B (agent-scoped).",
+        "status": "planned",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["collective"],
+              "RELATES_TO": ["event", "post"]
+            }
+          },
+          "value": {
+            "onConsume": {
+              "action": "use",
+              "resourceConformsTo": "community-gathering",
+              "recognition": "community-standing"
+            },
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "community-gathering",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["social-engagement", "relationship-formed"]
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P90D", "leg": "value" }
+          ]
+        }
+      },
+      "group": {
+        "description": "A named group within a collective — small group, committee, ministry, working group. Future — declared for vocabulary, not yet implemented. Category A2 (derived via link).",
+        "status": "planned",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["collective"],
+              "CONTAINS": ["post", "event", "thread"],
+              "RELATES_TO": ["group"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "governance-structure",
+              "recognition": "stewardship-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["relationship-formed"]
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P90D", "leg": "value" }
+          ]
+        }
+      },
+      "message": {
+        "description": "A direct or group message. Future — declared for vocabulary, not yet implemented. Category B (agent-scoped).",
+        "status": "planned",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["group", "thread"],
+              "RELATES_TO": ["message"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "social-content",
+              "recognition": "community-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "intimate",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["social-engagement"]
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P7D", "leg": "value" }
+          ]
+        }
+      },
+      "thread": {
+        "description": "A discussion thread — threaded conversation within a collective or group. Future — declared for vocabulary, not yet implemented. Category B (agent-scoped).",
+        "status": "planned",
+        "coupling": {
+          "knowledge": {
+            "relationships": {
+              "BELONGS_TO": ["collective", "group", "proposal"],
+              "CONTAINS": ["message", "post"],
+              "RELATES_TO": ["thread"]
+            }
+          },
+          "value": {
+            "onContribute": {
+              "action": "produce",
+              "resourceConformsTo": "social-content",
+              "recognition": "community-standing"
+            }
+          },
+          "governance": {
+            "defaultReach": "community",
+            "minimumReach": "intimate",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["social-engagement"]
+          },
+          "claims": [
+            { "asserts": "community-value-confirmed", "contradictedBy": "engagement-decline", "validityHorizon": "P30D", "leg": "value" }
+          ]
+        }
+      }
+    },
+    "relationships": {
+      "CONTAINS": {
+        "description": "Hierarchical containment — collectives contain proposals, groups contain threads.",
+        "sourceTypes": ["collective", "group", "thread"],
+        "targetTypes": ["proposal", "challenge", "statement", "collective", "post", "event", "thread", "message"],
+        "inverse": "BELONGS_TO"
+      },
+      "BELONGS_TO": {
+        "description": "Reverse of CONTAINS — the source is a member/child of the target.",
+        "sourceTypes": ["proposal", "challenge", "appeal", "statement", "post", "event", "group", "message", "thread"],
+        "targetTypes": ["collective", "group", "proposal", "thread"],
+        "inverse": "CONTAINS"
+      },
+      "CHALLENGES": {
+        "description": "The source challenges the validity of the target — a constitutional review request.",
+        "sourceTypes": ["challenge"],
+        "targetTypes": ["proposal", "collective"]
+      },
+      "APPEALS": {
+        "description": "The source appeals the outcome of the target to a higher governance layer.",
+        "sourceTypes": ["appeal"],
+        "targetTypes": ["challenge", "proposal"]
+      },
+      "RELATES_TO": {
+        "description": "Generic association between governance/social content.",
+        "sourceTypes": ["collective", "proposal", "challenge", "appeal", "statement", "post", "event", "group", "message", "thread"],
+        "targetTypes": ["collective", "proposal", "challenge", "appeal", "statement", "post", "event", "group", "message", "thread"]
+      }
+    },
+    "signals": {
+      "governance-decision": {
+        "description": "Emitted when a proposal reaches a decision — ratified, rejected, or withdrawn. The core governance signal.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "governance-decision"
+      },
+      "community-report": {
+        "description": "Emitted when a community member flags content or behavior. Attention signal that may trigger governance review.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "community-report"
+      },
+      "challenge-filed": {
+        "description": "Emitted when a constitutional challenge is filed. Triggers escalation to the appropriate governance layer.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "constitutional-review"
+      },
+      "appeal-filed": {
+        "description": "Emitted when an appeal is filed against a governance decision. Escalates to a higher constitutional layer.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "constitutional-review"
+      },
+      "consensus-reached": {
+        "description": "Emitted when deliberation converges — bridging statements emerge, opinion clusters align. A positive governance signal.",
+        "substrateSignal": "compute",
+        "economicAction": "produce",
+        "resourceType": "consensus"
+      },
+      "social-engagement": {
+        "description": "Emitted when a member engages with social content — posts, reacts, attends events. The social attention signal.",
+        "substrateSignal": "attention",
+        "economicAction": "use",
+        "resourceType": "social-engagement"
+      },
+      "relationship-formed": {
+        "description": "Emitted when a new relationship is formed — joining a group, connecting with a member, attending an event together.",
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "resourceType": "relationship"
+      }
+    },
+    "observations": {
+      "governance-health": {
+        "description": "Governance decisions produce outcomes aligned with collective purpose",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "governance-outcome-divergence": {
+        "description": "Governance decisions produce outcomes that diverge from collective purpose or harm members",
+        "instrument": "outcome-correlation",
+        "polarity": "negative"
+      },
+      "social-health": {
+        "description": "Community members maintain diverse, active relationships and engagement",
+        "instrument": "distribution-health",
+        "polarity": "positive"
+      },
+      "social-isolation": {
+        "description": "Community members are isolated, disengaged, or polarized — social fabric weakening",
+        "instrument": "distribution-health",
+        "polarity": "negative"
+      },
+      "participation-breadth": {
+        "description": "Governance participation is distributed across community members",
+        "instrument": "distribution-health",
+        "polarity": "positive"
+      },
+      "participation-concentrated": {
+        "description": "The same few people decide everything — governance capture by participation asymmetry",
+        "instrument": "distribution-health",
+        "polarity": "negative"
+      },
+      "community-growth": {
+        "description": "Community is retaining members and welcoming new ones",
+        "instrument": "retention-check",
+        "polarity": "positive"
+      },
+      "community-attrition": {
+        "description": "Community is losing members — people leaving or disengaging",
+        "instrument": "retention-check",
+        "polarity": "negative"
+      },
+      "decision-legitimacy": {
+        "description": "Decisions are accepted and enacted by the community without unresolved challenges",
+        "instrument": "outcome-correlation",
+        "polarity": "positive"
+      },
+      "decision-challenged": {
+        "description": "Decisions are contested — challenges or appeals indicate legitimacy problems",
+        "instrument": "outcome-correlation",
+        "polarity": "negative"
+      }
+    }
+  }
+}

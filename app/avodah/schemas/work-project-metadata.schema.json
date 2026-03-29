@@ -1,0 +1,23 @@
+{
+  "$id": "avodah:schema:metadata:work-project",
+  "title": "WorkProjectMeta",
+  "description": "Metadata for work-project content type. Container for work stories with board configuration.",
+  "type": "object",
+  "properties": {
+    "visibility": { "type": "string", "enum": ["private", "community"] },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "isTerminal": { "type": "boolean" }
+        }
+      }
+    },
+    "members": { "type": "array", "items": { "type": "string" } },
+    "defaultCadence": { "type": "string" }
+  },
+  "additionalProperties": true
+}
