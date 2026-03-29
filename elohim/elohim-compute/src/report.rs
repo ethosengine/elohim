@@ -3,13 +3,15 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::build_info::BuildInfo;
+use crate::detail_level::DetailLevel;
 use crate::{HealthReporter, PeerHealthSnapshot, ResourceSnapshot, ServiceHealth};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComputeReport {
     pub service_id: String,
-    pub version: String,
+    pub build: BuildInfo,
     pub health: ServiceHealth,
     pub health_reason: String,
     pub started_at: DateTime<Utc>,
@@ -22,6 +24,7 @@ pub struct ComputeReport {
 impl ComputeReport {
     pub fn build(
         reporter: &dyn HealthReporter,
+        build_info: &BuildInfo,
         resources: ResourceSnapshot,
         peers: Vec<PeerHealthSnapshot>,
         extensions: serde_json::Value,
@@ -31,7 +34,7 @@ impl ComputeReport {
         let uptime = (now - started).num_seconds().max(0) as u64;
         Self {
             service_id: reporter.service_id().to_string(),
-            version: String::new(),
+            build: build_info.clone(),
             health: reporter.health(),
             health_reason: reporter.health_reason(),
             started_at: started,
@@ -40,6 +43,24 @@ impl ComputeReport {
             peers,
             extensions,
         }
+    }
+
+    /// Serialize to JSON and strip fields above the requested detail level.
+    ///
+    /// - Below `Trace`: remove `extensions`
+    /// - Below `Debug`: also remove `resources` and `peers`
+    pub fn filter(&self, level: DetailLevel) -> serde_json::Value {
+        let mut value = serde_json::to_value(self).expect("ComputeReport always serializes");
+        if let Some(obj) = value.as_object_mut() {
+            if level < DetailLevel::Trace {
+                obj.remove("extensions");
+            }
+            if level < DetailLevel::Debug {
+                obj.remove("resources");
+                obj.remove("peers");
+            }
+        }
+        value
     }
 }
 
@@ -69,9 +90,14 @@ mod tests {
         }
     }
 
+    fn test_build_info() -> BuildInfo {
+        BuildInfo::new("test-service")
+    }
+
     #[test]
     fn test_build_from_reporter() {
         let reporter = MockReporter;
+        let build_info = test_build_info();
         let resources = ResourceSnapshot {
             timestamp: Utc::now(),
             requests: RequestCounterSnapshot {
@@ -93,9 +119,10 @@ mod tests {
         }];
         let extensions = serde_json::json!({ "hotCacheEntries": 500 });
 
-        let report = ComputeReport::build(&reporter, resources, peers, extensions);
+        let report = ComputeReport::build(&reporter, &build_info, resources, peers, extensions);
 
         assert_eq!(report.service_id, "test-service");
+        assert_eq!(report.build.service, "test-service");
         assert_eq!(report.health, ServiceHealth::Healthy);
         assert_eq!(report.health_reason, "all systems go");
         assert!(report.uptime_seconds >= 119);
@@ -107,6 +134,7 @@ mod tests {
     #[test]
     fn test_report_serializes_camel_case() {
         let reporter = MockReporter;
+        let build_info = test_build_info();
         let resources = ResourceSnapshot {
             timestamp: Utc::now(),
             requests: RequestCounterSnapshot {
@@ -117,7 +145,13 @@ mod tests {
             managed_storage_bytes: 0,
             managed_document_count: 0,
         };
-        let report = ComputeReport::build(&reporter, resources, vec![], serde_json::Value::Null);
+        let report = ComputeReport::build(
+            &reporter,
+            &build_info,
+            resources,
+            vec![],
+            serde_json::Value::Null,
+        );
         let json = serde_json::to_string(&report).unwrap();
         assert!(json.contains("\"serviceId\""));
         assert!(json.contains("\"healthReason\""));
@@ -128,6 +162,7 @@ mod tests {
     #[test]
     fn test_report_roundtrip() {
         let reporter = MockReporter;
+        let build_info = test_build_info();
         let resources = ResourceSnapshot {
             timestamp: Utc::now(),
             requests: RequestCounterSnapshot {
@@ -138,12 +173,105 @@ mod tests {
             managed_storage_bytes: 2048,
             managed_document_count: 3,
         };
-        let mut report = ComputeReport::build(&reporter, resources, vec![], serde_json::json!({}));
-        report.version = "0.1.0".to_string();
+        let report = ComputeReport::build(
+            &reporter,
+            &build_info,
+            resources,
+            vec![],
+            serde_json::json!({}),
+        );
         let json = serde_json::to_string(&report).unwrap();
         let deserialized: ComputeReport = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.service_id, "test-service");
-        assert_eq!(deserialized.version, "0.1.0");
+        assert_eq!(deserialized.build.version, env!("CARGO_PKG_VERSION"));
         assert_eq!(deserialized.health, ServiceHealth::Healthy);
+    }
+
+    #[test]
+    fn test_filter_trace_includes_everything() {
+        let reporter = MockReporter;
+        let build_info = test_build_info();
+        let resources = ResourceSnapshot {
+            timestamp: Utc::now(),
+            requests: RequestCounterSnapshot {
+                total: 1,
+                by_category: HashMap::new(),
+            },
+            active_connections: 0,
+            managed_storage_bytes: 0,
+            managed_document_count: 0,
+        };
+        let report = ComputeReport::build(
+            &reporter,
+            &build_info,
+            resources,
+            vec![],
+            serde_json::json!({ "extra": true }),
+        );
+        let filtered = report.filter(DetailLevel::Trace);
+        let obj = filtered.as_object().unwrap();
+        assert!(obj.contains_key("extensions"));
+        assert!(obj.contains_key("resources"));
+        assert!(obj.contains_key("peers"));
+    }
+
+    #[test]
+    fn test_filter_debug_removes_extensions() {
+        let reporter = MockReporter;
+        let build_info = test_build_info();
+        let resources = ResourceSnapshot {
+            timestamp: Utc::now(),
+            requests: RequestCounterSnapshot {
+                total: 1,
+                by_category: HashMap::new(),
+            },
+            active_connections: 0,
+            managed_storage_bytes: 0,
+            managed_document_count: 0,
+        };
+        let report = ComputeReport::build(
+            &reporter,
+            &build_info,
+            resources,
+            vec![],
+            serde_json::json!({ "extra": true }),
+        );
+        let filtered = report.filter(DetailLevel::Debug);
+        let obj = filtered.as_object().unwrap();
+        assert!(!obj.contains_key("extensions"));
+        assert!(obj.contains_key("resources"));
+        assert!(obj.contains_key("peers"));
+    }
+
+    #[test]
+    fn test_filter_info_removes_resources_peers_extensions() {
+        let reporter = MockReporter;
+        let build_info = test_build_info();
+        let resources = ResourceSnapshot {
+            timestamp: Utc::now(),
+            requests: RequestCounterSnapshot {
+                total: 1,
+                by_category: HashMap::new(),
+            },
+            active_connections: 0,
+            managed_storage_bytes: 0,
+            managed_document_count: 0,
+        };
+        let report = ComputeReport::build(
+            &reporter,
+            &build_info,
+            resources,
+            vec![],
+            serde_json::json!({ "extra": true }),
+        );
+        let filtered = report.filter(DetailLevel::Info);
+        let obj = filtered.as_object().unwrap();
+        assert!(!obj.contains_key("extensions"));
+        assert!(!obj.contains_key("resources"));
+        assert!(!obj.contains_key("peers"));
+        // Core fields still present
+        assert!(obj.contains_key("serviceId"));
+        assert!(obj.contains_key("build"));
+        assert!(obj.contains_key("health"));
     }
 }
