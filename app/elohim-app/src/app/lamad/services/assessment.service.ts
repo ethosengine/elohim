@@ -14,6 +14,7 @@ import {
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 import { ContentNode } from '../models/content-node.model';
+import type { AssessmentMetadata } from '../generated/metadata-types';
 
 /**
  * Assessment result stored in localStorage (MVP) or source chain (Holochain).
@@ -139,7 +140,7 @@ export class AssessmentService {
       map(assessment => {
         if (!assessment) return false;
 
-        const metadata = assessment.metadata as Record<string, unknown> | undefined;
+        const metadata = assessment.metadata as AssessmentMetadata | undefined;
         const prerequisite = metadata?.['prerequisiteAttestation'] as string | undefined;
 
         if (!prerequisite) return true; // No prerequisite
@@ -266,7 +267,7 @@ export class AssessmentService {
         const scores = this.computeScores(session.responses, content);
         const interpretation = this.computeInterpretation(scores, content);
 
-        const metadata = assessment.metadata as Record<string, unknown> | undefined;
+        const metadata = assessment.metadata as AssessmentMetadata | undefined;
         const result: AssessmentResult = {
           assessmentId: session.assessmentId,
           agentId: session.agentId,

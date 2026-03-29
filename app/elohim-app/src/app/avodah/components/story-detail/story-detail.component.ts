@@ -387,9 +387,7 @@ export class StoryDetailComponent implements OnInit {
   }
 
   meta(): WorkStoryMeta {
-    return parseWorkStoryMeta(
-      (this.story?.metadata ?? {}) as Record<string, unknown>,
-    );
+    return parseWorkStoryMeta(this.story?.metadata ?? {});
   }
 
   contentIcon(contentType: string): string {
@@ -407,7 +405,7 @@ export class StoryDetailComponent implements OnInit {
     const status = (event.target as HTMLSelectElement).value as WorkStoryStatus;
     if (!this.story) return;
     await this.api.updateStoryStatus(this.story.id, status);
-    (this.story.metadata as Record<string, unknown>)['status'] = status;
+    (this.story.metadata as WorkStoryMeta).status = status;
   }
 
   async changePriority(event: Event): Promise<void> {
@@ -416,7 +414,7 @@ export class StoryDetailComponent implements OnInit {
     await this.api.updateStoryField(this.story.id, {
       metadata: { priority },
     });
-    (this.story.metadata as Record<string, unknown>)['priority'] = priority;
+    (this.story.metadata as WorkStoryMeta).priority = priority;
   }
 
   async changeVisibility(event: Event): Promise<void> {
@@ -426,7 +424,7 @@ export class StoryDetailComponent implements OnInit {
     await this.api.updateStoryField(this.story.id, {
       metadata: { visibility },
     });
-    (this.story.metadata as Record<string, unknown>)['visibility'] = visibility;
+    (this.story.metadata as WorkStoryMeta).visibility = visibility;
   }
 
   async submitAttachment(event: Event): Promise<void> {

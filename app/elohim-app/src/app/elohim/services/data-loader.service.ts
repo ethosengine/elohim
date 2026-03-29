@@ -1613,13 +1613,13 @@ export class DataLoaderService {
     return this.contentService.queryContent({ contentType: 'assessment', limit: 500 }).pipe(
       map(contentNodes => {
         const assessments: AssessmentIndexEntry[] = contentNodes.map(node => {
-          const meta = (node.metadata ?? {}) as Record<string, unknown>;
+          const meta = node.metadata ?? {};
           return {
             id: node.id,
             title: node.title,
             domain: (meta['domain'] as string) ?? 'general',
             instrumentType: (meta['instrumentType'] as string) ?? 'questionnaire',
-            estimatedTime: (meta['estimatedTime'] as string) ?? '15 minutes',
+            estimatedTime: (meta.estimatedTime as string) ?? '15 minutes',
           };
         });
 

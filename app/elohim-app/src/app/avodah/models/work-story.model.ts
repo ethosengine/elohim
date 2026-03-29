@@ -3,6 +3,8 @@ export type { WorkStoryMeta } from '../generated/metadata-types';
 
 import type { WorkStoryMeta } from '../generated/metadata-types';
 
+import type { ContentMetadata } from '../../lamad/models/content-node.model';
+
 export type WorkStoryStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';
 export type WorkVisibility = 'private' | 'community' | 'exchange';
 export type WorkPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -22,6 +24,6 @@ const DEFAULTS: WorkStoryMeta = {
   priority: 'medium',
 };
 
-export function parseWorkStoryMeta(raw: Record<string, unknown>): WorkStoryMeta {
+export function parseWorkStoryMeta(raw: ContentMetadata): WorkStoryMeta {
   return { ...DEFAULTS, ...raw } as WorkStoryMeta;
 }

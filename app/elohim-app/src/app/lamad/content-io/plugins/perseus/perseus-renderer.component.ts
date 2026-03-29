@@ -629,8 +629,8 @@ export class PerseusRendererComponent
     if (firstQuestion?.discoveryMode) {
       return 'discovery';
     }
-    // Check node metadata as fallback
-    const metadata = this.node?.metadata as Record<string, unknown> | undefined;
+    // Check node metadata as fallback — quizType is an ad-hoc field on ContentMetadata index signature
+    const metadata = this.node?.metadata;
     if (metadata?.['quizType'] === 'domain-discovery') {
       return 'discovery';
     }

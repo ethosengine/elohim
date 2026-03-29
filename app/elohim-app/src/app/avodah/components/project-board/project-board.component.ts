@@ -8,7 +8,7 @@ import {
   DEFAULT_BOARD_COLUMNS,
   parseWorkProjectMeta,
 } from '../../models/work-project.model';
-import { parseWorkStoryMeta, type WorkStoryStatus } from '../../models/work-story.model';
+import { parseWorkStoryMeta, type WorkStoryMeta, type WorkStoryStatus } from '../../models/work-story.model';
 import { AvodahApiService } from '../../services/avodah-api.service';
 import { StoryCardComponent } from '../story-card/story-card.component';
 
@@ -226,7 +226,7 @@ export class ProjectBoardComponent implements OnInit {
     const projects = await this.api.getProjects();
     this.project = projects.find(p => p.id === projectId) ?? null;
     if (this.project) {
-      const meta = parseWorkProjectMeta(this.project.metadata as Record<string, unknown>);
+      const meta = parseWorkProjectMeta(this.project.metadata);
       this.columns = (meta.columns ?? DEFAULT_BOARD_COLUMNS) as BoardColumn[];
     }
     this.stories = await this.api.getStoriesForProject(projectId);
@@ -234,7 +234,7 @@ export class ProjectBoardComponent implements OnInit {
 
   storiesInColumn(columnId: string): ContentNode[] {
     return this.stories.filter(s => {
-      const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
+      const meta = parseWorkStoryMeta(s.metadata);
       return meta.status === columnId;
     });
   }
@@ -268,7 +268,7 @@ export class ProjectBoardComponent implements OnInit {
 
     const story = this.stories.find(s => s.id === storyId);
     if (story) {
-      (story.metadata as Record<string, unknown>)['status'] = column.id;
+      (story.metadata as WorkStoryMeta).status = column.id as WorkStoryStatus;
     }
     void this.api.updateStoryStatus(
       storyId,

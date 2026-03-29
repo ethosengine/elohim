@@ -358,7 +358,7 @@ export class ProjectBacklogComponent implements OnInit {
   }
 
   storyMeta(story: ContentNode) {
-    return parseWorkStoryMeta(story.metadata as Record<string, unknown>);
+    return parseWorkStoryMeta(story.metadata);
   }
 
   filteredStories(): ContentNode[] {

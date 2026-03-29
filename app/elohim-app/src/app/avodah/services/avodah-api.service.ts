@@ -19,7 +19,7 @@ function toContentNode(view: ContentWithTagsView): ContentNode {
     contentFormat: view.contentFormat as ContentNode['contentFormat'],
     tags: view.tags ?? [],
     relatedNodeIds: [],
-    metadata: (view.metadata as Record<string, unknown>) ?? {},
+    metadata: (view.metadata ?? {}) as ContentNode['metadata'],
     createdAt: view.createdAt,
     updatedAt: view.updatedAt,
   };
@@ -39,7 +39,7 @@ export class AvodahApiService {
   async getStoriesForProject(projectId: string): Promise<ContentNode[]> {
     const views = await firstValueFrom(this.storageApi.getContents({ contentType: 'work-story' }));
     return views
-      .filter(v => (v.metadata as Record<string, unknown> | null)?.['projectId'] === projectId)
+      .filter(v => ((v.metadata ?? {}) as ContentNode['metadata'])['projectId'] === projectId)
       .map(toContentNode);
   }
 

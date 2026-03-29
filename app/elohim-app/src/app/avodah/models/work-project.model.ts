@@ -3,6 +3,8 @@ export type { WorkProjectMeta } from '../generated/metadata-types';
 
 import type { WorkProjectMeta } from '../generated/metadata-types';
 
+import type { ContentMetadata } from '../../lamad/models/content-node.model';
+
 export interface BoardColumn {
   id: string;
   name: string;
@@ -19,7 +21,7 @@ export const DEFAULT_BOARD_COLUMNS: BoardColumn[] = [
   { id: 'done', name: 'Done', color: '#10b981', isTerminal: true },
 ];
 
-export function parseWorkProjectMeta(raw: Record<string, unknown>): WorkProjectMeta {
+export function parseWorkProjectMeta(raw: ContentMetadata): WorkProjectMeta {
   return {
     columns: DEFAULT_BOARD_COLUMNS,
     visibility: 'private',

@@ -229,7 +229,7 @@ export class StoryCardComponent {
   readonly cardClick = output<ContentNode>();
 
   readonly meta = computed<WorkStoryMeta>(() =>
-    parseWorkStoryMeta(this.story().metadata as unknown as Record<string, unknown>)
+    parseWorkStoryMeta(this.story().metadata)
   );
 
   readonly shortId = computed<string>(() => {

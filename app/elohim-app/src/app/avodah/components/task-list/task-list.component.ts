@@ -269,7 +269,7 @@ export class TaskListComponent implements OnInit {
     this.project = projects.find(p => p.id === this.projectId) ?? null;
     const all = await this.api.getStoriesForProject(this.projectId);
     this.recurringStories = all.filter(s => {
-      const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
+      const meta = parseWorkStoryMeta(s.metadata);
       return meta.cadence !== undefined;
     });
   }
@@ -280,25 +280,25 @@ export class TaskListComponent implements OnInit {
 
   storiesInGroup(interval: CadenceInterval): ContentNode[] {
     return this.recurringStories.filter(s => {
-      const meta = parseWorkStoryMeta(s.metadata as Record<string, unknown>);
+      const meta = parseWorkStoryMeta(s.metadata);
       return meta.cadence?.interval === interval;
     });
   }
 
   nextOccurrence(story: ContentNode): string {
-    const meta = parseWorkStoryMeta(story.metadata as Record<string, unknown>);
+    const meta = parseWorkStoryMeta(story.metadata);
     if (!meta.cadence?.nextOccurrence) return '—';
     const date = new Date(meta.cadence.nextOccurrence);
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   hasExchange(story: ContentNode): boolean {
-    const meta = parseWorkStoryMeta(story.metadata as Record<string, unknown>);
+    const meta = parseWorkStoryMeta(story.metadata);
     return meta.visibility === 'exchange';
   }
 
   hasAttestation(story: ContentNode): boolean {
-    const meta = parseWorkStoryMeta(story.metadata as Record<string, unknown>);
+    const meta = parseWorkStoryMeta(story.metadata);
     return Array.isArray(meta.attestationGates) && meta.attestationGates.length > 0;
   }
 
