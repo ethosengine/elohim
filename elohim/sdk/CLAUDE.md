@@ -16,7 +16,7 @@ If someone could become the bank, the credential authority, the governance board
 - Substrate signals: attention, compute, storage, bandwidth, energy, time, resource
 
 ### NOT SDK (app layer)
-- What `PathMetadata.thumbnailUrl` means → that's `app/lamad/`
+- What `PathMetadata.thumbnailUrl` means → that's `domains/lamad/`
 - Doorway projection/cache types → web2 bridge, not protocol primitive
 - UI state, dashboard aggregations, theme preferences
 - Quiz session state, streak tracking → app-level compositions
@@ -24,12 +24,12 @@ If someone could become the bank, the credential authority, the governance board
 ## Two-Layer Type System
 
 ```
-Protocol Layer (this directory)              App Layer (app/lamad/)
-─────────────────────────────               ────────────────────────
+Protocol Layer (this directory)              Domain Layer (domains/lamad/)
+─────────────────────────────               ────────────────────────────
 schemas/  → protocol JSON schemas            manifest.json → domain vocabulary
   enums/     ContentType, Reach, ...          schemas/  → PathMetadata, EprCompositeBody
   inputs/    CreateContentInput               scripts/  → codegen from manifest + schemas
-  views/     ContentView, EconomicEventView   generated/ → discriminated unions, type guards
+  views/     ContentView, EconomicEventView
   manifest/  app-manifest.schema.json
 
 storage-client-ts/ → Rust ts-rs generated     Both layers generate to:
@@ -52,7 +52,7 @@ pnpm run lamad:codegen
 ```
 
 See `schemas/CLAUDE.md` for protocol codegen details.
-See `../../app/lamad/CLAUDE.md` for app codegen details.
+See `domains/lamad/CLAUDE.md` for domain codegen details.
 
 ## storage-client-ts
 

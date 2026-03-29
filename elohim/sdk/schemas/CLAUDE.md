@@ -108,7 +108,7 @@ To add a new distributed file, add it to `INTERFACE_FILES` in `codegen-ts.mjs`.
 
 ## Manifest Schema (app-manifest.schema.json)
 
-Validates app manifests (like `app/lamad/manifest.json`). Requires:
+Validates app manifests (like `elohim/sdk/domains/lamad/manifest.json`). Requires:
 
 - Every content type declares **three-leg coupling** (knowledge + value + governance)
 - Every content type declares **claims** (feedback: what outcomes it asserts)
@@ -119,10 +119,10 @@ The manifest schema uses `$ref` to the substrate-signal enum. The test script (`
 
 ## Two Type Layers
 
-These schemas are the **protocol layer** — wire types, enums, generic metadata bag. They don't know what `PathMetadata.thumbnailUrl` means. That's the **app layer** (`app/lamad/schemas/`).
+These schemas are the **protocol layer** — wire types, enums, generic metadata bag. They don't know what `PathMetadata.thumbnailUrl` means. That's the **app layer** (`elohim/sdk/domains/lamad/schemas/`).
 
 ```
-Protocol (this directory)              App (app/lamad/)
+Protocol (this directory)              Domain (sdk/domains/lamad/)
 ContentView { metadata: {} }    →     PathMetadata { thumbnailUrl, difficulty }
 CreateContentInput              →     ConceptMetadata { summary, bloomsLevel }
 SubstrateSignal enum            →     coupling-map.ts per content type

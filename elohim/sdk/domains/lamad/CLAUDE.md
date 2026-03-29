@@ -1,11 +1,11 @@
-# Lamad App Package
+# Lamad Domain
 
-This directory is an **EPR artifact** — a protocol-validated app package that declares the learning domain's vocabulary, metadata schemas, and coupling contracts. The protocol validates its structure; lamad owns the semantic meaning.
+This directory is the **lamad protocol domain** — the learning pillar's vocabulary, metadata schemas, and coupling contracts. The protocol validates its structure; lamad owns the semantic meaning.
 
 ## Two-Layer Type Architecture
 
 ```
-Protocol SDK (elohim/sdk/schemas/)          This Package (app/lamad/)
+Protocol SDK (elohim/sdk/schemas/)          This Domain (elohim/sdk/domains/lamad/)
 ├─ Wire types: ContentView,                 ├─ Domain types: PathMetadata,
 │  CreateContentInput,                      │  ConceptMetadata, AssessmentMetadata
 │  CreateEconomicEventInput                 ├─ Body types: EprCompositeBody,
@@ -22,7 +22,7 @@ The protocol owns the **envelope** (wire shape, field names, generic metadata ba
 ## Directory Structure
 
 ```
-app/lamad/
+elohim/sdk/domains/lamad/
 ├── manifest.json               # Vocabulary: 20 content types, formats, relationships, signals
 │                                 Each content type declares three-leg coupling:
 │                                 knowledge (graph edges) + value (REA flows) + governance (reach + model)
@@ -89,7 +89,7 @@ pnpm run schema:validate
 Edit the schema first, then regenerate. Never hand-write types that a schema should own.
 
 1. Protocol primitives (enums, wire types) → edit in `elohim/sdk/schemas/v1/`, run `pnpm run schema:codegen:ts`
-2. Domain metadata/body shapes → edit in `app/lamad/schemas/`, run `pnpm run lamad:codegen`
+2. Domain metadata/body shapes → edit in `elohim/sdk/domains/lamad/schemas/`, run `pnpm run lamad:codegen`
 3. Vocabulary (content types, signals, coupling) → edit `manifest.json`, run `pnpm run lamad:codegen`
 
 ### Typed metadata, not string keys
