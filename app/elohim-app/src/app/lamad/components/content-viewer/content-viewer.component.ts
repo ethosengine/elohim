@@ -821,16 +821,16 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Get metadata category
    */
   getMetadataCategory(): string | null {
-    if (!this.node?.metadata?.['category']) return null;
-    return this.node.metadata['category'];
+    if (!this.node?.metadata?.category) return null;
+    return this.node.metadata.category ?? null;
   }
 
   /**
    * Get metadata authors as joined string
    */
   getMetadataAuthors(): string | null {
-    if (!this.node?.metadata?.['authors']) return null;
-    const authors = this.node.metadata['authors'];
+    if (!this.node?.metadata?.authors) return null;
+    const authors = this.node.metadata.authors;
     if (Array.isArray(authors) && authors.length > 0) {
       return authors.join(', ');
     }
@@ -841,8 +841,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Get metadata version
    */
   getMetadataVersion(): string | null {
-    if (!this.node?.metadata?.['version']) return null;
-    return this.node.metadata['version'];
+    if (!this.node?.metadata?.version) return null;
+    return this.node.metadata.version ?? null;
   }
 
   /**

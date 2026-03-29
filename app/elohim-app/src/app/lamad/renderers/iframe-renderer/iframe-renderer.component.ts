@@ -129,6 +129,7 @@ export class IframeRendererComponent implements OnChanges {
     }
 
     // Legacy mode: check metadata for URL
+    // Intentionally untyped: embedUrl/url are legacy metadata fields not in any domain schema
     if (metadata?.['embedUrl'] ?? metadata?.['url']) {
       const url = (metadata['embedUrl'] ?? metadata['url']) as string;
       // Security: URL comes from trusted content metadata stored in backend

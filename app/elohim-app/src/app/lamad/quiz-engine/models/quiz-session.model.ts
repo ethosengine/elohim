@@ -24,6 +24,7 @@ import type {
   PerseusScoreResult,
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
+import type { ConceptMetadata } from '../../generated/metadata-types';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -628,10 +629,11 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
     existing.scores.push(response.score);
     if (response.correct) existing.correct++;
 
-    // Get Bloom's level from question
+    // Get Bloom's level from question — bloomsLevel is on ConceptMetadata
     const question = session.questions.find(q => q.item.id === response.questionId);
-    if (question?.item.metadata?.['bloomsLevel']) {
-      existing.blooms.add(question.item.metadata['bloomsLevel'] as string);
+    const bloomsLevel = (question?.item.metadata as ConceptMetadata | undefined)?.bloomsLevel;
+    if (bloomsLevel) {
+      existing.blooms.add(bloomsLevel);
     }
 
     contentScoreMap.set(response.contentId, existing);

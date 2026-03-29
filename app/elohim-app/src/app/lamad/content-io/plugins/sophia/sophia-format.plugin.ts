@@ -231,6 +231,7 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
     return false;
   }
 
+  // Intentionally untyped: extracting from raw sophia JSON content, not ContentNode.metadata
   private extractTitle(obj: Record<string, unknown>): string {
     if (obj['metadata'] && typeof obj['metadata'] === 'object') {
       const metadata = obj['metadata'] as Record<string, unknown>;
