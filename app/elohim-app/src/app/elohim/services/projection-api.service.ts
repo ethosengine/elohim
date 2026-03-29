@@ -21,6 +21,7 @@ import { environment } from '../../../environments/environment';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath, parsePathView } from '../../lamad/models/learning-path.model';
 
+import { ContentService } from './content.service';
 import { StorageClientService } from './storage-client.service';
 
 import type { IStorageApi, ContentFilters, RelationshipFilters } from '../interfaces';
@@ -106,6 +107,7 @@ export interface ProjectionStats {
 @Injectable({ providedIn: 'root' })
 export class ProjectionAPIService implements IStorageApi {
   private readonly http = inject(HttpClient);
+  private readonly contentService = inject(ContentService);
   private readonly storageClient = inject(StorageClientService);
 
   // Circuit breaker: after consecutive failures, disable for a cooldown period.
@@ -524,36 +526,11 @@ export class ProjectionAPIService implements IStorageApi {
   // =========================================================================
 
   /**
-   * Transform projected content to ContentNode model
+   * Transform projected content to ContentNode model.
+   * Delegates to ContentService.transformRawContent() — single typed pipeline.
    */
   private transformContent(data: Record<string, unknown>): ContentNode {
-    // Rust API now returns parsed metadata directly
-    const metadata = (data['metadata'] ?? {}) as Record<string, unknown>;
-
-    // Resolve blob references in metadata thumbnailUrl
-    if (metadata['thumbnailUrl'] && typeof metadata['thumbnailUrl'] === 'string') {
-      metadata['thumbnailUrl'] = this.resolveBlobUrl(metadata['thumbnailUrl'] as string);
-    }
-
-    // Projection data may have slightly different field names
-    return {
-      id: (data['id'] ?? data['docId']) as string,
-      contentType: data['contentType'] as string,
-      title: (data['title'] ?? '') as string,
-      description: (data['description'] ?? '') as string,
-      content: (data['content'] ?? data['contentBody'] ?? '') as string,
-      contentFormat: (data['contentFormat'] ?? 'markdown') as string,
-      tags: (data['tags'] ?? []) as string[],
-      relatedNodeIds: (data['relatedNodeIds'] ?? []) as string[],
-      metadata,
-      authorId: (data['authorId'] ?? data['author']) as string | undefined,
-      reach: (data['reach'] ?? 'private') as string,
-      trustScore: data['trustScore'] as number | undefined,
-      estimatedMinutes: data['estimatedMinutes'] as number | undefined,
-      thumbnailUrl: this.resolveBlobUrl(data['thumbnailUrl'] as string | null | undefined),
-      createdAt: data['createdAt'] as string | undefined,
-      updatedAt: data['updatedAt'] as string | undefined,
-    } as ContentNode;
+    return this.contentService.transformRawContent(data);
   }
 
   /**
@@ -578,7 +555,7 @@ export class ProjectionAPIService implements IStorageApi {
         pathType: (d['pathType'] ?? 'course') as string,
         difficulty: (d['difficulty'] ?? 'beginner') as string,
         estimatedDuration: d['estimatedDuration'] as string | undefined,
-        thumbnailUrl: this.resolveBlobUrl(
+        thumbnailUrl: this.contentService.resolveBlobReference(
           ((d['metadata'] as Record<string, unknown> | undefined)?.['thumbnailUrl'] as string | undefined)
             ?? d['thumbnailUrl'] as string | null | undefined
         ),
@@ -594,29 +571,6 @@ export class ProjectionAPIService implements IStorageApi {
     };
 
     return parsePathView(node);
-  }
-
-  /**
-   * Resolve a blob reference to a full URL.
-   * Uses StorageClientService for strategy-aware URL construction.
-   */
-  private resolveBlobUrl(value: string | null | undefined): string | undefined {
-    if (!value) return undefined;
-
-    // Already a full URL - pass through
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      return value;
-    }
-
-    // Extract blob hash from various formats
-    let blobHash = value;
-    if (value.startsWith('/blob/')) {
-      blobHash = value.slice(6);
-    } else if (value.startsWith('blob/')) {
-      blobHash = value.slice(5);
-    }
-
-    return this.storageClient.getBlobUrl(blobHash);
   }
 
   /**

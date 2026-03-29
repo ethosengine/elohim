@@ -151,6 +151,8 @@ interface RawContentData {
   relatedNodeIds?: string[];
   metadata?: Record<string, unknown>;
   authorId?: string;
+  /** Alias for authorId — projection cache may use 'author' instead */
+  author?: string;
   reach?: string;
   trustScore?: number;
   estimatedMinutes?: number;
@@ -643,6 +645,29 @@ export class ContentService {
   }
 
   // =========================================================================
+  // Public Transform API (used by ProjectionApiService to avoid duplicate logic)
+  // =========================================================================
+
+  /**
+   * Transform raw untyped data to ContentNode model.
+   * Used by ProjectionApiService to route projection cache data through
+   * the single typed pipeline instead of maintaining a duplicate transform.
+   */
+  transformRawContent(data: Record<string, unknown>): ContentNode {
+    // Intentionally untyped cast: projection data has the same fields as RawContentData
+    // but arrives as Record<string, unknown> from the HTTP cache layer.
+    return this.transformContent(data as unknown as RawContentData);
+  }
+
+  /**
+   * Resolve a blob reference to a full URL.
+   * Public so ProjectionApiService can resolve blob URLs without duplicating logic.
+   */
+  resolveBlobReference(value: string | null | undefined): string | undefined {
+    return this.resolveBlobUrl(value);
+  }
+
+  // =========================================================================
   // Private Helpers
   // =========================================================================
 
@@ -669,7 +694,7 @@ export class ContentService {
       tags: data.tags ?? [],
       relatedNodeIds: data.relatedNodeIds ?? [],
       metadata,
-      authorId: data.authorId,
+      authorId: data.authorId ?? data.author,
       reach: data.reach ?? 'commons',
       trustScore: data.trustScore,
       // Resolve thumbnailUrl from wire data or typed metadata (PathMetadata/ConceptMetadata)
