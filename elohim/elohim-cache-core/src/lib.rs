@@ -15,6 +15,9 @@
 pub mod resolution;
 pub mod write_buffer;
 
+#[cfg(feature = "native")]
+pub mod extraction;
+
 // Re-export resolution types for convenience
 pub use resolution::{ContentResolver, SourceTier, ResolutionResult, ResolutionError};
 
