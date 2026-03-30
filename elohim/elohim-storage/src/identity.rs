@@ -20,6 +20,74 @@ use std::path::Path;
 
 use crate::error::StorageError;
 
+/// What cache infrastructure tier this peer uses for extracted content.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CacheTier {
+    /// Doorway MongoDB — survives restarts, shared across replicas
+    Projection,
+    /// Storage disk — device-local, budget-constrained
+    Extraction,
+    /// No cache — raw blob from blob store only
+    BlobOnly,
+}
+
+/// Delivery capabilities of a peer — what it can serve and how.
+///
+/// The delivery layer is type-agnostic: it speaks in content hashes,
+/// not application vocabulary. EPR metadata says what content IS.
+/// Governance says whether it SHOULD be served. This struct only
+/// answers "what CAN I serve?"
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryCapabilities {
+    /// Can serve individual extracted files from cache
+    pub serves_extracted: bool,
+    /// Can serve raw compressed blobs (client must extract)
+    pub serves_compressed: bool,
+    /// Content hashes this peer can serve file-by-file right now
+    pub ready_content: Vec<String>,
+    /// Cache infrastructure tier
+    pub cache_tier: CacheTier,
+}
+
+impl Default for DeliveryCapabilities {
+    fn default() -> Self {
+        Self {
+            serves_extracted: false,
+            serves_compressed: false,
+            ready_content: vec![],
+            cache_tier: CacheTier::BlobOnly,
+        }
+    }
+}
+
+impl DeliveryCapabilities {
+    /// Convert to capability string array for gossipsub advertisement.
+    /// Format matches the Vec<String> in CapacityAnnouncement.
+    pub fn to_capability_strings(&self) -> Vec<String> {
+        let mut caps = Vec::new();
+        if self.serves_extracted {
+            caps.push("serves_extracted".to_string());
+        }
+        if self.serves_compressed {
+            caps.push("serves_compressed".to_string());
+        }
+        caps.push(format!(
+            "cache_tier:{}",
+            match self.cache_tier {
+                CacheTier::Projection => "projection",
+                CacheTier::Extraction => "extraction",
+                CacheTier::BlobOnly => "blob-only",
+            }
+        ));
+        for hash in &self.ready_content {
+            caps.push(format!("warm:{hash}"));
+        }
+        caps
+    }
+}
+
 /// Node capabilities for P2P participation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeCapabilities {
@@ -35,6 +103,8 @@ pub struct NodeCapabilities {
     pub serve_family: bool,
     /// Willing to serve anyone (network mode)
     pub serve_public: bool,
+    /// Delivery capabilities — what this peer can serve and how
+    pub delivery: DeliveryCapabilities,
 }
 
 impl Default for NodeCapabilities {
@@ -46,6 +116,7 @@ impl Default for NodeCapabilities {
             cache_budget_bytes: 512 * 1024 * 1024,      // 512 MB default
             serve_family: false,
             serve_public: false,
+            delivery: DeliveryCapabilities::default(),
         }
     }
 }
@@ -60,6 +131,12 @@ impl NodeCapabilities {
             cache_budget_bytes: 200 * 1024 * 1024,      // 200 MB
             serve_family: false,
             serve_public: false,
+            delivery: DeliveryCapabilities {
+                serves_extracted: false,
+                serves_compressed: true,
+                ready_content: vec![],
+                cache_tier: CacheTier::BlobOnly,
+            },
         }
     }
 
@@ -72,6 +149,12 @@ impl NodeCapabilities {
             cache_budget_bytes: 2 * 1024 * 1024 * 1024,  // 2 GB
             serve_family: true,
             serve_public: false,
+            delivery: DeliveryCapabilities {
+                serves_extracted: true,
+                serves_compressed: true,
+                ready_content: vec![],
+                cache_tier: CacheTier::Extraction,
+            },
         }
     }
 
@@ -84,6 +167,12 @@ impl NodeCapabilities {
             cache_budget_bytes: 10 * 1024 * 1024 * 1024, // 10 GB
             serve_family: true,
             serve_public: true,
+            delivery: DeliveryCapabilities {
+                serves_extracted: true,
+                serves_compressed: true,
+                ready_content: vec![],
+                cache_tier: CacheTier::Extraction,
+            },
         }
     }
 
@@ -282,6 +371,74 @@ mod tests {
         let json = caps.to_json().unwrap();
         assert!(json.contains("\"storage\":true"));
         assert!(json.contains("\"always_on\":false"));
+        // delivery should be included in serialized output
+        assert!(json.contains("\"delivery\""));
+    }
+
+    #[test]
+    fn test_delivery_capabilities_presets() {
+        let laptop = NodeCapabilities::laptop();
+        assert!(!laptop.delivery.serves_extracted);
+        assert!(laptop.delivery.serves_compressed);
+        assert!(laptop.delivery.ready_content.is_empty());
+        assert_eq!(laptop.delivery.cache_tier, CacheTier::BlobOnly);
+
+        let home = NodeCapabilities::home_node();
+        assert!(home.delivery.serves_extracted);
+        assert!(home.delivery.serves_compressed);
+        assert!(home.delivery.ready_content.is_empty());
+        assert_eq!(home.delivery.cache_tier, CacheTier::Extraction);
+
+        let network = NodeCapabilities::network_node();
+        assert!(network.delivery.serves_extracted);
+        assert!(network.delivery.serves_compressed);
+        assert!(network.delivery.ready_content.is_empty());
+        assert_eq!(network.delivery.cache_tier, CacheTier::Extraction);
+    }
+
+    #[test]
+    fn test_delivery_default_is_blob_only() {
+        let delivery = DeliveryCapabilities::default();
+        assert!(!delivery.serves_extracted);
+        assert!(!delivery.serves_compressed);
+        assert!(delivery.ready_content.is_empty());
+        assert_eq!(delivery.cache_tier, CacheTier::BlobOnly);
+    }
+
+    #[test]
+    fn test_capability_strings_extracted_peer() {
+        let delivery = DeliveryCapabilities {
+            serves_extracted: true,
+            serves_compressed: true,
+            ready_content: vec![],
+            cache_tier: CacheTier::Extraction,
+        };
+        let strings = delivery.to_capability_strings();
+        assert!(strings.contains(&"serves_extracted".to_string()));
+        assert!(strings.contains(&"serves_compressed".to_string()));
+        assert!(strings.contains(&"cache_tier:extraction".to_string()));
+    }
+
+    #[test]
+    fn test_capability_strings_with_ready_content() {
+        let delivery = DeliveryCapabilities {
+            serves_extracted: true,
+            serves_compressed: false,
+            ready_content: vec!["bafkrei_abc123".to_string(), "bafkrei_def456".to_string()],
+            cache_tier: CacheTier::Projection,
+        };
+        let strings = delivery.to_capability_strings();
+        assert!(strings.contains(&"warm:bafkrei_abc123".to_string()));
+        assert!(strings.contains(&"warm:bafkrei_def456".to_string()));
+        assert!(strings.contains(&"cache_tier:projection".to_string()));
+        assert!(!strings.contains(&"serves_compressed".to_string()));
+    }
+
+    #[test]
+    fn test_capability_strings_blob_only() {
+        let delivery = DeliveryCapabilities::default();
+        let strings = delivery.to_capability_strings();
+        assert_eq!(strings, vec!["cache_tier:blob-only"]);
     }
 
     #[cfg(feature = "p2p")]
