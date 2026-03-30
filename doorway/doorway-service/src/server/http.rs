@@ -1278,12 +1278,12 @@ async fn handle_request(
 
         // Account API routes — handled by dynamic registry fallback below
 
-        // HTML5 App serving routes (proxied to elohim-storage)
+        // HTML5 App serving routes (projection cache → elohim-storage fallback)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
-            debug!(path = %p, "Forwarding app request to elohim-storage");
+            debug!(path = %p, "Handling app request (projection cache)");
             return Ok(to_boxed(
-                routes::handle_app_request(req, state.args.storage_url.clone(), p).await,
+                routes::handle_app_request(req, Arc::clone(&state), p).await,
             ));
         }
 
