@@ -61,7 +61,7 @@ export interface ScoredPeer {
  * extractIpFromMultiaddr('/ip6/::1/tcp/9876') // ''
  */
 export function extractIpFromMultiaddr(addr: string): string {
-  const match = addr.match(/\/ip4\/([^/]+)/);
+  const match = /\/ip4\/([^/]+)/.exec(addr);
   return match ? match[1] : '';
 }
 
@@ -120,10 +120,7 @@ export function scorePeer(peer: DeliveryPeer, contentHash: string): ScoredPeer {
  * Returns peers sorted by score descending, filtered to only those
  * with a reachable baseUrl (i.e., have a parseable IPv4 multiaddr).
  */
-export function scorePeersForContent(
-  peers: DeliveryPeer[],
-  contentHash: string
-): ScoredPeer[] {
+export function scorePeersForContent(peers: DeliveryPeer[], contentHash: string): ScoredPeer[] {
   return peers
     .map(p => scorePeer(p, contentHash))
     .filter(p => p.baseUrl !== '')
