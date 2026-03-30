@@ -49,7 +49,7 @@ pub mod tiered;
 pub use access_control::{
     can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext,
 };
-pub use app_file_cache::{AppFileCacheService, CachedFile};
+pub use app_file_cache::{spawn_app_cache_invalidation_task, AppFileCacheService, CachedFile};
 pub use delivery_relay::{CoalescedRequest, DeliveryRelay, DeliveryRelayConfig};
 pub use keys::CacheKey;
 pub use reach_aware_serving::{

@@ -597,6 +597,17 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Start app file cache invalidation hook — watches projection store updates
+    // for html5-app content changes and invalidates cached files + blob hash index.
+    if let (Some(ref projection_store), Some(ref app_cache)) =
+        (&state.projection, &state.app_file_cache)
+    {
+        let update_rx = projection_store.subscribe();
+        let _invalidation_handle =
+            doorway::cache::spawn_app_cache_invalidation_task(Arc::clone(app_cache), update_rx);
+        info!("App file cache invalidation hook started");
+    }
+
     // Warm projection cache from existing storage content (background, delayed)
     // Signals only deliver FUTURE writes — existing content needs explicit fetch.
     if args.projection_writer && !peer_urls.is_empty() {
