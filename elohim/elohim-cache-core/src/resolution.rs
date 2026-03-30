@@ -32,9 +32,9 @@
 //! // { source_id: 'indexeddb', tier: 0, url: null, cached: true }
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 use crate::current_time_ms;
 
@@ -207,8 +207,8 @@ impl ContentResolver {
         // Remove existing source with same ID
         self.sources.retain(|s| s.id != id);
 
-        let content_types: Vec<String> = serde_json::from_str(content_types_json)
-            .unwrap_or_default();
+        let content_types: Vec<String> =
+            serde_json::from_str(content_types_json).unwrap_or_default();
 
         self.sources.push(ContentSource {
             id,
@@ -220,11 +220,9 @@ impl ContentResolver {
         });
 
         // Keep sorted by (tier asc, priority desc)
-        self.sources.sort_by(|a, b| {
-            match a.tier.cmp(&b.tier) {
-                std::cmp::Ordering::Equal => b.priority.cmp(&a.priority),
-                other => other,
-            }
+        self.sources.sort_by(|a, b| match a.tier.cmp(&b.tier) {
+            std::cmp::Ordering::Equal => b.priority.cmp(&a.priority),
+            other => other,
         });
     }
 
@@ -315,7 +313,11 @@ impl ContentResolver {
             sorted_locs.sort_by(|a, b| b.1.cmp(&a.1));
 
             for (source_id, _last_seen) in sorted_locs {
-                if let Some(source) = self.sources.iter().find(|s| s.id == source_id && s.available) {
+                if let Some(source) = self
+                    .sources
+                    .iter()
+                    .find(|s| s.id == source_id && s.available)
+                {
                     self.cache_hit_count += 1;
                     return self.build_result(source, content_type, content_id, true);
                 }
@@ -325,7 +327,12 @@ impl ContentResolver {
         // 2. Find first available source that supports this content type
         // "*" is a wildcard — matches any content type (used by doorway's type-agnostic projection)
         for source in &self.sources {
-            if source.available && source.content_types.iter().any(|t| t == "*" || t == content_type) {
+            if source.available
+                && source
+                    .content_types
+                    .iter()
+                    .any(|t| t == "*" || t == content_type)
+            {
                 return self.build_result(source, content_type, content_id, false);
             }
         }
@@ -335,7 +342,8 @@ impl ContentResolver {
             error: "no_source_available".to_string(),
             content_type: content_type.to_string(),
             content_id: content_id.to_string(),
-        }).unwrap_or_else(|_| r#"{"error":"serialization_failed"}"#.to_string())
+        })
+        .unwrap_or_else(|_| r#"{"error":"serialization_failed"}"#.to_string())
     }
 
     /// Get ordered list of sources to try for a content type.
@@ -349,15 +357,23 @@ impl ContentResolver {
     /// ```
     #[wasm_bindgen]
     pub fn get_resolution_chain(&self, content_type: &str) -> String {
-        let chain: Vec<serde_json::Value> = self.sources
+        let chain: Vec<serde_json::Value> = self
+            .sources
             .iter()
-            .filter(|s| s.available && s.content_types.iter().any(|t| t == "*" || t == content_type))
-            .map(|s| serde_json::json!({
-                "id": s.id,
-                "tier": s.tier as u8,
-                "priority": s.priority,
-                "url": s.base_url,
-            }))
+            .filter(|s| {
+                s.available
+                    && s.content_types
+                        .iter()
+                        .any(|t| t == "*" || t == content_type)
+            })
+            .map(|s| {
+                serde_json::json!({
+                    "id": s.id,
+                    "tier": s.tier as u8,
+                    "priority": s.priority,
+                    "url": s.base_url,
+                })
+            })
             .collect();
 
         serde_json::to_string(&chain).unwrap_or_else(|_| "[]".to_string())
@@ -382,12 +398,15 @@ impl ContentResolver {
         entry_point: String,
         fallback_url: Option<String>,
     ) {
-        self.app_registry.insert(app_id, AppRegistration {
-            blob_hash,
-            entry_point,
-            fallback_url,
-            registered_at: current_time_ms(),
-        });
+        self.app_registry.insert(
+            app_id,
+            AppRegistration {
+                blob_hash,
+                entry_point,
+                fallback_url,
+                registered_at: current_time_ms(),
+            },
+        );
     }
 
     /// Unregister an HTML5 app.
@@ -418,7 +437,8 @@ impl ContentResolver {
     /// Returns the URL to load in an iframe, or empty string if not resolvable.
     #[wasm_bindgen]
     pub fn resolve_app_url(&self, app_id: &str, path: Option<String>) -> String {
-        let entry_point = self.app_registry
+        let entry_point = self
+            .app_registry
             .get(app_id)
             .map(|r| r.entry_point.clone())
             .unwrap_or_else(|| "index.html".to_string());
@@ -461,9 +481,12 @@ impl ContentResolver {
         let url = self.resolve_app_url(app_id, path);
         let reg = self.app_registry.get(app_id);
 
-        let source_id = self.sources
+        let source_id = self
+            .sources
             .iter()
-            .find(|s| s.available && s.content_types.iter().any(|t| t == "app") && s.base_url.is_some())
+            .find(|s| {
+                s.available && s.content_types.iter().any(|t| t == "app") && s.base_url.is_some()
+            })
             .map(|s| s.id.clone());
 
         serde_json::to_string(&serde_json::json!({
@@ -471,7 +494,8 @@ impl ContentResolver {
             "source_id": source_id,
             "blob_hash": reg.map(|r| &r.blob_hash),
             "fallback_url": reg.and_then(|r| r.fallback_url.as_ref()),
-        })).unwrap_or_else(|_| "{}".to_string())
+        }))
+        .unwrap_or_else(|_| "{}".to_string())
     }
 
     // =========================================================================
@@ -494,7 +518,8 @@ impl ContentResolver {
             "source_count": self.sources.len(),
             "indexed_content_count": self.content_index.len(),
             "registered_app_count": self.app_registry.len(),
-        })).unwrap_or_else(|_| "{}".to_string())
+        }))
+        .unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Reset statistics.
@@ -548,7 +573,8 @@ impl ContentResolver {
             tier: source.tier as u8,
             url,
             cached,
-        }).unwrap_or_else(|_| r#"{"error":"serialization_failed"}"#.to_string())
+        })
+        .unwrap_or_else(|_| r#"{"error":"serialization_failed"}"#.to_string())
     }
 }
 
@@ -607,8 +633,20 @@ mod tests {
     fn test_resolve_order() {
         let mut resolver = ContentResolver::new();
 
-        resolver.register_source("local".into(), SourceTier::Local, 100, r#"["content"]"#, None);
-        resolver.register_source("projection".into(), SourceTier::Projection, 80, r#"["content"]"#, None);
+        resolver.register_source(
+            "local".into(),
+            SourceTier::Local,
+            100,
+            r#"["content"]"#,
+            None,
+        );
+        resolver.register_source(
+            "projection".into(),
+            SourceTier::Projection,
+            80,
+            r#"["content"]"#,
+            None,
+        );
 
         let result = resolver.resolve("content", "test-id");
         let parsed: ResolutionResult = serde_json::from_str(&result).unwrap();
@@ -623,8 +661,20 @@ mod tests {
     fn test_content_location_learning() {
         let mut resolver = ContentResolver::new();
 
-        resolver.register_source("local".into(), SourceTier::Local, 100, r#"["content"]"#, None);
-        resolver.register_source("projection".into(), SourceTier::Projection, 80, r#"["content"]"#, None);
+        resolver.register_source(
+            "local".into(),
+            SourceTier::Local,
+            100,
+            r#"["content"]"#,
+            None,
+        );
+        resolver.register_source(
+            "projection".into(),
+            SourceTier::Projection,
+            80,
+            r#"["content"]"#,
+            None,
+        );
 
         // First resolution - no cached location
         let result1 = resolver.resolve("content", "test-id");
@@ -645,8 +695,20 @@ mod tests {
     fn test_source_availability() {
         let mut resolver = ContentResolver::new();
 
-        resolver.register_source("local".into(), SourceTier::Local, 100, r#"["content"]"#, None);
-        resolver.register_source("projection".into(), SourceTier::Projection, 80, r#"["content"]"#, None);
+        resolver.register_source(
+            "local".into(),
+            SourceTier::Local,
+            100,
+            r#"["content"]"#,
+            None,
+        );
+        resolver.register_source(
+            "projection".into(),
+            SourceTier::Projection,
+            80,
+            r#"["content"]"#,
+            None,
+        );
 
         // Mark local as unavailable
         resolver.set_source_available("local", false);
@@ -678,11 +740,17 @@ mod tests {
         );
 
         let url = resolver.resolve_app_url("evolution-of-trust", None);
-        assert_eq!(url, "https://doorway.example.com/apps/evolution-of-trust/index.html");
+        assert_eq!(
+            url,
+            "https://doorway.example.com/apps/evolution-of-trust/index.html"
+        );
 
         // Test with custom path
         let url2 = resolver.resolve_app_url("evolution-of-trust", Some("js/main.js".into()));
-        assert_eq!(url2, "https://doorway.example.com/apps/evolution-of-trust/js/main.js");
+        assert_eq!(
+            url2,
+            "https://doorway.example.com/apps/evolution-of-trust/js/main.js"
+        );
     }
 
     #[test]
@@ -717,7 +785,13 @@ mod tests {
     fn test_stats() {
         let mut resolver = ContentResolver::new();
 
-        resolver.register_source("local".into(), SourceTier::Local, 100, r#"["content"]"#, None);
+        resolver.register_source(
+            "local".into(),
+            SourceTier::Local,
+            100,
+            r#"["content"]"#,
+            None,
+        );
 
         // Make some resolutions
         resolver.resolve("content", "id1");

@@ -29,9 +29,9 @@
 //! }
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 use crate::current_time_ms;
 
@@ -409,7 +409,8 @@ impl WriteBuffer {
                 has_batch: false,
                 batch: None,
                 remaining_count: 0,
-            }).unwrap_or_else(|_| r#"{"has_batch":false}"#.to_string());
+            })
+            .unwrap_or_else(|_| r#"{"has_batch":false}"#.to_string());
         };
 
         // Clean up dedup index for operations being flushed
@@ -438,7 +439,8 @@ impl WriteBuffer {
             has_batch: true,
             batch: Some(batch),
             remaining_count: self.total_queued(),
-        }).unwrap_or_else(|_| r#"{"has_batch":false}"#.to_string())
+        })
+        .unwrap_or_else(|_| r#"{"has_batch":false}"#.to_string())
     }
 
     // =========================================================================
@@ -479,8 +481,7 @@ impl WriteBuffer {
     /// Pass JSON array of failed operation IDs.
     #[wasm_bindgen]
     pub fn mark_operations_failed(&mut self, batch_id: &str, failed_op_ids_json: &str) {
-        let failed_ids: Vec<String> = serde_json::from_str(failed_op_ids_json)
-            .unwrap_or_default();
+        let failed_ids: Vec<String> = serde_json::from_str(failed_op_ids_json).unwrap_or_default();
 
         if let Some(batch) = self.in_flight.remove(batch_id) {
             for mut op in batch.operations {
@@ -505,8 +506,10 @@ impl WriteBuffer {
     /// Get total number of queued operations.
     #[wasm_bindgen]
     pub fn total_queued(&self) -> u32 {
-        (self.high_queue.len() + self.normal_queue.len() +
-         self.bulk_queue.len() + self.retry_queue.len()) as u32
+        (self.high_queue.len()
+            + self.normal_queue.len()
+            + self.bulk_queue.len()
+            + self.retry_queue.len()) as u32
     }
 
     /// Get number of in-flight batches (sent but not confirmed).
@@ -590,8 +593,7 @@ impl WriteBuffer {
     /// Use with drain_all() for graceful shutdown/restart.
     #[wasm_bindgen]
     pub fn restore(&mut self, operations_json: &str) {
-        let ops: Vec<WriteOperation> = serde_json::from_str(operations_json)
-            .unwrap_or_default();
+        let ops: Vec<WriteOperation> = serde_json::from_str(operations_json).unwrap_or_default();
 
         for op in ops {
             // Restore dedup index
@@ -647,9 +649,24 @@ mod tests {
         let mut buffer = WriteBuffer::new(10, 1000, 3);
 
         // Queue in reverse priority order
-        buffer.queue_write("bulk1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Bulk);
-        buffer.queue_write("normal1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
-        buffer.queue_write("high1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::High);
+        buffer.queue_write(
+            "bulk1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Bulk,
+        );
+        buffer.queue_write(
+            "normal1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
+        buffer.queue_write(
+            "high1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::High,
+        );
 
         // High priority should come out first
         let result: BatchResult = serde_json::from_str(&buffer.get_pending_batch()).unwrap();
@@ -721,7 +738,12 @@ mod tests {
     fn test_retry_logic() {
         let mut buffer = WriteBuffer::new(10, 1000, 2); // max 2 retries
 
-        buffer.queue_write("op1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
+        buffer.queue_write(
+            "op1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
 
         // Get batch
         let result: BatchResult = serde_json::from_str(&buffer.get_pending_batch()).unwrap();
@@ -759,28 +781,58 @@ mod tests {
 
         // Fill to 80%
         for i in 0..80 {
-            buffer.queue_write(format!("op{}", i), WriteOpType::CreateEntry, "{}".into(), WritePriority::Bulk);
+            buffer.queue_write(
+                format!("op{}", i),
+                WriteOpType::CreateEntry,
+                "{}".into(),
+                WritePriority::Bulk,
+            );
         }
 
         assert!(buffer.is_backpressured());
         assert_eq!(buffer.backpressure(), 80);
 
         // High priority should still be allowed
-        assert!(buffer.queue_write("high".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::High));
+        assert!(buffer.queue_write(
+            "high".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::High
+        ));
 
         // Bulk should be rejected when at max
         for i in 80..100 {
-            buffer.queue_write(format!("op{}", i), WriteOpType::CreateEntry, "{}".into(), WritePriority::Bulk);
+            buffer.queue_write(
+                format!("op{}", i),
+                WriteOpType::CreateEntry,
+                "{}".into(),
+                WritePriority::Bulk,
+            );
         }
-        assert!(!buffer.queue_write("rejected".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Bulk));
+        assert!(!buffer.queue_write(
+            "rejected".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Bulk
+        ));
     }
 
     #[test]
     fn test_drain_and_restore() {
         let mut buffer = WriteBuffer::new(10, 1000, 3);
 
-        buffer.queue_write("op1".into(), WriteOpType::CreateEntry, r#"{"a":1}"#.into(), WritePriority::Normal);
-        buffer.queue_write("op2".into(), WriteOpType::CreateLink, r#"{"b":2}"#.into(), WritePriority::Bulk);
+        buffer.queue_write(
+            "op1".into(),
+            WriteOpType::CreateEntry,
+            r#"{"a":1}"#.into(),
+            WritePriority::Normal,
+        );
+        buffer.queue_write(
+            "op2".into(),
+            WriteOpType::CreateLink,
+            r#"{"b":2}"#.into(),
+            WritePriority::Bulk,
+        );
 
         // Drain all
         let drained = buffer.drain_all();
@@ -803,7 +855,12 @@ mod tests {
         assert!(!buffer.should_flush());
 
         // High priority always triggers flush
-        buffer.queue_write("high".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::High);
+        buffer.queue_write(
+            "high".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::High,
+        );
         assert!(buffer.should_flush());
     }
 
@@ -811,8 +868,18 @@ mod tests {
     fn test_batch_commit() {
         let mut buffer = WriteBuffer::new(10, 1000, 3);
 
-        buffer.queue_write("op1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
-        buffer.queue_write("op2".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
+        buffer.queue_write(
+            "op1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
+        buffer.queue_write(
+            "op2".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
 
         let result: BatchResult = serde_json::from_str(&buffer.get_pending_batch()).unwrap();
         let batch_id = result.batch.unwrap().batch_id;
@@ -827,9 +894,24 @@ mod tests {
     fn test_partial_batch_failure() {
         let mut buffer = WriteBuffer::new(10, 1000, 3);
 
-        buffer.queue_write("op1".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
-        buffer.queue_write("op2".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
-        buffer.queue_write("op3".into(), WriteOpType::CreateEntry, "{}".into(), WritePriority::Normal);
+        buffer.queue_write(
+            "op1".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
+        buffer.queue_write(
+            "op2".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
+        buffer.queue_write(
+            "op3".into(),
+            WriteOpType::CreateEntry,
+            "{}".into(),
+            WritePriority::Normal,
+        );
 
         let result: BatchResult = serde_json::from_str(&buffer.get_pending_batch()).unwrap();
         let batch_id = result.batch.unwrap().batch_id;

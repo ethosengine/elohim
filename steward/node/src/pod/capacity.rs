@@ -255,7 +255,9 @@ mod tests {
         assert_eq!(ann.queue_depth, 3);
         assert!(ann.ready);
         // Should contain the original compute capability + delivery strings
-        assert!(ann.capabilities.contains(&"path-recommendation".to_string()));
+        assert!(ann
+            .capabilities
+            .contains(&"path-recommendation".to_string()));
         assert!(ann.capabilities.contains(&"serves_extracted".to_string()));
         assert!(ann.capabilities.contains(&"serves_compressed".to_string()));
         assert!(ann
@@ -281,7 +283,9 @@ mod tests {
         // Default delivery has serves_extracted=false, serves_compressed=false,
         // cache_tier=BlobOnly, empty ready_content.
         // Only cache_tier string is always emitted.
-        assert!(ann.capabilities.contains(&"content-safety-review".to_string()));
+        assert!(ann
+            .capabilities
+            .contains(&"content-safety-review".to_string()));
         assert!(ann
             .capabilities
             .contains(&"cache_tier:blob-only".to_string()));
@@ -302,20 +306,14 @@ mod tests {
             ready_content: vec!["hash-1".into(), "hash-2".into()],
             cache_tier: CacheTier::Projection,
         };
-        let ann = build_announcement_with_delivery(
-            "node-rt",
-            42,
-            2,
-            5,
-            &[],
-            true,
-            &delivery,
-        );
+        let ann = build_announcement_with_delivery("node-rt", 42, 2, 5, &[], true, &delivery);
         let encoded = ann.encode().unwrap();
         let decoded = CapacityAnnouncement::decode(&encoded).unwrap();
 
         assert_eq!(decoded.node_id, "node-rt");
-        assert!(decoded.capabilities.contains(&"serves_extracted".to_string()));
+        assert!(decoded
+            .capabilities
+            .contains(&"serves_extracted".to_string()));
         assert!(decoded
             .capabilities
             .contains(&"cache_tier:projection".to_string()));

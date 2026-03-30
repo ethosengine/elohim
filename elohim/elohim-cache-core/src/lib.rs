@@ -19,10 +19,13 @@ pub mod write_buffer;
 pub mod extraction;
 
 // Re-export resolution types for convenience
-pub use resolution::{ContentResolver, SourceTier, ResolutionResult, ResolutionError};
+pub use resolution::{ContentResolver, ResolutionError, ResolutionResult, SourceTier};
 
 // Re-export write buffer types for convenience
-pub use write_buffer::{WriteBuffer, WritePriority, WriteOpType, WriteBatch, WriteBufferStats, WriteOperation, BatchResult};
+pub use write_buffer::{
+    BatchResult, WriteBatch, WriteBuffer, WriteBufferStats, WriteOpType, WriteOperation,
+    WritePriority,
+};
 
 use std::collections::{BTreeMap, HashMap};
 use wasm_bindgen::prelude::*;
@@ -766,10 +769,10 @@ pub fn calculate_priority(
 
     // Bandwidth bonus
     score += match bandwidth_class {
-        4 => 20,  // Ultra
-        3 => 10,  // High
-        2 => 5,   // Medium
-        1 => -5,  // Low
+        4 => 20, // Ultra
+        3 => 10, // High
+        2 => 5,  // Medium
+        1 => -5, // Low
         _ => 0,
     };
 
@@ -860,7 +863,14 @@ mod tests {
 
         // Fill cache
         for i in 0..10 {
-            cache.put(format!("item-{}", i), 100, 7, "test".into(), "gov".into(), i);
+            cache.put(
+                format!("item-{}", i),
+                100,
+                7,
+                "test".into(),
+                "gov".into(),
+                i,
+            );
         }
 
         // Should have evicted to stay under 500 bytes

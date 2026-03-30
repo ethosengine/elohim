@@ -5,11 +5,11 @@
 //! - Budget enforcement (evict LRA apps when over budget)
 //! - Hash-based invalidation (stale extractions auto-evict)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tokio::sync::{broadcast, RwLock};
-use serde::{Deserialize, Serialize};
 
 use super::backend::CacheBackend;
 use super::CacheError;
@@ -31,9 +31,15 @@ pub struct ExtractionCacheConfig {
     pub cache_dir: PathBuf,
 }
 
-fn default_enabled() -> bool { true }
-fn default_budget() -> u64 { 512 * 1024 * 1024 } // 512 MB
-fn default_ttl() -> u64 { 3600 } // 1 hour
+fn default_enabled() -> bool {
+    true
+}
+fn default_budget() -> u64 {
+    512 * 1024 * 1024
+} // 512 MB
+fn default_ttl() -> u64 {
+    3600
+} // 1 hour
 
 impl Default for ExtractionCacheConfig {
     fn default() -> Self {
@@ -124,9 +130,7 @@ impl ExtractionCache {
     pub async fn is_current(&self, app_id: &str, blob_hash: &str) -> bool {
         let index = self.index.read().await;
         match index.get(app_id) {
-            Some(entry) => {
-                entry.blob_hash == blob_hash && !self.is_expired(entry)
-            }
+            Some(entry) => entry.blob_hash == blob_hash && !self.is_expired(entry),
             None => false,
         }
     }
@@ -194,12 +198,15 @@ impl ExtractionCache {
         // Update index
         let now = now_secs();
         let mut index = self.index.write().await;
-        index.insert(app_id.to_string(), AppCacheEntry {
-            blob_hash: blob_hash.to_string(),
-            extracted_at: now,
-            last_accessed: now,
-            total_size,
-        });
+        index.insert(
+            app_id.to_string(),
+            AppCacheEntry {
+                blob_hash: blob_hash.to_string(),
+                extracted_at: now,
+                last_accessed: now,
+                total_size,
+            },
+        );
 
         Ok(())
     }
@@ -311,8 +318,8 @@ fn now_secs() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::disk::DiskBackend;
+    use super::*;
 
     async fn test_cache(ttl: u64, budget: u64) -> (ExtractionCache, tempfile::TempDir) {
         let tmp = tempfile::tempdir().unwrap();
@@ -337,7 +344,10 @@ mod tests {
     #[tokio::test]
     async fn test_put_and_get_file() {
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-abc", sample_files())
+            .await
+            .unwrap();
 
         let html = cache.get_file("app1", "index.html").await;
         assert_eq!(html, Some(b"<html>hello</html>".to_vec()));
@@ -355,7 +365,10 @@ mod tests {
     #[tokio::test]
     async fn test_is_current_with_matching_hash() {
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-abc", sample_files())
+            .await
+            .unwrap();
 
         assert!(cache.is_current("app1", "hash-abc").await);
         assert!(!cache.is_current("app1", "hash-different").await);
@@ -365,7 +378,10 @@ mod tests {
     #[tokio::test]
     async fn test_evict_app() {
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-abc", sample_files())
+            .await
+            .unwrap();
 
         cache.evict_app("app1").await.unwrap();
         assert_eq!(cache.get_file("app1", "index.html").await, None);
@@ -375,7 +391,10 @@ mod tests {
     #[tokio::test]
     async fn test_hash_mismatch_triggers_re_extraction() {
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-v1", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-v1", sample_files())
+            .await
+            .unwrap();
 
         // Simulate re-seed with new hash
         assert!(!cache.is_current("app1", "hash-v2").await);
@@ -385,7 +404,10 @@ mod tests {
         cache.put_app("app1", "hash-v2", new_files).await.unwrap();
 
         assert!(cache.is_current("app1", "hash-v2").await);
-        assert_eq!(cache.get_file("app1", "index.html").await, Some(b"<html>v2</html>".to_vec()));
+        assert_eq!(
+            cache.get_file("app1", "index.html").await,
+            Some(b"<html>v2</html>".to_vec())
+        );
     }
 
     #[tokio::test]
@@ -421,7 +443,10 @@ mod tests {
     async fn test_ttl_expiry() {
         // TTL of 1 second
         let (cache, _tmp) = test_cache(1, 1024 * 1024).await;
-        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-abc", sample_files())
+            .await
+            .unwrap();
 
         // Force the entry to look old by backdating last_accessed
         {
@@ -442,7 +467,10 @@ mod tests {
     async fn test_ttl_not_expired() {
         // TTL of 3600 seconds — entries stay alive
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-abc", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-abc", sample_files())
+            .await
+            .unwrap();
 
         // Should still be current
         assert!(cache.is_current("app1", "hash-abc").await);
@@ -459,8 +487,14 @@ mod tests {
     #[tokio::test]
     async fn test_ready_content_hashes_returns_warm_entries() {
         let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
-        cache.put_app("app1", "hash-aaa", sample_files()).await.unwrap();
-        cache.put_app("app2", "hash-bbb", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-aaa", sample_files())
+            .await
+            .unwrap();
+        cache
+            .put_app("app2", "hash-bbb", sample_files())
+            .await
+            .unwrap();
 
         let mut hashes = cache.ready_content_hashes().await;
         hashes.sort();
@@ -470,8 +504,14 @@ mod tests {
     #[tokio::test]
     async fn test_ready_content_hashes_excludes_expired() {
         let (cache, _tmp) = test_cache(1, 1024 * 1024).await;
-        cache.put_app("app1", "hash-aaa", sample_files()).await.unwrap();
-        cache.put_app("app2", "hash-bbb", sample_files()).await.unwrap();
+        cache
+            .put_app("app1", "hash-aaa", sample_files())
+            .await
+            .unwrap();
+        cache
+            .put_app("app2", "hash-bbb", sample_files())
+            .await
+            .unwrap();
 
         // Backdate app1 so it expires (same pattern as test_ttl_expiry)
         {

@@ -1,10 +1,10 @@
 //! DiskBackend — filesystem-backed cache storage
 
+use super::backend::CacheBackend;
+use super::CacheError;
 use async_trait::async_trait;
 use std::path::PathBuf;
 use tokio::fs;
-use super::backend::CacheBackend;
-use super::CacheError;
 
 /// Filesystem-backed cache storage.
 pub struct DiskBackend {
@@ -127,7 +127,10 @@ mod tests {
     #[tokio::test]
     async fn test_put_and_get() {
         let (backend, _tmp) = temp_backend().await;
-        let is_new = backend.put("app1/index.html", b"<html>hello</html>".to_vec()).await.unwrap();
+        let is_new = backend
+            .put("app1/index.html", b"<html>hello</html>".to_vec())
+            .await
+            .unwrap();
         assert!(is_new);
         let data = backend.get("app1/index.html").await.unwrap();
         assert_eq!(data, Some(b"<html>hello</html>".to_vec()));
@@ -142,16 +145,28 @@ mod tests {
     #[tokio::test]
     async fn test_put_overwrite_returns_false() {
         let (backend, _tmp) = temp_backend().await;
-        backend.put("app1/index.html", b"v1".to_vec()).await.unwrap();
-        let is_new = backend.put("app1/index.html", b"v2".to_vec()).await.unwrap();
+        backend
+            .put("app1/index.html", b"v1".to_vec())
+            .await
+            .unwrap();
+        let is_new = backend
+            .put("app1/index.html", b"v2".to_vec())
+            .await
+            .unwrap();
         assert!(!is_new);
-        assert_eq!(backend.get("app1/index.html").await.unwrap(), Some(b"v2".to_vec()));
+        assert_eq!(
+            backend.get("app1/index.html").await.unwrap(),
+            Some(b"v2".to_vec())
+        );
     }
 
     #[tokio::test]
     async fn test_delete() {
         let (backend, _tmp) = temp_backend().await;
-        backend.put("app1/style.css", b"body{}".to_vec()).await.unwrap();
+        backend
+            .put("app1/style.css", b"body{}".to_vec())
+            .await
+            .unwrap();
         assert!(backend.delete("app1/style.css").await.unwrap());
         assert!(!backend.delete("app1/style.css").await.unwrap());
         assert_eq!(backend.get("app1/style.css").await.unwrap(), None);
@@ -160,22 +175,40 @@ mod tests {
     #[tokio::test]
     async fn test_delete_prefix() {
         let (backend, _tmp) = temp_backend().await;
-        backend.put("app1/index.html", b"html".to_vec()).await.unwrap();
-        backend.put("app1/js/main.js", b"js".to_vec()).await.unwrap();
-        backend.put("app1/css/style.css", b"css".to_vec()).await.unwrap();
-        backend.put("app2/index.html", b"other".to_vec()).await.unwrap();
+        backend
+            .put("app1/index.html", b"html".to_vec())
+            .await
+            .unwrap();
+        backend
+            .put("app1/js/main.js", b"js".to_vec())
+            .await
+            .unwrap();
+        backend
+            .put("app1/css/style.css", b"css".to_vec())
+            .await
+            .unwrap();
+        backend
+            .put("app2/index.html", b"other".to_vec())
+            .await
+            .unwrap();
 
         let deleted = backend.delete_prefix("app1").await.unwrap();
         assert_eq!(deleted, 3);
         assert_eq!(backend.get("app1/index.html").await.unwrap(), None);
-        assert_eq!(backend.get("app2/index.html").await.unwrap(), Some(b"other".to_vec()));
+        assert_eq!(
+            backend.get("app2/index.html").await.unwrap(),
+            Some(b"other".to_vec())
+        );
     }
 
     #[tokio::test]
     async fn test_exists() {
         let (backend, _tmp) = temp_backend().await;
         assert!(!backend.exists("app1/index.html").await.unwrap());
-        backend.put("app1/index.html", b"html".to_vec()).await.unwrap();
+        backend
+            .put("app1/index.html", b"html".to_vec())
+            .await
+            .unwrap();
         assert!(backend.exists("app1/index.html").await.unwrap());
     }
 
@@ -190,7 +223,13 @@ mod tests {
     #[tokio::test]
     async fn test_path_traversal_rejected() {
         let (backend, _tmp) = temp_backend().await;
-        assert!(matches!(backend.put("../escape/file", b"bad".to_vec()).await, Err(CacheError::InvalidKey(_))));
-        assert!(matches!(backend.get("../../etc/passwd").await, Err(CacheError::InvalidKey(_))));
+        assert!(matches!(
+            backend.put("../escape/file", b"bad".to_vec()).await,
+            Err(CacheError::InvalidKey(_))
+        ));
+        assert!(matches!(
+            backend.get("../../etc/passwd").await,
+            Err(CacheError::InvalidKey(_))
+        ));
     }
 }

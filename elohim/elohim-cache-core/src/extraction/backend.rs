@@ -1,7 +1,7 @@
 //! CacheBackend trait — pluggable storage for extraction cache
 
-use async_trait::async_trait;
 use super::CacheError;
+use async_trait::async_trait;
 
 /// Pluggable storage backend for cached content.
 ///

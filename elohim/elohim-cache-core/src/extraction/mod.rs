@@ -3,11 +3,13 @@
 //! Requires the `native` feature (not available in WASM builds).
 
 mod backend;
-mod disk;
 mod cache;
+mod disk;
 mod error;
 
 pub use backend::CacheBackend;
+pub use cache::{
+    AppCacheEntry, ExtractionCache, ExtractionCacheConfig, ExtractionCacheStats, ExtractionGuard,
+};
 pub use disk::DiskBackend;
-pub use cache::{ExtractionCache, ExtractionCacheConfig, AppCacheEntry, ExtractionCacheStats, ExtractionGuard};
 pub use error::CacheError;
