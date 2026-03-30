@@ -18,11 +18,15 @@
 //! TTL index on `last_accessed` garbage-collects stale entries after 24h.
 //! `invalidate_app()` provides immediate bulk purge when needed.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use bson::{doc, DateTime};
 use dashmap::DashMap;
+use futures_util::TryStreamExt;
 use mongodb::options::ReplaceOptions;
-use tokio::sync::broadcast;
-use tracing::{debug, error, warn};
+use tokio::sync::{broadcast, RwLock};
+use tracing::{debug, error, info, warn};
 
 use crate::db::mongo::MongoClient;
 use crate::db::schemas::{AppFileCacheDoc, APP_FILE_CACHE_COLLECTION};
@@ -50,6 +54,9 @@ pub struct CachedFile {
 ///
 /// Designed for concurrent access from the HTTP handler layer — all methods
 /// are safe to call from multiple tokio tasks simultaneously.
+/// Collection name for projected entries in MongoDB (the projection store).
+const PROJECTED_ENTRIES_COLLECTION: &str = "projected_entries";
+
 pub struct AppFileCacheService {
     /// MongoDB client for persistent cache storage
     mongo: MongoClient,
@@ -61,6 +68,10 @@ pub struct AppFileCacheService {
     /// requests arrive for the same file before the first fetch completes.
     /// Key format: "apps:{app_id}:{file_path}"
     in_flight: DashMap<String, broadcast::Sender<Option<CachedFile>>>,
+
+    /// app_id -> blob_hash mapping (populated from content projection).
+    /// Used to construct cache keys for HTML5 app file lookups.
+    app_index: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl AppFileCacheService {
@@ -74,6 +85,7 @@ impl AppFileCacheService {
             mongo: mongo.clone(),
             agreement_id,
             in_flight: DashMap::new(),
+            app_index: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -202,6 +214,123 @@ impl AppFileCacheService {
         }
     }
 
+    // =========================================================================
+    // App Index — blob hash resolution for HTML5 apps
+    // =========================================================================
+
+    /// Load the app index from the projection store (MongoDB).
+    ///
+    /// Queries `projected_entries` for Content documents with
+    /// `contentFormat == "html5-app"` and builds a HashMap of
+    /// `app_id -> blob_hash`. Called at startup and can be called
+    /// to refresh the entire index.
+    pub async fn load_app_index(&self) {
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
+
+        // Query for Content documents where data.contentFormat == "html5-app"
+        let filter = doc! {
+            "doc_type": "Content",
+            "data.contentFormat": "html5-app",
+            "metadata.is_deleted": { "$ne": true },
+        };
+
+        let mut cursor = match collection.find(filter).await {
+            Ok(cursor) => cursor,
+            Err(e) => {
+                warn!(error = %e, "Failed to query projected_entries for app index");
+                return;
+            }
+        };
+
+        let mut index = HashMap::new();
+        let mut count = 0u32;
+
+        while let Ok(Some(doc)) = cursor.try_next().await {
+            // Extract app_id and blob_hash from the data field
+            if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
+                let app_id = data
+                    .get_str("appId")
+                    .ok()
+                    .or_else(|| data.get_str("id").ok());
+                let blob_hash = data.get_str("blobHash").ok();
+
+                if let (Some(app_id), Some(blob_hash)) = (app_id, blob_hash) {
+                    if !app_id.is_empty() && !blob_hash.is_empty() {
+                        index.insert(app_id.to_string(), blob_hash.to_string());
+                        count += 1;
+                    }
+                }
+            }
+        }
+
+        let mut locked = self.app_index.write().await;
+        *locked = index;
+
+        info!(count = count, "App index loaded from projection store");
+    }
+
+    /// Resolve the current blob_hash for an app_id.
+    ///
+    /// Checks the in-memory index first. On miss, performs a lazy
+    /// single-document query against MongoDB and updates the index
+    /// if found.
+    pub async fn resolve_blob_hash(&self, app_id: &str) -> Option<String> {
+        // Fast path: check index
+        {
+            let index = self.app_index.read().await;
+            if let Some(hash) = index.get(app_id) {
+                return Some(hash.clone());
+            }
+        }
+
+        // Slow path: lazy load from MongoDB for this specific app
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
+
+        let filter = doc! {
+            "doc_type": "Content",
+            "data.contentFormat": "html5-app",
+            "$or": [
+                { "data.appId": app_id },
+                { "data.id": app_id },
+            ],
+            "metadata.is_deleted": { "$ne": true },
+        };
+
+        match collection.find_one(filter).await {
+            Ok(Some(doc)) => {
+                if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
+                    if let Ok(blob_hash) = data.get_str("blobHash") {
+                        if !blob_hash.is_empty() {
+                            // Update index
+                            let mut index = self.app_index.write().await;
+                            index.insert(app_id.to_string(), blob_hash.to_string());
+                            return Some(blob_hash.to_string());
+                        }
+                    }
+                }
+                None
+            }
+            Ok(None) => None,
+            Err(e) => {
+                warn!(app_id = %app_id, error = %e, "Failed to resolve blob_hash for app");
+                None
+            }
+        }
+    }
+
+    /// Remove an app_id from the index so the next request re-resolves
+    /// with a fresh blob_hash from MongoDB.
+    ///
+    /// Called by the invalidation hook when a content update signal
+    /// arrives for an html5-app.
+    pub async fn refresh_app(&self, app_id: &str) {
+        let mut index = self.app_index.write().await;
+        index.remove(app_id);
+        debug!(app_id = %app_id, "Removed app from index (will re-resolve on next request)");
+    }
+
     /// Begin an in-flight fetch for a file.
     ///
     /// If another task is already fetching this file, returns
@@ -252,6 +381,82 @@ impl AppFileCacheService {
 }
 
 // =============================================================================
+// Projection Invalidation Hook
+// =============================================================================
+
+/// Extract the `appId` from a projected content document's data field,
+/// but only if the content format is `html5-app`.
+///
+/// Returns `None` for non-app content or if required fields are missing.
+fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) -> Option<String> {
+    if doc.doc_type != "Content" {
+        return None;
+    }
+
+    let data = &doc.data;
+    let format = data.get("contentFormat").and_then(|v| v.as_str())?;
+    if format != "html5-app" {
+        return None;
+    }
+
+    // Prefer appId, fall back to id
+    data.get("appId")
+        .and_then(|v| v.as_str())
+        .or_else(|| data.get("id").and_then(|v| v.as_str()))
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// Spawn a background task that watches the projection store's update channel
+/// for html5-app content changes and invalidates the app file cache accordingly.
+///
+/// When a content update signal arrives with `contentFormat == "html5-app"`:
+/// 1. `invalidate_app(app_id)` — clears all cached files for that app
+/// 2. `refresh_app(app_id)` — clears the blob hash index entry so the next
+///    request re-resolves with the fresh blob_hash
+pub fn spawn_app_cache_invalidation_task(
+    cache: Arc<AppFileCacheService>,
+    mut update_rx: tokio::sync::broadcast::Receiver<crate::projection::document::ProjectedDocument>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("App file cache invalidation hook started");
+
+        loop {
+            match update_rx.recv().await {
+                Ok(doc) => {
+                    if let Some(app_id) = extract_html5_app_id(&doc) {
+                        info!(
+                            app_id = %app_id,
+                            doc_id = %doc.doc_id,
+                            "HTML5 app content updated — invalidating cache"
+                        );
+                        let deleted = cache.invalidate_app(&app_id).await;
+                        cache.refresh_app(&app_id).await;
+                        debug!(
+                            app_id = %app_id,
+                            deleted_files = deleted,
+                            "App cache invalidation complete"
+                        );
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    warn!(
+                        lagged = n,
+                        "App cache invalidation hook lagged — some updates may not have triggered invalidation"
+                    );
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    info!(
+                        "Projection update channel closed — app cache invalidation hook stopping"
+                    );
+                    break;
+                }
+            }
+        }
+    })
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -282,5 +487,107 @@ mod tests {
     fn test_in_flight_key_with_nested_path() {
         let key = AppFileCacheService::in_flight_key("app-xyz", "js/vendor/lib.js");
         assert_eq!(key, "apps:app-xyz:js/vendor/lib.js");
+    }
+
+    // =========================================================================
+    // extract_html5_app_id tests
+    // =========================================================================
+
+    fn make_projected_doc(
+        doc_type: &str,
+        doc_id: &str,
+        data: serde_json::Value,
+    ) -> crate::projection::document::ProjectedDocument {
+        crate::projection::document::ProjectedDocument::new(
+            doc_type,
+            doc_id,
+            "test-action",
+            "test-author",
+            data,
+        )
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_with_app_id_field() {
+        let doc = make_projected_doc(
+            "Content",
+            "content-quiz-1",
+            serde_json::json!({
+                "contentFormat": "html5-app",
+                "appId": "quiz-1",
+                "blobHash": "sha256-abc"
+            }),
+        );
+        assert_eq!(extract_html5_app_id(&doc), Some("quiz-1".to_string()));
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_falls_back_to_id() {
+        let doc = make_projected_doc(
+            "Content",
+            "simulation-phys",
+            serde_json::json!({
+                "contentFormat": "html5-app",
+                "id": "simulation-phys",
+                "blobHash": "sha256-def"
+            }),
+        );
+        assert_eq!(
+            extract_html5_app_id(&doc),
+            Some("simulation-phys".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_ignores_non_html5_app() {
+        let doc = make_projected_doc(
+            "Content",
+            "concept-123",
+            serde_json::json!({
+                "contentFormat": "markdown",
+                "appId": "concept-123"
+            }),
+        );
+        assert_eq!(extract_html5_app_id(&doc), None);
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_ignores_non_content_doc_type() {
+        let doc = make_projected_doc(
+            "Human",
+            "human-abc",
+            serde_json::json!({
+                "contentFormat": "html5-app",
+                "appId": "quiz-1"
+            }),
+        );
+        assert_eq!(extract_html5_app_id(&doc), None);
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_returns_none_for_missing_format() {
+        let doc = make_projected_doc(
+            "Content",
+            "content-no-format",
+            serde_json::json!({
+                "appId": "quiz-1",
+                "blobHash": "sha256-abc"
+            }),
+        );
+        assert_eq!(extract_html5_app_id(&doc), None);
+    }
+
+    #[test]
+    fn test_extract_html5_app_id_returns_none_for_empty_app_id() {
+        let doc = make_projected_doc(
+            "Content",
+            "content-empty",
+            serde_json::json!({
+                "contentFormat": "html5-app",
+                "appId": "",
+                "id": ""
+            }),
+        );
+        assert_eq!(extract_html5_app_id(&doc), None);
     }
 }

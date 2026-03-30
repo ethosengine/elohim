@@ -40,8 +40,9 @@ const RETRY_BASE_DELAY_MS: u64 = 100;
 /// Handle app requests with cache-first resolution.
 ///
 /// 1. Parse path into app_id and file_path
-/// 2. If cache available AND blob_hash known: try cache → coalesce → fetch
-/// 3. Otherwise: fall through to direct proxy (BYPASS)
+/// 2. Resolve blob_hash from app index (projection store lookup)
+/// 3. If cache available AND blob_hash known: try cache → coalesce → fetch
+/// 4. Otherwise: fall through to direct proxy (BYPASS)
 pub async fn handle_app_request(
     _req: Request<Incoming>,
     state: Arc<AppState>,
@@ -77,12 +78,9 @@ pub async fn handle_app_request(
     };
 
     // Cache-first path: only active when cache service AND blob_hash are available.
-    // Blob hash resolution is wired in Task 5 — until then, this always falls through
-    // to the BYPASS path, which is the existing proxy behaviour.
+    // blob_hash is resolved from the app index (populated from projection store).
     if let Some(ref cache) = state.app_file_cache {
-        // TODO(Task 5): Look up blob_hash from app index.
-        // For now blob_hash is always None, so we always BYPASS.
-        let blob_hash: Option<String> = None;
+        let blob_hash = cache.resolve_blob_hash(app_id).await;
 
         if let Some(hash) = blob_hash {
             // --- Try cache lookup ---

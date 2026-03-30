@@ -430,6 +430,8 @@ impl AppState {
         // Initialize app file projection cache (MongoDB-backed)
         let app_file_cache = {
             let svc = AppFileCacheService::new(&mongo, "self-negotiated".to_string());
+            // Pre-populate the app index (app_id -> blob_hash) from projection store
+            svc.load_app_index().await;
             info!("App file projection cache initialized");
             Some(Arc::new(svc))
         };
