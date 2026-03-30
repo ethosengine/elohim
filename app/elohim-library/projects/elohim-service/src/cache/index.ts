@@ -89,6 +89,13 @@ export {
   type ResolverConfig,
   type ResolverInitResult,
 
+  // Delivery peer scoring
+  type DeliveryPeer,
+  type ScoredPeer,
+  scorePeer,
+  scorePeersForContent,
+  extractIpFromMultiaddr,
+
   // Factory functions
   createContentResolver,
   isWasmResolverAvailable,

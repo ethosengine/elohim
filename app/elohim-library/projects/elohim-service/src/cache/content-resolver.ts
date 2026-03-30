@@ -29,6 +29,108 @@
  */
 
 // ============================================================================
+// Delivery Peer Scoring
+// ============================================================================
+
+/** Peer information from storage's /api/v1/peers/delivery */
+export interface DeliveryPeer {
+  peerId: string;
+  multiaddrs: string[];
+  network: 'lan' | 'wan' | 'relay';
+  capabilities: string[];
+  lastSeen: number;
+  httpPort: number;
+}
+
+/** Scored peer ready for ranked delivery attempts */
+export interface ScoredPeer {
+  peerId: string;
+  baseUrl: string;
+  score: number;
+  network: string;
+  servesExtracted: boolean;
+  servesCompressed: boolean;
+  warm: boolean;
+}
+
+/**
+ * Extract an IPv4 address from a multiaddr string.
+ *
+ * @example
+ * extractIpFromMultiaddr('/ip4/192.168.1.50/tcp/9876') // '192.168.1.50'
+ * extractIpFromMultiaddr('/ip6/::1/tcp/9876') // ''
+ */
+export function extractIpFromMultiaddr(addr: string): string {
+  const match = addr.match(/\/ip4\/([^/]+)/);
+  return match ? match[1] : '';
+}
+
+/**
+ * Score a single delivery peer for a specific content hash.
+ *
+ * Scoring factors (descending weight):
+ * - Network proximity: LAN 1000, WAN 500, relay 100
+ * - Warm cache for this content: +300
+ * - Serves extracted files: +200
+ * - Serves compressed bundles: +50
+ * - Recency (lastSeen): <30s +100, <90s +50
+ */
+export function scorePeer(peer: DeliveryPeer, contentHash: string): ScoredPeer {
+  let score = 0;
+
+  // Network proximity (biggest factor)
+  if (peer.network === 'lan') score += 1000;
+  else if (peer.network === 'wan') score += 500;
+  else score += 100; // relay
+
+  const servesExtracted = peer.capabilities.includes('serves_extracted');
+  const servesCompressed = peer.capabilities.includes('serves_compressed');
+  const warm = peer.capabilities.includes(`warm:${contentHash}`);
+
+  // Delivery capability
+  if (servesExtracted) score += 200;
+  if (servesCompressed) score += 50;
+
+  // Warm cache for THIS content
+  if (warm) score += 300;
+
+  // Recency
+  const age = Date.now() - peer.lastSeen;
+  if (age < 30000) score += 100;
+  else if (age < 90000) score += 50;
+
+  // Construct baseUrl from multiaddr (extract IP) + httpPort
+  const ip = extractIpFromMultiaddr(peer.multiaddrs[0] || '');
+  const baseUrl = ip ? `http://${ip}:${peer.httpPort}` : '';
+
+  return {
+    peerId: peer.peerId,
+    baseUrl,
+    score,
+    network: peer.network,
+    servesExtracted,
+    servesCompressed,
+    warm,
+  };
+}
+
+/**
+ * Score and rank an array of delivery peers for a specific content hash.
+ *
+ * Returns peers sorted by score descending, filtered to only those
+ * with a reachable baseUrl (i.e., have a parseable IPv4 multiaddr).
+ */
+export function scorePeersForContent(
+  peers: DeliveryPeer[],
+  contentHash: string
+): ScoredPeer[] {
+  return peers
+    .map(p => scorePeer(p, contentHash))
+    .filter(p => p.baseUrl !== '')
+    .sort((a, b) => b.score - a.score);
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
