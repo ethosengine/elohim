@@ -913,7 +913,10 @@ impl P2PNode {
                 for (peer_id, addr) in &peers {
                     info!(peer = %peer_id, addr = %addr, "mDNS: discovered peer");
                     // Add peer to Kademlia routing table
-                    swarm.behaviour_mut().kademlia.add_address(peer_id, addr.clone());
+                    swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(peer_id, addr.clone());
                 }
                 drop(swarm);
 

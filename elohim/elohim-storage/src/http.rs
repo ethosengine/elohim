@@ -2799,7 +2799,10 @@ impl HttpServer {
     /// Returns an empty body with headers describing the delivery readiness
     /// of this storage node for the given app. Used by service workers and
     /// doorway to negotiate the optimal delivery path (extracted vs compressed).
-    async fn handle_app_capability(&self, path: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_app_capability(
+        &self,
+        path: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
         let app_id = path
             .strip_prefix("/apps/")
             .and_then(|s| s.strip_suffix("/_capability"))
