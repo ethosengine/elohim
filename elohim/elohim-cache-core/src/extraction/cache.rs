@@ -228,6 +228,18 @@ impl ExtractionCache {
         }
     }
 
+    /// Returns blob hashes of all currently cached (non-expired) extractions.
+    /// Used for capability advertisement — tells peers which content
+    /// this node can serve file-by-file right now.
+    pub async fn ready_content_hashes(&self) -> Vec<String> {
+        let index = self.index.read().await;
+        index
+            .values()
+            .filter(|entry| !self.is_expired(entry))
+            .map(|entry| entry.blob_hash.clone())
+            .collect()
+    }
+
     // --- Private helpers ---
 
     fn is_expired(&self, entry: &AppCacheEntry) -> bool {
@@ -435,6 +447,42 @@ mod tests {
         // Should still be current
         assert!(cache.is_current("app1", "hash-abc").await);
         assert!(cache.get_file("app1", "index.html").await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_ready_content_hashes_empty_cache() {
+        let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
+        let hashes = cache.ready_content_hashes().await;
+        assert!(hashes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_ready_content_hashes_returns_warm_entries() {
+        let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
+        cache.put_app("app1", "hash-aaa", sample_files()).await.unwrap();
+        cache.put_app("app2", "hash-bbb", sample_files()).await.unwrap();
+
+        let mut hashes = cache.ready_content_hashes().await;
+        hashes.sort();
+        assert_eq!(hashes, vec!["hash-aaa", "hash-bbb"]);
+    }
+
+    #[tokio::test]
+    async fn test_ready_content_hashes_excludes_expired() {
+        let (cache, _tmp) = test_cache(1, 1024 * 1024).await;
+        cache.put_app("app1", "hash-aaa", sample_files()).await.unwrap();
+        cache.put_app("app2", "hash-bbb", sample_files()).await.unwrap();
+
+        // Backdate app1 so it expires (same pattern as test_ttl_expiry)
+        {
+            let mut index = cache.index.write().await;
+            if let Some(entry) = index.get_mut("app1") {
+                entry.last_accessed = entry.last_accessed.saturating_sub(10);
+            }
+        }
+
+        let hashes = cache.ready_content_hashes().await;
+        assert_eq!(hashes, vec!["hash-bbb"]);
     }
 
     #[tokio::test]

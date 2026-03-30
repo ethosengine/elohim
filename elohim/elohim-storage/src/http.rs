@@ -548,6 +548,13 @@ impl HttpServer {
                 }
             }
 
+            // Delivery capability probe: HEAD /apps/{app_id}/_capability
+            // Lightweight probe for delivery negotiation — no body, just headers.
+            // Reports whether extraction cache is warm for this app.
+            (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
+                self.handle_app_capability(p).await
+            }
+
             // HTML5 App serving: /apps/{app_id}/{file_path}
             (Method::GET, p) if p.starts_with("/apps/") => {
                 if self.db_pool.is_some() {
@@ -2756,6 +2763,53 @@ impl HttpServer {
     // =========================================================================
     // HTML5 App serving handlers
     // =========================================================================
+
+    /// Handle delivery capability probe for an HTML5 app.
+    ///
+    /// Route: HEAD /apps/{app_id}/_capability
+    ///
+    /// Returns an empty body with headers describing the delivery readiness
+    /// of this storage node for the given app. Used by service workers and
+    /// doorway to negotiate the optimal delivery path (extracted vs compressed).
+    async fn handle_app_capability(&self, path: &str) -> Result<Response<Full<Bytes>>, StorageError> {
+        let app_id = path
+            .strip_prefix("/apps/")
+            .and_then(|s| s.strip_suffix("/_capability"))
+            .unwrap_or("");
+
+        if app_id.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header("Content-Length", "0")
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+
+        // Look up blob_hash from app_index
+        let blob_hash = { self.app_index.read().await.get(app_id).cloned() };
+
+        // Check extraction cache warmth
+        let (ready, delivery_mode) = match (&self.extraction_cache, &blob_hash) {
+            (Some(cache), Some(hash)) => {
+                let is_warm = cache.is_current(app_id, hash).await;
+                (is_warm, if is_warm { "extracted" } else { "compressed" })
+            }
+            _ => (false, "compressed"),
+        };
+
+        let mut builder = Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Length", "0")
+            .header("X-Delivery-Mode", delivery_mode)
+            .header("X-Cache-Tier", "extraction")
+            .header("X-Ready", if ready { "true" } else { "false" });
+
+        if let Some(hash) = &blob_hash {
+            builder = builder.header("X-Blob-Hash", hash.as_str());
+        }
+
+        Ok(builder.body(Full::new(Bytes::new())).unwrap())
+    }
 
     /// Handle HTML5 app file requests
     ///

@@ -49,6 +49,11 @@
                 "glob": "**/*",
                 "input": "node_modules/elohim-cache-core",
                 "output": "/wasm/elohim-cache-core"
+              },
+              {
+                "glob": "apps-sw.js",
+                "input": "src/assets",
+                "output": "/"
               }
             ],
             "styles": [

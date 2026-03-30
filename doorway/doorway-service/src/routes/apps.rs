@@ -418,6 +418,105 @@ async fn forward_app_request_with_header(
         .unwrap()
 }
 
+/// Parse `/apps/{app_id}/_capability` into the app_id.
+///
+/// Returns `None` if the path doesn't match the expected pattern.
+fn parse_capability_path(path: &str) -> Option<&str> {
+    let app_id = path
+        .strip_prefix("/apps/")
+        .and_then(|s| s.strip_suffix("/_capability"))?;
+    if app_id.is_empty() || app_id.contains('/') {
+        return None;
+    }
+    Some(app_id)
+}
+
+/// Handle delivery capability probe for an HTML5 app.
+///
+/// Route: HEAD /apps/{app_id}/_capability
+///
+/// Returns an empty body with headers describing the delivery readiness
+/// of this doorway for the given app. If doorway has a projection cache,
+/// Doorway lives on the same node as elohim-storage. Storage owns compute
+/// reporting — doorway augments it with its projection cache info.
+///
+/// Flow: proxy to storage for the node's real capability, then overlay
+/// doorway's projection cache status. One node, one capability report.
+pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response<Full<Bytes>> {
+    let app_id = match parse_capability_path(path) {
+        Some(id) => id,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header("Content-Length", "0")
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+        }
+    };
+
+    let storage_url = match &state.args.storage_url {
+        Some(url) => url,
+        None => {
+            return Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .header("Content-Length", "0")
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+        }
+    };
+
+    // Step 1: Get the node's capability from storage (same node)
+    let endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
+    let storage_resp = reqwest::Client::new().head(&endpoint).send().await;
+
+    let mut builder = Response::builder().status(StatusCode::OK);
+
+    // Forward storage's capability headers (extraction cache state, blob hash, etc.)
+    if let Ok(resp) = &storage_resp {
+        for (name, value) in resp.headers() {
+            if name.as_str().starts_with("x-") {
+                builder = builder.header(name, value);
+            }
+        }
+    }
+
+    // Step 2: Augment with doorway's projection cache info.
+    // If doorway has projection cache, it UPGRADES the delivery mode —
+    // the client gets "extracted" from MongoDB even if storage's extraction
+    // cache is cold, because doorway's projection cache sits in front.
+    if let Some(ref cache) = state.app_file_cache {
+        let blob_hash = cache.resolve_blob_hash(app_id).await;
+        let projection_ready = blob_hash.is_some();
+
+        // Override: doorway's projection cache is the outermost layer
+        builder = builder.header("X-Delivery-Mode", "extracted");
+        builder = builder.header("X-Cache-Tier", "projection");
+        builder = builder.header(
+            "X-Projection-Ready",
+            if projection_ready { "true" } else { "false" },
+        );
+
+        // Also include storage's extraction cache readiness (from forwarded headers)
+        // so the client sees the full node picture. Storage's X-Ready becomes
+        // X-Extraction-Ready; doorway adds X-Projection-Ready.
+        if let Some(hash) = &blob_hash {
+            builder = builder.header("X-Blob-Hash", hash.as_str());
+        }
+    } else if storage_resp.is_err() {
+        // Storage unreachable and no projection cache — report degraded
+        return Response::builder()
+            .status(StatusCode::BAD_GATEWAY)
+            .header("Content-Length", "0")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+    }
+
+    builder
+        .header("Content-Length", "0")
+        .body(Full::new(Bytes::new()))
+        .unwrap()
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -490,5 +589,47 @@ mod tests {
     fn test_build_app_response_coalesced() {
         let resp = build_app_response(b"data", "text/css", "HIT-COALESCED");
         assert_eq!(resp.headers().get("X-Cache").unwrap(), "HIT-COALESCED");
+    }
+
+    // =========================================================================
+    // Capability path parsing tests
+    // =========================================================================
+
+    #[test]
+    fn test_parse_capability_path_normal() {
+        let app_id = parse_capability_path("/apps/my-app/_capability").unwrap();
+        assert_eq!(app_id, "my-app");
+    }
+
+    #[test]
+    fn test_parse_capability_path_with_hash() {
+        let app_id = parse_capability_path("/apps/bafkrei-abc123/_capability").unwrap();
+        assert_eq!(app_id, "bafkrei-abc123");
+    }
+
+    #[test]
+    fn test_parse_capability_path_empty_app_id() {
+        assert!(parse_capability_path("/apps//_capability").is_none());
+    }
+
+    #[test]
+    fn test_parse_capability_path_no_capability_suffix() {
+        assert!(parse_capability_path("/apps/my-app/index.html").is_none());
+    }
+
+    #[test]
+    fn test_parse_capability_path_nested_slashes() {
+        // app_id should not contain slashes
+        assert!(parse_capability_path("/apps/my/nested/app/_capability").is_none());
+    }
+
+    #[test]
+    fn test_parse_capability_path_wrong_prefix() {
+        assert!(parse_capability_path("/other/my-app/_capability").is_none());
+    }
+
+    #[test]
+    fn test_parse_capability_path_only_prefix() {
+        assert!(parse_capability_path("/apps/_capability").is_none());
     }
 }

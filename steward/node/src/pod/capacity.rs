@@ -3,6 +3,7 @@
 //! Nodes periodically broadcast their available compute capacity.
 //! Training-wheels: broadcast only, no neighbor table consumption yet.
 
+use elohim_storage::identity::DeliveryCapabilities;
 use serde::{Deserialize, Serialize};
 
 /// Gossipsub topic for compute capacity announcements.
@@ -15,6 +16,11 @@ pub const CAPACITY_BROADCAST_INTERVAL_SECS: u64 = 30;
 ///
 /// This constructs the announcement that would be published to the
 /// `/elohim/compute/capacity/1.0.0` gossipsub topic every 30 seconds.
+///
+/// Delivery capability strings (from [`DeliveryCapabilities::to_capability_strings()`])
+/// are appended to whatever compute capabilities the caller provides,
+/// so that neighbors can discover both compute and delivery capabilities
+/// from a single gossipsub announcement.
 ///
 /// # TODO: Wire into gossipsub broadcast loop
 ///
@@ -46,6 +52,56 @@ pub fn build_announcement(
         queue_depth,
         estimated_tokens_per_sec: 0.0, // TODO: measure actual throughput
         capabilities: capabilities.to_vec(),
+        ready,
+    }
+}
+
+/// Build a capacity announcement with delivery capabilities merged in.
+///
+/// This is the preferred constructor when the node has delivery infrastructure
+/// (extraction cache, blob store, etc.). Delivery capability strings are
+/// appended to the provided compute capabilities so that neighbors can
+/// discover what content this peer can serve and at what cache tier.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let delivery = DeliveryCapabilities {
+///     serves_extracted: true,
+///     serves_compressed: true,
+///     ready_content: vec!["bafkrei...".into()],
+///     cache_tier: CacheTier::Extraction,
+/// };
+/// let ann = build_announcement_with_delivery(
+///     "node-1", 100, 0, 0,
+///     &["path-recommendation".into()],
+///     true, &delivery,
+/// );
+/// // ann.capabilities contains both compute and delivery strings
+/// ```
+pub fn build_announcement_with_delivery(
+    node_id: &str,
+    budget_remaining: u32,
+    active_requests: u32,
+    queue_depth: u32,
+    capabilities: &[String],
+    ready: bool,
+    delivery: &DeliveryCapabilities,
+) -> CapacityAnnouncement {
+    let mut all_caps = capabilities.to_vec();
+    all_caps.extend(delivery.to_capability_strings());
+
+    CapacityAnnouncement {
+        node_id: node_id.into(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        budget_remaining,
+        active_requests,
+        queue_depth,
+        estimated_tokens_per_sec: 0.0, // TODO: measure actual throughput
+        capabilities: all_caps,
         ready,
     }
 }
@@ -171,5 +227,101 @@ mod tests {
         assert_eq!(decoded.queue_depth, 0);
         assert_eq!(decoded.capabilities.len(), 2);
         assert!(!decoded.ready);
+    }
+
+    #[test]
+    fn test_build_announcement_with_delivery_merges_capabilities() {
+        use elohim_storage::identity::CacheTier;
+
+        let delivery = DeliveryCapabilities {
+            serves_extracted: true,
+            serves_compressed: true,
+            ready_content: vec!["bafkrei-abc".into()],
+            cache_tier: CacheTier::Extraction,
+        };
+        let ann = build_announcement_with_delivery(
+            "node-delivery",
+            50,
+            1,
+            3,
+            &["path-recommendation".into()],
+            true,
+            &delivery,
+        );
+
+        assert_eq!(ann.node_id, "node-delivery");
+        assert_eq!(ann.budget_remaining, 50);
+        assert_eq!(ann.active_requests, 1);
+        assert_eq!(ann.queue_depth, 3);
+        assert!(ann.ready);
+        // Should contain the original compute capability + delivery strings
+        assert!(ann.capabilities.contains(&"path-recommendation".to_string()));
+        assert!(ann.capabilities.contains(&"serves_extracted".to_string()));
+        assert!(ann.capabilities.contains(&"serves_compressed".to_string()));
+        assert!(ann
+            .capabilities
+            .contains(&"cache_tier:extraction".to_string()));
+        assert!(ann.capabilities.contains(&"warm:bafkrei-abc".to_string()));
+        // Total: 1 compute + 4 delivery (serves_extracted, serves_compressed, cache_tier, warm:bafkrei-abc)
+        assert_eq!(ann.capabilities.len(), 5);
+    }
+
+    #[test]
+    fn test_build_announcement_with_delivery_empty_delivery() {
+        let delivery = DeliveryCapabilities::default();
+        let ann = build_announcement_with_delivery(
+            "node-minimal",
+            100,
+            0,
+            0,
+            &["content-safety-review".into()],
+            false,
+            &delivery,
+        );
+        // Default delivery has serves_extracted=false, serves_compressed=false,
+        // cache_tier=BlobOnly, empty ready_content.
+        // Only cache_tier string is always emitted.
+        assert!(ann.capabilities.contains(&"content-safety-review".to_string()));
+        assert!(ann
+            .capabilities
+            .contains(&"cache_tier:blob-only".to_string()));
+        // Should NOT contain serves_extracted or serves_compressed (both false)
+        assert!(!ann.capabilities.contains(&"serves_extracted".to_string()));
+        assert!(!ann.capabilities.contains(&"serves_compressed".to_string()));
+        // 1 compute + 1 delivery (cache_tier only)
+        assert_eq!(ann.capabilities.len(), 2);
+    }
+
+    #[test]
+    fn test_build_announcement_with_delivery_roundtrips() {
+        use elohim_storage::identity::CacheTier;
+
+        let delivery = DeliveryCapabilities {
+            serves_extracted: true,
+            serves_compressed: false,
+            ready_content: vec!["hash-1".into(), "hash-2".into()],
+            cache_tier: CacheTier::Projection,
+        };
+        let ann = build_announcement_with_delivery(
+            "node-rt",
+            42,
+            2,
+            5,
+            &[],
+            true,
+            &delivery,
+        );
+        let encoded = ann.encode().unwrap();
+        let decoded = CapacityAnnouncement::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.node_id, "node-rt");
+        assert!(decoded.capabilities.contains(&"serves_extracted".to_string()));
+        assert!(decoded
+            .capabilities
+            .contains(&"cache_tier:projection".to_string()));
+        assert!(decoded.capabilities.contains(&"warm:hash-1".to_string()));
+        assert!(decoded.capabilities.contains(&"warm:hash-2".to_string()));
+        // serves_extracted + cache_tier + 2 warm hashes = 4
+        assert_eq!(decoded.capabilities.len(), 4);
     }
 }

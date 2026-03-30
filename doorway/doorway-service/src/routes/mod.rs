@@ -49,7 +49,7 @@ pub use admin_users::{
     UsageTracker,
 };
 pub use api::handle_api_request;
-pub use apps::handle_app_request;
+pub use apps::{handle_app_capability, handle_app_request};
 pub use auth_routes::handle_auth_request;
 pub use blob::{
     error_response as blob_error_response, handle_blob_request, handle_blob_request_with_fallback,
