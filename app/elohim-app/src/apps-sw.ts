@@ -32,6 +32,94 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 });
 
 // ---------------------------------------------------------------------------
+// Multi-peer scoring (inline — SW can't import from elohim-service at runtime)
+// ---------------------------------------------------------------------------
+
+interface ScoredPeer {
+  peerId: string;
+  baseUrl: string;
+  score: number;
+  network: string;
+  servesExtracted: boolean;
+  servesCompressed: boolean;
+  warm: boolean;
+}
+
+interface DeliveryPeerResponse {
+  peerId: string;
+  multiaddrs: string[];
+  network: string;
+  capabilities: string[];
+  lastSeen: number;
+  httpPort: number;
+}
+
+function extractIpFromMultiaddrSw(addr: string): string {
+  const match = addr.match(/\/ip4\/([^/]+)/);
+  return match ? match[1] : '';
+}
+
+function scorePeerForSw(peer: DeliveryPeerResponse, contentHash: string): ScoredPeer {
+  let score = 0;
+
+  // Network proximity (biggest factor)
+  if (peer.network === 'lan') score += 1000;
+  else if (peer.network === 'wan') score += 500;
+  else score += 100; // relay
+
+  const servesExtracted = peer.capabilities.includes('serves_extracted');
+  const servesCompressed = peer.capabilities.includes('serves_compressed');
+  const warm = peer.capabilities.includes(`warm:${contentHash}`);
+
+  // Delivery capability
+  if (servesExtracted) score += 200;
+  if (servesCompressed) score += 50;
+
+  // Warm cache for THIS content
+  if (warm) score += 300;
+
+  // Recency
+  const age = Date.now() - peer.lastSeen;
+  if (age < 30000) score += 100;
+  else if (age < 90000) score += 50;
+
+  // Construct baseUrl from multiaddr (extract IP) + httpPort
+  const ip = extractIpFromMultiaddrSw(peer.multiaddrs[0] || '');
+  const baseUrl = ip ? `http://${ip}:${peer.httpPort}` : '';
+
+  return { peerId: peer.peerId, baseUrl, score, network: peer.network, servesExtracted, servesCompressed, warm };
+}
+
+// ---------------------------------------------------------------------------
+// Delivery peer discovery (30s cache)
+// ---------------------------------------------------------------------------
+
+let peerCache: { peers: ScoredPeer[]; fetchedAt: number } | null = null;
+const PEER_CACHE_TTL = 30000; // 30s
+
+async function getDeliveryPeers(blobHash: string): Promise<ScoredPeer[]> {
+  if (peerCache && Date.now() - peerCache.fetchedAt < PEER_CACHE_TTL) {
+    return peerCache.peers;
+  }
+
+  try {
+    const resp = await fetch('/api/v1/peers/delivery');
+    if (!resp.ok) return [];
+    const peers: DeliveryPeerResponse[] = await resp.json();
+
+    const scored = peers
+      .map(p => scorePeerForSw(p, blobHash))
+      .filter(p => p.baseUrl) // only peers with reachable URLs
+      .sort((a, b) => b.score - a.score);
+
+    peerCache = { peers: scored, fetchedAt: Date.now() };
+    return scored;
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Capability probe (Task 7)
 // ---------------------------------------------------------------------------
 
@@ -79,6 +167,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
   const appId = pathParts[0];
+  const filePath = pathParts.slice(1).join('/');
 
   // 1. Check local cache first
   const cache = await caches.open(CACHE_NAME);
@@ -88,13 +177,29 @@ async function handleAppFetch(request: Request): Promise<Response> {
   // 2. Probe peer capability (cached per app load)
   const capability = await probeCapability(appId);
 
-  // 3. Choose delivery mode
+  // 3. Try LAN/WAN peers in scored order (best-effort P2P delivery)
+  const peers = await getDeliveryPeers(capability.blobHash);
+  for (const peer of peers) {
+    if (!peer.baseUrl) continue;
+    try {
+      if (peer.servesExtracted && peer.warm) {
+        const resp = await fetch(`${peer.baseUrl}/apps/${appId}/${filePath}`);
+        if (resp.ok) {
+          cache.put(request, resp.clone());
+          return resp;
+        }
+      }
+    } catch {
+      continue; // peer unreachable, try next
+    }
+  }
+
+  // 4. Fall back to default path (doorway — the safety net)
   if (capability.deliveryMode === 'extracted' || capability.ready) {
-    // Peer can serve individual files — fetch and cache
+    // Doorway can serve individual files — fetch and cache
     return fetchAndCache(cache, request);
   } else {
-    // Peer serves compressed only — fetch ZIP, extract, serve from cache
-    const filePath = pathParts.slice(1).join('/');
+    // Doorway serves compressed only — fetch ZIP, extract, serve from cache
     return fetchViaZip(cache, appId, capability.blobHash, filePath);
   }
 }

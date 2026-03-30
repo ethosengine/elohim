@@ -472,6 +472,11 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             (Method::GET, "/p2p/status") => self.handle_p2p_status().await,
 
+            // Delivery peers — discovered peers with delivery capabilities
+            // Used by frontend for multi-peer app delivery scoring
+            #[cfg(feature = "p2p")]
+            (Method::GET, "/api/v1/peers/delivery") => self.handle_delivery_peers().await,
+
             // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
@@ -1227,6 +1232,29 @@ impl HttpServer {
                 .body(Full::new(Bytes::from(
                     r#"{"error": "P2P networking not enabled"}"#,
                 )))
+                .unwrap())
+        }
+    }
+
+    /// Handle delivery peers request — returns discovered peers with capabilities
+    #[cfg(feature = "p2p")]
+    async fn handle_delivery_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Some(ref handle) = self.p2p_handle {
+            let peers = handle.delivery_peers();
+            let json = serde_json::to_string(&peers).map_err(|e| {
+                StorageError::Internal(format!("Failed to serialize delivery peers: {}", e))
+            })?;
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(json)))
+                .unwrap())
+        } else {
+            // No P2P — return empty array (not an error)
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from("[]")))
                 .unwrap())
         }
     }
@@ -6799,6 +6827,14 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/db/allocations/{id}/resolve")
                 .handler("resolve_db_allocation")
                 .auth_required()
+                .build(),
+        )
+        // Delivery peers — discovered peers with delivery capabilities
+        // Used by frontend Service Worker for multi-peer app delivery scoring
+        .route(
+            Route::get("/api/v1/peers/delivery")
+                .handler("delivery_peers")
+                .cache_ttl(10)
                 .build(),
         )
         // Cache stream for projection warm-up (SSE)
