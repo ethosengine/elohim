@@ -45,6 +45,9 @@ pub enum EprRequest {
     ResolveBatch { ids: Vec<String> },
     /// Get document-tier content by ID (stub — not yet implemented)
     GetDocument { id: String },
+    /// Query a peer's delivery capability for a specific blob.
+    /// No reach authorization needed — asking "can you serve this?" not "give me this."
+    QueryDelivery { blob_hash: String },
 }
 
 /// EPR response types
@@ -68,6 +71,13 @@ pub enum EprResponse {
     },
     /// Error
     Error(String),
+    /// Delivery capability info for a specific blob
+    DeliveryInfo {
+        serves_extracted: bool,
+        serves_compressed: bool,
+        cache_tier: String, // "projection" | "extraction" | "blob-only"
+        warm: bool,         // this specific blob is extracted and ready
+    },
 }
 
 /// Codec for EPR request/response
@@ -337,6 +347,144 @@ mod tests {
         match decoded {
             EprResponse::Error(msg) => assert_eq!(msg, "something broke"),
             _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_epr_request_query_delivery_roundtrip() {
+        let request = EprRequest::QueryDelivery {
+            blob_hash: "sha256-abc123def456".to_string(),
+        };
+        let bytes = rmp_serde::to_vec(&request).unwrap();
+        let decoded: EprRequest = rmp_serde::from_slice(&bytes).unwrap();
+        match decoded {
+            EprRequest::QueryDelivery { blob_hash } => {
+                assert_eq!(blob_hash, "sha256-abc123def456");
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_epr_response_delivery_info_roundtrip() {
+        let response = EprResponse::DeliveryInfo {
+            serves_extracted: true,
+            serves_compressed: true,
+            cache_tier: "extraction".to_string(),
+            warm: true,
+        };
+        let bytes = rmp_serde::to_vec(&response).unwrap();
+        let decoded: EprResponse = rmp_serde::from_slice(&bytes).unwrap();
+        match decoded {
+            EprResponse::DeliveryInfo {
+                serves_extracted,
+                serves_compressed,
+                cache_tier,
+                warm,
+            } => {
+                assert!(serves_extracted);
+                assert!(serves_compressed);
+                assert_eq!(cache_tier, "extraction");
+                assert!(warm);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_epr_response_delivery_info_cold_roundtrip() {
+        let response = EprResponse::DeliveryInfo {
+            serves_extracted: false,
+            serves_compressed: true,
+            cache_tier: "blob-only".to_string(),
+            warm: false,
+        };
+        let bytes = rmp_serde::to_vec(&response).unwrap();
+        let decoded: EprResponse = rmp_serde::from_slice(&bytes).unwrap();
+        match decoded {
+            EprResponse::DeliveryInfo {
+                serves_extracted,
+                serves_compressed,
+                cache_tier,
+                warm,
+            } => {
+                assert!(!serves_extracted);
+                assert!(serves_compressed);
+                assert_eq!(cache_tier, "blob-only");
+                assert!(!warm);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    /// Verify that existing variants still encode/decode correctly after adding new ones.
+    /// MessagePack uses integer keys for enum variants, so new variants at the end are backward compatible.
+    #[test]
+    fn test_backward_compat_existing_variants_still_decode() {
+        // Encode all existing variants and verify they decode correctly
+        let requests: Vec<EprRequest> = vec![
+            EprRequest::Resolve {
+                id: "test-id".to_string(),
+                agent_pubkey: None,
+            },
+            EprRequest::Announce {
+                head: vec![0x01, 0x02],
+            },
+            EprRequest::ResolveBatch {
+                ids: vec!["a".to_string()],
+            },
+            EprRequest::GetDocument {
+                id: "doc-1".to_string(),
+            },
+            EprRequest::QueryDelivery {
+                blob_hash: "hash-1".to_string(),
+            },
+        ];
+
+        for (i, request) in requests.iter().enumerate() {
+            let bytes = rmp_serde::to_vec(request).unwrap();
+            let decoded: EprRequest = rmp_serde::from_slice(&bytes)
+                .unwrap_or_else(|e| panic!("Failed to decode request variant {}: {}", i, e));
+            // Verify the variant index matches by re-encoding
+            let re_encoded = rmp_serde::to_vec(&decoded).unwrap();
+            assert_eq!(
+                bytes, re_encoded,
+                "Request variant {} roundtrip mismatch",
+                i
+            );
+        }
+
+        let responses: Vec<EprResponse> = vec![
+            EprResponse::Head(vec![0x01]),
+            EprResponse::HeadBatch(vec![vec![0x01]]),
+            EprResponse::Announced {
+                accepted: true,
+                reason: None,
+            },
+            EprResponse::NotFound,
+            EprResponse::AccessDenied {
+                required_reach: "trusted".to_string(),
+                reason: "test".to_string(),
+            },
+            EprResponse::Error("err".to_string()),
+            EprResponse::DeliveryInfo {
+                serves_extracted: true,
+                serves_compressed: false,
+                cache_tier: "projection".to_string(),
+                warm: true,
+            },
+        ];
+
+        for (i, response) in responses.iter().enumerate() {
+            let bytes = rmp_serde::to_vec(response).unwrap();
+            let decoded: EprResponse = rmp_serde::from_slice(&bytes)
+                .unwrap_or_else(|e| panic!("Failed to decode response variant {}: {}", i, e));
+            let re_encoded = rmp_serde::to_vec(&decoded).unwrap();
+            assert_eq!(
+                bytes, re_encoded,
+                "Response variant {} roundtrip mismatch",
+                i
+            );
         }
     }
 }
