@@ -76,3 +76,6 @@ export { EventStreamService } from './event-stream.service';
 
 // Kairos temporal scheduling
 export { ScheduleService } from './schedule.service';
+
+// Service Worker bridge (HTML5 app cache invalidation)
+export { SwBridgeService } from './sw-bridge.service';
