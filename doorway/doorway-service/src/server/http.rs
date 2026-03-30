@@ -1280,6 +1280,15 @@ async fn handle_request(
 
         // Account API routes — handled by dynamic registry fallback below
 
+        // Delivery capability probe (must match before GET /apps/)
+        // HEAD /apps/{app_id}/_capability — lightweight probe, no body
+        (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
+            debug!(path = %p, "Handling app capability probe");
+            return Ok(to_boxed(
+                routes::handle_app_capability(Arc::clone(&state), p).await,
+            ));
+        }
+
         // HTML5 App serving routes (projection cache → elohim-storage fallback)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
