@@ -259,7 +259,7 @@ async fn async_main(
 
     // Initialize P2P node if enabled
     #[cfg(feature = "p2p")]
-    let p2p_node = if args.enable_p2p {
+    let mut p2p_node = if args.enable_p2p {
         let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
             // Generate a placeholder agent key if none provided
             format!(
@@ -423,6 +423,13 @@ async fn async_main(
 
     if let Some(ref cache) = extraction_cache {
         http_server = http_server.with_extraction_cache(Arc::clone(cache));
+    }
+
+    // Wire extraction cache into P2P node for delivery capability queries
+    #[cfg(feature = "p2p")]
+    if let (Some(ref mut node), Some(ref cache)) = (&mut p2p_node, &extraction_cache) {
+        node.set_extraction_cache(Arc::clone(cache));
+        info!("  P2P delivery capability: extraction cache wired");
     }
 
     info!("HTTP API available at http://{}", http_addr);

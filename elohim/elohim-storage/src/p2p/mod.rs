@@ -78,6 +78,7 @@ use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
 use crate::sync::{DocStore, StreamTracker, SyncManager};
+use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
@@ -158,6 +159,8 @@ pub struct P2PNode {
     pending_shard_fetches: PendingShardMap,
     /// Whether startup EPR Head publication has run
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
+    /// Extraction cache for delivery capability advertisement
+    extraction_cache: Option<Arc<ExtractionCache>>,
 }
 
 /// P2P node status for observability
@@ -408,6 +411,7 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            extraction_cache: None,
         })
     }
 
@@ -424,6 +428,12 @@ impl P2PNode {
     ) -> Self {
         self.policy_enforcement = Some(enforcement);
         self
+    }
+
+    /// Set the extraction cache for delivery capability queries.
+    /// Called after cache initialization (which may happen after P2P node start).
+    pub fn set_extraction_cache(&mut self, cache: Arc<ExtractionCache>) {
+        self.extraction_cache = Some(cache);
     }
 
     /// Get the local PeerId
@@ -1981,6 +1991,29 @@ impl P2PNode {
             EprRequest::GetDocument { id } => {
                 debug!(id = %id, "EPR GetDocument not yet implemented");
                 EprResponse::Error("GetDocument not yet implemented".to_string())
+            }
+            EprRequest::QueryDelivery { blob_hash } => {
+                debug!(blob_hash = %blob_hash, "Handling EPR QueryDelivery request");
+
+                let warm = match &self.extraction_cache {
+                    Some(cache) => {
+                        let hashes = cache.ready_content_hashes().await;
+                        hashes.contains(&blob_hash)
+                    }
+                    None => false,
+                };
+
+                let (serves_extracted, cache_tier) = match &self.extraction_cache {
+                    Some(_) => (warm, "extraction".to_string()),
+                    None => (false, "blob-only".to_string()),
+                };
+
+                EprResponse::DeliveryInfo {
+                    serves_extracted,
+                    serves_compressed: true, // all nodes can serve raw blobs
+                    cache_tier,
+                    warm,
+                }
             }
         }
     }
