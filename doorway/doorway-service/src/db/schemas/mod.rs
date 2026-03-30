@@ -1,14 +1,16 @@
 //! Database schemas for Doorway
 //!
-//! Defines MongoDB document structures for users, API keys, hosts, and OAuth.
+//! Defines MongoDB document structures for users, API keys, hosts, OAuth, and caches.
 
 mod api_key;
+mod app_file_cache;
 mod host;
 mod metadata;
 mod oauth_session;
 mod user;
 
 pub use api_key::{ApiKeyDoc, API_KEY_COLLECTION};
+pub use app_file_cache::{AppFileCacheDoc, APP_FILE_CACHE_COLLECTION};
 pub use host::{HostDoc, HostStatus, HOST_COLLECTION};
 pub use metadata::Metadata;
 pub use oauth_session::{
