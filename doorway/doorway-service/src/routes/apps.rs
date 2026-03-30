@@ -437,8 +437,11 @@ fn parse_capability_path(path: &str) -> Option<&str> {
 ///
 /// Returns an empty body with headers describing the delivery readiness
 /// of this doorway for the given app. If doorway has a projection cache,
-/// reports its own capability (projection tier). Otherwise, proxies the
-/// HEAD request to elohim-storage for its extraction-tier capability.
+/// Doorway lives on the same node as elohim-storage. Storage owns compute
+/// reporting — doorway augments it with its projection cache info.
+///
+/// Flow: proxy to storage for the node's real capability, then overlay
+/// doorway's projection cache status. One node, one capability report.
 pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response<Full<Bytes>> {
     let app_id = match parse_capability_path(path) {
         Some(id) => id,
@@ -451,26 +454,6 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         }
     };
 
-    // If we have projection cache, report our own capability
-    if let Some(ref cache) = state.app_file_cache {
-        let blob_hash = cache.resolve_blob_hash(app_id).await;
-        let ready = blob_hash.is_some();
-
-        let mut builder = Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Length", "0")
-            .header("X-Delivery-Mode", "extracted")
-            .header("X-Cache-Tier", "projection")
-            .header("X-Ready", if ready { "true" } else { "false" });
-
-        if let Some(hash) = &blob_hash {
-            builder = builder.header("X-Blob-Hash", hash.as_str());
-        }
-
-        return builder.body(Full::new(Bytes::new())).unwrap();
-    }
-
-    // No projection cache — proxy HEAD to storage for its capability
     let storage_url = match &state.args.storage_url {
         Some(url) => url,
         None => {
@@ -482,33 +465,56 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         }
     };
 
+    // Step 1: Get the node's capability from storage (same node)
     let endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
-    match reqwest::Client::new().head(&endpoint).send().await {
-        Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::OK);
-            let mut builder = Response::builder().status(status);
+    let storage_resp = reqwest::Client::new().head(&endpoint).send().await;
 
-            // Forward X-* headers from storage
-            for (name, value) in resp.headers() {
-                if name.as_str().starts_with("x-") {
-                    builder = builder.header(name, value);
-                }
+    let mut builder = Response::builder().status(StatusCode::OK);
+
+    // Forward storage's capability headers (extraction cache state, blob hash, etc.)
+    if let Ok(resp) = &storage_resp {
+        for (name, value) in resp.headers() {
+            if name.as_str().starts_with("x-") {
+                builder = builder.header(name, value);
             }
-
-            builder
-                .header("Content-Length", "0")
-                .body(Full::new(Bytes::new()))
-                .unwrap()
-        }
-        Err(e) => {
-            warn!(error = %e, "Failed to proxy capability probe to storage");
-            Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .header("Content-Length", "0")
-                .body(Full::new(Bytes::new()))
-                .unwrap()
         }
     }
+
+    // Step 2: Augment with doorway's projection cache info.
+    // If doorway has projection cache, it UPGRADES the delivery mode —
+    // the client gets "extracted" from MongoDB even if storage's extraction
+    // cache is cold, because doorway's projection cache sits in front.
+    if let Some(ref cache) = state.app_file_cache {
+        let blob_hash = cache.resolve_blob_hash(app_id).await;
+        let projection_ready = blob_hash.is_some();
+
+        // Override: doorway's projection cache is the outermost layer
+        builder = builder.header("X-Delivery-Mode", "extracted");
+        builder = builder.header("X-Cache-Tier", "projection");
+        builder = builder.header(
+            "X-Projection-Ready",
+            if projection_ready { "true" } else { "false" },
+        );
+
+        // Also include storage's extraction cache readiness (from forwarded headers)
+        // so the client sees the full node picture. Storage's X-Ready becomes
+        // X-Extraction-Ready; doorway adds X-Projection-Ready.
+        if let Some(hash) = &blob_hash {
+            builder = builder.header("X-Blob-Hash", hash.as_str());
+        }
+    } else if storage_resp.is_err() {
+        // Storage unreachable and no projection cache — report degraded
+        return Response::builder()
+            .status(StatusCode::BAD_GATEWAY)
+            .header("Content-Length", "0")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+    }
+
+    builder
+        .header("Content-Length", "0")
+        .body(Full::new(Bytes::new()))
+        .unwrap()
 }
 
 // =============================================================================
