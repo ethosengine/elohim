@@ -74,9 +74,30 @@ type PendingShardMap = Arc<
     >,
 >;
 
+use dashmap::DashMap;
+
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
+
+/// A peer discovered on the network with its delivery capabilities.
+/// Populated from mDNS discovery + identify protocol info.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryPeer {
+    /// libp2p PeerId (base58)
+    pub peer_id: String,
+    /// Known multiaddrs for this peer
+    pub multiaddrs: Vec<String>,
+    /// Network proximity: "lan" (mDNS) or "wan"
+    pub network: String,
+    /// Capability strings from CapacityAnnouncement (e.g., "serves_extracted", "warm:sha256-abc")
+    pub capabilities: Vec<String>,
+    /// When this peer was last seen (unix ms)
+    pub last_seen: u64,
+    /// HTTP port for direct file serving (default 8090)
+    pub http_port: u16,
+}
 use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
 
@@ -161,6 +182,8 @@ pub struct P2PNode {
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
+    /// Discovered peers with delivery capabilities (populated from mDNS + identify)
+    delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
 }
 
 /// P2P node status for observability
@@ -205,12 +228,23 @@ pub struct P2PHandle {
     status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
     command_tx: mpsc::Sender<P2PCommand>,
     agent_pubkey: String,
+    /// Shared ref to delivery peer registry (populated by P2P event loop)
+    delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
 }
 
 impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Get all known delivery peers with their capabilities.
+    /// Used by the /api/v1/peers/delivery HTTP endpoint.
+    pub fn delivery_peers(&self) -> Vec<DeliveryPeer> {
+        self.delivery_peers
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect()
     }
 
     /// Publish an EPR Head to the DHT. Fire-and-forget.
@@ -306,6 +340,14 @@ impl P2PHandle {
 
 /// Map reach level string to numeric index for comparison.
 /// Used by the cache fast-path to compare ambient ceiling against requested reach.
+/// Extract an HTTP port hint from a multiaddr string.
+/// mDNS peers expose their libp2p port; HTTP is conventionally at 8090.
+fn extract_http_port(_addr: &str) -> u16 {
+    // Default HTTP port for elohim-storage — peers don't advertise
+    // HTTP port in multiaddr (that's for libp2p). The convention is 8090.
+    8090
+}
+
 fn reach_level_index(reach: &str) -> u8 {
     match reach {
         "commons" | "public" => 0,
@@ -412,6 +454,7 @@ impl P2PNode {
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             extraction_cache: None,
+            delivery_peers: Arc::new(DashMap::new()),
         })
     }
 
@@ -867,15 +910,48 @@ impl P2PNode {
             }
             behaviour::ElohimStorageBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 let mut swarm = self.swarm.write().await;
-                for (peer_id, addr) in peers {
+                for (peer_id, addr) in &peers {
                     info!(peer = %peer_id, addr = %addr, "mDNS: discovered peer");
                     // Add peer to Kademlia routing table
-                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                    swarm.behaviour_mut().kademlia.add_address(peer_id, addr.clone());
+                }
+                drop(swarm);
+
+                // Register as LAN delivery peers
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                for (peer_id, addr) in peers {
+                    let key = peer_id.to_string();
+                    let addr_str = addr.to_string();
+
+                    // Extract IP-based HTTP port hint (default 8090)
+                    let http_port = extract_http_port(&addr_str);
+
+                    self.delivery_peers
+                        .entry(key.clone())
+                        .and_modify(|p| {
+                            if !p.multiaddrs.contains(&addr_str) {
+                                p.multiaddrs.push(addr_str.clone());
+                            }
+                            p.last_seen = now_ms;
+                            p.network = "lan".to_string();
+                        })
+                        .or_insert_with(|| DeliveryPeer {
+                            peer_id: key,
+                            multiaddrs: vec![addr_str],
+                            network: "lan".to_string(),
+                            capabilities: vec!["serves_compressed".to_string()],
+                            last_seen: now_ms,
+                            http_port,
+                        });
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::Mdns(mdns::Event::Expired(peers)) => {
-                for (peer_id, _addr) in peers {
+                for (peer_id, _addr) in &peers {
                     debug!(peer = %peer_id, "mDNS: peer expired");
+                    self.delivery_peers.remove(&peer_id.to_string());
                 }
             }
             // Sync protocol events
@@ -2117,6 +2193,7 @@ impl P2PNode {
             status_rx: self.status_tx.subscribe(),
             command_tx: self.command_tx.clone(),
             agent_pubkey: self.identity.agent_pubkey().to_string(),
+            delivery_peers: Arc::clone(&self.delivery_peers),
         }
     }
 
