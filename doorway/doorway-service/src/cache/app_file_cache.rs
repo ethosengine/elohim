@@ -346,15 +346,18 @@ impl AppFileCacheService {
     ) -> Option<broadcast::Receiver<Option<CachedFile>>> {
         let key = Self::in_flight_key(app_id, file_path);
 
-        // Check if already in flight
-        if let Some(sender) = self.in_flight.get(&key) {
-            return Some(sender.subscribe());
+        // Atomic check-and-insert via entry() API to prevent TOCTOU race.
+        // Without this, two concurrent tasks could both see an empty slot,
+        // both insert, and the first task's broadcast sender gets overwritten
+        // — orphaning its waiters.
+        match self.in_flight.entry(key) {
+            dashmap::mapref::entry::Entry::Occupied(entry) => Some(entry.get().subscribe()),
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                let (tx, _) = broadcast::channel(1);
+                entry.insert(tx);
+                None
+            }
         }
-
-        // Register as the leader
-        let (tx, _) = broadcast::channel(1);
-        self.in_flight.insert(key, tx);
-        None
     }
 
     /// Complete an in-flight fetch, broadcasting the result to all waiters.

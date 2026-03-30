@@ -22,8 +22,7 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::body::Incoming;
-use hyper::{Request, Response, StatusCode};
+use hyper::{Response, StatusCode};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -43,11 +42,7 @@ const RETRY_BASE_DELAY_MS: u64 = 100;
 /// 2. Resolve blob_hash from app index (projection store lookup)
 /// 3. If cache available AND blob_hash known: try cache → coalesce → fetch
 /// 4. Otherwise: fall through to direct proxy (BYPASS)
-pub async fn handle_app_request(
-    _req: Request<Incoming>,
-    state: Arc<AppState>,
-    path: &str,
-) -> Response<Full<Bytes>> {
+pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Full<Bytes>> {
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
@@ -76,6 +71,16 @@ pub async fn handle_app_request(
                 .unwrap();
         }
     };
+
+    // Path traversal protection — defense in depth (storage also validates)
+    if file_path.contains("..") || file_path.contains('\0') || file_path.starts_with('/') {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header("Content-Type", "application/json")
+            .header("X-Cache", "BYPASS")
+            .body(Full::new(Bytes::from(r#"{"error": "Invalid file path"}"#)))
+            .unwrap();
+    }
 
     // Cache-first path: only active when cache service AND blob_hash are available.
     // blob_hash is resolved from the app index (populated from projection store).
@@ -204,7 +209,7 @@ async fn fetch_and_cache(
                         };
                         cache.finish_fetch(app_id, file_path, Some(cached_file));
 
-                        info!(
+                        debug!(
                             app_id = %app_id,
                             file_path = %file_path,
                             size = body.len(),
@@ -557,6 +562,17 @@ mod tests {
     #[test]
     fn test_parse_app_path_not_apps() {
         assert!(parse_app_path("/other/my-app/file.js").is_none());
+    }
+
+    // Path traversal detection (defense in depth — validated in handle_app_request)
+    #[test]
+    fn test_parse_app_path_traversal_passes_parse_but_caught_later() {
+        // parse_app_path doesn't reject traversal — that's handle_app_request's job
+        let result = parse_app_path("/apps/my-app/../../../etc/passwd");
+        assert!(result.is_some()); // parser succeeds
+        let (app_id, file_path) = result.unwrap();
+        assert_eq!(app_id, "my-app");
+        assert!(file_path.contains("..")); // but file_path contains traversal
     }
 
     #[test]

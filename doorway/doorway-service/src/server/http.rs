@@ -1294,7 +1294,7 @@ async fn handle_request(
         (Method::GET, p) if p.starts_with("/apps/") => {
             debug!(path = %p, "Handling app request (projection cache)");
             return Ok(to_boxed(
-                routes::handle_app_request(req, Arc::clone(&state), p).await,
+                routes::handle_app_request(Arc::clone(&state), p).await,
             ));
         }
 
