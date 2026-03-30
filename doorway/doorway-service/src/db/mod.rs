@@ -7,4 +7,4 @@ pub mod mongo;
 pub mod schemas;
 
 pub use mongo::{MongoClient, MongoCollection};
-pub use schemas::{ApiKeyDoc, HostDoc, Metadata, UserDoc};
+pub use schemas::{ApiKeyDoc, AppFileCacheDoc, HostDoc, Metadata, UserDoc};

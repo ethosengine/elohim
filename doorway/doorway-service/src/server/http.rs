@@ -17,8 +17,8 @@ use tracing::{debug, error, info, warn};
 
 use crate::bootstrap::{self, BootstrapStore};
 use crate::cache::{
-    self, spawn_tiered_cleanup_task, CacheConfig, CacheRuleStore, ContentCache, DeliveryRelay,
-    DoorwayResolver, TieredBlobCache, TieredCacheConfig,
+    self, spawn_tiered_cleanup_task, AppFileCacheService, CacheConfig, CacheRuleStore,
+    ContentCache, DeliveryRelay, DoorwayResolver, TieredBlobCache, TieredCacheConfig,
 };
 use crate::conductor::{ConductorRegistry, ConductorRouter};
 use crate::config::Args;
@@ -115,6 +115,8 @@ pub struct AppState {
     pub started_at: chrono::DateTime<chrono::Utc>,
     /// Cached MongoDB projection stats (per-instance, not global static)
     pub projection_stats_cache: Arc<tokio::sync::Mutex<(std::time::Instant, u64, u64)>>,
+    /// App file projection cache (MongoDB-backed, for HTML5 app assets)
+    pub app_file_cache: Option<Arc<AppFileCacheService>>,
 }
 
 impl AppState {
@@ -193,6 +195,7 @@ impl AppState {
                 0,
                 0,
             ))),
+            app_file_cache: None,
         }
     }
 
@@ -275,6 +278,7 @@ impl AppState {
                 0,
                 0,
             ))),
+            app_file_cache: None,
         }
     }
 
@@ -372,6 +376,7 @@ impl AppState {
                 0,
                 0,
             ))),
+            app_file_cache: None,
         }
     }
 
@@ -422,6 +427,15 @@ impl AppState {
             crate::services::federation::new_peer_url_list(args.federation_peers.clone());
         let cors_config = crate::cors::CorsConfig::from_args(&args);
 
+        // Initialize app file projection cache (MongoDB-backed)
+        let app_file_cache = {
+            let svc = AppFileCacheService::new(&mongo, "self-negotiated".to_string());
+            // Pre-populate the app index (app_id -> blob_hash) from projection store
+            svc.load_app_index().await;
+            info!("App file projection cache initialized");
+            Some(Arc::new(svc))
+        };
+
         Ok(Self {
             args,
             mongo: Some(mongo),
@@ -463,6 +477,7 @@ impl AppState {
                 0,
                 0,
             ))),
+            app_file_cache,
         })
     }
 
@@ -1265,12 +1280,12 @@ async fn handle_request(
 
         // Account API routes — handled by dynamic registry fallback below
 
-        // HTML5 App serving routes (proxied to elohim-storage)
+        // HTML5 App serving routes (projection cache → elohim-storage fallback)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
-            debug!(path = %p, "Forwarding app request to elohim-storage");
+            debug!(path = %p, "Handling app request (projection cache)");
             return Ok(to_boxed(
-                routes::handle_app_request(req, state.args.storage_url.clone(), p).await,
+                routes::handle_app_request(req, Arc::clone(&state), p).await,
             ));
         }
 

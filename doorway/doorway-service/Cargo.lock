@@ -1105,6 +1105,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "serde",
+ "serde_bytes",
  "serde_ipld_dagcbor",
  "serde_json",
  "serde_urlencoded",

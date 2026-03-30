@@ -1,17 +1,22 @@
-//! HTML5 App Route Handler - Forwards /apps/ requests to elohim-storage
+//! HTML5 App Route Handler — Projection Cache with Storage Fallback
 //!
-//! This is a proxy route that forwards app serving requests to elohim-storage,
-//! similar to how /db/ routes proxy database requests.
+//! Serves HTML5 app assets (JS, CSS, images) from a MongoDB projection cache
+//! with transparent fallback to elohim-storage for cache misses. When a browser
+//! loads an HTML5 app (e.g., a Sophia quiz), it fires 30+ concurrent requests
+//! for assets — the cache absorbs this web2 traffic pattern so storage stays
+//! focused on P2P.
 //!
-//! ## Architecture
+//! ## Cache-First Flow
 //!
 //! ```text
-//! Browser → Doorway → elohim-storage
-//!              │           │
-//!         (proxy)    (ZIP extraction)
+//! Browser → Doorway
+//!              ├─ Cache HIT  → serve from MongoDB         (X-Cache: HIT)
+//!              ├─ Coalesced  → wait for in-flight fetch    (X-Cache: HIT-COALESCED)
+//!              ├─ Cache MISS → fetch from storage, cache   (X-Cache: MISS)
+//!              └─ No cache   → direct proxy to storage     (X-Cache: BYPASS)
 //! ```
 //!
-//! ## Endpoints (forwarded to storage)
+//! ## Endpoints
 //!
 //! - GET /apps/{app_id}/{path} - Serve file from HTML5 app ZIP
 
@@ -19,7 +24,10 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper::{Request, Response, StatusCode};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
+
+use crate::server::AppState;
 
 /// Maximum retries for transient failures (502/connection errors).
 /// HTML5 apps load 30+ assets concurrently which can overwhelm storage
@@ -29,16 +37,19 @@ const MAX_RETRIES: u32 = 2;
 /// Base delay between retries (doubles each attempt).
 const RETRY_BASE_DELAY_MS: u64 = 100;
 
-/// Handle app proxy requests
+/// Handle app requests with cache-first resolution.
 ///
-/// Forwards all /apps/* requests to elohim-storage
+/// 1. Parse path into app_id and file_path
+/// 2. Resolve blob_hash from app index (projection store lookup)
+/// 3. If cache available AND blob_hash known: try cache → coalesce → fetch
+/// 4. Otherwise: fall through to direct proxy (BYPASS)
 pub async fn handle_app_request(
     _req: Request<Incoming>,
-    storage_url: Option<String>,
+    state: Arc<AppState>,
     path: &str,
 ) -> Response<Full<Bytes>> {
-    let storage_url = match storage_url {
-        Some(url) => url,
+    let storage_url = match &state.args.storage_url {
+        Some(url) => url.clone(),
         None => {
             warn!("Apps proxy called but STORAGE_URL not configured");
             return Response::builder()
@@ -51,12 +62,229 @@ pub async fn handle_app_request(
         }
     };
 
-    // Forward the request to elohim-storage with retry for transient failures
-    forward_app_request(&storage_url, path).await
+    // Parse /apps/{app_id}/{file_path...}
+    let (app_id, file_path) = match parse_app_path(path) {
+        Some(parsed) => parsed,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header("Content-Type", "application/json")
+                .header("X-Cache", "BYPASS")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "Invalid app path. Expected /apps/{app_id}/{file_path}"}"#,
+                )))
+                .unwrap();
+        }
+    };
+
+    // Cache-first path: only active when cache service AND blob_hash are available.
+    // blob_hash is resolved from the app index (populated from projection store).
+    if let Some(ref cache) = state.app_file_cache {
+        let blob_hash = cache.resolve_blob_hash(app_id).await;
+
+        if let Some(hash) = blob_hash {
+            // --- Try cache lookup ---
+            if let Some(cached) = cache.get(app_id, file_path, &hash).await {
+                debug!(app_id = %app_id, file_path = %file_path, "App file cache HIT");
+                return build_app_response(&cached.data, &cached.content_type, "HIT");
+            }
+
+            // --- Try in-flight coalescing ---
+            match cache.begin_fetch(app_id, file_path) {
+                Some(mut rx) => {
+                    // Another task is already fetching this file — wait for it
+                    debug!(
+                        app_id = %app_id,
+                        file_path = %file_path,
+                        "Coalescing app file fetch (waiting for leader)"
+                    );
+                    match rx.recv().await {
+                        Ok(Some(cached)) => {
+                            return build_app_response(
+                                &cached.data,
+                                &cached.content_type,
+                                "HIT-COALESCED",
+                            );
+                        }
+                        _ => {
+                            // Leader failed or channel closed — fall through to proxy
+                            warn!(
+                                app_id = %app_id,
+                                file_path = %file_path,
+                                "Coalesced fetch failed, falling through to proxy"
+                            );
+                            return forward_app_request_with_header(&storage_url, path, "MISS")
+                                .await;
+                        }
+                    }
+                }
+                None => {
+                    // We are the leader — fetch from storage, cache, broadcast
+                    let response =
+                        fetch_and_cache(cache, &storage_url, path, app_id, file_path, &hash).await;
+                    return response;
+                }
+            }
+        }
+    }
+
+    // No cache or no blob_hash — direct proxy (existing behaviour)
+    forward_app_request_with_header(&storage_url, path, "BYPASS").await
 }
 
-/// Forward a /apps/* request to elohim-storage, retrying on transient errors.
-async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Bytes>> {
+/// Parse `/apps/{app_id}/{file_path...}` into (app_id, file_path).
+///
+/// Returns `None` if the path doesn't have at least an app_id and one file
+/// path segment.
+fn parse_app_path(path: &str) -> Option<(&str, &str)> {
+    // Strip leading "/apps/"
+    let rest = path.strip_prefix("/apps/")?;
+    if rest.is_empty() {
+        return None;
+    }
+
+    // Split into app_id and file_path at the first '/'
+    let (app_id, file_path) = match rest.find('/') {
+        Some(idx) => {
+            let (id, remainder) = rest.split_at(idx);
+            // remainder starts with '/', strip it
+            (id, &remainder[1..])
+        }
+        None => {
+            // No file path segment — just an app_id
+            return None;
+        }
+    };
+
+    if app_id.is_empty() || file_path.is_empty() {
+        return None;
+    }
+
+    Some((app_id, file_path))
+}
+
+/// Fetch a file from storage, cache it, broadcast to waiters, and return the response.
+async fn fetch_and_cache(
+    cache: &crate::cache::AppFileCacheService,
+    storage_url: &str,
+    full_path: &str,
+    app_id: &str,
+    file_path: &str,
+    blob_hash: &str,
+) -> Response<Full<Bytes>> {
+    let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), full_path);
+    let client = reqwest::Client::new();
+
+    let result = client.get(&storage_endpoint).send().await;
+
+    match result {
+        Ok(response) => {
+            let status = response.status();
+
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/octet-stream")
+                .to_string();
+
+            match response.bytes().await {
+                Ok(body) => {
+                    if status.is_success() {
+                        // Cache the file
+                        cache
+                            .put(app_id, file_path, blob_hash, &content_type, body.to_vec())
+                            .await;
+
+                        // Broadcast to coalesced waiters
+                        let cached_file = crate::cache::CachedFile {
+                            data: body.to_vec(),
+                            content_type: content_type.clone(),
+                            blob_hash: blob_hash.to_string(),
+                        };
+                        cache.finish_fetch(app_id, file_path, Some(cached_file));
+
+                        info!(
+                            app_id = %app_id,
+                            file_path = %file_path,
+                            size = body.len(),
+                            "App file cached (MISS)"
+                        );
+
+                        build_app_response(&body, &content_type, "MISS")
+                    } else {
+                        // Non-success status — don't cache, broadcast failure
+                        cache.finish_fetch(app_id, file_path, None);
+
+                        Response::builder()
+                            .status(
+                                StatusCode::from_u16(status.as_u16())
+                                    .unwrap_or(StatusCode::BAD_GATEWAY),
+                            )
+                            .header("Content-Type", &content_type)
+                            .header("X-Cache", "MISS")
+                            .body(Full::new(Bytes::from(body.to_vec())))
+                            .unwrap()
+                    }
+                }
+                Err(e) => {
+                    cache.finish_fetch(app_id, file_path, None);
+                    warn!(error = %e, "Failed to read storage response body during cache fetch");
+                    Response::builder()
+                        .status(StatusCode::BAD_GATEWAY)
+                        .header("Content-Type", "application/json")
+                        .header("X-Cache", "MISS")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Failed to read storage response: {e}"}}"#
+                        ))))
+                        .unwrap()
+                }
+            }
+        }
+        Err(e) => {
+            cache.finish_fetch(app_id, file_path, None);
+            warn!(error = %e, "Failed to connect to storage during cache fetch");
+            Response::builder()
+                .status(StatusCode::BAD_GATEWAY)
+                .header("Content-Type", "application/json")
+                .header("X-Cache", "MISS")
+                .body(Full::new(Bytes::from(format!(
+                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
+                ))))
+                .unwrap()
+        }
+    }
+}
+
+/// Build an HTTP response for an app file with standard headers.
+///
+/// Sets COEP/CORP headers (required for cross-origin embedding in Angular),
+/// cache control, and the X-Cache diagnostic header.
+fn build_app_response(
+    data: &[u8],
+    content_type: &str,
+    cache_status: &str,
+) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", content_type)
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
+        .header("Cross-Origin-Embedder-Policy", "credentialless")
+        .header("X-Cache", cache_status)
+        .header("Cache-Control", "public, max-age=3600")
+        .body(Full::new(Bytes::from(data.to_vec())))
+        .unwrap()
+}
+
+/// Forward a /apps/* request to elohim-storage with retry for transient errors.
+///
+/// This is the existing proxy path, preserved for BYPASS and fallback scenarios.
+/// Adds the X-Cache header to the response.
+async fn forward_app_request_with_header(
+    storage_url: &str,
+    path: &str,
+    cache_status: &str,
+) -> Response<Full<Bytes>> {
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
 
     debug!(url = %storage_endpoint, "Forwarding app request to elohim-storage");
@@ -117,7 +345,8 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                             // Required for COEP: require-corp in Angular app
                             .header("Cross-Origin-Resource-Policy", "cross-origin")
                             // Required for iframes embedded in COEP pages
-                            .header("Cross-Origin-Embedder-Policy", "credentialless");
+                            .header("Cross-Origin-Embedder-Policy", "credentialless")
+                            .header("X-Cache", cache_status);
 
                         if let Some(cc) = cache_control {
                             builder = builder.header("Cache-Control", cc);
@@ -145,6 +374,7 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                         return Response::builder()
                             .status(StatusCode::BAD_GATEWAY)
                             .header("Content-Type", "application/json")
+                            .header("X-Cache", cache_status)
                             .body(Full::new(Bytes::from(format!(
                                 r#"{{"error": "Failed to read storage response: {e}"}}"#
                             ))))
@@ -168,6 +398,7 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                 return Response::builder()
                     .status(StatusCode::BAD_GATEWAY)
                     .header("Content-Type", "application/json")
+                    .header("X-Cache", cache_status)
                     .body(Full::new(Bytes::from(format!(
                         r#"{{"error": "Failed to connect to storage: {e}"}}"#
                     ))))
@@ -180,8 +411,84 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
     Response::builder()
         .status(StatusCode::BAD_GATEWAY)
         .header("Content-Type", "application/json")
+        .header("X-Cache", cache_status)
         .body(Full::new(Bytes::from(
             r#"{"error": "Max retries exhausted"}"#,
         )))
         .unwrap()
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_app_path_normal() {
+        let (app_id, file_path) = parse_app_path("/apps/my-app/index.html").unwrap();
+        assert_eq!(app_id, "my-app");
+        assert_eq!(file_path, "index.html");
+    }
+
+    #[test]
+    fn test_parse_app_path_nested() {
+        let (app_id, file_path) = parse_app_path("/apps/quiz-123/js/vendor/pixi.min.js").unwrap();
+        assert_eq!(app_id, "quiz-123");
+        assert_eq!(file_path, "js/vendor/pixi.min.js");
+    }
+
+    #[test]
+    fn test_parse_app_path_no_file() {
+        assert!(parse_app_path("/apps/my-app").is_none());
+    }
+
+    #[test]
+    fn test_parse_app_path_no_app_id() {
+        assert!(parse_app_path("/apps/").is_none());
+    }
+
+    #[test]
+    fn test_parse_app_path_empty() {
+        assert!(parse_app_path("/apps/my-app/").is_none());
+    }
+
+    #[test]
+    fn test_parse_app_path_not_apps() {
+        assert!(parse_app_path("/other/my-app/file.js").is_none());
+    }
+
+    #[test]
+    fn test_build_app_response_headers() {
+        let resp = build_app_response(b"hello", "text/html", "HIT");
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers().get("Content-Type").unwrap(), "text/html");
+        assert_eq!(resp.headers().get("X-Cache").unwrap(), "HIT");
+        assert_eq!(
+            resp.headers().get("Cross-Origin-Resource-Policy").unwrap(),
+            "cross-origin"
+        );
+        assert_eq!(
+            resp.headers().get("Cross-Origin-Embedder-Policy").unwrap(),
+            "credentialless"
+        );
+        assert_eq!(
+            resp.headers().get("Cache-Control").unwrap(),
+            "public, max-age=3600"
+        );
+    }
+
+    #[test]
+    fn test_build_app_response_bypass() {
+        let resp = build_app_response(b"data", "application/javascript", "BYPASS");
+        assert_eq!(resp.headers().get("X-Cache").unwrap(), "BYPASS");
+    }
+
+    #[test]
+    fn test_build_app_response_coalesced() {
+        let resp = build_app_response(b"data", "text/css", "HIT-COALESCED");
+        assert_eq!(resp.headers().get("X-Cache").unwrap(), "HIT-COALESCED");
+    }
 }
