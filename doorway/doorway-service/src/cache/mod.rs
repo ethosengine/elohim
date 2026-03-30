@@ -37,6 +37,7 @@
 //! This COMPLEMENTS agent-side `elohim-cache-core` - it does NOT replace it.
 
 pub mod access_control;
+pub mod app_file_cache;
 pub mod delivery_relay;
 pub mod keys;
 pub mod reach_aware_serving;
@@ -48,6 +49,7 @@ pub mod tiered;
 pub use access_control::{
     can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext,
 };
+pub use app_file_cache::{AppFileCacheService, CachedFile};
 pub use delivery_relay::{CoalescedRequest, DeliveryRelay, DeliveryRelayConfig};
 pub use keys::CacheKey;
 pub use reach_aware_serving::{
