@@ -9,7 +9,7 @@
  * ```typescript
  * const service = new HolochainImportService({
  *   adminUrl: 'wss://doorway-alpha.elohim.host',
- *   appId: 'elohim',
+ *   hAppId: 'elohim',
  *   batchSize: 50,
  * });
  *
@@ -46,7 +46,7 @@ export class HolochainImportService {
     this.config = config;
     this.client = new HolochainClientService({
       adminUrl: config.adminUrl,
-      appId: config.appId,
+      hAppId: config.hAppId,
       happPath: config.happPath,
     });
   }
@@ -258,7 +258,7 @@ export function createElohimImportService(
 ): HolochainImportService {
   return new HolochainImportService({
     adminUrl,
-    appId: 'elohim',
+    hAppId: 'elohim',
     batchSize,
     happPath,
   });

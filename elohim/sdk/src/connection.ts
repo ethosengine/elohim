@@ -18,7 +18,7 @@ export interface ConnectionState {
   isConnected: boolean;
   adminUrl: string | null;
   appUrl: string | null;
-  appId: string | null;
+  hAppId: string | null;
   cellId: CellId | null;
 }
 
@@ -41,7 +41,7 @@ export class HolochainConnection {
   constructor(config: ConnectionConfig) {
     this.config = {
       timeout: 30000,
-      appId: DEFAULT_APP_ID,
+      hAppId: DEFAULT_APP_ID,
       roleId: DEFAULT_ROLE_ID,
       ...config,
     };
@@ -80,12 +80,12 @@ export class HolochainConnection {
     // List apps to check if our app is installed
     const apps = await this.adminWs.listApps({});
     const appInfo = apps.find(
-      (app: AppInfo) => app.installed_app_id === this.config.appId
+      (app: AppInfo) => app.installed_app_id === this.config.hAppId
     );
 
     if (!appInfo) {
       throw new Error(
-        `App '${this.config.appId}' not installed. Install the hApp first.`
+        `App '${this.config.hAppId}' not installed. Install the hApp first.`
       );
     }
 
@@ -163,7 +163,7 @@ export class HolochainConnection {
       isConnected: this.appWs !== null && this.cellId !== null,
       adminUrl: this.config.adminUrl,
       appUrl: this.config.appUrl ?? null,
-      appId: this.config.appId ?? null,
+      hAppId: this.config.hAppId ?? null,
       cellId: this.cellId,
     };
   }

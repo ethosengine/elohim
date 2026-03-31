@@ -64,7 +64,7 @@ export interface ClientEnvironmentConfig {
   /** Personal elohim-node URLs for Tauri sync (DHT-registered) */
   nodeUrls?: string[];
   /** Holochain app ID for agent data */
-  holochainAppId?: string;
+  holochainHAppId?: string;
   /** Direct conductor URL (Tauri mode only) */
   holochainConductorUrl?: string;
   /** elohim-storage sidecar URL (Tauri mode - local blob/session storage) */

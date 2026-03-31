@@ -47,7 +47,7 @@ export interface HolochainConfig {
   origin: string;
 
   /** Installed app ID (e.g., 'elohim-lamad') */
-  appId: InstalledAppId;
+  hAppId: InstalledAppId;
 
   /** Path to hApp file (for installation) */
   happPath?: string;
@@ -390,7 +390,7 @@ export const DEFAULT_HOLOCHAIN_CONFIG: HolochainConfig = {
   adminUrl: holochainConfig?.adminUrl ?? 'ws://localhost:4444',
   appUrl: holochainConfig?.appUrl ?? 'ws://localhost:4445',
   origin: 'elohim-app',
-  appId: 'elohim',
+  hAppId: 'elohim',
   happPath: '/opt/holochain/elohim.happ',
   proxyApiKey: holochainConfig?.proxyApiKey,
   useLocalProxy: holochainConfig?.useLocalProxy ?? true, // Auto-detect Che and use dev-proxy
@@ -438,8 +438,8 @@ export interface EdgeNodeDisplayInfo {
   /** Cell ID display [DnaHash, AgentPubKey] */
   cellId: { dnaHash: string; agentPubKey: string } | null;
 
-  /** App ID from config */
-  appId: string;
+  /** Holochain app ID from config */
+  hAppId: string;
 
   /** DNA hash extracted from cell ID */
   dnaHash: string | null;

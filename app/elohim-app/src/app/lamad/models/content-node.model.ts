@@ -595,8 +595,8 @@ export interface ContentRelationshipDetail {
   /** Unique relationship ID */
   id: string;
 
-  /** App ID for multi-tenant scoping */
-  appId: string;
+  /** Holochain app ID for multi-tenant scoping */
+  hAppId: string;
 
   /** Source content node ID */
   sourceNodeId: string;
@@ -681,7 +681,7 @@ export type RelationshipInferenceSource =
  */
 export interface ContentRelationshipDetailWire {
   id: string;
-  appId: string;
+  hAppId: string;
   sourceId: string;
   targetId: string;
   relationshipType: string;
@@ -705,7 +705,7 @@ export function transformRelationshipDetailFromWire(
 ): ContentRelationshipDetail {
   return {
     id: wire.id,
-    appId: wire.appId,
+    hAppId: wire.hAppId,
     sourceNodeId: wire.sourceId,
     targetNodeId: wire.targetId,
     relationshipType: wire.relationshipType as ContentRelationshipType,

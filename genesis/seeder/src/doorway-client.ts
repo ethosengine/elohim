@@ -537,13 +537,13 @@ export class DoorwayClient {
    * This tells the cache about the app so it can serve files from the zip.
    */
   async registerApp(
-    appId: string,
+    slug: string,
     blobHash: string,
     entryPoint: string = 'index.html',
     fallbackUrl?: string
   ): Promise<{ success: boolean; error?: string }> {
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would register app: ${appId} -> ${blobHash}`);
+      console.log(`[DRY RUN] Would register app: ${slug} -> ${blobHash}`);
       return { success: true };
     }
 
@@ -554,7 +554,7 @@ export class DoorwayClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          appId: appId,
+          slug: slug,
           blobHash: blobHash,
           entryPoint: entryPoint,
           fallbackUrl: fallbackUrl,

@@ -23,7 +23,7 @@ export const environment: Environment = {
     doorwayUrl: DOORWAY_ALPHA_HTTPS,
     apiKey: DEV_API_KEY,
     nodeUrls: [], // No personal nodes in alpha
-    holochainAppId: 'elohim',
+    holochainHAppId: 'elohim',
     holochainConductorUrl: DOORWAY_ALPHA_WSS,
   },
 };

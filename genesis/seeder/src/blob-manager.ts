@@ -256,10 +256,10 @@ export class BlobManager {
   private async extractHtml5AppBlob(
     content: ContentFile,
     contentDir: string
-  ): Promise<{ blob: Buffer; entryPoint?: string; appId?: string } | null> {
-    // Get appId from content.content object (for html5-app format)
+  ): Promise<{ blob: Buffer; entryPoint?: string; slug?: string } | null> {
+    // Get slug from content.content object (for html5-app format)
     const contentObj = typeof content.content === 'object' ? content.content as Record<string, unknown> : null;
-    const appId = contentObj?.appId as string | undefined;
+    const slug = contentObj?.slug as string | undefined;
     const entryPoint = contentObj?.entryPoint as string | undefined || (content.entryPoint as string) || 'index.html';
 
     // Try metadata.localZipPath first (relative to genesis directory)
@@ -273,7 +273,7 @@ export class BlobManager {
         return {
           blob: fs.readFileSync(zipPath),
           entryPoint,
-          appId,
+          slug,
         };
       }
     }
@@ -284,7 +284,7 @@ export class BlobManager {
       return {
         blob: fs.readFileSync(zipPath),
         entryPoint,
-        appId,
+        slug,
       };
     }
 
@@ -295,7 +295,7 @@ export class BlobManager {
         return {
           blob: fs.readFileSync(blobPath),
           entryPoint,
-          appId,
+          slug,
         };
       }
     }

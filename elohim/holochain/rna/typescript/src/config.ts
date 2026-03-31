@@ -76,8 +76,8 @@ export const defaultOptions: MigrationOptions = {
 export interface ConnectionConfig {
   /** Admin WebSocket URL (e.g., "ws://localhost:4444") */
   adminUrl: string;
-  /** App ID to connect to (e.g., "my-app") */
-  appId: string;
+  /** Holochain app ID to connect to (e.g., "my-app") */
+  hAppId: string;
   /** Path to .hc_ports file (optional) */
   portsFile?: string;
 }

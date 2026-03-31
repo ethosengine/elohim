@@ -24,7 +24,7 @@
  * // 1. Connect to Holochain
  * const conn = await connect({
  *   adminUrl: 'ws://localhost:4444',
- *   appId: 'my-app',
+ *   hAppId: 'my-app',
  *   sourceRole: 'my-dna-v1',
  *   targetRole: 'my-dna-v2',
  * });

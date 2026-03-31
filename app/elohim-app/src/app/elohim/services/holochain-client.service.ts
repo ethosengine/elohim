@@ -154,7 +154,7 @@ export class HolochainClientService {
       appUrl: this.config.appUrl,
       proxyApiKey: this.config.proxyApiKey,
       storageUrl: this.config.storageUrl,
-      appId: installedAppId ?? this.config.appId,
+      hAppId: installedAppId ?? this.config.hAppId,
       happPath: this.config.happPath,
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,
@@ -329,7 +329,7 @@ export class HolochainClientService {
 
       this.logger.info('Connected', {
         strategy: this.strategy.name,
-        appId: this.config.appId,
+        hAppId: this.config.hAppId,
         agentPubKey: result.agentPubKey ? this.encodeAgentPubKey(result.agentPubKey) : 'N/A',
         cellCount: result.cellIds?.size ?? 0,
         mode: this.strategy.mode,
@@ -883,7 +883,7 @@ export class HolochainClientService {
   private async getInstalledApp(adminWs: AdminWebsocket): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
-      return apps.find(app => app.installed_app_id === this.config.appId) ?? null;
+      return apps.find(app => app.installed_app_id === this.config.hAppId) ?? null;
     } catch {
       return null;
     }
@@ -1023,7 +1023,7 @@ export class HolochainClientService {
       appUrl: config.appUrl,
       agentPubKey: conn.agentPubKey ? this.uint8ArrayToBase64(conn.agentPubKey) : null,
       cellId: cellIdDisplay,
-      appId: config.appId,
+      hAppId: config.hAppId,
       dnaHash,
       connectedAt: conn.connectedAt ?? null,
       hasStoredCredentials: this.hasStoredCredentials(),

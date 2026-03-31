@@ -33,9 +33,9 @@ export const appConfig: ApplicationConfig = {
         storageUrl: environment.client?.storageUrl,
       }),
       // Holochain connection for agent-centric data (attestations, identity, points)
-      holochain: environment.client?.holochainAppId
+      holochain: environment.client?.holochainHAppId
         ? {
-            appId: environment.client.holochainAppId,
+            hAppId: environment.client.holochainHAppId,
             enabled: true,
             directConductorUrl: environment.client.holochainConductorUrl,
           }

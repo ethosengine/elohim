@@ -28,7 +28,7 @@ const program = new Command();
 // Default configuration
 const DEFAULT_CONFIG: HolochainImportConfig = {
   adminUrl: 'wss://doorway-alpha.elohim.host',
-  appId: 'elohim',
+  hAppId: 'elohim',
   batchSize: 50,
 };
 
@@ -42,7 +42,7 @@ program
   .description('Import content from source files to Holochain')
   .option('-s, --source <dir>', 'Source content directory', './docs/content')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .option('--happ-path <path>', 'Path to .happ file for installation')
   .option('--batch-size <n>', 'Entries per bulk call', String(DEFAULT_CONFIG.batchSize))
   .option('-f, --full', 'Force full reimport', false)
@@ -55,7 +55,7 @@ program
     console.log('Holochain Content Import');
     console.log('========================');
     console.log(`Source: ${sourceDir}`);
-    console.log(`Holochain: ${options.adminUrl} (${options.appId})`);
+    console.log(`Holochain: ${options.adminUrl} (${options.hAppId})`);
     console.log(`Mode: ${options.full ? 'Full' : 'Incremental'}`);
     console.log(`Batch size: ${options.batchSize}`);
     if (options.dryRun) {
@@ -106,7 +106,7 @@ program
       // Step 2: Import to Holochain
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
-        appId: options.appId,
+        hAppId: options.hAppId,
         happPath: options.happPath,
         batchSize: Number.parseInt(options.batchSize, 10),
       });
@@ -141,12 +141,12 @@ program
   .command('holo:stats')
   .description('Show Holochain content statistics')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .action(async options => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
-        appId: options.appId,
+        hAppId: options.hAppId,
         batchSize: 50,
       });
 
@@ -181,7 +181,7 @@ program
   .option('-i, --ids <ids>', 'Comma-separated content IDs to verify')
   .option('-f, --file <path>', 'File with IDs (one per line)')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .action(async options => {
     let ids: string[] = [];
 
@@ -203,7 +203,7 @@ program
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
-        appId: options.appId,
+        hAppId: options.hAppId,
         batchSize: 50,
       });
 
@@ -247,12 +247,12 @@ program
   .option('-t, --type <type>', 'Content type to list', 'scenario')
   .option('-l, --limit <n>', 'Maximum entries', '20')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .action(async options => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
-        appId: options.appId,
+        hAppId: options.hAppId,
         batchSize: 50,
       });
 
@@ -293,13 +293,13 @@ program
   .description('Get a single content by ID')
   .argument('<id>', 'Content ID to fetch')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .option('--json', 'Output as JSON', false)
   .action(async (id: string, options: any) => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
-        appId: options.appId,
+        hAppId: options.hAppId,
         batchSize: 50,
       });
 
@@ -345,16 +345,16 @@ program
   .command('holo:test')
   .description('Test Holochain connection')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
-  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
+  .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.hAppId)
   .action(async options => {
     console.log('Testing Holochain connection...');
     console.log(`Admin URL: ${options.adminUrl}`);
-    console.log(`App ID: ${options.appId}`);
+    console.log(`App ID: ${options.hAppId}`);
     console.log('');
 
     const client = new HolochainClientService({
       adminUrl: options.adminUrl,
-      appId: options.appId,
+      hAppId: options.hAppId,
     });
 
     try {

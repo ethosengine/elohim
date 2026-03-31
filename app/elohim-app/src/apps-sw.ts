@@ -130,15 +130,15 @@ interface DeliveryInfo {
   ready: boolean;
 }
 
-/** Probe results cached per app_id — cleared on invalidation or new blob_hash */
+/** Probe results cached per slug — cleared on invalidation or new blob_hash */
 const deliveryCache = new Map<string, DeliveryInfo>();
 
-async function probeCapability(appId: string): Promise<DeliveryInfo> {
-  const cached = deliveryCache.get(appId);
+async function probeCapability(slug: string): Promise<DeliveryInfo> {
+  const cached = deliveryCache.get(slug);
   if (cached) return cached;
 
   try {
-    const resp = await fetch(`/apps/${appId}/_capability`, { method: 'HEAD' });
+    const resp = await fetch(`/apps/${slug}/_capability`, { method: 'HEAD' });
     const info: DeliveryInfo = {
       deliveryMode: resp.headers.get('X-Delivery-Mode') || 'compressed',
       blobHash: resp.headers.get('X-Blob-Hash') || '',
@@ -147,7 +147,7 @@ async function probeCapability(appId: string): Promise<DeliveryInfo> {
         resp.headers.get('X-Ready') === 'true' ||
         resp.headers.get('X-Projection-Ready') === 'true',
     };
-    deliveryCache.set(appId, info);
+    deliveryCache.set(slug, info);
     return info;
   } catch {
     return {
@@ -166,7 +166,7 @@ async function probeCapability(appId: string): Promise<DeliveryInfo> {
 async function handleAppFetch(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
-  const appId = pathParts[0];
+  const slug = pathParts[0];
   const filePath = pathParts.slice(1).join('/');
 
   // 1. Check local cache first
@@ -175,7 +175,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
   if (cached) return cached;
 
   // 2. Probe peer capability (cached per app load)
-  const capability = await probeCapability(appId);
+  const capability = await probeCapability(slug);
 
   // 3. Try LAN/WAN peers in scored order (best-effort P2P delivery)
   const peers = await getDeliveryPeers(capability.blobHash);
@@ -183,7 +183,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
     if (!peer.baseUrl) continue;
     try {
       if (peer.servesExtracted && peer.warm) {
-        const resp = await fetch(`${peer.baseUrl}/apps/${appId}/${filePath}`);
+        const resp = await fetch(`${peer.baseUrl}/apps/${slug}/${filePath}`);
         if (resp.ok) {
           cache.put(request, resp.clone());
           return resp;
@@ -200,7 +200,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
     return fetchAndCache(cache, request);
   } else {
     // Doorway serves compressed only — fetch ZIP, extract, serve from cache
-    return fetchViaZip(cache, appId, capability.blobHash, filePath);
+    return fetchViaZip(cache, slug, capability.blobHash, filePath);
   }
 }
 
@@ -229,20 +229,20 @@ const zipExtracting = new Map<string, Promise<void>>();
 
 async function fetchViaZip(
   cache: Cache,
-  appId: string,
+  slug: string,
   blobHash: string,
   filePath: string,
 ): Promise<Response> {
   // Ensure ZIP is extracted (deduplicate concurrent extractions)
-  if (!zipExtracting.has(appId)) {
-    zipExtracting.set(appId, extractZip(cache, appId, blobHash));
+  if (!zipExtracting.has(slug)) {
+    zipExtracting.set(slug, extractZip(cache, slug, blobHash));
   }
-  await zipExtracting.get(appId);
-  zipExtracting.delete(appId);
+  await zipExtracting.get(slug);
+  zipExtracting.delete(slug);
 
   // Now serve from cache
   const cached = await cache.match(
-    new Request(`${self.location.origin}/apps/${appId}/${filePath}`),
+    new Request(`${self.location.origin}/apps/${slug}/${filePath}`),
   );
   if (cached) return cached;
 
@@ -252,11 +252,11 @@ async function fetchViaZip(
 
 async function extractZip(
   cache: Cache,
-  appId: string,
+  slug: string,
   blobHash: string,
 ): Promise<void> {
   // Fetch the raw ZIP blob
-  const blobUrl = blobHash ? `/blob/${blobHash}` : `/apps/${appId}/`;
+  const blobUrl = blobHash ? `/blob/${blobHash}` : `/apps/${slug}/`;
   const resp = await fetch(blobUrl);
   if (!resp.ok) return;
 
@@ -271,7 +271,7 @@ async function extractZip(
       headers: { 'Content-Type': contentType },
     });
     await cache.put(
-      new Request(`${self.location.origin}/apps/${appId}/${path}`),
+      new Request(`${self.location.origin}/apps/${slug}/${path}`),
       response,
     );
   }
@@ -312,18 +312,18 @@ function guessContentType(path: string): string {
 
 const channel = new BroadcastChannel('apps-sw');
 channel.onmessage = async (event: MessageEvent) => {
-  const { type, appId } = event.data;
-  if (type === 'invalidate' && appId) {
+  const { type, slug } = event.data;
+  if (type === 'invalidate' && slug) {
     const cache = await caches.open(CACHE_NAME);
     const keys = await cache.keys();
-    const prefix = `/apps/${appId}/`;
+    const prefix = `/apps/${slug}/`;
     const toDelete = keys.filter((req) =>
       new URL(req.url).pathname.startsWith(prefix),
     );
     await Promise.all(toDelete.map((key) => cache.delete(key)));
-    deliveryCache.delete(appId);
+    deliveryCache.delete(slug);
     console.log(
-      `[apps-sw] invalidated ${toDelete.length} files for ${appId}`,
+      `[apps-sw] invalidated ${toDelete.length} files for ${slug}`,
     );
   }
 };

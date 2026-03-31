@@ -207,7 +207,7 @@ export class StorageClientService {
       appUrl: hc?.appUrl ?? '',
       proxyApiKey: hc?.proxyApiKey,
       storageUrl: hc?.storageUrl,
-      appId: 'elohim',
+      hAppId: 'elohim',
       useLocalProxy: hc?.useLocalProxy,
     };
   }

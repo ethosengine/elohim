@@ -36,7 +36,7 @@ import {
  * {
  *   contentFormat: 'html5-app',
  *   content: {
- *     appId: 'evolution-of-trust',  // URL namespace
+ *     slug: 'evolution-of-trust',   // URL namespace
  *     entryPoint: 'index.html',      // File to load
  *     fallbackUrl?: 'https://...'    // External fallback
  *   }
@@ -93,11 +93,11 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
 
     // File upload - extract metadata from zip
     const filename = input.name.replace(/\.zip$/i, '');
-    const appId = this.slugify(filename);
+    const slug = this.slugify(filename);
 
     return {
       content: {
-        appId,
+        slug,
         entryPoint: 'index.html',
       } as Html5AppContent,
       contentFormat: 'html5-app',
@@ -119,8 +119,8 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       content,
       contentFormat: 'html5-app',
       contentType: 'simulation',
-      title: this.humanize(content.appId),
-      description: `Interactive HTML5 application: ${this.humanize(content.appId)}`,
+      title: this.humanize(content.slug),
+      description: `Interactive HTML5 application: ${this.humanize(content.slug)}`,
       tags: ['html5-app', 'interactive'],
       metadata: {
         embedStrategy: 'iframe',
@@ -141,7 +141,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
 
     return JSON.stringify(
       {
-        appId: content.appId,
+        slug: content.slug,
         entryPoint: content.entryPoint,
         fallbackUrl: content.fallbackUrl,
       },
@@ -200,23 +200,23 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     }
 
     const content = parsed as Partial<Html5AppContent>;
-    this.validateAppId(content, errors);
+    this.validateSlug(content, errors);
     this.validateEntryPoint(content, errors, warnings);
     this.validateFallbackUrl(content, warnings);
 
     return { errors, warnings };
   }
 
-  private validateAppId(content: Partial<Html5AppContent>, errors: ValidationError[]): void {
-    if (!content.appId || typeof content.appId !== 'string') {
+  private validateSlug(content: Partial<Html5AppContent>, errors: ValidationError[]): void {
+    if (!content.slug || typeof content.slug !== 'string') {
       errors.push({
-        code: 'MISSING_APP_ID',
-        message: 'Missing required field: appId (string)',
+        code: 'MISSING_SLUG',
+        message: 'Missing required field: slug (string)',
       });
-    } else if (!/^[a-z0-9-]+$/.test(content.appId)) {
+    } else if (!/^[a-z0-9-]+$/.test(content.slug)) {
       errors.push({
-        code: 'INVALID_APP_ID',
-        message: 'appId must be lowercase alphanumeric with hyphens only',
+        code: 'INVALID_SLUG',
+        message: 'slug must be lowercase alphanumeric with hyphens only',
       });
     }
   }
@@ -319,7 +319,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         const obj = parsed as Record<string, unknown>;
 
         // Check for Html5AppContent structure
-        if (typeof obj['appId'] === 'string' && typeof obj['entryPoint'] === 'string') {
+        if (typeof obj['slug'] === 'string' && typeof obj['entryPoint'] === 'string') {
           return 0.9; // High confidence
         }
 

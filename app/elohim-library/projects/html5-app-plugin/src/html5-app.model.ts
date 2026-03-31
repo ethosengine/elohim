@@ -48,7 +48,7 @@ export const DEFAULT_CONFIG: Required<Html5AppConfig> = {
  */
 export interface Html5AppInfo {
   /** Unique app identifier */
-  appId: string;
+  slug: string;
 
   /** Entry point file (e.g., 'index.html') */
   entryPoint: string;
@@ -110,7 +110,7 @@ export interface Html5AppManifest {
  */
 export interface StoredFile {
   /** App ID this file belongs to */
-  appId: string;
+  slug: string;
 
   /** File path within the app */
   path: string;
@@ -133,7 +133,7 @@ export interface StoredFile {
  */
 export interface StoredAppMeta {
   /** App ID */
-  appId: string;
+  slug: string;
 
   /** App info */
   info: Html5AppInfo;
@@ -172,7 +172,7 @@ export interface SwMessage {
  * Register app message payload.
  */
 export interface RegisterAppPayload {
-  appId: string;
+  slug: string;
   entryPoint: string;
   files: string[];
 }
@@ -201,7 +201,7 @@ export type Html5AppEventType = 'load' | 'unload' | 'error' | 'ready';
  */
 export interface LoadEvent {
   type: 'load';
-  appId: string;
+  slug: string;
   info: Html5AppInfo;
 }
 
@@ -210,7 +210,7 @@ export interface LoadEvent {
  */
 export interface UnloadEvent {
   type: 'unload';
-  appId: string;
+  slug: string;
 }
 
 /**
@@ -218,7 +218,7 @@ export interface UnloadEvent {
  */
 export interface ErrorEvent {
   type: 'error';
-  appId?: string;
+  slug?: string;
   error: Error;
 }
 

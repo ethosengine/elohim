@@ -20,7 +20,7 @@ import {
  *
  * const client = new StorageClient({
  *   baseUrl: 'http://localhost:8080',
- *   appId: 'lamad',
+ *   hAppId: 'lamad',
  * });
  *
  * // List documents
@@ -115,7 +115,7 @@ export class StorageClient {
     if (options.limit !== undefined) params.set('limit', options.limit.toString());
 
     const query = params.toString();
-    const path = `/sync/v1/${this.config.appId}/docs${query ? `?${query}` : ''}`;
+    const path = `/sync/v1/${this.config.hAppId}/docs${query ? `?${query}` : ''}`;
     return this.request<ListDocumentsResponse>('GET', path);
   }
 
@@ -125,7 +125,7 @@ export class StorageClient {
   async getDocument(docId: string): Promise<GetDocumentResponse> {
     return this.request<GetDocumentResponse>(
       'GET',
-      `/sync/v1/${this.config.appId}/docs/${encodeURIComponent(docId)}`
+      `/sync/v1/${this.config.hAppId}/docs/${encodeURIComponent(docId)}`
     );
   }
 
@@ -135,7 +135,7 @@ export class StorageClient {
   async getHeads(docId: string): Promise<GetHeadsResponse> {
     return this.request<GetHeadsResponse>(
       'GET',
-      `/sync/v1/${this.config.appId}/docs/${encodeURIComponent(docId)}/heads`
+      `/sync/v1/${this.config.hAppId}/docs/${encodeURIComponent(docId)}/heads`
     );
   }
 
@@ -150,7 +150,7 @@ export class StorageClient {
     const haveParam = haveHeads.length > 0 ? `?have=${haveHeads.join(',')}` : '';
     return this.request<GetChangesResponse>(
       'GET',
-      `/sync/v1/${this.config.appId}/docs/${encodeURIComponent(docId)}/changes${haveParam}`
+      `/sync/v1/${this.config.hAppId}/docs/${encodeURIComponent(docId)}/changes${haveParam}`
     );
   }
 
@@ -167,7 +167,7 @@ export class StorageClient {
 
     return this.request<ApplyChangesResponse>(
       'POST',
-      `/sync/v1/${this.config.appId}/docs/${encodeURIComponent(docId)}/changes`,
+      `/sync/v1/${this.config.hAppId}/docs/${encodeURIComponent(docId)}/changes`,
       { changes: changesB64 }
     );
   }

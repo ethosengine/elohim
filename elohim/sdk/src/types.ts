@@ -2976,7 +2976,7 @@ export interface GateRevenueSummary {
 export interface ConnectionConfig {
   adminUrl: string;
   appUrl?: string;
-  appId?: string;
+  hAppId?: string;
   roleId?: string;
   timeout?: number;
 }

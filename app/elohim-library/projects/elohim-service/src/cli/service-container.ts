@@ -220,7 +220,7 @@ export class ServiceContainer {
   /**
    * Create Holochain client service
    */
-  createHolochainClient(config: { adminUrl: string; appId: string }): HolochainClientService {
+  createHolochainClient(config: { adminUrl: string; hAppId: string }): HolochainClientService {
     return new HolochainClientService(config);
   }
 

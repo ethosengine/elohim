@@ -426,7 +426,7 @@ async function createRelationship(input: {
   }
 
   try {
-    const response = await fetch(`${STORAGE_URL}/db/relationships?appId=lamad`, {
+    const response = await fetch(`${STORAGE_URL}/db/relationships?hAppId=lamad`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
