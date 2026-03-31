@@ -53,10 +53,14 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │   │   ├── elohim-agent-sdk/      # Agent SDK (TypeScript)
 │   │   └── mcp-servers/           # Model Context Protocol servers
 │   ├── elohim-storage/            # P2P content storage service (Rust)
+│   ├── elohim-cache-core/         # Caching primitives (extraction, LRU, blob)
+│   ├── elohim-compute/            # Compute coordination & capacity reporting
 │   ├── elohim-bitswap/            # IPFS Bitswap protocol
 │   ├── rust-ipfs/                 # IPFS implementation (git submodule)
-│   ├── sdk/                       # TypeScript client libraries
-│   │   └── storage-client-ts/     # Generated types from Rust
+│   ├── sdk/                       # Protocol SDK
+│   │   ├── schemas/               # Protocol JSON Schemas (v1) — source of truth
+│   │   ├── domains/               # App manifests (lamad, etc.)
+│   │   └── storage-client-ts/     # Generated TypeScript types from Rust
 │   └── holochain/                 # Holochain-specific layer
 │       ├── dna/                   # DNA definitions (zomes, hApp packaging)
 │       ├── holochain-cache-core/  # WASM cache module
@@ -66,6 +70,7 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │
 ├── app/                           # Frontend Applications
 │   ├── elohim-app/                # Angular 19 main platform
+│   │   ├── src/apps-sw.ts         # Service Worker (P2P app delivery)
 │   │   └── src/app/
 │   │       ├── elohim/            # Core infrastructure services
 │   │       ├── imagodei/          # Human identity & stewardship
@@ -76,7 +81,7 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │   │       └── doorway/           # Gateway integration
 │   └── elohim-library/            # Shared Angular libraries
 │       └── projects/
-│           └── elohim-service/    # Import pipeline, content models
+│           └── elohim-service/    # Import pipeline, content models, peer scoring
 │
 ├── sophia/                        # Assessment engine (git submodule)
 │   └── packages/
@@ -95,9 +100,9 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │       ├── src/                   # Always-on family node daemon
 │       └── simulation/            # Network simulation tooling
 │
-├── doorway/                       # Optional Hosted Gateway
-│   ├── doorway-service/           # Rust gateway (bootstrap, signal, proxy)
-│   └── doorway-app/               # Angular admin UI
+├── doorway/                       # Web2 Gateway (absorption + onboarding)
+│   ├── doorway-service/           # Rust gateway (bootstrap, signal, projection cache)
+│   └── doorway-app/               # Angular operator dashboard
 │
 ├── crates/                        # Shared Rust Crates
 │   ├── doorway-client/            # Gateway client traits
@@ -106,11 +111,13 @@ Organized by system boundary: core runtime, frontend apps, deployment shells, op
 │
 ├── genesis/                       # Meta / Ops / Content
 │   ├── orchestrator/              # CI/CD central controller
-│   ├── a2o/                       # Alpha-to-omega E2E validation
-│   ├── docs/                      # Source content (markdown, Gherkin)
-│   ├── research/                  # Research index (links to module research/)
-│   ├── seeder/                    # Content seeding tools
-│   └── manifests/                 # K8s deployment manifests
+│   │   └── manifests/             # K8s deployment manifests (alpha, staging, prod)
+│   ├── a2o/                       # Alpha-to-omega E2E validation (BDD scenarios)
+│   ├── docs/                      # Source content & manifesto (markdown)
+│   ├── research/                  # Distributed observation protocol research
+│   ├── seeder/                    # Content seeding pipeline (TypeScript)
+│   ├── plans/                     # Sprint design docs & implementation plans
+│   └── blobs/                     # Binary assets (ZIP bundles, media)
 │
 └── scripts/                       # Developer tooling
 ```
@@ -144,8 +151,12 @@ The protocol runs on [Holochain](https://holochain.org/), a framework for distri
 - Serve as DHT shard holders and bootstrap nodes
 - Enable web browsers to connect via Doorway gateway
 
-**Elohim Storage** (`elohim/elohim-storage/`) provides P2P blob storage:
-- Large content that exceeds Holochain's DHT limits
+**Elohim Storage** (`elohim/elohim-storage/`) provides P2P content storage and delivery:
+- Content-addressed blob storage (CIDv1 + SHA256) with chunked large file support
+- HTML5 app serving with disk-based extraction cache and thundering herd protection
+- Delivery capability advertisement via gossipsub (peers announce what they can serve)
+- `QueryDelivery` EPR protocol for peer-to-peer capability negotiation
+- Delivery peer registry populated from mDNS/libp2p discovery
 - Reed-Solomon erasure coding for redundancy
 - Integration with content seeder pipeline
 
@@ -176,14 +187,16 @@ Stories start private and can be promoted to community visibility or published t
 
 ## Key Infrastructure Components
 
-### Doorway (Gateway)
+### Doorway (Web2 Gateway)
 
-The consolidated Web2 gateway that makes P2P networks accessible:
+The web2 absorption layer that protects the P2P network from browser traffic patterns and serves as the onboarding flywheel into the protocol:
 - **Bootstrap**: Agent discovery ("Who's in the space?")
 - **Signal**: WebRTC signaling ("Connect to peers")
-- **Gateway**: Conductor access with caching ("Get the data")
+- **Gateway**: Conductor access with projection caching ("Get the data")
+- **Projection Cache**: MongoDB-backed cache for HTML5 app files with request coalescing — absorbs 30+ concurrent asset requests per page load so storage stays focused on P2P
+- **Capability Probe**: `HEAD /_capability` endpoint delegates to storage for node capability, augments with projection cache status
 
-One domain (`doorway.elohim.host`) serves all three functions. See [`doorway/doorway-service/ARCHITECTURE.md`](./doorway/doorway-service/ARCHITECTURE.md).
+One domain (`doorway.elohim.host`) serves all functions. Doorway lives on the same node as storage — it reuses storage's compute reporting and adds only its MongoDB projection layer. See [`doorway/doorway-service/ARCHITECTURE.md`](./doorway/doorway-service/ARCHITECTURE.md).
 
 ### Elohim Agents (Constitutional AI)
 
