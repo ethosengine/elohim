@@ -21,11 +21,13 @@ COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
 COPY crates ./crates
 COPY elohim/constitution ./constitution
 COPY elohim/elohim-cache-core ./elohim-cache-core
+COPY elohim/elohim-compute ./elohim-compute
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
-    sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml
+    sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml
 
 # Constitution crate uses workspace inheritance — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't copied into the build context
@@ -53,7 +55,7 @@ RUN mkdir -p src && \
     echo 'pub fn placeholder() {}' > src/lib.rs
 
 # Build dependencies (this layer gets cached)
-RUN cargo build --release
+RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 
 # Remove placeholder source, binaries, and proc-macro outputs to force rebuild.
 # CRITICAL: build/ and .fingerprint/ contain embed_migrations! output from the
@@ -81,6 +83,7 @@ COPY elohim/elohim-storage/src ./src
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
 # when the value changes (ARG alone is insufficient for BuildKit cache invalidation)
 RUN echo "Building at ${CACHE_BUST}" && \
+    RUSTFLAGS='--cfg getrandom_backend="custom"' \
     GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT} \
     GIT_COMMIT_FULL=${GIT_COMMIT_FULL} \
     BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
