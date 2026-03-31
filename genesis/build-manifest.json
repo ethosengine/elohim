@@ -1,0 +1,49 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-genesis",
+  "description": "Content seeding and validation",
+  "steps": {
+    "validate-seeds": {
+      "description": "Generate schema types and validate seed constants against protocol schemas",
+      "inputs": {
+        "sources": [
+          "genesis/seeds/**",
+          "elohim/sdk/schemas/**",
+          "elohim/sdk/domains/**"
+        ],
+        "buildProcess": ["genesis/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["validated-seeds"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Validate Constants",
+        "function": null
+      }
+    },
+    "seed-content": {
+      "description": "Seed validated content to target environment",
+      "inputs": {
+        "sources": [],
+        "buildProcess": ["genesis/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["seeded-content"],
+        "verify": null
+      },
+      "depends": [
+        "validate-seeds",
+        "elohim:build-site-image",
+        "elohim-edge:build-edge-image",
+        "elohim-edge:cargo-build-storage"
+      ],
+      "executor": {
+        "stage": "Seed Database",
+        "function": null
+      }
+    }
+  },
+  "deployment": {}
+}

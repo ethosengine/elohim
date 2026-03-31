@@ -1,0 +1,74 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-edge",
+  "description": "Edge services — doorway gateway, storage, conductor, edge image",
+  "steps": {
+    "cargo-build-doorway": {
+      "description": "Build doorway gateway container image (Rust binary compiled inside Docker)",
+      "inputs": {
+        "sources": [
+          "doorway/doorway-service/src/**",
+          "doorway/doorway-service/Cargo.toml",
+          "doorway/doorway-service/Cargo.lock",
+          "doorway/doorway-client/**"
+        ],
+        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["doorway-binary"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Doorway",
+        "function": null
+      }
+    },
+    "cargo-build-storage": {
+      "description": "Build elohim-storage container image (Rust binary compiled inside Docker)",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-storage/src/**",
+          "elohim/elohim-storage/Cargo.toml",
+          "elohim/elohim-storage/Cargo.lock",
+          "elohim/sdk/**"
+        ],
+        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["storage-binary"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Storage",
+        "function": null
+      }
+    },
+    "build-edge-image": {
+      "description": "Package doorway + storage + conductor into edge container image",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/edgenode/**",
+          "elohim/holochain/*.yaml"
+        ],
+        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["edge-image"],
+        "verify": null
+      },
+      "depends": ["cargo-build-doorway", "cargo-build-storage", "elohim-holochain:build-happ"],
+      "executor": {
+        "stage": "Build Edge Node Image",
+        "function": null
+      }
+    }
+  },
+  "deployment": {
+    "targets": {
+      "alpha": { "healthCheck": "https://alpha-edge.elohim.host/health" },
+      "staging": { "healthCheck": "https://staging-edge.elohim.host/health" }
+    }
+  }
+}
