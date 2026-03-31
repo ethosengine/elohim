@@ -262,7 +262,7 @@ This project takes that seriously. The concepts build on:
 
 - **ValueFlows / REA accounting** - Making care visible and valuable without reducing it to money
 - **Holochain & distributed systems** - Infrastructure without single points of capture
-- **Platform cooperativism** - Worker and community stewardship of digital spaces
+- **Platform cooperativism** - Worker and community stewardship of digital and physical spaces
 - **Constitutional AI research** - Principles-based constraint over rules enforcement
 - **Peer-to-peer architecture** - Topologies that resist rent-seeking by design
 
