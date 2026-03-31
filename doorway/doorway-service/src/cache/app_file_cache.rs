@@ -269,12 +269,20 @@ impl AppFileCacheService {
         info!(count = count, "Slug index loaded from projection store");
     }
 
-    /// Resolve the current blob_hash for a slug.
+    /// Resolve the current blob_hash for an identifier (slug or content address).
     ///
-    /// Checks the in-memory index first. On miss, performs a lazy
-    /// single-document query against MongoDB and updates the index
-    /// if found.
-    pub async fn resolve_blob_hash(&self, slug: &str) -> Option<String> {
+    /// Short-circuits for content addresses (`sha256-...`) — returns the
+    /// identifier directly since it IS the blob hash. For slugs, checks
+    /// the in-memory index first, then falls back to a lazy single-document
+    /// query against MongoDB.
+    pub async fn resolve_blob_hash(&self, identifier: &str) -> Option<String> {
+        // Short-circuit: if identifier is already a content address, return it directly
+        if identifier.starts_with("sha256-") && identifier.len() > 10 {
+            return Some(identifier.to_string());
+        }
+
+        let slug = identifier;
+
         // Fast path: check index
         {
             let index = self.slug_index.read().await;

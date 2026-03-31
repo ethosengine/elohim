@@ -28,6 +28,14 @@ use tracing::{debug, info, warn};
 
 use crate::server::AppState;
 
+/// Check whether an identifier looks like a content address (CID) rather than a slug.
+///
+/// Content addresses use the `sha256-{hex}` format from the storage layer.
+/// The length check (>10) avoids false positives on short strings.
+fn is_content_address(identifier: &str) -> bool {
+    identifier.starts_with("sha256-") && identifier.len() > 10
+}
+
 /// Maximum retries for transient failures (502/connection errors).
 /// HTML5 apps load 30+ assets concurrently which can overwhelm storage
 /// during extraction; a brief retry absorbs the back-pressure.
@@ -82,24 +90,46 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
             .unwrap();
     }
 
-    // Cache-first path: only active when cache service AND blob_hash are available.
-    // blob_hash is resolved from the slug index (populated from projection store).
-    if let Some(ref cache) = state.app_file_cache {
-        let blob_hash = cache.resolve_blob_hash(slug).await;
+    // Dual-path resolution: if the identifier is already a content address (sha256-...),
+    // use it directly as the blob_hash — no slug resolution needed.
+    let (resolved_hash, content_slug) = if is_content_address(slug) {
+        // CID path: /apps/{sha256-hash}/file — use hash directly
+        (Some(slug.to_string()), None)
+    } else {
+        // Slug path: /apps/{slug}/file — resolve via cache
+        let hash = if let Some(ref cache) = state.app_file_cache {
+            cache.resolve_blob_hash(slug).await
+        } else {
+            None
+        };
+        (hash, Some(slug))
+    };
 
-        if let Some(hash) = blob_hash {
+    // Cache-first path: only active when cache service AND blob_hash are available.
+    // blob_hash is resolved from the slug index (populated from projection store)
+    // or directly from the content address in the URL.
+    if let Some(ref cache) = state.app_file_cache {
+        if let Some(ref hash) = resolved_hash {
+            let cache_slug = content_slug.unwrap_or(slug);
+
             // --- Try cache lookup ---
-            if let Some(cached) = cache.get(slug, file_path, &hash).await {
-                debug!(slug = %slug, file_path = %file_path, "App file cache HIT");
-                return build_app_response(&cached.data, &cached.content_type, "HIT");
+            if let Some(cached) = cache.get(cache_slug, file_path, hash).await {
+                debug!(slug = %cache_slug, file_path = %file_path, "App file cache HIT");
+                return build_app_response(
+                    &cached.data,
+                    &cached.content_type,
+                    "HIT",
+                    Some(hash.as_str()),
+                    content_slug,
+                );
             }
 
             // --- Try in-flight coalescing ---
-            match cache.begin_fetch(slug, file_path) {
+            match cache.begin_fetch(cache_slug, file_path) {
                 Some(mut rx) => {
                     // Another task is already fetching this file — wait for it
                     debug!(
-                        slug = %slug,
+                        slug = %cache_slug,
                         file_path = %file_path,
                         "Coalescing app file fetch (waiting for leader)"
                     );
@@ -109,12 +139,14 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
                                 &cached.data,
                                 &cached.content_type,
                                 "HIT-COALESCED",
+                                Some(hash.as_str()),
+                                content_slug,
                             );
                         }
                         _ => {
                             // Leader failed or channel closed — fall through to proxy
                             warn!(
-                                slug = %slug,
+                                slug = %cache_slug,
                                 file_path = %file_path,
                                 "Coalesced fetch failed, falling through to proxy"
                             );
@@ -126,7 +158,8 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
                 None => {
                     // We are the leader — fetch from storage, cache, broadcast
                     let response =
-                        fetch_and_cache(cache, &storage_url, path, slug, file_path, &hash).await;
+                        fetch_and_cache(cache, &storage_url, path, cache_slug, file_path, hash)
+                            .await;
                     return response;
                 }
             }
@@ -193,6 +226,19 @@ async fn fetch_and_cache(
                 .unwrap_or("application/octet-stream")
                 .to_string();
 
+            // Read content addressing headers from upstream storage response
+            let upstream_address = response
+                .headers()
+                .get("x-content-address")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
+            let upstream_slug = response
+                .headers()
+                .get("x-content-slug")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
             match response.bytes().await {
                 Ok(body) => {
                     if status.is_success() {
@@ -216,7 +262,13 @@ async fn fetch_and_cache(
                             "App file cached (MISS)"
                         );
 
-                        build_app_response(&body, &content_type, "MISS")
+                        build_app_response(
+                            &body,
+                            &content_type,
+                            "MISS",
+                            upstream_address.as_deref(),
+                            upstream_slug.as_deref(),
+                        )
                     } else {
                         // Non-success status — don't cache, broadcast failure
                         cache.finish_fetch(slug, file_path, None);
@@ -264,21 +316,31 @@ async fn fetch_and_cache(
 /// Build an HTTP response for an app file with standard headers.
 ///
 /// Sets COEP/CORP headers (required for cross-origin embedding in Angular),
-/// cache control, and the X-Cache diagnostic header.
+/// cache control, and the X-Cache diagnostic header. Optionally includes
+/// `X-Content-Address` and `X-Content-Slug` headers for content addressing.
 fn build_app_response(
     data: &[u8],
     content_type: &str,
     cache_status: &str,
+    blob_hash: Option<&str>,
+    content_slug: Option<&str>,
 ) -> Response<Full<Bytes>> {
-    Response::builder()
+    let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", content_type)
         .header("Cross-Origin-Resource-Policy", "cross-origin")
         .header("Cross-Origin-Embedder-Policy", "credentialless")
         .header("X-Cache", cache_status)
-        .header("Cache-Control", "public, max-age=3600")
-        .body(Full::new(Bytes::from(data.to_vec())))
-        .unwrap()
+        .header("Cache-Control", "public, max-age=3600");
+
+    if let Some(hash) = blob_hash {
+        builder = builder.header("X-Content-Address", hash);
+    }
+    if let Some(slug) = content_slug {
+        builder = builder.header("X-Content-Slug", slug);
+    }
+
+    builder.body(Full::new(Bytes::from(data.to_vec()))).unwrap()
 }
 
 /// Forward a /apps/* request to elohim-storage with retry for transient errors.
@@ -335,6 +397,19 @@ async fn forward_app_request_with_header(
                     .and_then(|v| v.to_str().ok())
                     .map(|s| s.to_string());
 
+                // Forward content addressing headers from upstream storage
+                let content_address = response
+                    .headers()
+                    .get("x-content-address")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+
+                let content_slug = response
+                    .headers()
+                    .get("x-content-slug")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+
                 match response.bytes().await {
                     Ok(body) => {
                         info!(
@@ -359,6 +434,14 @@ async fn forward_app_request_with_header(
 
                         if let Some(et) = etag {
                             builder = builder.header("ETag", et);
+                        }
+
+                        if let Some(ref addr) = content_address {
+                            builder = builder.header("X-Content-Address", addr.as_str());
+                        }
+
+                        if let Some(ref slug) = content_slug {
+                            builder = builder.header("X-Content-Slug", slug.as_str());
                         }
 
                         return builder.body(Full::new(Bytes::from(body.to_vec()))).unwrap();
@@ -564,6 +647,39 @@ mod tests {
         assert!(parse_app_path("/other/my-app/file.js").is_none());
     }
 
+    #[test]
+    fn test_parse_app_path_content_address() {
+        let (slug, file_path) =
+            parse_app_path("/apps/sha256-abc123def456789012/index.html").unwrap();
+        assert_eq!(slug, "sha256-abc123def456789012");
+        assert_eq!(file_path, "index.html");
+    }
+
+    // =========================================================================
+    // is_content_address tests
+    // =========================================================================
+
+    #[test]
+    fn test_is_content_address_valid() {
+        assert!(is_content_address("sha256-abc123def456"));
+    }
+
+    #[test]
+    fn test_is_content_address_too_short() {
+        // "sha256-" is 7 chars, need >10 total
+        assert!(!is_content_address("sha256-abc"));
+    }
+
+    #[test]
+    fn test_is_content_address_slug() {
+        assert!(!is_content_address("my-cool-app"));
+    }
+
+    #[test]
+    fn test_is_content_address_empty() {
+        assert!(!is_content_address(""));
+    }
+
     // Path traversal detection (defense in depth — validated in handle_app_request)
     #[test]
     fn test_parse_app_path_traversal_passes_parse_but_caught_later() {
@@ -577,7 +693,7 @@ mod tests {
 
     #[test]
     fn test_build_app_response_headers() {
-        let resp = build_app_response(b"hello", "text/html", "HIT");
+        let resp = build_app_response(b"hello", "text/html", "HIT", None, None);
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get("Content-Type").unwrap(), "text/html");
         assert_eq!(resp.headers().get("X-Cache").unwrap(), "HIT");
@@ -593,17 +709,52 @@ mod tests {
             resp.headers().get("Cache-Control").unwrap(),
             "public, max-age=3600"
         );
+        // No content addressing headers when None
+        assert!(resp.headers().get("X-Content-Address").is_none());
+        assert!(resp.headers().get("X-Content-Slug").is_none());
+    }
+
+    #[test]
+    fn test_build_app_response_with_content_address_headers() {
+        let resp = build_app_response(
+            b"data",
+            "text/html",
+            "MISS",
+            Some("sha256-abc123def456"),
+            Some("my-app"),
+        );
+        assert_eq!(
+            resp.headers().get("X-Content-Address").unwrap(),
+            "sha256-abc123def456"
+        );
+        assert_eq!(resp.headers().get("X-Content-Slug").unwrap(), "my-app");
+    }
+
+    #[test]
+    fn test_build_app_response_with_address_only() {
+        let resp = build_app_response(
+            b"data",
+            "text/html",
+            "HIT",
+            Some("sha256-abc123def456"),
+            None,
+        );
+        assert_eq!(
+            resp.headers().get("X-Content-Address").unwrap(),
+            "sha256-abc123def456"
+        );
+        assert!(resp.headers().get("X-Content-Slug").is_none());
     }
 
     #[test]
     fn test_build_app_response_bypass() {
-        let resp = build_app_response(b"data", "application/javascript", "BYPASS");
+        let resp = build_app_response(b"data", "application/javascript", "BYPASS", None, None);
         assert_eq!(resp.headers().get("X-Cache").unwrap(), "BYPASS");
     }
 
     #[test]
     fn test_build_app_response_coalesced() {
-        let resp = build_app_response(b"data", "text/css", "HIT-COALESCED");
+        let resp = build_app_response(b"data", "text/css", "HIT-COALESCED", None, None);
         assert_eq!(resp.headers().get("X-Cache").unwrap(), "HIT-COALESCED");
     }
 
