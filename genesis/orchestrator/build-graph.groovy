@@ -134,4 +134,153 @@ def dfsDetectCycle(Map graph, String node, Set visited, Set inStack, List path) 
     inStack.remove(node)
 }
 
+// ============================================================
+// CHANGE DETECTION
+// ============================================================
+
+@NonCPS
+def matchesGlob(String filePath, String pattern) {
+    def normalizedFile = filePath.startsWith('./') ? filePath.substring(2) : filePath
+    def normalizedPattern = pattern.startsWith('./') ? pattern.substring(2) : pattern
+
+    def regex = normalizedPattern
+        .replace('.', '\\.')
+        .replace('**/','(.+/)?')
+        .replace('**', '.*')
+        .replace('*', '[^/]*')
+        .replace('?', '[^/]')
+
+    return normalizedFile.matches(regex)
+}
+
+@NonCPS
+def checkSourceChanges(List changedFiles, Map step) {
+    def sources = step.inputs?.sources ?: []
+    if (sources.isEmpty()) return [stale: false]
+
+    for (def file : changedFiles) {
+        for (def pattern : sources) {
+            if (matchesGlob(file, pattern)) {
+                return [stale: true, reason: "source: ${file} matches ${pattern}"]
+            }
+        }
+    }
+    return [stale: false]
+}
+
+@NonCPS
+def extractFunctionBody(String fileContent, String functionName) {
+    def pattern = ~/def\s+${functionName}\s*\([^)]*\)\s*\{/
+    def matcher = pattern.matcher(fileContent)
+    if (!matcher.find()) return null
+
+    int start = matcher.end()
+    int depth = 1
+    int pos = start
+    while (pos < fileContent.length() && depth > 0) {
+        char c = fileContent.charAt(pos)
+        if (c == '{' as char) depth++
+        else if (c == '}' as char) depth--
+        pos++
+    }
+    return fileContent.substring(start, pos - 1).trim()
+}
+
+@NonCPS
+def sha256(String content) {
+    def digest = MessageDigest.getInstance('SHA-256')
+    def hash = digest.digest(content.getBytes('UTF-8'))
+    return hash.collect { String.format('%02x', it) }.join()
+}
+
+def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName) {
+    def refs = step.inputs?.buildProcess ?: []
+    if (refs.isEmpty()) return [stale: false, hashes: [:]]
+
+    def currentHashes = [:]
+
+    for (def ref : refs) {
+        def parts = ref.split('@', 2)
+        def fileName = parts[0]
+        def funcName = parts.length > 1 ? parts[1] : null
+
+        def fileContent
+        try {
+            fileContent = readFile(file: fileName)
+        } catch (Exception e) {
+            echo "WARNING: Cannot read '${fileName}' referenced by '${qualifiedName}': ${e.message}"
+            return [stale: true, reason: "buildProcess: cannot read ${fileName}", hashes: [:]]
+        }
+
+        String contentToHash
+        if (funcName) {
+            contentToHash = extractFunctionBody(fileContent, funcName)
+            if (contentToHash == null) {
+                echo "WARNING: Function '${funcName}' not found in '${fileName}' (referenced by '${qualifiedName}')"
+                return [stale: true, reason: "buildProcess: function ${funcName} not found in ${fileName}", hashes: [:]]
+            }
+        } else {
+            contentToHash = fileContent
+        }
+
+        def currentHash = sha256(contentToHash)
+        currentHashes[ref] = currentHash
+
+        def previousHash = buildState?.stepStates?.get(qualifiedName)?.buildProcessHashes?.get(ref)
+        if (previousHash == null || currentHash != previousHash) {
+            def label = funcName ? "${fileName}@${funcName}" : fileName
+            return [stale: true, reason: "buildProcess: ${label} hash changed", hashes: currentHashes]
+        }
+    }
+
+    return [stale: false, hashes: currentHashes]
+}
+
+@NonCPS
+def propagateStaleness(Map graph, Map staleMap) {
+    def changed = true
+    while (changed) {
+        changed = false
+        graph.steps.each { name, step ->
+            if (staleMap[name]?.stale) return
+
+            def staleDep = step.depends.find { dep -> staleMap[dep]?.stale }
+            if (staleDep) {
+                staleMap[name] = [stale: true, reason: "depends: ${staleDep}"]
+                changed = true
+            }
+        }
+    }
+    return staleMap
+}
+
+def detectAllStaleness(Map graph, List changedFiles, Map buildState) {
+    def staleMap = [:]
+    def allHashes = [:]
+
+    for (def entry : graph.steps.entrySet()) {
+        def name = entry.key
+        def step = entry.value
+
+        def sourceResult = checkSourceChanges(changedFiles, step)
+        if (sourceResult.stale) {
+            staleMap[name] = sourceResult
+            continue
+        }
+
+        def processResult = checkBuildProcessChanges(step, buildState, name)
+        allHashes[name] = processResult.hashes
+        if (processResult.stale) {
+            staleMap[name] = [stale: true, reason: processResult.reason]
+            continue
+        }
+
+        staleMap[name] = [stale: false]
+    }
+
+    staleMap = propagateStaleness(graph, staleMap)
+
+    return [staleMap: staleMap, buildProcessHashes: allHashes]
+}
+
 return this
