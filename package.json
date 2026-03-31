@@ -59,7 +59,8 @@
     "qahal:codegen": "node elohim/sdk/domains/qahal/scripts/codegen.mjs",
     "qahal:codegen:verify": "node elohim/sdk/domains/qahal/scripts/codegen.mjs --verify",
     "avodah:codegen": "node elohim/sdk/domains/avodah/scripts/codegen.mjs",
-    "avodah:codegen:verify": "node elohim/sdk/domains/avodah/scripts/codegen.mjs --verify"
+    "avodah:codegen:verify": "node elohim/sdk/domains/avodah/scripts/codegen.mjs --verify",
+    "validate:manifests": "node genesis/orchestrator/validate-manifests.mjs"
   },
   "dependencies": {
   }
