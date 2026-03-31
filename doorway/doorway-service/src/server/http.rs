@@ -505,6 +505,13 @@ impl AppState {
 
         self.projection = projection;
         info!("Projection store upgraded to MongoDB-backed");
+
+        // Initialize app file projection cache now that MongoDB is available
+        let svc = AppFileCacheService::new(mongo, "self-negotiated".to_string());
+        svc.load_app_index().await;
+        info!("App file projection cache initialized");
+        self.app_file_cache = Some(Arc::new(svc));
+
         Ok(())
     }
 }
