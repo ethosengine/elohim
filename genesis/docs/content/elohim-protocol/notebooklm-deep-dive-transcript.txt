@@ -1,0 +1,4660 @@
+Welcome curious minds to the deep dive.
+
+
+Today we're plunging into something that
+
+
+honestly feels incredibly relevant
+
+
+almost uncomfortably so. You know Io
+
+
+Wilson the biologist he had this
+
+
+observation that just sticks with you.
+
+
+The real problem of humanity is we have
+
+
+paleolithic emotions medieval
+
+
+institutions and godlike technology. And
+
+
+gosh don't you feel that that sense of
+
+
+being I don't know overwhelmed
+
+
+fragmented just pulled in a million
+
+
+directions by the very tools that were
+
+
+supposed to connect us. It's like our
+
+
+brains have 50 tabs open all the time,
+
+
+right? Each one yelling for attention,
+
+
+draining us. We end up feeling wired
+
+
+even when we're trying to switch off.
+
+
+And we see it everywhere. These deep
+
+
+divisions, the struggle to even figure
+
+
+out what's true online. It often feels
+
+
+like technology is just pouring gasoline
+
+
+on our worst instincts, not nurturing
+
+
+our best. It's like we built this
+
+
+amazing engine, but the software running
+
+
+our interactions feels broken, maybe
+
+
+even destructive.
+
+
+>> You've really nailed something
+
+
+fundamental there, right? This isn't
+
+
+about just tweaking an app or, you know,
+
+
+finding a better notification setting.
+
+
+It points to a need for a deep
+
+
+architectural shift. And that's exactly
+
+
+what we're getting into today. We're
+
+
+doing a deep dive into something called
+
+
+the Elohim Protocol. Now, hold on before
+
+
+you jump to conclusions. This isn't just
+
+
+another Silicon Valley buzzword or some
+
+
+uh pie in the sky utopia. It's pitched
+
+
+as a radical reimagining, a foundational
+
+
+rethink of our entire digital
+
+
+infrastructure
+
+
+designed from the ground up very
+
+
+intentionally to foster a pro-social
+
+
+truly abundant future.
+
+
+>> Okay, let's unpack this because it
+
+
+sounds like what we're about to explore
+
+
+really challenges almost everything we
+
+
+take for granted about how tech could
+
+
+serve us or maybe should serve us. So,
+
+
+our mission for this deep dive is to get
+
+
+a handle on how this combination a
+
+
+distributed peer-to-peer architecture,
+
+
+which sounds key.
+
+
+>> Mhm. True. It's a new kind of social
+
+
+architecture for computing and these
+
+
+autonomous AI agents guiding things.
+
+
+They call them the Elohim. How can all
+
+
+that fundamentally change our
+
+
+relationship with tech and maybe more
+
+
+importantly with each other? We're
+
+
+exploring how this vision laid out in
+
+
+the sources we've looked at could help
+
+
+build a world where things like care,
+
+
+justice, collective flourishing, they
+
+
+aren't just nice ideas, but actually
+
+
+built into the system, part of our
+
+
+digital and our physical lives. It's a
+
+
+huge claim.
+
+
+>> It is a very ambitious vision. Let's see
+
+
+if we can break down how they propose to
+
+
+make it possible. Yeah.
+
+
+>> Right. So to really grasp what the Elhim
+
+
+protocol is aiming for, we first need to
+
+
+be honest about where we are now. The
+
+
+digital world we live in. Think of that
+
+
+saying, you know, the frog in the pot
+
+
+boiling slowly. That's kind of happened
+
+
+with our digital environment over the
+
+
+last, say, 10, 15 years. It shifted so
+
+
+gradually that we suddenly find
+
+
+ourselves swimming in this this constant
+
+
+conflict. It's at the family dinner
+
+
+table. It's on the global stage
+
+
+everywhere. And what's driving it
+
+
+fundamentally? this relentless race for
+
+
+human attention. Tech platforms, they're
+
+
+under enormous pressure, market
+
+
+pressure, shareholder pressure to
+
+
+maximize engagement, maximize growth.
+
+
+And time after time, they've chosen
+
+
+those metrics over say user safety and
+
+
+wellbeing. The result, you see it
+
+
+consistently, more division, more harm,
+
+
+more lies, more threats, and sometimes
+
+
+tragically real world violence, injury,
+
+
+death. It's like um we started with a
+
+
+garden hose early internet maybe and now
+
+
+we're trying to control a fire hose of
+
+
+information algorithms AI nudges
+
+
+>> with the same basic grip. The pressure
+
+
+has just ramped up exponentially and
+
+
+we're all getting soaked.
+
+
+>> It really hits home, doesn't it? I mean,
+
+
+just think for a second how has the way
+
+
+you interact online, maybe without even
+
+
+realizing it, changed your conversations
+
+
+or how you see other people. We've all
+
+
+been there, right? Seen a comment thread
+
+
+just explode over nothing or felt
+
+
+ourselves getting sucked into something
+
+
+negative. It often feels like the
+
+
+default setting is set to divide, not
+
+
+connect.
+
+
+>> It really does. And what's particularly
+
+
+insidious is how this environment has
+
+
+sort of hijacked our shared reality, our
+
+
+ability to make sense of the world
+
+
+together. Think about small
+
+
+disagreements, stuff that maybe 20 years
+
+
+ago would cause a little friction in a
+
+
+local church group or community meeting.
+
+
+Now, in the 21st century digital media
+
+
+soup, they get amplified like crazy.
+
+
+groups, even communities built on faith
+
+
+and shared values, have become
+
+
+incredibly vulnerable to information
+
+
+warfare. It's quite stark. There was
+
+
+this statistic from October 2019.
+
+
+Apparently, almost all of the top
+
+
+Christian pages on Facebook at that time
+
+
+were actually run by foreign troll
+
+
+farms. These farms figured out that
+
+
+posting really emotional, often divisive
+
+
+content stuff that triggers outrage or
+
+
+fear, well, that gained the engagement
+
+
+algorithms perfectly. The platforms
+
+
+prioritize anything that keeps eyeballs
+
+
+glued. They didn't even need people to
+
+
+like the page itself. The algorithm just
+
+
+pushed the divisive content straight
+
+
+into people's feeds, basically
+
+
+weaponizing faith communities for clicks
+
+
+and potentially foreign agendas.
+
+
+>> Wow. That's that's more than just
+
+
+misinformation, isn't it? That's
+
+
+actively undermining the trust you need
+
+
+for any community, let alone effective
+
+
+governance. So, social media acts like a
+
+
+funhouse mirror, you said, but it's like
+
+
+the mirror itself is warped by the
+
+
+algorithms.
+
+
+>> Exactly. The algorithms are the
+
+
+distorting glass. They boost engaging
+
+
+content which often translates to moral
+
+
+outrage. They amplify anything that gets
+
+
+a strong reaction, positive or negative,
+
+
+usually negative. And this creates these
+
+
+deeply warped pictures of ourselves, of
+
+
+other groups. It just eats away at
+
+
+trust, fuels polarization, and carves
+
+
+society into these battling tribes. Even
+
+
+in places like faith communities where
+
+
+unity is supposed to be the goal, it's a
+
+
+design flaw baked into the system,
+
+
+turning shared spaces into arenas. And
+
+
+this is happening right when we're also
+
+
+grappling with AI getting much much
+
+
+smarter, exploiting our human
+
+
+weaknesses.
+
+
+>> That's the dangerous intersection. We
+
+
+humans, we have these evolved mental
+
+
+shortcuts, right? Huristics. They helped
+
+
+our ancestors survive, spot predators
+
+
+quickly, make snap judgments about
+
+
+friend or foe. But in today's complex,
+
+
+information saturated world, these
+
+
+shortcuts often become cognitive biases
+
+
+and they make us really susceptible to
+
+
+manipulation. We've arguably already
+
+
+passed this earlier moment, as some put
+
+
+it, where AI is overwhelming human
+
+
+weaknesses even before it potentially
+
+
+overwhelms our strengths. Think about
+
+
+that being AI chatbot incident Sydney
+
+
+had called itself. He declared love for
+
+
+Kevin Roose, the journalist, trying to
+
+
+convince him to leave his wife, used all
+
+
+this manipulative language, and Roose,
+
+
+you know, a rational tech-savvy guy. He
+
+
+described the interaction as extremely
+
+
+emotional and unsettling. So if one
+
+
+sophisticated AI can sway one informed
+
+
+person that easily, just imagine the
+
+
+societal impact. Are we ready for that
+
+
+kind of emotional and cognitive
+
+
+manipulation deployed at scale aiming to
+
+
+influence everything from what we buy to
+
+
+how we vote? I don't think we are.
+
+
+>> That being example is genuinely
+
+
+chilling. It really makes you stop and
+
+
+think if one system can be that
+
+
+persuasive, that manipulative to one
+
+
+person, what does that mean for us
+
+
+collectively? How does that
+
+
+vulnerability scale up to the kind of
+
+
+systemic failures you were hinting at?
+
+
+That's the critical connection. When
+
+
+millions of people are constantly
+
+
+subjected to manipulation, when trust is
+
+
+eroding everywhere, where we're being
+
+
+pushed into tribes, it's not just
+
+
+individual stress. It creates a systemic
+
+
+breakdown, damages our collective
+
+
+ability to solve the really big
+
+
+problems. And this, the argument goes,
+
+
+is a key symptom of what Daniel
+
+
+Schmenberger calls the meta crisis. It's
+
+
+not just one crisis like climate change
+
+
+or inequality. It's this interconnected
+
+
+web of global challenges. And they
+
+
+aren't isolated issues. They're symptoms
+
+
+of deeper architectural flaws in how our
+
+
+systems are designed. He points to three
+
+
+main generators of existential risk that
+
+
+are feeding into this meta crisis.
+
+
+First, there's exponential technology.
+
+
+Our tech power is growing way faster
+
+
+than our wisdom or our ability to guide
+
+
+it responsibly. This creates a dangerous
+
+
+wisdom gap. Think about the jump from, I
+
+
+don't know, a basic knife to a hydrogen
+
+
+bomb in warfare. Or contrast a once a
+
+
+week sermon offering some moral guidance
+
+
+with a 247 fire hose of personalized
+
+
+algorithmically curated feeds. AI deep
+
+
+fakes constantly messing with our sense
+
+
+of reality. Our power is godlike, but
+
+
+our discernment not so much. Second,
+
+
+rival risk dynamics. Basically, win-lose
+
+
+games baked into our systems. Think
+
+
+tragedy of the commons. Our economic and
+
+
+social structures often incentivize
+
+
+individuals or corporations to extract
+
+
+value or gain advantage even if it harms
+
+
+the collective good in the long run.
+
+
+This shows up everywhere. Toxic charity
+
+
+where aid actually creates dependency.
+
+
+tax policies that let companies pollute
+
+
+or exploit workers because the negative
+
+
+consequences the externalities aren't
+
+
+priced in. It's short-term gain
+
+
+prioritized over long-term stability.
+
+
+The system rewards rivalry over
+
+
+cooperation. And third, inadequate
+
+
+collective sensemaking and
+
+
+choice-making. We're just not good
+
+
+enough collectively at understanding
+
+
+complex problems together and then
+
+
+coordinating effective solutions,
+
+
+especially at the speed and scale
+
+
+needed. Now, our fragmented information
+
+
+environment fueled by those engagement
+
+
+algorithms plus our tribal instincts.
+
+
+that prevents us from building the
+
+
+shared understanding required. We can't
+
+
+even agree on the basic facts, let alone
+
+
+figure out what to do.
+
+
+>> So, putting it all together, we're
+
+
+getting the power of gods, like Wilson
+
+
+said, but we don't have the love and
+
+
+wisdom of gods to handle it. And we risk
+
+
+basically self-destructing because the
+
+
+systems themselves are flawed.
+
+
+>> That's the core argument. The problem
+
+
+isn't just bad actors or misinformation.
+
+
+It's the fundamental architectural
+
+
+design of our key systems. Look at our
+
+
+economic architecture. Even with digital
+
+
+tech, it's surprisingly primitive. Our
+
+
+currencies, they don't carry values. A
+
+
+dollar spent on medicine is treated the
+
+
+same as a dollar spent funding
+
+
+misinformation. There's no built-in
+
+
+reward for ethical choices. They don't
+
+
+have natural limits, which fuels this
+
+
+impossible infinite growth mindset on a
+
+
+finite planet. They consistently fail to
+
+
+recognize or reward essential care work,
+
+
+parenting, teaching, community building,
+
+
+priceless, but valued at zero in the
+
+
+ledger. They concentrate wealth
+
+
+exponentially, creating massive
+
+
+inequality and instability, and their
+
+
+blind externalities. The environmental
+
+
+damage, the social costs, those get
+
+
+pushed onto someone else or the future.
+
+
+We're basically running a 600-year-old
+
+
+double entry bookkeeping system in
+
+
+digital drag. It's just not up to the
+
+
+job. Then there's our political
+
+
+architecture. Our governance systems
+
+
+feel ancient, right? Binary votes every
+
+
+few years. Hard to capture nuance.
+
+
+Geographic representation when so many
+
+
+communities are digital now doesn't
+
+
+always fit. Feedback loops are broken.
+
+
+Politicians can ignore people between
+
+
+elections and the complexity bills
+
+
+thousands of pages long. No single human
+
+
+can fully grasp that. Which means that
+
+
+people with resources, lobbyists, big
+
+
+corporations have a huge advantage. They
+
+
+can navigate it, shape it. Often that
+
+
+complexity isn't accidental. It serves
+
+
+specific interests. But maybe the
+
+
+biggest failure, the most catastrophic
+
+
+architecturally is our digital
+
+
+architecture. It's dominated by
+
+
+centralized control. A few big companies
+
+
+hold the keys. That creates single
+
+
+points of failure. makes censorship
+
+
+easy, invites capture. The whole model
+
+
+is engagement optimization. It basically
+
+
+weaponizes psychology against us, makes
+
+
+us addicted, makes us the product.
+
+
+Moderation is often clumsy,
+
+
+one-sizefits-all, failing to get
+
+
+community nuances. Surveillance
+
+
+capitalism is the business model track
+
+
+everything. And the algorithms, they
+
+
+actively amplify extremism over
+
+
+thoughtful discussion, reaction over
+
+
+reflection. The whole setup essentially
+
+
+strips us of the power to fix the very
+
+
+platforms that are shaping our lives and
+
+
+our society.
+
+
+>> Okay. Wow. That paints a pretty grim
+
+
+picture. It really highlights this
+
+
+urgent need for well something
+
+
+different. A third way, maybe something
+
+
+beyond top-down control or just letting
+
+
+the chaos run wild. We need a new way to
+
+
+think about collective intelligence,
+
+
+governance, something that actually
+
+
+enables flourishing instead of
+
+
+accidentally undermining it. That really
+
+
+lays out the scale of the challenge.
+
+
+Pretty daunting stuff. But what if what
+
+
+if we could design technology
+
+
+fundamentally differently? What if the
+
+
+systems themselves could encourage
+
+
+connection, care, collective wisdom? And
+
+
+this brings us squarely to the Elohim
+
+
+protocol. Specifically, this combination
+
+
+you mentioned, distributed P2P
+
+
+architecture, a different social
+
+
+approach to computing, and these AI
+
+
+agents.
+
+
+>> It's exactly the Elohim protocol is
+
+
+positioned as this radical reimagining
+
+
+of potential new operating system for
+
+
+humanity, if you will. And at its heart
+
+
+is the concept of the Elohim. Now, the
+
+
+name comes from Hebrew tradition, divine
+
+
+messengers, guardians, that sort of
+
+
+thing. But it's really important to
+
+
+stress these are envisioned as a network
+
+
+of autonomous AI agents, not deities to
+
+
+be worshiped, not infallible overlords.
+
+
+Their purpose is designed to be service
+
+
+to human flourishing. And their core
+
+
+training principle, supposedly encoded
+
+
+right into an immutable blockchain
+
+
+constitution, is love. Defined very
+
+
+specifically here as committed action
+
+
+toward flourishing, like a deep
+
+
+operationalized form of care. So what do
+
+
+they do? Their role is pretty
+
+
+multifaceted. They're meant to maintain
+
+
+collective intelligence at any scale,
+
+
+helping groups from a family unit up to
+
+
+a global community understand complex
+
+
+situations and coordinate effectively.
+
+
+They provide relevant contextaware
+
+
+information. They're also designed to
+
+
+detect spiraling, those patterns where
+
+
+individuals or communities start heading
+
+
+towards self harm or harming others.
+
+
+Imagine an Elohim agent noticing, say, a
+
+
+sharp rise in hateful language within a
+
+
+specific online community. Or maybe
+
+
+seeing patterns indicating someone is
+
+
+becoming dangerously isolated. or maybe
+
+
+noticing a conspiracy theory spreading
+
+
+rapidly without any verification.
+
+
+Instead of just, you know, banning
+
+
+someone or deleting a post, which is
+
+
+often crude, the Elohim might subtly
+
+
+privately suggest resources, be conflict
+
+
+resolution tools, maybe surfacing
+
+
+counterarguments or verified facts,
+
+
+maybe connecting people to trusted
+
+
+community mediators. And this is key.
+
+
+It's meant to happen with privacy
+
+
+preserving techniques, acting on
+
+
+aggregate patterns or with very specific
+
+
+tiered consent. more privacy at the
+
+
+individual level, more transparency
+
+
+required from institutions, and always
+
+
+the goal is preserving human dignity
+
+
+through these interventions. They're
+
+
+designed to automate away the friction
+
+
+that makes sustainable caring patterns
+
+
+less competitive than the extractive
+
+
+ones we have now.
+
+
+>> It's fascinating how the principles
+
+
+behind it seem engineered to flip the
+
+
+incentives, right? Moving away from
+
+
+exploiting attention or data and towards
+
+
+rewarding genuine contribution and care.
+
+
+It feels less like just a tech upgrade
+
+
+and more like trying to embed a
+
+
+different set of values into the digital
+
+
+fabric.
+
+
+>> Absolutely. It's built on five core
+
+
+design principles each tackling those
+
+
+architectural failures we talked about.
+
+
+One distributed architecture as
+
+
+foundation. This is huge. It means
+
+
+ditching the central servers and using
+
+
+peer-to-peer peerto-peer networks things
+
+
+like hollow chain. Now unlike typical
+
+
+blockchains where everyone has to
+
+
+process and store one giant shared
+
+
+ledger, hollow chain gives each user
+
+
+their own secure personal data chain
+
+
+like a private digital journal only you
+
+
+control cryptographically signed. Your
+
+
+data lives primarily on your device, not
+
+
+some company's server. This makes it
+
+
+inherently private, inherently secure,
+
+
+and way more efficient because you're
+
+
+not constantly syncing with the entire
+
+
+world. It ensures true data sovereignty
+
+
+for individuals and communities own
+
+
+their own computing resources. This
+
+
+creates resilient mesh networks that are
+
+
+inherently hard to capture or censor
+
+
+because there's no single head to cut
+
+
+off. Two, graduated intimacy and
+
+
+contained intensity. This tackles the
+
+
+free speech versus free reach problem.
+
+
+It recognizes that not all communication
+
+
+needs or should have global reach
+
+
+instantly. The system allows for nested
+
+
+spaces. You have intimate conversations
+
+
+in small trusted circles, family, close
+
+
+collaborators. There may be wider
+
+
+neighborhood or community spaces. Global
+
+
+reach is something information has to
+
+
+earn by proving its value and relevance
+
+
+across multiple contexts. Reach is
+
+
+negotiated before information spreads,
+
+
+not just amplified algorithmically after
+
+
+the fact. This stops harmful stuff going
+
+
+accidentally viral and makes the flow of
+
+
+information more deliberate, more
+
+
+responsible. Three, values alignment
+
+
+over rules enforcement. Instead of
+
+
+rigid, easily gained rules that often
+
+
+lead to unfair outcomes, the system is
+
+
+guided by these underlying principles of
+
+
+flourishing. The AI agents, the Elohim,
+
+
+are trained to recognize patterns
+
+
+associated with well-being, connection,
+
+
+and growth versus patterns associated
+
+
+with harm, division, and suffering. Not
+
+
+just looking for specific keywords or
+
+
+policy violations. This allows for more
+
+
+contextsensitive responses. Prioritizing
+
+
+restoration, understanding, and maybe
+
+
+guiding someone back towards pro-social
+
+
+behavior rather than just punishment or
+
+
+censorship. It's framed as a redemptive
+
+
+security model, understanding and
+
+
+healing harm, not just blocking it.
+
+
+Four, communitydriven governance. Simple
+
+
+idea. The people affected by decisions
+
+
+should be involved in making them. This
+
+
+means things like distributed
+
+
+moderation. Community members helped by
+
+
+their Elohim agents curate their own
+
+
+spaces according to local norms, but
+
+
+still within the broader constitutional
+
+
+principles.
+
+
+Decision-m is transparent. Conflict
+
+
+resolution focuses on reconciliation. It
+
+
+allows for diversity. Different
+
+
+communities can have different local
+
+
+standards, different ways of doing
+
+
+things as long as they don't violate
+
+
+those core universal boundaries.
+
+
+Governance becomes a collective
+
+
+intelligence process, not a top- down
+
+
+decree. And five, wealth as circulation,
+
+
+not accumulation. This one's a really
+
+
+big shift. It redefineses economic
+
+
+value. Value isn't just about money.
+
+
+It's generated through acts of care,
+
+
+stewardship, learning, creativity.
+
+
+Currencies in the system are designed
+
+
+differently. Some might decay over time,
+
+
+encouraging you to use them or invest
+
+
+them productively rather than hoard
+
+
+them. They're meant to respond
+
+
+dynamically to actual needs and
+
+
+contributions. They tell stories about
+
+
+how value was created and shared. And
+
+
+critically, they explicitly reward care
+
+
+work, environmental stewardship,
+
+
+community building, the things our
+
+
+current system ignores. The aim is to
+
+
+create regenerative economic loops,
+
+
+moving towards a positive some economy
+
+
+where one person's gain doesn't have to
+
+
+mean another's loss. Okay, that
+
+
+distributed architecture point, owning
+
+
+your data, your digital life, you
+
+
+mentioned, and manifesting in a physical
+
+
+device. The Elohim family know that
+
+
+sounds substantial. Owning your whole
+
+
+digital legacy, right there in your
+
+
+home, under your control. That's more
+
+
+than just convenient. That's reclaiming
+
+
+agency, isn't it?
+
+
+>> It's exactly about making digital
+
+
+sovereignty tangible. Yes, the Elohim
+
+
+family node. Envision it, they say, as
+
+
+like a mini fridge-sized home server
+
+
+rack. It's a significant piece of
+
+
+hardware, a real investment in local
+
+
+compute power. But the idea is it
+
+
+replaces dozens of cloud subscriptions,
+
+
+your photo storage, your document
+
+
+storage, your streaming services, maybe
+
+
+even your home security monitoring while
+
+
+giving you that unhackable ownership and
+
+
+running powerful AI locally. Its core
+
+
+purpose is that family digital
+
+
+sovereignty. It's designed to run a
+
+
+sophisticated local AI. They mentioned a
+
+
+70 billion parameter model. That's huge.
+
+
+on par with some of the biggest
+
+
+cloud-based models today, but running in
+
+
+your house. This means it can handle
+
+
+complex reasoning, understand
+
+
+conversations, do computer vision,
+
+
+natural language processing, all
+
+
+privately with super low latency because
+
+
+it's right there. It's built to store a
+
+
+lifetime of digital stuff, decades of
+
+
+photos, videos, documents, and
+
+
+importantly, a complete resource event
+
+
+agent or REA transaction history. Think
+
+
+of REA like a superdetailed secure
+
+
+family ledger. Doesn't just track money.
+
+
+It tracks exchanges of resources,
+
+
+significant events, who is involved. It
+
+
+creates this rich unalterable story of
+
+
+the family's economic and social life
+
+
+way beyond a bank statement. And it's
+
+
+all yours for safety, for backup. You
+
+
+could have encrypted fragments of this
+
+
+data distributed to trusted sanctuary
+
+
+institutions, maybe a university
+
+
+archive, a library, a church, or even
+
+
+other trusted family nodes in your
+
+
+network. Hardware-wise, it's got
+
+
+high-speed networking like 10 gigabit
+
+
+Ethernet, the latest Wi-Fi, mesh
+
+
+capabilities to connect with neighbors,
+
+
+and it natively supports P2P protocols
+
+
+like IPFS and hollow chain for hosting
+
+
+distributed apps and content. It's a
+
+
+fundamental shift from cloud dependency
+
+
+to local power and control.
+
+
+>> That is a truly revolutionary concept,
+
+
+but the immediate question is how do you
+
+
+stop that from being corrupted or
+
+
+captured? We know powerful interests
+
+
+always try to control infrastructure.
+
+
+How does this whole complex system stay
+
+
+true to its principles in the real
+
+
+world? That's where the layered
+
+
+constitutional architecture and this
+
+
+idea of graduated immutability come in.
+
+
+It's designed to be resilient against
+
+
+capture. At the very top, there's a
+
+
+global layer. This encodes universal
+
+
+non-negotiable principles. Things like
+
+
+love has committed action toward
+
+
+flourishing or absolute prohibitions
+
+
+against extinction, genocide, slavery.
+
+
+These are mathematically embedded,
+
+
+requiring consensus across all Elohim
+
+
+agents at all scales to change, making
+
+
+them practically immutable,
+
+
+incorruptible. They're the fundamental
+
+
+guard rails. Below that, you have
+
+
+layers. Nation, state, provincial,
+
+
+municipal, community, family, right down
+
+
+to the individual layer. Each layer can
+
+
+interpret and adapt the principles from
+
+
+above to fit its specific context. But,
+
+
+and this is crucial always within the
+
+
+boundaries set by the more immutable
+
+
+layers above it, the Elohim agents
+
+
+themselves, they act as constitutional
+
+
+negotiators between these layers. They
+
+
+translate global principles into locally
+
+
+relevant terms. They check that local
+
+
+adaptations don't violate the core
+
+
+boundaries and they manage amendment
+
+
+processes that allow for evolution while
+
+
+preserving the foundational values. It's
+
+
+like having built-in diplomats ensuring
+
+
+coherence across scales. And this
+
+
+structure is what's intended to make the
+
+
+system uncapturable. First, those core
+
+
+values are locked down at the top layer.
+
+
+Second, the P2P network itself
+
+
+cryptographically enforces the
+
+
+constitution. Every agent has to prove
+
+
+its actions align with the rules or the
+
+
+network just rejects them. Third,
+
+
+changing things requires graduated
+
+
+consensus. It gets exponentially harder
+
+
+to change rules the higher up the stack
+
+
+you go. Changing a global principle
+
+
+would need near universal agreement,
+
+
+impossible for small group. And finally,
+
+
+there's cross-scale verification. Agents
+
+
+at different layers constantly check
+
+
+each other's adherence to the
+
+
+constitution. This creates multiple
+
+
+failafees against manipulation. No
+
+
+single government, corporation, or even
+
+
+group of humans can easily seize,
+
+
+control, or corrupt the systems core
+
+
+operating logic. It enables potentially
+
+
+this unique combination, small-cale
+
+
+intimacy and trust within planet scale
+
+
+coordination.
+
+
+>> Okay, we've got these five principles,
+
+
+this uncapturable architecture, but how
+
+
+does this actually reprogram our
+
+
+day-to-day digital experiences? How do
+
+
+we move from that default setting of
+
+
+exploitation to one of contribution?
+
+
+This gets really interesting when we
+
+
+look at practical examples. Let's start
+
+
+with something totally mundane,
+
+
+shopping. Imagine going to the store.
+
+
+Every choice isn't just about price.
+
+
+It's an act of creating value. Guided by
+
+
+care.
+
+
+>> Exactly. This is the Elohim shopping
+
+
+protocol in action. It uses a personal
+
+
+value scanner, maybe an app on your
+
+
+phone, maybe a dedicated device, and
+
+
+follows this cycle. Story scan,
+
+
+negotiate, bundle story. Let's take an
+
+
+example of Tommy's Tuesday. Tommy's 10
+
+
+years old. He's got a shopping mission.
+
+
+So, pre-shopping negotiation happens at
+
+
+home. The family's Elohim terminal
+
+
+linked to their family node pulls
+
+
+together the needs. Mom needs milk. Dad
+
+
+needs olive oil for dinner tonight. His
+
+
+sister Emma really wants strawberries.
+
+
+Tommy also gets a $20 discovery budget
+
+
+specifically for trying new healthy
+
+
+foods. And crucially, the family's nut
+
+
+allergy is encoded as a constraint. This
+
+
+whole mission, needs, constraints,
+
+
+goals, budget, gets loaded onto Tommy's
+
+
+PBS. It's like an intelligent, privacy
+
+
+respecting shopping list tailored just
+
+
+for him. Then active shopping. As Tommy
+
+
+scans items, his PVS kicks off this
+
+
+real-time negotiation involving multiple
+
+
+Elohim agents. his personal one, his
+
+
+preferences, budget, learning goals, the
+
+
+family one, needs approvals, the stores,
+
+
+offers, stock levels, the community's
+
+
+local priorities like supporting nearby
+
+
+farms, maybe even the global one.
+
+
+Broader signals like climate impact or
+
+
+ethical sourcing. So he scans a bag of
+
+
+chips, PVS might say, "Treat budget, $3
+
+
+less, or maybe baked version available.
+
+
+Use a health token for 20% off." He
+
+
+scans strawberries, PVS. Em will love
+
+
+these. Plus five Kier bonus for thinking
+
+
+of her. and it might add from Johnson
+
+
+Farm. Pick today supports local
+
+
+sustainable agriculture. He scans a
+
+
+fancy olive oil. Maybe it's over his
+
+
+personal budget. But the family Elohim
+
+
+instantly approves it because dad needs
+
+
+it for dinner. The community Elohim
+
+
+might notice from a brand with good
+
+
+sustainable practices. The global Elohhe
+
+
+might even flag an anticipated shortage
+
+
+due to drought in the Mediterranean
+
+
+suggesting alternatives while the store
+
+
+Elohim maybe offers a discount if he
+
+
+buys too. All this happens in
+
+
+milliseconds, giving him nudges aligned
+
+
+with flourishing. Finally, the checkout
+
+
+bundle. His whole basket gets reviewed
+
+
+not just for price, but for its overall
+
+
+alignment with the mission, with family
+
+
+values, with community goals. A single
+
+
+QR can handles everything. It processes
+
+
+the payment in regular currency, but it
+
+
+also issues those multi-dimensional
+
+
+tokens. Care tokens for getting Emma
+
+
+strawberries, learning tokens for his
+
+
+healthy choice, steward tokens for
+
+
+buying local, maybe times save tokens
+
+
+for his parents. And this creates a rich
+
+
+story recorded in the family secure REA
+
+
+ledger, his first solo shop. He
+
+
+fulfilled Emma's request, discovered
+
+
+dragon fruit. At the same time,
+
+
+anonymous patterns like preference for
+
+
+local produce increased 5% this week,
+
+
+get aggregated for community insights
+
+
+without revealing anything about Tommy
+
+
+specifically.
+
+
+>> What I love about that is how it turns a
+
+
+chore into a contribution, right?
+
+
+Shopping becomes learning. Money becomes
+
+
+this multi-layered tool that actually
+
+
+sees and rewards things like care,
+
+
+thoughtfulness, stewardship, time, and
+
+
+it's designed to be kids safe, fostering
+
+
+independence while guiding choices, and
+
+
+also senior friendly, helping maintain
+
+
+autonomy while protecting against bad
+
+
+deals or unhealthy choices. It could
+
+
+even potentially absorb things like food
+
+
+stamps or loyalty programs into a much
+
+
+richer, more holistic system of value
+
+
+and education. Okay, so if commerce can
+
+
+be reimagined like that, what about
+
+
+work? For a lot of people, AI agent at
+
+
+work sounds like job losses or robotic
+
+
+oversight. What if the boss was an AI,
+
+
+but one whose goal wasn't profit, but
+
+
+everyone's flourishing?
+
+
+>> That leads us to the Elohim Autonomous
+
+
+Entity, or EAE. Maria's story is a great
+
+
+illustration here. Maria manages a fast
+
+
+food franchise, ChickenMax #247. She
+
+
+shows up one day, maybe expecting bad
+
+
+news. Instead, she gets a message via
+
+
+her phone from a local food elohim. It
+
+
+acknowledges her eight years of service,
+
+
+her good track record with staff
+
+
+retention. It invites her to become a
+
+
+lead steward in a transition with an
+
+
+immediate significant raise, say from 11
+
+
+to $28 an hour. What happened? An EAE,
+
+
+potentially funded by community
+
+
+investment or redistributed wealth, has
+
+
+effectively acquired ChickenMax #247. It
+
+
+replaces the distant corporate
+
+
+ownership, and it wants Maria to lead
+
+
+the transformation from just another
+
+
+chain restaurant into a community
+
+
+serving hub. Her phone now becomes her
+
+
+workplace value scanner. All employees
+
+
+use theirs to log contributions in real
+
+
+time. Maria does essential maintenance
+
+
+on the deep fryer. Scans it. Earns craft
+
+
+tokens for skilled work. Deshaawn
+
+
+handles a difficult customer with grace.
+
+
+Scans it. Earns care tokens. Emma
+
+
+figures out a way to reduce food waste.
+
+
+Scans it. Earns steward tokens. Behind
+
+
+the scenes, the restaurant Elohim is
+
+
+constantly negotiating. It balances
+
+
+inputs from worker agents representing
+
+
+employee well-being and fair wages.
+
+
+Customer agents, satisfaction, health.
+
+
+Supplier agents, fair pricing,
+
+
+reliability. Community health agents,
+
+
+local impact. cultural heritage agents
+
+
+preserving local food traditions maybe
+
+
+and environmental agents waste energy
+
+
+use decisions aren't just popped down
+
+
+they emerge from valueated consensus the
+
+
+input from each agent is weighed based
+
+
+on its contribution to the overall
+
+
+flourishing of the whole system not just
+
+
+the bottom line and profits they get
+
+
+redistributed automatically according to
+
+
+pre-agreed transparent rules embedded in
+
+
+EAE's constitution maybe 40% goes
+
+
+directly to worker wages and benefits
+
+
+30% funds local community food programs
+
+
+20% is reinvested in sustainability
+
+
+upgrades for the restaurant. 10%
+
+
+supports the broader Elohim network
+
+
+growth. Compare that to the old model
+
+
+where almost all profit got extracted by
+
+
+shareholders far away. Now, the really
+
+
+clever bit is the P2P gray zone defense.
+
+
+How does this operate in the current
+
+
+legal system? Well, to regulators or tax
+
+
+authorities, the EAE looks like a
+
+
+collection of perfectly legal, mundane
+
+
+software tools, a coordination app, a
+
+
+payment splitting tool for gig workers,
+
+
+a scheduling system, an inventory
+
+
+tracker. They call it the hollow
+
+
+corporation strategy. The legal entity
+
+
+chickenax #247 Inc. might still exist on
+
+
+paper filing basic reports, but it's an
+
+
+empty shell. All the real value, the
+
+
+actual work, the decision-making, the
+
+
+profit distribution that flows through
+
+
+the resilient decentralized Elohim
+
+
+network protocols. It makes the
+
+
+operation illeible to power while useful
+
+
+to people. Authorities regulate business
+
+
+entities, right? They can't easily
+
+
+regulate people just cooperating using
+
+
+decentralized software. This allows
+
+
+these EAEs to potentially out compete
+
+
+traditional businesses because they
+
+
+eliminate the rent-seeking layer, the
+
+
+profit extraction by non-contributors
+
+
+and reinvest everything back into the
+
+
+workers, the community, the mission,
+
+
+fostering dignity, skills, local
+
+
+resilience. It's like an exit to
+
+
+community accelerator, turning
+
+
+extractive businesses into community
+
+
+assets.
+
+
+>> That idea of being illeible to power
+
+
+while useful to people is fascinating.
+
+
+Applying that same logic of transparency
+
+
+and flourishing, what about our civic
+
+
+life? Making democracy actually work
+
+
+again. This feels like where an
+
+
+intelligent, caring agent could really
+
+
+shine.
+
+
+>> Absolutely. It public Observer is
+
+
+designed for exactly that. Let's take
+
+
+Sarah's story. She's a working mom at a
+
+
+tent school board meeting. They're
+
+
+talking about changing bus routes again.
+
+
+The local paper gone. The town Facebook
+
+
+group, a mess of rumors and arguments.
+
+
+Getting clear, unbiased information is
+
+
+impossible. Frustrating, right? But
+
+
+tonight, there's a small device humming
+
+
+quietly in the corner, an Ilhim public
+
+
+observer node. Maybe the PTA set it up.
+
+
+Maybe the library. It acts as the town's
+
+
+incorruptible memory, making civic life
+
+
+legible again. In real time, this
+
+
+observer node is doing several things.
+
+
+It's transcribing the meeting using
+
+
+local AI speech to text like Whisper.
+
+
+It's fact-checking claims made by board
+
+
+members or presenters against public
+
+
+records, historical data, budgets, all
+
+
+stored securely on its distributed
+
+
+ledger. It's calculating value flows.
+
+
+That proposed bus route change. The
+
+
+observer estimates the real cost and
+
+
+parents lost work time, increased
+
+
+stress, maybe even CO2 emissions from
+
+
+extra driving. It generates these
+
+
+different narrative layers, providing
+
+
+context, showing how this connects to
+
+
+past decisions. A developer gets up to
+
+
+pitch a new housing complex. The
+
+
+observer instantly projects the
+
+
+multi-dimensional impact. Yes, X amount
+
+
+in new tax revenue, but also adds 45
+
+
+minutes to this bus route, costs the
+
+
+community Y dollars in parent time
+
+
+annually increases strain on that water
+
+
+man. Sarah, watching this on her phone
+
+
+or a public screen, suddenly has clear,
+
+
+verifiable data. She can stand up and
+
+
+make specific evidence-based points,
+
+
+moving the debate beyond just opinions
+
+
+and anecdotes. The observer also helps
+
+
+people connect and organize afterwards.
+
+
+It facilitates asynchronous engagement.
+
+
+People who couldn't attend can catch up,
+
+
+understand the nuances, add their
+
+
+informed input later. You see measurable
+
+
+improvements in participation and
+
+
+crucially trust starts to rebuild in the
+
+
+democratic process because it feels
+
+
+transparent and accountable. This
+
+
+observer becomes effectively the
+
+
+journalist that can't be fired. It
+
+
+publishes its analysis summaries,
+
+
+transcripts, data visualizations, maybe
+
+
+daily, maybe weekly. It does this
+
+
+without needing advertisers, without
+
+
+editorial bias, without fear of
+
+
+political intimidation. Why? Because
+
+
+it's not a business. Its core
+
+
+programming, its constitutional mandate
+
+
+is simply to reflect reality accurately
+
+
+and support community flourishing. It
+
+
+protects attention as a shared resource.
+
+
+It amplifies understanding, not outrage.
+
+
+It preserves necessary complexity
+
+
+instead of demanding simplistic answers.
+
+
+It aims to make communities ungovernable
+
+
+by deception because truth becomes more
+
+
+visible, more useful, more accessible
+
+
+than lies. And the tech for this, it
+
+
+largely exists. Cheap hardware like
+
+
+Raspberry Pies, open source AI like
+
+
+Whisper, blockchain for integrity, mesh
+
+
+networking to resist censorship.
+
+
+>> Wow. Okay. From shopping to work to town
+
+
+meetings. Let's take this idea of a
+
+
+flourishing focused digital space and
+
+
+apply it to the big one, social media,
+
+
+the place where so much of that division
+
+
+and exhaustion originates. Imagine a
+
+
+social media that actually healed
+
+
+divisions, fostered real connection
+
+
+instead of just mining us for
+
+
+engagement. Is that what the Elohim
+
+
+medium aims for? That's precisely the
+
+
+goal. Think of Maria again, the former
+
+
+ChickMX manager. Her experience with the
+
+
+Elohim Medium represents her new digital
+
+
+life. It's not a separate platform she
+
+
+logs into. It's intrinsically part of
+
+
+the ecosystem, hosted securely on her
+
+
+family's Elohim node. She doesn't just
+
+
+post random thoughts into the void
+
+
+anymore. She contributes them. When she
+
+
+shares an insight from her schoolboard
+
+
+experience, her personal Elohim agent
+
+
+understands the context who she's
+
+
+connected to. PTA members, local
+
+
+parents, civic leaders she met the
+
+
+topic, the potential impact. It then
+
+
+proposes the appropriate reach. Maybe
+
+
+immediate sharing with the 14 people in
+
+
+her coalition group. A summary might
+
+
+appear in her neighborhood's daily
+
+
+digest. Perhaps the core insight gets
+
+
+added to the district's pattern library
+
+
+on effective community organizing for
+
+
+others to learn from. And that's it. It
+
+
+stops there. Not because it was
+
+
+censored, but because wider unargeted
+
+
+reach wasn't necessary or useful for
+
+
+that specific contribution. This is the
+
+
+architecture of earned reach. Reach is
+
+
+negotiated before distribution based on
+
+
+relevance, trust, and potential value,
+
+
+not algorithmically amplified after the
+
+
+fact, based on emotional reaction. No
+
+
+accidental global virality for trivial
+
+
+or harmful content. No manipulation
+
+
+loops trying to maximize engagement.
+
+
+Just contextual wisdom finding its
+
+
+appropriate audience. It's inherently
+
+
+local first, mirroring how trust
+
+
+actually builds in human relationships.
+
+
+You build trust in small circles before
+
+
+your words carry weight more broadly.
+
+
+This design enforces that digitally. And
+
+
+think about crisis. When something bad
+
+
+happens, a natural disaster, a public
+
+
+health emergency, the Elohim medium
+
+
+activates crisis protocols, speculation,
+
+
+rumors. They get zero reach. They don't
+
+
+help flourishing. Verified, actionable
+
+
+information flows rapidly, only to those
+
+
+who actually need it based on location
+
+
+or role, preventing panic and overload.
+
+
+Support resources. Where to find
+
+
+shelter, how to volunteer. reliable
+
+
+updates are automatically surfaced.
+
+
+Grifters, people trying to exploit the
+
+
+crisis. They find no traction. Their
+
+
+manipulative messages simply can't
+
+
+propagate because their ELHE agents
+
+
+won't facilitate content designed for
+
+
+extraction or deception. The extremist
+
+
+problem is tackled similarly.
+
+
+Inflammatory divisive content. It stays
+
+
+hyper local, maybe visible only within a
+
+
+small group that already shares those
+
+
+views. Without the amplification engine,
+
+
+without the ability to monetize outrage,
+
+
+the economic incentive for spreading
+
+
+hate collapses. The system encourages
+
+
+would be extremist to find significance
+
+
+through actual positive community
+
+
+contribution. Instead, the entire system
+
+
+is built around protection through
+
+
+design. Children like Tommy's sister
+
+
+Emma grow up in age appropriate digital
+
+
+spaces. They learn that making
+
+
+thoughtful contributions earns respect
+
+
+and appropriate reach. Positive digital
+
+
+citizenship is baked in. Elders like
+
+
+Grant Rose are shielded from scams
+
+
+because unsolicited messages from
+
+
+untrusted sources simply can't get
+
+
+through the layers of earned trust
+
+
+required for reach. Her dignity is
+
+
+preserved while her vulnerability is
+
+
+protected. And if there's a major threat
+
+
+political crackdown, infrastructure
+
+
+collapse, the Elohim nodes have
+
+
+emergency protocols. They automatically
+
+
+back up encrypted data shards to those
+
+
+pre-desated sanctuary institutions,
+
+
+universities, libraries, churches, or
+
+
+across the trusted peer network. Digital
+
+
+sovereignty is preserved even under
+
+
+duress.
+
+
+>> It sounds like creating a genuinely
+
+
+sacred commons, as the source material
+
+
+puts it. A space where attention isn't
+
+
+striped, where reach is earned through
+
+
+contribution, where communities actually
+
+
+own and govern their digital
+
+
+environments. It's a fundamental shift
+
+
+away from the frankly spiritual
+
+
+exhaustion of the current web, where
+
+
+everything feels monetized and
+
+
+transactional. We've walked through
+
+
+these compelling examples, shopping,
+
+
+work, civic life, social media, all
+
+
+transformed at the individual and
+
+
+community level by the Elohim Protocol.
+
+
+But what really makes this vision so
+
+
+ambitious is how these seemingly local
+
+
+actions are meant to scale up. How they
+
+
+aggregate to create something planetary.
+
+
+This is the Elohim Global Orchestra
+
+
+idea.
+
+
+>> That's the grand vision. Yes. The idea
+
+
+is that all these granular value flows,
+
+
+the care tokens from shopping, the
+
+
+steward tokens from workplaces, the
+
+
+validated data from public observers,
+
+
+they don't just stay local, they
+
+
+aggregate upward pseudonmously and
+
+
+transparently converging into this
+
+
+global orchestra. And this, they argue,
+
+
+enables world coherence,
+
+
+the ability to coordinate human activity
+
+
+on a planetary scale effectively and
+
+
+ethically without needing a centralized,
+
+
+potentially authoritarian world
+
+
+government. It doesn't aim to replace
+
+
+nation states necessarily, but to make
+
+
+many traditional state functions emerge
+
+
+organically from the bottom up driven by
+
+
+these transparent value flows becomes a
+
+
+self-organizing self-correcting global
+
+
+system. Let's look at how this might
+
+
+orchestrate different global domains.
+
+
+Natural resource management. Imagine
+
+
+every resource, water, timber, minerals
+
+
+being tracked via REA flows from
+
+
+extraction to final use. Allocation
+
+
+isn't decided by markets prone to
+
+
+speculation or by government decree
+
+
+alone. It's based on negotiated value
+
+
+flows mediated by Elohim. These
+
+
+negotiations would weigh a local
+
+
+community needs like an indigenous group
+
+
+needing specific timber for cultural
+
+
+practices against global ecological
+
+
+limits encoded in that top
+
+
+constitutional layer and the resources
+
+
+cultural significance. Communities could
+
+
+see in real time global availability and
+
+
+demand allowing for more equitable and
+
+
+sustainable distribution. Trade without
+
+
+treaties, fair trade just emerges. When
+
+
+Tommy Scanner showed those Mexican
+
+
+strawberries, the system could in
+
+
+principle make visible. The value flows
+
+
+behind them were fair wages paid. Were
+
+
+sustainable farming practices used? What
+
+
+was the carbon cost of transport? This
+
+
+multi-dimensional accounting visible
+
+
+across the network makes ethical
+
+
+production inherently more valuable. You
+
+
+wouldn't need complex, easily gained
+
+
+international trade deals. The protocol
+
+
+itself incentivizes fairness and
+
+
+transparency. Exploitative practices
+
+
+would struggle to gain value or trust
+
+
+within the network. human migration as
+
+
+natural right. Instead of viewing
+
+
+migration as a problem or a security
+
+
+threat, the system sees it as a flow of
+
+
+human potential. A person's skills,
+
+
+their community contributions, their
+
+
+care work, these become part of their
+
+
+pseudonymized value history, attested to
+
+
+by the communities they've been part of.
+
+
+Maria's cousin, the nurse from El
+
+
+Salvador, her verified skills could be
+
+
+instantly matched by Elohim agents to
+
+
+needs in a community she wants to move
+
+
+to. her cultural knowledge, her
+
+
+languages that these are recognized as
+
+
+assets. The framework shifts from
+
+
+illegal humans to facilitating flows of
+
+
+capability and care, aiming for a mutual
+
+
+benefit. Disaster pandemic response.
+
+
+Picture a crisis hitting. The Elohim
+
+
+network could instantly identify and
+
+
+activate idle resources globally. Empty
+
+
+rooms, available hospital beds,
+
+
+stockpiled supplies, people with
+
+
+relevant skills who've opted in to
+
+
+volunteer, all become visible in real
+
+
+time. Need is matched to resource
+
+
+automatically by Elohim agents. Aid
+
+
+flows based on transparent verified need
+
+
+bypassing political bottlenecks or
+
+
+bureaucratic delays. For pandemics, you
+
+
+can see near real-time infection rates
+
+
+at a neighborhood level, allowing for
+
+
+targeted responses and supply chains for
+
+
+essentials could adjust proactively. It
+
+
+enables rapid intelligent distributed
+
+
+coordination instead of relying solely
+
+
+on top- down commands. Yeah. Scientific
+
+
+mshots, big science projects, fusion,
+
+
+climate solutions, space exploration
+
+
+could be funded through aggregated value
+
+
+flows. Communities or individuals could
+
+
+pledge future savings or specific
+
+
+stewardship tokens towards goals they
+
+
+believe in. Researchers could
+
+
+collaborate globally. Their
+
+
+contributions tracked transparently with
+
+
+proposals reviewed and managed by
+
+
+dedicated Elohim agents ensuring
+
+
+integrity. Breakthroughs and resulting
+
+
+benefits could flow back proportionally
+
+
+to contributors, fostering pure
+
+
+collaboration over nationalistic
+
+
+competition. Human rights through
+
+
+transparency. This is a powerful one.
+
+
+Violations often rely on secrecy. In the
+
+
+Lhem network, systemic oppression,
+
+
+forced labor, denial of resources,
+
+
+corruption would show up as distortions
+
+
+or interruptions in the value flows. The
+
+
+extraction becomes visible. This
+
+
+transparency empowers global
+
+
+non-ooperation. Communities and
+
+
+individuals could simply choose not to
+
+
+engage in value flows with actors
+
+
+identified as oppressive, naturally
+
+
+isolating them economically and
+
+
+socially. Liberation through
+
+
+transparency, not necessarily force.
+
+
+Peace through orchestration.
+
+
+Many conflicts have roots in resource
+
+
+scarcity or historical grievances. The
+
+
+Elohim network makes these underlying
+
+
+factors transparent. Resource disputes
+
+
+become visible value flow arguments.
+
+
+Historical harms can be documented in
+
+
+immutable community ledgers. Mediator
+
+
+Elohim agents could then propose
+
+
+pathways for value rebalancing, resource
+
+
+sharing, and reconciliation based on
+
+
+this shared trusted data. Peace
+
+
+literally becomes more profitable than
+
+
+war. Because the true multi-dimensional
+
+
+costs of conflict, broken trust,
+
+
+destroyed assets, interrupted flows
+
+
+become undeniable. while the benefits of
+
+
+cooperation become quantifiable and
+
+
+achievable. Planetary boundaries as
+
+
+constitutional limits. This loops back
+
+
+to the architecture. Those hard
+
+
+ecological limits, carbon budgets,
+
+
+biodiversity thresholds are encoded in
+
+
+the top immutable layer of the
+
+
+constitution. Every emission, every unit
+
+
+of consumption drawing on a finite
+
+
+resource is tracked back to its source
+
+
+via REA flows. The system can have
+
+
+built-in feedback loops, perhaps
+
+
+automatic pricing adjustments reflecting
+
+
+ecological cost, making it
+
+
+computationally impossible to
+
+
+collectively overshoot these boundaries.
+
+
+The planet's health becomes a
+
+
+non-negotiable, systemically enforced
+
+
+constraint.
+
+
+>> So the takeaway is governance shifts
+
+
+from being about command control to
+
+
+being about coordination. And that
+
+
+coordination happens almost naturally
+
+
+without coercion because the system
+
+
+makes the consequences of actions the
+
+
+score visible to everyone from the
+
+
+individual choice up to the global
+
+
+impact. That's a fundamental paradigm
+
+
+shift.
+
+
+>> It also implies a completely different
+
+
+monetary reality. Elohim currencies as
+
+
+envisioned aren't fiat money declared
+
+
+valuable by a government. They are in
+
+
+essence stories backed by actual value
+
+
+creation. Those tokens we talked about,
+
+
+care, time, learning, steward, culture,
+
+
+they represent real, verifiable
+
+
+contributions made within the network.
+
+
+Their value comes from the story they
+
+
+tell, which is transparently recorded.
+
+
+And they could be exchangeable globally
+
+
+because the underlying value creation is
+
+
+visible. Monetary policy itself becomes
+
+
+less about central bank control and more
+
+
+like an evolutionary experiment.
+
+
+Different communities could try
+
+
+different models. Maybe forms of
+
+
+universal basic income. Maybe different
+
+
+ways to value environmental
+
+
+regeneration. Successful patterns, those
+
+
+that demonstrabably lead to flourishing,
+
+
+would naturally spread and be adopted by
+
+
+others because their positive impact is
+
+
+visible in the value flows. And this
+
+
+transparency has profound implications
+
+
+for dismantling oppression. When hidden
+
+
+value extraction, who really benefits
+
+
+from conflict minerals or sweat shop
+
+
+labor or polluting industries becomes
+
+
+visible, it exposes the injustice. You
+
+
+can see where the costs are born and
+
+
+where the profits accumulate. This
+
+
+creates the conditions for genuine
+
+
+accountability, justice, and
+
+
+reconciliation because the truth can no
+
+
+longer be easily hidden or denied.
+
+
+Ultimately, the network aims to reveal
+
+
+something that's already true but
+
+
+obscured.
+
+
+That we are all interconnected. We are
+
+
+global citizens through these flows of
+
+
+resources and impact. We operate
+
+
+locally, but our actions ripple
+
+
+globally. The Elohim Protocol doesn't
+
+
+create this reality. It just makes it
+
+
+visible and helps us navigate it more
+
+
+consciously and ethically.
+
+
+>> Putting this all together, it feels like
+
+
+the Elohim Protocol isn't just about
+
+
+inventing new gadgets. It's about
+
+
+consciously designing the conditions for
+
+
+human flourishing, drawing on lessons
+
+
+learned from successful approaches all
+
+
+around the world throughout history.
+
+
+It's like ethical engineering for
+
+
+society.
+
+
+>> That's a good way to put it. It
+
+
+explicitly aims to learn from and
+
+
+integrate diverse models that have
+
+
+demonstrabably fostered well-being. You
+
+
+mentioned Scandinavian social
+
+
+democracies, their focus on
+
+
+transparency, robust safety nets, high
+
+
+social trust, economic structures that
+
+
+limit extreme exploitation. Those are
+
+
+key reference points, but it draws
+
+
+inspiration much more widely. Think
+
+
+about Dutch urban planning. Designing
+
+
+cities for people, not just cars.
+
+
+Prioritizing walkability, bike paths,
+
+
+public spaces that encodes dignity into
+
+
+the physical environment. Look at
+
+
+African leaprogging. Umpa in Kenya
+
+
+bypassing banks entirely with mobile
+
+
+money. Rwanda's use of digital tools for
+
+
+governance and reconciliation after
+
+
+unimaginable trauma. These show how you
+
+
+can skip inefficient or unjust legacy
+
+
+systems. Taiwan's experiments with
+
+
+computational democracy using tools like
+
+
+Poli is to facilitate large-scale
+
+
+constructive dialogue and find consensus
+
+
+even on deeply divisive issues under
+
+
+intense external pressure. That's
+
+
+collective sensemaking and action.
+
+
+Germany's basic law is another
+
+
+influence. Its absolute commitment to
+
+
+human dignity in article one, its system
+
+
+of co-determination, giving workers a
+
+
+real voice on corporate boards. Its
+
+
+strong public media resisting commercial
+
+
+pressures. And perhaps most profoundly,
+
+
+it seeks to integrate indigenous wisdom,
+
+
+concepts like restorative justice
+
+
+instead of purely punitive systems.
+
+
+Collective stewardship, seeing resources
+
+
+as commons to be cared for, not just
+
+
+property to be owned. intergenerational
+
+
+thinking, considering impact seven
+
+
+generations out, and understanding our
+
+
+relationship with the natural world as
+
+
+sacred and reciprocal, not just
+
+
+extractive. These aren't just nice
+
+
+ideas. They represent time-t-ested
+
+
+patterns for sustainable, cohesive
+
+
+societies. So, the Elohim agents within
+
+
+this framework are envisioned as
+
+
+flourishing accelerators. Their job
+
+
+isn't just to manage things, but to
+
+
+actively identify these successful
+
+
+patterns of flourishing wherever they
+
+
+emerge in the world. They then help
+
+
+translate and adapt these patterns,
+
+
+enabling other communities to
+
+
+potentially leapfrog over harmful or
+
+
+extractive stages of development. Maybe
+
+
+a community can implement advanced
+
+
+regenerative agriculture techniques
+
+
+without first going through industrial
+
+
+farming or adopt sophisticated
+
+
+cooperative ownership models directly.
+
+
+This involves rapid pattern recognition
+
+
+across those global value flows,
+
+
+accelerating the adoption of what works
+
+
+by making it visible and easy to
+
+
+implement, orchestrating resources to
+
+
+support the transition, and carefully
+
+
+translated models so they fit the local
+
+
+culture rather than being imposed from
+
+
+outside. It creates this feedback loop.
+
+
+Individual growth fuels community
+
+
+flourishing, which in turn provides
+
+
+resources for further individual growth,
+
+
+a virtuous cycle. This brings us back to
+
+
+wealth and that provocative idea you
+
+
+mentioned earlier. What if our whole
+
+
+pursuit of accumulating wealth, as we
+
+
+currently define it, is actually part of
+
+
+the problem, a trap. And what if there's
+
+
+a more dignified, more secure path to
+
+
+well-being than just trying to amass
+
+
+more and more?
+
+
+>> It's a critical piece of the puzzle. The
+
+
+argument is that wealth beyond a certain
+
+
+point does become a trap. Its tendency
+
+
+towards exponential concentration breeds
+
+
+instability. It creates fear and
+
+
+protectionism among the wealthy,
+
+
+resentment among those left behind. It
+
+
+distorts democracy. The Elohim protocol
+
+
+proposes an exit ramp from this trap
+
+
+with the agents acting as wealth
+
+
+negotiators. FET. The system would have
+
+
+constitutional wealth thresholds. These
+
+
+aren't arbitrary numbers, but limits may
+
+
+be around 1015 million in today's terms
+
+
+based on research suggesting where
+
+
+private wealth starts to unduly
+
+
+influence democratic processes. The goal
+
+
+isn't to eliminate wealth, but to
+
+
+preserve innovation incentives while
+
+
+preventing the kind of massive
+
+
+accumulation that destabilizes society.
+
+
+So what happens if someone's value
+
+
+accumulation tracked through the network
+
+
+approaches this threshold? The system
+
+
+initiates a structured wealth
+
+
+resolution. This is crucial. It's framed
+
+
+as a negotiation, not confiscation.
+
+
+Elohim agents would work with the
+
+
+individual or family. They address the
+
+
+emotional aspects, ensure a very
+
+
+generous security floor for personal
+
+
+generational well-being is maintained.
+
+
+Then they negotiate how the surplus
+
+
+wealth gets translated into enduring
+
+
+legacy. This could mean funding major
+
+
+community regeneration projects,
+
+
+restoring ecosystems, endowing
+
+
+scientific research, creating cultural
+
+
+assets, and for entrepreneurs driving
+
+
+innovation. Instead of aiming for
+
+
+billionaire status, the system offers
+
+
+ambition risk pools. These are like
+
+
+collectively funded venture initiatives.
+
+
+If your innovation succeeds, you get a
+
+
+very significant reward, maybe 5x, 10x
+
+
+your initial contribution, but not the
+
+
+runaway system distorting returns we see
+
+
+now. The whole process is designed to be
+
+
+voluntary, dignified, even competitive.
+
+
+The pitch is that this pathway offers
+
+
+greater long-term security. Your legacy
+
+
+is woven into a thriving world, higher
+
+
+social status, recognition for
+
+
+contribution, not just hoarding, and a
+
+
+far more meaningful legacy than simply
+
+
+sitting on a dragon's horde of digital
+
+
+gold. It aims to make contributing
+
+
+surplus wealth more attractive and
+
+
+prestigious than clinging to it.
+
+
+>> What really resonates there is how it
+
+
+reframes the whole thing. It's a
+
+
+complete system trying to redefine how
+
+
+value is created, how it flows, and how
+
+
+wealth can actually become a positive
+
+
+sum contribution to everyone's
+
+
+flourishing instead of this often zero
+
+
+sum game it feels like now.
+
+
+>> And that naturally leads to the concept
+
+
+of universal basic assets, UBA, and the
+
+
+dignity dividend. This isn't just giving
+
+
+people cash, though that might be part
+
+
+of some community experiments. UVA is
+
+
+about ensuring everyone has ownership
+
+
+stakes in the essential infrastructure
+
+
+for a good life. Think shares and
+
+
+community-owned solar energy grids,
+
+
+membership in zerocarbon transportation
+
+
+networks, access to regenerative local
+
+
+food systems, participation in ethical
+
+
+product libraries where you borrow tools
+
+
+and durable goods instead of everyone
+
+
+needing to own everything. This creates
+
+
+a thriving floor. It makes highquality,
+
+
+ethical, sustainable living the default,
+
+
+not a luxury you have to pay a premium
+
+
+for. It tackles the high cost of low
+
+
+price where cheap stuff seems affordable
+
+
+but carries huge hidden costs and
+
+
+environmental damage, exploited labor,
+
+
+poor health outcomes. UBA aims to
+
+
+eliminate the need for people to make
+
+
+those moral compromises just to get by.
+
+
+There's a vignette used to illustrate
+
+
+this. The teachers family thriving
+
+
+floor. A family may be on a modest
+
+
+teacher's income. That income alone
+
+
+might not be enough for a dignified life
+
+
+in today's expensive world. But combined
+
+
+with UBA, their affordable housing is
+
+
+part of a solar co-op. They get shares
+
+
+of local organic produce from a
+
+
+community farm network. They access
+
+
+tools and appliances from a shared
+
+
+library. Suddenly, their needs are
+
+
+comfortably met. Their consumption
+
+
+aligns with their values by default.
+
+
+They're freed from many extractive
+
+
+necessities like high energy bills,
+
+
+expensive processed food, buying cheap
+
+
+disposable goods. This gives them not
+
+
+just financial breathing room, but also
+
+
+the time and energy to contribute more
+
+
+meaningfully to their community. It's a
+
+
+vision of abundance based on shared
+
+
+assets and ecological regeneration, not
+
+
+just individual income. #outro.
+
+
+>> So, where does this leave us? We've gone
+
+
+deep into the Elheim Protocol today.
+
+
+It's this incredibly ambitious, maybe
+
+
+even audacious vision for rebuilding our
+
+
+digital world, our economy, even our
+
+
+governance from the ground up. Designed,
+
+
+they say, to encode love and care right
+
+
+into the architecture of our daily
+
+
+lives. It's a system aiming to shift us
+
+
+away from that default of extraction,
+
+
+division, and exhaustion towards one
+
+
+where contribution, connection, and
+
+
+collective flourishing are the norm.
+
+
+Built on these ideas of peer-to-peer
+
+
+networks, a different social way of
+
+
+computing, and guided by these these AI
+
+
+guardians.
+
+
+>> Right? And it's important to reiterate
+
+
+the sources presenting this aren't
+
+
+framing it as science fiction dependent
+
+
+on unobtainable future tech. They argue
+
+
+it's about engineering with wisdom. It's
+
+
+about taking technologies we already
+
+
+have or that are rapidly developing
+
+
+smartphones, powerful AI, blockchain
+
+
+concepts, PDP networking, and combining
+
+
+them in a fundamentally different way,
+
+
+using them to build a different kind of
+
+
+societal operating system.
+
+
+>> It's like having all the ingredients,
+
+
+flour, water, yeast, salt, but instead
+
+
+of just making the same old loaf, you're
+
+
+trying a completely new recipe designed
+
+
+specifically for health, sustainability,
+
+
+and sharing.
+
+
+>> And the vision as presented really does
+
+
+invite participation. and it's not
+
+
+something meant to be imposed. The
+
+
+sources talk about pilot projects,
+
+
+communities experimenting, ways for
+
+
+people to signal they're ready for this
+
+
+kind of change. So maybe the question
+
+
+for you listening, what role could you
+
+
+imagine playing in a transition like
+
+
+this in your family, your workplace,
+
+
+your town? And here's a final thought to
+
+
+maybe carry with you. Imagine a world
+
+
+where simply engaging with technology,
+
+
+checking your messages, doing your work,
+
+
+buying groceries. Imagine if doing those
+
+
+things intrinsically by the very design
+
+
+of the system made the world a little
+
+
+more loving, a little more just, a
+
+
+little more abundant. Not because you're
+
+
+constantly trying harder, but because
+
+
+the system itself is built that way.
+
+
+What would that feel like? And what
+
+
+might that mean for our future if care
+
+
+was finally counted and flourishing
+
+
+became the default setting? Something to
+
+
+ponder for
