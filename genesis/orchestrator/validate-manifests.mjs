@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { execSync } from 'child_process';
 import Ajv from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const SCHEMA_PATH = resolve(ROOT, 'genesis/orchestrator/manifest.schema.json');
@@ -24,6 +25,7 @@ if (manifestPaths.length === 0) {
 // Load schema
 const schema = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
 const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);
 const validate = ajv.compile(schema);
 
 let errors = 0;

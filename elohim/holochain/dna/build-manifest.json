@@ -1,0 +1,51 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-holochain",
+  "description": "Holochain DNA compilation — WASM zomes and hApp packaging",
+  "steps": {
+    "build-dna-wasm": {
+      "description": "Compile integrity and coordinator zomes to WASM",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/dna/**/*.rs",
+          "elohim/holochain/dna/**/Cargo.toml",
+          "elohim/holochain/dna/**/Cargo.lock",
+          "elohim/holochain/dna/**/*.nix",
+          "elohim/elohim-cache-core/**"
+        ],
+        "buildProcess": [
+          "elohim/holochain/dna/Jenkinsfile"
+        ]
+      },
+      "outputs": {
+        "artifacts": ["dna-wasm"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build DNA",
+        "function": null
+      }
+    },
+    "build-happ": {
+      "description": "Package compiled zomes into .happ bundle",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/dna/**/happ.yaml",
+          "elohim/holochain/dna/**/dna.yaml"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": ["elohim.happ"],
+        "verify": null
+      },
+      "depends": ["build-dna-wasm"],
+      "executor": {
+        "stage": "Build DNA",
+        "function": null
+      }
+    }
+  },
+  "deployment": {}
+}
