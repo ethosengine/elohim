@@ -548,6 +548,28 @@ def runBddCoverageGap() {
     }
 }
 
+/**
+ * Run build graph walker in shadow mode alongside PIPELINES analysis.
+ * Compares results and logs divergences without affecting build decisions.
+ */
+def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
+    try {
+        def buildGraph = load('genesis/orchestrator/build-graph.groovy')
+        def result = buildGraph.walkBuildGraph(changedFiles)
+
+        // Print comparison matrix
+        echo buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
+
+        // Save build state for next run (even in shadow mode, to build up hash baseline)
+        def commitHash = getGitCommitHash()
+        buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash)
+
+    } catch (Exception e) {
+        echo "⚠️ Build Graph shadow mode failed (non-blocking): ${e.message}"
+        echo "Stack trace: ${e.stackTrace.take(10).collect { it.toString() }.join('\n')}"
+    }
+}
+
 // =============================================================================
 // PIPELINE
 // =============================================================================
@@ -840,6 +862,9 @@ spec:
 
                         // ALWAYS show the decision matrix
                         printDecisionMatrix(analysis, ordered)
+
+                        echo '\n=== Build Graph Shadow Mode ==='
+                        runBuildGraphShadow(changedFiles, analysis)
 
                         // Set build description
                         if (ordered.isEmpty() && mode == 'auto') {
