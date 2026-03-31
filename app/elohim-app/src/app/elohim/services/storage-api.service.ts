@@ -123,7 +123,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   private readonly baseUrl: string;
 
   /** App ID for multi-tenant scoping */
-  private readonly appId = 'lamad';
+  private readonly hAppId = 'lamad';
 
   /** Default request timeout in milliseconds */
   private readonly defaultTimeoutMs = 30000;
@@ -161,7 +161,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
 
   /** List content items with optional filters. */
   getContents(filters?: ContentFilters): Observable<ContentWithTagsView[]> {
-    let params = new HttpParams().set('appId', this.appId);
+    let params = new HttpParams().set('hAppId', this.hAppId);
 
     if (filters?.contentType) params = params.set('contentType', filters.contentType);
     if (filters?.tags?.length) params = params.set('tags', filters.tags.join(','));
@@ -197,7 +197,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   /** Get relationships for a content node, with joined content. */
   getRelatedContent(id: string): Observable<RelationshipWithContentView[]> {
     const params = new HttpParams()
-      .set('appId', this.appId)
+      .set('hAppId', this.hAppId)
       .set('sourceId', id)
       .set('includeContent', 'true');
 
@@ -212,7 +212,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   /** Get mastery state for a human on specific content. */
   getMastery(humanId: string, contentId: string): Observable<ContentMasteryView | null> {
     const params = new HttpParams()
-      .set('appId', this.appId)
+      .set('hAppId', this.hAppId)
       .set('humanId', humanId)
       .set('contentId', contentId);
 
@@ -247,7 +247,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * Query params use camelCase.
    */
   getRelationships(query?: RelationshipFilters): Observable<RelationshipView[]> {
-    let params = new HttpParams().set('appId', this.appId);
+    let params = new HttpParams().set('hAppId', this.hAppId);
 
     if (query?.sourceId) params = params.set('sourceId', query.sourceId);
     if (query?.targetId) params = params.set('targetId', query.targetId);
@@ -318,7 +318,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * List human relationships with optional filters.
    */
   getHumanRelationships(query?: HumanRelationshipQuery): Observable<HumanRelationshipView[]> {
-    let params = new HttpParams().set('appId', 'imagodei');
+    let params = new HttpParams().set('hAppId', 'imagodei');
 
     if (query?.partyId) params = params.set('partyId', query.partyId);
     if (query?.partyAId) params = params.set('partyAId', query.partyAId);
@@ -377,7 +377,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * List contributor presences with optional filters.
    */
   getContributorPresences(query?: PresenceQuery): Observable<ContributorPresenceView[]> {
-    let params = new HttpParams().set('appId', this.appId);
+    let params = new HttpParams().set('hAppId', this.hAppId);
 
     if (query?.presenceState) params = params.set('presenceState', query.presenceState);
     if (query?.stewardId) params = params.set('stewardId', query.stewardId);
@@ -451,7 +451,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * List economic events with optional filters.
    */
   getEconomicEvents(query?: EventQuery): Observable<EconomicEventView[]> {
-    let params = new HttpParams().set('appId', 'shefa');
+    let params = new HttpParams().set('hAppId', 'shefa');
 
     if (query?.agentId) {
       params = params.set(query.agentRole === 'provider' ? 'provider' : 'receiver', query.agentId);
@@ -497,7 +497,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * List content mastery records with optional filters.
    */
   getMasteryRecords(query?: MasteryQuery): Observable<ContentMasteryView[]> {
-    let params = new HttpParams().set('appId', this.appId);
+    let params = new HttpParams().set('hAppId', this.hAppId);
 
     if (query?.humanId) params = params.set('humanId', query.humanId);
     if (query?.contentId) params = params.set('contentId', query.contentId);
@@ -683,7 +683,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * List stewardship allocations with optional filters.
    */
   getStewardshipAllocations(query?: AllocationQuery): Observable<StewardshipAllocationView[]> {
-    let params = new HttpParams().set('appId', this.appId);
+    let params = new HttpParams().set('hAppId', this.hAppId);
 
     if (query?.contentId) params = params.set('contentId', query.contentId);
     if (query?.stewardPresenceId) params = params.set('stewardPresenceId', query.stewardPresenceId);

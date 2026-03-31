@@ -219,8 +219,8 @@ export interface HolochainContentRelationship {
 export interface HolochainClientConfig {
   /** WebSocket URL for admin interface (e.g., ws://localhost:4444 or wss://holochain-dev.elohim.host) */
   adminUrl: string;
-  /** Installed app ID (e.g., elohim) */
-  appId: string;
+  /** Installed Holochain app ID (e.g., elohim) */
+  hAppId: string;
   /** Optional path to .happ file for installation */
   happPath?: string;
 }

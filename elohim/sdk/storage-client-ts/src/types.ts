@@ -4,8 +4,8 @@
 export interface StorageConfig {
   /** Base URL for elohim-storage HTTP API */
   baseUrl: string;
-  /** Application ID for namespacing */
-  appId: string;
+  /** Holochain app ID for namespacing */
+  hAppId: string;
   /** Optional API key for authentication */
   apiKey?: string;
   /** Request timeout in milliseconds (default: 30000) */
@@ -32,8 +32,8 @@ export interface DocumentInfo {
  * Response from list documents endpoint
  */
 export interface ListDocumentsResponse {
-  /** Application ID */
-  app_id: string;
+  /** Holochain app ID */
+  hAppId: string;
   /** List of documents */
   documents: DocumentInfo[];
   /** Total count (for pagination) */
@@ -48,8 +48,8 @@ export interface ListDocumentsResponse {
  * Response from get document endpoint
  */
 export interface GetDocumentResponse {
-  /** Application ID */
-  app_id: string;
+  /** Holochain app ID */
+  hAppId: string;
   /** Document ID */
   doc_id: string;
   /** Current heads (hex-encoded change hashes) */
@@ -60,8 +60,8 @@ export interface GetDocumentResponse {
  * Response from get heads endpoint
  */
 export interface GetHeadsResponse {
-  /** Application ID */
-  app_id: string;
+  /** Holochain app ID */
+  hAppId: string;
   /** Document ID */
   doc_id: string;
   /** Current heads (hex-encoded change hashes) */
@@ -72,8 +72,8 @@ export interface GetHeadsResponse {
  * Response from get changes endpoint
  */
 export interface GetChangesResponse {
-  /** Application ID */
-  app_id: string;
+  /** Holochain app ID */
+  hAppId: string;
   /** Document ID */
   doc_id: string;
   /** Changes as base64-encoded blobs */
@@ -86,8 +86,8 @@ export interface GetChangesResponse {
  * Response from apply changes endpoint
  */
 export interface ApplyChangesResponse {
-  /** Application ID */
-  app_id: string;
+  /** Holochain app ID */
+  hAppId: string;
   /** Document ID */
   doc_id: string;
   /** New heads after applying changes */

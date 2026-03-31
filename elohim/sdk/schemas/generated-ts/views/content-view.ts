@@ -88,7 +88,7 @@ export type ValidationStatus = 'valid' | 'migrated' | 'degraded' | 'healing';
  */
 export interface ContentView {
   id: string;
-  appId: string;
+  hAppId: string;
   title: string;
   description?: string | null;
   contentType: ContentType;

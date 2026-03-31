@@ -126,7 +126,7 @@ impl ContentProjection {
 
         // Extract fields from JSON
         let content_type = data
-            .get("content_type")
+            .get("contentType")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown")
             .to_string();
@@ -149,7 +149,7 @@ impl ContentProjection {
             .map(|s| s.to_string());
 
         let content_format = data
-            .get("content_format")
+            .get("contentFormat")
             .and_then(|v| v.as_str())
             .unwrap_or("markdown")
             .to_string();
@@ -171,12 +171,12 @@ impl ContentProjection {
             .to_string();
 
         let trust_score = data
-            .get("trust_score")
+            .get("trustScore")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
         let estimated_minutes = data
-            .get("estimated_minutes")
+            .get("estimatedMinutes")
             .and_then(|v| v.as_u64())
             .map(|v| v as u32);
 
@@ -408,12 +408,12 @@ mod tests {
     #[test]
     fn test_content_projection_from_entry() {
         let data = serde_json::json!({
-            "content_type": "concept",
+            "contentType": "concept",
             "title": "Economic Flows",
             "description": "Understanding value flow in networks",
             "tags": ["economics", "governance"],
             "reach": "commons",
-            "trust_score": 0.95,
+            "trustScore": 0.95,
         });
 
         let proj = ContentProjection::from_entry(

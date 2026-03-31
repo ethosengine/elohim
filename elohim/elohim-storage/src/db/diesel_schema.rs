@@ -13,7 +13,7 @@ diesel::table! {
 diesel::table! {
     comments (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         content_id -> Text,
         human_id -> Text,
         body -> Text,
@@ -27,7 +27,7 @@ diesel::table! {
 diesel::table! {
     collectives (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         name -> Text,
         description -> Nullable<Text>,
         governance_layer -> Text,
@@ -44,7 +44,7 @@ diesel::table! {
 diesel::table! {
     collective_participations (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         collective_id -> Text,
         human_id -> Text,
         intimacy_level -> Text,
@@ -61,7 +61,7 @@ diesel::table! {
 diesel::table! {
     content (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         title -> Text,
         description -> Nullable<Text>,
         content_type -> Text,
@@ -83,7 +83,7 @@ diesel::table! {
 diesel::table! {
     content_mastery (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         human_id -> Text,
         content_id -> Text,
         mastery_level -> Text,
@@ -104,8 +104,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    content_tags (app_id, content_id, tag) {
-        app_id -> Text,
+    content_tags (h_app_id, content_id, tag) {
+        h_app_id -> Text,
         content_id -> Text,
         tag -> Text,
     }
@@ -114,7 +114,7 @@ diesel::table! {
 diesel::table! {
     contributor_presences (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         display_name -> Text,
         presence_state -> Text,
         external_identifiers_json -> Nullable<Text>,
@@ -148,7 +148,7 @@ diesel::table! {
 diesel::table! {
     enum_registry (id) {
         id -> Integer,
-        app_id -> Text,
+        h_app_id -> Text,
         enum_name -> Text,
         enum_value -> Text,
         tier -> Text,
@@ -160,7 +160,7 @@ diesel::table! {
 diesel::table! {
     economic_events (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         action -> Text,
         provider -> Text,
         receiver -> Text,
@@ -192,7 +192,7 @@ diesel::table! {
 diesel::table! {
     human_relationships (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         party_a_id -> Text,
         party_b_id -> Text,
         relationship_type -> Text,
@@ -239,7 +239,7 @@ diesel::table! {
 diesel::table! {
     relationships (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         source_id -> Text,
         target_id -> Text,
         relationship_type -> Text,
@@ -260,7 +260,7 @@ diesel::table! {
 diesel::table! {
     schedules (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         entity_type -> Text,
         entity_id -> Text,
         scheduled_at -> Nullable<Text>,
@@ -277,7 +277,7 @@ diesel::table! {
 diesel::table! {
     places (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         dht_anchor_hash -> Text,
         name -> Text,
         place_type -> Text,
@@ -302,7 +302,7 @@ diesel::table! {
 diesel::table! {
     spatial_contexts (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         entity_type -> Text,
         entity_id -> Text,
         latitude -> Nullable<Double>,
@@ -336,7 +336,7 @@ diesel::table! {
 diesel::table! {
     stewardship_allocations (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         content_id -> Text,
         steward_presence_id -> Text,
         allocation_ratio -> Float,
@@ -406,7 +406,7 @@ diesel::table! {
         profile_reach -> Text,
         location -> Nullable<Text>,
         profile_photo_url -> Nullable<Text>,
-        app_id -> Text,
+        h_app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
         dht_anchor_hash -> Nullable<Text>,
@@ -421,7 +421,7 @@ diesel::table! {
     /// before building the CustodianMetricsView.
     custodian_metrics (custodian_id) {
         custodian_id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         tier -> Integer,
         health_json -> Text,
         storage_json -> Text,
@@ -644,7 +644,7 @@ diesel::table! {
 diesel::table! {
     steward_affinity (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         steward_id -> Text,
         content_id -> Text,
         affinity_score -> Float,
@@ -709,7 +709,7 @@ diesel::table! {
 diesel::table! {
     rea_commitments (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         action -> Text,
         provider -> Text,
         receiver -> Text,
@@ -737,7 +737,7 @@ diesel::table! {
 diesel::table! {
     agreements (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         name -> Nullable<Text>,
         note -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
@@ -760,7 +760,7 @@ diesel::table! {
         region -> Nullable<Text>,
         context_epr_id -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
-        app_id -> Text,
+        h_app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
     }
@@ -780,7 +780,7 @@ diesel::table! {
 diesel::table! {
     knowledge_maps (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         map_type -> Text,
         owner_id -> Text,
         title -> Text,
@@ -805,7 +805,7 @@ diesel::table! {
 diesel::table! {
     imagodei_observations (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         human_id -> Text,
         observed_at -> Text,
         observation_type -> Text,
@@ -852,7 +852,7 @@ diesel::table! {
 diesel::table! {
     hazards (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         place_id -> Text,
         hazard_type -> Text,
         severity -> Text,
@@ -877,7 +877,7 @@ diesel::table! {
 diesel::table! {
     risk_alerts (id) {
         id -> Text,
-        app_id -> Text,
+        h_app_id -> Text,
         place_id -> Text,
         alert_type -> Text,
         severity -> Text,

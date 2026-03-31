@@ -81,7 +81,7 @@ fn resolve_place_from_h3(
     // Try neighborhood resolution first (more specific)
     if let Some(h3) = h3_res7 {
         let result: Result<String, _> = places::table
-            .filter(places::app_id.eq(ctx.app_id()))
+            .filter(places::h_app_id.eq(ctx.h_app_id()))
             .filter(places::h3_index.eq(h3))
             .filter(places::status.eq("active"))
             .select(places::id)
@@ -95,7 +95,7 @@ fn resolve_place_from_h3(
     // Fall back to municipal resolution (broader)
     if let Some(h3) = h3_res5 {
         let result: Result<String, _> = places::table
-            .filter(places::app_id.eq(ctx.app_id()))
+            .filter(places::h_app_id.eq(ctx.h_app_id()))
             .filter(places::h3_index.eq(h3))
             .filter(places::status.eq("active"))
             .select(places::id)
@@ -138,7 +138,7 @@ pub fn create_spatial_context(
     // Mark any existing current entry for this entity as historical
     diesel::update(
         spatial_contexts::table
-            .filter(spatial_contexts::app_id.eq(ctx.app_id()))
+            .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id()))
             .filter(spatial_contexts::entity_type.eq(&input.entity_type))
             .filter(spatial_contexts::entity_id.eq(&input.entity_id))
             .filter(spatial_contexts::is_current.eq(1)),
@@ -149,7 +149,7 @@ pub fn create_spatial_context(
 
     let new = NewSpatialContext {
         id: id.clone(),
-        app_id: ctx.app_id().to_string(),
+        h_app_id: ctx.h_app_id().to_string(),
         entity_type: input.entity_type,
         entity_id: input.entity_id,
         latitude: input.latitude,
@@ -201,7 +201,7 @@ pub fn get_spatial_context(
     entity_id: &str,
 ) -> Result<SpatialContext, StorageError> {
     spatial_contexts::table
-        .filter(spatial_contexts::app_id.eq(ctx.app_id()))
+        .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id()))
         .filter(spatial_contexts::entity_type.eq(entity_type))
         .filter(spatial_contexts::entity_id.eq(entity_id))
         .filter(spatial_contexts::is_current.eq(1))
@@ -224,7 +224,7 @@ pub fn get_spatial_context_history(
     entity_id: &str,
 ) -> Result<Vec<SpatialContext>, StorageError> {
     spatial_contexts::table
-        .filter(spatial_contexts::app_id.eq(ctx.app_id()))
+        .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id()))
         .filter(spatial_contexts::entity_type.eq(entity_type))
         .filter(spatial_contexts::entity_id.eq(entity_id))
         .order(spatial_contexts::created_at.desc())
@@ -240,7 +240,7 @@ pub fn get_spatial_context_by_id(
 ) -> Result<SpatialContext, StorageError> {
     spatial_contexts::table
         .filter(spatial_contexts::id.eq(id))
-        .filter(spatial_contexts::app_id.eq(ctx.app_id()))
+        .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id()))
         .first(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
@@ -258,7 +258,7 @@ pub fn list_spatial_contexts(
     query: &SpatialContextQuery,
 ) -> Result<Vec<SpatialContext>, StorageError> {
     let mut q = spatial_contexts::table
-        .filter(spatial_contexts::app_id.eq(ctx.app_id()))
+        .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(ref entity_type) = query.entity_type {
@@ -357,7 +357,7 @@ pub fn delete_spatial_context(
     let count = diesel::delete(
         spatial_contexts::table
             .filter(spatial_contexts::id.eq(id))
-            .filter(spatial_contexts::app_id.eq(ctx.app_id())),
+            .filter(spatial_contexts::h_app_id.eq(ctx.h_app_id())),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Failed to delete spatial context: {}", e)))?;

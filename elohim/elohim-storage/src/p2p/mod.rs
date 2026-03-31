@@ -1259,28 +1259,28 @@ impl P2PNode {
     /// Handle an incoming sync request
     async fn handle_sync_request(&self, request: SyncRequest) -> SyncResponse {
         match request {
-            SyncRequest::GetHeads { app_id, doc_id } => {
-                debug!(app_id = %app_id, doc_id = %doc_id, "Handling GetHeads request");
-                match self.sync_manager.get_heads(&app_id, &doc_id).await {
+            SyncRequest::GetHeads { h_app_id, doc_id } => {
+                debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Handling GetHeads request");
+                match self.sync_manager.get_heads(&h_app_id, &doc_id).await {
                     Ok(heads) => {
                         // Get change count from doc store
                         let change_count = match self
                             .sync_manager
-                            .list_documents(&app_id, Some(&doc_id), 0, 1)
+                            .list_documents(&h_app_id, Some(&doc_id), 0, 1)
                             .await
                         {
                             Ok((docs, _)) => docs.first().map(|d| d.change_count).unwrap_or(0),
                             Err(_) => 0,
                         };
                         SyncResponse::Heads {
-                            app_id,
+                            h_app_id,
                             doc_id,
                             heads,
                             change_count,
                         }
                     }
                     Err(e) => {
-                        warn!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
+                        warn!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
                         SyncResponse::Error {
                             message: format!("Failed to get heads: {}", e),
                         }
@@ -1288,21 +1288,21 @@ impl P2PNode {
                 }
             }
             SyncRequest::SyncChanges {
-                app_id,
+                h_app_id,
                 doc_id,
                 have_heads,
                 bloom_filter: _, // TODO: Use bloom filter for optimization
             } => {
-                debug!(app_id = %app_id, doc_id = %doc_id, have_heads = ?have_heads, "Handling SyncChanges request");
+                debug!(h_app_id = %h_app_id, doc_id = %doc_id, have_heads = ?have_heads, "Handling SyncChanges request");
                 match self
                     .sync_manager
-                    .get_changes_since(&app_id, &doc_id, &have_heads)
+                    .get_changes_since(&h_app_id, &doc_id, &have_heads)
                     .await
                 {
                     Ok((changes, new_heads)) => {
-                        info!(app_id = %app_id, doc_id = %doc_id, changes_count = changes.len(), "Sending changes");
+                        info!(h_app_id = %h_app_id, doc_id = %doc_id, changes_count = changes.len(), "Sending changes");
                         SyncResponse::Changes {
-                            app_id,
+                            h_app_id,
                             doc_id,
                             changes,
                             has_more: false, // TODO: Implement pagination
@@ -1310,7 +1310,7 @@ impl P2PNode {
                         }
                     }
                     Err(e) => {
-                        warn!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
+                        warn!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
                         SyncResponse::Error {
                             message: format!("Failed to get changes: {}", e),
                         }
@@ -1318,16 +1318,16 @@ impl P2PNode {
                 }
             }
             SyncRequest::GetChanges {
-                app_id,
+                h_app_id,
                 doc_id,
                 change_hashes,
             } => {
-                debug!(app_id = %app_id, doc_id = %doc_id, change_hashes = ?change_hashes, "Handling GetChanges request");
+                debug!(h_app_id = %h_app_id, doc_id = %doc_id, change_hashes = ?change_hashes, "Handling GetChanges request");
                 // For now, return all changes since empty heads (full sync)
                 // TODO: Implement selective change fetching by hash
                 match self
                     .sync_manager
-                    .get_changes_since(&app_id, &doc_id, &[])
+                    .get_changes_since(&h_app_id, &doc_id, &[])
                     .await
                 {
                     Ok((changes, _)) => {
@@ -1342,14 +1342,14 @@ impl P2PNode {
                             })
                             .collect();
                         SyncResponse::RequestedChanges {
-                            app_id,
+                            h_app_id,
                             doc_id,
                             changes: changes_with_hashes,
                             not_found: vec![],
                         }
                     }
                     Err(e) => {
-                        warn!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get requested changes");
+                        warn!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get requested changes");
                         SyncResponse::Error {
                             message: format!("Failed to get changes: {}", e),
                         }
@@ -1357,28 +1357,28 @@ impl P2PNode {
                 }
             }
             SyncRequest::AnnounceChange {
-                app_id,
+                h_app_id,
                 doc_id,
                 change_hash: _,
                 change_data,
             } => {
-                debug!(app_id = %app_id, doc_id = %doc_id, "Handling AnnounceChange request");
+                debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Handling AnnounceChange request");
                 if let Some(data) = change_data {
                     match self
                         .sync_manager
-                        .apply_changes(&app_id, &doc_id, vec![data])
+                        .apply_changes(&h_app_id, &doc_id, vec![data])
                         .await
                     {
                         Ok(_) => {
-                            info!(app_id = %app_id, doc_id = %doc_id, "Applied announced change");
+                            info!(h_app_id = %h_app_id, doc_id = %doc_id, "Applied announced change");
                             SyncResponse::ChangeAck {
-                                app_id,
+                                h_app_id,
                                 doc_id,
                                 was_new: true,
                             }
                         }
                         Err(e) => {
-                            warn!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to apply change");
+                            warn!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to apply change");
                             SyncResponse::Error {
                                 message: format!("Failed to apply change: {}", e),
                             }
@@ -1387,22 +1387,22 @@ impl P2PNode {
                 } else {
                     // Just an announcement, we'd need to request the change
                     SyncResponse::ChangeAck {
-                        app_id,
+                        h_app_id,
                         doc_id,
                         was_new: false,
                     }
                 }
             }
             SyncRequest::ListDocuments {
-                app_id,
+                h_app_id,
                 prefix,
                 offset,
                 limit,
             } => {
-                debug!(app_id = %app_id, prefix = ?prefix, offset = offset, limit = limit, "Handling ListDocuments request");
+                debug!(h_app_id = %h_app_id, prefix = ?prefix, offset = offset, limit = limit, "Handling ListDocuments request");
                 match self
                     .sync_manager
-                    .list_documents(&app_id, prefix.as_deref(), offset, limit)
+                    .list_documents(&h_app_id, prefix.as_deref(), offset, limit)
                     .await
                 {
                     Ok((docs, total)) => {
@@ -1418,14 +1418,14 @@ impl P2PNode {
                             .collect();
                         let has_more = (offset as u64 + documents.len() as u64) < total;
                         SyncResponse::DocumentList {
-                            app_id,
+                            h_app_id,
                             documents,
                             total,
                             has_more,
                         }
                     }
                     Err(e) => {
-                        warn!(app_id = %app_id, error = %e, "Failed to list documents");
+                        warn!(h_app_id = %h_app_id, error = %e, "Failed to list documents");
                         SyncResponse::Error {
                             message: format!("Failed to list documents: {}", e),
                         }
@@ -1445,13 +1445,13 @@ impl P2PNode {
     ) {
         match response {
             SyncResponse::DocumentList {
-                app_id,
+                h_app_id,
                 documents,
                 total,
                 ..
             } => {
                 debug!(
-                    peer = %peer, app_id = %app_id, doc_count = documents.len(),
+                    peer = %peer, h_app_id = %h_app_id, doc_count = documents.len(),
                     total = total, "Received document list from peer"
                 );
 
@@ -1459,14 +1459,14 @@ impl P2PNode {
                 for remote_doc in &documents {
                     match self
                         .sync_manager
-                        .get_heads(&app_id, &remote_doc.doc_id)
+                        .get_heads(&h_app_id, &remote_doc.doc_id)
                         .await
                     {
                         Ok(local_heads) => {
                             if local_heads != remote_doc.heads {
                                 // Heads differ — request changes from this peer
                                 let sync_request = SyncRequest::SyncChanges {
-                                    app_id: app_id.clone(),
+                                    h_app_id: h_app_id.clone(),
                                     doc_id: remote_doc.doc_id.clone(),
                                     have_heads: local_heads,
                                     bloom_filter: None,
@@ -1485,7 +1485,7 @@ impl P2PNode {
                         Err(_) => {
                             // Document doesn't exist locally — request full sync
                             let sync_request = SyncRequest::SyncChanges {
-                                app_id: app_id.clone(),
+                                h_app_id: h_app_id.clone(),
                                 doc_id: remote_doc.doc_id.clone(),
                                 have_heads: vec![],
                                 bloom_filter: None,
@@ -1504,27 +1504,27 @@ impl P2PNode {
                 }
             }
             SyncResponse::Changes {
-                app_id,
+                h_app_id,
                 doc_id,
                 changes,
                 new_heads,
                 ..
             } => {
                 if changes.is_empty() {
-                    debug!(peer = %peer, app_id = %app_id, doc_id = %doc_id, "No new changes from peer");
+                    debug!(peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id, "No new changes from peer");
                     return;
                 }
                 info!(
-                    peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                    peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id,
                     change_count = changes.len(), "Applying changes from peer"
                 );
                 if let Err(e) = self
                     .sync_manager
-                    .apply_changes(&app_id, &doc_id, changes)
+                    .apply_changes(&h_app_id, &doc_id, changes)
                     .await
                 {
                     warn!(
-                        peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                        peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id,
                         error = %e, "Failed to apply sync changes"
                     );
                 } else {
@@ -1535,16 +1535,16 @@ impl P2PNode {
                 }
             }
             SyncResponse::Heads {
-                app_id,
+                h_app_id,
                 doc_id,
                 heads,
                 ..
             } => {
                 // Compare with local heads and request changes if different
-                match self.sync_manager.get_heads(&app_id, &doc_id).await {
+                match self.sync_manager.get_heads(&h_app_id, &doc_id).await {
                     Ok(local_heads) if local_heads != heads => {
                         let sync_request = SyncRequest::SyncChanges {
-                            app_id: app_id.clone(),
+                            h_app_id: h_app_id.clone(),
                             doc_id: doc_id.clone(),
                             have_heads: local_heads,
                             bloom_filter: None,
@@ -1716,7 +1716,7 @@ impl P2PNode {
 
         let presences: Vec<crate::db::models::ContributorPresence> = contributor_presences::table
             .filter(contributor_presences::id.eq_any(&presence_ids))
-            .filter(contributor_presences::app_id.eq(ctx.app_id()))
+            .filter(contributor_presences::h_app_id.eq(ctx.h_app_id()))
             .load(conn)
             .map_err(|e| format!("Presence lookup failed: {}", e))?;
 
@@ -2217,7 +2217,7 @@ impl P2PNode {
 
         for peer_id in peers {
             let request = SyncRequest::ListDocuments {
-                app_id: "elohim".to_string(),
+                h_app_id: "elohim".to_string(),
                 prefix: None,
                 offset: 0,
                 limit: 1000,

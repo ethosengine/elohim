@@ -110,7 +110,7 @@ pub fn get_mastery(
     id: &str,
 ) -> Result<Option<ContentMastery>, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::id.eq(id))
         .first(conn)
         .optional()
@@ -125,7 +125,7 @@ pub fn get_mastery_for_content(
     content_id: &str,
 ) -> Result<Option<ContentMastery>, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::human_id.eq(human_id))
         .filter(content_mastery::content_id.eq(content_id))
         .first(conn)
@@ -140,7 +140,7 @@ pub fn list_mastery(
     query: &MasteryQuery,
 ) -> Result<Vec<ContentMastery>, StorageError> {
     let mut base_query = content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Apply filters
@@ -205,7 +205,7 @@ pub fn get_refresh_needed(
     limit: i64,
 ) -> Result<Vec<ContentMastery>, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::human_id.eq(human_id))
         .filter(content_mastery::needs_refresh.eq(1))
         .order(content_mastery::freshness_score.asc())
@@ -226,7 +226,7 @@ pub fn get_mastery_for_contents(
     }
 
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::human_id.eq(human_id))
         .filter(content_mastery::content_id.eq_any(content_ids))
         .load(conn)
@@ -261,7 +261,7 @@ pub fn upsert_mastery(
         // Update existing
         diesel::update(
             content_mastery::table
-                .filter(content_mastery::app_id.eq(&ctx.app_id))
+                .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
                 .filter(content_mastery::id.eq(&existing.id)),
         )
         .set((
@@ -282,7 +282,7 @@ pub fn upsert_mastery(
 
         let new_mastery = NewContentMastery {
             id: &id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             human_id: &input.human_id,
             content_id: &input.content_id,
             mastery_level: &input.mastery_level,
@@ -333,7 +333,7 @@ pub fn record_engagement(
     // Update engagement stats and refresh freshness
     diesel::update(
         content_mastery::table
-            .filter(content_mastery::app_id.eq(&ctx.app_id))
+            .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
             .filter(content_mastery::id.eq(&id)),
     )
     .set((
@@ -394,7 +394,7 @@ pub fn advance_mastery(
     // Update mastery
     diesel::update(
         content_mastery::table
-            .filter(content_mastery::app_id.eq(&ctx.app_id))
+            .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
             .filter(content_mastery::id.eq(&mastery.id)),
     )
     .set((
@@ -435,7 +435,7 @@ pub fn apply_freshness_decay(
     // Note: SQLite doesn't support UPDATE with computed values easily,
     // so we fetch, compute, and update
     let records: Vec<ContentMastery> = content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::freshness_score.gt(0.0f32))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
@@ -473,7 +473,7 @@ pub fn update_privileges(
 ) -> Result<ContentMastery, StorageError> {
     diesel::update(
         content_mastery::table
-            .filter(content_mastery::app_id.eq(&ctx.app_id))
+            .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
             .filter(content_mastery::id.eq(id)),
     )
     .set((
@@ -495,7 +495,7 @@ pub fn delete_mastery(
 ) -> Result<bool, StorageError> {
     let deleted = diesel::delete(
         content_mastery::table
-            .filter(content_mastery::app_id.eq(&ctx.app_id))
+            .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
             .filter(content_mastery::id.eq(id)),
     )
     .execute(conn)
@@ -582,7 +582,7 @@ pub fn calculate_path_mastery(
 /// Get mastery record count for an app
 pub fn mastery_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -594,7 +594,7 @@ pub fn stats_by_level(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .group_by(content_mastery::mastery_level)
         .select((content_mastery::mastery_level, diesel::dsl::count_star()))
         .load(conn)
@@ -607,7 +607,7 @@ pub fn refresh_needed_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .filter(content_mastery::needs_refresh.eq(1))
         .count()
         .get_result(conn)
@@ -620,7 +620,7 @@ pub fn average_freshness(
     ctx: &AppContext,
 ) -> Result<f64, StorageError> {
     content_mastery::table
-        .filter(content_mastery::app_id.eq(&ctx.app_id))
+        .filter(content_mastery::h_app_id.eq(&ctx.h_app_id))
         .select(diesel::dsl::avg(content_mastery::freshness_score))
         .first::<Option<f64>>(conn)
         .map(|v| v.unwrap_or(1.0))

@@ -64,7 +64,7 @@ async fn handle_create(
 
     let new = NewPlace {
         id,
-        app_id: ctx.app_id().to_string(),
+        h_app_id: ctx.h_app_id().to_string(),
         dht_anchor_hash: dht_hash,
         name: v.name,
         place_type: v.place_type,

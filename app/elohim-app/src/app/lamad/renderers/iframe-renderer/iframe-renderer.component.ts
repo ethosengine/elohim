@@ -12,8 +12,8 @@ import { ContentNode } from '../../models/content-node.model';
  * When contentFormat is 'html5-app', the content object should have this shape.
  */
 export interface Html5AppContent {
-  /** App identifier for URL namespace (e.g., 'evolution-of-trust') */
-  appId: string;
+  /** App slug for URL namespace (e.g., 'evolution-of-trust') */
+  slug: string;
   /** Entry point file within the zip (e.g., 'index.html') */
   entryPoint: string;
   /** Optional fallback URL if doorway is unavailable */
@@ -28,7 +28,7 @@ export interface Html5AppContent {
  * 2. HTML5 App mode: content is Html5AppContent, served via doorway's /apps/ endpoint
  *
  * For HTML5 apps, the component builds the doorway URL:
- *   `${doorwayUrl}/apps/${appId}/${entryPoint}`
+ *   `${doorwayUrl}/apps/${slug}/${entryPoint}`
  *
  * The doorway handles zip extraction, caching, and serving with proper headers.
  */
@@ -152,19 +152,19 @@ export class IframeRendererComponent implements OnChanges {
 
   /**
    * Build the doorway URL for an HTML5 app.
-   * Format: ${doorwayUrl}/apps/${appId}/${entryPoint}
+   * Format: ${doorwayUrl}/apps/${slug}/${entryPoint}
    */
   private buildHtml5AppUrl(content: Html5AppContent): string {
     // Get doorway URL with Che environment detection
     const doorwayUrl = this.resolveDoorwayUrl();
-    const { appId, entryPoint } = content;
+    const { slug, entryPoint } = content;
 
     // If no doorway URL configured, try fallback
     if (!doorwayUrl && content.fallbackUrl) {
       return content.fallbackUrl;
     }
 
-    return `${doorwayUrl}/apps/${appId}/${entryPoint}`;
+    return `${doorwayUrl}/apps/${slug}/${entryPoint}`;
   }
 
   /**
@@ -230,6 +230,6 @@ export class IframeRendererComponent implements OnChanges {
       return false;
     }
     const obj = content as Record<string, unknown>;
-    return typeof obj['appId'] === 'string' && typeof obj['entryPoint'] === 'string';
+    return typeof obj['slug'] === 'string' && typeof obj['entryPoint'] === 'string';
   }
 }

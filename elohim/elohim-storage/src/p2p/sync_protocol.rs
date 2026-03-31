@@ -48,7 +48,7 @@ pub enum SyncRequest {
     /// Returns the document's heads (latest change hashes)
     GetHeads {
         /// Application namespace (e.g., "lamad", "calendar")
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
     },
 
@@ -56,7 +56,7 @@ pub enum SyncRequest {
     /// This is the core Automerge sync request
     SyncChanges {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// The requester's current heads (change hashes they have)
         have_heads: Vec<String>,
@@ -67,7 +67,7 @@ pub enum SyncRequest {
     /// Request specific changes by hash (for targeted fetch)
     GetChanges {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// Specific change hashes to retrieve
         change_hashes: Vec<String>,
@@ -76,7 +76,7 @@ pub enum SyncRequest {
     /// Announce a new change (push notification)
     AnnounceChange {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// The new change hash
         change_hash: String,
@@ -87,7 +87,7 @@ pub enum SyncRequest {
     /// List documents this peer is willing to sync
     ListDocuments {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         /// Optional filter by document type/prefix
         prefix: Option<String>,
         /// Pagination
@@ -102,7 +102,7 @@ pub enum SyncResponse {
     /// Document heads response
     Heads {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// Current heads (latest change hashes)
         heads: Vec<String>,
@@ -113,7 +113,7 @@ pub enum SyncResponse {
     /// Changes response
     Changes {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// Serialized Automerge changes
         changes: Vec<Vec<u8>>,
@@ -126,7 +126,7 @@ pub enum SyncResponse {
     /// Specific changes response
     RequestedChanges {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// Map of hash -> change data
         changes: Vec<(String, Vec<u8>)>,
@@ -137,7 +137,7 @@ pub enum SyncResponse {
     /// Change announcement acknowledgment
     ChangeAck {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
         /// Whether the change was new to this peer
         was_new: bool,
@@ -146,7 +146,7 @@ pub enum SyncResponse {
     /// Document list response
     DocumentList {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         documents: Vec<DocumentInfo>,
         /// Total count for pagination
         total: u64,
@@ -156,7 +156,7 @@ pub enum SyncResponse {
     /// Document not found
     NotFound {
         /// Application namespace
-        app_id: String,
+        h_app_id: String,
         doc_id: String,
     },
 
@@ -303,14 +303,14 @@ mod tests {
     #[test]
     fn test_sync_request_serialization() {
         let request = SyncRequest::GetHeads {
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             doc_id: "test-doc".to_string(),
         };
         let bytes = rmp_serde::to_vec(&request).unwrap();
         let decoded: SyncRequest = rmp_serde::from_slice(&bytes).unwrap();
         match decoded {
-            SyncRequest::GetHeads { app_id, doc_id } => {
-                assert_eq!(app_id, "lamad");
+            SyncRequest::GetHeads { h_app_id, doc_id } => {
+                assert_eq!(h_app_id, "lamad");
                 assert_eq!(doc_id, "test-doc");
             }
             _ => panic!("Wrong variant"),
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_sync_response_serialization() {
         let response = SyncResponse::Heads {
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             doc_id: "test-doc".to_string(),
             heads: vec!["abc123".to_string()],
             change_count: 42,
@@ -329,12 +329,12 @@ mod tests {
         let decoded: SyncResponse = rmp_serde::from_slice(&bytes).unwrap();
         match decoded {
             SyncResponse::Heads {
-                app_id,
+                h_app_id,
                 doc_id,
                 heads,
                 change_count,
             } => {
-                assert_eq!(app_id, "lamad");
+                assert_eq!(h_app_id, "lamad");
                 assert_eq!(doc_id, "test-doc");
                 assert_eq!(heads.len(), 1);
                 assert_eq!(change_count, 42);

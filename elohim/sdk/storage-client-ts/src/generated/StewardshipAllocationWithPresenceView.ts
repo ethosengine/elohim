@@ -2,7 +2,7 @@
 import type { ContributorPresenceView } from "./ContributorPresenceView";
 import type { JsonValue } from "./JsonValue";
 
-export type StewardshipAllocationWithPresenceView = { steward: ContributorPresenceView | null, id: string, appId: string, contentId: string, stewardPresenceId: string, allocationRatio: number, allocationMethod: string, contributionType: string, 
+export type StewardshipAllocationWithPresenceView = { steward: ContributorPresenceView | null, id: string, hAppId: string, contentId: string, stewardPresenceId: string, allocationRatio: number, allocationMethod: string, contributionType: string, 
 /**
  * Parsed contribution evidence (was contribution_evidence_json string in storage)
  */

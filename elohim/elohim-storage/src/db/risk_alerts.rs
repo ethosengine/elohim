@@ -53,7 +53,7 @@ pub fn get_risk_alert_by_id(
 ) -> Result<RiskAlert, StorageError> {
     risk_alerts::table
         .filter(risk_alerts::id.eq(id))
-        .filter(risk_alerts::app_id.eq(ctx.app_id()))
+        .filter(risk_alerts::h_app_id.eq(ctx.h_app_id()))
         .first(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
@@ -70,7 +70,7 @@ pub fn list_risk_alerts(
     query: &RiskAlertQuery,
 ) -> Result<Vec<RiskAlert>, StorageError> {
     let mut q = risk_alerts::table
-        .filter(risk_alerts::app_id.eq(ctx.app_id()))
+        .filter(risk_alerts::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(ref place_id) = query.place_id {
@@ -103,7 +103,7 @@ pub fn list_alerts_for_places(
     }
 
     risk_alerts::table
-        .filter(risk_alerts::app_id.eq(ctx.app_id()))
+        .filter(risk_alerts::h_app_id.eq(ctx.h_app_id()))
         .filter(risk_alerts::place_id.eq_any(place_ids))
         .filter(risk_alerts::status.eq("active"))
         .order(risk_alerts::place_id.asc())
@@ -120,7 +120,7 @@ pub fn find_active_alert(
     trigger_hazard_id: Option<&str>,
 ) -> Result<Option<RiskAlert>, StorageError> {
     let mut q = risk_alerts::table
-        .filter(risk_alerts::app_id.eq(ctx.app_id()))
+        .filter(risk_alerts::h_app_id.eq(ctx.h_app_id()))
         .filter(risk_alerts::place_id.eq(place_id))
         .filter(risk_alerts::alert_type.eq(alert_type))
         .filter(risk_alerts::status.eq("active"))
@@ -161,7 +161,7 @@ pub fn update_risk_alert(
     diesel::update(
         risk_alerts::table
             .filter(risk_alerts::id.eq(id))
-            .filter(risk_alerts::app_id.eq(ctx.app_id())),
+            .filter(risk_alerts::h_app_id.eq(ctx.h_app_id())),
     )
     .set((
         risk_alerts::status.eq(&new_status),

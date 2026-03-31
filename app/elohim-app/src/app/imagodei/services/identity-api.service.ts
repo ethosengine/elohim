@@ -32,7 +32,7 @@ interface HumanApiResponse {
   affinities: string[];
   profileReach: string;
   location: string | null;
-  appId: string;
+  hAppId: string;
   createdAt: string;
   updatedAt: string;
 }

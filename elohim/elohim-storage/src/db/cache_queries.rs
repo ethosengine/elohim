@@ -19,7 +19,7 @@ pub fn list_cacheable_content(
     offset: i64,
 ) -> Result<Vec<Content>, StorageError> {
     content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::reach.eq_any(["commons", "public"]))
         .order(content::updated_at.asc())
         .limit(limit)
@@ -36,7 +36,7 @@ pub fn list_cacheable_humans(
     offset: i64,
 ) -> Result<Vec<Human>, StorageError> {
     humans::table
-        .filter(humans::app_id.eq(&ctx.app_id))
+        .filter(humans::h_app_id.eq(&ctx.h_app_id))
         .filter(humans::profile_reach.eq("public"))
         .order(humans::updated_at.asc())
         .limit(limit)
@@ -53,7 +53,7 @@ pub fn list_cacheable_relationships(
     offset: i64,
 ) -> Result<Vec<Relationship>, StorageError> {
     relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(relationships::reach.eq_any(["commons", "public"]))
         .order(relationships::updated_at.asc())
         .limit(limit)

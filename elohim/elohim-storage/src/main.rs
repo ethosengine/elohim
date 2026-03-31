@@ -590,8 +590,8 @@ async fn async_main(
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
     }
 
-    // Load app index for HTML5 app caching
-    http_server.load_app_index().await;
+    // Load slug index for HTML5 app caching
+    http_server.load_slug_index().await;
 
     let http_server = Arc::new(http_server);
 

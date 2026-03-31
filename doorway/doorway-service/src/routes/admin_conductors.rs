@@ -49,7 +49,7 @@ pub struct ConductorsResponse {
 #[serde(rename_all = "camelCase")]
 pub struct AgentSummary {
     pub agent_pub_key: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub assigned_at: String,
 }
 
@@ -69,7 +69,7 @@ pub struct AgentConductorResponse {
     pub agent_pub_key: String,
     pub conductor_id: String,
     pub conductor_url: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub assigned_at: String,
 }
 
@@ -135,7 +135,7 @@ pub async fn handle_conductor_agents(
         .into_iter()
         .map(|(key, entry)| AgentSummary {
             agent_pub_key: key,
-            app_id: entry.app_id,
+            h_app_id: entry.app_id,
             assigned_at: entry.assigned_at.to_rfc3339(),
         })
         .collect();
@@ -169,7 +169,7 @@ pub async fn handle_agent_conductor(
                 agent_pub_key: agent_pub_key.to_string(),
                 conductor_id: entry.conductor_id,
                 conductor_url: entry.conductor_url,
-                app_id: entry.app_id,
+                h_app_id: entry.app_id,
                 assigned_at: entry.assigned_at.to_rfc3339(),
             },
         ),
@@ -189,11 +189,11 @@ pub async fn handle_agent_conductor(
 pub struct AssignAgentRequest {
     pub agent_pub_key: String,
     pub conductor_id: String,
-    #[serde(default = "default_app_id")]
-    pub app_id: String,
+    #[serde(default = "default_h_app_id")]
+    pub h_app_id: String,
 }
 
-fn default_app_id() -> String {
+fn default_h_app_id() -> String {
     "elohim".to_string()
 }
 
@@ -250,7 +250,7 @@ pub async fn handle_assign_agent(
         .register_agent(
             &request.agent_pub_key,
             &request.conductor_id,
-            &request.app_id,
+            &request.h_app_id,
         )
         .await
     {
@@ -263,7 +263,7 @@ pub async fn handle_assign_agent(
                         agent_pub_key: request.agent_pub_key,
                         conductor_id: entry.conductor_id,
                         conductor_url: entry.conductor_url,
-                        app_id: entry.app_id,
+                        h_app_id: entry.app_id,
                         assigned_at: entry.assigned_at.to_rfc3339(),
                     },
                 ),

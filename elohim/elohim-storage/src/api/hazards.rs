@@ -64,7 +64,7 @@ async fn handle_create(
 
     let new = NewHazard {
         id,
-        app_id: ctx.app_id().to_string(),
+        h_app_id: ctx.h_app_id().to_string(),
         place_id: v.place_id,
         hazard_type: v.hazard_type,
         severity: v.severity,

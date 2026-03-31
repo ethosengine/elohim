@@ -31,7 +31,7 @@ pub struct CreateStewardedNodeInput {
     pub region: Option<String>,
     pub context_epr_id: Option<String>,
     pub dht_anchor_hash: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
 }
 
 /// Input for creating a stewardship relationship between a node and a human
@@ -76,7 +76,7 @@ pub fn create_stewarded_node(
         region: input.region,
         context_epr_id: input.context_epr_id,
         dht_anchor_hash: input.dht_anchor_hash,
-        app_id: input.app_id,
+        h_app_id: input.h_app_id,
     };
 
     diesel::insert_into(stewarded_nodes::table)

@@ -123,7 +123,7 @@ export function formatCellId(cellId: CellId): string {
  * ```typescript
  * const conn = await connect({
  *   adminUrl: 'ws://localhost:4444',
- *   appId: 'my-app',
+ *   hAppId: 'my-app',
  *   sourceRole: 'my-dna-v1',
  *   targetRole: 'my-dna-v2',
  * });
@@ -134,7 +134,7 @@ export function formatCellId(cellId: CellId): string {
  */
 export async function connect(config: {
   adminUrl: string;
-  appId: string;
+  hAppId: string;
   sourceRole: string;
   targetRole: string;
 }): Promise<HolochainConnection> {
@@ -146,12 +146,12 @@ export async function connect(config: {
 
   // List apps and find ours
   const apps = await adminWs.listApps({});
-  const app = apps.find((a) => a.installed_app_id === config.appId);
+  const app = apps.find((a) => a.installed_app_id === config.hAppId);
 
   if (!app) {
     const available = apps.map((a) => a.installed_app_id).join(', ');
     throw new Error(
-      `App "${config.appId}" not found. Available: ${available || 'none'}`
+      `App "${config.hAppId}" not found. Available: ${available || 'none'}`
     );
   }
 

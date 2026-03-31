@@ -3,7 +3,7 @@
 /**
  * Content mastery row from SELECT query
  */
-export type ContentMastery = { id: string, app_id: string, human_id: string, content_id: string, mastery_level: string, mastery_level_index: number, freshness_score: number, needs_refresh: number, engagement_count: number, last_engagement_type: string | null, last_engagement_at: string | null, level_achieved_at: string | null, content_version_at_mastery: string | null, assessment_evidence_json: string | null, privileges_json: string | null, created_at: string, updated_at: string, 
+export type ContentMastery = { id: string, h_app_id: string, human_id: string, content_id: string, mastery_level: string, mastery_level_index: number, freshness_score: number, needs_refresh: number, engagement_count: number, last_engagement_type: string | null, last_engagement_at: string | null, level_achieved_at: string | null, content_version_at_mastery: string | null, assessment_evidence_json: string | null, privileges_json: string | null, created_at: string, updated_at: string, 
 /**
  * Source of truth: private source chain (agent-scoped). Classification: B2 (Agent-Scoped + Attestation).
  * Populated only when mastery crosses threshold and an Attestation is issued to the DHT.

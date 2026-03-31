@@ -290,7 +290,7 @@ async fn handle_report_metrics(
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
 
-    let upsert = input.into_upsert(&ctx.app_id, now_ms);
+    let upsert = input.into_upsert(&ctx.h_app_id, now_ms);
     let mut conn = get_conn(pool)?;
     let row = crate::db::custodian_metrics::upsert_metrics(&mut conn, upsert)?;
     Ok(response::ok(&CustodianMetricsView::from(row)))

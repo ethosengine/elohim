@@ -32,7 +32,7 @@ export const environment: Environment = {
     storageUrl: 'http://localhost:8090',
     // For Tauri mode: personal nodes and conductor
     nodeUrls: [], // No personal nodes in dev
-    holochainAppId: 'elohim',
+    holochainHAppId: 'elohim',
     holochainConductorUrl: 'ws://localhost:8888',
   },
 };

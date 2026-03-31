@@ -56,7 +56,7 @@ pub fn list_observations_for_human(
     let layers = visibility_layers_up_to(max_visibility);
 
     imagodei_observations::table
-        .filter(imagodei_observations::app_id.eq(&ctx.app_id))
+        .filter(imagodei_observations::h_app_id.eq(&ctx.h_app_id))
         .filter(imagodei_observations::human_id.eq(human_id))
         .filter(imagodei_observations::visibility_layer.eq_any(layers))
         .order(imagodei_observations::observed_at.desc())
@@ -73,7 +73,7 @@ pub fn list_observations_by_type(
     observation_type: &str,
 ) -> Result<Vec<ImagodeiObservation>, StorageError> {
     imagodei_observations::table
-        .filter(imagodei_observations::app_id.eq(&ctx.app_id))
+        .filter(imagodei_observations::h_app_id.eq(&ctx.h_app_id))
         .filter(imagodei_observations::human_id.eq(human_id))
         .filter(imagodei_observations::observation_type.eq(observation_type))
         .order(imagodei_observations::observed_at.desc())
@@ -88,7 +88,7 @@ pub fn count_observations_for_human(
     human_id: &str,
 ) -> Result<i64, StorageError> {
     imagodei_observations::table
-        .filter(imagodei_observations::app_id.eq(&ctx.app_id))
+        .filter(imagodei_observations::h_app_id.eq(&ctx.h_app_id))
         .filter(imagodei_observations::human_id.eq(human_id))
         .count()
         .get_result(conn)
@@ -131,7 +131,7 @@ mod tests {
             r#"
             CREATE TABLE imagodei_observations (
                 id TEXT PRIMARY KEY NOT NULL,
-                app_id TEXT NOT NULL,
+                h_app_id TEXT NOT NULL,
                 human_id TEXT NOT NULL,
                 observed_at TEXT NOT NULL,
                 observation_type TEXT NOT NULL,
@@ -154,7 +154,7 @@ mod tests {
 
     fn test_ctx() -> AppContext {
         AppContext {
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
         }
     }
 
@@ -167,7 +167,7 @@ mod tests {
     ) -> NewImagodeiObservation<'a> {
         NewImagodeiObservation {
             id,
-            app_id: "lamad",
+            h_app_id: "lamad",
             human_id,
             observed_at,
             observation_type,

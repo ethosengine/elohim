@@ -109,7 +109,7 @@ pub fn get_contributor_presence(
     id: &str,
 ) -> Result<Option<ContributorPresence>, StorageError> {
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .filter(contributor_presences::id.eq(id))
         .first(conn)
         .optional()
@@ -125,7 +125,7 @@ pub fn list_contributor_presences(
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
 
     let mut base_query = contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Apply filters
@@ -172,7 +172,7 @@ pub fn find_by_external_identifier(
     let search_pattern = format!("%\"{}\":\"%{}%\"%", identifier_type, identifier_value);
 
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .filter(contributor_presences::external_identifiers_json.like(&search_pattern))
         .first(conn)
         .optional()
@@ -190,7 +190,7 @@ pub fn get_presences_for_content(
     let search_pattern_last = format!("%\"{}\"\\]%", content_id);
 
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .filter(
             contributor_presences::establishing_content_ids_json.like(&search_pattern)
                 .or(contributor_presences::establishing_content_ids_json.like(&search_pattern_last))
@@ -206,7 +206,7 @@ pub fn get_stewardship_candidates(
     limit: i64,
 ) -> Result<Vec<ContributorPresence>, StorageError> {
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .filter(contributor_presences::presence_state.eq(presence_states::UNCLAIMED))
         .order(contributor_presences::recognition_score.desc())
         .limit(limit)
@@ -232,7 +232,7 @@ pub fn create_contributor_presence(
 
     let new_presence = NewContributorPresence {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         display_name: &input.display_name,
         presence_state: presence_states::UNCLAIMED,
         external_identifiers_json: input.external_identifiers_json.as_deref(),
@@ -303,7 +303,7 @@ pub fn accumulate_recognition(
 
     diesel::update(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .set((
@@ -342,7 +342,7 @@ pub fn initiate_stewardship(
 
     diesel::update(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .set((
@@ -379,7 +379,7 @@ pub fn initiate_claim(
 
     diesel::update(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .set((
@@ -420,7 +420,7 @@ pub fn verify_claim(
 
     diesel::update(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .set((
@@ -445,7 +445,7 @@ pub fn update_stewardship_quality(
 ) -> Result<ContributorPresence, StorageError> {
     diesel::update(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .set((
@@ -467,7 +467,7 @@ pub fn delete_contributor_presence(
 ) -> Result<bool, StorageError> {
     let deleted = diesel::delete(
         contributor_presences::table
-            .filter(contributor_presences::app_id.eq(&ctx.app_id))
+            .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
             .filter(contributor_presences::id.eq(id)),
     )
     .execute(conn)
@@ -486,7 +486,7 @@ pub fn contributor_presence_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -498,7 +498,7 @@ pub fn stats_by_state(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .group_by(contributor_presences::presence_state)
         .select((
             contributor_presences::presence_state,
@@ -514,7 +514,7 @@ pub fn total_recognition(
     ctx: &AppContext,
 ) -> Result<f32, StorageError> {
     contributor_presences::table
-        .filter(contributor_presences::app_id.eq(&ctx.app_id))
+        .filter(contributor_presences::h_app_id.eq(&ctx.h_app_id))
         .select(diesel::dsl::sum(contributor_presences::recognition_score))
         .first::<Option<f32>>(conn)
         .map(|v| v.unwrap_or(0.0))

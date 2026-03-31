@@ -6,7 +6,7 @@
   "description": "An interactive guide to the game theory of trust. Through playable simulations, explore why and how trust evolves - or breaks down - between individuals and in societies. A masterpiece of explorable explanation by Nicky Case.",
   "url": "https://ncase.me/trust/",
   "content": {
-    "appId": "evolution-of-trust",
+    "slug": "evolution-of-trust",
     "entryPoint": "index.html",
     "fallbackUrl": "https://ncase.me/trust/"
   },

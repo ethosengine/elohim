@@ -143,8 +143,8 @@ pub struct HttpServer {
     p2p_handle: Option<crate::p2p::P2PHandle>,
     /// Extraction cache for HTML5 app files (None = disabled)
     extraction_cache: Option<Arc<ExtractionCache>>,
-    /// In-memory index: appId -> blobHash (avoids per-request SQLite scan)
-    app_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
+    /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
+    slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Concurrency limiter: prevents OOM under burst traffic (e.g., HTML5 app loads)
     request_semaphore: Arc<Semaphore>,
 }
@@ -174,6 +174,13 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
     }
 }
 
+/// Check whether an identifier looks like a content address (sha256-...) rather
+/// than a human-readable slug. Used by `/apps/` routes to decide whether to
+/// resolve via `slug_index` or treat the identifier as a direct blob hash.
+fn is_content_address(identifier: &str) -> bool {
+    identifier.starts_with("sha256-") && identifier.len() > 10
+}
+
 impl HttpServer {
     /// Create a new HTTP server
     pub fn new(blob_store: Arc<BlobStore>, bind_addr: SocketAddr) -> Self {
@@ -191,7 +198,7 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             p2p_handle: None,
             extraction_cache: None,
-            app_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
         }
     }
@@ -254,12 +261,12 @@ impl HttpServer {
         self
     }
 
-    /// Load the app index from database (call after db_pool is set)
-    pub async fn load_app_index(&self) {
+    /// Load the slug index from database (call after db_pool is set)
+    pub async fn load_slug_index(&self) {
         let mut conn = match self.get_conn() {
             Ok(c) => c,
             Err(e) => {
-                warn!("Failed to get DB connection for app index: {}", e);
+                warn!("Failed to get DB connection for slug index: {}", e);
                 return;
             }
         };
@@ -272,25 +279,25 @@ impl HttpServer {
 
         match db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
             Ok(items) => {
-                let mut index = self.app_index.write().await;
+                let mut index = self.slug_index.write().await;
                 index.clear();
                 for item in items {
                     if let Some(ref content_body) = item.content.content_body {
                         if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                            if let Some(app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                            if let Some(slug) = obj.get("slug").and_then(|v| v.as_str()) {
                                 let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
                                 if !blob_hash.is_empty() {
-                                    info!(app_id = %app_id, blob_hash = %blob_hash, "Indexed HTML5 app");
-                                    index.insert(app_id.to_string(), blob_hash);
+                                    info!(slug = %slug, blob_hash = %blob_hash, "Indexed HTML5 app");
+                                    index.insert(slug.to_string(), blob_hash);
                                 }
                             }
                         }
                     }
                 }
-                info!(count = index.len(), "App index loaded");
+                info!(count = index.len(), "Slug index loaded");
             }
             Err(e) => {
-                warn!("Failed to load app index: {}", e);
+                warn!("Failed to load slug index: {}", e);
             }
         }
     }
@@ -477,7 +484,7 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             (Method::GET, "/api/v1/peers/delivery") => self.handle_delivery_peers().await,
 
-            // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+            // Sync API: /sync/v1/{h_app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
                     self.handle_sync_request(req, method, &path, sync_manager.clone())
@@ -553,14 +560,14 @@ impl HttpServer {
                 }
             }
 
-            // Delivery capability probe: HEAD /apps/{app_id}/_capability
+            // Delivery capability probe: HEAD /apps/{slug}/_capability
             // Lightweight probe for delivery negotiation — no body, just headers.
             // Reports whether extraction cache is warm for this app.
             (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
                 self.handle_app_capability(p).await
             }
 
-            // HTML5 App serving: /apps/{app_id}/{file_path}
+            // HTML5 App serving: /apps/{slug}/{file_path}
             (Method::GET, p) if p.starts_with("/apps/") => {
                 if self.db_pool.is_some() {
                     self.handle_app_request(&path).await
@@ -741,7 +748,7 @@ impl HttpServer {
         if detail >= elohim_compute::DetailLevel::Debug {
             body["manifests"] = serde_json::json!(self.manifests.read().await.len());
             body["concurrencyLimit"] = serde_json::json!(MAX_CONCURRENT_REQUESTS);
-            body["appIndex"] = serde_json::json!(self.app_index.read().await.len());
+            body["slugIndex"] = serde_json::json!(self.slug_index.read().await.len());
         }
 
         // trace level: full internal state
@@ -1262,10 +1269,10 @@ impl HttpServer {
     /// Handle sync API requests
     ///
     /// Routes:
-    /// - GET /sync/v1/{app_id}/docs - List documents
-    /// - GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
-    /// - GET /sync/v1/{app_id}/docs/{doc_id}/changes?have={heads} - Get changes since heads
-    /// - POST /sync/v1/{app_id}/docs/{doc_id}/changes - Apply changes
+    /// - GET /sync/v1/{h_app_id}/docs - List documents
+    /// - GET /sync/v1/{h_app_id}/docs/{doc_id}/heads - Get document heads
+    /// - GET /sync/v1/{h_app_id}/docs/{doc_id}/changes?have={heads} - Get changes since heads
+    /// - POST /sync/v1/{h_app_id}/docs/{doc_id}/changes - Apply changes
     async fn handle_sync_request(
         &self,
         req: Request<Incoming>,
@@ -1273,46 +1280,46 @@ impl HttpServer {
         path: &str,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Parse path: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+        // Parse path: /sync/v1/{h_app_id}/docs[/{doc_id}[/heads|/changes]]
         let parts: Vec<&str> = path.trim_start_matches("/sync/v1/").split('/').collect();
 
         if parts.is_empty() || parts[0].is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .body(Full::new(Bytes::from(r#"{"error": "Missing h_app_id"}"#)))
                 .unwrap());
         }
 
-        let app_id = parts[0];
+        let h_app_id = parts[0];
 
-        // /sync/v1/{app_id}/docs
+        // /sync/v1/{h_app_id}/docs
         if parts.len() == 2 && parts[1] == "docs" {
             return self
-                .handle_sync_list_docs(method, app_id, &req, sync_manager)
+                .handle_sync_list_docs(method, h_app_id, &req, sync_manager)
                 .await;
         }
 
-        // /sync/v1/{app_id}/docs/{doc_id}
+        // /sync/v1/{h_app_id}/docs/{doc_id}
         if parts.len() == 3 && parts[1] == "docs" {
             let doc_id = parts[2];
             return self
-                .handle_sync_doc(method, app_id, doc_id, req, sync_manager)
+                .handle_sync_doc(method, h_app_id, doc_id, req, sync_manager)
                 .await;
         }
 
-        // /sync/v1/{app_id}/docs/{doc_id}/{action}
+        // /sync/v1/{h_app_id}/docs/{doc_id}/{action}
         if parts.len() == 4 && parts[1] == "docs" {
             let doc_id = parts[2];
             let action = parts[3];
 
             return match action {
                 "heads" => {
-                    self.handle_sync_heads(method, app_id, doc_id, sync_manager)
+                    self.handle_sync_heads(method, h_app_id, doc_id, sync_manager)
                         .await
                 }
                 "changes" => {
-                    self.handle_sync_changes(method, app_id, doc_id, req, sync_manager)
+                    self.handle_sync_changes(method, h_app_id, doc_id, req, sync_manager)
                         .await
                 }
                 _ => Ok(Response::builder()
@@ -1333,11 +1340,11 @@ impl HttpServer {
             .unwrap())
     }
 
-    /// GET /sync/v1/{app_id}/docs - List documents
+    /// GET /sync/v1/{h_app_id}/docs - List documents
     async fn handle_sync_list_docs(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         req: &Request<Incoming>,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -1367,7 +1374,7 @@ impl HttpServer {
             .unwrap_or(100);
 
         match sync_manager
-            .list_documents(app_id, prefix, offset, limit)
+            .list_documents(h_app_id, prefix, offset, limit)
             .await
         {
             Ok((docs, total)) => {
@@ -1385,7 +1392,7 @@ impl HttpServer {
                     .collect();
 
                 let body = serde_json::json!({
-                    "appId": app_id,
+                    "hAppId": h_app_id,
                     "documents": documents,
                     "total": total,
                     "offset": offset,
@@ -1399,7 +1406,7 @@ impl HttpServer {
                     .unwrap())
             }
             Err(e) => {
-                error!(app_id = %app_id, error = %e, "Failed to list documents");
+                error!(h_app_id = %h_app_id, error = %e, "Failed to list documents");
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1413,7 +1420,7 @@ impl HttpServer {
     async fn handle_sync_doc(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         _req: Request<Incoming>,
         sync_manager: Arc<SyncManager>,
@@ -1421,7 +1428,7 @@ impl HttpServer {
         match method {
             Method::GET => {
                 // Return document info
-                match sync_manager.get_heads(app_id, doc_id).await {
+                match sync_manager.get_heads(h_app_id, doc_id).await {
                     Ok(heads) => {
                         if heads.is_empty() {
                             return Ok(Response::builder()
@@ -1435,7 +1442,7 @@ impl HttpServer {
                         }
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "heads": heads,
                         });
@@ -1447,7 +1454,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get document");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get document");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1464,11 +1471,11 @@ impl HttpServer {
         }
     }
 
-    /// GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
+    /// GET /sync/v1/{h_app_id}/docs/{doc_id}/heads - Get document heads
     async fn handle_sync_heads(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -1480,10 +1487,10 @@ impl HttpServer {
                 .unwrap());
         }
 
-        match sync_manager.get_heads(app_id, doc_id).await {
+        match sync_manager.get_heads(h_app_id, doc_id).await {
             Ok(heads) => {
                 let body = serde_json::json!({
-                    "appId": app_id,
+                    "hAppId": h_app_id,
                     "docId": doc_id,
                     "heads": heads,
                 });
@@ -1495,7 +1502,7 @@ impl HttpServer {
                     .unwrap())
             }
             Err(e) => {
-                error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
+                error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1505,11 +1512,11 @@ impl HttpServer {
         }
     }
 
-    /// GET/POST /sync/v1/{app_id}/docs/{doc_id}/changes
+    /// GET/POST /sync/v1/{h_app_id}/docs/{doc_id}/changes
     async fn handle_sync_changes(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         req: Request<Incoming>,
         sync_manager: Arc<SyncManager>,
@@ -1530,7 +1537,7 @@ impl HttpServer {
                     .unwrap_or_default();
 
                 match sync_manager
-                    .get_changes_since(app_id, doc_id, &have_heads)
+                    .get_changes_since(h_app_id, doc_id, &have_heads)
                     .await
                 {
                     Ok((changes, new_heads)) => {
@@ -1546,7 +1553,7 @@ impl HttpServer {
                             .collect();
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "changes": changes_b64,
                             "newHeads": new_heads,
@@ -1559,7 +1566,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1601,12 +1608,12 @@ impl HttpServer {
                         .unwrap());
                 }
 
-                match sync_manager.apply_changes(app_id, doc_id, changes).await {
+                match sync_manager.apply_changes(h_app_id, doc_id, changes).await {
                     Ok(new_heads) => {
-                        info!(app_id = %app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
+                        info!(h_app_id = %h_app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "newHeads": new_heads,
                         });
@@ -1618,7 +1625,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to apply changes");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to apply changes");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1659,7 +1666,7 @@ impl HttpServer {
     /// - DELETE /db/knowledge-maps/{id} - Delete knowledge map
     ///
     /// Extract app context from path, supporting both:
-    /// - New: /db/{app_id}/content/... -> AppContext(app_id)
+    /// - New: /db/{h_app_id}/content/... -> AppContext(h_app_id)
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
     fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
         // Check if path starts with a known resource type (legacy route)
@@ -1671,14 +1678,14 @@ impl HttpServer {
             }
         }
 
-        // New route: /db/{app_id}/...
+        // New route: /db/{h_app_id}/...
         if let Some(slash_pos) = sub_path.find('/') {
-            let app_id = &sub_path[..slash_pos];
+            let h_app_id = &sub_path[..slash_pos];
             let resource_path = &sub_path[slash_pos + 1..];
-            return (db::AppContext::new(app_id), resource_path);
+            return (db::AppContext::new(h_app_id), resource_path);
         }
 
-        // Just app_id with no resource (e.g., /db/lamad -> stats for that app)
+        // Just h_app_id with no resource (e.g., /db/lamad -> stats for that app)
         if !sub_path.is_empty() && !legacy_prefixes.contains(&sub_path) {
             return (db::AppContext::new(sub_path), "stats");
         }
@@ -1698,7 +1705,7 @@ impl HttpServer {
 
         // Extract app context (supports both legacy and new routes)
         let (app_ctx, resource_path) = Self::extract_app_context(sub_path);
-        debug!(app_id = %app_ctx.app_id, resource_path = %resource_path, "DB request routing");
+        debug!(h_app_id = %app_ctx.h_app_id, resource_path = %resource_path, "DB request routing");
 
         // Route to specific handlers (all use Diesel pool via self.get_conn())
         if resource_path == "stats" {
@@ -1982,7 +1989,7 @@ impl HttpServer {
             .db_pool
             .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
-        let scoped = db::AppScopedDb::new(pool.clone(), &app_ctx.app_id);
+        let scoped = db::AppScopedDb::new(pool.clone(), &app_ctx.h_app_id);
         Ok(response::from_result(scoped.stats()))
     }
 
@@ -2794,21 +2801,23 @@ impl HttpServer {
 
     /// Handle delivery capability probe for an HTML5 app.
     ///
-    /// Route: HEAD /apps/{app_id}/_capability
+    /// Route: HEAD /apps/{identifier}/_capability
     ///
-    /// Returns an empty body with headers describing the delivery readiness
-    /// of this storage node for the given app. Used by service workers and
-    /// doorway to negotiate the optimal delivery path (extracted vs compressed).
+    /// The identifier can be either a slug (human-readable name) or a content
+    /// address (sha256-...). Returns an empty body with headers describing the
+    /// delivery readiness of this storage node for the given app. Used by
+    /// service workers and doorway to negotiate the optimal delivery path
+    /// (extracted vs compressed).
     async fn handle_app_capability(
         &self,
         path: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let app_id = path
+        let identifier = path
             .strip_prefix("/apps/")
             .and_then(|s| s.strip_suffix("/_capability"))
             .unwrap_or("");
 
-        if app_id.is_empty() {
+        if identifier.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Length", "0")
@@ -2816,13 +2825,22 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Look up blob_hash from app_index
-        let blob_hash = { self.app_index.read().await.get(app_id).cloned() };
+        // Resolve identifier: content address bypasses slug_index lookup
+        let is_cid = is_content_address(identifier);
+        let (resolved_slug, blob_hash) = if is_cid {
+            (None, Some(identifier.to_string()))
+        } else {
+            let hash = self.slug_index.read().await.get(identifier).cloned();
+            (Some(identifier.to_string()), hash)
+        };
+
+        // Cache key: use slug when available, otherwise the CID itself
+        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
 
         // Check extraction cache warmth
         let (ready, delivery_mode) = match (&self.extraction_cache, &blob_hash) {
             (Some(cache), Some(hash)) => {
-                let is_warm = cache.is_current(app_id, hash).await;
+                let is_warm = cache.is_current(cache_key, hash).await;
                 (is_warm, if is_warm { "extracted" } else { "compressed" })
             }
             _ => (false, "compressed"),
@@ -2836,7 +2854,12 @@ impl HttpServer {
             .header("X-Ready", if ready { "true" } else { "false" });
 
         if let Some(hash) = &blob_hash {
-            builder = builder.header("X-Blob-Hash", hash.as_str());
+            builder = builder
+                .header("X-Blob-Hash", hash.as_str())
+                .header("X-Content-Address", hash.as_str());
+        }
+        if let Some(ref slug) = resolved_slug {
+            builder = builder.header("X-Content-Slug", slug.as_str());
         }
 
         Ok(builder.body(Full::new(Bytes::new())).unwrap())
@@ -2844,7 +2867,11 @@ impl HttpServer {
 
     /// Handle HTML5 app file requests
     ///
-    /// Route: GET /apps/{app_id}/{file_path}
+    /// Route: GET /apps/{identifier}/{file_path}
+    ///
+    /// The identifier can be either a slug (human-readable name) or a content
+    /// address (sha256-...). Slug-based paths resolve via `slug_index`; content
+    /// address paths use the hash directly as the blob key.
     ///
     /// Fast path (cache hit): O(1) index lookup + disk read. No DB, no ZIP, no pool.
     /// Slow path (cache miss): DB query + ZIP extract + cache all files + serve.
@@ -2852,18 +2879,20 @@ impl HttpServer {
         use std::io::Read;
         use zip::ZipArchive;
 
-        // Parse path: /apps/{app_id}/{file_path}
+        // Parse path: /apps/{identifier}/{file_path}
         let remainder = path.strip_prefix("/apps/").unwrap_or("");
-        let (app_id, file_path) = match remainder.find('/') {
+        let (identifier, file_path) = match remainder.find('/') {
             Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
             None => (remainder, "index.html"),
         };
 
-        if app_id.is_empty() {
+        if identifier.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "Missing app identifier"}"#,
+                )))
                 .unwrap());
         }
 
@@ -2875,28 +2904,42 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(app_id = %app_id, file_path = %file_path, "App file request");
-
-        // --- Fast path: check extraction cache ---
-        let cached_blob_hash = {
-            let index = self.app_index.read().await;
-            index.get(app_id).cloned()
+        // Resolve identifier: content address bypasses slug_index lookup
+        let is_cid = is_content_address(identifier);
+        let (resolved_slug, cached_blob_hash) = if is_cid {
+            (None, Some(identifier.to_string()))
+        } else {
+            let hash = {
+                let index = self.slug_index.read().await;
+                index.get(identifier).cloned()
+            };
+            (Some(identifier.to_string()), hash)
         };
 
+        // Cache key: use slug when available, otherwise the CID itself
+        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
+
+        debug!(identifier = %identifier, file_path = %file_path, is_cid = %is_cid, "App file request");
+
+        // --- Fast path: check extraction cache ---
         if let (Some(ref cache), Some(ref hash)) = (&self.extraction_cache, &cached_blob_hash) {
-            if cache.is_current(app_id, hash).await {
-                if let Some(data) = cache.get_file(app_id, file_path).await {
+            if cache.is_current(cache_key, hash).await {
+                if let Some(data) = cache.get_file(cache_key, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT");
-                    return Ok(Response::builder()
+                    debug!(identifier = %identifier, file_path = %file_path, "Cache HIT");
+                    let mut builder = Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-App-Id", app_id)
                         .header("X-Cache", "HIT")
-                        .body(Full::new(Bytes::from(data)))
-                        .unwrap());
+                        .header("X-Content-Address", hash.as_str());
+                    if let Some(ref slug) = resolved_slug {
+                        builder = builder
+                            .header("X-Slug", slug.as_str())
+                            .header("X-Content-Slug", slug.as_str());
+                    }
+                    return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
                 }
             }
         }
@@ -2905,23 +2948,29 @@ impl HttpServer {
         // Thundering herd protection: if another request is already extracting
         // this app, wait for it to finish then retry from cache.
         if let Some(ref cache) = self.extraction_cache {
-            if let Some(mut rx) = cache.begin_extraction(app_id) {
+            if let Some(mut rx) = cache.begin_extraction(cache_key) {
                 // Another request is extracting — wait for it
-                debug!(app_id = %app_id, "Waiting for in-flight extraction");
+                debug!(identifier = %identifier, "Waiting for in-flight extraction");
                 let _ = rx.recv().await; // ignore errors — extractor may have finished
                                          // Retry from cache
-                if let Some(data) = cache.get_file(app_id, file_path).await {
+                if let Some(data) = cache.get_file(cache_key, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT (after wait)");
-                    return Ok(Response::builder()
+                    debug!(identifier = %identifier, file_path = %file_path, "Cache HIT (after wait)");
+                    let mut builder = Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-App-Id", app_id)
-                        .header("X-Cache", "HIT-COALESCED")
-                        .body(Full::new(Bytes::from(data)))
-                        .unwrap());
+                        .header("X-Cache", "HIT-COALESCED");
+                    if let Some(ref hash) = cached_blob_hash {
+                        builder = builder.header("X-Content-Address", hash.as_str());
+                    }
+                    if let Some(ref slug) = resolved_slug {
+                        builder = builder
+                            .header("X-Slug", slug.as_str())
+                            .header("X-Content-Slug", slug.as_str());
+                    }
+                    return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
                 }
                 // Extraction failed or file not found — fall through to extract ourselves
             }
@@ -2932,25 +2981,38 @@ impl HttpServer {
         let _extraction_guard = self
             .extraction_cache
             .as_ref()
-            .map(|c| c.extraction_guard(app_id));
+            .map(|c| c.extraction_guard(cache_key));
 
-        debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
+        debug!(identifier = %identifier, "Cache MISS — extracting from ZIP");
 
         let blob_hash = match cached_blob_hash {
             Some(h) => h,
-            None => match self.lookup_app_blob_hash(app_id).await? {
-                Some(h) => h,
-                None => {
+            None => {
+                if is_cid {
+                    // CID was provided but blob not found — nothing to resolve
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "App not found: {}"}}"#,
-                            app_id
+                            r#"{{"error": "App not found for content address: {}"}}"#,
+                            identifier
                         ))))
                         .unwrap());
                 }
-            },
+                match self.lookup_slug_blob_hash(identifier).await? {
+                    Some(h) => h,
+                    None => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "App not found: {}"}}"#,
+                                identifier
+                            ))))
+                            .unwrap());
+                    }
+                }
+            }
         };
 
         if blob_hash.is_empty() {
@@ -2963,7 +3025,7 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(app_id = %app_id, blob_hash = %blob_hash, "Found blob hash");
+        debug!(identifier = %identifier, blob_hash = %blob_hash, "Found blob hash");
 
         // Fetch ZIP from blob store
         let zip_data = match self.blob_store.get(&blob_hash).await {
@@ -2981,7 +3043,7 @@ impl HttpServer {
             Err(e) => return Err(e),
         };
 
-        debug!(app_id = %app_id, zip_size = zip_data.len(), "Fetched ZIP blob");
+        debug!(identifier = %identifier, zip_size = zip_data.len(), "Fetched ZIP blob");
 
         // Extract ALL files from ZIP
         let cursor = std::io::Cursor::new(&zip_data);
@@ -3027,8 +3089,8 @@ impl HttpServer {
 
         // Cache the extracted files (non-fatal if caching fails)
         if let Some(ref cache) = self.extraction_cache {
-            if let Err(e) = cache.put_app(app_id, &blob_hash, all_files).await {
-                warn!(error = %e, app_id = %app_id, "Failed to cache extraction (non-fatal)");
+            if let Err(e) = cache.put_app(cache_key, &blob_hash, all_files).await {
+                warn!(error = %e, identifier = %identifier, "Failed to cache extraction (non-fatal)");
             }
             // Guard drop handles finish_extraction — no explicit call needed
         }
@@ -3051,26 +3113,30 @@ impl HttpServer {
         let content_type = Self::get_mime_type(file_path);
 
         info!(
-            app_id = %app_id,
+            identifier = %identifier,
             file_path = %file_path,
             content_type = %content_type,
             size = contents.len(),
             "Serving app file (extracted + cached)"
         );
 
-        Ok(Response::builder()
+        let mut builder = Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, content_type)
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
-            .header("X-App-Id", app_id)
             .header("X-Cache", "MISS")
-            .body(Full::new(Bytes::from(contents)))
-            .unwrap())
+            .header("X-Content-Address", &blob_hash);
+        if let Some(ref slug) = resolved_slug {
+            builder = builder
+                .header("X-Slug", slug.as_str())
+                .header("X-Content-Slug", slug.as_str());
+        }
+        Ok(builder.body(Full::new(Bytes::from(contents))).unwrap())
     }
 
-    /// Look up blob hash for an app by querying DB and updating app_index.
-    async fn lookup_app_blob_hash(&self, app_id: &str) -> Result<Option<String>, StorageError> {
+    /// Look up blob hash for an app by querying DB and updating slug_index.
+    async fn lookup_slug_blob_hash(&self, slug: &str) -> Result<Option<String>, StorageError> {
         let mut conn = self.get_conn()?;
         let app_ctx = db::AppContext::default_lamad();
         let query = ContentQuery {
@@ -3085,13 +3151,13 @@ impl HttpServer {
         for item in items {
             if let Some(ref content_body) = item.content.content_body {
                 if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                    if let Some(content_app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                    if let Some(content_slug) = obj.get("slug").and_then(|v| v.as_str()) {
                         let hash = item.content.blob_hash.clone().unwrap_or_default();
                         if !hash.is_empty() {
-                            let mut index = self.app_index.write().await;
-                            index.insert(content_app_id.to_string(), hash.clone());
+                            let mut index = self.slug_index.write().await;
+                            index.insert(content_slug.to_string(), hash.clone());
                         }
-                        if content_app_id == app_id {
+                        if content_slug == slug {
                             found_hash = item.content.blob_hash.clone();
                         }
                     }
@@ -4136,10 +4202,10 @@ impl HttpServer {
                     .to_bytes();
                 let input_view: CreateStewardedNodeInputView = serde_json::from_slice(&body)
                     .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
-                // Inject app_id from context
+                // Inject h_app_id from context
                 let mut input: crate::db::stewarded_nodes::CreateStewardedNodeInput =
                     input_view.into();
-                input.app_id = app_ctx.app_id.clone();
+                input.h_app_id = app_ctx.h_app_id.clone();
 
                 match crate::db::stewarded_nodes::create_stewarded_node(&mut conn, input) {
                     Ok(node) => {
@@ -4771,7 +4837,7 @@ impl HttpServer {
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let mut conn = self.get_diesel_conn()?;
 
-        match humans::list_humans(&mut conn, &ctx.app_id) {
+        match humans::list_humans(&mut conn, &ctx.h_app_id) {
             Ok(items) => {
                 let views: Vec<HumanView> = items.into_iter().map(HumanView::from).collect();
                 let body = serde_json::json!({
@@ -5033,7 +5099,7 @@ impl HttpServer {
             for assignment in &package.content {
                 let updated = diesel::update(
                     content::table
-                        .filter(content::app_id.eq(&ctx.app_id))
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
                         .filter(content::id.eq(&assignment.content_id)),
                 )
                 .set(content::reach.eq(&assignment.reach))
@@ -5120,7 +5186,7 @@ impl HttpServer {
                 use diesel::prelude::*;
 
                 let matching_content: Vec<String> = content::table
-                    .filter(content::app_id.eq(&ctx.app_id))
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
                     .filter(content::content_type.eq(&steward_seed.content_category))
                     .select(content::id)
                     .load(&mut *conn)
@@ -5258,7 +5324,7 @@ impl HttpServer {
 
             // Get all content in this app context — the reach field tells us the assignment
             let items: Vec<(String, String)> = content::table
-                .filter(content::app_id.eq(&ctx.app_id))
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .select((content::id, content::reach))
                 .load(&mut *conn)
                 .map_err(|e| StorageError::Internal(format!("Content query failed: {}", e)))?;

@@ -465,56 +465,56 @@ export class ContentResolverService implements OnDestroy {
   /**
    * Register an HTML5 app.
    *
-   * @param appId - Unique app identifier
+   * @param slug - Unique app identifier
    * @param blobHash - Content hash of the app bundle
    * @param entryPoint - Entry point file (default: index.html)
    * @param fallbackUrl - Fallback URL if app cannot be served locally
    */
-  registerApp(appId: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
+  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
     this.ensureReady();
-    this.resolver!.registerApp(appId, blobHash, entryPoint, fallbackUrl);
+    this.resolver!.registerApp(slug, blobHash, entryPoint, fallbackUrl);
   }
 
   /**
    * Unregister an app.
    */
-  unregisterApp(appId: string): void {
+  unregisterApp(slug: string): void {
     this.ensureReady();
-    this.resolver!.unregisterApp(appId);
+    this.resolver!.unregisterApp(slug);
   }
 
   /**
    * Check if app is registered.
    */
-  hasApp(appId: string): boolean {
+  hasApp(slug: string): boolean {
     this.ensureReady();
-    return this.resolver!.hasApp(appId);
+    return this.resolver!.hasApp(slug);
   }
 
   /**
    * Get app blob hash.
    */
-  getAppBlobHash(appId: string): string | null {
+  getAppBlobHash(slug: string): string | null {
     this.ensureReady();
-    return this.resolver!.getAppBlobHash(appId);
+    return this.resolver!.getAppBlobHash(slug);
   }
 
   /**
    * Resolve app URL.
    * Returns the best URL to load the app from.
    */
-  resolveAppUrl(appId: string, path?: string): string {
+  resolveAppUrl(slug: string, path?: string): string {
     this.ensureReady();
-    return this.resolver!.resolveAppUrl(appId, path);
+    return this.resolver!.resolveAppUrl(slug, path);
   }
 
   /**
    * Resolve app URL with full metadata.
    * Returns URL, source, blob hash, and fallback information.
    */
-  resolveAppUrlFull(appId: string, path?: string): AppResolutionResult {
+  resolveAppUrlFull(slug: string, path?: string): AppResolutionResult {
     this.ensureReady();
-    return this.resolver!.resolveAppUrlFull(appId, path);
+    return this.resolver!.resolveAppUrlFull(slug, path);
   }
 
   // ==========================================================================

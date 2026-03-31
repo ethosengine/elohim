@@ -75,7 +75,7 @@ export interface ConnectionConfig {
   storageUrl?: string;
 
   /** Installed app ID in Holochain conductor */
-  appId: string;
+  hAppId: string;
 
   /** Path to hApp bundle (for installation) */
   happPath?: string;

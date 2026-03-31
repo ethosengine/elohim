@@ -224,22 +224,22 @@ export interface IContentResolver {
   getResolutionChain(contentType: string): SourceInfo[];
 
   /** Register an HTML5 app */
-  registerApp(appId: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void;
+  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void;
 
   /** Unregister an app */
-  unregisterApp(appId: string): void;
+  unregisterApp(slug: string): void;
 
   /** Check if app is registered */
-  hasApp(appId: string): boolean;
+  hasApp(slug: string): boolean;
 
   /** Get app blob hash */
-  getAppBlobHash(appId: string): string | null;
+  getAppBlobHash(slug: string): string | null;
 
   /** Resolve app URL */
-  resolveAppUrl(appId: string, path?: string): string;
+  resolveAppUrl(slug: string, path?: string): string;
 
   /** Resolve app URL with full metadata */
-  resolveAppUrlFull(appId: string, path?: string): AppResolutionResult;
+  resolveAppUrlFull(slug: string, path?: string): AppResolutionResult;
 
   /** Get statistics */
   getStats(): ResolverStats;
@@ -288,16 +288,16 @@ interface WasmContentResolver {
   resolve(contentType: string, contentId: string): string;
   get_resolution_chain(contentType: string): string;
   register_app(
-    appId: string,
+    slug: string,
     blobHash: string,
     entryPoint: string,
     fallbackUrl: string | null
   ): void;
-  unregister_app(appId: string): void;
-  has_app(appId: string): boolean;
-  get_app_blob_hash(appId: string): string | null;
-  resolve_app_url(appId: string, path: string | null): string;
-  resolve_app_url_full(appId: string, path: string | null): string;
+  unregister_app(slug: string): void;
+  has_app(slug: string): boolean;
+  get_app_blob_hash(slug: string): string | null;
+  resolve_app_url(slug: string, path: string | null): string;
+  resolve_app_url_full(slug: string, path: string | null): string;
   get_stats(): string;
   reset_stats(): void;
   source_count(): number;
@@ -504,8 +504,8 @@ export class TsContentResolver implements IContentResolver {
       }));
   }
 
-  registerApp(appId: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
-    this.appRegistry.set(appId, {
+  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
+    this.appRegistry.set(slug, {
       blobHash,
       entryPoint,
       fallbackUrl: fallbackUrl ?? null,
@@ -513,27 +513,27 @@ export class TsContentResolver implements IContentResolver {
     });
   }
 
-  unregisterApp(appId: string): void {
-    this.appRegistry.delete(appId);
+  unregisterApp(slug: string): void {
+    this.appRegistry.delete(slug);
   }
 
-  hasApp(appId: string): boolean {
-    return this.appRegistry.has(appId);
+  hasApp(slug: string): boolean {
+    return this.appRegistry.has(slug);
   }
 
-  getAppBlobHash(appId: string): string | null {
-    return this.appRegistry.get(appId)?.blobHash ?? null;
+  getAppBlobHash(slug: string): string | null {
+    return this.appRegistry.get(slug)?.blobHash ?? null;
   }
 
-  resolveAppUrl(appId: string, path?: string): string {
-    const reg = this.appRegistry.get(appId);
+  resolveAppUrl(slug: string, path?: string): string {
+    const reg = this.appRegistry.get(slug);
     const entryPoint = reg?.entryPoint ?? 'index.html';
     const filePath = path ?? entryPoint;
 
     // Find source that can serve apps
     for (const source of this.sources) {
       if (source.available && source.contentTypes.includes('app') && source.baseUrl) {
-        return `${source.baseUrl}/apps/${appId}/${filePath}`;
+        return `${source.baseUrl}/apps/${slug}/${filePath}`;
       }
     }
 
@@ -545,9 +545,9 @@ export class TsContentResolver implements IContentResolver {
     return '';
   }
 
-  resolveAppUrlFull(appId: string, path?: string): AppResolutionResult {
-    const url = this.resolveAppUrl(appId, path);
-    const reg = this.appRegistry.get(appId);
+  resolveAppUrlFull(slug: string, path?: string): AppResolutionResult {
+    const url = this.resolveAppUrl(slug, path);
+    const reg = this.appRegistry.get(slug);
 
     const sourceId =
       this.sources.find(s => s.available && s.contentTypes.includes('app') && s.baseUrl)?.id ??
@@ -667,28 +667,28 @@ class WasmContentResolverWrapper implements IContentResolver {
     }));
   }
 
-  registerApp(appId: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
-    this.wasm.register_app(appId, blobHash, entryPoint, fallbackUrl ?? null);
+  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
+    this.wasm.register_app(slug, blobHash, entryPoint, fallbackUrl ?? null);
   }
 
-  unregisterApp(appId: string): void {
-    this.wasm.unregister_app(appId);
+  unregisterApp(slug: string): void {
+    this.wasm.unregister_app(slug);
   }
 
-  hasApp(appId: string): boolean {
-    return this.wasm.has_app(appId);
+  hasApp(slug: string): boolean {
+    return this.wasm.has_app(slug);
   }
 
-  getAppBlobHash(appId: string): string | null {
-    return this.wasm.get_app_blob_hash(appId);
+  getAppBlobHash(slug: string): string | null {
+    return this.wasm.get_app_blob_hash(slug);
   }
 
-  resolveAppUrl(appId: string, path?: string): string {
-    return this.wasm.resolve_app_url(appId, path ?? null);
+  resolveAppUrl(slug: string, path?: string): string {
+    return this.wasm.resolve_app_url(slug, path ?? null);
   }
 
-  resolveAppUrlFull(appId: string, path?: string): AppResolutionResult {
-    const json = this.wasm.resolve_app_url_full(appId, path ?? null);
+  resolveAppUrlFull(slug: string, path?: string): AppResolutionResult {
+    const json = this.wasm.resolve_app_url_full(slug, path ?? null);
     const parsed = JSON.parse(json);
     return {
       url: parsed.url ?? null,

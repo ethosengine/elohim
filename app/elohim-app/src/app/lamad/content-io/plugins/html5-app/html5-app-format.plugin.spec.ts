@@ -83,7 +83,7 @@ describe('Html5AppFormatPlugin', () => {
   describe('import', () => {
     it('should import from JSON string', async () => {
       const content = JSON.stringify({
-        appId: 'test-app',
+        slug: 'test-app',
         entryPoint: 'index.html',
       });
 
@@ -91,7 +91,7 @@ describe('Html5AppFormatPlugin', () => {
 
       expect(result.contentFormat).toBe('html5-app');
       expect(result.contentType).toBe('simulation');
-      expect((result.content as any).appId).toBe('test-app');
+      expect((result.content as any).slug).toBe('test-app');
       expect((result.content as any).entryPoint).toBe('index.html');
     });
 

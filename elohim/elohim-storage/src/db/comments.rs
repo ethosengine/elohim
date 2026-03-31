@@ -50,7 +50,7 @@ pub fn create_comment(
 
     let new = NewComment {
         id: id.clone(),
-        app_id: ctx.app_id().to_string(),
+        h_app_id: ctx.h_app_id().to_string(),
         content_id: input.content_id.clone(),
         human_id: input.human_id.clone(),
         body: input.body.clone(),
@@ -78,7 +78,7 @@ pub fn get_comment(
 ) -> Result<Comment, StorageError> {
     comments::table
         .filter(comments::id.eq(id))
-        .filter(comments::app_id.eq(ctx.app_id()))
+        .filter(comments::h_app_id.eq(ctx.h_app_id()))
         .first::<Comment>(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => StorageError::NotFound(id.to_string()),
@@ -93,7 +93,7 @@ pub fn list_comments(
     query: &CommentQuery,
 ) -> Result<Vec<Comment>, StorageError> {
     let mut q = comments::table
-        .filter(comments::app_id.eq(ctx.app_id()))
+        .filter(comments::h_app_id.eq(ctx.h_app_id()))
         .order(comments::created_at.desc())
         .into_boxed();
 
@@ -138,7 +138,7 @@ pub fn delete_comment(
 ) -> Result<(), StorageError> {
     let deleted = diesel::delete(comments::table)
         .filter(comments::id.eq(id))
-        .filter(comments::app_id.eq(ctx.app_id()))
+        .filter(comments::h_app_id.eq(ctx.h_app_id()))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to delete comment: {}", e)))?;
 

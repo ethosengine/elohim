@@ -20,7 +20,7 @@ pub fn list_enum_values(
     debug!(enum_name, "Listing enum registry values");
 
     enum_registry::table
-        .filter(enum_registry::app_id.eq(&ctx.app_id))
+        .filter(enum_registry::h_app_id.eq(&ctx.h_app_id))
         .filter(enum_registry::enum_name.eq(enum_name))
         .order(enum_registry::id.asc())
         .load::<EnumRegistryEntry>(conn)
@@ -39,7 +39,7 @@ pub fn register_enum_value(
     debug!(enum_name, enum_value, tier, "Registering enum value");
 
     let new = NewEnumRegistryEntry {
-        app_id: ctx.app_id.clone(),
+        h_app_id: ctx.h_app_id.clone(),
         enum_name: enum_name.to_string(),
         enum_value: enum_value.to_string(),
         tier: tier.to_string(),

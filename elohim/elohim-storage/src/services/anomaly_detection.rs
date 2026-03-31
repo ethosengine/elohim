@@ -85,7 +85,7 @@ mod tests {
             .to_string();
         ImagodeiObservation {
             id: uuid::Uuid::new_v4().to_string(),
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             human_id: "human-1".to_string(),
             observed_at,
             observation_type: "growth_signal".to_string(),

@@ -758,8 +758,8 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 
   // If blob entry exists, use sparse DHT pattern (just metadata + CID reference)
   // Otherwise, embed full content in DHT entry (legacy behavior)
-  // Exception: html5-app keeps original content object (appId, entryPoint, fallbackUrl)
-  // because the renderer needs that to build the /apps/{appId}/{entryPoint} URL
+  // Exception: html5-app keeps original content object (slug, entryPoint, fallbackUrl)
+  // because the renderer needs that to build the /apps/{slug}/{entryPoint} URL
   const isHtml5App = concept.contentFormat === 'html5-app';
   const useSparsePattern = blobEntry !== undefined && !isHtml5App;
 
@@ -790,7 +790,7 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     title: concept.title,
     description: description,
     // Sparse: store hash reference, Full: store entire content
-    // html5-app: always store the content object with appId/entryPoint
+    // html5-app: always store the content object with slug/entryPoint
     contentBody: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat, concept.contentType),
     tags: concept.tags || [],
@@ -1133,7 +1133,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
   });
 
   // Map to store blob_hash for each html5-app content ID
-  const html5AppBlobHashes = new Map<string, { hash: string; appId: string; entryPoint: string }>();
+  const html5AppBlobHashes = new Map<string, { hash: string; slug: string; entryPoint: string }>();
 
   // Find and process all html5-app content
   const html5Apps = filteredConcepts.filter(({ concept }) =>
@@ -1164,18 +1164,18 @@ async function seedViaDoorway(): Promise<SeedResult> {
           );
 
           if (uploadResult.success) {
-            // Extract appId from content object
+            // Extract slug from content object
             const contentObj = typeof concept.content === 'object' ? concept.content as Record<string, unknown> : null;
-            const appId = contentObj?.appId as string || concept.id;
+            const slug = contentObj?.slug as string || concept.id;
             const entryPoint = contentObj?.entryPoint as string || 'index.html';
 
             html5AppBlobHashes.set(concept.id, {
               hash: processed.blobMetadata.hash,
-              appId,
+              slug,
               entryPoint,
             });
 
-            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (appId: ${appId})`);
+            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (slug: ${slug})`);
           } else {
             console.error(`   ❌ ${concept.id}: upload failed - ${uploadResult.error}`);
           }
@@ -1219,9 +1219,9 @@ async function seedViaDoorway(): Promise<SeedResult> {
         // Set blob_hash to point to the uploaded ZIP
         input.blobHash = appInfo.hash;
 
-        // Add appId to metadata so elohim-storage can look it up
+        // Add slug to metadata so elohim-storage can look it up
         const meta = (input.metadata ?? {}) as Record<string, unknown>;
-        meta.appId = appInfo.appId;
+        meta.slug = appInfo.slug;
         meta.entryPoint = appInfo.entryPoint;
         input.metadata = meta;
       }

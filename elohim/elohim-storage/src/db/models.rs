@@ -1,6 +1,6 @@
 //! Diesel model definitions for database tables
 //!
-//! All models include `app_id` for multi-tenant app scoping.
+//! All models include `h_app_id` for multi-tenant app scoping.
 //! - Queryable structs: for SELECT queries (reading data)
 //! - Insertable structs: for INSERT queries (writing data)
 //!
@@ -69,7 +69,7 @@ pub struct NewApp<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct Content {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub title: String,
     pub description: Option<String>,
     pub content_type: String,
@@ -102,7 +102,7 @@ pub struct ContentWithTags {
 #[diesel(table_name = content)]
 pub struct NewContent<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub title: &'a str,
     pub description: Option<&'a str>,
     pub content_type: &'a str,
@@ -121,7 +121,7 @@ pub struct NewContent<'a> {
 #[diesel(table_name = content_tags)]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContentTag {
-    pub app_id: String,
+    pub h_app_id: String,
     pub content_id: String,
     pub tag: String,
 }
@@ -130,7 +130,7 @@ pub struct ContentTag {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = content_tags)]
 pub struct NewContentTag<'a> {
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub content_id: &'a str,
     pub tag: &'a str,
 }
@@ -146,7 +146,7 @@ pub struct NewContentTag<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct Relationship {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub source_id: String,
     pub target_id: String,
     pub relationship_type: String,
@@ -169,7 +169,7 @@ pub struct Relationship {
 #[diesel(table_name = relationships)]
 pub struct NewRelationship<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub source_id: &'a str,
     pub target_id: &'a str,
     pub relationship_type: &'a str,
@@ -204,7 +204,7 @@ pub struct RelationshipWithContent {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct HumanRelationship {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub party_a_id: String,
     pub party_b_id: String,
     pub relationship_type: String,
@@ -233,7 +233,7 @@ pub struct HumanRelationship {
 #[diesel(table_name = human_relationships)]
 pub struct NewHumanRelationship<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub party_a_id: &'a str,
     pub party_b_id: &'a str,
     pub relationship_type: &'a str,
@@ -264,7 +264,7 @@ pub struct NewHumanRelationship<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContributorPresence {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub display_name: String,
     pub presence_state: String,
     pub external_identifiers_json: Option<String>,
@@ -300,7 +300,7 @@ pub struct ContributorPresence {
 #[diesel(table_name = contributor_presences)]
 pub struct NewContributorPresence<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub display_name: &'a str,
     pub presence_state: &'a str,
     pub external_identifiers_json: Option<&'a str>,
@@ -323,7 +323,7 @@ pub struct NewContributorPresence<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct EconomicEvent {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub action: String,
     pub provider: String,
     pub receiver: String,
@@ -357,7 +357,7 @@ pub struct EconomicEvent {
 #[diesel(table_name = economic_events)]
 pub struct NewEconomicEvent<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub action: &'a str,
     pub provider: &'a str,
     pub receiver: &'a str,
@@ -395,7 +395,7 @@ pub struct NewEconomicEvent<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContentMastery {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub human_id: String,
     pub content_id: String,
     pub mastery_level: String,
@@ -421,7 +421,7 @@ pub struct ContentMastery {
 #[diesel(table_name = content_mastery)]
 pub struct NewContentMastery<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub human_id: &'a str,
     pub content_id: &'a str,
     pub mastery_level: &'a str,
@@ -548,7 +548,7 @@ pub struct Human {
     pub profile_reach: String,
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
     pub created_at: String,
     pub updated_at: String,
     /// Source of truth: DHT (Human entry in imagodei DNA). NULL for pre-coherence rows.
@@ -567,7 +567,7 @@ pub struct NewHuman {
     pub profile_reach: String,
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
 }
 
 // ============================================================================
@@ -784,7 +784,7 @@ pub mod affinity_sources {
 #[diesel(table_name = crate::db::diesel_schema::steward_affinity)]
 pub struct StewardAffinity {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub steward_id: String,
     pub content_id: String,
     pub affinity_score: f32,
@@ -798,7 +798,7 @@ pub struct StewardAffinity {
 #[diesel(table_name = crate::db::diesel_schema::steward_affinity)]
 pub struct NewStewardAffinity<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub steward_id: &'a str,
     pub content_id: &'a str,
     pub affinity_score: f32,
@@ -816,7 +816,7 @@ pub struct NewStewardAffinity<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct StewardshipAllocation {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub content_id: String,
     pub steward_presence_id: String,
     pub allocation_ratio: f32,
@@ -848,7 +848,7 @@ pub struct StewardshipAllocation {
 #[diesel(table_name = stewardship_allocations)]
 pub struct NewStewardshipAllocation<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub content_id: &'a str,
     pub steward_presence_id: &'a str,
     pub allocation_ratio: f32,
@@ -1059,7 +1059,7 @@ pub struct NewLocalSession<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct Collective {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub name: String,
     pub description: Option<String>,
     pub governance_layer: String,
@@ -1077,7 +1077,7 @@ pub struct Collective {
 #[diesel(table_name = collectives)]
 pub struct NewCollective<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub name: &'a str,
     pub description: Option<&'a str>,
     pub governance_layer: &'a str,
@@ -1098,7 +1098,7 @@ pub struct NewCollective<'a> {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct CollectiveParticipation {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub collective_id: String,
     pub human_id: String,
     pub intimacy_level: String,
@@ -1116,7 +1116,7 @@ pub struct CollectiveParticipation {
 #[diesel(table_name = collective_participations)]
 pub struct NewCollectiveParticipation<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub collective_id: &'a str,
     pub human_id: &'a str,
     pub intimacy_level: &'a str,
@@ -1192,7 +1192,7 @@ pub mod consent_states {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct CustodianMetrics {
     pub custodian_id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub tier: i32,
     /// JSON: CustodianHealthView fields
     pub health_json: String,
@@ -1217,7 +1217,7 @@ pub struct CustodianMetrics {
 #[diesel(table_name = custodian_metrics)]
 pub struct UpsertCustodianMetrics {
     pub custodian_id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub tier: i32,
     pub health_json: String,
     pub storage_json: String,
@@ -1817,7 +1817,7 @@ pub struct NewContributorDashboard<'a> {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct ReaCommitment {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub action: String,
     pub provider: String,
     pub receiver: String,
@@ -1846,7 +1846,7 @@ pub struct ReaCommitment {
 #[diesel(table_name = rea_commitments)]
 pub struct NewReaCommitment<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub action: &'a str,
     pub provider: &'a str,
     pub receiver: &'a str,
@@ -1879,7 +1879,7 @@ pub struct NewReaCommitment<'a> {
 #[diesel(table_name = agreements)]
 pub struct AgreementRow {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub name: Option<String>,
     pub note: Option<String>,
     pub dht_anchor_hash: Option<String>,
@@ -1891,7 +1891,7 @@ pub struct AgreementRow {
 #[diesel(table_name = agreements)]
 pub struct NewAgreement<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub name: Option<&'a str>,
     pub note: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
@@ -1919,7 +1919,7 @@ pub struct StewardedNode {
     pub region: Option<String>,
     pub context_epr_id: Option<String>,
     pub dht_anchor_hash: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -1939,7 +1939,7 @@ pub struct NewStewardedNode {
     pub region: Option<String>,
     pub context_epr_id: Option<String>,
     pub dht_anchor_hash: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
 }
 
 /// Stewardship relationship between a node and a human.
@@ -1978,7 +1978,7 @@ pub struct NewNodeStewardship {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct KnowledgeMap {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub map_type: String,
     pub owner_id: String,
     pub title: String,
@@ -2004,7 +2004,7 @@ pub struct KnowledgeMap {
 #[diesel(table_name = knowledge_maps)]
 pub struct NewKnowledgeMap<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub map_type: &'a str,
     pub owner_id: &'a str,
     pub title: &'a str,
@@ -2033,7 +2033,7 @@ pub struct NewKnowledgeMap<'a> {
 #[diesel(table_name = imagodei_observations)]
 pub struct ImagodeiObservation {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub human_id: String,
     pub observed_at: String,
     pub observation_type: String,
@@ -2054,7 +2054,7 @@ pub struct ImagodeiObservation {
 #[diesel(table_name = imagodei_observations)]
 pub struct NewImagodeiObservation<'a> {
     pub id: &'a str,
-    pub app_id: &'a str,
+    pub h_app_id: &'a str,
     pub human_id: &'a str,
     pub observed_at: &'a str,
     pub observation_type: &'a str,
@@ -2080,7 +2080,7 @@ pub struct NewImagodeiObservation<'a> {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Comment {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub content_id: String,
     pub human_id: String,
     pub body: String,
@@ -2095,7 +2095,7 @@ pub struct Comment {
 #[diesel(table_name = comments)]
 pub struct NewComment {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub content_id: String,
     pub human_id: String,
     pub body: String,
@@ -2178,7 +2178,7 @@ pub struct NewStatementVote<'a> {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Schedule {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub entity_type: String,
     pub entity_id: String,
     pub scheduled_at: Option<String>,
@@ -2196,7 +2196,7 @@ pub struct Schedule {
 #[diesel(table_name = schedules)]
 pub struct NewSchedule {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub entity_type: String,
     pub entity_id: String,
     pub scheduled_at: Option<String>,
@@ -2219,7 +2219,7 @@ pub struct NewSchedule {
 #[diesel(table_name = spatial_contexts)]
 pub struct SpatialContext {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub entity_type: String,
     pub entity_id: String,
     pub latitude: Option<f64>,
@@ -2247,7 +2247,7 @@ pub struct SpatialContext {
 #[diesel(table_name = spatial_contexts)]
 pub struct NewSpatialContext {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub entity_type: String,
     pub entity_id: String,
     pub latitude: Option<f64>,
@@ -2280,7 +2280,7 @@ pub struct NewSpatialContext {
 #[diesel(table_name = places)]
 pub struct Place {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub dht_anchor_hash: String,
     pub name: String,
     pub place_type: String,
@@ -2306,7 +2306,7 @@ pub struct Place {
 #[diesel(table_name = places)]
 pub struct NewPlace {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub dht_anchor_hash: String,
     pub name: String,
     pub place_type: String,
@@ -2339,7 +2339,7 @@ pub struct NewPlace {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Hazard {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub hazard_type: String,
     pub severity: String,
@@ -2365,7 +2365,7 @@ pub struct Hazard {
 #[diesel(table_name = hazards)]
 pub struct NewHazard {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub hazard_type: String,
     pub severity: String,
@@ -2396,7 +2396,7 @@ pub struct NewHazard {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct RiskAlert {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub alert_type: String,
     pub severity: String,
@@ -2422,7 +2422,7 @@ pub struct RiskAlert {
 #[diesel(table_name = risk_alerts)]
 pub struct NewRiskAlert {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub alert_type: String,
     pub severity: String,
@@ -2450,7 +2450,7 @@ pub struct NewRiskAlert {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct EnumRegistryEntry {
     pub id: i32,
-    pub app_id: String,
+    pub h_app_id: String,
     pub enum_name: String,
     pub enum_value: String,
     pub tier: String,
@@ -2462,7 +2462,7 @@ pub struct EnumRegistryEntry {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = enum_registry)]
 pub struct NewEnumRegistryEntry {
-    pub app_id: String,
+    pub h_app_id: String,
     pub enum_name: String,
     pub enum_value: String,
     pub tier: String,

@@ -108,8 +108,8 @@ export type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Pr
  * The client automatically determines the connection method based on ClientMode.
  */
 export interface HolochainConnection {
-  /** App ID installed in conductor */
-  appId: string;
+  /** Holochain app ID installed in conductor */
+  hAppId: string;
   /** Whether connection is available */
   enabled: boolean;
   /**

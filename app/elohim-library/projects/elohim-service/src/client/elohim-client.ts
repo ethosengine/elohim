@@ -232,7 +232,7 @@ export class ElohimClient {
 
   /** Get the Holochain app ID */
   getHolochainAppId(): string | null {
-    return this.holochain?.appId ?? null;
+    return this.holochain?.hAppId ?? null;
   }
 
   // === Content Operations ===

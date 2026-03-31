@@ -31,7 +31,7 @@ import { HolochainClientConfig, ZomeCallInput, ZomeCallResult } from '../models/
  * ```typescript
  * const client = new HolochainClientService({
  *   adminUrl: 'ws://localhost:4444',
- *   appId: 'elohim',
+ *   hAppId: 'elohim',
  * });
  *
  * await client.connect();
@@ -80,28 +80,28 @@ export class HolochainClientService {
 
       // Step 3: Check if app is installed
       const apps = await this.adminWs.listApps({});
-      let appInfo = apps.find(app => app.installed_app_id === this.config.appId);
+      let appInfo = apps.find(app => app.installed_app_id === this.config.hAppId);
 
       if (!appInfo) {
         if (this.config.happPath) {
           console.log(
-            `App ${this.config.appId} not found, installing from ${this.config.happPath}...`
+            `App ${this.config.hAppId} not found, installing from ${this.config.happPath}...`
           );
 
           // Generate agent key and install
           this.agentPubKey = await this.adminWs.generateAgentPubKey();
           appInfo = await this.adminWs.installApp({
             source: { type: 'path', value: this.config.happPath },
-            installed_app_id: this.config.appId,
+            installed_app_id: this.config.hAppId,
             agent_key: this.agentPubKey,
           });
 
           // Enable the app
-          await this.adminWs.enableApp({ installed_app_id: this.config.appId });
-          console.log(`App ${this.config.appId} installed and enabled`);
+          await this.adminWs.enableApp({ installed_app_id: this.config.hAppId });
+          console.log(`App ${this.config.hAppId} installed and enabled`);
         } else {
           throw new Error(
-            `App ${this.config.appId} not found and no happPath provided for installation`
+            `App ${this.config.hAppId} not found and no happPath provided for installation`
           );
         }
       }
@@ -133,7 +133,7 @@ export class HolochainClientService {
       // Step 7: Attach app interface and connect
       const { port } = await this.adminWs.attachAppInterface({ allowed_origins: 'elohim-service' });
       const token = await this.adminWs.issueAppAuthenticationToken({
-        installed_app_id: this.config.appId,
+        installed_app_id: this.config.hAppId,
       });
 
       this.appWs = await AppWebsocket.connect({
@@ -142,7 +142,7 @@ export class HolochainClientService {
       });
 
       this.isConnected = true;
-      console.log(`Connected to Holochain conductor (app: ${this.config.appId})`);
+      console.log(`Connected to Holochain conductor (app: ${this.config.hAppId})`);
     } catch (error) {
       await this.disconnect();
       throw error;
@@ -287,7 +287,7 @@ export function createElohimClient(
 ): HolochainClientService {
   return new HolochainClientService({
     adminUrl,
-    appId: 'elohim',
+    hAppId: 'elohim',
     happPath,
   });
 }

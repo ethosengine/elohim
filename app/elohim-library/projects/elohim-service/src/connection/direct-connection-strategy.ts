@@ -197,23 +197,23 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
       this.logger.debug('Agent key generated');
 
       // Step 4: Check if app is installed, install if needed
-      let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
+      let appInfo = await this.getInstalledApp(this.adminWs, config.hAppId);
 
       if (!appInfo) {
-        this.logger.info(`App ${config.appId} not installed. Installing...`);
+        this.logger.info(`App ${config.hAppId} not installed. Installing...`);
 
         if (config.happPath) {
           appInfo = await this.adminWs.installApp({
             source: { type: 'path', value: config.happPath },
-            installed_app_id: config.appId,
+            installed_app_id: config.hAppId,
             agent_key: agentPubKey,
           });
 
           await this.adminWs.enableApp({
-            installed_app_id: config.appId,
+            installed_app_id: config.hAppId,
           });
         } else {
-          throw new Error(`App ${config.appId} not installed and no happPath provided`);
+          throw new Error(`App ${config.hAppId} not installed and no happPath provided`);
         }
       }
 
@@ -277,7 +277,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
 
       // Step 10: Get app authentication token
       const issuedToken = await this.adminWs.issueAppAuthenticationToken({
-        installed_app_id: config.appId,
+        installed_app_id: config.hAppId,
         single_use: false,
         expiry_seconds: 86400, // 24 hours for native (longer session)
       });
@@ -297,7 +297,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
       this.connected = true;
 
       this.logger.info('Connection successful', {
-        appId: config.appId,
+        hAppId: config.hAppId,
         cellCount: cellIds.size,
       });
 

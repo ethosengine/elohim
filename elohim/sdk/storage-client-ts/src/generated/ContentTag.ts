@@ -3,4 +3,4 @@
 /**
  * Content tag row
  */
-export type ContentTag = { app_id: string, content_id: string, tag: string, };
+export type ContentTag = { h_app_id: string, content_id: string, tag: string, };

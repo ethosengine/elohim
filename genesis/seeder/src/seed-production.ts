@@ -58,7 +58,7 @@ import { validateContentFile, validateAllContent, printValidationReport } from '
 interface SeedConfig {
   // Holochain
   adminUrl: string;
-  appId: string;
+  hAppId: string;
 
   // Doorway
   doorwayUrl: string;
@@ -374,10 +374,10 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           wsClientOptions: { origin: 'http://localhost' },
         });
         const apps = await adminWs.listApps({});
-        const app = apps.find(a => a.installed_app_id === config.appId);
+        const app = apps.find(a => a.installed_app_id === config.hAppId);
 
         if (!app) {
-          throw new Error(`App '${config.appId}' not found`);
+          throw new Error(`App '${config.hAppId}' not found`);
         }
 
         // Find the first role with provisioned cells
@@ -404,7 +404,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           ? (cellInfo as any).provisioned.cell_id
           : (cellInfo as any).value.cell_id;
         const appInfo = await adminWs.attachAppInterface({ allowed_origins: '*' });
-        const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: config.appId });
+        const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: config.hAppId });
         const appWsUrl = `ws://localhost:${appInfo.port}`;
         const appWs = await AppWebsocket.connect({
           url: new URL(appWsUrl),
@@ -412,7 +412,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           token: token.token,
         });
 
-        console.log(`Connected to app: ${config.appId}`);
+        console.log(`Connected to app: ${config.hAppId}`);
         console.log(`Cell: ${encodeHashToBase64(cellId[0])}`);
 
         // Seed content
@@ -618,7 +618,7 @@ async function main() {
 
   const config: SeedConfig = {
     adminUrl: process.env.HOLOCHAIN_ADMIN_URL || 'ws://localhost:8888',
-    appId: process.env.HOLOCHAIN_APP_ID || 'elohim',
+    hAppId: process.env.HOLOCHAIN_APP_ID || 'elohim',
     doorwayUrl: process.env.DOORWAY_URL || 'http://localhost:3000',
     doorwayApiKey: process.env.DOORWAY_API_KEY,
     storageUrl: process.env.STORAGE_URL, // Optional - enables unified shard model

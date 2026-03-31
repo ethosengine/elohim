@@ -133,7 +133,7 @@ impl From<App> for AppView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContentView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub title: String,
     pub description: Option<String>,
     pub content_type: String,
@@ -156,7 +156,7 @@ impl From<Content> for ContentView {
     fn from(c: Content) -> Self {
         Self {
             id: c.id,
-            app_id: c.app_id,
+            h_app_id: c.h_app_id,
             title: c.title,
             description: c.description,
             content_type: c.content_type,
@@ -190,7 +190,7 @@ impl ContentView {
     pub fn from_epr_head(head: &crate::epr_codec::EprHead) -> Self {
         Self {
             id: head.id.clone(),
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             title: head.lamad.title.clone(),
             description: head.lamad.description.clone(),
             content_type: head.lamad.content_type.clone(),
@@ -255,7 +255,7 @@ impl From<ContentWithTags> for ContentWithTagsView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct RelationshipView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub source_id: String,
     pub target_id: String,
     pub relationship_type: String,
@@ -278,7 +278,7 @@ impl From<Relationship> for RelationshipView {
     fn from(r: Relationship) -> Self {
         Self {
             id: r.id,
-            app_id: r.app_id,
+            h_app_id: r.h_app_id,
             source_id: r.source_id,
             target_id: r.target_id,
             relationship_type: r.relationship_type,
@@ -326,7 +326,7 @@ impl From<RelationshipWithContent> for RelationshipWithContentView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct HumanRelationshipView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub party_a_id: String,
     pub party_b_id: String,
     pub relationship_type: String,
@@ -355,7 +355,7 @@ impl From<HumanRelationship> for HumanRelationshipView {
     fn from(h: HumanRelationship) -> Self {
         Self {
             id: h.id,
-            app_id: h.app_id,
+            h_app_id: h.h_app_id,
             party_a_id: h.party_a_id,
             party_b_id: h.party_b_id,
             relationship_type: h.relationship_type,
@@ -389,7 +389,7 @@ impl From<HumanRelationship> for HumanRelationshipView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContributorPresenceView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub display_name: String,
     pub presence_state: String,
     /// Parsed external identifiers (was external_identifiers_json string in storage)
@@ -429,7 +429,7 @@ impl From<ContributorPresence> for ContributorPresenceView {
     fn from(c: ContributorPresence) -> Self {
         Self {
             id: c.id,
-            app_id: c.app_id,
+            h_app_id: c.h_app_id,
             display_name: c.display_name,
             presence_state: c.presence_state,
             external_identifiers: parse_json_opt(&c.external_identifiers_json),
@@ -470,7 +470,7 @@ impl From<ContributorPresence> for ContributorPresenceView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct EconomicEventView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub action: String,
     pub provider: String,
     pub receiver: String,
@@ -505,7 +505,7 @@ impl From<EconomicEvent> for EconomicEventView {
     fn from(e: EconomicEvent) -> Self {
         Self {
             id: e.id,
-            app_id: e.app_id,
+            h_app_id: e.h_app_id,
             action: e.action,
             provider: e.provider,
             receiver: e.receiver,
@@ -629,7 +629,7 @@ impl From<ReaCommitment> for ReaCommitmentView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ContentMasteryView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub human_id: String,
     pub content_id: String,
     pub mastery_level: String,
@@ -654,7 +654,7 @@ impl From<ContentMastery> for ContentMasteryView {
     fn from(m: ContentMastery) -> Self {
         Self {
             id: m.id,
-            app_id: m.app_id,
+            h_app_id: m.h_app_id,
             human_id: m.human_id,
             content_id: m.content_id,
             mastery_level: m.mastery_level,
@@ -684,7 +684,7 @@ impl From<ContentMastery> for ContentMasteryView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct StewardshipAllocationView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub content_id: String,
     pub steward_presence_id: String,
     pub allocation_ratio: f32,
@@ -717,7 +717,7 @@ impl From<StewardshipAllocation> for StewardshipAllocationView {
     fn from(a: StewardshipAllocation) -> Self {
         Self {
             id: a.id,
-            app_id: a.app_id,
+            h_app_id: a.h_app_id,
             content_id: a.content_id,
             steward_presence_id: a.steward_presence_id,
             allocation_ratio: a.allocation_ratio,
@@ -2025,7 +2025,7 @@ pub struct HumanView {
     pub profile_reach: String,
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
     pub created_at: String,
     pub updated_at: String,
     /// DHT provenance: ActionHash of the Human entry in imagodei DNA. None for pre-coherence rows.
@@ -2044,7 +2044,7 @@ impl From<Human> for HumanView {
             profile_reach: h.profile_reach,
             location: h.location,
             profile_photo_url: h.profile_photo_url,
-            app_id: h.app_id,
+            h_app_id: h.h_app_id,
             created_at: h.created_at,
             updated_at: h.updated_at,
             dht_anchor_hash: h.dht_anchor_hash,
@@ -2328,15 +2328,15 @@ pub struct ReportCustodianMetricsInputView {
 }
 
 impl ReportCustodianMetricsInputView {
-    /// Convert to the insertable DB type, stamping `app_id` and `last_updated_at`.
+    /// Convert to the insertable DB type, stamping `h_app_id` and `last_updated_at`.
     pub fn into_upsert(
         self,
-        app_id: impl Into<String>,
+        h_app_id: impl Into<String>,
         now_ms: i64,
     ) -> crate::db::models::UpsertCustodianMetrics {
         crate::db::models::UpsertCustodianMetrics {
             custodian_id: self.custodian_id,
-            app_id: app_id.into(),
+            h_app_id: h_app_id.into(),
             tier: self.tier as i32,
             health_json: serde_json::to_string(&self.health).unwrap_or_default(),
             storage_json: serde_json::to_string(&self.storage).unwrap_or_default(),
@@ -4139,7 +4139,7 @@ impl From<CreateStewardedNodeInputView> for crate::db::stewarded_nodes::CreateSt
             region: v.region,
             context_epr_id: v.context_epr_id,
             dht_anchor_hash: None,
-            app_id: String::new(), // set by handler from AppContext
+            h_app_id: String::new(), // set by handler from AppContext
         }
     }
 }
@@ -4788,7 +4788,7 @@ use crate::db::models::{Hazard, RiskAlert};
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct HazardView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub hazard_type: String,
     pub severity: String,
@@ -4813,7 +4813,7 @@ impl From<Hazard> for HazardView {
     fn from(h: Hazard) -> Self {
         Self {
             id: h.id,
-            app_id: h.app_id,
+            h_app_id: h.h_app_id,
             place_id: h.place_id,
             hazard_type: h.hazard_type,
             severity: h.severity,
@@ -4877,7 +4877,7 @@ fn default_hazard_source() -> String {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct RiskAlertView {
     pub id: String,
-    pub app_id: String,
+    pub h_app_id: String,
     pub place_id: String,
     pub alert_type: String,
     pub severity: String,
@@ -4902,7 +4902,7 @@ impl From<RiskAlert> for RiskAlertView {
     fn from(r: RiskAlert) -> Self {
         Self {
             id: r.id,
-            app_id: r.app_id,
+            h_app_id: r.h_app_id,
             place_id: r.place_id,
             alert_type: r.alert_type,
             severity: r.severity,

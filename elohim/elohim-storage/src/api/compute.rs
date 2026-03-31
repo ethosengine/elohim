@@ -91,7 +91,7 @@ async fn assemble_dashboard(
     use diesel::prelude::*;
 
     let custodian_rows: Vec<CustodianMetrics> = cm_dsl::custodian_metrics
-        .filter(cm_dsl::app_id.eq(&ctx.app_id))
+        .filter(cm_dsl::h_app_id.eq(&ctx.h_app_id))
         .order(cm_dsl::last_updated_at.desc())
         .limit(50)
         .load(conn)
@@ -110,7 +110,7 @@ async fn assemble_dashboard(
     use crate::db::models::EconomicEvent;
 
     let produce_events: Vec<EconomicEvent> = ee_dsl::economic_events
-        .filter(ee_dsl::app_id.eq(&ctx.app_id))
+        .filter(ee_dsl::h_app_id.eq(&ctx.h_app_id))
         .filter(ee_dsl::action.eq("produce"))
         .order(ee_dsl::has_point_in_time.desc())
         .limit(20)
@@ -147,7 +147,7 @@ async fn assemble_dashboard(
     let view = SheafaDashboardStateView {
         // Identity — operator is the local agent; detailed lookup pending
         // imagodei integration.
-        operator_id: ctx.app_id.clone(),
+        operator_id: ctx.h_app_id.clone(),
         operator_name: "Local Operator".to_string(),
         stewarded_resource_id: String::new(),
         node_id: "local".to_string(),

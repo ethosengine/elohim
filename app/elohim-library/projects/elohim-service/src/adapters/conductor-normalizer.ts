@@ -86,7 +86,7 @@ export interface ConductorContentResponse {
 export function normalizeConductorContent(raw: ConductorContentResponse): ContentView {
   return {
     id: raw.id,
-    appId: 'lamad',
+    hAppId: 'lamad',
     title: raw.title,
     description: raw.description ?? undefined,
     contentType: raw.content_type as ContentType,

@@ -12,7 +12,7 @@ export class SwBridgeService {
       : null;
 
   /** Tell the SW to evict all cached files for an app */
-  invalidateApp(appId: string): void {
-    this.channel?.postMessage({ type: 'invalidate', appId });
+  invalidateApp(slug: string): void {
+    this.channel?.postMessage({ type: 'invalidate', slug });
   }
 }

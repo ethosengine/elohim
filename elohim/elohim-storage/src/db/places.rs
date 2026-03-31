@@ -75,7 +75,7 @@ pub fn get_place_by_id(
 ) -> Result<Place, StorageError> {
     places::table
         .filter(places::id.eq(id))
-        .filter(places::app_id.eq(ctx.app_id()))
+        .filter(places::h_app_id.eq(ctx.h_app_id()))
         .first(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
@@ -92,7 +92,7 @@ pub fn list_places(
     query: &PlaceQuery,
 ) -> Result<Vec<Place>, StorageError> {
     let mut q = places::table
-        .filter(places::app_id.eq(ctx.app_id()))
+        .filter(places::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(ref pt) = query.place_type {

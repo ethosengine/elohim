@@ -66,7 +66,7 @@ async fn handle_confirm(
     let mut conn = get_conn(pool)?;
     let new_obs = crate::db::models::NewImagodeiObservation {
         id: &obs_id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         human_id: &pending.human_id,
         observed_at: &now,
         observation_type: "pause_override",
