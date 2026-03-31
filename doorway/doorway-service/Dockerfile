@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
+# Install rustfmt and clippy (not included in slim image)
+RUN rustup component add rustfmt clippy
+
 # Copy manifests and local crates first for dependency caching
 COPY doorway/doorway-service/Cargo.toml doorway/doorway-service/Cargo.lock ./
 COPY crates ./crates
