@@ -13,7 +13,7 @@
 //!
 //! ## Invalidation
 //!
-//! Files are keyed by `{app_id}:{file_path}:{blob_hash}`. When a new
+//! Files are keyed by `{slug}:{file_path}:{blob_hash}`. When a new
 //! blob_hash arrives (re-seed), the old entries become unreachable. MongoDB's
 //! TTL index on `last_accessed` garbage-collects stale entries after 24h.
 //! `invalidate_app()` provides immediate bulk purge when needed.
@@ -66,12 +66,12 @@ pub struct AppFileCacheService {
 
     /// In-flight fetch coalescing: prevents thundering herd when many
     /// requests arrive for the same file before the first fetch completes.
-    /// Key format: "apps:{app_id}:{file_path}"
+    /// Key format: "apps:{slug}:{file_path}"
     in_flight: DashMap<String, broadcast::Sender<Option<CachedFile>>>,
 
-    /// app_id -> blob_hash mapping (populated from content projection).
+    /// slug -> blob_hash mapping (populated from content projection).
     /// Used to construct cache keys for HTML5 app file lookups.
-    app_index: Arc<RwLock<HashMap<String, String>>>,
+    slug_index: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl AppFileCacheService {
@@ -85,33 +85,33 @@ impl AppFileCacheService {
             mongo: mongo.clone(),
             agreement_id,
             in_flight: DashMap::new(),
-            app_index: Arc::new(RwLock::new(HashMap::new())),
+            slug_index: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     /// Build the MongoDB `_id` for a cached file.
     ///
-    /// Format: `{app_id}:{file_path}:{blob_hash}`
-    pub fn cache_key(app_id: &str, file_path: &str, blob_hash: &str) -> String {
-        format!("{app_id}:{file_path}:{blob_hash}")
+    /// Format: `{slug}:{file_path}:{blob_hash}`
+    pub fn cache_key(slug: &str, file_path: &str, blob_hash: &str) -> String {
+        format!("{slug}:{file_path}:{blob_hash}")
     }
 
     /// Build the in-flight coalescing key for a file being fetched.
     ///
-    /// Format: `apps:{app_id}:{file_path}`
+    /// Format: `apps:{slug}:{file_path}`
     ///
     /// Note: this is blob_hash-independent because we only ever fetch the
     /// latest version of a file — the blob_hash is determined by the fetch.
-    pub fn in_flight_key(app_id: &str, file_path: &str) -> String {
-        format!("apps:{app_id}:{file_path}")
+    pub fn in_flight_key(slug: &str, file_path: &str) -> String {
+        format!("apps:{slug}:{file_path}")
     }
 
-    /// Look up a cached file by app_id, file_path, and blob_hash.
+    /// Look up a cached file by slug, file_path, and blob_hash.
     ///
     /// On cache hit, updates `last_accessed` in a fire-and-forget spawn
     /// to keep the TTL index fresh without blocking the caller.
-    pub async fn get(&self, app_id: &str, file_path: &str, blob_hash: &str) -> Option<CachedFile> {
-        let mongo_id = Self::cache_key(app_id, file_path, blob_hash);
+    pub async fn get(&self, slug: &str, file_path: &str, blob_hash: &str) -> Option<CachedFile> {
+        let mongo_id = Self::cache_key(slug, file_path, blob_hash);
 
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
@@ -153,14 +153,14 @@ impl AppFileCacheService {
     /// composite key, it is replaced.
     pub async fn put(
         &self,
-        app_id: &str,
+        slug: &str,
         file_path: &str,
         blob_hash: &str,
         content_type: &str,
         data: Vec<u8>,
     ) {
         let doc = AppFileCacheDoc::new(
-            app_id.to_string(),
+            slug.to_string(),
             file_path.to_string(),
             blob_hash.to_string(),
             self.agreement_id.clone(),
@@ -195,20 +195,20 @@ impl AppFileCacheService {
     /// Delete all cached files for an app.
     ///
     /// Returns the number of documents deleted.
-    pub async fn invalidate_app(&self, app_id: &str) -> u64 {
+    pub async fn invalidate_app(&self, slug: &str) -> u64 {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
 
-        match collection.delete_many(doc! { "app_id": app_id }).await {
+        match collection.delete_many(doc! { "slug": slug }).await {
             Ok(result) => {
                 let count = result.deleted_count;
                 if count > 0 {
-                    debug!(app_id = %app_id, count = count, "Invalidated app file cache");
+                    debug!(slug = %slug, count = count, "Invalidated app file cache");
                 }
                 count
             }
             Err(e) => {
-                error!(app_id = %app_id, error = %e, "Failed to invalidate app file cache");
+                error!(slug = %slug, error = %e, "Failed to invalidate app file cache");
                 0
             }
         }
@@ -218,13 +218,13 @@ impl AppFileCacheService {
     // App Index — blob hash resolution for HTML5 apps
     // =========================================================================
 
-    /// Load the app index from the projection store (MongoDB).
+    /// Load the slug index from the projection store (MongoDB).
     ///
     /// Queries `projected_entries` for Content documents with
     /// `contentFormat == "html5-app"` and builds a HashMap of
-    /// `app_id -> blob_hash`. Called at startup and can be called
+    /// `slug -> blob_hash`. Called at startup and can be called
     /// to refresh the entire index.
-    pub async fn load_app_index(&self) {
+    pub async fn load_slug_index(&self) {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
 
@@ -238,7 +238,7 @@ impl AppFileCacheService {
         let mut cursor = match collection.find(filter).await {
             Ok(cursor) => cursor,
             Err(e) => {
-                warn!(error = %e, "Failed to query projected_entries for app index");
+                warn!(error = %e, "Failed to query projected_entries for slug index");
                 return;
             }
         };
@@ -250,35 +250,35 @@ impl AppFileCacheService {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
                 let blob_hash = data.get_str("blobHash").ok();
 
-                // The HTML5 app's appId lives inside contentBody (a JSON string),
-                // NOT in data.appId (which is the Holochain app context, e.g. "lamad").
-                let html5_app_id = extract_html5_app_id_from_data(data);
+                // The HTML5 app's slug lives inside contentBody (a JSON string),
+                // NOT in data.hAppId (which is the Holochain app context, e.g. "lamad").
+                let html5_slug = extract_html5_slug_from_data(data);
 
-                if let (Some(app_id), Some(blob_hash)) = (html5_app_id, blob_hash) {
-                    if !app_id.is_empty() && !blob_hash.is_empty() {
-                        index.insert(app_id.to_string(), blob_hash.to_string());
+                if let (Some(slug), Some(blob_hash)) = (html5_slug, blob_hash) {
+                    if !slug.is_empty() && !blob_hash.is_empty() {
+                        index.insert(slug.to_string(), blob_hash.to_string());
                         count += 1;
                     }
                 }
             }
         }
 
-        let mut locked = self.app_index.write().await;
+        let mut locked = self.slug_index.write().await;
         *locked = index;
 
-        info!(count = count, "App index loaded from projection store");
+        info!(count = count, "Slug index loaded from projection store");
     }
 
-    /// Resolve the current blob_hash for an app_id.
+    /// Resolve the current blob_hash for a slug.
     ///
     /// Checks the in-memory index first. On miss, performs a lazy
     /// single-document query against MongoDB and updates the index
     /// if found.
-    pub async fn resolve_blob_hash(&self, app_id: &str) -> Option<String> {
+    pub async fn resolve_blob_hash(&self, slug: &str) -> Option<String> {
         // Fast path: check index
         {
-            let index = self.app_index.read().await;
-            if let Some(hash) = index.get(app_id) {
+            let index = self.slug_index.read().await;
+            if let Some(hash) = index.get(slug) {
                 return Some(hash.clone());
             }
         }
@@ -287,8 +287,8 @@ impl AppFileCacheService {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
 
-        // The HTML5 app's appId is inside contentBody (JSON string), not at
-        // data.appId (which is the Holochain app context). We can't query
+        // The HTML5 app's slug is inside contentBody (JSON string), not at
+        // data.hAppId (which is the Holochain app context). We can't query
         // inside a JSON string with MongoDB, so scan all html5-app entries.
         let filter = doc! {
             "doc_type": "Content",
@@ -299,19 +299,19 @@ impl AppFileCacheService {
         let mut cursor = match collection.find(filter).await {
             Ok(c) => c,
             Err(e) => {
-                warn!(app_id = %app_id, error = %e, "Failed to query for app blob hash");
+                warn!(slug = %slug, error = %e, "Failed to query for app blob hash");
                 return None;
             }
         };
 
         while let Ok(Some(doc)) = cursor.try_next().await {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let html5_app_id = extract_html5_app_id_from_data(data);
-                if html5_app_id.as_deref() == Some(app_id) {
+                let html5_slug = extract_html5_slug_from_data(data);
+                if html5_slug.as_deref() == Some(slug) {
                     if let Ok(blob_hash) = data.get_str("blobHash") {
                         if !blob_hash.is_empty() {
-                            let mut index = self.app_index.write().await;
-                            index.insert(app_id.to_string(), blob_hash.to_string());
+                            let mut index = self.slug_index.write().await;
+                            index.insert(slug.to_string(), blob_hash.to_string());
                             return Some(blob_hash.to_string());
                         }
                     }
@@ -322,15 +322,15 @@ impl AppFileCacheService {
         None
     }
 
-    /// Remove an app_id from the index so the next request re-resolves
+    /// Remove a slug from the index so the next request re-resolves
     /// with a fresh blob_hash from MongoDB.
     ///
     /// Called by the invalidation hook when a content update signal
     /// arrives for an html5-app.
-    pub async fn refresh_app(&self, app_id: &str) {
-        let mut index = self.app_index.write().await;
-        index.remove(app_id);
-        debug!(app_id = %app_id, "Removed app from index (will re-resolve on next request)");
+    pub async fn refresh_app(&self, slug: &str) {
+        let mut index = self.slug_index.write().await;
+        index.remove(slug);
+        debug!(slug = %slug, "Removed app from index (will re-resolve on next request)");
     }
 
     /// Begin an in-flight fetch for a file.
@@ -343,10 +343,10 @@ impl AppFileCacheService {
     /// "leader" and should perform the fetch, then call `finish_fetch()`.
     pub fn begin_fetch(
         &self,
-        app_id: &str,
+        slug: &str,
         file_path: &str,
     ) -> Option<broadcast::Receiver<Option<CachedFile>>> {
-        let key = Self::in_flight_key(app_id, file_path);
+        let key = Self::in_flight_key(slug, file_path);
 
         // Atomic check-and-insert via entry() API to prevent TOCTOU race.
         // Without this, two concurrent tasks could both see an empty slot,
@@ -366,8 +366,8 @@ impl AppFileCacheService {
     ///
     /// Must be called after `begin_fetch()` returns `None` (leader path),
     /// regardless of whether the fetch succeeded or failed.
-    pub fn finish_fetch(&self, app_id: &str, file_path: &str, result: Option<CachedFile>) {
-        let key = Self::in_flight_key(app_id, file_path);
+    pub fn finish_fetch(&self, slug: &str, file_path: &str, result: Option<CachedFile>) {
+        let key = Self::in_flight_key(slug, file_path);
 
         if let Some((_, sender)) = self.in_flight.remove(&key) {
             let waiting = sender.receiver_count();
@@ -375,7 +375,7 @@ impl AppFileCacheService {
             let _ = sender.send(result);
             if waiting > 0 {
                 debug!(
-                    app_id = %app_id,
+                    slug = %slug,
                     file_path = %file_path,
                     waiting = waiting,
                     "Coalesced app file fetch completed"
@@ -389,11 +389,11 @@ impl AppFileCacheService {
 // Projection Invalidation Hook
 // =============================================================================
 
-/// Extract the `appId` from a projected content document's data field,
+/// Extract the `slug` from a projected content document's data field,
 /// but only if the content format is `html5-app`.
 ///
 /// Returns `None` for non-app content or if required fields are missing.
-fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) -> Option<String> {
+fn extract_html5_slug(doc: &crate::projection::document::ProjectedDocument) -> Option<String> {
     if doc.doc_type != "Content" {
         return None;
     }
@@ -404,15 +404,14 @@ fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) ->
         return None;
     }
 
-    // The HTML5 app's appId is inside contentBody (a JSON string containing
-    // {appId, entryPoint, fallbackUrl}). data.appId is the Holochain app
+    // The HTML5 app's slug is inside contentBody (a JSON string containing
+    // {slug, entryPoint, fallbackUrl}). data.hAppId is the Holochain app
     // context (e.g., "lamad"), NOT the HTML5 app identifier.
-    // TODO: disambiguate as hAppId (Holochain) vs appId (HTML5) in future sprint.
     if let Some(content_body) = data.get("contentBody").and_then(|v| v.as_str()) {
         if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
-            if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
-                if !app_id.is_empty() {
-                    return Some(app_id.to_string());
+            if let Some(slug) = body.get("slug").and_then(|v| v.as_str()) {
+                if !slug.is_empty() {
+                    return Some(slug.to_string());
                 }
             }
         }
@@ -420,9 +419,9 @@ fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) ->
 
     // Fallback: try contentBody as object (not string) — depends on projection format
     if let Some(body) = data.get("contentBody") {
-        if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
-            if !app_id.is_empty() {
-                return Some(app_id.to_string());
+        if let Some(slug) = body.get("slug").and_then(|v| v.as_str()) {
+            if !slug.is_empty() {
+                return Some(slug.to_string());
             }
         }
     }
@@ -434,16 +433,16 @@ fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) ->
         .map(|s| s.to_string())
 }
 
-/// Extract HTML5 app ID from a raw BSON data document.
-/// Same logic as `extract_html5_app_id` but for raw MongoDB documents
-/// used in the app index load and resolve paths.
-fn extract_html5_app_id_from_data(data: &bson::Document) -> Option<String> {
-    // Parse contentBody (JSON string or BSON object) for the HTML5 appId
+/// Extract HTML5 app slug from a raw BSON data document.
+/// Same logic as `extract_html5_slug` but for raw MongoDB documents
+/// used in the slug index load and resolve paths.
+fn extract_html5_slug_from_data(data: &bson::Document) -> Option<String> {
+    // Parse contentBody (JSON string or BSON object) for the HTML5 slug
     if let Ok(content_body) = data.get_str("contentBody") {
         if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
-            if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
-                if !app_id.is_empty() {
-                    return Some(app_id.to_string());
+            if let Some(slug) = body.get("slug").and_then(|v| v.as_str()) {
+                if !slug.is_empty() {
+                    return Some(slug.to_string());
                 }
             }
         }
@@ -451,9 +450,9 @@ fn extract_html5_app_id_from_data(data: &bson::Document) -> Option<String> {
 
     // Try contentBody as BSON document (not string)
     if let Ok(body) = data.get_document("contentBody") {
-        if let Ok(app_id) = body.get_str("appId") {
-            if !app_id.is_empty() {
-                return Some(app_id.to_string());
+        if let Ok(slug) = body.get_str("slug") {
+            if !slug.is_empty() {
+                return Some(slug.to_string());
             }
         }
     }
@@ -479,16 +478,16 @@ pub fn spawn_app_cache_invalidation_task(
         loop {
             match update_rx.recv().await {
                 Ok(doc) => {
-                    if let Some(app_id) = extract_html5_app_id(&doc) {
+                    if let Some(slug) = extract_html5_slug(&doc) {
                         info!(
-                            app_id = %app_id,
+                            slug = %slug,
                             doc_id = %doc.doc_id,
                             "HTML5 app content updated — invalidating cache"
                         );
-                        let deleted = cache.invalidate_app(&app_id).await;
-                        cache.refresh_app(&app_id).await;
+                        let deleted = cache.invalidate_app(&slug).await;
+                        cache.refresh_app(&slug).await;
                         debug!(
-                            app_id = %app_id,
+                            slug = %slug,
                             deleted_files = deleted,
                             "App cache invalidation complete"
                         );
@@ -545,7 +544,7 @@ mod tests {
     }
 
     // =========================================================================
-    // extract_html5_app_id tests
+    // extract_html5_slug tests
     // =========================================================================
 
     fn make_projected_doc(
@@ -563,24 +562,24 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_html5_app_id_with_app_id_field() {
-        // appId for HTML5 apps lives inside contentBody (JSON string),
+    fn test_extract_html5_slug_with_slug_field() {
+        // slug for HTML5 apps lives inside contentBody (JSON string),
         // NOT at the top level of data (which is the Holochain app context)
         let doc = make_projected_doc(
             "Content",
             "content-quiz-1",
             serde_json::json!({
                 "contentFormat": "html5-app",
-                "appId": "lamad",  // Holochain app context — NOT the HTML5 app ID
-                "contentBody": "{\"appId\":\"quiz-1\",\"entryPoint\":\"index.html\"}",
+                "hAppId": "lamad",  // Holochain app context — NOT the HTML5 app slug
+                "contentBody": "{\"slug\":\"quiz-1\",\"entryPoint\":\"index.html\"}",
                 "blobHash": "sha256-abc"
             }),
         );
-        assert_eq!(extract_html5_app_id(&doc), Some("quiz-1".to_string()));
+        assert_eq!(extract_html5_slug(&doc), Some("quiz-1".to_string()));
     }
 
     #[test]
-    fn test_extract_html5_app_id_falls_back_to_id() {
+    fn test_extract_html5_slug_falls_back_to_id() {
         let doc = make_projected_doc(
             "Content",
             "simulation-phys",
@@ -591,61 +590,61 @@ mod tests {
             }),
         );
         assert_eq!(
-            extract_html5_app_id(&doc),
+            extract_html5_slug(&doc),
             Some("simulation-phys".to_string())
         );
     }
 
     #[test]
-    fn test_extract_html5_app_id_ignores_non_html5_app() {
+    fn test_extract_html5_slug_ignores_non_html5_app() {
         let doc = make_projected_doc(
             "Content",
             "concept-123",
             serde_json::json!({
                 "contentFormat": "markdown",
-                "appId": "concept-123"
+                "slug": "concept-123"
             }),
         );
-        assert_eq!(extract_html5_app_id(&doc), None);
+        assert_eq!(extract_html5_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_app_id_ignores_non_content_doc_type() {
+    fn test_extract_html5_slug_ignores_non_content_doc_type() {
         let doc = make_projected_doc(
             "Human",
             "human-abc",
             serde_json::json!({
                 "contentFormat": "html5-app",
-                "appId": "quiz-1"
+                "slug": "quiz-1"
             }),
         );
-        assert_eq!(extract_html5_app_id(&doc), None);
+        assert_eq!(extract_html5_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_app_id_returns_none_for_missing_format() {
+    fn test_extract_html5_slug_returns_none_for_missing_format() {
         let doc = make_projected_doc(
             "Content",
             "content-no-format",
             serde_json::json!({
-                "appId": "quiz-1",
+                "slug": "quiz-1",
                 "blobHash": "sha256-abc"
             }),
         );
-        assert_eq!(extract_html5_app_id(&doc), None);
+        assert_eq!(extract_html5_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_app_id_returns_none_for_empty_app_id() {
+    fn test_extract_html5_slug_returns_none_for_empty_slug() {
         let doc = make_projected_doc(
             "Content",
             "content-empty",
             serde_json::json!({
                 "contentFormat": "html5-app",
-                "appId": "",
+                "slug": "",
                 "id": ""
             }),
         );
-        assert_eq!(extract_html5_app_id(&doc), None);
+        assert_eq!(extract_html5_slug(&doc), None);
     }
 }

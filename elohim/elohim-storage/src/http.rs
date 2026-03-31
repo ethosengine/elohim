@@ -143,8 +143,8 @@ pub struct HttpServer {
     p2p_handle: Option<crate::p2p::P2PHandle>,
     /// Extraction cache for HTML5 app files (None = disabled)
     extraction_cache: Option<Arc<ExtractionCache>>,
-    /// In-memory index: appId -> blobHash (avoids per-request SQLite scan)
-    app_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
+    /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
+    slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Concurrency limiter: prevents OOM under burst traffic (e.g., HTML5 app loads)
     request_semaphore: Arc<Semaphore>,
 }
@@ -191,7 +191,7 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             p2p_handle: None,
             extraction_cache: None,
-            app_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
         }
     }
@@ -254,12 +254,12 @@ impl HttpServer {
         self
     }
 
-    /// Load the app index from database (call after db_pool is set)
-    pub async fn load_app_index(&self) {
+    /// Load the slug index from database (call after db_pool is set)
+    pub async fn load_slug_index(&self) {
         let mut conn = match self.get_conn() {
             Ok(c) => c,
             Err(e) => {
-                warn!("Failed to get DB connection for app index: {}", e);
+                warn!("Failed to get DB connection for slug index: {}", e);
                 return;
             }
         };
@@ -272,25 +272,25 @@ impl HttpServer {
 
         match db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
             Ok(items) => {
-                let mut index = self.app_index.write().await;
+                let mut index = self.slug_index.write().await;
                 index.clear();
                 for item in items {
                     if let Some(ref content_body) = item.content.content_body {
                         if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                            if let Some(app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                            if let Some(slug) = obj.get("slug").and_then(|v| v.as_str()) {
                                 let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
                                 if !blob_hash.is_empty() {
-                                    info!(app_id = %app_id, blob_hash = %blob_hash, "Indexed HTML5 app");
-                                    index.insert(app_id.to_string(), blob_hash);
+                                    info!(slug = %slug, blob_hash = %blob_hash, "Indexed HTML5 app");
+                                    index.insert(slug.to_string(), blob_hash);
                                 }
                             }
                         }
                     }
                 }
-                info!(count = index.len(), "App index loaded");
+                info!(count = index.len(), "Slug index loaded");
             }
             Err(e) => {
-                warn!("Failed to load app index: {}", e);
+                warn!("Failed to load slug index: {}", e);
             }
         }
     }
@@ -553,14 +553,14 @@ impl HttpServer {
                 }
             }
 
-            // Delivery capability probe: HEAD /apps/{app_id}/_capability
+            // Delivery capability probe: HEAD /apps/{slug}/_capability
             // Lightweight probe for delivery negotiation — no body, just headers.
             // Reports whether extraction cache is warm for this app.
             (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
                 self.handle_app_capability(p).await
             }
 
-            // HTML5 App serving: /apps/{app_id}/{file_path}
+            // HTML5 App serving: /apps/{slug}/{file_path}
             (Method::GET, p) if p.starts_with("/apps/") => {
                 if self.db_pool.is_some() {
                     self.handle_app_request(&path).await
@@ -741,7 +741,7 @@ impl HttpServer {
         if detail >= elohim_compute::DetailLevel::Debug {
             body["manifests"] = serde_json::json!(self.manifests.read().await.len());
             body["concurrencyLimit"] = serde_json::json!(MAX_CONCURRENT_REQUESTS);
-            body["appIndex"] = serde_json::json!(self.app_index.read().await.len());
+            body["slugIndex"] = serde_json::json!(self.slug_index.read().await.len());
         }
 
         // trace level: full internal state
@@ -2794,7 +2794,7 @@ impl HttpServer {
 
     /// Handle delivery capability probe for an HTML5 app.
     ///
-    /// Route: HEAD /apps/{app_id}/_capability
+    /// Route: HEAD /apps/{slug}/_capability
     ///
     /// Returns an empty body with headers describing the delivery readiness
     /// of this storage node for the given app. Used by service workers and
@@ -2803,12 +2803,12 @@ impl HttpServer {
         &self,
         path: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let app_id = path
+        let slug = path
             .strip_prefix("/apps/")
             .and_then(|s| s.strip_suffix("/_capability"))
             .unwrap_or("");
 
-        if app_id.is_empty() {
+        if slug.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Length", "0")
@@ -2816,13 +2816,13 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Look up blob_hash from app_index
-        let blob_hash = { self.app_index.read().await.get(app_id).cloned() };
+        // Look up blob_hash from slug_index
+        let blob_hash = { self.slug_index.read().await.get(slug).cloned() };
 
         // Check extraction cache warmth
         let (ready, delivery_mode) = match (&self.extraction_cache, &blob_hash) {
             (Some(cache), Some(hash)) => {
-                let is_warm = cache.is_current(app_id, hash).await;
+                let is_warm = cache.is_current(slug, hash).await;
                 (is_warm, if is_warm { "extracted" } else { "compressed" })
             }
             _ => (false, "compressed"),
@@ -2844,7 +2844,7 @@ impl HttpServer {
 
     /// Handle HTML5 app file requests
     ///
-    /// Route: GET /apps/{app_id}/{file_path}
+    /// Route: GET /apps/{slug}/{file_path}
     ///
     /// Fast path (cache hit): O(1) index lookup + disk read. No DB, no ZIP, no pool.
     /// Slow path (cache miss): DB query + ZIP extract + cache all files + serve.
@@ -2852,18 +2852,18 @@ impl HttpServer {
         use std::io::Read;
         use zip::ZipArchive;
 
-        // Parse path: /apps/{app_id}/{file_path}
+        // Parse path: /apps/{slug}/{file_path}
         let remainder = path.strip_prefix("/apps/").unwrap_or("");
-        let (app_id, file_path) = match remainder.find('/') {
+        let (slug, file_path) = match remainder.find('/') {
             Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
             None => (remainder, "index.html"),
         };
 
-        if app_id.is_empty() {
+        if slug.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .body(Full::new(Bytes::from(r#"{"error": "Missing slug"}"#)))
                 .unwrap());
         }
 
@@ -2875,25 +2875,25 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(app_id = %app_id, file_path = %file_path, "App file request");
+        debug!(slug = %slug, file_path = %file_path, "App file request");
 
         // --- Fast path: check extraction cache ---
         let cached_blob_hash = {
-            let index = self.app_index.read().await;
-            index.get(app_id).cloned()
+            let index = self.slug_index.read().await;
+            index.get(slug).cloned()
         };
 
         if let (Some(ref cache), Some(ref hash)) = (&self.extraction_cache, &cached_blob_hash) {
-            if cache.is_current(app_id, hash).await {
-                if let Some(data) = cache.get_file(app_id, file_path).await {
+            if cache.is_current(slug, hash).await {
+                if let Some(data) = cache.get_file(slug, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT");
+                    debug!(slug = %slug, file_path = %file_path, "Cache HIT");
                     return Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-App-Id", app_id)
+                        .header("X-Slug", slug)
                         .header("X-Cache", "HIT")
                         .body(Full::new(Bytes::from(data)))
                         .unwrap());
@@ -2905,20 +2905,20 @@ impl HttpServer {
         // Thundering herd protection: if another request is already extracting
         // this app, wait for it to finish then retry from cache.
         if let Some(ref cache) = self.extraction_cache {
-            if let Some(mut rx) = cache.begin_extraction(app_id) {
+            if let Some(mut rx) = cache.begin_extraction(slug) {
                 // Another request is extracting — wait for it
-                debug!(app_id = %app_id, "Waiting for in-flight extraction");
+                debug!(slug = %slug, "Waiting for in-flight extraction");
                 let _ = rx.recv().await; // ignore errors — extractor may have finished
                                          // Retry from cache
-                if let Some(data) = cache.get_file(app_id, file_path).await {
+                if let Some(data) = cache.get_file(slug, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(app_id = %app_id, file_path = %file_path, "Cache HIT (after wait)");
+                    debug!(slug = %slug, file_path = %file_path, "Cache HIT (after wait)");
                     return Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-App-Id", app_id)
+                        .header("X-Slug", slug)
                         .header("X-Cache", "HIT-COALESCED")
                         .body(Full::new(Bytes::from(data)))
                         .unwrap());
@@ -2932,13 +2932,13 @@ impl HttpServer {
         let _extraction_guard = self
             .extraction_cache
             .as_ref()
-            .map(|c| c.extraction_guard(app_id));
+            .map(|c| c.extraction_guard(slug));
 
-        debug!(app_id = %app_id, "Cache MISS — extracting from ZIP");
+        debug!(slug = %slug, "Cache MISS — extracting from ZIP");
 
         let blob_hash = match cached_blob_hash {
             Some(h) => h,
-            None => match self.lookup_app_blob_hash(app_id).await? {
+            None => match self.lookup_slug_blob_hash(slug).await? {
                 Some(h) => h,
                 None => {
                     return Ok(Response::builder()
@@ -2946,7 +2946,7 @@ impl HttpServer {
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(format!(
                             r#"{{"error": "App not found: {}"}}"#,
-                            app_id
+                            slug
                         ))))
                         .unwrap());
                 }
@@ -2963,7 +2963,7 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(app_id = %app_id, blob_hash = %blob_hash, "Found blob hash");
+        debug!(slug = %slug, blob_hash = %blob_hash, "Found blob hash");
 
         // Fetch ZIP from blob store
         let zip_data = match self.blob_store.get(&blob_hash).await {
@@ -2981,7 +2981,7 @@ impl HttpServer {
             Err(e) => return Err(e),
         };
 
-        debug!(app_id = %app_id, zip_size = zip_data.len(), "Fetched ZIP blob");
+        debug!(slug = %slug, zip_size = zip_data.len(), "Fetched ZIP blob");
 
         // Extract ALL files from ZIP
         let cursor = std::io::Cursor::new(&zip_data);
@@ -3027,8 +3027,8 @@ impl HttpServer {
 
         // Cache the extracted files (non-fatal if caching fails)
         if let Some(ref cache) = self.extraction_cache {
-            if let Err(e) = cache.put_app(app_id, &blob_hash, all_files).await {
-                warn!(error = %e, app_id = %app_id, "Failed to cache extraction (non-fatal)");
+            if let Err(e) = cache.put_app(slug, &blob_hash, all_files).await {
+                warn!(error = %e, slug = %slug, "Failed to cache extraction (non-fatal)");
             }
             // Guard drop handles finish_extraction — no explicit call needed
         }
@@ -3051,7 +3051,7 @@ impl HttpServer {
         let content_type = Self::get_mime_type(file_path);
 
         info!(
-            app_id = %app_id,
+            slug = %slug,
             file_path = %file_path,
             content_type = %content_type,
             size = contents.len(),
@@ -3063,14 +3063,14 @@ impl HttpServer {
             .header(header::CONTENT_TYPE, content_type)
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
-            .header("X-App-Id", app_id)
+            .header("X-Slug", slug)
             .header("X-Cache", "MISS")
             .body(Full::new(Bytes::from(contents)))
             .unwrap())
     }
 
-    /// Look up blob hash for an app by querying DB and updating app_index.
-    async fn lookup_app_blob_hash(&self, app_id: &str) -> Result<Option<String>, StorageError> {
+    /// Look up blob hash for an app by querying DB and updating slug_index.
+    async fn lookup_slug_blob_hash(&self, slug: &str) -> Result<Option<String>, StorageError> {
         let mut conn = self.get_conn()?;
         let app_ctx = db::AppContext::default_lamad();
         let query = ContentQuery {
@@ -3085,13 +3085,13 @@ impl HttpServer {
         for item in items {
             if let Some(ref content_body) = item.content.content_body {
                 if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                    if let Some(content_app_id) = obj.get("appId").and_then(|v| v.as_str()) {
+                    if let Some(content_slug) = obj.get("slug").and_then(|v| v.as_str()) {
                         let hash = item.content.blob_hash.clone().unwrap_or_default();
                         if !hash.is_empty() {
-                            let mut index = self.app_index.write().await;
-                            index.insert(content_app_id.to_string(), hash.clone());
+                            let mut index = self.slug_index.write().await;
+                            index.insert(content_slug.to_string(), hash.clone());
                         }
-                        if content_app_id == app_id {
+                        if content_slug == slug {
                             found_hash = item.content.blob_hash.clone();
                         }
                     }
