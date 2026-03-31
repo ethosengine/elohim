@@ -174,6 +174,13 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
     }
 }
 
+/// Check whether an identifier looks like a content address (sha256-...) rather
+/// than a human-readable slug. Used by `/apps/` routes to decide whether to
+/// resolve via `slug_index` or treat the identifier as a direct blob hash.
+fn is_content_address(identifier: &str) -> bool {
+    identifier.starts_with("sha256-") && identifier.len() > 10
+}
+
 impl HttpServer {
     /// Create a new HTTP server
     pub fn new(blob_store: Arc<BlobStore>, bind_addr: SocketAddr) -> Self {
@@ -2794,21 +2801,23 @@ impl HttpServer {
 
     /// Handle delivery capability probe for an HTML5 app.
     ///
-    /// Route: HEAD /apps/{slug}/_capability
+    /// Route: HEAD /apps/{identifier}/_capability
     ///
-    /// Returns an empty body with headers describing the delivery readiness
-    /// of this storage node for the given app. Used by service workers and
-    /// doorway to negotiate the optimal delivery path (extracted vs compressed).
+    /// The identifier can be either a slug (human-readable name) or a content
+    /// address (sha256-...). Returns an empty body with headers describing the
+    /// delivery readiness of this storage node for the given app. Used by
+    /// service workers and doorway to negotiate the optimal delivery path
+    /// (extracted vs compressed).
     async fn handle_app_capability(
         &self,
         path: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let slug = path
+        let identifier = path
             .strip_prefix("/apps/")
             .and_then(|s| s.strip_suffix("/_capability"))
             .unwrap_or("");
 
-        if slug.is_empty() {
+        if identifier.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Length", "0")
@@ -2816,13 +2825,22 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Look up blob_hash from slug_index
-        let blob_hash = { self.slug_index.read().await.get(slug).cloned() };
+        // Resolve identifier: content address bypasses slug_index lookup
+        let is_cid = is_content_address(identifier);
+        let (resolved_slug, blob_hash) = if is_cid {
+            (None, Some(identifier.to_string()))
+        } else {
+            let hash = self.slug_index.read().await.get(identifier).cloned();
+            (Some(identifier.to_string()), hash)
+        };
+
+        // Cache key: use slug when available, otherwise the CID itself
+        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
 
         // Check extraction cache warmth
         let (ready, delivery_mode) = match (&self.extraction_cache, &blob_hash) {
             (Some(cache), Some(hash)) => {
-                let is_warm = cache.is_current(slug, hash).await;
+                let is_warm = cache.is_current(cache_key, hash).await;
                 (is_warm, if is_warm { "extracted" } else { "compressed" })
             }
             _ => (false, "compressed"),
@@ -2836,7 +2854,12 @@ impl HttpServer {
             .header("X-Ready", if ready { "true" } else { "false" });
 
         if let Some(hash) = &blob_hash {
-            builder = builder.header("X-Blob-Hash", hash.as_str());
+            builder = builder
+                .header("X-Blob-Hash", hash.as_str())
+                .header("X-Content-Address", hash.as_str());
+        }
+        if let Some(ref slug) = resolved_slug {
+            builder = builder.header("X-Content-Slug", slug.as_str());
         }
 
         Ok(builder.body(Full::new(Bytes::new())).unwrap())
@@ -2844,7 +2867,11 @@ impl HttpServer {
 
     /// Handle HTML5 app file requests
     ///
-    /// Route: GET /apps/{slug}/{file_path}
+    /// Route: GET /apps/{identifier}/{file_path}
+    ///
+    /// The identifier can be either a slug (human-readable name) or a content
+    /// address (sha256-...). Slug-based paths resolve via `slug_index`; content
+    /// address paths use the hash directly as the blob key.
     ///
     /// Fast path (cache hit): O(1) index lookup + disk read. No DB, no ZIP, no pool.
     /// Slow path (cache miss): DB query + ZIP extract + cache all files + serve.
@@ -2852,18 +2879,20 @@ impl HttpServer {
         use std::io::Read;
         use zip::ZipArchive;
 
-        // Parse path: /apps/{slug}/{file_path}
+        // Parse path: /apps/{identifier}/{file_path}
         let remainder = path.strip_prefix("/apps/").unwrap_or("");
-        let (slug, file_path) = match remainder.find('/') {
+        let (identifier, file_path) = match remainder.find('/') {
             Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
             None => (remainder, "index.html"),
         };
 
-        if slug.is_empty() {
+        if identifier.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Missing slug"}"#)))
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "Missing app identifier"}"#,
+                )))
                 .unwrap());
         }
 
@@ -2875,28 +2904,42 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(slug = %slug, file_path = %file_path, "App file request");
-
-        // --- Fast path: check extraction cache ---
-        let cached_blob_hash = {
-            let index = self.slug_index.read().await;
-            index.get(slug).cloned()
+        // Resolve identifier: content address bypasses slug_index lookup
+        let is_cid = is_content_address(identifier);
+        let (resolved_slug, cached_blob_hash) = if is_cid {
+            (None, Some(identifier.to_string()))
+        } else {
+            let hash = {
+                let index = self.slug_index.read().await;
+                index.get(identifier).cloned()
+            };
+            (Some(identifier.to_string()), hash)
         };
 
+        // Cache key: use slug when available, otherwise the CID itself
+        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
+
+        debug!(identifier = %identifier, file_path = %file_path, is_cid = %is_cid, "App file request");
+
+        // --- Fast path: check extraction cache ---
         if let (Some(ref cache), Some(ref hash)) = (&self.extraction_cache, &cached_blob_hash) {
-            if cache.is_current(slug, hash).await {
-                if let Some(data) = cache.get_file(slug, file_path).await {
+            if cache.is_current(cache_key, hash).await {
+                if let Some(data) = cache.get_file(cache_key, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(slug = %slug, file_path = %file_path, "Cache HIT");
-                    return Ok(Response::builder()
+                    debug!(identifier = %identifier, file_path = %file_path, "Cache HIT");
+                    let mut builder = Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-Slug", slug)
                         .header("X-Cache", "HIT")
-                        .body(Full::new(Bytes::from(data)))
-                        .unwrap());
+                        .header("X-Content-Address", hash.as_str());
+                    if let Some(ref slug) = resolved_slug {
+                        builder = builder
+                            .header("X-Slug", slug.as_str())
+                            .header("X-Content-Slug", slug.as_str());
+                    }
+                    return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
                 }
             }
         }
@@ -2905,23 +2948,29 @@ impl HttpServer {
         // Thundering herd protection: if another request is already extracting
         // this app, wait for it to finish then retry from cache.
         if let Some(ref cache) = self.extraction_cache {
-            if let Some(mut rx) = cache.begin_extraction(slug) {
+            if let Some(mut rx) = cache.begin_extraction(cache_key) {
                 // Another request is extracting — wait for it
-                debug!(slug = %slug, "Waiting for in-flight extraction");
+                debug!(identifier = %identifier, "Waiting for in-flight extraction");
                 let _ = rx.recv().await; // ignore errors — extractor may have finished
                                          // Retry from cache
-                if let Some(data) = cache.get_file(slug, file_path).await {
+                if let Some(data) = cache.get_file(cache_key, file_path).await {
                     let content_type = Self::get_mime_type(file_path);
-                    debug!(slug = %slug, file_path = %file_path, "Cache HIT (after wait)");
-                    return Ok(Response::builder()
+                    debug!(identifier = %identifier, file_path = %file_path, "Cache HIT (after wait)");
+                    let mut builder = Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, content_type)
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
-                        .header("X-Slug", slug)
-                        .header("X-Cache", "HIT-COALESCED")
-                        .body(Full::new(Bytes::from(data)))
-                        .unwrap());
+                        .header("X-Cache", "HIT-COALESCED");
+                    if let Some(ref hash) = cached_blob_hash {
+                        builder = builder.header("X-Content-Address", hash.as_str());
+                    }
+                    if let Some(ref slug) = resolved_slug {
+                        builder = builder
+                            .header("X-Slug", slug.as_str())
+                            .header("X-Content-Slug", slug.as_str());
+                    }
+                    return Ok(builder.body(Full::new(Bytes::from(data))).unwrap());
                 }
                 // Extraction failed or file not found — fall through to extract ourselves
             }
@@ -2932,25 +2981,38 @@ impl HttpServer {
         let _extraction_guard = self
             .extraction_cache
             .as_ref()
-            .map(|c| c.extraction_guard(slug));
+            .map(|c| c.extraction_guard(cache_key));
 
-        debug!(slug = %slug, "Cache MISS — extracting from ZIP");
+        debug!(identifier = %identifier, "Cache MISS — extracting from ZIP");
 
         let blob_hash = match cached_blob_hash {
             Some(h) => h,
-            None => match self.lookup_slug_blob_hash(slug).await? {
-                Some(h) => h,
-                None => {
+            None => {
+                if is_cid {
+                    // CID was provided but blob not found — nothing to resolve
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "App not found: {}"}}"#,
-                            slug
+                            r#"{{"error": "App not found for content address: {}"}}"#,
+                            identifier
                         ))))
                         .unwrap());
                 }
-            },
+                match self.lookup_slug_blob_hash(identifier).await? {
+                    Some(h) => h,
+                    None => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "App not found: {}"}}"#,
+                                identifier
+                            ))))
+                            .unwrap());
+                    }
+                }
+            }
         };
 
         if blob_hash.is_empty() {
@@ -2963,7 +3025,7 @@ impl HttpServer {
                 .unwrap());
         }
 
-        debug!(slug = %slug, blob_hash = %blob_hash, "Found blob hash");
+        debug!(identifier = %identifier, blob_hash = %blob_hash, "Found blob hash");
 
         // Fetch ZIP from blob store
         let zip_data = match self.blob_store.get(&blob_hash).await {
@@ -2981,7 +3043,7 @@ impl HttpServer {
             Err(e) => return Err(e),
         };
 
-        debug!(slug = %slug, zip_size = zip_data.len(), "Fetched ZIP blob");
+        debug!(identifier = %identifier, zip_size = zip_data.len(), "Fetched ZIP blob");
 
         // Extract ALL files from ZIP
         let cursor = std::io::Cursor::new(&zip_data);
@@ -3027,8 +3089,8 @@ impl HttpServer {
 
         // Cache the extracted files (non-fatal if caching fails)
         if let Some(ref cache) = self.extraction_cache {
-            if let Err(e) = cache.put_app(slug, &blob_hash, all_files).await {
-                warn!(error = %e, slug = %slug, "Failed to cache extraction (non-fatal)");
+            if let Err(e) = cache.put_app(cache_key, &blob_hash, all_files).await {
+                warn!(error = %e, identifier = %identifier, "Failed to cache extraction (non-fatal)");
             }
             // Guard drop handles finish_extraction — no explicit call needed
         }
@@ -3051,22 +3113,26 @@ impl HttpServer {
         let content_type = Self::get_mime_type(file_path);
 
         info!(
-            slug = %slug,
+            identifier = %identifier,
             file_path = %file_path,
             content_type = %content_type,
             size = contents.len(),
             "Serving app file (extracted + cached)"
         );
 
-        Ok(Response::builder()
+        let mut builder = Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, content_type)
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
-            .header("X-Slug", slug)
             .header("X-Cache", "MISS")
-            .body(Full::new(Bytes::from(contents)))
-            .unwrap())
+            .header("X-Content-Address", &blob_hash);
+        if let Some(ref slug) = resolved_slug {
+            builder = builder
+                .header("X-Slug", slug.as_str())
+                .header("X-Content-Slug", slug.as_str());
+        }
+        Ok(builder.body(Full::new(Bytes::from(contents))).unwrap())
     }
 
     /// Look up blob hash for an app by querying DB and updating slug_index.
