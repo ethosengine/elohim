@@ -100,7 +100,7 @@ pub fn get_commitment(
     id: &str,
 ) -> Result<Option<ReaCommitment>, StorageError> {
     rea_commitments::table
-        .filter(rea_commitments::app_id.eq(&ctx.app_id))
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .filter(rea_commitments::id.eq(id))
         .first(conn)
         .optional()
@@ -114,7 +114,7 @@ pub fn list_commitments(
     query: &ReaCommitmentQuery,
 ) -> Result<Vec<ReaCommitment>, StorageError> {
     let mut base_query = rea_commitments::table
-        .filter(rea_commitments::app_id.eq(&ctx.app_id))
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     if let Some(ref action) = query.action {
@@ -157,7 +157,7 @@ pub fn get_commitments_for_agent(
     limit: i64,
 ) -> Result<Vec<ReaCommitment>, StorageError> {
     rea_commitments::table
-        .filter(rea_commitments::app_id.eq(&ctx.app_id))
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .filter(
             rea_commitments::provider
                 .eq(agent_id)
@@ -183,7 +183,7 @@ pub fn create_commitment(
 
     let new = NewReaCommitment {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         action: &input.action,
         provider: &input.provider,
         receiver: &input.receiver,
@@ -227,7 +227,7 @@ pub fn update_commitment_state(
     if let Some(f) = finished_val {
         diesel::update(
             rea_commitments::table
-                .filter(rea_commitments::app_id.eq(&ctx.app_id))
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
                 .filter(rea_commitments::id.eq(id)),
         )
         .set((
@@ -239,7 +239,7 @@ pub fn update_commitment_state(
     } else {
         diesel::update(
             rea_commitments::table
-                .filter(rea_commitments::app_id.eq(&ctx.app_id))
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
                 .filter(rea_commitments::id.eq(id)),
         )
         .set(rea_commitments::state.eq(&update.state))
@@ -267,7 +267,7 @@ pub fn upsert_with_anchor(
         // Update dht_anchor_hash on existing record
         diesel::update(
             rea_commitments::table
-                .filter(rea_commitments::app_id.eq(&ctx.app_id))
+                .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
                 .filter(rea_commitments::id.eq(&id)),
         )
         .set(rea_commitments::dht_anchor_hash.eq(dht_anchor_hash))
@@ -276,7 +276,7 @@ pub fn upsert_with_anchor(
     } else {
         let new = NewReaCommitment {
             id: &id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             action: &input.action,
             provider: &input.provider,
             receiver: &input.receiver,
@@ -319,7 +319,7 @@ pub fn commitment_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     rea_commitments::table
-        .filter(rea_commitments::app_id.eq(&ctx.app_id))
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))

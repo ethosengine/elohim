@@ -72,7 +72,7 @@ pub fn create_affinity(
 
     let new_affinity = NewStewardAffinity {
         id: &id,
-        app_id: ctx.app_id(),
+        h_app_id: ctx.h_app_id(),
         steward_id: &input.steward_id,
         content_id: &input.content_id,
         affinity_score: input.affinity_score,
@@ -100,7 +100,7 @@ pub fn get_affinity_by_id(
 ) -> Result<StewardAffinity, StorageError> {
     steward_affinity::table
         .filter(steward_affinity::id.eq(id))
-        .filter(steward_affinity::app_id.eq(ctx.app_id()))
+        .filter(steward_affinity::h_app_id.eq(ctx.h_app_id()))
         .first::<StewardAffinity>(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => StorageError::NotFound(id.to_string()),
@@ -116,7 +116,7 @@ pub fn get_affinity_for_steward_content(
     content_id: &str,
 ) -> Result<Option<StewardAffinity>, StorageError> {
     steward_affinity::table
-        .filter(steward_affinity::app_id.eq(ctx.app_id()))
+        .filter(steward_affinity::h_app_id.eq(ctx.h_app_id()))
         .filter(steward_affinity::steward_id.eq(steward_id))
         .filter(steward_affinity::content_id.eq(content_id))
         .first::<StewardAffinity>(conn)
@@ -131,7 +131,7 @@ pub fn list_affinities(
     query: &AffinityQuery,
 ) -> Result<Vec<StewardAffinity>, StorageError> {
     let mut q = steward_affinity::table
-        .filter(steward_affinity::app_id.eq(ctx.app_id()))
+        .filter(steward_affinity::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(steward_id) = &query.steward_id {
@@ -189,7 +189,7 @@ pub fn update_affinity_score(
 
     diesel::update(steward_affinity::table)
         .filter(steward_affinity::id.eq(&existing.id))
-        .filter(steward_affinity::app_id.eq(ctx.app_id()))
+        .filter(steward_affinity::h_app_id.eq(ctx.h_app_id()))
         .set((
             steward_affinity::affinity_score.eq(new_score),
             steward_affinity::source.eq(source),

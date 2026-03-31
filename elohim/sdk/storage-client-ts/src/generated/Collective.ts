@@ -3,4 +3,4 @@
 /**
  * Collective row from SELECT query
  */
-export type Collective = { id: string, app_id: string, name: string, description: string | null, governance_layer: string, constitutional_parent_id: string | null, reach: string, metadata_json: string | null, created_by: string | null, created_at: string, updated_at: string, dissolved_at: string | null, };
+export type Collective = { id: string, h_app_id: string, name: string, description: string | null, governance_layer: string, constitutional_parent_id: string | null, reach: string, metadata_json: string | null, created_by: string | null, created_at: string, updated_at: string, dissolved_at: string | null, };

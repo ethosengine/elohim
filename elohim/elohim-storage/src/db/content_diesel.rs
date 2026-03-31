@@ -132,7 +132,7 @@ pub fn get_content(
     content_id: &str,
 ) -> Result<Option<Content>, StorageError> {
     content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
         .first(conn)
         .optional()
@@ -146,7 +146,7 @@ pub fn get_content_with_tags(
     content_id: &str,
 ) -> Result<Option<ContentWithTags>, StorageError> {
     let content_opt: Option<Content> = content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
         .first(conn)
         .optional()
@@ -155,7 +155,7 @@ pub fn get_content_with_tags(
     match content_opt {
         Some(c) => {
             let tags: Vec<String> = content_tags::table
-                .filter(content_tags::app_id.eq(&ctx.app_id))
+                .filter(content_tags::h_app_id.eq(&ctx.h_app_id))
                 .filter(content_tags::content_id.eq(content_id))
                 .select(content_tags::tag)
                 .load(conn)
@@ -174,7 +174,7 @@ pub fn get_content_tags(
     content_id: &str,
 ) -> Result<Vec<String>, StorageError> {
     content_tags::table
-        .filter(content_tags::app_id.eq(&ctx.app_id))
+        .filter(content_tags::h_app_id.eq(&ctx.h_app_id))
         .filter(content_tags::content_id.eq(content_id))
         .select(content_tags::tag)
         .load(conn)
@@ -192,7 +192,7 @@ pub fn list_content(
 
     // Build base query with app scoping
     let mut base_query = content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Apply filters
@@ -247,7 +247,7 @@ pub fn check_content_exists(
     }
 
     content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq_any(ids))
         .select(content::id)
         .load(conn)
@@ -268,7 +268,7 @@ pub fn create_content(
         // Insert content
         let new_content = NewContent {
             id: &input.id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             title: &input.title,
             description: input.description.as_deref(),
             content_type: &input.content_type,
@@ -290,7 +290,7 @@ pub fn create_content(
         // Insert tags
         for tag in &input.tags {
             let new_tag = NewContentTag {
-                app_id: &ctx.app_id,
+                h_app_id: &ctx.h_app_id,
                 content_id: &input.id,
                 tag,
             };
@@ -302,7 +302,7 @@ pub fn create_content(
 
         // Return created content with tags
         let content = content::table
-            .filter(content::app_id.eq(&ctx.app_id))
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
             .filter(content::id.eq(&input.id))
             .first(conn)
             .map_err(|e| StorageError::Internal(format!("Fetch failed: {}", e)))?;
@@ -328,7 +328,7 @@ pub fn bulk_create_content(
         for input in items {
             // Check if exists
             let exists: bool = content::table
-                .filter(content::app_id.eq(&ctx.app_id))
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(&input.id))
                 .select(diesel::dsl::count_star())
                 .first::<i64>(conn)
@@ -343,7 +343,7 @@ pub fn bulk_create_content(
             // Insert content
             let new_content = NewContent {
                 id: &input.id,
-                app_id: &ctx.app_id,
+                h_app_id: &ctx.h_app_id,
                 title: &input.title,
                 description: input.description.as_deref(),
                 content_type: &input.content_type,
@@ -365,7 +365,7 @@ pub fn bulk_create_content(
                     // Insert tags
                     for tag in &input.tags {
                         let new_tag = NewContentTag {
-                            app_id: &ctx.app_id,
+                            h_app_id: &ctx.h_app_id,
                             content_id: &input.id,
                             tag,
                         };
@@ -431,7 +431,7 @@ pub fn update_content(
     conn.transaction(|conn| {
         diesel::update(
             content::table
-                .filter(content::app_id.eq(&ctx.app_id))
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id)),
         )
         .set((
@@ -450,7 +450,7 @@ pub fn update_content(
         if let Some(ref new_tags) = input.tags {
             diesel::delete(
                 content_tags::table
-                    .filter(content_tags::app_id.eq(&ctx.app_id))
+                    .filter(content_tags::h_app_id.eq(&ctx.h_app_id))
                     .filter(content_tags::content_id.eq(id)),
             )
             .execute(conn)
@@ -458,7 +458,7 @@ pub fn update_content(
 
             for tag in new_tags {
                 let new_tag = NewContentTag {
-                    app_id: &ctx.app_id,
+                    h_app_id: &ctx.h_app_id,
                     content_id: id,
                     tag,
                 };
@@ -483,7 +483,7 @@ pub fn delete_content(
 ) -> Result<bool, StorageError> {
     let deleted = diesel::delete(
         content::table
-            .filter(content::app_id.eq(&ctx.app_id))
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
             .filter(content::id.eq(content_id)),
     )
     .execute(conn)
@@ -517,7 +517,7 @@ pub fn get_content_by_tag(
 /// Get content count for an app
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
-        .filter(content::app_id.eq(&ctx.app_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -527,7 +527,7 @@ pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i6
 #[allow(deprecated)]
 pub fn tag_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content_tags::table
-        .filter(content_tags::app_id.eq(&ctx.app_id))
+        .filter(content_tags::h_app_id.eq(&ctx.h_app_id))
         .select(diesel::dsl::count_distinct(content_tags::tag))
         .first(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -548,7 +548,7 @@ mod tests {
             r#"
             CREATE TABLE content (
                 id TEXT PRIMARY KEY NOT NULL,
-                app_id TEXT NOT NULL DEFAULT 'lamad',
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
                 title TEXT NOT NULL,
                 description TEXT,
                 content_type TEXT NOT NULL DEFAULT 'concept',
@@ -574,10 +574,10 @@ mod tests {
         diesel::sql_query(
             r#"
             CREATE TABLE content_tags (
-                app_id TEXT NOT NULL DEFAULT 'lamad',
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
                 content_id TEXT NOT NULL,
                 tag TEXT NOT NULL,
-                PRIMARY KEY (app_id, content_id, tag)
+                PRIMARY KEY (h_app_id, content_id, tag)
             )
             "#,
         )

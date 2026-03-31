@@ -53,7 +53,7 @@ pub fn get_hazard_by_id(
 ) -> Result<Hazard, StorageError> {
     hazards::table
         .filter(hazards::id.eq(id))
-        .filter(hazards::app_id.eq(ctx.app_id()))
+        .filter(hazards::h_app_id.eq(ctx.h_app_id()))
         .first(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
@@ -70,7 +70,7 @@ pub fn list_hazards(
     query: &HazardQuery,
 ) -> Result<Vec<Hazard>, StorageError> {
     let mut q = hazards::table
-        .filter(hazards::app_id.eq(ctx.app_id()))
+        .filter(hazards::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(ref place_id) = query.place_id {
@@ -98,7 +98,7 @@ pub fn list_active_hazards_for_place(
     place_id: &str,
 ) -> Result<Vec<Hazard>, StorageError> {
     hazards::table
-        .filter(hazards::app_id.eq(ctx.app_id()))
+        .filter(hazards::h_app_id.eq(ctx.h_app_id()))
         .filter(hazards::place_id.eq(place_id))
         .filter(
             hazards::status
@@ -122,7 +122,7 @@ pub fn list_hazards_for_places(
     }
 
     hazards::table
-        .filter(hazards::app_id.eq(ctx.app_id()))
+        .filter(hazards::h_app_id.eq(ctx.h_app_id()))
         .filter(hazards::place_id.eq_any(place_ids))
         .filter(
             hazards::status
@@ -147,7 +147,7 @@ pub fn update_hazard_status(
     diesel::update(
         hazards::table
             .filter(hazards::id.eq(id))
-            .filter(hazards::app_id.eq(ctx.app_id())),
+            .filter(hazards::h_app_id.eq(ctx.h_app_id())),
     )
     .set((
         hazards::status.eq(new_status),

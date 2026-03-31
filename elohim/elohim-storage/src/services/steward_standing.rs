@@ -52,7 +52,7 @@ mod tests {
     fn make_allocation(governance_state: &str, recognition: f32) -> StewardshipAllocation {
         StewardshipAllocation {
             id: "test-id".to_string(),
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             content_id: "content-1".to_string(),
             steward_presence_id: "presence-1".to_string(),
             allocation_ratio: 1.0,

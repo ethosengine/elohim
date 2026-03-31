@@ -139,7 +139,7 @@ pub fn create_schedule(
 
     let new = NewSchedule {
         id: id.clone(),
-        app_id: ctx.app_id().to_string(),
+        h_app_id: ctx.h_app_id().to_string(),
         entity_type: input.entity_type,
         entity_id: input.entity_id,
         scheduled_at: input.scheduled_at,
@@ -178,7 +178,7 @@ pub fn get_schedule(
     entity_id: &str,
 ) -> Result<Schedule, StorageError> {
     schedules::table
-        .filter(schedules::app_id.eq(ctx.app_id()))
+        .filter(schedules::h_app_id.eq(ctx.h_app_id()))
         .filter(schedules::entity_type.eq(entity_type))
         .filter(schedules::entity_id.eq(entity_id))
         .first(conn)
@@ -199,7 +199,7 @@ pub fn get_schedule_by_id(
 ) -> Result<Schedule, StorageError> {
     schedules::table
         .filter(schedules::id.eq(id))
-        .filter(schedules::app_id.eq(ctx.app_id()))
+        .filter(schedules::h_app_id.eq(ctx.h_app_id()))
         .first(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
@@ -216,7 +216,7 @@ pub fn list_schedules(
     query: &ScheduleQuery,
 ) -> Result<Vec<Schedule>, StorageError> {
     let mut q = schedules::table
-        .filter(schedules::app_id.eq(ctx.app_id()))
+        .filter(schedules::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(ref entity_type) = query.entity_type {

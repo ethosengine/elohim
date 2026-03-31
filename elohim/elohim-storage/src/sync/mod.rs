@@ -52,10 +52,10 @@ impl SyncManager {
     /// Get or create a document
     pub async fn get_or_create_doc(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
     ) -> Result<Automerge, StorageError> {
-        match self.doc_store.get(app_id, doc_id).await? {
+        match self.doc_store.get(h_app_id, doc_id).await? {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
                     .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
@@ -63,7 +63,7 @@ impl SyncManager {
             }
             None => {
                 let doc = Automerge::new();
-                self.doc_store.save(app_id, doc_id, &doc).await?;
+                self.doc_store.save(h_app_id, doc_id, &doc).await?;
                 Ok(doc)
             }
         }
@@ -72,11 +72,11 @@ impl SyncManager {
     /// Apply changes from a peer
     pub async fn apply_changes(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         changes: Vec<Vec<u8>>,
     ) -> Result<Vec<String>, StorageError> {
-        let mut doc = self.get_or_create_doc(app_id, doc_id).await?;
+        let mut doc = self.get_or_create_doc(h_app_id, doc_id).await?;
 
         // Apply each change blob incrementally
         for change_bytes in changes {
@@ -85,23 +85,23 @@ impl SyncManager {
         }
 
         // Save updated document
-        self.doc_store.save(app_id, doc_id, &doc).await?;
+        self.doc_store.save(h_app_id, doc_id, &doc).await?;
 
         // Return new heads
         let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
 
-        debug!(app_id = %app_id, doc_id = %doc_id, heads = ?heads, "Applied changes, new heads");
+        debug!(h_app_id = %h_app_id, doc_id = %doc_id, heads = ?heads, "Applied changes, new heads");
         Ok(heads)
     }
 
     /// Get changes since given heads
     pub async fn get_changes_since(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         have_heads: &[String],
     ) -> Result<(Vec<Vec<u8>>, Vec<String>), StorageError> {
-        let doc = match self.doc_store.get(app_id, doc_id).await? {
+        let doc = match self.doc_store.get(h_app_id, doc_id).await? {
             Some(stored) => Automerge::load(&stored.data)
                 .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?,
             None => return Ok((vec![], vec![])),
@@ -140,8 +140,8 @@ impl SyncManager {
     }
 
     /// Get current heads for a document
-    pub async fn get_heads(&self, app_id: &str, doc_id: &str) -> Result<Vec<String>, StorageError> {
-        match self.doc_store.get(app_id, doc_id).await? {
+    pub async fn get_heads(&self, h_app_id: &str, doc_id: &str) -> Result<Vec<String>, StorageError> {
+        match self.doc_store.get(h_app_id, doc_id).await? {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
                     .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
@@ -155,16 +155,16 @@ impl SyncManager {
     /// List documents for an app
     pub async fn list_documents(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         prefix: Option<&str>,
         offset: u32,
         limit: u32,
     ) -> Result<(Vec<StoredDocument>, u64), StorageError> {
-        self.doc_store.list(app_id, prefix, offset, limit).await
+        self.doc_store.list(h_app_id, prefix, offset, limit).await
     }
 
     /// Get document count for an app
-    pub async fn count_documents(&self, app_id: &str) -> Result<u64, StorageError> {
-        self.doc_store.count(app_id).await
+    pub async fn count_documents(&self, h_app_id: &str) -> Result<u64, StorageError> {
+        self.doc_store.count(h_app_id).await
     }
 }

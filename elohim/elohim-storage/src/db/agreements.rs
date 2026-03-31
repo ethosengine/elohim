@@ -53,7 +53,7 @@ pub fn get_agreement(
     id: &str,
 ) -> Result<Option<AgreementRow>, StorageError> {
     agreements::table
-        .filter(agreements::app_id.eq(&ctx.app_id))
+        .filter(agreements::h_app_id.eq(&ctx.h_app_id))
         .filter(agreements::id.eq(id))
         .first(conn)
         .optional()
@@ -67,7 +67,7 @@ pub fn list_agreements(
     query: &AgreementQuery,
 ) -> Result<Vec<AgreementRow>, StorageError> {
     let mut base_query = agreements::table
-        .filter(agreements::app_id.eq(&ctx.app_id))
+        .filter(agreements::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     if let Some(ref name) = query.name {
@@ -96,7 +96,7 @@ pub fn create_agreement(
 
     let new = NewAgreement {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         name: input.name.as_deref(),
         note: input.note.as_deref(),
         dht_anchor_hash: None,
@@ -128,7 +128,7 @@ pub fn upsert_agreement(
         // Update dht_anchor_hash (and optionally name/note/metadata)
         diesel::update(
             agreements::table
-                .filter(agreements::app_id.eq(&ctx.app_id))
+                .filter(agreements::h_app_id.eq(&ctx.h_app_id))
                 .filter(agreements::id.eq(&id)),
         )
         .set((
@@ -142,7 +142,7 @@ pub fn upsert_agreement(
     } else {
         let new = NewAgreement {
             id: &id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             name: input.name.as_deref(),
             note: input.note.as_deref(),
             dht_anchor_hash,

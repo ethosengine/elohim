@@ -27,7 +27,7 @@ pub struct CreateHumanInput {
     pub profile_reach: String,
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
-    pub app_id: String,
+    pub h_app_id: String,
 }
 
 /// Input for updating mutable profile fields (all optional)
@@ -68,7 +68,7 @@ pub fn create_human(
         profile_reach: input.profile_reach,
         location: input.location,
         profile_photo_url: input.profile_photo_url,
-        app_id: input.app_id,
+        h_app_id: input.h_app_id,
     };
 
     diesel::insert_into(humans::table)
@@ -107,11 +107,11 @@ pub fn get_human_by_agent_key(
 /// List all humans for a given app, ordered by display name.
 pub fn list_humans(
     conn: &mut SqliteConnection,
-    app_id: &str,
+    h_app_id: &str,
 ) -> Result<Vec<Human>, diesel::result::Error> {
     use crate::db::diesel_schema::humans::dsl;
     dsl::humans
-        .filter(dsl::app_id.eq(app_id))
+        .filter(dsl::h_app_id.eq(h_app_id))
         .order(dsl::display_name.asc())
         .load::<Human>(conn)
 }

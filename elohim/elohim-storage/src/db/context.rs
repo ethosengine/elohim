@@ -1,20 +1,20 @@
 //! App context for multi-tenant database operations
 //!
-//! All database operations are scoped by app_id to enable multiple apps
+//! All database operations are scoped by h_app_id to enable multiple apps
 //! to store content in the same database without interference.
 
 /// App context passed to all database operations for multi-tenant isolation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AppContext {
-    /// Application identifier for scoping database operations
-    pub app_id: String,
+    /// Holochain application identifier for scoping database operations
+    pub h_app_id: String,
 }
 
 impl AppContext {
-    /// Create a new app context with the specified app ID
-    pub fn new(app_id: impl Into<String>) -> Self {
+    /// Create a new app context with the specified Holochain app ID
+    pub fn new(h_app_id: impl Into<String>) -> Self {
         Self {
-            app_id: app_id.into(),
+            h_app_id: h_app_id.into(),
         }
     }
 
@@ -28,9 +28,9 @@ impl AppContext {
         Self::new("elohim")
     }
 
-    /// Get the app_id as a string reference
-    pub fn app_id(&self) -> &str {
-        &self.app_id
+    /// Get the h_app_id as a string reference
+    pub fn h_app_id(&self) -> &str {
+        &self.h_app_id
     }
 }
 
@@ -43,7 +43,7 @@ impl Default for AppContext {
 
 impl std::fmt::Display for AppContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AppContext({})", self.app_id)
+        write!(f, "AppContext({})", self.h_app_id)
     }
 }
 
@@ -53,14 +53,14 @@ mod tests {
 
     #[test]
     fn test_default_contexts() {
-        assert_eq!(AppContext::default_lamad().app_id, "lamad");
-        assert_eq!(AppContext::default_elohim().app_id, "elohim");
-        assert_eq!(AppContext::default().app_id, "lamad");
+        assert_eq!(AppContext::default_lamad().h_app_id, "lamad");
+        assert_eq!(AppContext::default_elohim().h_app_id, "elohim");
+        assert_eq!(AppContext::default().h_app_id, "lamad");
     }
 
     #[test]
     fn test_custom_context() {
         let ctx = AppContext::new("calendar");
-        assert_eq!(ctx.app_id, "calendar");
+        assert_eq!(ctx.h_app_id, "calendar");
     }
 }

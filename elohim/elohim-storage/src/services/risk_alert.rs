@@ -43,7 +43,7 @@ pub fn evaluate_and_generate_alerts(
             let id = Uuid::new_v4().to_string();
             let alert = NewRiskAlert {
                 id: id.clone(),
-                app_id: ctx.app_id().to_string(),
+                h_app_id: ctx.h_app_id().to_string(),
                 place_id: place_id.to_string(),
                 alert_type: "capacity-threshold".to_string(),
                 severity: "critical".to_string(),
@@ -88,7 +88,7 @@ pub fn evaluate_and_generate_alerts(
                     let id = Uuid::new_v4().to_string();
                     let alert = NewRiskAlert {
                         id: id.clone(),
-                        app_id: ctx.app_id().to_string(),
+                        h_app_id: ctx.h_app_id().to_string(),
                         place_id: place_id.to_string(),
                         alert_type: "hazard-approaching".to_string(),
                         severity,
@@ -134,7 +134,7 @@ pub fn evaluate_and_generate_alerts(
             let id = Uuid::new_v4().to_string();
             let alert = NewRiskAlert {
                 id: id.clone(),
-                app_id: ctx.app_id().to_string(),
+                h_app_id: ctx.h_app_id().to_string(),
                 place_id: place_id.to_string(),
                 alert_type: "vulnerability-critical".to_string(),
                 severity: "critical".to_string(),
@@ -176,7 +176,7 @@ pub fn evaluate_and_generate_alerts(
             let id = Uuid::new_v4().to_string();
             let alert = NewRiskAlert {
                 id: id.clone(),
-                app_id: ctx.app_id().to_string(),
+                h_app_id: ctx.h_app_id().to_string(),
                 place_id: place_id.to_string(),
                 alert_type: "multi-hazard-overlap".to_string(),
                 severity: "warning".to_string(),
@@ -213,7 +213,7 @@ pub fn evaluate_and_generate_alerts(
             let id = Uuid::new_v4().to_string();
             let alert = NewRiskAlert {
                 id: id.clone(),
-                app_id: ctx.app_id().to_string(),
+                h_app_id: ctx.h_app_id().to_string(),
                 place_id: place_id.to_string(),
                 alert_type: "weather-severe".to_string(),
                 severity: "warning".to_string(),

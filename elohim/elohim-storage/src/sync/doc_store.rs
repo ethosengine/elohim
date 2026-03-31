@@ -34,7 +34,7 @@ impl Default for DocStoreConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredDocument {
     /// Application namespace (e.g., "lamad", "calendar")
-    pub app_id: String,
+    pub h_app_id: String,
     /// Document ID
     pub doc_id: String,
     /// Document type (e.g., "graph", "path", "personal")
@@ -116,10 +116,10 @@ impl DocStore {
 
     /// Save an Automerge document
     ///
-    /// Documents are stored with composite keys: `{app_id}:{doc_id}`
+    /// Documents are stored with composite keys: `{h_app_id}:{doc_id}`
     pub async fn save(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         doc: &Automerge,
     ) -> Result<(), StorageError> {
@@ -128,7 +128,7 @@ impl DocStore {
         let change_count = doc.get_changes(&[]).len() as u64;
 
         let stored = StoredDocument {
-            app_id: app_id.to_string(),
+            h_app_id: h_app_id.to_string(),
             doc_id: doc_id.to_string(),
             doc_type: self.infer_doc_type(doc_id),
             data,
@@ -143,29 +143,29 @@ impl DocStore {
         let bytes =
             rmp_serde::to_vec(&stored).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // Composite key: app_id:doc_id
-        let storage_key = format!("{}:{}", app_id, doc_id);
+        // Composite key: h_app_id:doc_id
+        let storage_key = format!("{}:{}", h_app_id, doc_id);
         self.docs
             .insert(storage_key.as_bytes(), bytes)
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        // Update metadata index: app_id:doc_type:doc_id -> storage_key
-        let meta_key = format!("{}:{}:{}", app_id, stored.doc_type, doc_id);
+        // Update metadata index: h_app_id:doc_type:doc_id -> storage_key
+        let meta_key = format!("{}:{}:{}", h_app_id, stored.doc_type, doc_id);
         self.meta
             .insert(meta_key.as_bytes(), storage_key.as_bytes())
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        debug!(app_id = %app_id, doc_id = %doc_id, change_count = change_count, "Document saved");
+        debug!(h_app_id = %h_app_id, doc_id = %doc_id, change_count = change_count, "Document saved");
         Ok(())
     }
 
     /// Get a stored document
     pub async fn get(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
     ) -> Result<Option<StoredDocument>, StorageError> {
-        let storage_key = format!("{}:{}", app_id, doc_id);
+        let storage_key = format!("{}:{}", h_app_id, doc_id);
         match self.docs.get(storage_key.as_bytes()) {
             Ok(Some(bytes)) => {
                 let stored: StoredDocument = rmp_serde::from_slice(&bytes)
@@ -191,12 +191,12 @@ impl DocStore {
     }
 
     /// Delete a document
-    pub async fn delete(&self, app_id: &str, doc_id: &str) -> Result<bool, StorageError> {
-        let storage_key = format!("{}:{}", app_id, doc_id);
+    pub async fn delete(&self, h_app_id: &str, doc_id: &str) -> Result<bool, StorageError> {
+        let storage_key = format!("{}:{}", h_app_id, doc_id);
 
         // Get doc to find its type for metadata cleanup
-        if let Some(stored) = self.get(app_id, doc_id).await? {
-            let meta_key = format!("{}:{}:{}", app_id, stored.doc_type, doc_id);
+        if let Some(stored) = self.get(h_app_id, doc_id).await? {
+            let meta_key = format!("{}:{}:{}", h_app_id, stored.doc_type, doc_id);
             self.meta
                 .remove(meta_key.as_bytes())
                 .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -209,15 +209,15 @@ impl DocStore {
             .is_some();
 
         if existed {
-            debug!(app_id = %app_id, doc_id = %doc_id, "Document deleted");
+            debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Document deleted");
         }
 
         Ok(existed)
     }
 
     /// Check if a document exists
-    pub async fn exists(&self, app_id: &str, doc_id: &str) -> Result<bool, StorageError> {
-        let storage_key = format!("{}:{}", app_id, doc_id);
+    pub async fn exists(&self, h_app_id: &str, doc_id: &str) -> Result<bool, StorageError> {
+        let storage_key = format!("{}:{}", h_app_id, doc_id);
         self.docs
             .contains_key(storage_key.as_bytes())
             .map_err(|e| StorageError::Database(e.to_string()))
@@ -225,11 +225,11 @@ impl DocStore {
 
     /// List documents with optional filtering and pagination
     ///
-    /// - `app_id`: Required application namespace
+    /// - `h_app_id`: Required application namespace
     /// - `prefix`: Optional filter by document type (e.g., "graph", "path")
     pub async fn list(
         &self,
-        app_id: &str,
+        h_app_id: &str,
         prefix: Option<&str>,
         offset: u32,
         limit: u32,
@@ -238,11 +238,11 @@ impl DocStore {
         let mut total = 0u64;
         let mut skipped = 0u32;
 
-        // Build scan prefix: app_id:type: or app_id:
+        // Build scan prefix: h_app_id:type: or h_app_id:
         let scan_prefix = if let Some(doc_type) = prefix {
-            format!("{}:{}:", app_id, doc_type)
+            format!("{}:{}:", h_app_id, doc_type)
         } else {
-            format!("{}:", app_id)
+            format!("{}:", h_app_id)
         };
 
         // Scan documents with prefix
@@ -275,8 +275,8 @@ impl DocStore {
     }
 
     /// Get document count for an app
-    pub async fn count(&self, app_id: &str) -> Result<u64, StorageError> {
-        let prefix = format!("{}:", app_id);
+    pub async fn count(&self, h_app_id: &str) -> Result<u64, StorageError> {
+        let prefix = format!("{}:", h_app_id);
         Ok(self.docs.scan_prefix(prefix.as_bytes()).count() as u64)
     }
 
@@ -332,12 +332,12 @@ mod tests {
         })
         .unwrap();
 
-        // Save with app_id
+        // Save with h_app_id
         store.save("lamad", "test-doc", &doc).await.unwrap();
 
         // Get
         let stored = store.get("lamad", "test-doc").await.unwrap().unwrap();
-        assert_eq!(stored.app_id, "lamad");
+        assert_eq!(stored.h_app_id, "lamad");
         assert_eq!(stored.doc_id, "test-doc");
         assert!(stored.change_count > 0);
 
@@ -386,19 +386,19 @@ mod tests {
 
         // Verify isolation - each app sees its own doc
         let stored1 = store.get("app1", "shared-doc").await.unwrap().unwrap();
-        assert_eq!(stored1.app_id, "app1");
+        assert_eq!(stored1.h_app_id, "app1");
 
         let stored2 = store.get("app2", "shared-doc").await.unwrap().unwrap();
-        assert_eq!(stored2.app_id, "app2");
+        assert_eq!(stored2.h_app_id, "app2");
 
         // Verify list isolation
         let (docs1, count1) = store.list("app1", None, 0, 10).await.unwrap();
         assert_eq!(count1, 1);
-        assert_eq!(docs1[0].app_id, "app1");
+        assert_eq!(docs1[0].h_app_id, "app1");
 
         let (docs2, count2) = store.list("app2", None, 0, 10).await.unwrap();
         assert_eq!(count2, 1);
-        assert_eq!(docs2[0].app_id, "app2");
+        assert_eq!(docs2[0].h_app_id, "app2");
 
         // Verify count isolation
         assert_eq!(store.count("app1").await.unwrap(), 1);

@@ -82,7 +82,7 @@ pub fn get_knowledge_map(
     id: &str,
 ) -> Result<Option<KnowledgeMap>, StorageError> {
     knowledge_maps::table
-        .filter(knowledge_maps::app_id.eq(&ctx.app_id))
+        .filter(knowledge_maps::h_app_id.eq(&ctx.h_app_id))
         .filter(knowledge_maps::id.eq(id))
         .first(conn)
         .optional()
@@ -96,7 +96,7 @@ pub fn list_knowledge_maps(
     query: &KnowledgeMapQuery,
 ) -> Result<Vec<KnowledgeMap>, StorageError> {
     let mut base_query = knowledge_maps::table
-        .filter(knowledge_maps::app_id.eq(&ctx.app_id))
+        .filter(knowledge_maps::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     if let Some(ref owner_id) = query.owner_id {
@@ -137,7 +137,7 @@ pub fn create_knowledge_map(
 
     let new_map = NewKnowledgeMap {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         map_type: &input.map_type,
         owner_id: &input.owner_id,
         title: &input.title,
@@ -176,7 +176,7 @@ pub fn update_knowledge_map(
 
     diesel::update(
         knowledge_maps::table
-            .filter(knowledge_maps::app_id.eq(&ctx.app_id))
+            .filter(knowledge_maps::h_app_id.eq(&ctx.h_app_id))
             .filter(knowledge_maps::id.eq(id)),
     )
     .set((
@@ -213,7 +213,7 @@ pub fn delete_knowledge_map(
 ) -> Result<bool, StorageError> {
     let deleted = diesel::delete(
         knowledge_maps::table
-            .filter(knowledge_maps::app_id.eq(&ctx.app_id))
+            .filter(knowledge_maps::h_app_id.eq(&ctx.h_app_id))
             .filter(knowledge_maps::id.eq(id)),
     )
     .execute(conn)
@@ -232,7 +232,7 @@ pub fn knowledge_map_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     knowledge_maps::table
-        .filter(knowledge_maps::app_id.eq(&ctx.app_id))
+        .filter(knowledge_maps::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -252,7 +252,7 @@ mod tests {
             r#"
             CREATE TABLE knowledge_maps (
                 id TEXT PRIMARY KEY NOT NULL,
-                app_id TEXT NOT NULL DEFAULT 'lamad',
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
                 map_type TEXT NOT NULL,
                 owner_id TEXT NOT NULL,
                 title TEXT NOT NULL,

@@ -166,13 +166,13 @@ pub async fn handle_api_request(
 
 /// Extract app context from request headers, defaulting to "lamad"
 fn extract_app_context(req: &Request<Incoming>) -> AppContext {
-    let app_id = req
+    let h_app_id = req
         .headers()
         .get("X-App-Id")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("lamad")
         .to_string();
-    AppContext { app_id }
+    AppContext { h_app_id }
 }
 
 /// Helper to get a Diesel connection from the pool
@@ -300,7 +300,7 @@ pub async fn evaluate_gate(
                         .map(|v| serde_json::to_string(v).unwrap_or_default());
                     let new_obs = crate::db::models::NewImagodeiObservation {
                         id: &obs_id,
-                        app_id: &ctx.app_id,
+                        h_app_id: &ctx.h_app_id,
                         human_id: hid,
                         observed_at: &now,
                         observation_type: &draft.observation_type,
@@ -334,7 +334,7 @@ pub async fn evaluate_gate(
                 let now = crate::db::models::current_timestamp();
                 let new_obs = crate::db::models::NewImagodeiObservation {
                     id: &obs_id,
-                    app_id: &ctx.app_id,
+                    h_app_id: &ctx.h_app_id,
                     human_id: hid,
                     observed_at: &now,
                     observation_type: "growth_signal",

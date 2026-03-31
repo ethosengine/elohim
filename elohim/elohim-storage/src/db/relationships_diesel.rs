@@ -97,7 +97,7 @@ pub fn get_relationship(
     id: &str,
 ) -> Result<Option<Relationship>, StorageError> {
     relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(relationships::id.eq(id))
         .first(conn)
         .optional()
@@ -111,7 +111,7 @@ pub fn list_relationships(
     query: &RelationshipQuery,
 ) -> Result<Vec<Relationship>, StorageError> {
     let mut base_query = relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Filter by content involvement
@@ -183,7 +183,7 @@ pub fn get_outgoing_relationships(
     relationship_types: Option<&[String]>,
 ) -> Result<Vec<Relationship>, StorageError> {
     let mut base_query = relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(relationships::source_id.eq(content_id))
         .into_boxed();
 
@@ -207,7 +207,7 @@ pub fn get_incoming_relationships(
     relationship_types: Option<&[String]>,
 ) -> Result<Vec<Relationship>, StorageError> {
     let mut base_query = relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(relationships::target_id.eq(content_id))
         .into_boxed();
 
@@ -237,7 +237,7 @@ pub fn create_relationship(
 
     let new_rel = NewRelationship {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         source_id: &input.source_id,
         target_id: &input.target_id,
         relationship_type: &input.relationship_type,
@@ -255,7 +255,7 @@ pub fn create_relationship(
     diesel::insert_into(relationships::table)
         .values(&new_rel)
         .on_conflict((
-            relationships::app_id,
+            relationships::h_app_id,
             relationships::source_id,
             relationships::target_id,
             relationships::relationship_type,
@@ -300,7 +300,7 @@ pub fn create_bidirectional(
         // Create forward relationship
         let forward_rel = NewRelationship {
             id: &forward_id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             source_id: &input.source_id,
             target_id: &input.target_id,
             relationship_type: &input.relationship_type,
@@ -322,7 +322,7 @@ pub fn create_bidirectional(
         // Create inverse relationship
         let inverse_rel = NewRelationship {
             id: &inverse_id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             source_id: &input.target_id, // Swapped
             target_id: &input.source_id, // Swapped
             relationship_type: inverse_type,
@@ -369,7 +369,7 @@ pub fn bulk_create_relationships(
 
             // Check if exists
             let exists: bool = relationships::table
-                .filter(relationships::app_id.eq(&ctx.app_id))
+                .filter(relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(relationships::source_id.eq(&input.source_id))
                 .filter(relationships::target_id.eq(&input.target_id))
                 .filter(relationships::relationship_type.eq(&input.relationship_type))
@@ -380,7 +380,7 @@ pub fn bulk_create_relationships(
 
             let new_rel = NewRelationship {
                 id: &id,
-                app_id: &ctx.app_id,
+                h_app_id: &ctx.h_app_id,
                 source_id: &input.source_id,
                 target_id: &input.target_id,
                 relationship_type: &input.relationship_type,
@@ -397,7 +397,7 @@ pub fn bulk_create_relationships(
             match diesel::insert_into(relationships::table)
                 .values(&new_rel)
                 .on_conflict((
-                    relationships::app_id,
+                    relationships::h_app_id,
                     relationships::source_id,
                     relationships::target_id,
                     relationships::relationship_type,
@@ -443,7 +443,7 @@ pub fn delete_relationship(
 
     let deleted = diesel::delete(
         relationships::table
-            .filter(relationships::app_id.eq(&ctx.app_id))
+            .filter(relationships::h_app_id.eq(&ctx.h_app_id))
             .filter(relationships::id.eq(id)),
     )
     .execute(conn)
@@ -454,7 +454,7 @@ pub fn delete_relationship(
         if let Some(inverse_id) = rel.inverse_relationship_id {
             let _ = diesel::delete(
                 relationships::table
-                    .filter(relationships::app_id.eq(&ctx.app_id))
+                    .filter(relationships::h_app_id.eq(&ctx.h_app_id))
                     .filter(relationships::id.eq(&inverse_id)),
             )
             .execute(conn);
@@ -472,7 +472,7 @@ pub fn delete_relationships_for_content(
 ) -> Result<usize, StorageError> {
     let deleted = diesel::delete(
         relationships::table
-            .filter(relationships::app_id.eq(&ctx.app_id))
+            .filter(relationships::h_app_id.eq(&ctx.h_app_id))
             .filter(
                 relationships::source_id
                     .eq(content_id)
@@ -495,7 +495,7 @@ pub fn relationship_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -507,7 +507,7 @@ pub fn relationship_stats_by_type(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .group_by(relationships::relationship_type)
         .select((relationships::relationship_type, diesel::dsl::count_star()))
         .load(conn)
@@ -520,7 +520,7 @@ pub fn relationship_stats_by_source(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     relationships::table
-        .filter(relationships::app_id.eq(&ctx.app_id))
+        .filter(relationships::h_app_id.eq(&ctx.h_app_id))
         .group_by(relationships::inference_source)
         .select((relationships::inference_source, diesel::dsl::count_star()))
         .load(conn)
@@ -541,7 +541,7 @@ mod tests {
             r#"
             CREATE TABLE relationships (
                 id TEXT PRIMARY KEY NOT NULL,
-                app_id TEXT NOT NULL DEFAULT 'lamad',
+                h_app_id TEXT NOT NULL DEFAULT 'lamad',
                 source_id TEXT NOT NULL,
                 target_id TEXT NOT NULL,
                 relationship_type TEXT NOT NULL,
@@ -563,7 +563,7 @@ mod tests {
         .expect("Failed to create relationships table");
 
         diesel::sql_query(
-            "CREATE UNIQUE INDEX idx_rel_unique ON relationships(app_id, source_id, target_id, relationship_type)"
+            "CREATE UNIQUE INDEX idx_rel_unique ON relationships(h_app_id, source_id, target_id, relationship_type)"
         )
         .execute(&mut conn)
         .expect("Failed to create unique index");

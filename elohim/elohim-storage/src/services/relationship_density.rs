@@ -56,7 +56,7 @@ mod tests {
     ) -> HumanRelationship {
         HumanRelationship {
             id: "test-id".to_string(),
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             party_a_id: "human-a".to_string(),
             party_b_id: "human-b".to_string(),
             relationship_type: "peer".to_string(),

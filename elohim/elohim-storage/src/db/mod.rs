@@ -13,7 +13,7 @@
 //! ## Tables
 //!
 //! - `apps` - Registered apps for multi-tenancy
-//! - `content` - Content metadata (id, app_id, title, type, blob_hash)
+//! - `content` - Content metadata (id, h_app_id, title, type, blob_hash)
 //! - `content_tags` - Tag index for fast lookup
 
 // Diesel modules with app scoping
@@ -142,10 +142,10 @@ pub struct AppScopedDb {
 
 impl AppScopedDb {
     /// Create a new app-scoped database handle
-    pub fn new(pool: DbPool, app_id: impl Into<String>) -> Self {
+    pub fn new(pool: DbPool, h_app_id: impl Into<String>) -> Self {
         Self {
             pool,
-            ctx: AppContext::new(app_id),
+            ctx: AppContext::new(h_app_id),
         }
     }
 

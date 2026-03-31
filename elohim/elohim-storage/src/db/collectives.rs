@@ -108,7 +108,7 @@ pub fn get_collective(
     id: &str,
 ) -> Result<Option<Collective>, StorageError> {
     collectives::table
-        .filter(collectives::app_id.eq(&ctx.app_id))
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
         .filter(collectives::id.eq(id))
         .first(conn)
         .optional()
@@ -122,7 +122,7 @@ pub fn list_collectives(
     query: &CollectiveQuery,
 ) -> Result<Vec<Collective>, StorageError> {
     let mut base_query = collectives::table
-        .filter(collectives::app_id.eq(&ctx.app_id))
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     if let Some(ref layer) = query.governance_layer {
@@ -169,7 +169,7 @@ pub fn create_collective(
     if existing.is_some() {
         diesel::update(
             collectives::table
-                .filter(collectives::app_id.eq(&ctx.app_id))
+                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
                 .filter(collectives::id.eq(&input.id)),
         )
         .set((
@@ -185,7 +185,7 @@ pub fn create_collective(
     } else {
         let new = NewCollective {
             id: &input.id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             name: &input.name,
             description: input.description.as_deref(),
             governance_layer: &input.governance_layer,
@@ -213,7 +213,7 @@ pub fn dissolve_collective(
 ) -> Result<Collective, StorageError> {
     diesel::update(
         collectives::table
-            .filter(collectives::app_id.eq(&ctx.app_id))
+            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
             .filter(collectives::id.eq(id)),
     )
     .set((
@@ -238,7 +238,7 @@ pub fn get_participations_for_human(
     human_id: &str,
 ) -> Result<Vec<CollectiveParticipation>, StorageError> {
     collective_participations::table
-        .filter(collective_participations::app_id.eq(&ctx.app_id))
+        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
         .filter(collective_participations::human_id.eq(human_id))
         .filter(collective_participations::departed_at.is_null())
         .order(collective_participations::joined_at.desc())
@@ -253,7 +253,7 @@ pub fn get_participants_of_collective(
     collective_id: &str,
 ) -> Result<Vec<CollectiveParticipation>, StorageError> {
     collective_participations::table
-        .filter(collective_participations::app_id.eq(&ctx.app_id))
+        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
         .filter(collective_participations::collective_id.eq(collective_id))
         .filter(collective_participations::departed_at.is_null())
         .order(collective_participations::joined_at.asc())
@@ -286,7 +286,7 @@ pub fn create_participation(
 
     // Check if participation already exists (upsert for re-seeding)
     let existing: Option<CollectiveParticipation> = collective_participations::table
-        .filter(collective_participations::app_id.eq(&ctx.app_id))
+        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
         .filter(collective_participations::collective_id.eq(&input.collective_id))
         .filter(collective_participations::human_id.eq(&input.human_id))
         .first(conn)
@@ -321,7 +321,7 @@ pub fn create_participation(
 
     let new = NewCollectiveParticipation {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         collective_id: &input.collective_id,
         human_id: &input.human_id,
         intimacy_level: &input.intimacy_level,
@@ -361,7 +361,7 @@ pub fn update_participation_intimacy(
 
     diesel::update(
         collective_participations::table
-            .filter(collective_participations::app_id.eq(&ctx.app_id))
+            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
             .filter(collective_participations::id.eq(participation_id)),
     )
     .set((
@@ -390,7 +390,7 @@ pub fn depart_collective(
 ) -> Result<bool, StorageError> {
     let updated = diesel::update(
         collective_participations::table
-            .filter(collective_participations::app_id.eq(&ctx.app_id))
+            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
             .filter(collective_participations::collective_id.eq(collective_id))
             .filter(collective_participations::human_id.eq(human_id))
             .filter(collective_participations::departed_at.is_null()),
@@ -415,7 +415,7 @@ pub fn collective_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     collectives::table
-        .filter(collectives::app_id.eq(&ctx.app_id))
+        .filter(collectives::h_app_id.eq(&ctx.h_app_id))
         .filter(collectives::dissolved_at.is_null())
         .count()
         .get_result(conn)

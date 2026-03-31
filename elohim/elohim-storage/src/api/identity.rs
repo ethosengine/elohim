@@ -71,7 +71,7 @@ async fn register_human(
         profile_reach: body.profile_reach,
         location: body.location,
         profile_photo_url: body.profile_photo_url,
-        app_id: "imagodei".to_string(),
+        h_app_id: "imagodei".to_string(),
     };
 
     let mut conn = get_conn(pool)?;

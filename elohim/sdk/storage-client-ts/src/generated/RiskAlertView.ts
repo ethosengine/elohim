@@ -4,4 +4,4 @@ import type { JsonValue } from "./JsonValue";
 /**
  * View for a generated risk alert
  */
-export type RiskAlertView = { id: string, appId: string, placeId: string, alertType: string, severity: string, title: string, description: string, triggerHazardId: string | null, triggerData: JsonValue | null, triggeredAt: string, leadTimeHours: number | null, expiresAt: string | null, status: string, acknowledgedBy: string | null, acknowledgedAt: string | null, resolvedAt: string | null, escalatedTo: string | null, metadata: JsonValue | null, createdAt: string, updatedAt: string, };
+export type RiskAlertView = { id: string, hAppId: string, placeId: string, alertType: string, severity: string, title: string, description: string, triggerHazardId: string | null, triggerData: JsonValue | null, triggeredAt: string, leadTimeHours: number | null, expiresAt: string | null, status: string, acknowledgedBy: string | null, acknowledgedAt: string | null, resolvedAt: string | null, escalatedTo: string | null, metadata: JsonValue | null, createdAt: string, updatedAt: string, };

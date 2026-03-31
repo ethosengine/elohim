@@ -49,7 +49,7 @@ pub fn list_metrics(
     query: &CustodianMetricsQuery,
 ) -> Result<Vec<CustodianMetrics>, StorageError> {
     let mut q = custodian_metrics::table
-        .filter(custodian_metrics::app_id.eq(&ctx.app_id))
+        .filter(custodian_metrics::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     let limit = query.limit.unwrap_or(100);
@@ -71,7 +71,7 @@ pub fn get_metrics_by_id(
 ) -> Result<Option<CustodianMetrics>, StorageError> {
     custodian_metrics::table
         .filter(custodian_metrics::custodian_id.eq(custodian_id))
-        .filter(custodian_metrics::app_id.eq(&ctx.app_id))
+        .filter(custodian_metrics::h_app_id.eq(&ctx.h_app_id))
         .first::<CustodianMetrics>(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Failed to get custodian_metrics: {e}")))
@@ -88,7 +88,7 @@ pub fn list_unhealthy_metrics(
     ctx: &AppContext,
 ) -> Result<Vec<CustodianMetrics>, StorageError> {
     custodian_metrics::table
-        .filter(custodian_metrics::app_id.eq(&ctx.app_id))
+        .filter(custodian_metrics::h_app_id.eq(&ctx.h_app_id))
         .load::<CustodianMetrics>(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to list custodian_metrics: {e}")))
 }
@@ -103,6 +103,6 @@ pub fn upsert_metrics(
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to upsert custodian_metrics: {e}")))?;
 
-    get_metrics_by_id(conn, &input.custodian_id, &AppContext::new(&input.app_id))?
+    get_metrics_by_id(conn, &input.custodian_id, &AppContext::new(&input.h_app_id))?
         .ok_or_else(|| StorageError::Internal("Upserted row not found".into()))
 }

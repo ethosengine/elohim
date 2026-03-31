@@ -55,7 +55,7 @@ pub fn get_place_capacity(
     // Load place
     let capacity_json: String = places::table
         .filter(places::id.eq(place_id))
-        .filter(places::app_id.eq(ctx.app_id()))
+        .filter(places::h_app_id.eq(ctx.h_app_id()))
         .select(places::carrying_capacity_json)
         .first(conn)
         .map_err(|e| match e {
@@ -89,7 +89,7 @@ fn compute_current_usage(
     // Sum resource quantities for consume/use events at this location
     // that match the resource category (via resource_conforms_to)
     let total: Option<f32> = economic_events::table
-        .filter(economic_events::app_id.eq(ctx.app_id()))
+        .filter(economic_events::h_app_id.eq(ctx.h_app_id()))
         .filter(economic_events::at_location.eq(place_id))
         .filter(
             economic_events::action

@@ -693,7 +693,7 @@ mod tests {
     ) -> StewardshipAllocation {
         StewardshipAllocation {
             id: id.to_string(),
-            app_id: "test-app".to_string(),
+            h_app_id: "test-app".to_string(),
             content_id: "content-1".to_string(),
             steward_presence_id: steward_presence_id.to_string(),
             allocation_ratio: ratio,

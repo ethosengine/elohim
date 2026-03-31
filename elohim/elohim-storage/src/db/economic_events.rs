@@ -126,7 +126,7 @@ pub fn get_economic_event(
     id: &str,
 ) -> Result<Option<EconomicEvent>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .filter(economic_events::id.eq(id))
         .first(conn)
         .optional()
@@ -140,7 +140,7 @@ pub fn list_economic_events(
     query: &EconomicEventQuery,
 ) -> Result<Vec<EconomicEvent>, StorageError> {
     let mut base_query = economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Apply filters
@@ -200,7 +200,7 @@ pub fn get_events_for_agent(
     limit: i64,
 ) -> Result<Vec<EconomicEvent>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .filter(
             economic_events::provider
                 .eq(agent_id)
@@ -219,7 +219,7 @@ pub fn get_events_for_content(
     content_id: &str,
 ) -> Result<Vec<EconomicEvent>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .filter(economic_events::content_id.eq(content_id))
         .order(economic_events::has_point_in_time.desc())
         .load(conn)
@@ -233,7 +233,7 @@ pub fn get_events_for_presence(
     presence_id: &str,
 ) -> Result<Vec<EconomicEvent>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .filter(economic_events::contributor_presence_id.eq(presence_id))
         .order(economic_events::has_point_in_time.desc())
         .load(conn)
@@ -248,7 +248,7 @@ pub fn get_events_by_lamad_type(
     limit: i64,
 ) -> Result<Vec<EconomicEvent>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .filter(economic_events::lamad_event_type.eq(lamad_type))
         .order(economic_events::has_point_in_time.desc())
         .limit(limit)
@@ -305,7 +305,7 @@ pub fn record_event(
 
     let new_event = NewEconomicEvent {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         action: &input.action,
         provider: &input.provider,
         receiver: &input.receiver,
@@ -575,7 +575,7 @@ pub fn update_event_state(
 ) -> Result<EconomicEvent, StorageError> {
     diesel::update(
         economic_events::table
-            .filter(economic_events::app_id.eq(&ctx.app_id))
+            .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
             .filter(economic_events::id.eq(id)),
     )
     .set(economic_events::state.eq(new_state))
@@ -605,7 +605,7 @@ pub fn upsert_with_anchor(
         // Update dht_anchor_hash on existing record
         diesel::update(
             economic_events::table
-                .filter(economic_events::app_id.eq(&ctx.app_id))
+                .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
                 .filter(economic_events::id.eq(&id)),
         )
         .set(economic_events::dht_anchor_hash.eq(dht_anchor_hash))
@@ -629,7 +629,7 @@ pub fn upsert_with_anchor(
 
         let new_event = NewEconomicEvent {
             id: &id,
-            app_id: &ctx.app_id,
+            h_app_id: &ctx.h_app_id,
             action: &input.action,
             provider: &input.provider,
             receiver: &input.receiver,
@@ -673,7 +673,7 @@ pub fn upsert_with_anchor(
 /// Get economic event count for an app
 pub fn event_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -685,7 +685,7 @@ pub fn stats_by_action(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .group_by(economic_events::action)
         .select((economic_events::action, diesel::dsl::count_star()))
         .load(conn)
@@ -698,7 +698,7 @@ pub fn stats_by_lamad_type(
     ctx: &AppContext,
 ) -> Result<Vec<(Option<String>, i64)>, StorageError> {
     economic_events::table
-        .filter(economic_events::app_id.eq(&ctx.app_id))
+        .filter(economic_events::h_app_id.eq(&ctx.h_app_id))
         .group_by(economic_events::lamad_event_type)
         .select((economic_events::lamad_event_type, diesel::dsl::count_star()))
         .load(conn)

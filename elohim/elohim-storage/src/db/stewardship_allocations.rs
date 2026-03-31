@@ -114,7 +114,7 @@ pub fn create_allocation(
 
     let new_allocation = NewStewardshipAllocation {
         id: &id,
-        app_id: ctx.app_id(),
+        h_app_id: ctx.h_app_id(),
         content_id: &input.content_id,
         steward_presence_id: &input.steward_presence_id,
         allocation_ratio: input.allocation_ratio,
@@ -147,7 +147,7 @@ pub fn get_allocation_by_id(
 ) -> Result<StewardshipAllocation, StorageError> {
     stewardship_allocations::table
         .filter(stewardship_allocations::id.eq(id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .first::<StewardshipAllocation>(conn)
         .map_err(|e| match e {
             diesel::result::Error::NotFound => StorageError::NotFound(id.to_string()),
@@ -162,7 +162,7 @@ pub fn list_allocations(
     query: &AllocationQuery,
 ) -> Result<Vec<StewardshipAllocation>, StorageError> {
     let mut q = stewardship_allocations::table
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .into_boxed();
 
     if let Some(content_id) = &query.content_id {
@@ -251,7 +251,7 @@ pub fn get_content_stewardship(
 
     let presences: Vec<ContributorPresence> = contributor_presences::table
         .filter(contributor_presences::id.eq_any(&steward_ids))
-        .filter(contributor_presences::app_id.eq(ctx.app_id()))
+        .filter(contributor_presences::h_app_id.eq(ctx.h_app_id()))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to load presences: {}", e)))?;
 
@@ -303,7 +303,7 @@ pub fn update_allocation(
     // Build update query dynamically
     diesel::update(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .set((
             stewardship_allocations::updated_at.eq(&now),
             input
@@ -359,7 +359,7 @@ pub fn supersede_allocation(
 
     diesel::update(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .set((
             stewardship_allocations::governance_state.eq(allocation_governance_states::SUPERSEDED),
             stewardship_allocations::effective_until.eq(&now),
@@ -383,7 +383,7 @@ pub fn accumulate_recognition(
 
     diesel::update(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .set((
             stewardship_allocations::recognition_accumulated
                 .eq(stewardship_allocations::recognition_accumulated + recognition_amount),
@@ -409,7 +409,7 @@ pub fn file_dispute(
 
     diesel::update(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(allocation_id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .set((
             stewardship_allocations::governance_state.eq(allocation_governance_states::DISPUTED),
             stewardship_allocations::dispute_id.eq(dispute_id),
@@ -443,7 +443,7 @@ pub fn resolve_dispute(
 
     diesel::update(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(allocation_id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .set((
             stewardship_allocations::governance_state.eq(new_state),
             stewardship_allocations::elohim_ratified_at.eq(&now),
@@ -464,7 +464,7 @@ pub fn delete_allocation(
 ) -> Result<(), StorageError> {
     let deleted = diesel::delete(stewardship_allocations::table)
         .filter(stewardship_allocations::id.eq(id))
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to delete allocation: {}", e)))?;
 
@@ -483,7 +483,7 @@ pub fn count_by_state(
     use diesel::dsl::count_star;
 
     let results: Vec<(String, i64)> = stewardship_allocations::table
-        .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .group_by(stewardship_allocations::governance_state)
         .select((stewardship_allocations::governance_state, count_star()))
         .load(conn)

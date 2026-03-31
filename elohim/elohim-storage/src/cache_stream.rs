@@ -63,13 +63,13 @@ fn format_heartbeat() -> String {
 /// each cacheable item as an SSE event. The stream ends with a
 /// `cache.done` event containing item counts.
 #[allow(clippy::field_reassign_with_default)]
-pub fn create_cache_stream(pool: DbPool, app_id: &str) -> hyper::Response<SseBody> {
+pub fn create_cache_stream(pool: DbPool, h_app_id: &str) -> hyper::Response<SseBody> {
     let (tx, rx) = mpsc::channel::<Bytes>(64);
-    let app_id = app_id.to_string();
+    let h_app_id = h_app_id.to_string();
 
     // Spawn the DB reader task
     tokio::spawn(async move {
-        let ctx = AppContext::new(&app_id);
+        let ctx = AppContext::new(&h_app_id);
         let mut counts = StreamCounts::default();
 
         // Stream content (reach = 'commons') — paths are now content rows with contentType 'path'

@@ -477,7 +477,7 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             (Method::GET, "/api/v1/peers/delivery") => self.handle_delivery_peers().await,
 
-            // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+            // Sync API: /sync/v1/{h_app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
                     self.handle_sync_request(req, method, &path, sync_manager.clone())
@@ -1262,10 +1262,10 @@ impl HttpServer {
     /// Handle sync API requests
     ///
     /// Routes:
-    /// - GET /sync/v1/{app_id}/docs - List documents
-    /// - GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
-    /// - GET /sync/v1/{app_id}/docs/{doc_id}/changes?have={heads} - Get changes since heads
-    /// - POST /sync/v1/{app_id}/docs/{doc_id}/changes - Apply changes
+    /// - GET /sync/v1/{h_app_id}/docs - List documents
+    /// - GET /sync/v1/{h_app_id}/docs/{doc_id}/heads - Get document heads
+    /// - GET /sync/v1/{h_app_id}/docs/{doc_id}/changes?have={heads} - Get changes since heads
+    /// - POST /sync/v1/{h_app_id}/docs/{doc_id}/changes - Apply changes
     async fn handle_sync_request(
         &self,
         req: Request<Incoming>,
@@ -1273,46 +1273,46 @@ impl HttpServer {
         path: &str,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Parse path: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+        // Parse path: /sync/v1/{h_app_id}/docs[/{doc_id}[/heads|/changes]]
         let parts: Vec<&str> = path.trim_start_matches("/sync/v1/").split('/').collect();
 
         if parts.is_empty() || parts[0].is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .body(Full::new(Bytes::from(r#"{"error": "Missing h_app_id"}"#)))
                 .unwrap());
         }
 
-        let app_id = parts[0];
+        let h_app_id = parts[0];
 
-        // /sync/v1/{app_id}/docs
+        // /sync/v1/{h_app_id}/docs
         if parts.len() == 2 && parts[1] == "docs" {
             return self
-                .handle_sync_list_docs(method, app_id, &req, sync_manager)
+                .handle_sync_list_docs(method, h_app_id, &req, sync_manager)
                 .await;
         }
 
-        // /sync/v1/{app_id}/docs/{doc_id}
+        // /sync/v1/{h_app_id}/docs/{doc_id}
         if parts.len() == 3 && parts[1] == "docs" {
             let doc_id = parts[2];
             return self
-                .handle_sync_doc(method, app_id, doc_id, req, sync_manager)
+                .handle_sync_doc(method, h_app_id, doc_id, req, sync_manager)
                 .await;
         }
 
-        // /sync/v1/{app_id}/docs/{doc_id}/{action}
+        // /sync/v1/{h_app_id}/docs/{doc_id}/{action}
         if parts.len() == 4 && parts[1] == "docs" {
             let doc_id = parts[2];
             let action = parts[3];
 
             return match action {
                 "heads" => {
-                    self.handle_sync_heads(method, app_id, doc_id, sync_manager)
+                    self.handle_sync_heads(method, h_app_id, doc_id, sync_manager)
                         .await
                 }
                 "changes" => {
-                    self.handle_sync_changes(method, app_id, doc_id, req, sync_manager)
+                    self.handle_sync_changes(method, h_app_id, doc_id, req, sync_manager)
                         .await
                 }
                 _ => Ok(Response::builder()
@@ -1333,11 +1333,11 @@ impl HttpServer {
             .unwrap())
     }
 
-    /// GET /sync/v1/{app_id}/docs - List documents
+    /// GET /sync/v1/{h_app_id}/docs - List documents
     async fn handle_sync_list_docs(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         req: &Request<Incoming>,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -1367,7 +1367,7 @@ impl HttpServer {
             .unwrap_or(100);
 
         match sync_manager
-            .list_documents(app_id, prefix, offset, limit)
+            .list_documents(h_app_id, prefix, offset, limit)
             .await
         {
             Ok((docs, total)) => {
@@ -1385,7 +1385,7 @@ impl HttpServer {
                     .collect();
 
                 let body = serde_json::json!({
-                    "appId": app_id,
+                    "hAppId": h_app_id,
                     "documents": documents,
                     "total": total,
                     "offset": offset,
@@ -1399,7 +1399,7 @@ impl HttpServer {
                     .unwrap())
             }
             Err(e) => {
-                error!(app_id = %app_id, error = %e, "Failed to list documents");
+                error!(h_app_id = %h_app_id, error = %e, "Failed to list documents");
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1413,7 +1413,7 @@ impl HttpServer {
     async fn handle_sync_doc(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         _req: Request<Incoming>,
         sync_manager: Arc<SyncManager>,
@@ -1421,7 +1421,7 @@ impl HttpServer {
         match method {
             Method::GET => {
                 // Return document info
-                match sync_manager.get_heads(app_id, doc_id).await {
+                match sync_manager.get_heads(h_app_id, doc_id).await {
                     Ok(heads) => {
                         if heads.is_empty() {
                             return Ok(Response::builder()
@@ -1435,7 +1435,7 @@ impl HttpServer {
                         }
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "heads": heads,
                         });
@@ -1447,7 +1447,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get document");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get document");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1464,11 +1464,11 @@ impl HttpServer {
         }
     }
 
-    /// GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
+    /// GET /sync/v1/{h_app_id}/docs/{doc_id}/heads - Get document heads
     async fn handle_sync_heads(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         sync_manager: Arc<SyncManager>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -1480,10 +1480,10 @@ impl HttpServer {
                 .unwrap());
         }
 
-        match sync_manager.get_heads(app_id, doc_id).await {
+        match sync_manager.get_heads(h_app_id, doc_id).await {
             Ok(heads) => {
                 let body = serde_json::json!({
-                    "appId": app_id,
+                    "hAppId": h_app_id,
                     "docId": doc_id,
                     "heads": heads,
                 });
@@ -1495,7 +1495,7 @@ impl HttpServer {
                     .unwrap())
             }
             Err(e) => {
-                error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
+                error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1505,11 +1505,11 @@ impl HttpServer {
         }
     }
 
-    /// GET/POST /sync/v1/{app_id}/docs/{doc_id}/changes
+    /// GET/POST /sync/v1/{h_app_id}/docs/{doc_id}/changes
     async fn handle_sync_changes(
         &self,
         method: Method,
-        app_id: &str,
+        h_app_id: &str,
         doc_id: &str,
         req: Request<Incoming>,
         sync_manager: Arc<SyncManager>,
@@ -1530,7 +1530,7 @@ impl HttpServer {
                     .unwrap_or_default();
 
                 match sync_manager
-                    .get_changes_since(app_id, doc_id, &have_heads)
+                    .get_changes_since(h_app_id, doc_id, &have_heads)
                     .await
                 {
                     Ok((changes, new_heads)) => {
@@ -1546,7 +1546,7 @@ impl HttpServer {
                             .collect();
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "changes": changes_b64,
                             "newHeads": new_heads,
@@ -1559,7 +1559,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1601,12 +1601,12 @@ impl HttpServer {
                         .unwrap());
                 }
 
-                match sync_manager.apply_changes(app_id, doc_id, changes).await {
+                match sync_manager.apply_changes(h_app_id, doc_id, changes).await {
                     Ok(new_heads) => {
-                        info!(app_id = %app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
+                        info!(h_app_id = %h_app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
 
                         let body = serde_json::json!({
-                            "appId": app_id,
+                            "hAppId": h_app_id,
                             "docId": doc_id,
                             "newHeads": new_heads,
                         });
@@ -1618,7 +1618,7 @@ impl HttpServer {
                             .unwrap())
                     }
                     Err(e) => {
-                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to apply changes");
+                        error!(h_app_id = %h_app_id, doc_id = %doc_id, error = %e, "Failed to apply changes");
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
@@ -1659,7 +1659,7 @@ impl HttpServer {
     /// - DELETE /db/knowledge-maps/{id} - Delete knowledge map
     ///
     /// Extract app context from path, supporting both:
-    /// - New: /db/{app_id}/content/... -> AppContext(app_id)
+    /// - New: /db/{h_app_id}/content/... -> AppContext(h_app_id)
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
     fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
         // Check if path starts with a known resource type (legacy route)
@@ -1671,14 +1671,14 @@ impl HttpServer {
             }
         }
 
-        // New route: /db/{app_id}/...
+        // New route: /db/{h_app_id}/...
         if let Some(slash_pos) = sub_path.find('/') {
-            let app_id = &sub_path[..slash_pos];
+            let h_app_id = &sub_path[..slash_pos];
             let resource_path = &sub_path[slash_pos + 1..];
-            return (db::AppContext::new(app_id), resource_path);
+            return (db::AppContext::new(h_app_id), resource_path);
         }
 
-        // Just app_id with no resource (e.g., /db/lamad -> stats for that app)
+        // Just h_app_id with no resource (e.g., /db/lamad -> stats for that app)
         if !sub_path.is_empty() && !legacy_prefixes.contains(&sub_path) {
             return (db::AppContext::new(sub_path), "stats");
         }
@@ -1698,7 +1698,7 @@ impl HttpServer {
 
         // Extract app context (supports both legacy and new routes)
         let (app_ctx, resource_path) = Self::extract_app_context(sub_path);
-        debug!(app_id = %app_ctx.app_id, resource_path = %resource_path, "DB request routing");
+        debug!(h_app_id = %app_ctx.h_app_id, resource_path = %resource_path, "DB request routing");
 
         // Route to specific handlers (all use Diesel pool via self.get_conn())
         if resource_path == "stats" {
@@ -1982,7 +1982,7 @@ impl HttpServer {
             .db_pool
             .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
-        let scoped = db::AppScopedDb::new(pool.clone(), &app_ctx.app_id);
+        let scoped = db::AppScopedDb::new(pool.clone(), &app_ctx.h_app_id);
         Ok(response::from_result(scoped.stats()))
     }
 
@@ -4136,10 +4136,10 @@ impl HttpServer {
                     .to_bytes();
                 let input_view: CreateStewardedNodeInputView = serde_json::from_slice(&body)
                     .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
-                // Inject app_id from context
+                // Inject h_app_id from context
                 let mut input: crate::db::stewarded_nodes::CreateStewardedNodeInput =
                     input_view.into();
-                input.app_id = app_ctx.app_id.clone();
+                input.h_app_id = app_ctx.h_app_id.clone();
 
                 match crate::db::stewarded_nodes::create_stewarded_node(&mut conn, input) {
                     Ok(node) => {
@@ -4771,7 +4771,7 @@ impl HttpServer {
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let mut conn = self.get_diesel_conn()?;
 
-        match humans::list_humans(&mut conn, &ctx.app_id) {
+        match humans::list_humans(&mut conn, &ctx.h_app_id) {
             Ok(items) => {
                 let views: Vec<HumanView> = items.into_iter().map(HumanView::from).collect();
                 let body = serde_json::json!({
@@ -5033,7 +5033,7 @@ impl HttpServer {
             for assignment in &package.content {
                 let updated = diesel::update(
                     content::table
-                        .filter(content::app_id.eq(&ctx.app_id))
+                        .filter(content::h_app_id.eq(&ctx.h_app_id))
                         .filter(content::id.eq(&assignment.content_id)),
                 )
                 .set(content::reach.eq(&assignment.reach))
@@ -5120,7 +5120,7 @@ impl HttpServer {
                 use diesel::prelude::*;
 
                 let matching_content: Vec<String> = content::table
-                    .filter(content::app_id.eq(&ctx.app_id))
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
                     .filter(content::content_type.eq(&steward_seed.content_category))
                     .select(content::id)
                     .load(&mut *conn)
@@ -5258,7 +5258,7 @@ impl HttpServer {
 
             // Get all content in this app context — the reach field tells us the assignment
             let items: Vec<(String, String)> = content::table
-                .filter(content::app_id.eq(&ctx.app_id))
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .select((content::id, content::reach))
                 .load(&mut *conn)
                 .map_err(|e| StorageError::Internal(format!("Content query failed: {}", e)))?;

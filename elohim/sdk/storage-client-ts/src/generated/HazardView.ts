@@ -4,4 +4,4 @@ import type { JsonValue } from "./JsonValue";
 /**
  * View for a geospatial hazard event
  */
-export type HazardView = { id: string, appId: string, placeId: string, hazardType: string, severity: string, title: string, description: string, reportedAt: string, projectedOnset: string | null, projectedEnd: string | null, actualOnset: string | null, resolvedAt: string | null, affectedH3Cells: JsonValue, radiusKm: number | null, source: string, sourceReference: string | null, metadata: JsonValue | null, status: string, createdAt: string, updatedAt: string, };
+export type HazardView = { id: string, hAppId: string, placeId: string, hazardType: string, severity: string, title: string, description: string, reportedAt: string, projectedOnset: string | null, projectedEnd: string | null, actualOnset: string | null, resolvedAt: string | null, affectedH3Cells: JsonValue, radiusKm: number | null, source: string, sourceReference: string | null, metadata: JsonValue | null, status: string, createdAt: string, updatedAt: string, };

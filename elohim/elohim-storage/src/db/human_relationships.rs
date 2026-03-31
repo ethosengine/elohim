@@ -110,7 +110,7 @@ pub fn get_human_relationship(
     id: &str,
 ) -> Result<Option<HumanRelationship>, StorageError> {
     human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(human_relationships::id.eq(id))
         .first(conn)
         .optional()
@@ -124,7 +124,7 @@ pub fn list_human_relationships(
     query: &HumanRelationshipQuery,
 ) -> Result<Vec<HumanRelationship>, StorageError> {
     let mut base_query = human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .into_boxed();
 
     // Filter by party involvement
@@ -209,7 +209,7 @@ pub fn get_relationship_between(
     relationship_type: Option<&str>,
 ) -> Result<Vec<HumanRelationship>, StorageError> {
     let mut base_query = human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(
             (human_relationships::party_a_id
                 .eq(party_a_id)
@@ -236,7 +236,7 @@ pub fn get_trusted_contacts(
     human_id: &str,
 ) -> Result<Vec<HumanRelationship>, StorageError> {
     human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .filter(
             human_relationships::party_a_id
                 .eq(human_id)
@@ -276,7 +276,7 @@ pub fn create_human_relationship(
 
     let new_rel = NewHumanRelationship {
         id: &id,
-        app_id: &ctx.app_id,
+        h_app_id: &ctx.h_app_id,
         party_a_id: &input.party_a_id,
         party_b_id: &input.party_b_id,
         relationship_type: &input.relationship_type,
@@ -322,7 +322,7 @@ pub fn update_consent(
     if rel.party_a_id == party_id {
         diesel::update(
             human_relationships::table
-                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(human_relationships::id.eq(id)),
         )
         .set((
@@ -334,7 +334,7 @@ pub fn update_consent(
     } else if rel.party_b_id == party_id {
         diesel::update(
             human_relationships::table
-                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(human_relationships::id.eq(id)),
         )
         .set((
@@ -378,7 +378,7 @@ pub fn update_custody(
     if rel.party_a_id == party_id {
         diesel::update(
             human_relationships::table
-                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(human_relationships::id.eq(id)),
         )
         .set((
@@ -398,7 +398,7 @@ pub fn update_custody(
     } else if rel.party_b_id == party_id {
         diesel::update(
             human_relationships::table
-                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(human_relationships::id.eq(id)),
         )
         .set((
@@ -433,7 +433,7 @@ pub fn update_custody(
     {
         diesel::update(
             human_relationships::table
-                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
                 .filter(human_relationships::id.eq(id)),
         )
         .set(human_relationships::auto_custody_enabled.eq(1))
@@ -462,7 +462,7 @@ pub fn update_intimacy_level(
 
     diesel::update(
         human_relationships::table
-            .filter(human_relationships::app_id.eq(&ctx.app_id))
+            .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
             .filter(human_relationships::id.eq(id)),
     )
     .set((
@@ -484,7 +484,7 @@ pub fn verify_relationship(
 ) -> Result<HumanRelationship, StorageError> {
     diesel::update(
         human_relationships::table
-            .filter(human_relationships::app_id.eq(&ctx.app_id))
+            .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
             .filter(human_relationships::id.eq(id)),
     )
     .set((
@@ -506,7 +506,7 @@ pub fn delete_human_relationship(
 ) -> Result<bool, StorageError> {
     let deleted = diesel::delete(
         human_relationships::table
-            .filter(human_relationships::app_id.eq(&ctx.app_id))
+            .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
             .filter(human_relationships::id.eq(id)),
     )
     .execute(conn)
@@ -525,7 +525,7 @@ pub fn human_relationship_count(
     ctx: &AppContext,
 ) -> Result<i64, StorageError> {
     human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
@@ -537,7 +537,7 @@ pub fn stats_by_intimacy(
     ctx: &AppContext,
 ) -> Result<Vec<(String, i64)>, StorageError> {
     human_relationships::table
-        .filter(human_relationships::app_id.eq(&ctx.app_id))
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
         .group_by(human_relationships::intimacy_level)
         .select((
             human_relationships::intimacy_level,

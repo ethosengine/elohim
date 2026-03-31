@@ -58,7 +58,7 @@ mod tests {
     fn make_mastery(level: &str, freshness: f32) -> ContentMastery {
         ContentMastery {
             id: "test-id".to_string(),
-            app_id: "lamad".to_string(),
+            h_app_id: "lamad".to_string(),
             human_id: "human-1".to_string(),
             content_id: "content-1".to_string(),
             mastery_level: level.to_string(),

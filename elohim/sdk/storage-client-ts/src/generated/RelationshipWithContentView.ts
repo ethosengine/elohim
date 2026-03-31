@@ -2,7 +2,7 @@
 import type { ContentView } from "./ContentView";
 import type { JsonValue } from "./JsonValue";
 
-export type RelationshipWithContentView = { source: ContentView | null, target: ContentView | null, id: string, appId: string, sourceId: string, targetId: string, relationshipType: string, confidence: number, inferenceSource: string, isBidirectional: boolean, inverseRelationshipId: string | null, 
+export type RelationshipWithContentView = { source: ContentView | null, target: ContentView | null, id: string, hAppId: string, sourceId: string, targetId: string, relationshipType: string, confidence: number, inferenceSource: string, isBidirectional: boolean, inverseRelationshipId: string | null, 
 /**
  * Parsed provenance chain (was provenance_chain_json string in storage)
  */
