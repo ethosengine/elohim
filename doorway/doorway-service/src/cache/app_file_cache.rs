@@ -247,15 +247,14 @@ impl AppFileCacheService {
         let mut count = 0u32;
 
         while let Ok(Some(doc)) = cursor.try_next().await {
-            // Extract app_id and blob_hash from the data field
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let app_id = data
-                    .get_str("appId")
-                    .ok()
-                    .or_else(|| data.get_str("id").ok());
                 let blob_hash = data.get_str("blobHash").ok();
 
-                if let (Some(app_id), Some(blob_hash)) = (app_id, blob_hash) {
+                // The HTML5 app's appId lives inside contentBody (a JSON string),
+                // NOT in data.appId (which is the Holochain app context, e.g. "lamad").
+                let html5_app_id = extract_html5_app_id_from_data(data);
+
+                if let (Some(app_id), Some(blob_hash)) = (html5_app_id, blob_hash) {
                     if !app_id.is_empty() && !blob_hash.is_empty() {
                         index.insert(app_id.to_string(), blob_hash.to_string());
                         count += 1;
@@ -288,36 +287,39 @@ impl AppFileCacheService {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
 
+        // The HTML5 app's appId is inside contentBody (JSON string), not at
+        // data.appId (which is the Holochain app context). We can't query
+        // inside a JSON string with MongoDB, so scan all html5-app entries.
         let filter = doc! {
             "doc_type": "Content",
             "data.contentFormat": "html5-app",
-            "$or": [
-                { "data.appId": app_id },
-                { "data.id": app_id },
-            ],
             "metadata.is_deleted": { "$ne": true },
         };
 
-        match collection.find_one(filter).await {
-            Ok(Some(doc)) => {
-                if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
+        let mut cursor = match collection.find(filter).await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(app_id = %app_id, error = %e, "Failed to query for app blob hash");
+                return None;
+            }
+        };
+
+        while let Ok(Some(doc)) = cursor.try_next().await {
+            if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
+                let html5_app_id = extract_html5_app_id_from_data(data);
+                if html5_app_id.as_deref() == Some(app_id) {
                     if let Ok(blob_hash) = data.get_str("blobHash") {
                         if !blob_hash.is_empty() {
-                            // Update index
                             let mut index = self.app_index.write().await;
                             index.insert(app_id.to_string(), blob_hash.to_string());
                             return Some(blob_hash.to_string());
                         }
                     }
                 }
-                None
-            }
-            Ok(None) => None,
-            Err(e) => {
-                warn!(app_id = %app_id, error = %e, "Failed to resolve blob_hash for app");
-                None
             }
         }
+
+        None
     }
 
     /// Remove an app_id from the index so the next request re-resolves
@@ -402,12 +404,62 @@ fn extract_html5_app_id(doc: &crate::projection::document::ProjectedDocument) ->
         return None;
     }
 
-    // Prefer appId, fall back to id
-    data.get("appId")
+    // The HTML5 app's appId is inside contentBody (a JSON string containing
+    // {appId, entryPoint, fallbackUrl}). data.appId is the Holochain app
+    // context (e.g., "lamad"), NOT the HTML5 app identifier.
+    // TODO: disambiguate as hAppId (Holochain) vs appId (HTML5) in future sprint.
+    if let Some(content_body) = data.get("contentBody").and_then(|v| v.as_str()) {
+        if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
+            if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
+                if !app_id.is_empty() {
+                    return Some(app_id.to_string());
+                }
+            }
+        }
+    }
+
+    // Fallback: try contentBody as object (not string) — depends on projection format
+    if let Some(body) = data.get("contentBody") {
+        if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
+            if !app_id.is_empty() {
+                return Some(app_id.to_string());
+            }
+        }
+    }
+
+    // Last resort: use content id (e.g., "simulation-evolution-of-trust")
+    data.get("id")
         .and_then(|v| v.as_str())
-        .or_else(|| data.get("id").and_then(|v| v.as_str()))
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
+}
+
+/// Extract HTML5 app ID from a raw BSON data document.
+/// Same logic as `extract_html5_app_id` but for raw MongoDB documents
+/// used in the app index load and resolve paths.
+fn extract_html5_app_id_from_data(data: &bson::Document) -> Option<String> {
+    // Parse contentBody (JSON string or BSON object) for the HTML5 appId
+    if let Ok(content_body) = data.get_str("contentBody") {
+        if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
+            if let Some(app_id) = body.get("appId").and_then(|v| v.as_str()) {
+                if !app_id.is_empty() {
+                    return Some(app_id.to_string());
+                }
+            }
+        }
+    }
+
+    // Try contentBody as BSON document (not string)
+    if let Ok(body) = data.get_document("contentBody") {
+        if let Ok(app_id) = body.get_str("appId") {
+            if !app_id.is_empty() {
+                return Some(app_id.to_string());
+            }
+        }
+    }
+
+    // Last resort: content id
+    data.get_str("id").ok().map(|s| s.to_string())
 }
 
 /// Spawn a background task that watches the projection store's update channel
@@ -512,12 +564,15 @@ mod tests {
 
     #[test]
     fn test_extract_html5_app_id_with_app_id_field() {
+        // appId for HTML5 apps lives inside contentBody (JSON string),
+        // NOT at the top level of data (which is the Holochain app context)
         let doc = make_projected_doc(
             "Content",
             "content-quiz-1",
             serde_json::json!({
                 "contentFormat": "html5-app",
-                "appId": "quiz-1",
+                "appId": "lamad",  // Holochain app context — NOT the HTML5 app ID
+                "contentBody": "{\"appId\":\"quiz-1\",\"entryPoint\":\"index.html\"}",
                 "blobHash": "sha256-abc"
             }),
         );
