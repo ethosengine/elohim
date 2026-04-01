@@ -1,0 +1,15 @@
+{
+  "$id": "epr:schema:input:create-token-transfer",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateTokenTransferInput",
+  "description": "Input for creating a token transfer between agents.",
+  "type": "object",
+  "required": ["fromAgent", "toAgent", "amount"],
+  "properties": {
+    "fromAgent": { "type": "string" },
+    "toAgent": { "type": "string" },
+    "amount": { "type": "number", "exclusiveMinimum": 0 },
+    "governanceLayer": { "type": "string" },
+    "note": { "type": "string" }
+  }
+}

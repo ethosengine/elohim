@@ -1,0 +1,23 @@
+{
+  "$id": "epr:schema:object:token-mint-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TokenMintEvent",
+  "description": "Immutable record of elohim-token minting. Every mint is coupled to a witnessed REA economic event — there is no free-floating token creation.",
+  "type": "object",
+  "required": ["id", "amount", "provenanceEventId", "mintTier", "sourceEprId", "agentId"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique mint event ID" },
+    "amount": { "type": "number", "description": "Amount of elohim-token minted" },
+    "provenanceEventId": { "type": "string", "description": "ID of the REA economic event that triggered this mint" },
+    "mintTier": { "type": "string", "enum": ["micro", "discernment"], "description": "Whether this was a deterministic micro-mint or an elohim discernment mint" },
+    "sourceEprId": { "type": "string", "description": "Content ID of the EPR that this mint is coupled to" },
+    "agentId": { "type": "string", "description": "Agent receiving the minted tokens" },
+    "constitutionalContext": { "type": "string", "description": "Governance layer under which this mint occurred" },
+    "elohimAttestation": { "type": "string", "description": "Elohim attestation hash (Tier 2 discernment mints only)" },
+    "reasoningTrace": { "type": "string", "description": "Explainability trace (Tier 2 discernment mints only)" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/db/models.rs",
+    "type": "TokenMintEvent"
+  }
+}

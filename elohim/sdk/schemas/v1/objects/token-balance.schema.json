@@ -1,0 +1,21 @@
+{
+  "$id": "epr:schema:object:token-balance",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TokenBalance",
+  "description": "Current elohim-token balance for an agent within a governance layer.",
+  "type": "object",
+  "required": ["agentId", "balance", "governanceLayer"],
+  "properties": {
+    "agentId": { "type": "string" },
+    "balance": { "type": "number" },
+    "governanceLayer": { "type": "string" },
+    "totalMinted": { "type": "number", "description": "Lifetime minted for this agent" },
+    "totalTransferredIn": { "type": "number" },
+    "totalTransferredOut": { "type": "number" },
+    "lastActivityAt": { "type": "string", "format": "date-time" }
+  },
+  "_source": {
+    "file": "elohim/elohim-storage/src/db/models.rs",
+    "type": "TokenBalance"
+  }
+}
