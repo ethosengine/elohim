@@ -12,6 +12,7 @@ use crate::db::models::NewTokenTransfer;
 use crate::db::{token_balances, token_transfers};
 use crate::db::token_balances::CreditSource;
 use crate::error::StorageError;
+use crate::services::responsibility_demand_service::ResponsibilityDemandService;
 use crate::views::{TokenBalanceView, TokenTransferView};
 
 pub struct TokenLedgerService;
@@ -79,6 +80,11 @@ impl TokenLedgerService {
                 "cannot transfer to self".into(),
             ));
         }
+
+        // Check responsibility demand curve
+        ResponsibilityDemandService::check_transfer_allowed(
+            conn, ctx, from_agent, amount, governance_layer,
+        )?;
 
         token_balances::debit_balance(conn, ctx, from_agent, governance_layer, amount)?;
         token_balances::credit_balance(
