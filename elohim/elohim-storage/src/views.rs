@@ -93,7 +93,8 @@ use crate::db::models::{
     GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Precedent,
     PremiumGate, Proposal, ProposalOption, RankedVote, ReaCommitment, Relationship,
     RelationshipWithContent, Schedule, Statement, StatementVote, StewardCredential, StewardedNode,
-    StewardshipAllocation, StewardshipAllocationWithPresence, Vote,
+    StewardshipAllocation, StewardshipAllocationWithPresence, TokenBalance, TokenMintEvent,
+    TokenTransfer, Vote,
 };
 use crate::db::steward_operations::RevenueSummary;
 
@@ -1595,6 +1596,137 @@ impl From<CreateMasteryInputView> for CreateMasteryInput {
             content_version_at_mastery: v.content_version_at_mastery,
         }
     }
+}
+
+// ============================================================================
+// Token Views (Shefa economy — elohim-token sprint 1)
+// ============================================================================
+
+/// API view for a token mint event.
+/// Mirrors `TokenMintEvent` with camelCase fields for TypeScript clients.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TokenMintEventView {
+    pub id: String,
+    pub h_app_id: String,
+    pub amount: f32,
+    pub provenance_event_id: String,
+    pub mint_tier: String,
+    pub source_epr_id: String,
+    pub agent_id: String,
+    pub constitutional_context: Option<String>,
+    pub elohim_attestation: Option<String>,
+    pub reasoning_trace: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+}
+
+impl From<TokenMintEvent> for TokenMintEventView {
+    fn from(m: TokenMintEvent) -> Self {
+        Self {
+            id: m.id,
+            h_app_id: m.h_app_id,
+            amount: m.amount,
+            provenance_event_id: m.provenance_event_id,
+            mint_tier: m.mint_tier,
+            source_epr_id: m.source_epr_id,
+            agent_id: m.agent_id,
+            constitutional_context: m.constitutional_context,
+            elohim_attestation: m.elohim_attestation,
+            reasoning_trace: m.reasoning_trace,
+            dht_anchor_hash: m.dht_anchor_hash,
+            created_at: m.created_at,
+        }
+    }
+}
+
+/// API view for a token balance ledger entry.
+/// One row per agent per governance layer.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TokenBalanceView {
+    pub agent_id: String,
+    pub h_app_id: String,
+    pub governance_layer: String,
+    pub balance: f32,
+    pub total_minted: f32,
+    pub total_transferred_in: f32,
+    pub total_transferred_out: f32,
+    pub last_activity_at: String,
+    pub created_at: String,
+}
+
+impl From<TokenBalance> for TokenBalanceView {
+    fn from(b: TokenBalance) -> Self {
+        Self {
+            agent_id: b.agent_id,
+            h_app_id: b.h_app_id,
+            governance_layer: b.governance_layer,
+            balance: b.balance,
+            total_minted: b.total_minted,
+            total_transferred_in: b.total_transferred_in,
+            total_transferred_out: b.total_transferred_out,
+            last_activity_at: b.last_activity_at,
+            created_at: b.created_at,
+        }
+    }
+}
+
+/// API view for a token transfer event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TokenTransferView {
+    pub id: String,
+    pub h_app_id: String,
+    pub from_agent: String,
+    pub to_agent: String,
+    pub amount: f32,
+    pub governance_layer: String,
+    pub note: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+}
+
+impl From<TokenTransfer> for TokenTransferView {
+    fn from(t: TokenTransfer) -> Self {
+        Self {
+            id: t.id,
+            h_app_id: t.h_app_id,
+            from_agent: t.from_agent,
+            to_agent: t.to_agent,
+            amount: t.amount,
+            governance_layer: t.governance_layer,
+            note: t.note,
+            dht_anchor_hash: t.dht_anchor_hash,
+            created_at: t.created_at,
+        }
+    }
+}
+
+/// Input view for creating a token transfer — camelCase API boundary type.
+/// Accepted by HTTP handlers; converted to internal DB types by the service layer.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateTokenTransferInputView {
+    /// Optional client-supplied ID. If absent, the service generates a UUID.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub from_agent: String,
+    pub to_agent: String,
+    pub amount: f32,
+    /// Governance layer for this transfer (e.g. `"individual"`, `"household"`).
+    #[serde(default = "default_governance_layer")]
+    pub governance_layer: String,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+fn default_governance_layer() -> String {
+    "individual".to_string()
 }
 
 // ============================================================================
