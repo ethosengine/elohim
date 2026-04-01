@@ -43,6 +43,62 @@
         "stage": "Seed Database",
         "function": null
       }
+    },
+    "schema-validate": {
+      "description": "Validate seed data against protocol schemas",
+      "inputs": {
+        "sources": [
+          "genesis/seeds/**",
+          "elohim/sdk/schemas/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Schema Validate", "function": null }
+    },
+    "schema-codegen": {
+      "description": "Verify schema codegen is fresh",
+      "inputs": {
+        "sources": ["elohim/sdk/schemas/**"],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Schema Codegen", "function": null }
+    },
+    "constants-sync": {
+      "description": "Verify constants sync between schema enums, generated code, and seed data",
+      "inputs": {
+        "sources": [
+          "genesis/data/**",
+          "elohim/sdk/schemas/**/*enum*",
+          "**/generated/schema-enums*"
+        ],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Constants Sync", "function": null }
+    },
+    "lint-a2o": {
+      "description": "Lint and typecheck a2o E2E framework",
+      "inputs": {
+        "sources": ["genesis/a2o/**"],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Lint A2O", "function": null }
+    }
+  },
+  "gate": {
+    "projects": {
+      "genesis": { "dir": "genesis/seeder", "steps": ["validate-seeds", "seed-content"] },
+      "schema-validate": { "dir": ".", "steps": ["schema-validate"] },
+      "schema-codegen": { "dir": ".", "steps": ["schema-codegen"] },
+      "constants-sync": { "dir": ".", "steps": ["constants-sync"] },
+      "genesis-a2o": { "dir": "genesis/a2o", "steps": ["lint-a2o"] }
     }
   },
   "deployment": {}

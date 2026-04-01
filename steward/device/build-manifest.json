@@ -29,5 +29,10 @@
       }
     }
   },
+  "gate": {
+    "projects": {
+      "steward-node": { "dir": "steward/node" }
+    }
+  },
   "deployment": {}
 }

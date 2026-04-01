@@ -65,6 +65,12 @@
       }
     }
   },
+  "gate": {
+    "projects": {
+      "doorway": { "dir": "doorway/doorway-service", "steps": ["cargo-build-doorway"] },
+      "elohim-storage": { "dir": "elohim/elohim-storage", "steps": ["cargo-build-storage"] }
+    }
+  },
   "deployment": {
     "targets": {
       "alpha": { "healthCheck": "https://alpha-edge.elohim.host/health" },

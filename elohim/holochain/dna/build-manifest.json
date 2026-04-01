@@ -45,6 +45,30 @@
         "stage": "Build DNA",
         "function": null
       }
+    },
+    "schema-dna": {
+      "description": "Verify DNA constants match protocol schema enums",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/**",
+          "elohim/sdk/schemas/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Schema DNA Check",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "schema-dna": { "dir": ".", "steps": ["schema-dna"] }
     }
   },
   "deployment": {}

@@ -44,6 +44,28 @@
         "stage": "Build Image",
         "function": null
       }
+    },
+    "lint-library": {
+      "description": "Quality gate for elohim-library (lint + typecheck + tests)",
+      "inputs": {
+        "sources": ["app/elohim-library/**"],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Lint Library",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-app": { "dir": "app/elohim-app", "steps": ["build-angular", "build-site-image"] },
+      "elohim-library": { "dir": "app/elohim-library", "steps": ["lint-library"] }
     }
   },
   "deployment": {
