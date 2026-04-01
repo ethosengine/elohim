@@ -1,0 +1,34 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-doorway-app",
+  "description": "Doorway admin UI — Angular app",
+  "steps": {
+    "build-doorway-app": {
+      "description": "Build doorway admin Angular app",
+      "inputs": {
+        "sources": [
+          "doorway/doorway-app/src/**",
+          "doorway/doorway-app/angular.json",
+          "doorway/doorway-app/tsconfig*.json",
+          "doorway/doorway-app/package.json"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": ["doorway-app-dist"],
+        "verify": "test -d doorway/doorway-app/dist/doorway-app"
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Doorway App",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "doorway-app": { "dir": "doorway/doorway-app", "steps": ["build-doorway-app"] }
+    }
+  },
+  "deployment": {}
+}

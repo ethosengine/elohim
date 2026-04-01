@@ -1,0 +1,32 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-orchestrator",
+  "description": "CI orchestrator — Jenkinsfile linting and validation",
+  "steps": {
+    "lint-jenkinsfiles": {
+      "description": "Lint all Jenkinsfiles with npm-groovy-lint",
+      "inputs": {
+        "sources": [
+          "**/Jenkinsfile*",
+          "genesis/orchestrator/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Lint Jenkinsfiles",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "orchestrator": { "dir": "genesis/orchestrator", "steps": ["lint-jenkinsfiles"] }
+    }
+  },
+  "deployment": {}
+}
