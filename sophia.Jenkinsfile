@@ -34,6 +34,11 @@
 // HELPER FUNCTIONS
 // ============================================================================
 
+def shouldRunStep(String stepName) {
+    def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
+    return steps.contains('all') || steps.contains(stepName)
+}
+
 /**
  * Determine SonarQube project config based on branch.
  * Returns: [projectKey: String, shouldEnforce: Boolean, env: String]
@@ -99,6 +104,7 @@ spec:
             defaultValue: false,
             description: 'Force full rebuild even without code changes'
         )
+        string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
     }
 
     options {
@@ -230,7 +236,10 @@ spec:
         }
 
         stage('Build UMD') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('build-sophia-umd') }
+            }}
             steps {
                 container('node') {
                     dir('sophia') {
