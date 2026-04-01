@@ -159,6 +159,10 @@ Before implementing a feature, find or write the a2o scenario that describes the
 
 When story-first isn't practical (prototyping, spikes), capture implementation intent before committing by appending to `.claude/data/dev-intent.jsonl` — a 3-4 sentence summary of what was built, the learner impact, and which a2o feature file needs updating. Then run `/close-loop` to generate scenario updates from your intent.
 
+### Story Harvest (on branch finish and after debugging)
+
+When using `finishing-a-development-branch`, invoke `story-harvest` between Step 1 (tests pass) and Step 3 (present options). When using `systematic-debugging` and a root cause is identified and fixed, invoke `story-harvest` before closing the debugging session. The skill identifies engineering constraints discovered during development — especially parameter-bearing discoveries (memory limits, concurrency thresholds, cache sizes) that inform operator presets and peer diversity configuration — and scaffolds a2o regression scenarios to preserve them.
+
 ### P2P Design Gate (MANDATORY)
 
 Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill. This gates brainstorming step 3 — no approaches may be proposed until the skill's decision tree is completed and the user has validated the entity classifications.

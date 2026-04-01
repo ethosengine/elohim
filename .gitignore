@@ -65,3 +65,4 @@ genesis/.blob-cache/
 .claude/sonar-issues-raw.json
 .claude/sonar-issues-summary.json
 genesis/research/repos/
+.superpowers/
