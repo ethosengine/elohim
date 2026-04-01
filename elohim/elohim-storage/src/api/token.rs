@@ -1,17 +1,19 @@
 //! Token API controller
 //!
 //! Routes:
-//!   `GET  /api/v1/token/balance/{agent_id}`                       — all balances for an agent
-//!   `GET  /api/v1/token/mints/{agent_id}`                         — mint history for an agent
-//!   `GET  /api/v1/token/transfers/{agent_id}`                     — transfer history for an agent
-//!   `POST /api/v1/token/transfer`                                 — create a peer-to-peer transfer
-//!   `GET  /api/v1/token/config`                                   — list all demand curve configs
-//!   `GET  /api/v1/token/config/{governance_layer}`                — get config for a layer
-//!   `POST /api/v1/token/config`                                   — create a demand curve config
-//!   `GET  /api/v1/token/obligation/{agent_id}/{governance_layer}` — evaluate agent obligation level
-//!   `POST /api/v1/token/discernment-mint`                         — elohim Tier 2 discernment mint
-//!   `POST /api/v1/token/apply-decay/{agent_id}/{governance_layer}` — apply one decay period
-//!   `GET  /api/v1/token/decay-history/{agent_id}`                 — decay audit log for an agent
+//!   `GET  /api/v1/token/balance/{agent_id}`                         — all balances for an agent
+//!   `GET  /api/v1/token/mints/{agent_id}`                           — mint history for an agent
+//!   `GET  /api/v1/token/transfers/{agent_id}`                       — transfer history for an agent
+//!   `POST /api/v1/token/transfer`                                   — create a peer-to-peer transfer
+//!   `GET  /api/v1/token/config`                                     — list all demand curve configs
+//!   `GET  /api/v1/token/config/{governance_layer}`                  — get config for a layer
+//!   `POST /api/v1/token/config`                                     — create a demand curve config
+//!   `GET  /api/v1/token/obligation/{agent_id}/{governance_layer}`   — evaluate agent obligation level
+//!   `POST /api/v1/token/discernment-mint`                           — elohim Tier 2 discernment mint
+//!   `POST /api/v1/token/apply-decay/{agent_id}/{governance_layer}`  — apply one decay period
+//!   `GET  /api/v1/token/decay-history/{agent_id}`                   — decay audit log for an agent
+//!   `GET  /api/v1/token/provenance/{agent_id}`                      — Merkle proof (individual layer)
+//!   `GET  /api/v1/token/provenance/{agent_id}/{governance_layer}`   — Merkle proof for a layer
 //!
 //! Delegates to `TokenLedgerService` for balance/transfer logic, to
 //! `db::token_mint_events` for mint history reads, to
@@ -31,6 +33,7 @@ use crate::services::responsibility_demand_service::ResponsibilityDemandService;
 use crate::services::token_decay_service::TokenDecayService;
 use crate::services::token_ledger_service::TokenLedgerService;
 use crate::services::token_mint_service::TokenMintService;
+use crate::services::provenance_service::ProvenanceService;
 use crate::views::{
     CreateResponsibilityDemandConfigInputView, CreateTokenTransferInputView,
     DiscernmentMintInputView, ResponsibilityDemandConfigView, TokenDecayEventView, TokenMintEventView,
@@ -127,6 +130,23 @@ pub async fn handle(
         (&Method::GET, p) if p.starts_with("decay-history/") => {
             let agent_id = p.trim_start_matches("decay-history/");
             handle_get_decay_history(agent_id, pool, ctx).await
+        }
+
+        // GET /api/v1/token/provenance/{agent_id}/{governance_layer}
+        // GET /api/v1/token/provenance/{agent_id}
+        (&Method::GET, p) if p.starts_with("provenance/") => {
+            let rest = p.trim_start_matches("provenance/");
+            match rest.find('/') {
+                Some(idx) => {
+                    let agent_id = &rest[..idx];
+                    let governance_layer = &rest[idx + 1..];
+                    handle_get_provenance(agent_id, governance_layer, pool, ctx).await
+                }
+                None => {
+                    // No slash — treat entire remainder as agent_id, default layer
+                    handle_get_provenance(rest, "individual", pool, ctx).await
+                }
+            }
         }
 
         _ => Ok(response::not_found(&format!(
@@ -371,4 +391,28 @@ async fn handle_get_decay_history(
         token_decay_events::get_decay_events_for_agent(&mut conn, ctx, agent_id)
             .map(|events| events.into_iter().map(TokenDecayEventView::from).collect::<Vec<_>>()),
     ))
+}
+
+/// GET /api/v1/token/provenance/{agent_id}/{governance_layer}
+/// GET /api/v1/token/provenance/{agent_id}   (defaults governance_layer to "individual")
+///
+/// Returns a Merkle-tree provenance proof covering all mint events for the agent.
+/// The `merkle_root` field is a hex-encoded SHA256 root over the set of mint event
+/// leaf hashes, proving that every token was issued from a witnessed contribution.
+///
+/// When no mints exist the root is the all-zero 64-character string, event_count is 0,
+/// and total_amount is 0 — this is a valid (empty) proof, not an error.
+async fn handle_get_provenance(
+    agent_id: &str,
+    governance_layer: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    Ok(from_result(ProvenanceService::generate_proof(
+        &mut conn,
+        ctx,
+        agent_id,
+        governance_layer,
+    )))
 }
