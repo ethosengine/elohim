@@ -42,6 +42,7 @@ pub mod spatial;
 pub mod steward;
 pub mod steward_affinity;
 pub mod stewardship;
+pub mod token;
 pub mod weather;
 
 use bytes::Bytes;
@@ -156,6 +157,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("gate") {
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
+    } else if sub_path.starts_with("token") {
+        let resource_path = sub_path.strip_prefix("token").unwrap_or("").trim_start_matches('/');
+        token::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",
