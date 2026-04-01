@@ -63,6 +63,9 @@ pub mod token_mint_events;
 pub mod token_balances;
 pub mod token_transfers;
 
+// Responsibility demand curve config (shefa — elohim-token sprint 2)
+pub mod responsibility_demand_configs;
+
 // Stewarded node topology (node registry + node-human stewardship)
 pub mod stewarded_nodes;
 

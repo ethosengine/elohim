@@ -19,9 +19,9 @@ use super::diesel_schema::{
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
     node_stewardship, places, precedents, premium_gates, proposal_options, proposals, ranked_votes,
-    rea_commitments, relationships, risk_alerts, schedules, spatial_contexts, statement_votes,
-    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
-    token_mint_events, token_transfers, votes,
+    rea_commitments, relationships, responsibility_demand_configs, risk_alerts, schedules,
+    spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
+    stewardship_allocations, token_balances, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -2558,5 +2558,52 @@ pub struct NewTokenTransfer<'a> {
     pub amount: f32,
     pub governance_layer: &'a str,
     pub note: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
+}
+
+// ============================================================================
+// Responsibility Demand Config Models (Shefa — elohim-token sprint 2)
+// ============================================================================
+
+/// Responsibility demand curve config row from SELECT query.
+/// Category C (operational): one config per governance layer per app.
+/// The curve parameters encode the community's social contract for coupling
+/// token accumulation with obligation (Robeyns capability insight).
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = responsibility_demand_configs)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ResponsibilityDemandConfig {
+    pub id: String,
+    pub h_app_id: String,
+    pub governance_layer: String,
+    pub dignity_floor: f32,
+    pub median_estimate: f32,
+    pub soft_ceiling_multiplier: f32,
+    pub hard_ceiling_multiplier: f32,
+    pub social_contract_health: f32,
+    pub enforcement_active: i32,
+    pub ratified_by: Option<String>,
+    pub ratified_at: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// New responsibility demand config for INSERT.
+/// `created_at` and `updated_at` are omitted — SQLite provides defaults.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = responsibility_demand_configs)]
+pub struct NewResponsibilityDemandConfig<'a> {
+    pub id: &'a str,
+    pub h_app_id: &'a str,
+    pub governance_layer: &'a str,
+    pub dignity_floor: f32,
+    pub median_estimate: f32,
+    pub soft_ceiling_multiplier: f32,
+    pub hard_ceiling_multiplier: f32,
+    pub social_contract_health: f32,
+    pub enforcement_active: i32,
+    pub ratified_by: Option<&'a str>,
+    pub ratified_at: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
 }

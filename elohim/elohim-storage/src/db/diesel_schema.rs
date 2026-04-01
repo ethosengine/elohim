@@ -944,6 +944,25 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    responsibility_demand_configs (id) {
+        id -> Text,
+        h_app_id -> Text,
+        governance_layer -> Text,
+        dignity_floor -> Float,
+        median_estimate -> Float,
+        soft_ceiling_multiplier -> Float,
+        hard_ceiling_multiplier -> Float,
+        social_contract_health -> Float,
+        enforcement_active -> Integer,
+        ratified_by -> Nullable<Text>,
+        ratified_at -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -987,6 +1006,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ranked_votes,
     rea_commitments,
     relationships,
+    responsibility_demand_configs,
     risk_alerts,
     schema_version,
     schedules,
