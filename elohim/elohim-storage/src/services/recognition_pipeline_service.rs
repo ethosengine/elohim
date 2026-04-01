@@ -21,6 +21,7 @@ use crate::db::steward_affinity;
 use crate::db::stewardship_allocations;
 use crate::db::AppContext;
 use crate::error::StorageError;
+use crate::services::token_mint_service::TokenMintService;
 
 // =============================================================================
 // Domain Types
@@ -462,6 +463,27 @@ pub fn settle(
         };
 
         record_event(conn, ctx, input)?;
+
+        // ── Mint elohim-token for this recognition share ──
+        // allocation_ratio is approximated as share fraction of total weighted amount;
+        // LimitedShare does not carry the original allocation_ratio, so we derive it here.
+        let share_ratio = if weighted_amount > 0.0 {
+            (share.final_amount / weighted_amount) as f32
+        } else {
+            0.0_f32
+        };
+        if let Err(e) = TokenMintService::mint_for_recognition(
+            conn,
+            ctx,
+            &share.steward_presence_id,
+            &event_id,
+            &trigger.content_id,
+            &trigger.event_type,
+            share_ratio,
+            "individual",
+        ) {
+            eprintln!("[token-mint] failed to mint for {}: {}", share.steward_presence_id, e);
+        }
 
         stewardship_allocations::accumulate_recognition(
             conn,
