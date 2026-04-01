@@ -27,7 +27,8 @@
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "husky": "^9.1.7",
-    "json-schema-to-typescript": "^15.0.4"
+    "json-schema-to-typescript": "^15.0.4",
+    "picomatch": "^4.0.4"
   },
   "scripts": {
     "prepare": "husky",
@@ -61,7 +62,5 @@
     "avodah:codegen": "node elohim/sdk/domains/avodah/scripts/codegen.mjs",
     "avodah:codegen:verify": "node elohim/sdk/domains/avodah/scripts/codegen.mjs --verify",
     "validate:manifests": "node genesis/orchestrator/validate-manifests.mjs"
-  },
-  "dependencies": {
   }
 }
