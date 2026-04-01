@@ -1798,6 +1798,75 @@ pub struct CreateResponsibilityDemandConfigInputView {
 }
 
 // ============================================================================
+// Token Decay Event Views (Shefa — elohim-token sprint 3)
+// ============================================================================
+
+use crate::db::models::TokenDecayEvent;
+
+/// API view for a token decay event.
+///
+/// Each decay event records one periodic balance reduction applied to an agent,
+/// including the before/after balances, the decay amount, the obligation level
+/// that triggered the decay, and the dignity floor that was enforced.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct TokenDecayEventView {
+    pub id: String,
+    pub agent_id: String,
+    pub governance_layer: String,
+    pub balance_before: f32,
+    pub balance_after: f32,
+    pub decay_amount: f32,
+    pub obligation_level: String,
+    pub dignity_floor: f32,
+    pub created_at: String,
+}
+
+impl From<TokenDecayEvent> for TokenDecayEventView {
+    fn from(d: TokenDecayEvent) -> Self {
+        Self {
+            id: d.id,
+            agent_id: d.agent_id,
+            governance_layer: d.governance_layer,
+            balance_before: d.balance_before,
+            balance_after: d.balance_after,
+            decay_amount: d.decay_amount,
+            obligation_level: d.obligation_level,
+            dignity_floor: d.dignity_floor,
+            created_at: d.created_at,
+        }
+    }
+}
+
+/// Input view for the discernment mint pathway.
+///
+/// Discernment mints are elohim-attested awards for demonstrated judgment —
+/// qualitative recognition that cannot be reduced to an REA provenance event.
+/// The elohim attestation and reasoning trace are mandatory: they form the
+/// audit record that allows constitutional review of elohim mint decisions.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DiscernmentMintInputView {
+    /// Agent receiving the discernment mint.
+    pub agent_id: String,
+    /// Governance layer for the mint (e.g. `"individual"`, `"household"`).
+    /// Defaults to `"individual"` when absent.
+    #[serde(default)]
+    pub governance_layer: Option<String>,
+    /// Token amount to mint.
+    pub amount: f32,
+    /// Identifier of the elohim agent making this attestation.
+    pub elohim_attestation: String,
+    /// Free-form reasoning trace from the elohim agent explaining the award.
+    pub reasoning_trace: String,
+    /// Optional EPR content reference that grounded the discernment decision.
+    #[serde(default)]
+    pub source_epr_id: Option<String>,
+}
+
+// ============================================================================
 // Collective Views (Qahal - Governance Contexts)
 // ============================================================================
 
