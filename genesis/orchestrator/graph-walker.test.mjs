@@ -112,10 +112,10 @@ describe('buildProcess matching', () => {
   });
 });
 
-// ── Dependency propagation ───────────────────────────────────────
+// ── No dependency propagation (source-only detection) ────────────
 
-describe('dependency propagation', () => {
-  it('marks dependent steps stale when dependency is stale', () => {
+describe('no dependency propagation', () => {
+  it('does NOT cascade staleness through cross-manifest dependencies', () => {
     const manifests = [
       makeManifest('lib', {
         build: makeStep(['lib/src/**']),
@@ -124,37 +124,34 @@ describe('dependency propagation', () => {
         build: makeStep([], ['lib:build']),
       }, { projects: { app: { dir: 'app' } } }),
     ];
+    // Only lib sources changed — app should NOT be triggered
     const result = walkGraph(manifests, ['lib/src/index.ts']);
-    assert.equal(result.projects.length, 2);
-    const appProject = result.projects.find(p => p.name === 'app');
-    assert.ok(appProject);
-    assert.ok(appProject.reasons.some(r => r.includes('depends:')));
+    assert.equal(result.projects.length, 1);
+    assert.equal(result.projects[0].name, 'lib');
   });
 
-  it('propagates staleness transitively (A -> B -> C)', () => {
+  it('detects both projects when both have direct source matches', () => {
     const manifests = [
-      makeManifest('a', {
-        build: makeStep(['a/**']),
-      }, { projects: { a: { dir: 'a' } } }),
-      makeManifest('b', {
-        build: makeStep([], ['a:build']),
-      }, { projects: { b: { dir: 'b' } } }),
-      makeManifest('c', {
-        build: makeStep([], ['b:build']),
-      }, { projects: { c: { dir: 'c' } } }),
+      makeManifest('lib', {
+        build: makeStep(['lib/src/**']),
+      }, { projects: { lib: { dir: 'lib' } } }),
+      makeManifest('app', {
+        build: makeStep(['app/src/**'], ['lib:build']),
+      }, { projects: { app: { dir: 'app' } } }),
     ];
-    const result = walkGraph(manifests, ['a/file.rs']);
-    assert.equal(result.projects.length, 3);
-    assert.ok(result.projects.find(p => p.name === 'c'));
+    // Both have source changes — both trigger independently
+    const result = walkGraph(manifests, ['lib/src/index.ts', 'app/src/main.ts']);
+    assert.equal(result.projects.length, 2);
   });
 
-  it('propagates within same manifest (bare dep names)', () => {
+  it('gate fires when any watched step has direct source match', () => {
     const manifests = [
       makeManifest('app', {
         compile: makeStep(['app/src/**']),
         bundle: makeStep([], ['compile']),
       }, { projects: { app: { dir: 'app' } } }),
     ];
+    // compile is directly stale, bundle is not — but gate watches both
     const result = walkGraph(manifests, ['app/src/main.ts']);
     assert.equal(result.projects.length, 1);
     assert.equal(result.projects[0].name, 'app');

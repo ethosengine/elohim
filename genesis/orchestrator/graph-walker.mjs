@@ -101,22 +101,11 @@ export function walkGraph(manifests, changedFiles) {
     }
   }
 
-  // Phase 3: Propagate staleness in dependency order
+  // Phase 3: Topo-sort for output ordering (dependencies before dependents)
+  // Note: we do NOT propagate staleness through dependencies. The hook's job
+  // is "did files in this project change?" — propagation is a Jenkins concern.
+  // Source/buildProcess matching is sufficient for quality gate detection.
   const order = topoSort(stepIndex);
-
-  for (const qualified of order) {
-    const { step, pipeline } = stepIndex.get(qualified);
-    for (const dep of step.depends) {
-      const qualDep = resolveStep(dep, pipeline);
-      if (stale.has(qualDep)) {
-        if (!stale.has(qualified)) {
-          stale.set(qualified, [`depends: ${qualDep}`]);
-        } else {
-          stale.get(qualified).push(`depends: ${qualDep}`);
-        }
-      }
-    }
-  }
 
   // Phase 4: Map stale steps to gate projects
   const projectMap = new Map();

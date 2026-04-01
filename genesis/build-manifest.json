@@ -90,11 +90,21 @@
       "outputs": { "artifacts": [], "verify": null },
       "depends": [],
       "executor": { "stage": "Lint A2O", "function": null }
+    },
+    "gate-genesis": {
+      "description": "Catch-all trigger for genesis directory quality gate",
+      "inputs": {
+        "sources": ["genesis/**"],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Gate Genesis", "function": null }
     }
   },
   "gate": {
     "projects": {
-      "genesis": { "dir": "genesis/seeder", "steps": ["validate-seeds", "seed-content"] },
+      "genesis": { "dir": "genesis/seeder", "steps": ["validate-seeds", "seed-content", "gate-genesis"] },
       "schema-validate": { "dir": ".", "steps": ["schema-validate"] },
       "schema-codegen": { "dir": ".", "steps": ["schema-codegen"] },
       "constants-sync": { "dir": ".", "steps": ["constants-sync"] },
