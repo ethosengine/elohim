@@ -562,7 +562,7 @@ def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
 
         // Save build state for next run (even in shadow mode, to build up hash baseline)
         def commitHash = getGitCommitHash()
-        buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash)
+        buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
 
     } catch (Exception e) {
         echo "⚠️ Build Graph shadow mode failed (non-blocking): ${e.message}"

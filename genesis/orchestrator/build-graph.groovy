@@ -475,13 +475,14 @@ def parseJson(String content) {
     return new JsonSlurper().parseText(content)
 }
 
-def saveBuildState(Map graph, Map staleMap, Map buildProcessHashes, String commitHash) {
+def saveBuildState(Map graph, Map staleMap, Map buildProcessHashes, String commitHash, Map previousState) {
     def stepStates = [:]
 
     graph.steps.each { name, step ->
         def info = staleMap[name]
+        def previousStepState = previousState?.stepStates?.get(name)
         stepStates[name] = [
-            lastBuiltCommit: info?.stale ? commitHash : (info?.lastBuiltCommit ?: null),
+            lastBuiltCommit: info?.stale ? commitHash : (previousStepState?.lastBuiltCommit ?: null),
             buildProcessHashes: buildProcessHashes[name] ?: [:],
             outputVerified: false
         ]
@@ -551,7 +552,8 @@ def walkBuildGraph(List changedFiles) {
         staleSteps: staleSteps,
         levels: levels,
         pipelineSteps: pipelineSteps,
-        buildProcessHashes: buildProcessHashes
+        buildProcessHashes: buildProcessHashes,
+        previousState: buildState
     ]
 }
 
