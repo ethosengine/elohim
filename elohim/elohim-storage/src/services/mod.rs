@@ -37,6 +37,7 @@ pub mod knowledge_service;
 pub mod mastery_depth;
 pub mod presence_service;
 pub mod rea_commitment_service;
+pub mod responsibility_demand_service;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
