@@ -4,18 +4,15 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
-import { execSync } from 'child_process';
 import Ajv from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
+import { discoverManifests, resolveStep } from './manifest-utils.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const SCHEMA_PATH = resolve(ROOT, 'genesis/orchestrator/manifest.schema.json');
 
 // Discover all build-manifest.json files
-const manifestPaths = execSync(
-  "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*'",
-  { cwd: ROOT, encoding: 'utf8' }
-).trim().split('\n').filter(Boolean);
+const manifestPaths = discoverManifests(ROOT);
 
 if (manifestPaths.length === 0) {
   console.error('ERROR: No build-manifest.json files found');
@@ -78,7 +75,7 @@ let depErrors = 0;
 for (const { path, content } of manifests) {
   for (const [stepName, step] of Object.entries(content.steps)) {
     for (const dep of step.depends) {
-      const qualified = dep.includes(':') ? dep : `${content.pipeline}:${dep}`;
+      const qualified = resolveStep(dep, content.pipeline);
       if (!allSteps.has(qualified)) {
         console.error(`  ✗ ${path}: step '${stepName}' depends on '${dep}' which does not exist`);
         depErrors++;
@@ -95,7 +92,7 @@ const inStack = new Set();
 let hasCycle = false;
 
 function dfs(node, pipeline) {
-  const qualified = node.includes(':') ? node : `${pipeline}:${node}`;
+  const qualified = resolveStep(node, pipeline);
   visited.add(qualified);
   inStack.add(qualified);
 
@@ -106,7 +103,7 @@ function dfs(node, pipeline) {
   if (!step) return;
 
   for (const dep of step.depends) {
-    const qualDep = dep.includes(':') ? dep : `${stepPipeline}:${dep}`;
+    const qualDep = resolveStep(dep, stepPipeline);
     if (!visited.has(qualDep)) {
       dfs(qualDep, stepPipeline);
     } else if (inStack.has(qualDep)) {
