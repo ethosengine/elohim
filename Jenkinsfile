@@ -77,6 +77,15 @@ def getSonarProjectConfig() {
 // STAGE HELPER METHODS (to reduce bytecode size)
 // ============================================================================
 
+/**
+ * Check if a build step should run based on the STEPS parameter.
+ * Returns true if STEPS is 'all' (default) or contains the step name.
+ */
+def shouldRunStep(String stepName) {
+    def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
+    return steps.contains('all') || steps.contains(stepName)
+}
+
 def deployAppToEnvironment(String environment, String namespace, String deploymentName, String manifestPath, String imageTag) {
     echo "Deploying to ${environment}: ${imageTag}"
 
@@ -338,6 +347,10 @@ spec:
         // We do explicit full checkout in the Checkout stage
         skipDefaultCheckout(true)
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+    }
+
+    parameters {
+        string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated list of build steps to run (from build-manifest.json). "all" runs everything.')
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -620,12 +633,22 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Sophia Plugin') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-sophia-umd') }
+                }
+            }
             steps { container('builder') { script { buildSophiaPlugin() } } }
         }
 
         stage('Build App') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-angular') }
+                }
+            }
             steps {
                 container('builder'){
                     dir('app/elohim-app') {
@@ -774,7 +797,12 @@ VEOF
         }
 
         stage('Build Image') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-site-image') }
+                }
+            }
             steps {
                 container('builder'){
                     script {
