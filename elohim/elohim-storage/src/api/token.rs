@@ -1,14 +1,17 @@
 //! Token API controller
 //!
 //! Routes:
-//!   `GET  /api/v1/token/balance/{agent_id}`                     — all balances for an agent
-//!   `GET  /api/v1/token/mints/{agent_id}`                       — mint history for an agent
-//!   `GET  /api/v1/token/transfers/{agent_id}`                   — transfer history for an agent
-//!   `POST /api/v1/token/transfer`                               — create a peer-to-peer transfer
-//!   `GET  /api/v1/token/config`                                 — list all demand curve configs
-//!   `GET  /api/v1/token/config/{governance_layer}`              — get config for a layer
-//!   `POST /api/v1/token/config`                                 — create a demand curve config
+//!   `GET  /api/v1/token/balance/{agent_id}`                       — all balances for an agent
+//!   `GET  /api/v1/token/mints/{agent_id}`                         — mint history for an agent
+//!   `GET  /api/v1/token/transfers/{agent_id}`                     — transfer history for an agent
+//!   `POST /api/v1/token/transfer`                                 — create a peer-to-peer transfer
+//!   `GET  /api/v1/token/config`                                   — list all demand curve configs
+//!   `GET  /api/v1/token/config/{governance_layer}`                — get config for a layer
+//!   `POST /api/v1/token/config`                                   — create a demand curve config
 //!   `GET  /api/v1/token/obligation/{agent_id}/{governance_layer}` — evaluate agent obligation level
+//!   `POST /api/v1/token/discernment-mint`                         — elohim Tier 2 discernment mint
+//!   `POST /api/v1/token/apply-decay/{agent_id}/{governance_layer}` — apply one decay period
+//!   `GET  /api/v1/token/decay-history/{agent_id}`                 — decay audit log for an agent
 //!
 //! Delegates to `TokenLedgerService` for balance/transfer logic, to
 //! `db::token_mint_events` for mint history reads, to
@@ -21,14 +24,16 @@ use hyper::{body::Incoming, Method, Request, Response};
 use uuid::Uuid;
 
 use crate::db::models::NewResponsibilityDemandConfig;
-use crate::db::{responsibility_demand_configs, token_mint_events, AppContext, DbPool};
+use crate::db::{responsibility_demand_configs, token_decay_events, token_mint_events, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response::{self, from_create_result, from_option, from_result};
 use crate::services::responsibility_demand_service::ResponsibilityDemandService;
+use crate::services::token_decay_service::TokenDecayService;
 use crate::services::token_ledger_service::TokenLedgerService;
+use crate::services::token_mint_service::TokenMintService;
 use crate::views::{
     CreateResponsibilityDemandConfigInputView, CreateTokenTransferInputView,
-    ResponsibilityDemandConfigView, TokenMintEventView,
+    DiscernmentMintInputView, ResponsibilityDemandConfigView, TokenDecayEventView, TokenMintEventView,
 };
 
 use super::{get_conn, parse_body};
@@ -95,6 +100,33 @@ pub async fn handle(
                     "obligation route requires: /api/v1/token/obligation/{agent_id}/{governance_layer}",
                 )),
             }
+        }
+
+        // POST /api/v1/token/discernment-mint — elohim Tier 2 discernment mint
+        (&Method::POST, "discernment-mint") => {
+            handle_discernment_mint(req, pool, ctx).await
+        }
+
+        // POST /api/v1/token/apply-decay/{agent_id}/{governance_layer} — apply one decay period
+        (&Method::POST, p) if p.starts_with("apply-decay/") => {
+            let rest = p.trim_start_matches("apply-decay/");
+            // rest is "{agent_id}/{governance_layer}" — split on first '/'
+            match rest.find('/') {
+                Some(idx) => {
+                    let agent_id = &rest[..idx];
+                    let governance_layer = &rest[idx + 1..];
+                    handle_apply_decay(agent_id, governance_layer, pool, ctx).await
+                }
+                None => Ok(response::bad_request(
+                    "apply-decay route requires: /api/v1/token/apply-decay/{agent_id}/{governance_layer}",
+                )),
+            }
+        }
+
+        // GET /api/v1/token/decay-history/{agent_id} — decay audit log for an agent
+        (&Method::GET, p) if p.starts_with("decay-history/") => {
+            let agent_id = p.trim_start_matches("decay-history/");
+            handle_get_decay_history(agent_id, pool, ctx).await
         }
 
         _ => Ok(response::not_found(&format!(
@@ -267,4 +299,76 @@ async fn handle_get_obligation(
         agent_id,
         governance_layer,
     )))
+}
+
+/// POST /api/v1/token/discernment-mint
+///
+/// Elohim Tier 2 minting for cross-domain patterns that no single REA event can
+/// capture. Requires mandatory `elohim_attestation` and `reasoning_trace` fields
+/// to form an auditable chain of custody for constitutional review.
+///
+/// The `governance_layer` field defaults to `"individual"` when absent.
+/// The `source_epr_id` field is optional — when absent the mint is treated as
+/// agent-level (no specific EPR reference).
+async fn handle_discernment_mint(
+    req: Request<Incoming>,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let input: DiscernmentMintInputView = parse_body(req).await?;
+    let mut conn = get_conn(pool)?;
+
+    let governance_layer = input
+        .governance_layer
+        .as_deref()
+        .unwrap_or("individual");
+
+    Ok(from_create_result(TokenMintService::discernment_mint(
+        &mut conn,
+        ctx,
+        &input.agent_id,
+        governance_layer,
+        input.amount,
+        &input.elohim_attestation,
+        &input.reasoning_trace,
+        input.source_epr_id.as_deref(),
+    )))
+}
+
+/// POST /api/v1/token/apply-decay/{agent_id}/{governance_layer}
+///
+/// Applies one decay period for an agent in a governance layer. The decay rate
+/// scales with the agent's current obligation level. The dignity floor is always
+/// protected. Returns a `DecayResult` describing what happened (including
+/// early-exit cases where no decay was applied).
+async fn handle_apply_decay(
+    agent_id: &str,
+    governance_layer: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    Ok(from_result(TokenDecayService::apply_decay(
+        &mut conn,
+        ctx,
+        agent_id,
+        governance_layer,
+    )))
+}
+
+/// GET /api/v1/token/decay-history/{agent_id}
+///
+/// Returns the decay audit log for an agent across all governance layers,
+/// ordered newest first. Each record shows the before/after balance, the decay
+/// amount, and the obligation level that triggered the decay.
+async fn handle_get_decay_history(
+    agent_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    Ok(from_result(
+        token_decay_events::get_decay_events_for_agent(&mut conn, ctx, agent_id)
+            .map(|events| events.into_iter().map(TokenDecayEventView::from).collect::<Vec<_>>()),
+    ))
 }
