@@ -140,7 +140,11 @@ impl SyncManager {
     }
 
     /// Get current heads for a document
-    pub async fn get_heads(&self, h_app_id: &str, doc_id: &str) -> Result<Vec<String>, StorageError> {
+    pub async fn get_heads(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+    ) -> Result<Vec<String>, StorageError> {
         match self.doc_store.get(h_app_id, doc_id).await? {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
