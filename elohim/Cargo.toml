@@ -5,6 +5,7 @@ members = [
     "elohim-agent/elohim-agent-service",
     "eae",
     "elohim-compute",
+    "elohim-token",
 ]
 exclude = [
     "elohim-bitswap",
