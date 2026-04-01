@@ -1730,6 +1730,74 @@ fn default_governance_layer() -> String {
 }
 
 // ============================================================================
+// Responsibility Demand Config Views (Shefa — elohim-token sprint 2)
+// ============================================================================
+
+use crate::db::models::ResponsibilityDemandConfig;
+
+/// API view for a responsibility demand curve config.
+///
+/// Encodes the per-layer parameters that couple token accumulation with
+/// obligation. `enforcementActive` is coerced from SQLite INTEGER (0/1) to bool.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResponsibilityDemandConfigView {
+    pub id: String,
+    pub governance_layer: String,
+    pub dignity_floor: f32,
+    pub median_estimate: f32,
+    pub soft_ceiling_multiplier: f32,
+    pub hard_ceiling_multiplier: f32,
+    pub social_contract_health: f32,
+    /// Coerced from INTEGER (0/1) to bool at the API boundary.
+    pub enforcement_active: bool,
+    pub ratified_by: Option<String>,
+    pub ratified_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<ResponsibilityDemandConfig> for ResponsibilityDemandConfigView {
+    fn from(c: ResponsibilityDemandConfig) -> Self {
+        Self {
+            id: c.id,
+            governance_layer: c.governance_layer,
+            dignity_floor: c.dignity_floor,
+            median_estimate: c.median_estimate,
+            soft_ceiling_multiplier: c.soft_ceiling_multiplier,
+            hard_ceiling_multiplier: c.hard_ceiling_multiplier,
+            social_contract_health: c.social_contract_health,
+            enforcement_active: c.enforcement_active != 0,
+            ratified_by: c.ratified_by,
+            ratified_at: c.ratified_at,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        }
+    }
+}
+
+/// Input view for creating a responsibility demand config — camelCase API boundary type.
+///
+/// All curve parameters are optional; the service layer applies protocol defaults
+/// when absent (dignity_floor=100, median_estimate=1000, multipliers=10/20,
+/// social_contract_health=0.5, enforcement_active=true).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateResponsibilityDemandConfigInputView {
+    /// Governance layer this config applies to (e.g. `"individual"`, `"household"`).
+    pub governance_layer: String,
+    pub dignity_floor: Option<f32>,
+    pub median_estimate: Option<f32>,
+    pub soft_ceiling_multiplier: Option<f32>,
+    pub hard_ceiling_multiplier: Option<f32>,
+    pub social_contract_health: Option<f32>,
+    /// Whether the curve is actively enforced. Defaults to `true`.
+    pub enforcement_active: Option<bool>,
+}
+
+// ============================================================================
 // Collective Views (Qahal - Governance Contexts)
 // ============================================================================
 
