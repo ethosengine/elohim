@@ -105,7 +105,7 @@ describe('HolochainClientService', () => {
       const config = service.getConfig();
 
       expect(config).toBeDefined();
-      expect(config.appId).toBeTruthy();
+      expect(config.hAppId).toBeTruthy();
     });
 
     it('should check for stored credentials', () => {
@@ -424,7 +424,7 @@ describe('HolochainClientService', () => {
     it('should provide access to config', () => {
       const config = service.getConfig();
 
-      expect(config.appId).toBeTruthy();
+      expect(config.hAppId).toBeTruthy();
       expect(config.adminUrl).toBeTruthy();
       expect(config.appUrl).toBeTruthy();
     });
@@ -512,7 +512,7 @@ describe('HolochainClientService', () => {
       expect(info.mode).toBeDefined();
       expect(info.adminUrl).toBeDefined();
       expect(info.appUrl).toBeDefined();
-      expect(info.appId).toBeDefined();
+      expect(info.hAppId).toBeDefined();
       expect(info.hasStoredCredentials).toBeDefined();
       expect(info.error).toBeDefined();
     });

@@ -208,7 +208,7 @@ describe('IframeRendererComponent', () => {
   describe('HTML5 App mode', () => {
     it('should handle Html5AppContent structure', () => {
       component.node = createHtml5AppNode({
-        appId: 'evolution-of-trust',
+        slug: 'evolution-of-trust',
         entryPoint: 'index.html',
       });
       component.ngOnChanges({
@@ -220,7 +220,7 @@ describe('IframeRendererComponent', () => {
 
     it('should set fallback URL when provided', () => {
       component.node = createHtml5AppNode({
-        appId: 'evolution-of-trust',
+        slug: 'evolution-of-trust',
         entryPoint: 'index.html',
         fallbackUrl: 'https://ncase.me/trust/',
       });

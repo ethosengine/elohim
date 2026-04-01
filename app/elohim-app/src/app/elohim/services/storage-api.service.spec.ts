@@ -70,7 +70,7 @@ describe('StorageApiService', () => {
       });
 
       const req = httpMock.expectOne(request => request.url.includes('/db/relationships'));
-      expect(req.request.params.get('appId')).toBe('lamad');
+      expect(req.request.params.get('hAppId')).toBe('lamad');
       req.flush(mockRelationships);
       tick();
     }));
@@ -218,7 +218,7 @@ describe('StorageApiService', () => {
 
       const req = httpMock.expectOne(request => {
         return (
-          request.params.get('appId') === 'imagodei' && request.params.get('partyId') === 'human-1'
+          request.params.get('hAppId') === 'imagodei' && request.params.get('partyId') === 'human-1'
         );
       });
       req.flush(mockRelationships);
@@ -423,7 +423,7 @@ describe('StorageApiService', () => {
       });
 
       const req = httpMock.expectOne(request => {
-        return request.url.includes('/db/events') && request.params.get('appId') === 'shefa';
+        return request.url.includes('/db/events') && request.params.get('hAppId') === 'shefa';
       });
       req.flush(mockEvents);
       tick();

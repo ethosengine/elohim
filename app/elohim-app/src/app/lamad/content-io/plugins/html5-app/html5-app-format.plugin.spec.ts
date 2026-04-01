@@ -95,9 +95,9 @@ describe('Html5AppFormatPlugin', () => {
       expect((result.content as any).entryPoint).toBe('index.html');
     });
 
-    it('should generate humanized title from appId', async () => {
+    it('should generate humanized title from slug', async () => {
       const content = JSON.stringify({
-        appId: 'evolution-of-trust',
+        slug: 'evolution-of-trust',
         entryPoint: 'index.html',
       });
 
@@ -114,7 +114,7 @@ describe('Html5AppFormatPlugin', () => {
       const result = await plugin.import(file);
 
       expect(result.contentFormat).toBe('html5-app');
-      expect((result.content as any).appId).toBe('my-cool-app');
+      expect((result.content as any).slug).toBe('my-cool-app');
       expect((result.content as any).entryPoint).toBe('index.html');
       expect(result.title).toBe('My Cool App');
     });
@@ -152,7 +152,7 @@ describe('Html5AppFormatPlugin', () => {
     it('should export content as JSON string', async () => {
       const node = {
         content: {
-          appId: 'test-app',
+          slug: 'test-app',
           entryPoint: 'index.html',
           fallbackUrl: 'https://example.com/app',
         },
@@ -163,14 +163,14 @@ describe('Html5AppFormatPlugin', () => {
       const result = await plugin.export(node);
 
       const parsed = JSON.parse(result);
-      expect(parsed.appId).toBe('test-app');
+      expect(parsed.slug).toBe('test-app');
       expect(parsed.entryPoint).toBe('index.html');
       expect(parsed.fallbackUrl).toBe('https://example.com/app');
     });
 
     it('should format JSON with indentation', async () => {
       const node = {
-        content: { appId: 'app', entryPoint: 'index.html' },
+        content: { slug: 'app', entryPoint: 'index.html' },
         title: 'App',
         contentFormat: 'html5-app',
       };
@@ -186,7 +186,7 @@ describe('Html5AppFormatPlugin', () => {
     describe('JSON input', () => {
       it('should validate correct JSON structure', async () => {
         const content = JSON.stringify({
-          appId: 'valid-app',
+          slug: 'valid-app',
           entryPoint: 'index.html',
           fallbackUrl: 'https://example.com',
         });
@@ -204,30 +204,30 @@ describe('Html5AppFormatPlugin', () => {
         expect(result.errors[0].code).toBe('INVALID_JSON');
       });
 
-      it('should error on missing appId', async () => {
+      it('should error on missing slug', async () => {
         const content = JSON.stringify({ entryPoint: 'index.html' });
 
         const result = await plugin.validate(content);
 
         expect(result.valid).toBe(false);
-        expect(result.errors.some(e => e.code === 'MISSING_APP_ID')).toBe(true);
+        expect(result.errors.some(e => e.code === 'MISSING_SLUG')).toBe(true);
       });
 
-      it('should error on invalid appId format', async () => {
+      it('should error on invalid slug format', async () => {
         const content = JSON.stringify({
-          appId: 'Invalid App ID!',
+          slug: 'Invalid App ID!',
           entryPoint: 'index.html',
         });
 
         const result = await plugin.validate(content);
 
         expect(result.valid).toBe(false);
-        expect(result.errors.some(e => e.code === 'INVALID_APP_ID')).toBe(true);
+        expect(result.errors.some(e => e.code === 'INVALID_SLUG')).toBe(true);
       });
 
-      it('should accept valid appId with hyphens', async () => {
+      it('should accept valid slug with hyphens', async () => {
         const content = JSON.stringify({
-          appId: 'my-cool-app-123',
+          slug: 'my-cool-app-123',
           entryPoint: 'index.html',
         });
 
@@ -237,7 +237,7 @@ describe('Html5AppFormatPlugin', () => {
       });
 
       it('should error on missing entryPoint', async () => {
-        const content = JSON.stringify({ appId: 'valid-app' });
+        const content = JSON.stringify({ slug: 'valid-app' });
 
         const result = await plugin.validate(content);
 
@@ -247,7 +247,7 @@ describe('Html5AppFormatPlugin', () => {
 
       it('should warn on non-HTML entryPoint', async () => {
         const content = JSON.stringify({
-          appId: 'valid-app',
+          slug: 'valid-app',
           entryPoint: 'main.js',
         });
 
@@ -259,7 +259,7 @@ describe('Html5AppFormatPlugin', () => {
 
       it('should warn when no fallbackUrl', async () => {
         const content = JSON.stringify({
-          appId: 'valid-app',
+          slug: 'valid-app',
           entryPoint: 'index.html',
         });
 
@@ -311,9 +311,9 @@ describe('Html5AppFormatPlugin', () => {
   });
 
   describe('detectFormat', () => {
-    it('should return 0.9 for appId + entryPoint structure', () => {
+    it('should return 0.9 for slug + entryPoint structure', () => {
       const content = JSON.stringify({
-        appId: 'test-app',
+        slug: 'test-app',
         entryPoint: 'index.html',
       });
 
@@ -325,7 +325,7 @@ describe('Html5AppFormatPlugin', () => {
     it('should return 0.95 for contentFormat html5-app', () => {
       const content = JSON.stringify({
         contentFormat: 'html5-app',
-        content: { appId: 'app' },
+        content: { slug: 'app' },
       });
 
       const confidence = plugin.detectFormat(content);
