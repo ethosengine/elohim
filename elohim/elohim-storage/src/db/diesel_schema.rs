@@ -899,6 +899,51 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    token_mint_events (id) {
+        id -> Text,
+        h_app_id -> Text,
+        amount -> Float,
+        provenance_event_id -> Text,
+        mint_tier -> Text,
+        source_epr_id -> Text,
+        agent_id -> Text,
+        constitutional_context -> Nullable<Text>,
+        elohim_attestation -> Nullable<Text>,
+        reasoning_trace -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    token_balances (agent_id, h_app_id, governance_layer) {
+        agent_id -> Text,
+        h_app_id -> Text,
+        governance_layer -> Text,
+        balance -> Float,
+        total_minted -> Float,
+        total_transferred_in -> Float,
+        total_transferred_out -> Float,
+        last_activity_at -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    token_transfers (id) {
+        id -> Text,
+        h_app_id -> Text,
+        from_agent -> Text,
+        to_agent -> Text,
+        amount -> Float,
+        governance_layer -> Text,
+        note -> Nullable<Text>,
+        dht_anchor_hash -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -951,5 +996,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     steward_credentials,
     stewarded_nodes,
     stewardship_allocations,
+    token_balances,
+    token_mint_events,
+    token_transfers,
     votes,
 );

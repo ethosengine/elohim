@@ -20,7 +20,8 @@ use super::diesel_schema::{
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
     node_stewardship, places, precedents, premium_gates, proposal_options, proposals, ranked_votes,
     rea_commitments, relationships, risk_alerts, schedules, spatial_contexts, statement_votes,
-    statements, steward_credentials, stewarded_nodes, stewardship_allocations, votes,
+    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -2468,4 +2469,94 @@ pub struct NewEnumRegistryEntry {
     pub tier: String,
     pub added_by: Option<String>,
     pub created_at: String,
+}
+
+// ============================================================================
+// Token Models (Shefa economy — elohim-token sprint 1)
+// ============================================================================
+
+/// Token mint event row from SELECT query.
+/// Category A (notarized): every mint is coupled to a witnessed REA event.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = token_mint_events)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct TokenMintEvent {
+    pub id: String,
+    pub h_app_id: String,
+    pub amount: f32,
+    pub provenance_event_id: String,
+    pub mint_tier: String,
+    pub source_epr_id: String,
+    pub agent_id: String,
+    pub constitutional_context: Option<String>,
+    pub elohim_attestation: Option<String>,
+    pub reasoning_trace: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+}
+
+/// New token mint event for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = token_mint_events)]
+pub struct NewTokenMintEvent<'a> {
+    pub id: &'a str,
+    pub h_app_id: &'a str,
+    pub amount: f32,
+    pub provenance_event_id: &'a str,
+    pub mint_tier: &'a str,
+    pub source_epr_id: &'a str,
+    pub agent_id: &'a str,
+    pub constitutional_context: Option<&'a str>,
+    pub elohim_attestation: Option<&'a str>,
+    pub reasoning_trace: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
+}
+
+/// Token balance row from SELECT query.
+/// Category B (agent-scoped): per-agent, per-governance-layer balance ledger.
+/// Composite PK: (agent_id, h_app_id, governance_layer).
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = token_balances)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct TokenBalance {
+    pub agent_id: String,
+    pub h_app_id: String,
+    pub governance_layer: String,
+    pub balance: f32,
+    pub total_minted: f32,
+    pub total_transferred_in: f32,
+    pub total_transferred_out: f32,
+    pub last_activity_at: String,
+    pub created_at: String,
+}
+
+/// Token transfer row from SELECT query.
+/// Category A (notarized): witnessed exchange between two agents.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = token_transfers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct TokenTransfer {
+    pub id: String,
+    pub h_app_id: String,
+    pub from_agent: String,
+    pub to_agent: String,
+    pub amount: f32,
+    pub governance_layer: String,
+    pub note: Option<String>,
+    pub dht_anchor_hash: Option<String>,
+    pub created_at: String,
+}
+
+/// New token transfer for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = token_transfers)]
+pub struct NewTokenTransfer<'a> {
+    pub id: &'a str,
+    pub h_app_id: &'a str,
+    pub from_agent: &'a str,
+    pub to_agent: &'a str,
+    pub amount: f32,
+    pub governance_layer: &'a str,
+    pub note: Option<&'a str>,
+    pub dht_anchor_hash: Option<&'a str>,
 }

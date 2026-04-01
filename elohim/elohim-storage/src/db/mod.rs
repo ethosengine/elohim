@@ -58,6 +58,11 @@ pub mod steward_operations;
 // Custodian node metrics
 pub mod custodian_metrics;
 
+// Token economy (shefa — elohim-token sprint 1)
+pub mod token_mint_events;
+pub mod token_balances;
+pub mod token_transfers;
+
 // Stewarded node topology (node registry + node-human stewardship)
 pub mod stewarded_nodes;
 
