@@ -49,6 +49,32 @@
           }
         }
       }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["dir"],
+            "additionalProperties": false,
+            "properties": {
+              "dir": {
+                "type": "string",
+                "description": "Working directory for running the quality gate"
+              },
+              "steps": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Which manifest steps trigger this gate project (default: all steps)"
+              }
+            }
+          },
+          "description": "Map of hook project name to gate config"
+        }
+      }
     }
   },
   "$defs": {
