@@ -146,7 +146,7 @@ describe('normalizeConductorContent', () => {
     const raw = createConductorResponse();
     const result = normalizeConductorContent(raw);
 
-    expect(result.appId).toBe('lamad');
+    expect(result.hAppId).toBe('lamad');
   });
 
   it('should set validationStatus to valid', () => {
@@ -258,7 +258,7 @@ describe('normalizeConductorContentBatch', () => {
     expect(results[2].id).toBe('item-3');
     // All should have camelCase fields
     results.forEach(r => {
-      expect(r.appId).toBe('lamad');
+      expect(r.hAppId).toBe('lamad');
       expect(r.validationStatus).toBe('valid');
     });
   });
@@ -320,7 +320,7 @@ describe('ensureContentView', () => {
     const result = ensureContentView(raw);
 
     expect(result.contentType).toBe('concept');
-    expect(result.appId).toBe('lamad');
+    expect(result.hAppId).toBe('lamad');
   });
 
   it('should pass through ContentView as-is', () => {
@@ -337,7 +337,7 @@ describe('ensureContentView', () => {
     const results = [conductorItem, viewItem].map(ensureContentView);
 
     expect(results[0].id).toBe('from-conductor');
-    expect(results[0].appId).toBe('lamad');
+    expect(results[0].hAppId).toBe('lamad');
     expect(results[1].id).toBe('from-storage');
   });
 });
