@@ -21,7 +21,8 @@ use super::diesel_schema::{
     node_stewardship, places, precedents, premium_gates, proposal_options, proposals, ranked_votes,
     rea_commitments, relationships, responsibility_demand_configs, risk_alerts, schedules,
     spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_mint_events, token_transfers, votes,
+    stewardship_allocations, token_balances, token_decay_events, token_mint_events, token_transfers,
+    votes,
 };
 
 // ============================================================================
@@ -2606,4 +2607,44 @@ pub struct NewResponsibilityDemandConfig<'a> {
     pub ratified_by: Option<&'a str>,
     pub ratified_at: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
+}
+
+// ============================================================================
+// Token Decay Event Models (Shefa — elohim-token sprint 3)
+// ============================================================================
+
+/// Token decay event row from SELECT query.
+/// Category C (operational): records each periodic decay application against
+/// an agent's balance, coupling balance reductions to obligation levels and
+/// dignity floor enforcement.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = token_decay_events)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct TokenDecayEvent {
+    pub id: String,
+    pub h_app_id: String,
+    pub agent_id: String,
+    pub governance_layer: String,
+    pub balance_before: f32,
+    pub balance_after: f32,
+    pub decay_amount: f32,
+    pub obligation_level: String,
+    pub dignity_floor: f32,
+    pub created_at: String,
+}
+
+/// New token decay event for INSERT.
+/// `created_at` is omitted — SQLite provides the default via `datetime('now')`.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = token_decay_events)]
+pub struct NewTokenDecayEvent<'a> {
+    pub id: &'a str,
+    pub h_app_id: &'a str,
+    pub agent_id: &'a str,
+    pub governance_layer: &'a str,
+    pub balance_before: f32,
+    pub balance_after: f32,
+    pub decay_amount: f32,
+    pub obligation_level: &'a str,
+    pub dignity_floor: f32,
 }

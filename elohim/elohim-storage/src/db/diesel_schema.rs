@@ -963,6 +963,21 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    token_decay_events (id) {
+        id -> Text,
+        h_app_id -> Text,
+        agent_id -> Text,
+        governance_layer -> Text,
+        balance_before -> Float,
+        balance_after -> Float,
+        decay_amount -> Float,
+        obligation_level -> Text,
+        dignity_floor -> Float,
+        created_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1017,6 +1032,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     stewarded_nodes,
     stewardship_allocations,
     token_balances,
+    token_decay_events,
     token_mint_events,
     token_transfers,
     votes,

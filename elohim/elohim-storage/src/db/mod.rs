@@ -66,6 +66,9 @@ pub mod token_transfers;
 // Responsibility demand curve config (shefa — elohim-token sprint 2)
 pub mod responsibility_demand_configs;
 
+// Token decay events (shefa — elohim-token sprint 3)
+pub mod token_decay_events;
+
 // Stewarded node topology (node registry + node-human stewardship)
 pub mod stewarded_nodes;
 
