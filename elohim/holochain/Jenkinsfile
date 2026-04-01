@@ -494,6 +494,11 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     sh "kubectl rollout status deployment/${depName} -n elohim-${targetEnv} --timeout=300s"
 }
 
+def shouldRunStep(String stepName) {
+    def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
+    return steps.contains('all') || steps.contains(stepName)
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -614,6 +619,7 @@ spec:
             defaultValue: false,
             description: 'Delete and recreate human StatefulSets before deploying. Use when changing topology or for clean state.'
         )
+        string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
     }
 
     options {
@@ -785,7 +791,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Doorway') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('cargo-build-doorway') }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -895,7 +904,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Storage') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('cargo-build-storage') }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -953,7 +965,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Edge Node Image') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('build-edge-image') }
+            }}
             steps {
                 container('builder') {
                     script {

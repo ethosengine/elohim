@@ -98,6 +98,11 @@ def getHumanStorageUrls(String ignored) {
     }
 }
 
+def shouldRunStep(String stepName) {
+    def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
+    return steps.contains('all') || steps.contains(stepName)
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -147,6 +152,7 @@ spec:
             defaultValue: false,
             description: 'Reset storage databases before seeding (deletes content.db and restarts pods to run fresh migrations)'
         )
+        string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
     }
 
     environment {
@@ -345,7 +351,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         }
 
         stage('Validate Constants') {
-            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { shouldRunStep('validate-seeds') }
+            }}
             steps {
                 container('builder') {
                     sh '''#!/bin/bash
@@ -529,7 +539,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
         }
 
         stage('Seed Database') {
-            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { shouldRunStep('seed-content') }
+            }}
             steps {
                 container('builder') {
                     script {

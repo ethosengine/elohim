@@ -51,6 +51,11 @@ def withBuildVars(props, Closure body) {
     }
 }
 
+def shouldRunStep(String stepName) {
+    def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
+    return steps.contains('all') || steps.contains(stepName)
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -114,6 +119,7 @@ spec:
             defaultValue: false,
             description: 'Force rebuild of DNA even without code changes'
         )
+        string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
     }
 
     options {
@@ -285,7 +291,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build DNA') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('build-dna-wasm') }
+            }}
             steps {
                 container('builder') {
                     dir('elohim/holochain/dna/elohim') {

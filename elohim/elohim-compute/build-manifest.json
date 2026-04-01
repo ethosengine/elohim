@@ -1,0 +1,33 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-compute",
+  "description": "Elohim compute — WASM compute module",
+  "steps": {
+    "build-compute": {
+      "description": "Build elohim-compute WASM module",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-compute/**",
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": ["compute-wasm"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Compute",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-compute": { "dir": "elohim/elohim-compute", "steps": ["build-compute"] }
+    }
+  },
+  "deployment": {}
+}

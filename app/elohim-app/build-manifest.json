@@ -1,0 +1,77 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim",
+  "description": "Elohim Angular app — build, service worker, site image",
+  "steps": {
+    "build-angular": {
+      "description": "Build Angular production bundle (includes service worker compilation via pnpm run build:sw)",
+      "inputs": {
+        "sources": [
+          "app/elohim-app/src/**",
+          "app/elohim-app/angular.json",
+          "app/elohim-app/tsconfig*.json",
+          "app/elohim-app/package.json",
+          "app/elohim-app/vite.config.ts",
+          "app/elohim-library/**"
+        ],
+        "buildProcess": ["Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["elohim-app-dist"],
+        "verify": "test -d app/elohim-app/dist/elohim-app"
+      },
+      "depends": ["elohim-sophia:build-sophia-umd"],
+      "executor": {
+        "stage": "Build App",
+        "function": null
+      }
+    },
+    "build-site-image": {
+      "description": "Package app into container image",
+      "inputs": {
+        "sources": [
+          "app/elohim-app/images/Dockerfile",
+          "app/elohim-app/images/nginx.conf"
+        ],
+        "buildProcess": ["Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["site-image"],
+        "verify": null
+      },
+      "depends": ["build-angular"],
+      "executor": {
+        "stage": "Build Image",
+        "function": null
+      }
+    },
+    "lint-library": {
+      "description": "Quality gate for elohim-library (lint + typecheck + tests)",
+      "inputs": {
+        "sources": ["app/elohim-library/**"],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Lint Library",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-app": { "dir": "app/elohim-app", "steps": ["build-angular", "build-site-image"] },
+      "elohim-library": { "dir": "app/elohim-library", "steps": ["lint-library"] }
+    }
+  },
+  "deployment": {
+    "targets": {
+      "alpha": { "healthCheck": "https://alpha.elohim.host/version" },
+      "staging": { "healthCheck": "https://staging.elohim.host/version" }
+    }
+  }
+}

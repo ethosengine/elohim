@@ -72,61 +72,82 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
-# ── Project Detection ─────────────────────────────────────────────
+# ── Project Detection (manifest-driven) ──────────────────────────
+#
+# Try graph walker first — reads build-manifest.json files and matches
+# changed files against source globs. Falls back to grep patterns if
+# node is unavailable or no manifests exist.
 
 PROJECTS=""
+USE_MANIFEST=false
 
-# doorway-app must be checked BEFORE doorway (prefix overlap)
-if echo "$CHANGED" | grep -q "^doorway/doorway-app/"; then
-  PROJECTS="$PROJECTS doorway-app"
+if command -v node >/dev/null 2>&1; then
+  MANIFEST_RESULT=$(echo "$CHANGED" | node genesis/orchestrator/graph-walker.mjs 2>/dev/null)
+  if [ $? -eq 0 ] && [ -n "$MANIFEST_RESULT" ]; then
+    MANIFEST_DIRS_RAW=$(echo "$MANIFEST_RESULT" | node -e "
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      const names = [], dirs = [];
+      for (const p of d.projects) { names.push(p.name); dirs.push(p.dir); }
+      if (names.length > 0) {
+        console.log('PROJECTS=\"' + names.join(' ') + '\"');
+        console.log('MANIFEST_DIRS=\"' + dirs.join(' ') + '\"');
+      }
+    " 2>/dev/null)
+    if [ -n "$MANIFEST_DIRS_RAW" ]; then
+      eval "$MANIFEST_DIRS_RAW"
+      USE_MANIFEST=true
+    fi
+  fi
 fi
-if echo "$CHANGED" | grep "^doorway/" | grep -qv "^doorway/doorway-app/"; then
-  PROJECTS="$PROJECTS doorway"
-fi
-if echo "$CHANGED" | grep -q "^app/elohim-app/"; then
-  PROJECTS="$PROJECTS elohim-app"
-fi
-if echo "$CHANGED" | grep -q "^sophia/"; then
-  PROJECTS="$PROJECTS sophia"
-fi
-if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
-  PROJECTS="$PROJECTS elohim-storage"
-fi
-if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
-  PROJECTS="$PROJECTS elohim-compute"
-fi
-if echo "$CHANGED" | grep -q "^steward/node/"; then
-  PROJECTS="$PROJECTS steward-node"
-fi
-if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
-  PROJECTS="$PROJECTS elohim-library"
-fi
-if echo "$CHANGED" | grep -q "^genesis/"; then
-  PROJECTS="$PROJECTS genesis"
-fi
-# Schema validation when genesis seed data or schema definitions change
-if echo "$CHANGED" | grep -q "^genesis/\|^elohim/sdk/schemas/"; then
-  PROJECTS="$PROJECTS schema-validate"
-fi
-# DNA conformance check when holochain constants or schema enums change
-if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
-  PROJECTS="$PROJECTS schema-dna"
-fi
-# Constants sync when seed data, schema enums, or generated constants change
-if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
-  PROJECTS="$PROJECTS constants-sync"
-fi
-# Schema codegen freshness when schema definitions change
-if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
-  PROJECTS="$PROJECTS schema-codegen"
-fi
-# Any Jenkinsfile change triggers orchestrator lint
-if echo "$CHANGED" | grep -q "Jenkinsfile"; then
-  PROJECTS="$PROJECTS orchestrator"
-fi
-# E2E framework changes trigger TypeScript linting
-if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
-  PROJECTS="$PROJECTS genesis-a2o"
+
+# Fallback: grep-based project detection
+if [ "$USE_MANIFEST" = false ]; then
+  # doorway-app must be checked BEFORE doorway (prefix overlap)
+  if echo "$CHANGED" | grep -q "^doorway/doorway-app/"; then
+    PROJECTS="$PROJECTS doorway-app"
+  fi
+  if echo "$CHANGED" | grep "^doorway/" | grep -qv "^doorway/doorway-app/"; then
+    PROJECTS="$PROJECTS doorway"
+  fi
+  if echo "$CHANGED" | grep -q "^app/elohim-app/"; then
+    PROJECTS="$PROJECTS elohim-app"
+  fi
+  if echo "$CHANGED" | grep -q "^sophia/"; then
+    PROJECTS="$PROJECTS sophia"
+  fi
+  if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
+    PROJECTS="$PROJECTS elohim-storage"
+  fi
+  if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
+    PROJECTS="$PROJECTS elohim-compute"
+  fi
+  if echo "$CHANGED" | grep -q "^steward/node/"; then
+    PROJECTS="$PROJECTS steward-node"
+  fi
+  if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
+    PROJECTS="$PROJECTS elohim-library"
+  fi
+  if echo "$CHANGED" | grep -q "^genesis/"; then
+    PROJECTS="$PROJECTS genesis"
+  fi
+  if echo "$CHANGED" | grep -q "^genesis/\|^elohim/sdk/schemas/"; then
+    PROJECTS="$PROJECTS schema-validate"
+  fi
+  if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
+    PROJECTS="$PROJECTS schema-dna"
+  fi
+  if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
+    PROJECTS="$PROJECTS constants-sync"
+  fi
+  if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
+    PROJECTS="$PROJECTS schema-codegen"
+  fi
+  if echo "$CHANGED" | grep -q "Jenkinsfile"; then
+    PROJECTS="$PROJECTS orchestrator"
+  fi
+  if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
+    PROJECTS="$PROJECTS genesis-a2o"
+  fi
 fi
 
 # Trim leading space
@@ -316,29 +337,38 @@ FAILED=""
 RESULTS=""
 INDEX=0
 
+if [ "$USE_MANIFEST" = true ]; then
+  set -- $MANIFEST_DIRS
+fi
+
 for PROJECT in $PROJECTS; do
   INDEX=$((INDEX + 1))
   PROJECT_START=$(date +%s)
 
   # Map project name to directory
-  case "$PROJECT" in
-    elohim-app)       PROJECT_DIR="app/elohim-app" ;;
-    elohim-library)   PROJECT_DIR="app/elohim-library" ;;
-    sophia)           PROJECT_DIR="sophia" ;;
-    doorway)          PROJECT_DIR="doorway/doorway-service" ;;
-    doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
-    elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
-    elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
-    steward-node)     PROJECT_DIR="steward/node" ;;
-    genesis)          PROJECT_DIR="genesis/seeder" ;;
-    schema-validate)  PROJECT_DIR="." ;;
-    schema-dna)       PROJECT_DIR="." ;;
-    schema-codegen)   PROJECT_DIR="." ;;
-    constants-sync)   PROJECT_DIR="." ;;
-    genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
-    orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
-    *)                PROJECT_DIR="$PROJECT" ;;
-  esac
+  if [ "$USE_MANIFEST" = true ]; then
+    PROJECT_DIR="$1"
+    shift
+  else
+    case "$PROJECT" in
+      elohim-app)       PROJECT_DIR="app/elohim-app" ;;
+      elohim-library)   PROJECT_DIR="app/elohim-library" ;;
+      sophia)           PROJECT_DIR="sophia" ;;
+      doorway)          PROJECT_DIR="doorway/doorway-service" ;;
+      doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
+      elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
+      elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
+      steward-node)     PROJECT_DIR="steward/node" ;;
+      genesis)          PROJECT_DIR="genesis/seeder" ;;
+      schema-validate)  PROJECT_DIR="." ;;
+      schema-dna)       PROJECT_DIR="." ;;
+      schema-codegen)   PROJECT_DIR="." ;;
+      constants-sync)   PROJECT_DIR="." ;;
+      genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
+      orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
+      *)                PROJECT_DIR="$PROJECT" ;;
+    esac
+  fi
 
   run_gate "$PROJECT" "$PROJECT_DIR"
   GATE_EXIT=$?

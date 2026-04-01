@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/build-manifest/v1",
+  "title": "Build Manifest",
+  "description": "Declares build steps, inputs, outputs, and dependencies for a pipeline",
+  "type": "object",
+  "required": ["manifestVersion", "pipeline", "description", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "manifestVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version for the manifest format"
+    },
+    "pipeline": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Pipeline name — must match orchestrator's pipeline identifier"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this pipeline's purpose"
+    },
+    "manualOnly": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, pipeline is never auto-triggered by the orchestrator"
+    },
+    "steps": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/step" },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "description": "Map of step name to step definition"
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "healthCheck": { "type": "string", "format": "uri" }
+            }
+          }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["dir"],
+            "additionalProperties": false,
+            "properties": {
+              "dir": {
+                "type": "string",
+                "description": "Working directory for running the quality gate"
+              },
+              "steps": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Which manifest steps trigger this gate project (default: all steps)"
+              }
+            }
+          },
+          "description": "Map of hook project name to gate config"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["description", "inputs", "outputs", "depends", "executor"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object",
+          "required": ["sources", "buildProcess"],
+          "additionalProperties": false,
+          "properties": {
+            "sources": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Glob patterns for source files (relative to repo root)"
+            },
+            "buildProcess": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[^@]+(@[a-zA-Z][a-zA-Z0-9_]*)?$"
+              },
+              "description": "References to build logic — 'File@functionName' for function hash, 'File' for whole-file hash"
+            }
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "required": ["artifacts"],
+          "additionalProperties": false,
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Named output artifacts this step produces"
+            },
+            "verify": {
+              "type": ["string", "null"],
+              "description": "Shell command to confirm artifact was produced"
+            }
+          }
+        },
+        "depends": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Step dependencies — bare name for same-manifest, 'pipeline:step' for cross-manifest"
+        },
+        "executor": {
+          "type": "object",
+          "required": ["stage"],
+          "additionalProperties": false,
+          "properties": {
+            "stage": {
+              "type": "string",
+              "description": "Jenkins stage name"
+            },
+            "function": {
+              "type": ["string", "null"],
+              "description": "Jenkinsfile helper function name (null if inline stage)"
+            }
+          }
+        }
+      }
+    }
+  }
+}
