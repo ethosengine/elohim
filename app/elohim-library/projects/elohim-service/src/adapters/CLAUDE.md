@@ -48,7 +48,7 @@ interface ConductorContentResponse {
 ```typescript
 interface ContentView {
   id: string;
-  appId: string;              // added by storage layer
+  hAppId: string;              // added by storage layer
   contentType: ContentType;   // camelCase, typed enum
   contentBody?: string | null; // renamed from content
   contentFormat: ContentFormat; // camelCase, typed enum
@@ -62,7 +62,7 @@ interface ContentView {
 ### normalizeConductorContent()
 
 Maps one to the other. One function, one place. Fields not on the conductor wire type get defaults:
-- `appId: 'lamad'` (only content DNA today)
+- `hAppId: 'lamad'` (only content DNA today)
 - `validationStatus: 'valid'` (conductor is authoritative)
 
 ### ensureContentView()

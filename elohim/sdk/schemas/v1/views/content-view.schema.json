@@ -4,10 +4,10 @@
   "title": "ContentView",
   "description": "Content record as returned by the storage API. Source of truth: DHT (Notarized, Category A).",
   "type": "object",
-  "required": ["id", "appId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt"],
+  "required": ["id", "hAppId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt"],
   "properties": {
     "id": { "type": "string" },
-    "appId": { "type": "string" },
+    "hAppId": { "type": "string" },
     "title": { "type": "string" },
     "description": { "type": ["string", "null"] },
     "contentType": { "$ref": "../enums/content-type.schema.json" },

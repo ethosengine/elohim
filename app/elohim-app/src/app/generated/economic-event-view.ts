@@ -11,7 +11,7 @@ export interface EconomicEventView {
   /**
    * Application scope (e.g. lamad)
    */
-  appId?: string;
+  hAppId?: string;
   /**
    * REA economic action (use, consume, produce, transfer, cite)
    */

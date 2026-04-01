@@ -44,7 +44,7 @@ import type {
  * - snake_case field names (Rust default serde)
  * - `content` field (not `contentBody`)
  * - `metadata_json: string` (not parsed `metadata: unknown`)
- * - No `appId` (added by storage layer)
+ * - No `hAppId` (added by storage layer)
  * - No `validationStatus` (added by storage layer)
  * - No `dhtAnchorHash` (added by storage layer)
  */
@@ -77,7 +77,7 @@ export interface ConductorContentResponse {
  * Maps snake_case fields to camelCase, parses metadata_json, and renames
  * `content` to `contentBody`. Fields not present on the conductor wire
  * type are set to sensible defaults:
- * - `appId`: 'lamad' (the only content DNA today)
+ * - `hAppId`: 'lamad' (the only content DNA today)
  * - `validationStatus`: 'valid' (conductor content is authoritative)
  *
  * @param raw - Conductor zome response in snake_case wire format

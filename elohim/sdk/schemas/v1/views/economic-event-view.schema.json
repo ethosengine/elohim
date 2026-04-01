@@ -7,7 +7,7 @@
   "required": ["id", "action", "provider", "receiver", "state", "createdAt"],
   "properties": {
     "id": { "type": "string", "description": "Unique event identifier" },
-    "appId": { "type": "string", "description": "Application scope (e.g. lamad)" },
+    "hAppId": { "type": "string", "description": "Application scope (e.g. lamad)" },
     "action": { "type": "string", "description": "REA economic action (use, consume, produce, transfer, cite)" },
     "provider": { "type": "string", "description": "Agent providing the resource" },
     "receiver": { "type": "string", "description": "Agent or content receiving the resource" },
