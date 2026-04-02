@@ -130,6 +130,12 @@ pub struct Args {
     #[arg(long, env = "STORAGE_URL")]
     pub storage_url: Option<String>,
 
+    /// Slug of the content node to serve as the root SPA.
+    /// When set, doorway serves the SPA at `/` instead of redirecting to `/threshold`.
+    /// The content node must have contentFormat "spa-bundle" and a valid blobHash.
+    #[arg(long, env = "ROOT_APP_SLUG")]
+    pub root_app_slug: Option<String>,
+
     /// Additional storage peer URLs (comma-separated)
     /// Each URL registers as a peer in the route registry via /manifest
     #[arg(long, env = "STORAGE_URLS", value_delimiter = ',')]
