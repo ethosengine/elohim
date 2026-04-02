@@ -39,7 +39,8 @@ export type ContentType =
   | 'stewardship-context'
   | 'work-story'
   | 'work-project'
-  | 'issue-report';
+  | 'issue-report'
+  | 'application';
 /**
  * Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints.
  */

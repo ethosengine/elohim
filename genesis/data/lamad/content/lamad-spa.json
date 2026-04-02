@@ -1,0 +1,26 @@
+{
+  "id": "lamad-spa",
+  "contentType": "application",
+  "title": "Lamad Learning Platform",
+  "name": "Lamad",
+  "description": "The Elohim Protocol's learning platform — served as doorway's root web surface.",
+  "content": {
+    "slug": "lamad",
+    "entryPoint": "index.html"
+  },
+  "contentFormat": "spa-bundle",
+  "tags": [
+    "application",
+    "spa",
+    "learning-platform",
+    "lamad"
+  ],
+  "blobHash": "",
+  "reach": "commons",
+  "metadata": {
+    "category": "application",
+    "embedStrategy": "root"
+  },
+  "createdAt": "2026-04-02T00:00:00.000000",
+  "updatedAt": "2026-04-02T00:00:00.000000"
+}

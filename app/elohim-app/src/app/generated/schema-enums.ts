@@ -98,6 +98,7 @@ export const ALL_CONTENT_TYPES = [
   'work-story',
   'work-project',
   'issue-report',
+  'application',
 ] as const;
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];

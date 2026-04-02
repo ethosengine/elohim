@@ -39,7 +39,8 @@ export type ContentType =
   | 'stewardship-context'
   | 'work-story'
   | 'work-project'
-  | 'issue-report';
+  | 'issue-report'
+  | 'application';
 /**
  * Rendering format hint
  */
