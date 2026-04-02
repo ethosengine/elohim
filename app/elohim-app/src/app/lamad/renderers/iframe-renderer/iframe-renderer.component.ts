@@ -4,7 +4,6 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 // @coverage: 80.7% (2026-02-24)
 
-import { environment } from '../../../../environments/environment';
 import { ContentNode } from '../../models/content-node.model';
 
 /**
@@ -169,57 +168,14 @@ export class IframeRendererComponent implements OnChanges {
 
   /**
    * Resolve the doorway base URL.
-   * Priority:
-   * 1. Eclipse Che endpoint URL (if accessing via Che route)
-   * 2. Relative URL for localhost in dev (doorway on same origin via proxy)
-   * 3. Environment config (deployed environments)
+   *
+   * Returns empty string (relative URL) for all environments. Doorway serves
+   * everything from the same origin — either directly or via ingress proxy.
+   * This ensures the service worker can intercept /apps/ requests for ZIP
+   * delivery on cold cache.
    */
   private resolveDoorwayUrl(): string {
-    // Check for Eclipse Che environment via Che endpoint URL
-    if (this.isCheEnvironment()) {
-      const cheUrl = this.getCheDevProxyUrl();
-      if (cheUrl) {
-        return cheUrl;
-      }
-    }
-
-    // For localhost development, use relative URL (assumes ng serve proxy or same-origin doorway)
-    if (this.isLocalDevelopment()) {
-      return ''; // Relative URL - /apps/... will be proxied
-    }
-
-    // Fallback to environment config
-    return environment.client?.doorwayUrl ?? environment.doorwayUrl ?? '';
-  }
-
-  /**
-   * Detect if running in Eclipse Che environment (via Che endpoint URL).
-   */
-  private isCheEnvironment(): boolean {
-    if (!('window' in globalThis)) return false;
-    return (
-      globalThis.location.hostname.includes('.devspaces.') ||
-      globalThis.location.hostname.includes('.code.ethosengine.com')
-    );
-  }
-
-  /**
-   * Detect local development environment.
-   */
-  private isLocalDevelopment(): boolean {
-    if (!('window' in globalThis)) return false;
-    return (
-      globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1'
-    );
-  }
-
-  /**
-   * Get the dev proxy HTTP URL in Che environment.
-   * Converts angular-dev endpoint to hc-dev endpoint.
-   */
-  private getCheDevProxyUrl(): string | null {
-    const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
-    return `https://${hostname}`;
+    return '';
   }
 
   /**
