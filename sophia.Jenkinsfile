@@ -349,6 +349,7 @@ spec:
                 container('node') {
                     dir('sophia') {
                         script {
+                            // Publish to public npm registry
                             withCredentials([string(credentialsId: 'npm-publish-token', variable: 'NPM_TOKEN')]) {
                                 sh '''#!/bin/bash
                                     set -euo pipefail
@@ -358,6 +359,23 @@ spec:
                                 '''
                             }
                             echo "Published @ethosengine/sophia-element to npm registry"
+
+                            // Publish to Nexus so elohim-app pipeline can pull without building from source
+                            withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_TOKEN')]) {
+                                sh '''#!/bin/bash
+                                    set -euo pipefail
+                                    PKG_VERSION=$(node -p "require('./packages/sophia-element/package.json').version")
+                                    echo "Checking if @ethosengine/sophia-element@${PKG_VERSION} exists on Nexus..."
+                                    if npm view "@ethosengine/sophia-element@${PKG_VERSION}" --registry=https://nexus.ethosengine.com/repository/npm/ version 2>/dev/null; then
+                                        echo "ℹ️  @ethosengine/sophia-element@${PKG_VERSION} already published to Nexus, skipping"
+                                    else
+                                        echo "Publishing @ethosengine/sophia-element@${PKG_VERSION} to Nexus..."
+                                        echo "//nexus.ethosengine.com/repository/npm-hosted/:_authToken=${NEXUS_TOKEN}" > ~/.npmrc
+                                        pnpm --filter @ethosengine/sophia-element publish --no-git-checks --registry=https://nexus.ethosengine.com/repository/npm-hosted/
+                                        echo "✅ Published @ethosengine/sophia-element@${PKG_VERSION} to Nexus"
+                                    fi
+                                '''
+                            }
                         }
                     }
                 }

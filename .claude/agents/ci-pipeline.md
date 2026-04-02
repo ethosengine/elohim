@@ -22,7 +22,7 @@ elohim-holochain (DNA/hApp, WASM artifacts)
 
 **Changeset Patterns** (from orchestrator):
 ```groovy
-'elohim-holochain': ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/'],
+'elohim-holochain': ['elohim/holochain/dna/', 'elohim/elohim-cache-core/', 'elohim/holochain/rna/'],
 'elohim-edge': ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/crates/'],
 'elohim': ['app/elohim-app/', 'app/elohim-library/', 'VERSION'],
 'elohim-genesis': ['genesis/', 'data/'],

@@ -31,21 +31,6 @@
                 "output": "/assets"
               },
               {
-                "glob": "sophia-element.umd.js",
-                "input": "../sophia/packages/sophia-element/dist",
-                "output": "/assets/sophia-plugin"
-              },
-              {
-                "glob": "*.css",
-                "input": "../sophia/packages/sophia-element/dist",
-                "output": "/assets/sophia-plugin"
-              },
-              {
-                "glob": "index.css",
-                "input": "../sophia/packages/sophia/dist",
-                "output": "/assets/sophia-plugin"
-              },
-              {
                 "glob": "**/*",
                 "input": "node_modules/elohim-cache-core",
                 "output": "/wasm/elohim-cache-core"
