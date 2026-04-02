@@ -224,6 +224,9 @@ mod tests {
         let mut shuffled = leaves.clone();
         shuffled.swap(0, 2);
         let root3 = ProvenanceService::compute_merkle_root(&shuffled);
-        assert_ne!(root1, root3, "different ordering must produce different root");
+        assert_ne!(
+            root1, root3,
+            "different ordering must produce different root"
+        );
     }
 }

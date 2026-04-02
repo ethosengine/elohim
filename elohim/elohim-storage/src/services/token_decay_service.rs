@@ -126,8 +126,7 @@ impl TokenDecayService {
         };
 
         // Step 2 — balance check
-        let balance_row =
-            token_balances::get_balance(conn, ctx, agent_id, governance_layer)?;
+        let balance_row = token_balances::get_balance(conn, ctx, agent_id, governance_layer)?;
 
         let balance = match balance_row {
             None => {

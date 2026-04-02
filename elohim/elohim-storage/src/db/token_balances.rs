@@ -112,9 +112,7 @@ pub fn credit_balance(
             let new_balance = row.balance + amount;
             let (new_minted, new_transferred_in) = match source {
                 CreditSource::Mint => (row.total_minted + amount, row.total_transferred_in),
-                CreditSource::TransferIn => {
-                    (row.total_minted, row.total_transferred_in + amount)
-                }
+                CreditSource::TransferIn => (row.total_minted, row.total_transferred_in + amount),
             };
 
             diesel::update(

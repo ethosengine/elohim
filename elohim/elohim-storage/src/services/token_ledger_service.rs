@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 
 use crate::db::context::AppContext;
 use crate::db::models::NewTokenTransfer;
-use crate::db::{token_balances, token_transfers};
 use crate::db::token_balances::CreditSource;
+use crate::db::{token_balances, token_transfers};
 use crate::error::StorageError;
 use crate::services::responsibility_demand_service::ResponsibilityDemandService;
 use crate::views::{TokenBalanceView, TokenTransferView};
@@ -76,14 +76,16 @@ impl TokenLedgerService {
             ));
         }
         if from_agent == to_agent {
-            return Err(StorageError::InvalidInput(
-                "cannot transfer to self".into(),
-            ));
+            return Err(StorageError::InvalidInput("cannot transfer to self".into()));
         }
 
         // Check responsibility demand curve
         ResponsibilityDemandService::check_transfer_allowed(
-            conn, ctx, from_agent, amount, governance_layer,
+            conn,
+            ctx,
+            from_agent,
+            amount,
+            governance_layer,
         )?;
 
         token_balances::debit_balance(conn, ctx, from_agent, governance_layer, amount)?;

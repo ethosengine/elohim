@@ -158,7 +158,10 @@ pub async fn handle_api_request(
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
     } else if sub_path.starts_with("token") {
-        let resource_path = sub_path.strip_prefix("token").unwrap_or("").trim_start_matches('/');
+        let resource_path = sub_path
+            .strip_prefix("token")
+            .unwrap_or("")
+            .trim_start_matches('/');
         token::handle(req, method, resource_path, &pool, &app_ctx).await
     } else {
         Ok(response::not_found(&format!(

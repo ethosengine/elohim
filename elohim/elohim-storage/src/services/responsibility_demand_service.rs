@@ -41,9 +41,7 @@ pub enum ObligationLevel {
 
     /// Between median and soft ceiling (median × soft_ceiling_multiplier).
     /// Elevated participation expected; stewardship visibility increases.
-    Elevated {
-        visibility_required: bool,
-    },
+    Elevated { visibility_required: bool },
 
     /// Between soft ceiling and hard ceiling (median × hard_ceiling_multiplier).
     /// Active stewardship required; justification for concentration expected.

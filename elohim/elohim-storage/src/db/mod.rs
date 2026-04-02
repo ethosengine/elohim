@@ -59,8 +59,8 @@ pub mod steward_operations;
 pub mod custodian_metrics;
 
 // Token economy (shefa — elohim-token sprint 1)
-pub mod token_mint_events;
 pub mod token_balances;
+pub mod token_mint_events;
 pub mod token_transfers;
 
 // Responsibility demand curve config (shefa — elohim-token sprint 2)

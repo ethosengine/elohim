@@ -26,17 +26,20 @@ use hyper::{body::Incoming, Method, Request, Response};
 use uuid::Uuid;
 
 use crate::db::models::NewResponsibilityDemandConfig;
-use crate::db::{responsibility_demand_configs, token_decay_events, token_mint_events, AppContext, DbPool};
+use crate::db::{
+    responsibility_demand_configs, token_decay_events, token_mint_events, AppContext, DbPool,
+};
 use crate::error::StorageError;
+use crate::services::provenance_service::ProvenanceService;
 use crate::services::response::{self, from_create_result, from_option, from_result};
 use crate::services::responsibility_demand_service::ResponsibilityDemandService;
 use crate::services::token_decay_service::TokenDecayService;
 use crate::services::token_ledger_service::TokenLedgerService;
 use crate::services::token_mint_service::TokenMintService;
-use crate::services::provenance_service::ProvenanceService;
 use crate::views::{
     CreateResponsibilityDemandConfigInputView, CreateTokenTransferInputView,
-    DiscernmentMintInputView, ResponsibilityDemandConfigView, TokenDecayEventView, TokenMintEventView,
+    DiscernmentMintInputView, ResponsibilityDemandConfigView, TokenDecayEventView,
+    TokenMintEventView,
 };
 
 use super::{get_conn, parse_body};
@@ -106,9 +109,7 @@ pub async fn handle(
         }
 
         // POST /api/v1/token/discernment-mint — elohim Tier 2 discernment mint
-        (&Method::POST, "discernment-mint") => {
-            handle_discernment_mint(req, pool, ctx).await
-        }
+        (&Method::POST, "discernment-mint") => handle_discernment_mint(req, pool, ctx).await,
 
         // POST /api/v1/token/apply-decay/{agent_id}/{governance_layer} — apply one decay period
         (&Method::POST, p) if p.starts_with("apply-decay/") => {
@@ -184,8 +185,12 @@ async fn handle_get_mints(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(from_result(
-        token_mint_events::get_mints_for_agent(&mut conn, ctx, agent_id)
-            .map(|events| events.into_iter().map(TokenMintEventView::from).collect::<Vec<_>>()),
+        token_mint_events::get_mints_for_agent(&mut conn, ctx, agent_id).map(|events| {
+            events
+                .into_iter()
+                .map(TokenMintEventView::from)
+                .collect::<Vec<_>>()
+        }),
     ))
 }
 
@@ -235,8 +240,12 @@ async fn handle_list_configs(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(from_result(
-        responsibility_demand_configs::get_all_configs(&mut conn, ctx)
-            .map(|configs| configs.into_iter().map(ResponsibilityDemandConfigView::from).collect::<Vec<_>>()),
+        responsibility_demand_configs::get_all_configs(&mut conn, ctx).map(|configs| {
+            configs
+                .into_iter()
+                .map(ResponsibilityDemandConfigView::from)
+                .collect::<Vec<_>>()
+        }),
     ))
 }
 
@@ -285,7 +294,11 @@ async fn handle_create_config(
         soft_ceiling_multiplier: input.soft_ceiling_multiplier.unwrap_or(10.0),
         hard_ceiling_multiplier: input.hard_ceiling_multiplier.unwrap_or(20.0),
         social_contract_health: input.social_contract_health.unwrap_or(0.5),
-        enforcement_active: if input.enforcement_active.unwrap_or(true) { 1 } else { 0 },
+        enforcement_active: if input.enforcement_active.unwrap_or(true) {
+            1
+        } else {
+            0
+        },
         ratified_by: None,
         ratified_at: None,
         dht_anchor_hash: None,
@@ -338,10 +351,7 @@ async fn handle_discernment_mint(
     let input: DiscernmentMintInputView = parse_body(req).await?;
     let mut conn = get_conn(pool)?;
 
-    let governance_layer = input
-        .governance_layer
-        .as_deref()
-        .unwrap_or("individual");
+    let governance_layer = input.governance_layer.as_deref().unwrap_or("individual");
 
     Ok(from_create_result(TokenMintService::discernment_mint(
         &mut conn,
@@ -388,8 +398,12 @@ async fn handle_get_decay_history(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
     Ok(from_result(
-        token_decay_events::get_decay_events_for_agent(&mut conn, ctx, agent_id)
-            .map(|events| events.into_iter().map(TokenDecayEventView::from).collect::<Vec<_>>()),
+        token_decay_events::get_decay_events_for_agent(&mut conn, ctx, agent_id).map(|events| {
+            events
+                .into_iter()
+                .map(TokenDecayEventView::from)
+                .collect::<Vec<_>>()
+        }),
     ))
 }
 

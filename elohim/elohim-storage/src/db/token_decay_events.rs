@@ -50,7 +50,9 @@ pub fn create_decay_event(
     diesel::insert_into(token_decay_events::table)
         .values(&record)
         .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Failed to insert token decay event: {}", e)))?;
+        .map_err(|e| {
+            StorageError::Internal(format!("Failed to insert token decay event: {}", e))
+        })?;
 
     token_decay_events::table
         .filter(token_decay_events::id.eq(id))

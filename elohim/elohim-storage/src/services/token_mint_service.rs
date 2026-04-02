@@ -16,8 +16,8 @@ use sha2::{Digest, Sha256};
 
 use crate::db::context::AppContext;
 use crate::db::models::NewTokenMintEvent;
-use crate::db::{token_balances, token_mint_events};
 use crate::db::token_balances::CreditSource;
+use crate::db::{token_balances, token_mint_events};
 use crate::error::StorageError;
 use crate::views::TokenMintEventView;
 
@@ -221,9 +221,7 @@ mod tests {
 
     #[test]
     fn test_event_weight_defaults() {
-        assert!(
-            (TokenMintService::event_weight("unknown-type") - 0.01).abs() < f32::EPSILON
-        );
+        assert!((TokenMintService::event_weight("unknown-type") - 0.01).abs() < f32::EPSILON);
     }
 
     #[test]

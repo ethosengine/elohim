@@ -482,7 +482,10 @@ pub fn settle(
             share_ratio,
             "individual",
         ) {
-            eprintln!("[token-mint] failed to mint for {}: {}", share.steward_presence_id, e);
+            eprintln!(
+                "[token-mint] failed to mint for {}: {}",
+                share.steward_presence_id, e
+            );
         }
 
         stewardship_allocations::accumulate_recognition(
