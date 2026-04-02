@@ -14,6 +14,10 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode};
+use std::sync::Arc;
+use tracing::debug;
+
+use crate::server::AppState;
 
 /// Embedded HTML bootstrap page — served when the root SPA isn't ready yet.
 ///
@@ -386,4 +390,183 @@ pub fn bootstrap_response() -> Response<Full<Bytes>> {
         .header("Expires", "0")
         .body(Full::new(Bytes::from(BOOTSTRAP_HTML)))
         .unwrap()
+}
+
+/// Handle a request that didn't match any API route — resolve via root app.
+///
+/// Fallback chain:
+/// 1. No ROOT_APP_SLUG → redirect to /threshold
+/// 2. No app_file_cache (MongoDB not configured) → redirect to /threshold
+/// 3. Slug not resolved (cache cold, blob hash unknown) → bootstrap page
+/// 4. File found in MongoDB cache → serve static asset
+/// 5. File not found in cache → delegate to /apps/ handler to trigger extraction
+/// 6. If all else fails → bootstrap page
+pub async fn handle_root_app_request(state: Arc<AppState>, path: &str) -> Response<Full<Bytes>> {
+    // Step 1: require ROOT_APP_SLUG
+    let slug = match &state.args.root_app_slug {
+        Some(s) => s.clone(),
+        None => {
+            return Response::builder()
+                .status(StatusCode::TEMPORARY_REDIRECT)
+                .header("Location", "/threshold")
+                .body(Full::new(Bytes::from(
+                    r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
+                )))
+                .unwrap();
+        }
+    };
+
+    // Step 2: require cache service
+    let cache = match &state.app_file_cache {
+        Some(c) => Arc::clone(c),
+        None => {
+            debug!(slug = %slug, "Root app: no app_file_cache configured, redirecting to /threshold");
+            return Response::builder()
+                .status(StatusCode::TEMPORARY_REDIRECT)
+                .header("Location", "/threshold")
+                .body(Full::new(Bytes::from(
+                    r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
+                )))
+                .unwrap();
+        }
+    };
+
+    // Step 3: resolve blob_hash — if unknown the zip isn't projected yet
+    let blob_hash = match cache.resolve_blob_hash(&slug).await {
+        Some(h) => h,
+        None => {
+            debug!(slug = %slug, "Root app: blob hash not resolved yet, serving bootstrap page");
+            return bootstrap_response();
+        }
+    };
+
+    // Determine file path from request: strip leading '/', default to index.html
+    let file_path = {
+        let stripped = path.trim_start_matches('/');
+        if stripped.is_empty() {
+            "index.html"
+        } else {
+            stripped
+        }
+    };
+
+    // Path traversal guard
+    if file_path.contains("..") || file_path.contains('\0') {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(r#"{"error":"Invalid file path"}"#)))
+            .unwrap();
+    }
+
+    // Step 4: try MongoDB cache
+    if let Some(cached) = cache.get(&slug, file_path, &blob_hash).await {
+        debug!(slug = %slug, file_path = %file_path, "Root app cache HIT");
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", cached.content_type.as_str())
+            .header("Cache-Control", cache_control_for(file_path))
+            .header("X-Root-App", slug.as_str())
+            .header("X-Cache", "HIT")
+            .body(Full::new(Bytes::from(cached.data)))
+            .unwrap();
+    }
+
+    // Step 5: delegate to /apps/ handler — triggers extraction and populates MongoDB cache.
+    debug!(slug = %slug, file_path = %file_path, "Root app cache MISS — delegating to /apps/ handler");
+    let apps_path = format!("/apps/{slug}/{file_path}");
+    let apps_response = super::apps::handle_app_request(Arc::clone(&state), &apps_path).await;
+
+    let status = apps_response.status();
+
+    // If storage returned 404 for this specific file (not index.html), serve index.html
+    // instead — SPA fallback for Angular client-side routing.
+    if status == StatusCode::NOT_FOUND && file_path != "index.html" {
+        debug!(
+            slug = %slug,
+            file_path = %file_path,
+            "Root app: file not found, serving index.html for SPA routing"
+        );
+
+        // Trigger index.html fetch+cache via apps handler, then read from MongoDB cache.
+        let index_apps_path = format!("/apps/{slug}/index.html");
+        let index_response =
+            super::apps::handle_app_request(Arc::clone(&state), &index_apps_path).await;
+
+        if index_response.status().is_success() {
+            // index.html is now in MongoDB cache — read it back to get the bytes cleanly.
+            if let Some(cached_index) = cache.get(&slug, "index.html", &blob_hash).await {
+                return Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", get_mime_type("index.html"))
+                    .header("Cache-Control", cache_control_for("index.html"))
+                    .header("X-Root-App", slug.as_str())
+                    .header("X-Cache", "MISS")
+                    .header("X-SPA-Fallback", "true")
+                    .body(Full::new(Bytes::from(cached_index.data)))
+                    .unwrap();
+            }
+        }
+
+        // index.html also not found — cache is fully cold; serve bootstrap
+        debug!(
+            slug = %slug,
+            "Root app: index.html not found either, serving bootstrap page"
+        );
+        return bootstrap_response();
+    }
+
+    // For successful responses from the apps handler, pass through as-is.
+    // The /apps/ handler sets appropriate Content-Type, Cache-Control, and X-Cache headers.
+    apps_response
+}
+
+/// Map a file extension to a MIME type for root-app static assets.
+pub fn get_mime_type(path: &str) -> &'static str {
+    let ext = path.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    match ext.as_str() {
+        "html" | "htm" => "text/html; charset=utf-8",
+        "js" | "mjs" => "application/javascript",
+        "css" => "text/css",
+        "json" => "application/json",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "ico" => "image/x-icon",
+        "woff" => "font/woff",
+        "woff2" => "font/woff2",
+        "ttf" => "font/ttf",
+        "otf" => "font/otf",
+        "webp" => "image/webp",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "wasm" => "application/wasm",
+        "txt" => "text/plain",
+        "xml" => "application/xml",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Return an appropriate Cache-Control header value for a root-app file.
+///
+/// - `index.html` and files without hashed names: `no-cache` — browser must
+///   revalidate so new SPA deployments are picked up immediately.
+/// - Everything else: immutable long-lived cache (hashed filenames guarantee
+///   content correctness; Angular/Vite output files always include a hash).
+pub fn cache_control_for(path: &str) -> &'static str {
+    // Files that must never be served stale
+    let basename = path.rsplit('/').next().unwrap_or(path);
+    match basename {
+        "index.html"
+        | "index.htm"
+        | "manifest.json"
+        | "manifest.webmanifest"
+        | "service-worker.js"
+        | "sw.js"
+        | "ngsw.json"
+        | "ngsw-worker.js" => "no-cache, no-store, must-revalidate",
+        _ => "public, max-age=31536000, immutable",
+    }
 }

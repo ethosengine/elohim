@@ -78,4 +78,4 @@ pub use collectives::handle_collectives_request;
 pub use elohim_agent::handle_elohim_agent_request;
 pub use epr::handle_epr_head_request;
 pub use journal::{handle_journal_analyze, handle_journal_suggest};
-pub use root_app::bootstrap_response;
+pub use root_app::{bootstrap_response, handle_root_app_request};

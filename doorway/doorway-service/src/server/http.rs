@@ -826,8 +826,9 @@ async fn handle_request(
             }
         }
 
-        // Root and /admin: redirect browsers to /threshold, preserve WS upgrade in dev
-        (Method::GET, "/") | (Method::GET, "/admin") => {
+        // Root path: serve root SPA if configured, otherwise redirect to /threshold.
+        // Preserve WebSocket upgrade for admin in dev mode (legacy path).
+        (Method::GET, "/") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
                 if state.args.dev_mode {
                     debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
@@ -844,17 +845,20 @@ async fn handle_request(
                     )
                 }
             } else {
-                to_boxed(
-                    Response::builder()
-                        .status(StatusCode::TEMPORARY_REDIRECT)
-                        .header("Location", "/threshold")
-                        .body(Full::new(Bytes::from(
-                            r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
-                        )))
-                        .unwrap(),
-                )
+                to_boxed(routes::handle_root_app_request(Arc::clone(&state), "/").await)
             }
         }
+
+        // /admin: always redirect to /threshold (operator dashboard moved)
+        (Method::GET, "/admin") => to_boxed(
+            Response::builder()
+                .status(StatusCode::TEMPORARY_REDIRECT)
+                .header("Location", "/threshold")
+                .body(Full::new(Bytes::from(
+                    r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
+                )))
+                .unwrap(),
+        ),
 
         // WebSocket upgrade for app interface (LEGACY: /app/{port} - deprecated, use /hc/app/{port})
         (Method::GET, p) if p.starts_with("/app/") => {
@@ -1421,6 +1425,12 @@ async fn handle_request(
                 debug!(path = %p, "No registry match");
                 to_boxed(not_found_response(p))
             }
+        }
+
+        // Root app catch-all: unmatched GET paths serve the SPA (if ROOT_APP_SLUG configured).
+        // Handles client-side routing — Angular paths like /learn/123 that aren't API routes.
+        (Method::GET, p) if state.args.root_app_slug.is_some() => {
+            to_boxed(routes::handle_root_app_request(Arc::clone(&state), p).await)
         }
 
         // Not found
