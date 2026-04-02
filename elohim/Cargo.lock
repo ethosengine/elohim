@@ -345,6 +345,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-token"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "enumflags2"
 version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

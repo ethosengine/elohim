@@ -53,16 +53,16 @@ Shefa encodes a fundamental shift from ownership to stewardship:
 - Accumulation requires demonstrated responsibility capacity
 - No agent (human or AI) can extract more than their attributed share
 
-### 2.3 The De Beers Insight Inverted
+### 2.3 Beer's Cybernetic Governance
 
-Cecil Rhodes understood that controlling flow changes everything. De Beers didn't create diamond scarcity—it controlled release to manufacture value.
+Stafford Beer's Viable System Model demonstrated that effective governance requires not central control but recursive feedback: each organizational level must possess sufficient regulatory variety to match the complexity it faces (Ashby's Law of Requisite Variety). Beer proved this practically in Project Cybersyn (Chile, 1971-73), building a real-time economic coordination system with factory-level participation.
 
-Shefa applies this insight to serve flourishing instead of extraction:
+Shefa applies Beer's cybernetic principles to serve flourishing:
 
-- **Old System**: Value flows to extraction points (corporations, banks, landlords)
-- **Shefa System**: Value flows to contribution points (workers, creators, caregivers)
+- **Old System**: Value flows are invisible; extraction is undetectable
+- **Shefa System**: Value flows are visible; coordination emerges through feedback, not command
 
-The "diamond" isn't the resource—it's the recognition of contribution. Constitutional governance controls recognition release for human flourishing rather than shareholder return.
+Recognition of contribution is the system's primary feedback signal. Constitutional governance shapes how recognition flows—not by rationing it, but by ensuring it reaches those who create value, enabling the self-regulation Beer described in *Designing Freedom*.
 
 ## 3. Technical Architecture
 
@@ -318,7 +318,7 @@ Tokens are exchangeable within the network according to constitutional rules:
 
 ### 8.1 The Cybersyn Vision Distributed
 
-Salvador Allende's Project Cybersyn envisioned real-time economic coordination with worker participation. It was destroyed because it was centralized.
+Stafford Beer's Project Cybersyn, designed for Salvador Allende's Chile, envisioned real-time economic coordination with worker participation. It was destroyed in the 1973 coup—not because the idea was wrong, but because it depended on a single government and a single building.
 
 Shefa achieves the same vision through distribution:
 

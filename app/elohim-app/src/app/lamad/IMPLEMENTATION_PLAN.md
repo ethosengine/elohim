@@ -800,7 +800,7 @@ at presence           with invitation       contributor agent
 
 ### Recognition Economics
 
-From the Economic Epic (De Beers' Cybersyn on P2P):
+From the Economic Epic (Beer's Cybersyn on P2P):
 - Recognition flows to contributor presences even before they join
 - Elohim steward presences with constitutional accountability
 - Claiming transfers accumulated recognition to verified identity
