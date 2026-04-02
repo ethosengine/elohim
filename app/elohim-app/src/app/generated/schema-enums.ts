@@ -39,6 +39,7 @@ export const ALL_CONTENT_FORMATS = [
   'video-embed',
   'audio-file',
   'html5-app',
+  'spa-bundle',
   'human-json',
   'organization-json',
   'json',

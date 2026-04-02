@@ -61,6 +61,7 @@ export type ContentFormat =
   | 'video-embed'
   | 'audio-file'
   | 'html5-app'
+  | 'spa-bundle'
   | 'human-json'
   | 'organization-json'
   | 'json'

@@ -675,6 +675,12 @@
         "mimeTypes": ["application/zip", "application/x-zip-compressed"],
         "extensions": ["zip"]
       },
+      "spa-bundle": {
+        "description": "Single-page application served as a doorway's root web surface. ZIP archive extracted and cached by doorway with SPA routing (unmatched paths serve index.html).",
+        "renderer": null,
+        "mimeTypes": ["application/zip", "application/x-zip-compressed"],
+        "extensions": ["zip"]
+      },
       "epr-composite": {
         "description": "EPR composite layout — a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",
         "renderer": "path-renderer",

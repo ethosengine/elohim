@@ -8,7 +8,7 @@
     "markdown", "html", "video", "audio", "interactive", "external", "epr-composite",
     "plaintext", "text", "plain", "gherkin",
     "perseus", "perseus-json", "perseus-quiz-json",
-    "video-embed", "audio-file", "html5-app",
+    "video-embed", "audio-file", "html5-app", "spa-bundle",
     "human-json", "organization-json", "json",
     "sophia", "sophia-quiz-json"
   ],

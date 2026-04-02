@@ -39,6 +39,7 @@ pub const ALL_CONTENT_FORMATS: &[&str] = &[
     "video-embed",
     "audio-file",
     "html5-app",
+    "spa-bundle",
     "human-json",
     "organization-json",
     "json",
