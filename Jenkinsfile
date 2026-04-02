@@ -260,6 +260,32 @@ def publishE2EReports(String environment) {
     }
 }
 
+def stageSpaBlob(String storageUrl, String distDir) {
+    sh """
+        cd '${distDir}'
+        zip -r lamad-spa.zip .
+        SPA_HASH=\$(sha256sum lamad-spa.zip | awk '{print \$1}')
+        echo "SPA blob hash: \${SPA_HASH}"
+        echo "SPA blob size: \$(du -h lamad-spa.zip | cut -f1)"
+
+        # Upload ZIP as blob to storage
+        curl -f -X PUT \
+            -H 'Content-Type: application/zip' \
+            --data-binary @lamad-spa.zip \
+            "${storageUrl}/blob/\${SPA_HASH}" \
+            || echo 'WARNING: Blob upload failed (storage may not be reachable)'
+
+        # Update content node with new blobHash
+        curl -f -X PUT \
+            -H 'Content-Type: application/json' \
+            -d '{"blobHash":"'\${SPA_HASH}'"}' \
+            "${storageUrl}/db/content/lamad-spa" \
+            || echo 'WARNING: Content node update failed'
+
+        rm -f lamad-spa.zip
+    """
+}
+
 // ============================================================================
 // END HELPER METHODS
 // ============================================================================
@@ -771,6 +797,23 @@ VEOF
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Upload SPA Blob') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-angular') }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def storageUrl = env.STORAGE_URL ?: 'http://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8090'
+                        stageSpaBlob(storageUrl, "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser")
                     }
                 }
             }
