@@ -335,7 +335,7 @@ spec:
             }
         }
 
-        stage('Publish') {
+        stage('Publish to npm') {
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
@@ -349,7 +349,6 @@ spec:
                 container('node') {
                     dir('sophia') {
                         script {
-                            // Publish to public npm registry
                             withCredentials([string(credentialsId: 'npm-publish-token', variable: 'NPM_TOKEN')]) {
                                 sh '''#!/bin/bash
                                     set -euo pipefail
@@ -359,8 +358,18 @@ spec:
                                 '''
                             }
                             echo "Published @ethosengine/sophia-element to npm registry"
+                        }
+                    }
+                }
+            }
+        }
 
-                            // Publish to Nexus so elohim-app pipeline can pull without building from source
+        stage('Publish to Nexus') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('node') {
+                    dir('sophia') {
+                        script {
                             withCredentials([string(credentialsId: 'ee-nexus-npm-token', variable: 'NEXUS_TOKEN')]) {
                                 sh '''#!/bin/bash
                                     set -euo pipefail
