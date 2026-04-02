@@ -40,7 +40,7 @@ def discoverAndParseManifests() {
 
 @NonCPS
 def parseManifest(String content, String filePath) {
-    def manifest = new JsonSlurper().parseText(content)
+    def manifest = deepCopy(new JsonSlurper().parseText(content))
     manifest._filePath = filePath
     return manifest
 }
@@ -472,7 +472,16 @@ def loadBuildState() {
 
 @NonCPS
 def parseJson(String content) {
-    return new JsonSlurper().parseText(content)
+    return deepCopy(new JsonSlurper().parseText(content))
+}
+
+/**
+ * Deep-convert LazyMap/LazyList from JsonSlurper into regular HashMap/ArrayList.
+ * LazyMap is not CPS-serializable and breaks when crossing @NonCPS → pipeline boundary.
+ */
+@NonCPS
+def deepCopy(obj) {
+    return new JsonSlurper().parseText(JsonOutput.toJson(obj))
 }
 
 def saveBuildState(Map graph, Map staleMap, Map buildProcessHashes, String commitHash, Map previousState) {

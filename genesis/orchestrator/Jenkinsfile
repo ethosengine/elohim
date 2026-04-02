@@ -565,8 +565,7 @@ def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
         buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
 
     } catch (Exception e) {
-        echo "⚠️ Build Graph shadow mode failed (non-blocking): ${e.message}"
-        echo "Stack trace: ${e.stackTrace.take(10).collect { it.toString() }.join('\n')}"
+        echo "⚠️ Build Graph shadow mode failed (non-blocking): ${e}"
     }
 }
 
