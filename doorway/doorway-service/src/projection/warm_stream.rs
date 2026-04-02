@@ -13,7 +13,16 @@ use std::sync::Arc;
 
 use futures_util::StreamExt;
 use serde_json::Value as JsonValue;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
+
+/// Maximum retry attempts per peer before giving up.
+const MAX_WARMUP_RETRIES: u32 = 5;
+
+/// Base delay between retries (doubles each attempt).
+const WARMUP_RETRY_BASE_SECS: u64 = 10;
+
+/// Maximum delay between retries.
+const WARMUP_RETRY_MAX_SECS: u64 = 120;
 
 use super::document::ProjectedDocument;
 use super::store::ProjectionStore;
@@ -225,6 +234,10 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
 
 /// Spawn cache stream warm-up for multiple peers as a background task.
 /// This is the startup entry point — called from main.rs.
+///
+/// Retries each peer up to [`MAX_WARMUP_RETRIES`] times with exponential
+/// backoff (base [`WARMUP_RETRY_BASE_SECS`]s, cap [`WARMUP_RETRY_MAX_SECS`]s)
+/// so that k8s pod restart ordering doesn't permanently empty the cache.
 pub fn spawn_stream_task(
     store: Arc<ProjectionStore>,
     storage_urls: Vec<String>,
@@ -240,25 +253,52 @@ pub fn spawn_stream_task(
         );
 
         for storage_url in &storage_urls {
-            let result = stream_from_peer(Arc::clone(&store), storage_url).await;
+            let mut attempt: u32 = 0;
 
-            if result.errors.is_empty() {
-                info!(
-                    storage_url = %storage_url,
-                    content = result.content_count,
-                    humans = result.human_count,
-                    relationships = result.relationship_count,
-                    "Cache stream warm-up completed successfully"
-                );
-            } else {
+            loop {
+                attempt += 1;
+                let result = stream_from_peer(Arc::clone(&store), storage_url).await;
+
+                let has_content = result.content_count > 0
+                    || result.human_count > 0
+                    || result.relationship_count > 0;
+
+                if result.errors.is_empty() || has_content {
+                    info!(
+                        storage_url = %storage_url,
+                        content = result.content_count,
+                        humans = result.human_count,
+                        relationships = result.relationship_count,
+                        attempt,
+                        "Cache stream warm-up completed successfully"
+                    );
+                    break;
+                }
+
+                if attempt >= MAX_WARMUP_RETRIES {
+                    error!(
+                        storage_url = %storage_url,
+                        attempts = attempt,
+                        errors = ?result.errors,
+                        "Cache stream warm-up failed after max retries"
+                    );
+                    break;
+                }
+
+                let retry_delay = WARMUP_RETRY_BASE_SECS
+                    .saturating_mul(2u64.pow(attempt - 1))
+                    .min(WARMUP_RETRY_MAX_SECS);
+
                 warn!(
                     storage_url = %storage_url,
-                    content = result.content_count,
-                    humans = result.human_count,
-                    relationships = result.relationship_count,
+                    attempt,
+                    max_retries = MAX_WARMUP_RETRIES,
+                    retry_delay_secs = retry_delay,
                     errors = ?result.errors,
-                    "Cache stream warm-up completed with errors"
+                    "Cache stream warm-up failed, retrying"
                 );
+
+                tokio::time::sleep(std::time::Duration::from_secs(retry_delay)).await;
             }
         }
     })
@@ -360,5 +400,42 @@ mod tests {
         assert_eq!(result.human_count, 0);
         assert_eq!(result.relationship_count, 0);
         assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_retry_delay_calculation() {
+        let base_delay_secs: u64 = 10;
+        let max_delay_secs: u64 = 120;
+
+        assert_eq!(
+            base_delay_secs
+                .saturating_mul(2u64.pow(0))
+                .min(max_delay_secs),
+            10
+        );
+        assert_eq!(
+            base_delay_secs
+                .saturating_mul(2u64.pow(1))
+                .min(max_delay_secs),
+            20
+        );
+        assert_eq!(
+            base_delay_secs
+                .saturating_mul(2u64.pow(2))
+                .min(max_delay_secs),
+            40
+        );
+        assert_eq!(
+            base_delay_secs
+                .saturating_mul(2u64.pow(3))
+                .min(max_delay_secs),
+            80
+        );
+        assert_eq!(
+            base_delay_secs
+                .saturating_mul(2u64.pow(4))
+                .min(max_delay_secs),
+            120
+        );
     }
 }
