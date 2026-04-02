@@ -26,6 +26,20 @@ spec:
         pathType: Prefix
       - backend:
           service:
+            name: elohim-doorway-alpha-service
+            port:
+              number: 8888
+        path: /apps
+        pathType: Prefix
+      - backend:
+          service:
+            name: elohim-doorway-alpha-service
+            port:
+              number: 8888
+        path: /blob
+        pathType: Prefix
+      - backend:
+          service:
             name: elohim-site-alpha-service
             port:
               number: 80

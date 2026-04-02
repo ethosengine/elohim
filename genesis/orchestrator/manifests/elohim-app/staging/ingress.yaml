@@ -19,6 +19,20 @@ spec:
       paths:
       - backend:
           service:
+            name: elohim-doorway-staging-service
+            port:
+              number: 8888
+        path: /apps
+        pathType: Prefix
+      - backend:
+          service:
+            name: elohim-doorway-staging-service
+            port:
+              number: 8888
+        path: /blob
+        pathType: Prefix
+      - backend:
+          service:
             name: elohim-site-staging-service
             port:
               number: 80
