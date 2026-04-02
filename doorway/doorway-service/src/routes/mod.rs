@@ -64,7 +64,7 @@ pub use federation::{
     handle_admin_refresh_federation_peers, handle_admin_remove_federation_peer,
     handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers,
 };
-pub use health::{health_check, readiness_check, version_info};
+pub use health::{health_check, readiness_check, startup_check, version_info};
 pub use identity::{handle_did_document, handle_did_endpoint, handle_identity_api_request};
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;

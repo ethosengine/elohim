@@ -706,6 +706,11 @@ async fn handle_request(
     }
 
     let response = match (method, path.as_str()) {
+        // Startup progress probe - reports identity/storage/projection/root-app readiness
+        (Method::GET, "/health/startup") => {
+            to_boxed(routes::startup_check(Arc::clone(&state)).await)
+        }
+
         // Liveness probe - returns 200 if doorway is running
         (Method::GET, "/health") | (Method::GET, "/healthz") => {
             to_boxed(routes::health_check(Arc::clone(&state)))

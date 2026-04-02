@@ -341,6 +341,33 @@ impl AppFileCacheService {
         debug!(slug = %slug, "Removed app from index (will re-resolve on next request)");
     }
 
+    /// Check whether any cached files exist for the given slug and blob_hash.
+    ///
+    /// Returns true if at least one file with this `slug:*:blob_hash` key
+    /// exists in MongoDB. Used by the /health/startup endpoint to report
+    /// whether the root app is ready to serve.
+    pub async fn has_cached_files(&self, slug: &str, blob_hash: &str) -> bool {
+        if blob_hash.is_empty() {
+            return false;
+        }
+
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
+
+        let filter = doc! {
+            "slug": slug,
+            "blob_hash": blob_hash,
+        };
+
+        match collection.count_documents(filter).await {
+            Ok(count) => count > 0,
+            Err(e) => {
+                warn!(slug = %slug, error = %e, "has_cached_files query failed");
+                false
+            }
+        }
+    }
+
     /// Begin an in-flight fetch for a file.
     ///
     /// If another task is already fetching this file, returns

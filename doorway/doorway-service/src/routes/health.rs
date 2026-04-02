@@ -282,6 +282,85 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .unwrap()
 }
 
+/// Handle startup progress endpoint (/health/startup)
+///
+/// Returns JSON showing startup progress for the bootstrap page to poll.
+/// Reports identity, storage, projection, and root-app readiness.
+pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let args = &state.args;
+
+    // identity.did — derive from doorway_id
+    let did = if let Some(ref id) = args.doorway_id {
+        if id.contains('.') {
+            format!("did:web:{id}")
+        } else {
+            let domain = id.replace('-', ".");
+            format!("did:web:{domain}")
+        }
+    } else {
+        format!("did:web:{}", args.node_id)
+    };
+
+    // storage
+    let storage_ready = args.storage_url.is_some();
+    let storage_url = args.storage_url.as_deref().unwrap_or("").to_string();
+
+    // projection counts from hot cache
+    let (content, humans, relationships) = state
+        .projection
+        .as_ref()
+        .map(|p| p.count_by_type())
+        .unwrap_or((0, 0, 0));
+    let projection_ready = content + humans + relationships > 0;
+
+    // root app
+    let root_slug = args.root_app_slug.as_deref().unwrap_or("").to_string();
+    let blob_hash = if let Some(ref cache) = state.app_file_cache {
+        cache
+            .resolve_blob_hash(&root_slug)
+            .await
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let extracted = if let Some(ref cache) = state.app_file_cache {
+        cache.has_cached_files(&root_slug, &blob_hash).await
+    } else {
+        false
+    };
+    let root_app_ready = extracted;
+
+    let body = serde_json::json!({
+        "identity": {
+            "ready": true,
+            "did": did,
+        },
+        "storage": {
+            "ready": storage_ready,
+            "url": storage_url,
+        },
+        "projection": {
+            "ready": projection_ready,
+            "content": content,
+            "humans": humans,
+            "relationships": relationships,
+        },
+        "rootApp": {
+            "ready": root_app_ready,
+            "slug": root_slug,
+            "blobHash": blob_hash,
+            "extracted": extracted,
+        },
+    })
+    .to_string();
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
 /// Handle version endpoint (/version)
 ///
 /// Returns build information for deployment verification.

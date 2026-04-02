@@ -562,6 +562,27 @@ impl ProjectionStore {
     pub fn has_mongodb(&self) -> bool {
         self.mongo.is_some()
     }
+
+    /// Count projected documents by type.
+    ///
+    /// Returns (content, humans, relationships) from the hot cache.
+    /// Used by the /health/startup endpoint to report projection progress.
+    pub fn count_by_type(&self) -> (usize, usize, usize) {
+        let mut content = 0usize;
+        let mut humans = 0usize;
+        let mut relationships = 0usize;
+
+        for entry in self.hot_cache.iter() {
+            match entry.doc.doc_type.as_str() {
+                "Content" => content += 1,
+                "Human" => humans += 1,
+                "Relationship" => relationships += 1,
+                _ => {}
+            }
+        }
+
+        (content, humans, relationships)
+    }
 }
 
 /// Hot cache statistics
