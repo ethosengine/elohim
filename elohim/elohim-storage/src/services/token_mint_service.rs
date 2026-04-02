@@ -60,6 +60,7 @@ impl TokenMintService {
     ///
     /// Writes an immutable `token_mint_events` record and credits the agent's
     /// balance in the given governance layer.
+    #[allow(clippy::too_many_arguments)]
     pub fn mint_for_recognition(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -118,6 +119,7 @@ impl TokenMintService {
     /// The mint ID is derived from `agent_id + governance_layer + timestamp_millis`
     /// so repeated calls for the same agent + layer in the same millisecond are
     /// idempotent (unlikely in practice; treated as a guard, not a guarantee).
+    #[allow(clippy::too_many_arguments)]
     pub fn discernment_mint(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
