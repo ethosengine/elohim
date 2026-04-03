@@ -102,3 +102,39 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     When a content update signal arrives with blob_hash "sha256-new" for "evolution-of-trust"
     Then the SW evicts all cached files for "evolution-of-trust"
     And the next request triggers a fresh fetch
+
+  # --- elohim-cache-core (WASM) Layer ---
+
+  @wip @browser-only
+  Scenario: WASM cache provides sub-millisecond content lookups
+    # elohim-cache-core is an IndexedDB-backed WASM module that sits in front of
+    # the SW → doorway → storage chain. When warm it resolves content without any
+    # network round-trip. Sub-5ms lookups are the design target.
+    Given elohim-cache-core WASM is loaded in the browser
+    And content "evolution-of-trust" has been fetched and written into the WASM IndexedDB cache
+    When Timothy navigates to a previously visited page in "evolution-of-trust"
+    Then the content lookup resolves from the WASM cache
+    And no network request is made for that content
+    And the lookup latency is under 5 ms
+
+  @wip @browser-only
+  Scenario: WASM cache falls back to network when content not cached
+    Given elohim-cache-core WASM is loaded in the browser
+    And the WASM cache has no entry for "evolution-of-trust"
+    When Timothy loads "evolution-of-trust"
+    Then the request falls through to the SW → doorway → storage chain
+    And the content is served successfully from the network
+    And the fetched content is written into the WASM cache for subsequent lookups
+
+  @wip @browser-only @regression
+  Scenario: WASM cache unavailable degrades gracefully
+    # elohim-cache-core WASM is built by the DNA pipeline and fetched from Harbor.
+    # If the DNA pipeline hasn't run, the WASM blob is absent and the fetch returns
+    # 404. The app must not crash or block content delivery when this happens.
+    # See known issue: "WASM cache 404 noise" in CLAUDE.md.
+    Given elohim-cache-core WASM failed to load with a 404 response
+    When Timothy loads "evolution-of-trust"
+    Then content requests bypass the WASM cache and go directly to the SW → network chain
+    And "evolution-of-trust" loads and functions normally
+    And no errors are shown to Timothy
+    And the browser console contains exactly 1 warning about WASM unavailability

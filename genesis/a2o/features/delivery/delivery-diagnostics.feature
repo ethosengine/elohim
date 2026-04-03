@@ -147,3 +147,40 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
     When Matthew re-enables all delivery layers
     Then the next load re-warms the caches
     And the serving layer returns to "projection-cache"
+
+  # --- Cold-Cache Performance (Phase 1 Validation) ---
+
+  @wip @browser-only @regression
+  Scenario: Cold-cache HTML5 app loads via SW ZIP delivery without crashing storage
+    # The original OOM failure happened when projection cache was cold and every
+    # browser file request hit storage directly. SW ZIP delivery is the fix:
+    # one blob fetch, local extraction, zero storage fanout. This scenario
+    # validates the full path and confirms storage is not overwhelmed.
+    Given the projection cache for "evolution-of-trust" is empty
+    And the Service Worker is registered same-origin
+    And browser console logging is enabled
+    When Timothy loads "evolution-of-trust"
+    Then the SW capability probe returns deliveryMode "compressed"
+    And the SW downloads the ZIP blob via a single GET /blob/{hash} request
+    And the SW extracts all app files into CacheStorage
+    And the app renders correctly within 10 seconds
+    And the browser console evidence shows:
+      | event                    | count    |
+      | capability probes sent   | 1        |
+      | ZIP blob fetches         | 1        |
+      | CacheStorage puts        | 30+      |
+      | direct storage requests  | 0        |
+    And elohim-storage received at most 2 HTTP requests total
+    And elohim-storage memory usage did not spike above baseline + 50 MB
+
+  @wip @browser-only
+  Scenario: Same-origin ingress enables SW interception for /apps/ requests
+    # SW can only intercept requests on the same origin. If the iframe renderer
+    # builds a cross-origin URL (e.g. storage-host/apps/...) the SW is bypassed
+    # entirely, defeating the caching strategy. This scenario verifies the ingress
+    # routes /apps/ and /blob/ through the main origin so SW interception fires.
+    Given the iframe renderer is building asset URLs for "evolution-of-trust"
+    When the renderer resolves the entry point path
+    Then the URL is relative to the main origin (e.g. /apps/evolution-of-trust/index.html)
+    And the SW fetch event fires for the request
+    And no CORS preflight is triggered
