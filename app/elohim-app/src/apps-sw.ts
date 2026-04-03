@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+/* eslint-disable no-console -- SW delivery evidence logging; parsed by a2o step definitions */
 declare const self: ServiceWorkerGlobalScope;
 
 import JSZip from 'jszip';
@@ -169,11 +170,17 @@ async function handleAppFetch(request: Request): Promise<Response> {
   const identifier = pathParts[0]; // Could be slug or blob_hash
   const filePath = pathParts.slice(1).join('/');
 
+  console.log(`[apps-sw] fetch: ${url.pathname}`);
+
   const cache = await caches.open(CACHE_NAME);
 
   // 1. Probe peer capability to get the blob_hash for CID-based caching
   const capability = await probeCapability(identifier);
   const blobHash = capability.blobHash;
+
+  console.log(
+    `[apps-sw] capability: ${identifier} deliveryMode=${capability.deliveryMode} ready=${capability.ready} blobHash=${capability.blobHash.slice(0, 12)}...`,
+  );
 
   // 2. Try cache under CID key first (immutable content address)
   if (blobHash) {
@@ -181,23 +188,33 @@ async function handleAppFetch(request: Request): Promise<Response> {
       `${self.location.origin}/apps/${blobHash}/${filePath}`,
     );
     const cached = await cache.match(cidKey);
-    if (cached) return cached;
+    if (cached) {
+      console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash || identifier}`);
+      return cached;
+    }
   }
 
   // 3. Also check under the original URL (backwards compat)
   const cached = await cache.match(request);
-  if (cached) return cached;
+  if (cached) {
+    console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash || identifier}`);
+    return cached;
+  }
 
   // 4. Try LAN/WAN peers in scored order (best-effort P2P delivery)
   const peers = await getDeliveryPeers(blobHash);
   for (const peer of peers) {
     if (!peer.baseUrl) continue;
     try {
+      console.log(
+        `[apps-sw] peer-try: ${peer.peerId.slice(0, 12)} network=${peer.network} score=${peer.score}`,
+      );
       if (peer.servesExtracted && peer.warm) {
         const resp = await fetch(
           `${peer.baseUrl}/apps/${identifier}/${filePath}`,
         );
         if (resp.ok) {
+          console.log(`[apps-sw] peer-hit: ${peer.peerId.slice(0, 12)} ${identifier}/${filePath}`);
           const cacheKey = buildCacheKey(blobHash, identifier, filePath);
           cache.put(cacheKey, resp.clone());
           return resp;
@@ -209,6 +226,9 @@ async function handleAppFetch(request: Request): Promise<Response> {
   }
 
   // 5. Fall back to default path (doorway — the safety net)
+  console.log(
+    `[apps-sw] fallback: mode=${capability.deliveryMode} ready=${capability.ready} → ${capability.deliveryMode === 'extracted' || capability.ready ? 'fetch-individual' : 'fetch-zip'}`,
+  );
   if (capability.deliveryMode === 'extracted' || capability.ready) {
     // Doorway can serve individual files — fetch and cache under CID
     return fetchAndCacheByCid(cache, request, blobHash, identifier, filePath);
@@ -252,6 +272,7 @@ async function fetchAndCacheByCid(
       } else {
         await cache.put(request, responseToCache);
       }
+      console.log(`[apps-sw] cached: ${slug}/${filePath} address=${contentAddress}`);
     }
     return response;
   } catch {
@@ -307,6 +328,7 @@ async function extractZip(
   if (!resp.ok) return;
 
   const data = await resp.arrayBuffer();
+  console.log(`[apps-sw] zip-fetch: ${blobUrl} size=${data.byteLength}`);
   const zip = await JSZip.loadAsync(data);
 
   // Cache under CID (immutable) when available, slug as fallback
@@ -323,6 +345,7 @@ async function extractZip(
       new Request(`${self.location.origin}/apps/${cachePrefix}/${path}`),
       response,
     );
+    console.log(`[apps-sw] cache-put: ${cachePrefix}/${path} type=${contentType}`);
   }
 }
 
