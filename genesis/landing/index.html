@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elohim Protocol — Digital Infrastructure for Human Flourishing</title>
+  <meta name="description" content="A distributed learning platform built on Holochain, governed by constitutional AI, and powered by mutual credit economics.">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Elohim Protocol">
+  <meta property="og:description" content="Digital infrastructure for human flourishing — learning, identity, governance, and economics woven into one constitutional substrate.">
+  <meta property="og:type" content="website">
+
+  <!-- Protocol meta -->
+  <meta name="epr:content-type" content="application">
+  <meta name="epr:content-format" content="spa-bundle">
+  <meta name="epr:reach" content="commons">
+
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <!-- Hero -->
+  <header class="hero" id="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">Elohim Protocol</h1>
+      <p class="hero-subtitle">Digital infrastructure for human flourishing</p>
+      <p class="hero-tagline">
+        Learning, identity, governance, and economics — woven into one
+        constitutional substrate, guarded by AI that serves rather than rules.
+      </p>
+      <div class="hero-actions">
+        <a href="/lamad" class="btn btn-primary" data-testid="cta-start-learning">Start Learning</a>
+        <a href="#manifesto" class="btn btn-secondary">Read the Manifesto</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Stats -->
+  <section class="stats" id="stats">
+    <div class="stats-grid">
+      <div class="stat">
+        <span class="stat-value" id="stat-content">--</span>
+        <span class="stat-label">Content Nodes</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-humans">--</span>
+        <span class="stat-label">Humans</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-peers">--</span>
+        <span class="stat-label">Peers Connected</span>
+      </div>
+    </div>
+    <p class="stats-source">Live from the protocol network</p>
+  </section>
+
+  <!-- Manifesto Summary -->
+  <section class="manifesto" id="manifesto">
+    <div class="section-content">
+      <h2>The Manifesto</h2>
+      <div class="manifesto-body" id="manifesto-body">
+        <!-- Populated at build time by render-content.ts, or at runtime as fallback -->
+        <noscript>
+          <p>We stand at a crossroads in the evolution of digital civilization.
+          Current social media architectures, built on surveillance capitalism
+          and engagement optimization, have failed to support human flourishing
+          at scale.</p>
+        </noscript>
+      </div>
+      <a href="/deliver/manifesto" class="read-more">Read the full manifesto</a>
+    </div>
+  </section>
+
+  <!-- Five Pillars -->
+  <section class="pillars" id="pillars">
+    <div class="section-content">
+      <h2>Five Pillars</h2>
+      <p class="section-intro">The protocol organizes around five Hebrew-named domains, each coupling power with responsibility.</p>
+      <div class="pillars-grid" id="pillars-grid">
+        <!-- Populated by main.ts from generated content -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Call to Action -->
+  <section class="cta" id="cta">
+    <div class="section-content">
+      <h2>Enter the Protocol</h2>
+      <p>The knowledge is accessible. The governance is participatory. The economics flow to contributors. Begin your path.</p>
+      <a href="/lamad" class="btn btn-primary btn-large">Start Learning</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>Served as a protocol content node by doorway. <span id="footer-source"></span></p>
+    <p class="footer-links">
+      <a href="/deliver/manifesto">Manifesto</a>
+      <a href="/deliver/constitution">Constitution</a>
+      <a href="https://github.com/ethosengine/elohim">Source Code</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
