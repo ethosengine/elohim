@@ -34,6 +34,10 @@ export class ProtocolOmnibarComponent {
   @Input() reach = '';
   @Input() deliverySource = '';
 
+  /** Show a back/exit button (e.g., when used as focus mode in lesson view) */
+  @Input() showBack = false;
+
+  @Output() backRequested = new EventEmitter<void>();
   @Output() reportRequested = new EventEmitter<void>();
   @Output() feedbackRequested = new EventEmitter<void>();
 

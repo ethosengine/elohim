@@ -222,7 +222,7 @@
         ></app-focused-view-toggle>
       </div>
 
-      <!-- Protocol Omnibar (shown in focused view — EPR provenance pill) -->
+      <!-- Protocol Omnibar (shown in focused view — EPR provenance pill + back button) -->
       <app-protocol-omnibar
         *ngIf="isFocusedView && node"
         [contentId]="node.id"
@@ -230,6 +230,8 @@
         [stewards]="omnibarStewards"
         [reach]="omnibarReach"
         [deliverySource]="omnibarDeliverySource"
+        [showBack]="true"
+        (backRequested)="onFocusedViewToggle(false)"
       ></app-protocol-omnibar>
 
       <!-- Content Tab -->

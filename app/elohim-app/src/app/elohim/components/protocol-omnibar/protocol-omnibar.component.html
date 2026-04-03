@@ -1,14 +1,24 @@
 <!-- === PILL STATE (default) === -->
-<button
-  *ngIf="state === 'pill'"
-  class="omnibar-pill"
-  (click)="expand()"
-  aria-label="View protocol provenance"
-  data-testid="omnibar-pill"
->
-  <span class="pill-mark">E</span>
-  <span class="pill-reach">{{ reachIcon }}</span>
-</button>
+<div *ngIf="state === 'pill'" class="pill-group">
+  <button
+    *ngIf="showBack"
+    class="omnibar-pill back-pill"
+    (click)="backRequested.emit()"
+    aria-label="Exit focused view"
+    data-testid="omnibar-back"
+  >
+    &#x2190;
+  </button>
+  <button
+    class="omnibar-pill"
+    (click)="expand()"
+    aria-label="View protocol provenance"
+    data-testid="omnibar-pill"
+  >
+    <span class="pill-mark">E</span>
+    <span class="pill-reach">{{ reachIcon }}</span>
+  </button>
+</div>
 
 <!-- === EXPANDED STATE === -->
 <div
@@ -63,6 +73,17 @@
   </div>
 
   <div class="omnibar-actions-area">
+    <!-- Back (when in focused/lesson context) -->
+    <button
+      *ngIf="showBack"
+      class="omnibar-btn"
+      (click)="backRequested.emit()"
+      aria-label="Exit focused view"
+      data-testid="omnibar-back-expanded"
+    >
+      &#x2190;
+    </button>
+
     <!-- Actions toggle -->
     <button
       class="omnibar-btn actions-toggle"
