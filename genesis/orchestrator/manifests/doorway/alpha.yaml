@@ -127,6 +127,8 @@ spec:
               value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
             - name: STORAGE_URLS
               value: "STORAGE_URLS_PLACEHOLDER"
+            - name: ROOT_APP_SLUG
+              value: "lamad"
             # Elohim Agent SDK sidecar (runs in same pod)
             - name: ELOHIM_AGENT_URL
               value: "http://localhost:8095"
