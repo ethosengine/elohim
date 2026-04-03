@@ -672,6 +672,17 @@ impl HttpServer {
             // Route manifest — declares the API surface for doorway dynamic discovery
             (Method::GET, "/manifest") => self.handle_manifest().await,
 
+            // Admin: extraction cache stats
+            (Method::GET, "/admin/extraction-cache/stats") => {
+                self.handle_extraction_cache_stats().await
+            }
+
+            // Admin: evict app from extraction cache
+            (Method::POST, p) if p.starts_with("/admin/extraction-cache/evict/") => {
+                let slug = p.strip_prefix("/admin/extraction-cache/evict/").unwrap_or("");
+                self.handle_extraction_cache_evict(slug).await
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -780,6 +791,64 @@ impl HttpServer {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(body)))
+            .unwrap())
+    }
+
+    /// GET /admin/extraction-cache/stats — Extraction cache statistics
+    ///
+    /// Returns the number of warm apps, total cached bytes, budget, and TTL.
+    /// Used by delivery diagnostics to observe the cache layer without evicting.
+    async fn handle_extraction_cache_stats(
+        &self,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = if let Some(ref cache) = self.extraction_cache {
+            let stats = cache.stats().await;
+            serde_json::json!({
+                "warmApps": stats.cached_apps,
+                "totalCachedBytes": stats.total_cached_bytes,
+                "budgetBytes": stats.budget_bytes,
+                "ttlSecs": stats.ttl_secs,
+            })
+        } else {
+            serde_json::json!({ "error": "extraction cache not configured" })
+        };
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap())
+    }
+
+    /// POST /admin/extraction-cache/evict/{slug} — Evict an app from the extraction cache
+    ///
+    /// Forces re-extraction on the next request for this app.
+    /// Used by delivery diagnostics tests to peel back the extraction layer
+    /// and reveal the blob decompression layer beneath.
+    async fn handle_extraction_cache_evict(
+        &self,
+        slug: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if slug.is_empty() {
+            let body = serde_json::json!({ "error": "missing slug" });
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(body.to_string())))
+                .unwrap());
+        }
+        let body = if let Some(ref cache) = self.extraction_cache {
+            cache.evict_app(slug).await.map_err(|e| {
+                StorageError::Internal(format!("Extraction cache evict failed: {}", e))
+            })?;
+            info!(slug = %slug, "Extraction cache evicted by admin");
+            serde_json::json!({ "slug": slug, "evicted": true })
+        } else {
+            serde_json::json!({ "error": "extraction cache not configured" })
+        };
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
     }
 
