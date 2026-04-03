@@ -130,6 +130,16 @@ export class ContentService {
   }
 
   /**
+   * Fetch a content node by slug (URL-friendly identifier).
+   * Slug is stored in content.slug for spa-bundle nodes,
+   * or falls back to the node ID.
+   */
+  getContentBySlug(slug: string): Observable<ContentNode | null> {
+    // First try direct ID lookup (slugs often are the ID)
+    return this.getContent(slug).pipe(catchError(() => of(null)));
+  }
+
+  /**
    * Get related resources (shallow metadata).
    * Does NOT load full content for related nodes - just their IDs.
    * The caller should load specific related resources as needed.
