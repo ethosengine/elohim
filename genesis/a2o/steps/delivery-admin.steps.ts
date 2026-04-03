@@ -22,10 +22,19 @@
 import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
+
 import { request } from 'undici';
 
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
+
+// Admin API paths — extracted to satisfy sonarjs/no-duplicate-string
+const CACHE_STATS = CACHE_STATS;
+const CACHE_DISABLE = CACHE_DISABLE;
+const CACHE_ENABLE = CACHE_ENABLE;
+const CACHE_WARM = CACHE_WARM;
+const HEALTH_STARTUP = HEALTH_STARTUP;
+const HEALTH = HEALTH;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,9 +75,9 @@ function getDoorwayUrl(world: E2EWorld): string {
  */
 Given('the doorway projection cache is disabled', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  await adminPost(url, '/admin/cache/disable');
+  await adminPost(url, CACHE_DISABLE);
   this.onCleanup(async () => {
-    await adminPost(url, '/admin/cache/enable');
+    await adminPost(url, CACHE_ENABLE);
   });
 });
 
@@ -81,8 +90,8 @@ Given(
   'the doorway projection cache is enabled and warm for {string}',
   async function (this: E2EWorld, _appSlug: string) {
     const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/enable');
-    const stats = await adminGet(url, '/admin/cache/stats');
+    await adminPost(url, CACHE_ENABLE);
+    const stats = await adminGet(url, CACHE_STATS);
     const projection = stats['projection'] as Record<string, unknown>;
     assert.ok(
       (projection['entries'] as number) > 0,
@@ -98,7 +107,7 @@ Given(
  */
 Given('the projection cache is enabled', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  await adminPost(url, '/admin/cache/enable');
+  await adminPost(url, CACHE_ENABLE);
 });
 
 /**
@@ -111,12 +120,12 @@ Given(
   'the projection cache is warm for {string}',
   async function (this: E2EWorld, appSlug: string) {
     const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/enable');
+    await adminPost(url, CACHE_ENABLE);
     // Trigger warmup and wait for entries to appear
-    await adminPost(url, '/admin/cache/warm');
+    await adminPost(url, CACHE_WARM);
     await retry(
       async () => {
-        const stats = await adminGet(url, '/admin/cache/stats');
+        const stats = await adminGet(url, CACHE_STATS);
         const projection = stats['projection'] as Record<string, unknown>;
         assert.ok(
           (projection['entries'] as number) > 0,
@@ -138,11 +147,11 @@ Given(
   'the projection cache for {string} is warm',
   async function (this: E2EWorld, appSlug: string) {
     const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/enable');
-    await adminPost(url, '/admin/cache/warm');
+    await adminPost(url, CACHE_ENABLE);
+    await adminPost(url, CACHE_WARM);
     await retry(
       async () => {
-        const stats = await adminGet(url, '/admin/cache/stats');
+        const stats = await adminGet(url, CACHE_STATS);
         const projection = stats['projection'] as Record<string, unknown>;
         assert.ok(
           (projection['entries'] as number) > 0,
@@ -169,36 +178,30 @@ When(
   '{word} disables the projection cache via operator API',
   async function (this: E2EWorld, _humanName: string) {
     const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/disable');
+    await adminPost(url, CACHE_DISABLE);
     this.onCleanup(async () => {
-      await adminPost(url, '/admin/cache/enable');
+      await adminPost(url, CACHE_ENABLE);
     });
   }
 );
 
-When(
-  '{word} disables the projection cache',
-  async function (this: E2EWorld, _humanName: string) {
-    const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/disable');
-    this.onCleanup(async () => {
-      await adminPost(url, '/admin/cache/enable');
-    });
-  }
-);
+When('{word} disables the projection cache', async function (this: E2EWorld, _humanName: string) {
+  const url = getDoorwayUrl(this);
+  await adminPost(url, CACHE_DISABLE);
+  this.onCleanup(async () => {
+    await adminPost(url, CACHE_ENABLE);
+  });
+});
 
 /**
  * Actor re-enables the projection cache.
  *
  * Example: When Matthew re-enables the projection cache
  */
-When(
-  '{word} re-enables the projection cache',
-  async function (this: E2EWorld, _humanName: string) {
-    const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/enable');
-  }
-);
+When('{word} re-enables the projection cache', async function (this: E2EWorld, _humanName: string) {
+  const url = getDoorwayUrl(this);
+  await adminPost(url, CACHE_ENABLE);
+});
 
 /**
  * Actor re-enables all delivery layers (projection cache + storage extraction).
@@ -206,14 +209,11 @@ When(
  *
  * Example: When Matthew re-enables all delivery layers
  */
-When(
-  '{word} re-enables all delivery layers',
-  async function (this: E2EWorld, _humanName: string) {
-    const url = getDoorwayUrl(this);
-    await adminPost(url, '/admin/cache/enable');
-    // Storage extraction cache is always on — no disable API needed
-  }
-);
+When('{word} re-enables all delivery layers', async function (this: E2EWorld, _humanName: string) {
+  const url = getDoorwayUrl(this);
+  await adminPost(url, CACHE_ENABLE);
+  // Storage extraction cache is always on — no disable API needed
+});
 
 /**
  * Assert all delivery layers are in the enabled state.
@@ -222,7 +222,7 @@ When(
  */
 Given('all delivery layers are enabled', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  await adminPost(url, '/admin/cache/enable');
+  await adminPost(url, CACHE_ENABLE);
 });
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ Then(
  */
 Then('the projection cache is bypassed but not cleared', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  const stats = await adminGet(url, '/admin/cache/stats');
+  const stats = await adminGet(url, CACHE_STATS);
   assert.equal(stats['enabled'], false, 'Cache should be disabled (bypassed)');
   const projection = stats['projection'] as Record<string, unknown>;
   assert.ok(
@@ -298,10 +298,7 @@ Then('subsequent requests are served from cache again', async function (this: E2
   const { statusCode, headers } = await request(`${url}/apps/${slug}/index.html`);
   assert.equal(statusCode, 200, `App request returned ${statusCode}`);
   const cacheHeader = (headers['x-cache'] as string | undefined) ?? '';
-  assert.ok(
-    cacheHeader.includes('HIT'),
-    `Expected HIT but got X-Cache: "${cacheHeader}"`
-  );
+  assert.ok(cacheHeader.includes('HIT'), `Expected HIT but got X-Cache: "${cacheHeader}"`);
 });
 
 /**
@@ -313,7 +310,7 @@ Then(
   'the projection cache contains entries for {string}',
   async function (this: E2EWorld, appSlug: string) {
     const url = getDoorwayUrl(this);
-    const stats = await adminGet(url, '/admin/cache/stats');
+    const stats = await adminGet(url, CACHE_STATS);
     const projection = stats['projection'] as Record<string, unknown>;
     assert.ok(
       (projection['entries'] as number) > 0,
@@ -330,10 +327,10 @@ Then(
  */
 Then('the next load re-warms the caches', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  await adminPost(url, '/admin/cache/warm');
+  await adminPost(url, CACHE_WARM);
   await retry(
     async () => {
-      const stats = await adminGet(url, '/admin/cache/stats');
+      const stats = await adminGet(url, CACHE_STATS);
       const projection = stats['projection'] as Record<string, unknown>;
       assert.ok((projection['entries'] as number) > 0, 'Cache still empty after re-warm');
     },
@@ -352,7 +349,7 @@ Then('the next load re-warms the caches', async function (this: E2EWorld) {
  */
 Then('the warmup retry state shows completed', async function (this: E2EWorld) {
   const url = getDoorwayUrl(this);
-  const data = await adminGet(url, '/health/startup');
+  const data = await adminGet(url, HEALTH_STARTUP);
   const warmup = data['warmup'] as Record<string, unknown> | null | undefined;
   assert.ok(warmup, 'warmup state not present in /health/startup response');
   assert.equal(warmup['completed'], true, `Warmup not completed: ${JSON.stringify(warmup)}`);
@@ -367,7 +364,7 @@ Then(
   'the warmup retry state shows maxAttempts {int}',
   async function (this: E2EWorld, expected: number) {
     const url = getDoorwayUrl(this);
-    const data = await adminGet(url, '/health/startup');
+    const data = await adminGet(url, HEALTH_STARTUP);
     const warmup = data['warmup'] as Record<string, unknown> | null | undefined;
     assert.ok(warmup, 'warmup state not present in /health/startup response');
     assert.equal(

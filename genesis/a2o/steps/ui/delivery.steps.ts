@@ -21,9 +21,7 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
-import {
-  PlaywrightDevice,
-} from '../../src/framework/devices/playwright-device.js';
+import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -175,10 +173,7 @@ Then(
       return reg?.scope ?? '';
     });
 
-    assert.ok(
-      swScope.includes(pathPrefix),
-      `SW scope "${swScope}" does not cover "${pathPrefix}"`
-    );
+    assert.ok(swScope.includes(pathPrefix), `SW scope "${swScope}" does not cover "${pathPrefix}"`);
   }
 );
 
@@ -244,13 +239,10 @@ Given(
  *
  * Example: Given the Service Worker has cached "evolution-of-trust"
  */
-Given(
-  'the Service Worker has cached {string}',
-  async function (this: E2EWorld, _appSlug: string) {
-    // Marker: assumes the app was loaded in a prior step.
-    // Verification happens in the Then assertions that follow.
-  }
-);
+Given('the Service Worker has cached {string}', async function (this: E2EWorld, _appSlug: string) {
+  // Marker: assumes the app was loaded in a prior step.
+  // Verification happens in the Then assertions that follow.
+});
 
 /**
  * Enable console recording — PlaywrightDevice already captures automatically.
@@ -345,23 +337,20 @@ When(
  * Example: When Timothy loads "evolution-of-trust"
  * Example: When Matthew loads "evolution-of-trust"
  */
-When(
-  '{word} loads {string}',
-  async function (this: E2EWorld, humanName: string, appSlug: string) {
-    const device = requirePlaywright(this, humanName);
-    const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+When('{word} loads {string}', async function (this: E2EWorld, humanName: string, appSlug: string) {
+  const device = requirePlaywright(this, humanName);
+  const doorway = [...this.doorways.values()][0];
+  assert.ok(doorway, 'No doorway registered');
 
-    device.clearCapture();
-    await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+  device.clearCapture();
+  await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
+    waitUntil: 'networkidle',
+    timeout: 30_000,
+  });
 
-    // Collect structured SW evidence from console logs for Then assertions
-    evidenceStore.set(this, collectDeliveryEvidence(device));
-  }
-);
+  // Collect structured SW evidence from console logs for Then assertions
+  evidenceStore.set(this, collectDeliveryEvidence(device));
+});
 
 /**
  * Reload a cached app (for offline resilience scenarios).
@@ -590,35 +579,29 @@ Then('the SW downloads the ZIP blob once', async function (this: E2EWorld) {
  * Example: And the SW extracts all app files into CacheStorage
  * Example: And the SW extracts all files from the ZIP into CacheStorage
  */
-Then(
-  'the SW extracts all app files into CacheStorage',
-  async function (this: E2EWorld) {
-    const device = firstPlaywright(this);
+Then('the SW extracts all app files into CacheStorage', async function (this: E2EWorld) {
+  const device = firstPlaywright(this);
 
-    const cacheCount = await device.page.evaluate(async () => {
-      const cache = await caches.open('apps-v1');
-      const keys = await cache.keys();
-      return keys.length;
-    });
+  const cacheCount = await device.page.evaluate(async () => {
+    const cache = await caches.open('apps-v1');
+    const keys = await cache.keys();
+    return keys.length;
+  });
 
-    assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract files from ZIP');
-  }
-);
+  assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract files from ZIP');
+});
 
-Then(
-  'the SW extracts all files from the ZIP into CacheStorage',
-  async function (this: E2EWorld) {
-    const device = firstPlaywright(this);
+Then('the SW extracts all files from the ZIP into CacheStorage', async function (this: E2EWorld) {
+  const device = firstPlaywright(this);
 
-    const cacheCount = await device.page.evaluate(async () => {
-      const cache = await caches.open('apps-v1');
-      const keys = await cache.keys();
-      return keys.length;
-    });
+  const cacheCount = await device.page.evaluate(async () => {
+    const cache = await caches.open('apps-v1');
+    const keys = await cache.keys();
+    return keys.length;
+  });
 
-    assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract ZIP files');
-  }
-);
+  assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract ZIP files');
+});
 
 /**
  * Verify the SW fetches each file individually (extracted delivery mode).
@@ -691,16 +674,13 @@ Then(
  *
  * Example: And the requested file is returned from the local extraction
  */
-Then(
-  'the requested file is returned from the local extraction',
-  async function (this: E2EWorld) {
-    const device = firstPlaywright(this);
+Then('the requested file is returned from the local extraction', async function (this: E2EWorld) {
+  const device = firstPlaywright(this);
 
-    // Page loaded successfully with files from extraction
-    const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0);
-    assert.ok(bodyLength >= 0, 'Page did not load — local extraction may have failed');
-  }
-);
+  // Page loaded successfully with files from extraction
+  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0);
+  assert.ok(bodyLength >= 0, 'Page did not load — local extraction may have failed');
+});
 
 /**
  * Parse the data table from the "browser console evidence shows:" step.
@@ -767,10 +747,7 @@ Then(
         // For "30+" — only assert if the SW logging is active (evidence > 0 total)
         const totalSwLogs = evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
         if (totalSwLogs > 0) {
-          assert.ok(
-            actual >= threshold,
-            `"${eventName}": expected >= ${threshold}, got ${actual}`
-          );
+          assert.ok(actual >= threshold, `"${eventName}": expected >= ${threshold}, got ${actual}`);
         }
       } else {
         // Exact count — only assert when expected is 0 (critical safety assertion)
@@ -778,14 +755,9 @@ Then(
         if (threshold === 0) {
           assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
         } else {
-          const totalSwLogs =
-            evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
+          const totalSwLogs = evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
           if (totalSwLogs > 0) {
-            assert.equal(
-              actual,
-              threshold,
-              `"${eventName}": expected ${threshold}, got ${actual}`
-            );
+            assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
           }
         }
       }
@@ -1037,39 +1009,36 @@ Then('the SW logs which source served each file', async function (this: E2EWorld
  *
  * Example: And sources are one of: "sw-cache", "peer-extracted", "peer-compressed-local-extract", "doorway-proxy"
  */
-Then(
-  /^sources are one of: (.+)$/,
-  async function (this: E2EWorld, sourcesRaw: string) {
-    const device = firstPlaywright(this);
+Then(/^sources are one of: (.+)$/, async function (this: E2EWorld, sourcesRaw: string) {
+  const device = firstPlaywright(this);
 
-    // Parse the comma-separated quoted source names
-    const allowedSources = sourcesRaw
-      .split(',')
-      .map(s => s.trim().replace(/^"|"$/g, '').trim())
-      .filter(Boolean);
+  // Parse the comma-separated quoted source names
+  const allowedSources = sourcesRaw
+    .split(',')
+    .map(s => s.trim().replace(/^"|"$/g, '').trim())
+    .filter(Boolean);
 
-    // Find all [apps-sw] log lines that indicate a delivery source
-    const sourceLogs = device.consoleLogs.filter(
-      l =>
-        l.text.includes('[apps-sw] cache-hit:') ||
-        l.text.includes('[apps-sw] peer-hit:') ||
-        l.text.includes('[apps-sw] fallback:')
-    );
+  // Find all [apps-sw] log lines that indicate a delivery source
+  const sourceLogs = device.consoleLogs.filter(
+    l =>
+      l.text.includes('[apps-sw] cache-hit:') ||
+      l.text.includes('[apps-sw] peer-hit:') ||
+      l.text.includes('[apps-sw] fallback:')
+  );
 
-    if (sourceLogs.length === 0) {
-      // SW structured logging not yet deployed — skip
-      return;
-    }
-
-    for (const log of sourceLogs) {
-      const hasAllowedSource = allowedSources.some(src => log.text.includes(src));
-      assert.ok(
-        hasAllowedSource,
-        `SW log line uses unexpected source:\n  "${log.text}"\nAllowed: ${allowedSources.join(', ')}`
-      );
-    }
+  if (sourceLogs.length === 0) {
+    // SW structured logging not yet deployed — skip
+    return;
   }
-);
+
+  for (const log of sourceLogs) {
+    const hasAllowedSource = allowedSources.some(src => log.text.includes(src));
+    assert.ok(
+      hasAllowedSource,
+      `SW log line uses unexpected source:\n  "${log.text}"\nAllowed: ${allowedSources.join(', ')}`
+    );
+  }
+});
 
 // ---------------------------------------------------------------------------
 // SW Bypass Mode (Diagnostic Scenarios)
@@ -1297,24 +1266,21 @@ Then(
  *
  * Example: Given elohim-cache-core WASM failed to load with a 404 response
  */
-Given(
-  'elohim-cache-core WASM failed to load with a 404 response',
-  async function (this: E2EWorld) {
-    const device = firstPlaywright(this);
+Given('elohim-cache-core WASM failed to load with a 404 response', async function (this: E2EWorld) {
+  const device = firstPlaywright(this);
 
-    // Check for the expected 404 warning in console logs
-    // In dev, the WASM is not built, so this is the normal state.
-    const wasm404Warnings = device.consoleLogs.filter(
-      l =>
-        (l.level === 'warning' || l.level === 'warn') &&
-        (l.text.includes('elohim-cache-core') || l.text.includes('wasm'))
-    );
+  // Check for the expected 404 warning in console logs
+  // In dev, the WASM is not built, so this is the normal state.
+  const wasm404Warnings = device.consoleLogs.filter(
+    l =>
+      (l.level === 'warning' || l.level === 'warn') &&
+      (l.text.includes('elohim-cache-core') || l.text.includes('wasm'))
+  );
 
-    // This step succeeds whether or not WASM 404 was seen — the scenario
-    // tests behavior when WASM is absent (common in dev/alpha).
-    void wasm404Warnings; // intentionally unused — presence is optional
-  }
-);
+  // This step succeeds whether or not WASM 404 was seen — the scenario
+  // tests behavior when WASM is absent (common in dev/alpha).
+  void wasm404Warnings; // intentionally unused — presence is optional
+});
 
 /**
  * Verify content bypasses WASM and goes through SW → network (graceful degradation).
@@ -1337,14 +1303,11 @@ Then(
  *
  * Example: And "evolution-of-trust" loads and functions normally
  */
-Then(
-  '{string} loads and functions normally',
-  async function (this: E2EWorld, _appSlug: string) {
-    const device = firstPlaywright(this);
-    const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0);
-    assert.ok(bodyLength > 0, `App "${_appSlug}" did not render — may have crashed`);
-  }
-);
+Then('{string} loads and functions normally', async function (this: E2EWorld, _appSlug: string) {
+  const device = firstPlaywright(this);
+  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0);
+  assert.ok(bodyLength > 0, `App "${_appSlug}" did not render — may have crashed`);
+});
 
 /**
  * Verify no JS errors are shown to the learner (pageErrors is empty).
@@ -1375,9 +1338,7 @@ Then(
     const wasmWarnings = device.consoleLogs.filter(
       l =>
         (l.level === 'warning' || l.level === 'warn') &&
-        (l.text.includes('elohim-cache-core') ||
-          l.text.includes('wasm') ||
-          l.text.includes('WASM'))
+        (l.text.includes('elohim-cache-core') || l.text.includes('wasm') || l.text.includes('WASM'))
     );
 
     assert.equal(
@@ -1424,27 +1385,21 @@ Given('the bootstrap page is displayed', async function (this: E2EWorld) {
  *
  * Example: And /health/startup is returning rootApp: pending
  */
-Given(
-  '\\/health\\/startup is returning rootApp: pending',
-  async function (this: E2EWorld) {
-    // Documentation marker — the startup status is controlled by the doorway service.
-    // In test, we observe the state we find; we can't force it to pending without
-    // stopping extraction.
-  }
-);
+Given('\\/health\\/startup is returning rootApp: pending', async function (this: E2EWorld) {
+  // Documentation marker — the startup status is controlled by the doorway service.
+  // In test, we observe the state we find; we can't force it to pending without
+  // stopping extraction.
+});
 
 /**
  * Precondition: /health/startup returns network errors on every poll.
  *
  * Example: And /health/startup returns network errors on every poll
  */
-Given(
-  '\\/health\\/startup returns network errors on every poll',
-  async function (this: E2EWorld) {
-    // Documentation marker — simulating network errors requires intercepting
-    // fetch in the page context. Placeholder for future implementation.
-  }
-);
+Given('\\/health\\/startup returns network errors on every poll', async function (this: E2EWorld) {
+  // Documentation marker — simulating network errors requires intercepting
+  // fetch in the page context. Placeholder for future implementation.
+});
 
 /**
  * Verify the bootstrap page navigated to / when rootApp became ready.
@@ -1632,9 +1587,15 @@ Then(
 
     // Capability log should include deliveryMode and blobHash
     const hasMode = capLogs.some(
-      l => l.text.includes('compressed') || l.text.includes('extracted') || l.text.includes('deliveryMode')
+      l =>
+        l.text.includes('compressed') ||
+        l.text.includes('extracted') ||
+        l.text.includes('deliveryMode')
     );
-    assert.ok(hasMode, `Capability probe log does not include delivery mode:\n${capLogs.map(l => l.text).join('\n')}`);
+    assert.ok(
+      hasMode,
+      `Capability probe log does not include delivery mode:\n${capLogs.map(l => l.text).join('\n')}`
+    );
   }
 );
 
@@ -1684,10 +1645,9 @@ Given(
       // No doorway registered yet — documentation marker only in genesis dry-run
       return;
     }
-    const { statusCode, body } = await request(
-      `${doorway.url}/admin/cache/clear/${contentId}`,
-      { method: 'POST' }
-    );
+    const { statusCode, body } = await request(`${doorway.url}/admin/cache/clear/${contentId}`, {
+      method: 'POST',
+    });
     if (statusCode !== 200) {
       // Admin API may not be wired yet — log and continue (best-effort)
       const text = await body.text();
@@ -1764,25 +1724,22 @@ When('an unauthenticated request is made for \\/', async function (this: E2EWorl
  *
  * Example: Then the response is the bootstrap page (not the SPA)
  */
-Then(
-  /^the response is the bootstrap page \(not the SPA\)$/,
-  async function (this: E2EWorld) {
-    const device = firstPlaywright(this);
+Then(/^the response is the bootstrap page \(not the SPA\)$/, async function (this: E2EWorld) {
+  const device = firstPlaywright(this);
 
-    const bodyText = await device.page.evaluate(
-      () => document.body?.textContent?.toLowerCase() ?? ''
-    );
-    const title = await device.page.title();
+  const bodyText = await device.page.evaluate(
+    () => document.body?.textContent?.toLowerCase() ?? ''
+  );
+  const title = await device.page.title();
 
-    // Bootstrap page should indicate loading, not the full Angular SPA
-    const isBootstrap =
-      bodyText.includes('loading') ||
-      bodyText.includes('starting') ||
-      title.toLowerCase().includes('loading');
+  // Bootstrap page should indicate loading, not the full Angular SPA
+  const isBootstrap =
+    bodyText.includes('loading') ||
+    bodyText.includes('starting') ||
+    title.toLowerCase().includes('loading');
 
-    assert.ok(
-      isBootstrap,
-      `Expected bootstrap page but got full app: title="${title}" body="${bodyText.slice(0, 200)}"`
-    );
-  }
-);
+  assert.ok(
+    isBootstrap,
+    `Expected bootstrap page but got full app: title="${title}" body="${bodyText.slice(0, 200)}"`
+  );
+});
