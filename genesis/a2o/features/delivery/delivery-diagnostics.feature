@@ -18,7 +18,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- The Original Failure (regression anchor) ---
 
-  @wip @regression
+  @regression
   Scenario: Without projection cache, browser load overwhelms storage
     Given the doorway projection cache is disabled
     When 10 browsers simultaneously load "evolution-of-trust"
@@ -30,7 +30,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
     # the projection cache is no longer load-bearing and the architecture
     # should be revisited.
 
-  @wip @regression
+  @regression
   Scenario: With projection cache enabled, same load is absorbed
     Given the doorway projection cache is enabled and warm for "evolution-of-trust"
     When 10 browsers simultaneously load "evolution-of-trust"
@@ -40,14 +40,12 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Layer Observability ---
 
-  @wip
   Scenario: Response headers indicate which cache layer served the request
     Given the projection cache is warm for "evolution-of-trust"
     When Matthew requests a file from "evolution-of-trust"
     Then the response includes a header indicating the serving layer
     And the serving layer is "projection-cache"
 
-  @wip
   Scenario: Cache miss shows proxy layer in response
     Given the projection cache is empty for "evolution-of-trust"
     When Matthew requests a file from "evolution-of-trust"
@@ -119,7 +117,6 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Degradation Testing Workflow ---
 
-  @wip
   Scenario: Operator walks the fallback chain by disabling layers
     # This is the diagnostic workflow Matthew used to discover the architecture.
     # Each step peels back a layer to reveal the next.

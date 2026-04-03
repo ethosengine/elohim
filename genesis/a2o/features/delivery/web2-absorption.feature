@@ -19,7 +19,6 @@ Feature: Web2 Absorption — Doorway Projection Cache
 
   # --- Cache Population (Cold Start) ---
 
-  @wip
   Scenario: First load proxies to storage and populates cache
     Given the projection cache for "evolution-of-trust" is empty
     When Timothy loads the html5-app "evolution-of-trust"
@@ -36,7 +35,6 @@ Feature: Web2 Absorption — Doorway Projection Cache
 
   # --- Cache Hits (Warm) ---
 
-  @wip
   Scenario: Second load serves entirely from cache
     Given the projection cache for "evolution-of-trust" is warm
     When Timothy loads the html5-app "evolution-of-trust"
@@ -52,7 +50,6 @@ Feature: Web2 Absorption — Doorway Projection Cache
 
   # --- Request Coalescing ---
 
-  @wip
   Scenario: Concurrent cold requests coalesce into a single storage fetch
     Given the projection cache for "evolution-of-trust" is empty
     When 30 browsers simultaneously request the same file "pixi.min.js" from "evolution-of-trust"
