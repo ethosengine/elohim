@@ -1,0 +1,26 @@
+{
+  "id": "protocol-landing",
+  "contentType": "application",
+  "title": "Elohim Protocol",
+  "name": "Elohim Protocol Landing Page",
+  "description": "Digital infrastructure for human flourishing — the protocol's public landing page, served as a content node.",
+  "content": {
+    "slug": "protocol-landing",
+    "entryPoint": "index.html"
+  },
+  "contentFormat": "spa-bundle",
+  "tags": [
+    "application",
+    "spa",
+    "protocol",
+    "landing-page"
+  ],
+  "blobHash": "",
+  "reach": "commons",
+  "metadata": {
+    "category": "application",
+    "embedStrategy": "root"
+  },
+  "createdAt": "2026-04-03T00:00:00.000000",
+  "updatedAt": "2026-04-03T00:00:00.000000"
+}
