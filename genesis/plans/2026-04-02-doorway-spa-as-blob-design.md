@@ -336,3 +336,37 @@ Everything is same-origin once ingress routes `/apps/` through the main domain. 
 - **Multi-app doorways:** One root app per doorway for now. `ROOT_APP_SLUG` is singular.
 - **Doorway-native TLS/ACME:** Phase 3 of ingress transition. Not this sprint.
 - **Removing `doorway-alpha.elohim.host`:** Kept for backwards compatibility. Both origins resolve to the same doorway.
+
+---
+
+## 8. Operator Configuration
+
+### Switching the root app
+
+Set `ROOT_APP_SLUG` environment variable in the doorway deployment:
+
+| ROOT_APP_SLUG | What doorway serves at `/` |
+|---------------|---------------------------|
+| `lamad` | The Lamad learning platform (Angular SPA) |
+| `protocol-landing` | The Elohim Protocol landing page (static SPA) |
+| *(unset)* | Redirect to `/threshold` (operator dashboard) |
+
+For alpha.elohim.host, the intended configuration is:
+- `ROOT_APP_SLUG=protocol-landing` — the public-facing protocol site
+- The Lamad app is accessible at `/lamad` (handled by the root SPA's routing or as a separate spa-bundle)
+
+### Build and deploy the landing page
+
+```bash
+cd genesis/landing
+pnpm install
+bash scripts/build-and-zip.sh
+
+# Upload blob
+curl -X PUT "http://${STORAGE_URL}/blob/$(cat dist/protocol-landing.sha256)" \
+  --data-binary @dist/protocol-landing.zip \
+  -H "Content-Type: application/zip"
+
+# Update seed node blobHash
+# (via seeder or direct storage API call)
+```
