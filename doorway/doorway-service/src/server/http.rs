@@ -122,6 +122,9 @@ pub struct AppState {
     /// directly to elohim-storage. Used by delivery diagnostics tests to prove
     /// fallback behavior. Set via POST /admin/cache/disable and /admin/cache/enable.
     pub cache_enabled: Arc<std::sync::atomic::AtomicBool>,
+    /// Observable warmup retry state — populated when spawn_stream_task starts.
+    /// Read by /health/startup to expose attempt count and completion status.
+    pub warmup_state: Option<Arc<crate::projection::warm_stream::WarmupState>>,
 }
 
 impl AppState {
@@ -202,6 +205,7 @@ impl AppState {
             ))),
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            warmup_state: None,
         }
     }
 
@@ -286,6 +290,7 @@ impl AppState {
             ))),
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            warmup_state: None,
         }
     }
 
@@ -385,6 +390,7 @@ impl AppState {
             ))),
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            warmup_state: None,
         }
     }
 
@@ -487,6 +493,7 @@ impl AppState {
             ))),
             app_file_cache,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            warmup_state: None,
         })
     }
 

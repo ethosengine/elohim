@@ -329,6 +329,18 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     };
     let root_app_ready = extracted;
 
+    let warmup = if let Some(ref ws) = state.warmup_state {
+        serde_json::json!({
+            "inProgress": ws.in_progress.load(std::sync::atomic::Ordering::Relaxed),
+            "attempts": ws.attempts.load(std::sync::atomic::Ordering::Relaxed),
+            "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
+            "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
+            "lastError": ws.last_error.lock().unwrap().clone(),
+        })
+    } else {
+        serde_json::json!(null)
+    };
+
     let body = serde_json::json!({
         "identity": {
             "ready": true,
@@ -349,6 +361,7 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             "blobHash": blob_hash,
             "extracted": extracted,
         },
+        "warmup": warmup,
     })
     .to_string();
 

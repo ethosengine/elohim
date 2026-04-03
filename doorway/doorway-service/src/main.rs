@@ -432,6 +432,14 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(registered, failed, "Steward peer registration complete");
     }
 
+    // Create WarmupState before Arc::new(state) so it can be stored in AppState
+    // and also passed to spawn_stream_task later.
+    if args.projection_writer && !peer_urls.is_empty() && state.projection.is_some() {
+        state.warmup_state = Some(Arc::new(
+            doorway::projection::warm_stream::WarmupState::new(),
+        ));
+    }
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)
@@ -616,6 +624,7 @@ async fn main() -> anyhow::Result<()> {
                 Arc::clone(projection_store),
                 peer_urls.clone(),
                 10, // 10s delay — let MongoDB + storage settle
+                state.warmup_state.clone(),
             );
             info!(
                 peers = peer_urls.len(),

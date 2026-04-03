@@ -9,6 +9,7 @@
 //! 1. **Startup** — for each peer storage URL
 //! 2. **Subscriber reconnect** — after AppWebsocket reconnects to conductor
 
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use futures_util::StreamExt;
@@ -232,6 +233,33 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
     result
 }
 
+/// Observable warmup state — read by /health/startup, written by spawn_stream_task.
+pub struct WarmupState {
+    pub in_progress: AtomicBool,
+    pub attempts: AtomicU32,
+    pub max_attempts: AtomicU32,
+    pub last_error: std::sync::Mutex<Option<String>>,
+    pub completed: AtomicBool,
+}
+
+impl WarmupState {
+    pub fn new() -> Self {
+        Self {
+            in_progress: AtomicBool::new(false),
+            attempts: AtomicU32::new(0),
+            max_attempts: AtomicU32::new(MAX_WARMUP_RETRIES),
+            last_error: std::sync::Mutex::new(None),
+            completed: AtomicBool::new(false),
+        }
+    }
+}
+
+impl Default for WarmupState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Spawn cache stream warm-up for multiple peers as a background task.
 /// This is the startup entry point — called from main.rs.
 ///
@@ -242,10 +270,15 @@ pub fn spawn_stream_task(
     store: Arc<ProjectionStore>,
     storage_urls: Vec<String>,
     delay_secs: u64,
+    warmup_state: Option<Arc<WarmupState>>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Let services settle before streaming
         tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+
+        if let Some(ref ws) = warmup_state {
+            ws.in_progress.store(true, Ordering::Relaxed);
+        }
 
         info!(
             peer_count = storage_urls.len(),
@@ -257,6 +290,11 @@ pub fn spawn_stream_task(
 
             loop {
                 attempt += 1;
+
+                if let Some(ref ws) = warmup_state {
+                    ws.attempts.store(attempt, Ordering::Relaxed);
+                }
+
                 let result = stream_from_peer(Arc::clone(&store), storage_url).await;
 
                 let has_content = result.content_count > 0
@@ -273,6 +311,12 @@ pub fn spawn_stream_task(
                         "Cache stream warm-up completed successfully"
                     );
                     break;
+                }
+
+                if let Some(ref ws) = warmup_state {
+                    if let Ok(mut guard) = ws.last_error.lock() {
+                        *guard = result.errors.first().cloned();
+                    }
                 }
 
                 if attempt >= MAX_WARMUP_RETRIES {
@@ -300,6 +344,11 @@ pub fn spawn_stream_task(
 
                 tokio::time::sleep(std::time::Duration::from_secs(retry_delay)).await;
             }
+        }
+
+        if let Some(ref ws) = warmup_state {
+            ws.in_progress.store(false, Ordering::Relaxed);
+            ws.completed.store(true, Ordering::Relaxed);
         }
     })
 }
