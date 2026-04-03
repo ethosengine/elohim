@@ -81,7 +81,9 @@ export class AttentionTrackerService implements OnDestroy {
     this.sessionViewed.add(contentId);
 
     const agentId = this.agentService.getCurrentAgentId();
-    const sub = this.eventService.recordContentView(agentId, contentId).subscribe();
+    const sub = this.eventService
+      .recordContentInteraction(agentId, contentId, 'content-view')
+      .subscribe();
     this.subscriptions.push(sub);
   }
 

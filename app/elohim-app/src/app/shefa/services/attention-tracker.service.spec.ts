@@ -16,6 +16,7 @@ describe('AttentionTrackerService', () => {
 
   beforeEach(() => {
     eventServiceMock = {
+      recordContentInteraction: vi.fn().mockReturnValue(of(MOCK_EVENT)),
       recordContentView: vi.fn().mockReturnValue(of(MOCK_EVENT)),
       recordContentComplete: vi.fn().mockReturnValue(of(MOCK_EVENT)),
       hasViewed: vi.fn().mockReturnValue(of(false)),
@@ -42,9 +43,10 @@ describe('AttentionTrackerService', () => {
       tick(3000);
       service.trackContentLeave('concept-trust');
 
-      expect(eventServiceMock['recordContentView']).toHaveBeenCalledWith(
+      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledWith(
         MOCK_AGENT_ID,
         'concept-trust',
+        'content-view',
       );
     }));
 
@@ -53,7 +55,7 @@ describe('AttentionTrackerService', () => {
       tick(2000);
       service.trackContentLeave('concept-trust');
 
-      expect(eventServiceMock['recordContentView']).not.toHaveBeenCalled();
+      expect(eventServiceMock['recordContentInteraction']).not.toHaveBeenCalled();
     }));
 
     it('deduplicates views within same session', fakeAsync(() => {
@@ -65,7 +67,7 @@ describe('AttentionTrackerService', () => {
       tick(3000);
       service.trackContentLeave('concept-trust');
 
-      expect(eventServiceMock['recordContentView']).toHaveBeenCalledTimes(1);
+      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(1);
     }));
 
     it('records separate events for different content', fakeAsync(() => {
@@ -77,7 +79,7 @@ describe('AttentionTrackerService', () => {
       tick(3000);
       service.trackContentLeave('concept-governance');
 
-      expect(eventServiceMock['recordContentView']).toHaveBeenCalledTimes(2);
+      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(2);
     }));
 
     it('records the view event at threshold time, not on leave', fakeAsync(() => {
@@ -85,7 +87,7 @@ describe('AttentionTrackerService', () => {
       tick(3000);
 
       // Event fires at threshold, before leave
-      expect(eventServiceMock['recordContentView']).toHaveBeenCalledTimes(1);
+      expect(eventServiceMock['recordContentInteraction']).toHaveBeenCalledTimes(1);
 
       service.trackContentLeave('concept-trust');
     }));
