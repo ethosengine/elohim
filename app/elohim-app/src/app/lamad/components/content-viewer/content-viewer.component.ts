@@ -66,6 +66,7 @@ import {
   ProtocolOmnibarComponent,
   OmnibarSteward,
 } from '@app/elohim/components/protocol-omnibar/protocol-omnibar.component';
+import { ContentAnalyticsComponent } from '../content-analytics/content-analytics.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
@@ -81,6 +82,7 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
     GraduatedFeedbackComponent,
     FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
+    ContentAnalyticsComponent,
     ProtocolOmnibarComponent,
   ],
   templateUrl: './content-viewer.component.html',

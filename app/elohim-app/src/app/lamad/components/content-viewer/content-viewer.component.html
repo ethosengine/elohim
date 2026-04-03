@@ -616,6 +616,13 @@
 
       <!-- Network Tab -->
       <section *ngSwitchCase="'network'" class="network-tab">
+        <!-- Attention Metrics (protocol-native analytics for stewards) -->
+        <app-content-analytics
+          *ngIf="node"
+          [contentId]="node.id"
+          data-testid="viewer-content-analytics"
+        ></app-content-analytics>
+
         <div class="network-header">
           <h3>Content Neighborhood</h3>
           <p>Explore related concepts in the knowledge graph</p>

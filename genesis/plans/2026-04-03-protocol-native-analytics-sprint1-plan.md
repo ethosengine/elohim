@@ -31,19 +31,17 @@
 | `src/app/shefa/services/attention-tracker.service.ts` | **NEW** — Orchestrates attention event recording: dwell-time qualification, deduplication, session lifecycle. Thin coordinator over EventService. |
 | `src/app/shefa/services/attention-tracker.service.spec.ts` | **NEW** — Tests for attention tracker |
 | `src/app/lamad/components/content-viewer/content-viewer.component.ts` | **MODIFY** — Inject AttentionTrackerService, call `trackContentView()` in `loadContent()`, call `trackContentLeave()` in `ngOnDestroy()` |
-| `src/app/lamad/components/attention-flow/attention-flow.component.ts` | **NEW** — Learner's personal attention dashboard |
+| `src/app/lamad/components/attention-flow/attention-flow.component.ts` | **NEW** — Learner's personal attention history (embedded in learner dashboard, like YouTube watch history) |
 | `src/app/lamad/components/attention-flow/attention-flow.component.html` | **NEW** — Template |
 | `src/app/lamad/components/attention-flow/attention-flow.component.css` | **NEW** — Styles |
 | `src/app/lamad/components/attention-flow/attention-flow.component.spec.ts` | **NEW** — Tests |
-| `src/app/lamad/components/content-analytics/content-analytics.component.ts` | **NEW** — Steward content analytics panel (embedded in content viewer Network tab) |
+| `src/app/lamad/components/content-analytics/content-analytics.component.ts` | **NEW** — Per-content attention metrics for stewards (embedded in /resource/:resourceId Network tab — view counts, completions, completion rate. Like GA per-page dashboard but protocol-native.) |
 | `src/app/lamad/components/content-analytics/content-analytics.component.html` | **NEW** — Template |
 | `src/app/lamad/components/content-analytics/content-analytics.component.css` | **NEW** — Styles |
 | `src/app/lamad/components/content-analytics/content-analytics.component.spec.ts` | **NEW** — Tests |
-| `src/app/services/analytics.service.ts` | **DELETE** — Remove GA wrapper |
-| `src/app/services/analytics.service.spec.ts` | **DELETE** — Remove GA tests |
-| `src/app/services/seo.service.ts` | **MODIFY** — Absorb `noindex` meta tag logic from analytics.service.ts |
-| `src/app/lamad/lamad.routes.ts` | **MODIFY** — Add `/lamad/attention` route |
 | `src/app/lamad/components/content-viewer/content-viewer.component.html` | **MODIFY** — Add ContentAnalyticsComponent to Network tab |
+| `src/app/lamad/components/learner-dashboard/learner-dashboard.component.ts` | **MODIFY** — Import and embed AttentionFlowComponent |
+| `src/app/lamad/components/learner-dashboard/learner-dashboard.component.html` | **MODIFY** — Add attention flow section |
 | `genesis/a2o/features/lamad/attention-analytics.feature` | **NEW** — BDD scenarios |
 
 ---
@@ -779,13 +777,21 @@ git commit -m "feat(lamad): embed attention metrics in content viewer Network ta
 
 ---
 
-### Task 7: Create AttentionFlowComponent (learner dashboard)
+### Task 7: Create AttentionFlowComponent and embed in learner dashboard
+
+The learner's attention history ("what did I see") belongs in the learner dashboard
+at `/lamad/me` — like YouTube watch history. NOT a standalone route.
+
+The per-content steward analytics (view counts, completion rates) are in Task 5-6
+at `/resource/:resourceId` Network tab — like GA per-page stats but protocol-native.
 
 **Files:**
 - Create: `src/app/lamad/components/attention-flow/attention-flow.component.ts`
 - Create: `src/app/lamad/components/attention-flow/attention-flow.component.html`
 - Create: `src/app/lamad/components/attention-flow/attention-flow.component.css`
 - Create: `src/app/lamad/components/attention-flow/attention-flow.component.spec.ts`
+- Modify: `src/app/lamad/components/learner-dashboard/learner-dashboard.component.ts`
+- Modify: `src/app/lamad/components/learner-dashboard/learner-dashboard.component.html`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1104,28 +1110,30 @@ export class AttentionFlowComponent implements OnInit {
 Run: `cd app/elohim-app && pnpm exec vitest run --config vite.config.ts "attention-flow"`
 Expected: All 3 tests PASS
 
-- [ ] **Step 5: Add route to lamad routes**
+- [ ] **Step 5: Embed AttentionFlowComponent in learner dashboard**
 
-In `src/app/lamad/lamad.routes.ts`, add in the AGENT CONTEXT section (after the `me` route, around line 108):
+Read `src/app/lamad/components/learner-dashboard/learner-dashboard.component.ts` first
+to understand the existing structure. Then:
+
+In the learner dashboard component, add the import:
 
 ```typescript
-      // Attention flow — learner's personal protocol-native analytics
-      {
-        path: 'attention',
-        loadComponent: async () =>
-          import('./components/attention-flow/attention-flow.component').then(
-            m => m.AttentionFlowComponent
-          ),
-        data: {
-          title: 'Your Attention Flow',
-          seo: {
-            title: 'Your Attention Flow',
-            description: 'See where your attention has been — protocol-native analytics.',
-            openGraph: { ogType: 'website' },
-          },
-        },
-      },
+import { AttentionFlowComponent } from '../attention-flow/attention-flow.component';
 ```
+
+Add `AttentionFlowComponent` to the `imports: [...]` array.
+
+In the learner dashboard template, add a section for attention history:
+
+```html
+<!-- Attention History (like YouTube watch history) -->
+<section class="dashboard-section">
+  <app-attention-flow></app-attention-flow>
+</section>
+```
+
+Place it after existing dashboard sections (progress, paths, etc.) — it's supplementary
+context, not the primary dashboard content.
 
 - [ ] **Step 6: Run full lint + tests**
 
@@ -1136,8 +1144,8 @@ Expected: PASS
 
 ```bash
 git add app/elohim-app/src/app/lamad/components/attention-flow/ \
-       app/elohim-app/src/app/lamad/lamad.routes.ts
-git commit -m "feat(lamad): add attention flow dashboard with learner event history"
+       app/elohim-app/src/app/lamad/components/learner-dashboard/
+git commit -m "feat(lamad): add attention flow history to learner dashboard"
 ```
 
 ---
@@ -1181,9 +1189,9 @@ git commit -m "chore(shefa): export AttentionTrackerService from barrel"
    - Bounce suppression → Task 2
    - Session deduplication → Task 2
    - Session start/end → Noted as future enhancement (not MVP — requires app-level lifecycle hook)
-   - Learner dashboard → Task 7 (AttentionFlowComponent)
-   - Steward analytics → Task 5 (ContentAnalyticsComponent)
-   - GA removal → Task 4
+   - Learner attention history → Task 7 (AttentionFlowComponent embedded in /lamad/me dashboard)
+   - Per-content steward analytics → Task 5-6 (ContentAnalyticsComponent in /resource/:resourceId Network tab)
+   - GA removal → Task 4 (DEFERRED — GA coexists with protocol-native tracking)
 
 2. **Placeholder scan:** No TBDs, TODOs, or "implement later" found.
 

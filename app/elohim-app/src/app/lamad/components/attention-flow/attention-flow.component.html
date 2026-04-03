@@ -1,0 +1,33 @@
+<div class="attention-flow" data-testid="attention-flow">
+  <h3 class="section-title">Attention History</h3>
+
+  <div *ngIf="isLoading" class="loading">Loading...</div>
+
+  <div *ngIf="!isLoading && events.length === 0" class="empty-state">
+    <p>No attention events yet. Start exploring content to see your history.</p>
+  </div>
+
+  <div *ngIf="!isLoading && events.length > 0" class="flow-content">
+    <div class="summary" data-testid="attention-summary">
+      <span class="summary-stat">{{ events.length }} events</span>
+      <span class="summary-divider">&middot;</span>
+      <span class="summary-stat">{{ uniqueContentCount }} unique</span>
+    </div>
+
+    <div class="event-list">
+      <a
+        *ngFor="let event of events"
+        class="event-item"
+        [routerLink]="['/resource', event.contentId]"
+        data-testid="attention-event"
+      >
+        <span class="event-icon">{{ getEventIcon(event) }}</span>
+        <div class="event-details">
+          <span class="event-label">{{ getEventLabel(event) }}</span>
+          <span class="event-id">{{ event.contentId }}</span>
+        </div>
+        <span class="event-time">{{ event.createdAt | date: 'shortDate' }}</span>
+      </a>
+    </div>
+  </div>
+</div>

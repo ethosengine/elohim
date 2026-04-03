@@ -21,6 +21,9 @@
 export { EventService, LamadEventTypes } from './event.service';
 export type { LamadEventType } from './event.service';
 
+// Attention tracking (dwell-qualified view recording, session dedup)
+export { AttentionTrackerService } from './attention-tracker.service';
+
 // Device stewardship (unified device view)
 export { DeviceStewardshipService } from './device-stewardship.service';
 
