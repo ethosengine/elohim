@@ -1,6 +1,7 @@
 //! HTTP routes for Doorway
 
 pub mod admin;
+pub mod admin_cache;
 pub mod admin_conductors;
 pub mod admin_users;
 pub mod api;

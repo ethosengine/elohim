@@ -65,6 +65,16 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
         }
     };
 
+    // Admin cache bypass — diagnostic tool for delivery testing.
+    // When disabled via POST /admin/cache/disable, skip the projection cache
+    // entirely and proxy directly to elohim-storage.
+    if !state
+        .cache_enabled
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        return forward_app_request_with_header(&storage_url, path, "BYPASS-ADMIN").await;
+    }
+
     // Parse /apps/{slug}/{file_path...}
     let (slug, file_path) = match parse_app_path(path) {
         Some(parsed) => parsed,

@@ -341,6 +341,32 @@ impl AppFileCacheService {
         debug!(slug = %slug, "Removed app from index (will re-resolve on next request)");
     }
 
+    /// Count the total number of cached files in MongoDB.
+    ///
+    /// Used by the admin cache stats endpoint to report how many files are
+    /// currently stored in the app file cache collection.
+    pub async fn cached_file_count(&self) -> usize {
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
+        match collection.count_documents(doc! {}).await {
+            Ok(count) => count as usize,
+            Err(e) => {
+                warn!(error = %e, "Failed to count cached files");
+                0
+            }
+        }
+    }
+
+    /// Clear all cached files for a specific slug.
+    ///
+    /// Returns the number of documents removed. Used by the admin cache
+    /// clear endpoint to evict a single app's entries from MongoDB.
+    pub async fn clear_slug(&self, slug: &str) -> usize {
+        let deleted = self.invalidate_app(slug).await;
+        self.refresh_app(slug).await;
+        deleted as usize
+    }
+
     /// Check whether any cached files exist for the given slug and blob_hash.
     ///
     /// Returns true if at least one file with this `slug:*:blob_hash` key

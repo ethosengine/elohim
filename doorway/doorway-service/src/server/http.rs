@@ -117,6 +117,11 @@ pub struct AppState {
     pub projection_stats_cache: Arc<tokio::sync::Mutex<(std::time::Instant, u64, u64)>>,
     /// App file projection cache (MongoDB-backed, for HTML5 app assets)
     pub app_file_cache: Option<Arc<AppFileCacheService>>,
+    /// Admin-controlled cache bypass flag.
+    /// When false, all /apps/* requests skip the projection cache and proxy
+    /// directly to elohim-storage. Used by delivery diagnostics tests to prove
+    /// fallback behavior. Set via POST /admin/cache/disable and /admin/cache/enable.
+    pub cache_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AppState {
@@ -196,6 +201,7 @@ impl AppState {
                 0,
             ))),
             app_file_cache: None,
+            cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
     }
 
@@ -279,6 +285,7 @@ impl AppState {
                 0,
             ))),
             app_file_cache: None,
+            cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
     }
 
@@ -377,6 +384,7 @@ impl AppState {
                 0,
             ))),
             app_file_cache: None,
+            cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
     }
 
@@ -478,6 +486,7 @@ impl AppState {
                 0,
             ))),
             app_file_cache,
+            cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         })
     }
 
@@ -1033,66 +1042,23 @@ async fn handle_request(
             let hash = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
             to_boxed(routes::handle_check_blob(hash, Arc::clone(&state)).await)
         }
-        // POST /admin/cache/warm - Trigger projection cache warm-up from storage
-        // Called by seeder after bulk content creation to populate projection cache
+        // Admin cache control API — observe and toggle projection/app-file caches
+        // Used by delivery diagnostics tests to prove fallback behavior
+        (Method::GET, "/admin/cache/stats") => {
+            to_boxed(routes::admin_cache::cache_stats(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/cache/disable") => {
+            to_boxed(routes::admin_cache::cache_disable(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/cache/enable") => {
+            to_boxed(routes::admin_cache::cache_enable(Arc::clone(&state)).await)
+        }
+        (Method::POST, p) if p.starts_with("/admin/cache/clear/") => {
+            let slug = p.strip_prefix("/admin/cache/clear/").unwrap_or("");
+            to_boxed(routes::admin_cache::cache_clear_slug(Arc::clone(&state), slug).await)
+        }
         (Method::POST, "/admin/cache/warm") => {
-            let state = Arc::clone(&state);
-            to_boxed(
-                async move {
-                    if let Some(ref projection_store) = state.projection {
-                        // Build peer URL list (same logic as startup)
-                        let mut peer_urls: Vec<String> = Vec::new();
-                        if let Some(ref url) = state.args.storage_url {
-                            peer_urls.push(url.clone());
-                        }
-                        for url in &state.args.storage_urls {
-                            let trimmed = url.trim().to_string();
-                            if !trimmed.is_empty() && !peer_urls.contains(&trimmed) {
-                                peer_urls.push(trimmed);
-                            }
-                        }
-
-                        if peer_urls.is_empty() {
-                            Response::builder()
-                                .status(StatusCode::BAD_REQUEST)
-                                .header("Content-Type", "application/json")
-                                .body(Full::new(Bytes::from(
-                                    r#"{"error":"No storage URLs configured"}"#,
-                                )))
-                                .unwrap()
-                        } else {
-                            let store = Arc::clone(projection_store);
-                            let count = peer_urls.len();
-                            // Spawn warm-up in background — don't block the response
-                            tokio::spawn(async move {
-                                for url in &peer_urls {
-                                    crate::projection::warm_stream::stream_from_peer(
-                                        Arc::clone(&store),
-                                        url,
-                                    )
-                                    .await;
-                                }
-                            });
-                            Response::builder()
-                                .status(StatusCode::ACCEPTED)
-                                .header("Content-Type", "application/json")
-                                .body(Full::new(Bytes::from(format!(
-                                    r#"{{"status":"warming","peers":{count}}}"#
-                                ))))
-                                .unwrap()
-                        }
-                    } else {
-                        Response::builder()
-                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                            .header("Content-Type", "application/json")
-                            .body(Full::new(Bytes::from(
-                                r#"{"error":"Projection store not available"}"#,
-                            )))
-                            .unwrap()
-                    }
-                }
-                .await,
-            )
+            to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await)
         }
 
         // ====================================================================
