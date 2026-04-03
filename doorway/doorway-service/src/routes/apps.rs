@@ -350,6 +350,10 @@ fn build_app_response(
         builder = builder.header("X-Content-Slug", slug);
     }
 
+    // Provenance header: all publicly served app content is commons-reach.
+    // Future: resolve per-content reach from projection cache.
+    builder = builder.header("X-Reach", "commons");
+
     builder.body(Full::new(Bytes::from(data.to_vec()))).unwrap()
 }
 

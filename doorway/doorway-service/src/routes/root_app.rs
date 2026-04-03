@@ -468,6 +468,7 @@ pub async fn handle_root_app_request(state: Arc<AppState>, path: &str) -> Respon
             .header("Cache-Control", cache_control_for(file_path))
             .header("X-Root-App", slug.as_str())
             .header("X-Cache", "HIT")
+            .header("X-Reach", "commons")
             .body(Full::new(Bytes::from(cached.data)))
             .unwrap();
     }
@@ -500,6 +501,7 @@ pub async fn handle_root_app_request(state: Arc<AppState>, path: &str) -> Respon
                 .header("Cache-Control", cache_control_for("index.html"))
                 .header("X-Root-App", slug.as_str())
                 .header("X-SPA-Fallback", "true")
+                .header("X-Reach", "commons")
                 .body(index_response.into_body())
                 .unwrap();
         }
