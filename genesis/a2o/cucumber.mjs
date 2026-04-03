@@ -47,5 +47,15 @@ export default function () {
         'features/deployment/persona-testnet-validation.feature',
       ],
     },
+    delivery: {
+      ...base,
+      paths: ['features/delivery/**/*.feature'],
+      worldParameters: { env: 'alpha' },
+    },
+    'delivery-browser': {
+      ...base,
+      paths: ['features/delivery/**/*.feature'],
+      worldParameters: { env: 'alpha', deviceMode: 'playwright' },
+    },
   };
 }
