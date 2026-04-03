@@ -52,6 +52,7 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   'work-story': '📋',
   'work-project': '🗂️',
   'issue-report': '🐛',
+  application: '🖥️',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',
@@ -94,6 +95,7 @@ export const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
   'external-link': '🔗',
   epub: '📚',
   'epr-composite': '🗺️',
+  'spa-bundle': '🖥️',
 };
 
 /**
