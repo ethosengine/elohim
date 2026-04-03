@@ -679,7 +679,9 @@ impl HttpServer {
 
             // Admin: evict app from extraction cache
             (Method::POST, p) if p.starts_with("/admin/extraction-cache/evict/") => {
-                let slug = p.strip_prefix("/admin/extraction-cache/evict/").unwrap_or("");
+                let slug = p
+                    .strip_prefix("/admin/extraction-cache/evict/")
+                    .unwrap_or("");
                 self.handle_extraction_cache_evict(slug).await
             }
 
@@ -798,9 +800,7 @@ impl HttpServer {
     ///
     /// Returns the number of warm apps, total cached bytes, budget, and TTL.
     /// Used by delivery diagnostics to observe the cache layer without evicting.
-    async fn handle_extraction_cache_stats(
-        &self,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_extraction_cache_stats(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         let body = if let Some(ref cache) = self.extraction_cache {
             let stats = cache.stats().await;
             serde_json::json!({
