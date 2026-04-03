@@ -1,6 +1,6 @@
 -- Token mint events: immutable record of every token minted
 -- Category A (notarized) — every mint is coupled to a witnessed REA event
-CREATE TABLE token_mint_events (
+CREATE TABLE IF NOT EXISTS token_mint_events (
     id TEXT PRIMARY KEY NOT NULL,
     h_app_id TEXT NOT NULL DEFAULT 'shefa',
     amount REAL NOT NULL,
@@ -15,16 +15,16 @@ CREATE TABLE token_mint_events (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_token_mint_events_h_app_id ON token_mint_events(h_app_id);
-CREATE INDEX idx_token_mint_events_agent_id ON token_mint_events(agent_id);
-CREATE INDEX idx_token_mint_events_provenance ON token_mint_events(provenance_event_id);
-CREATE INDEX idx_token_mint_events_source_epr ON token_mint_events(source_epr_id);
-CREATE INDEX idx_token_mint_events_tier ON token_mint_events(mint_tier);
-CREATE INDEX idx_token_mint_events_created ON token_mint_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_h_app_id ON token_mint_events(h_app_id);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_agent_id ON token_mint_events(agent_id);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_provenance ON token_mint_events(provenance_event_id);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_source_epr ON token_mint_events(source_epr_id);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_tier ON token_mint_events(mint_tier);
+CREATE INDEX IF NOT EXISTS idx_token_mint_events_created ON token_mint_events(created_at);
 
 -- Token balances: current holdings per agent per governance layer
 -- Category B (agent-scoped)
-CREATE TABLE token_balances (
+CREATE TABLE IF NOT EXISTS token_balances (
     agent_id TEXT NOT NULL,
     h_app_id TEXT NOT NULL DEFAULT 'shefa',
     governance_layer TEXT NOT NULL DEFAULT 'individual',
@@ -37,12 +37,12 @@ CREATE TABLE token_balances (
     PRIMARY KEY (agent_id, h_app_id, governance_layer)
 );
 
-CREATE INDEX idx_token_balances_h_app_id ON token_balances(h_app_id);
-CREATE INDEX idx_token_balances_balance ON token_balances(balance);
+CREATE INDEX IF NOT EXISTS idx_token_balances_h_app_id ON token_balances(h_app_id);
+CREATE INDEX IF NOT EXISTS idx_token_balances_balance ON token_balances(balance);
 
 -- Token transfers: witnessed exchanges between agents
 -- Category A (notarized)
-CREATE TABLE token_transfers (
+CREATE TABLE IF NOT EXISTS token_transfers (
     id TEXT PRIMARY KEY NOT NULL,
     h_app_id TEXT NOT NULL DEFAULT 'shefa',
     from_agent TEXT NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE token_transfers (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_token_transfers_h_app_id ON token_transfers(h_app_id);
-CREATE INDEX idx_token_transfers_from ON token_transfers(from_agent);
-CREATE INDEX idx_token_transfers_to ON token_transfers(to_agent);
-CREATE INDEX idx_token_transfers_created ON token_transfers(created_at);
+CREATE INDEX IF NOT EXISTS idx_token_transfers_h_app_id ON token_transfers(h_app_id);
+CREATE INDEX IF NOT EXISTS idx_token_transfers_from ON token_transfers(from_agent);
+CREATE INDEX IF NOT EXISTS idx_token_transfers_to ON token_transfers(to_agent);
+CREATE INDEX IF NOT EXISTS idx_token_transfers_created ON token_transfers(created_at);
