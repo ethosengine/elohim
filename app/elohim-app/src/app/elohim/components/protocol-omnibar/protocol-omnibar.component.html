@@ -1,0 +1,103 @@
+<!-- === PILL STATE (default) === -->
+<button
+  *ngIf="state === 'pill'"
+  class="omnibar-pill"
+  (click)="expand()"
+  aria-label="View protocol provenance"
+  data-testid="omnibar-pill"
+>
+  <span class="pill-mark">E</span>
+  <span class="pill-reach">{{ reachIcon }}</span>
+</button>
+
+<!-- === EXPANDED STATE === -->
+<div
+  *ngIf="state === 'expanded'"
+  class="omnibar-expanded"
+  data-testid="omnibar-expanded"
+>
+  <div class="omnibar-main">
+    <!-- EPR Address (clickable -> inspect) -->
+    <a
+      [routerLink]="inspectRoute"
+      class="omnibar-address"
+      data-testid="omnibar-address"
+      title="Inspect this EPR in the governance hub"
+    >
+      <span class="address-mark">E</span>
+      <code>{{ truncatedAddress }}</code>
+    </a>
+
+    <!-- Copy -->
+    <button
+      class="omnibar-btn"
+      (click)="copyAddress()"
+      aria-label="Copy EPR address"
+      data-testid="omnibar-copy"
+    >
+      {{ copyFeedback || copyIcon }}
+    </button>
+
+    <!-- Divider -->
+    <span class="divider"></span>
+
+    <!-- Reach badge -->
+    <span class="omnibar-reach" data-testid="omnibar-reach">
+      {{ reachIcon }} {{ reach }}
+    </span>
+
+    <!-- Stewards (compact) -->
+    <span
+      *ngFor="let steward of stewards; let i = index"
+      class="omnibar-steward"
+      data-testid="omnibar-steward"
+    >
+      <span *ngIf="i > 0" class="steward-sep">&middot;</span>
+      {{ steward.displayName }}
+    </span>
+
+    <!-- Delivery source (subtle) -->
+    <span class="omnibar-source" data-testid="omnibar-source">
+      via {{ deliverySource }}
+    </span>
+  </div>
+
+  <div class="omnibar-actions-area">
+    <!-- Actions toggle -->
+    <button
+      class="omnibar-btn actions-toggle"
+      (click)="toggleActions()"
+      aria-label="Content actions"
+      data-testid="omnibar-actions-toggle"
+    >
+      &#x22EE;
+    </button>
+
+    <!-- Collapse -->
+    <button
+      class="omnibar-btn"
+      (click)="collapse()"
+      aria-label="Collapse omnibar"
+      data-testid="omnibar-collapse"
+    >
+      &#x2715;
+    </button>
+  </div>
+
+  <!-- Actions dropdown -->
+  <div
+    *ngIf="showActions"
+    class="omnibar-dropdown"
+    data-testid="omnibar-dropdown"
+  >
+    <a [routerLink]="inspectRoute" class="dropdown-item" data-testid="omnibar-inspect">
+      Inspect EPR
+    </a>
+    <button class="dropdown-item" (click)="feedbackRequested.emit(); showActions = false" data-testid="omnibar-feedback">
+      Give feedback
+    </button>
+    <button class="dropdown-item" (click)="reportRequested.emit(); showActions = false" data-testid="omnibar-report">
+      Report content
+    </button>
+  </div>
+</div>
