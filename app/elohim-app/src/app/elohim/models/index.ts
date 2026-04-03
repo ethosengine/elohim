@@ -14,6 +14,9 @@ export * from './protocol-core.model';
 // REA Bridge - hREA/ValueFlows economic coordination
 export * from './rea-bridge.model';
 
+// Protocol event types — the attention-to-attestation pipeline primitives
+export * from './protocol-event-types.model';
+
 // Economic Event - Immutable value flow records
 export * from './economic-event.model';
 
