@@ -46,6 +46,7 @@ import {
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
+import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
@@ -155,6 +156,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly document = inject(DOCUMENT);
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
+  private readonly attentionTracker = inject(AttentionTrackerService);
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
@@ -167,6 +169,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const resourceId = params['resourceId'] as string;
       if (resourceId) {
+        // Leave previous content if navigating within the viewer
+        if (this.nodeId && this.nodeId !== resourceId) {
+          this.attentionTracker.trackContentLeave(this.nodeId);
+        }
         this.nodeId = resourceId;
         this.loadContent(resourceId);
       }
@@ -190,6 +196,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyRenderer();
+    // Stop attention tracking for current content
+    if (this.nodeId) {
+      this.attentionTracker.trackContentLeave(this.nodeId);
+    }
     // Clean up focused view mode if active
     this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
   }
@@ -342,6 +352,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
           // Auto-track view (increment if first time)
           this.affinityService.trackView(nodeId);
+
+          // Record attention event (dwell-qualified, deduplicated)
+          this.attentionTracker.trackContentView(nodeId);
 
           // Manifest-driven attention signal (onConsume economic event)
           void this.signalHarness.onRendererComplete(contentNode, {
