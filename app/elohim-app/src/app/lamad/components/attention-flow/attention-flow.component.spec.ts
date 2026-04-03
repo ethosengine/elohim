@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { of } from 'rxjs';
+import { vi } from 'vitest';
 
 import { AttentionFlowComponent } from './attention-flow.component';
 import { EventService } from '@app/shefa/services/event.service';
@@ -32,17 +33,18 @@ describe('AttentionFlowComponent', () => {
   ];
 
   beforeEach(async () => {
-    const eventServiceSpy = jasmine.createSpyObj('EventService', ['getRecentEvents']);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId']);
-
-    eventServiceSpy.getRecentEvents.and.returnValue(of(mockEvents));
-    agentServiceSpy.getCurrentAgentId.and.returnValue('agent-maya-123');
+    const mockEventService = {
+      getRecentEvents: vi.fn().mockReturnValue(of(mockEvents)),
+    };
+    const mockAgentService = {
+      getCurrentAgentId: vi.fn().mockReturnValue('agent-maya-123'),
+    };
 
     await TestBed.configureTestingModule({
       imports: [AttentionFlowComponent, RouterModule.forRoot([])],
       providers: [
-        { provide: EventService, useValue: eventServiceSpy },
-        { provide: AgentService, useValue: agentServiceSpy },
+        { provide: EventService, useValue: mockEventService },
+        { provide: AgentService, useValue: mockAgentService },
       ],
     }).compileComponents();
 
