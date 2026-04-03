@@ -10,3 +10,4 @@ packages:
   - elohim/sdk/storage-client-ts
   - elohim/elohim-agent/mcp-servers/elohim-content
   - elohim/elohim-agent/elohim-agent-sdk
+  - genesis/landing
