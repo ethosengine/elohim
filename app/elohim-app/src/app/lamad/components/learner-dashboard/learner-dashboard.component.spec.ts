@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { RouterTestingModule } from '@angular/router/testing';
 import { By } from '@angular/platform-browser';
 
@@ -137,6 +138,7 @@ describe('LearnerDashboardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [LearnerDashboardComponent, RouterTestingModule],
       providers: [
+        provideHttpClient(),
         { provide: MasteryStatsService, useValue: mockMasteryStats },
         { provide: ContentMasteryService, useValue: mockContentMastery },
         { provide: PathService, useValue: mockPathService },

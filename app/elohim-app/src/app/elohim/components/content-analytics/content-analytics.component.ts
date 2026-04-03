@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, inject } from '@angular/core';
+
 import { forkJoin } from 'rxjs';
 
 import { EventService } from '@app/shefa/services/event.service';
