@@ -222,6 +222,16 @@
         ></app-focused-view-toggle>
       </div>
 
+      <!-- Protocol Omnibar (shown in focused view — EPR provenance pill) -->
+      <app-protocol-omnibar
+        *ngIf="isFocusedView && node"
+        [contentId]="node.id"
+        [contentAddress]="omnibarContentAddress"
+        [stewards]="omnibarStewards"
+        [reach]="omnibarReach"
+        [deliverySource]="omnibarDeliverySource"
+      ></app-protocol-omnibar>
+
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">
         <!-- Main content -->

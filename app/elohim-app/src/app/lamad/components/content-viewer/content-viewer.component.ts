@@ -62,6 +62,10 @@ import {
 } from '../../renderers/renderer-registry.service';
 import { ContentService } from '../../services/content.service';
 import { PathContextService } from '../../services/path-context.service';
+import {
+  ProtocolOmnibarComponent,
+  OmnibarSteward,
+} from '@app/elohim/components/protocol-omnibar/protocol-omnibar.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
@@ -77,6 +81,7 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
     GraduatedFeedbackComponent,
     FeedbackMechanismGatewayComponent,
     FocusedViewToggleComponent,
+    ProtocolOmnibarComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
@@ -125,6 +130,12 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   // Focused view (immersive mode) state
   isFocusedView = false;
   private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
+
+  // Protocol omnibar data (shown in focused view — like browser padlock)
+  omnibarStewards: OmnibarSteward[] = [];
+  omnibarContentAddress = '';
+  omnibarReach = '';
+  omnibarDeliverySource = '';
 
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
@@ -346,6 +357,16 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
             createdAt: contentNode.createdAt,
             updatedAt: contentNode.updatedAt,
           });
+
+          // Populate protocol omnibar data (shown in focused view)
+          this.omnibarContentAddress = contentNode.id;
+          this.omnibarReach = (contentNode.reach as string) || 'commons';
+          this.omnibarDeliverySource = window.location.hostname;
+          this.omnibarStewards = (contentNode.stewardedBy || []).map(s => ({
+            humanId: s.humanId,
+            displayName: s.humanId,
+            ratio: s.affinity ?? 0,
+          }));
 
           // Get current affinity
           this.affinity = this.affinityService.getAffinity(nodeId);
