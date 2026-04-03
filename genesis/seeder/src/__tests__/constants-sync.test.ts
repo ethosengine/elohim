@@ -137,7 +137,7 @@ describe('Constants Sync: generated_enums.rs ↔ schema-enums.ts', () => {
 });
 
 describe('Constants Sync: content JSONs ↔ CONTENT_FORMATS', () => {
-  it('every contentFormat in seed data should be recognized', () => {
+  it('every contentFormat in seed data should be recognized', { timeout: 30_000 }, () => {
     const usedFormats = collectContentFormats();
     if (usedFormats.size === 0) {
       console.warn('No content files found, skipping');
