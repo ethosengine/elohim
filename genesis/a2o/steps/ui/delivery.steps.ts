@@ -19,6 +19,7 @@
 import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
+import { request } from 'undici';
 
 import {
   PlaywrightDevice,
@@ -1669,18 +1670,32 @@ Then(
 // ---------------------------------------------------------------------------
 
 /**
- * Set up context: projection cache is empty for the given content.
- * This is a test environment precondition — in real tests, the cache may be
- * warm. This step documents the intent.
+ * Clear the projection cache for the given content slug via the admin API.
+ * Delegates to the doorway cache-clear endpoint so both browser and API
+ * scenarios share the same implementation.
  *
  * Example: Given the projection cache for "evolution-of-trust" is empty
  */
 Given(
   'the projection cache for {string} is empty',
-  async function (this: E2EWorld, _contentId: string) {
-    // The projection cache lives in doorway (MongoDB). Clearing it requires
-    // an operator API call. This step is a documentation marker for the test intent.
-    // When the doorway operator API exposes a cache-clear endpoint, implement here.
+  async function (this: E2EWorld, contentId: string) {
+    const doorway = [...this.doorways.values()][0];
+    if (!doorway) {
+      // No doorway registered yet — documentation marker only in genesis dry-run
+      return;
+    }
+    const { statusCode, body } = await request(
+      `${doorway.url}/admin/cache/clear/${contentId}`,
+      { method: 'POST' }
+    );
+    if (statusCode !== 200) {
+      // Admin API may not be wired yet — log and continue (best-effort)
+      const text = await body.text();
+      // eslint-disable-next-line no-console
+      console.warn(`Cache clear for "${contentId}" returned ${statusCode}: ${text}`);
+    } else {
+      await body.arrayBuffer(); // drain
+    }
   }
 );
 
