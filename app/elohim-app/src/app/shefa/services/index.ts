@@ -17,8 +17,13 @@
 // SHEFA SERVICES (Domain-Agnostic hREA Primitives)
 // =============================================================================
 
-// Event service (elohim-storage backend)
-export { EventService, LamadEventTypes } from './event.service';
+// Event service (elohim-storage backend) — protocol-level content interaction
+export { EventService } from './event.service';
+// Re-export protocol event types for convenience (canonical source: @app/elohim/models)
+export { ProtocolEventTypes } from '@app/elohim/models/protocol-event-types.model';
+export type { ProtocolEventType } from '@app/elohim/models/protocol-event-types.model';
+// Legacy re-exports (domain types — will move to lamad barrel)
+export { LamadEventTypes } from './event.service';
 export type { LamadEventType } from './event.service';
 
 // Attention tracking (dwell-qualified view recording, session dedup)
