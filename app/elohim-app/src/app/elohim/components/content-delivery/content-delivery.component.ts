@@ -14,12 +14,12 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
-import { ContentService } from '@app/lamad/services/content.service';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import {
   ContentRenderer,
   RendererRegistryService,
 } from '@app/lamad/renderers/renderer-registry.service';
+import { ContentService } from '@app/lamad/services/content.service';
 import { SeoService } from '../../../services/seo.service';
 import {
   ProtocolOmnibarComponent,

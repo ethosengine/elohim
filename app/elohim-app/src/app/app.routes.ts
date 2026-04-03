@@ -41,6 +41,17 @@ export const routes: Routes = [
       ),
     title: 'Signing In...',
   },
+  // Full-page content delivery with protocol omnibar (no app chrome)
+  {
+    path: 'deliver/:slug',
+    loadComponent: async () =>
+      import('./elohim/components/content-delivery/content-delivery.component').then(
+        m => m.ContentDeliveryComponent
+      ),
+    data: {
+      title: 'Content',
+    },
+  },
   // Cross-pillar resource viewer (ContentNodes are protocol primitives, not pillar-scoped)
   {
     path: 'resource/:resourceId',
