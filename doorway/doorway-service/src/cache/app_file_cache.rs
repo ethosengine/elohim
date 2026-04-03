@@ -221,17 +221,17 @@ impl AppFileCacheService {
     /// Load the slug index from the projection store (MongoDB).
     ///
     /// Queries `projected_entries` for Content documents with
-    /// `contentFormat == "html5-app"` and builds a HashMap of
-    /// `slug -> blob_hash`. Called at startup and can be called
-    /// to refresh the entire index.
+    /// `contentFormat == "html5-app"` or `contentFormat == "spa-bundle"` and
+    /// builds a HashMap of `slug -> blob_hash`. Called at startup and can be
+    /// called to refresh the entire index.
     pub async fn load_slug_index(&self) {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
 
-        // Query for Content documents where data.contentFormat == "html5-app"
+        // Query for Content documents where data.contentFormat is a bundled app format
         let filter = doc! {
             "doc_type": "Content",
-            "data.contentFormat": "html5-app",
+            "data.contentFormat": { "$in": ["html5-app", "spa-bundle"] },
             "metadata.is_deleted": { "$ne": true },
         };
 
@@ -252,9 +252,9 @@ impl AppFileCacheService {
 
                 // The HTML5 app's slug lives inside contentBody (a JSON string),
                 // NOT in data.hAppId (which is the Holochain app context, e.g. "lamad").
-                let html5_slug = extract_html5_slug_from_data(data);
+                let app_slug = extract_app_slug_from_data(data);
 
-                if let (Some(slug), Some(blob_hash)) = (html5_slug, blob_hash) {
+                if let (Some(slug), Some(blob_hash)) = (app_slug, blob_hash) {
                     if !slug.is_empty() && !blob_hash.is_empty() {
                         index.insert(slug.to_string(), blob_hash.to_string());
                         count += 1;
@@ -295,12 +295,12 @@ impl AppFileCacheService {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
 
-        // The HTML5 app's slug is inside contentBody (JSON string), not at
+        // The app's slug is inside contentBody (JSON string), not at
         // data.hAppId (which is the Holochain app context). We can't query
-        // inside a JSON string with MongoDB, so scan all html5-app entries.
+        // inside a JSON string with MongoDB, so scan all bundled-app entries.
         let filter = doc! {
             "doc_type": "Content",
-            "data.contentFormat": "html5-app",
+            "data.contentFormat": { "$in": ["html5-app", "spa-bundle"] },
             "metadata.is_deleted": { "$ne": true },
         };
 
@@ -314,8 +314,8 @@ impl AppFileCacheService {
 
         while let Ok(Some(doc)) = cursor.try_next().await {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let html5_slug = extract_html5_slug_from_data(data);
-                if html5_slug.as_deref() == Some(slug) {
+                let app_slug = extract_app_slug_from_data(data);
+                if app_slug.as_deref() == Some(slug) {
                     if let Ok(blob_hash) = data.get_str("blobHash") {
                         if !blob_hash.is_empty() {
                             let mut index = self.slug_index.write().await;
@@ -334,7 +334,7 @@ impl AppFileCacheService {
     /// with a fresh blob_hash from MongoDB.
     ///
     /// Called by the invalidation hook when a content update signal
-    /// arrives for an html5-app.
+    /// arrives for a bundled app (html5-app or spa-bundle).
     pub async fn refresh_app(&self, slug: &str) {
         let mut index = self.slug_index.write().await;
         index.remove(slug);
@@ -425,17 +425,17 @@ impl AppFileCacheService {
 // =============================================================================
 
 /// Extract the `slug` from a projected content document's data field,
-/// but only if the content format is `html5-app`.
+/// but only if the content format is a bundled app format (`html5-app` or `spa-bundle`).
 ///
 /// Returns `None` for non-app content or if required fields are missing.
-fn extract_html5_slug(doc: &crate::projection::document::ProjectedDocument) -> Option<String> {
+fn extract_app_slug(doc: &crate::projection::document::ProjectedDocument) -> Option<String> {
     if doc.doc_type != "Content" {
         return None;
     }
 
     let data = &doc.data;
     let format = data.get("contentFormat").and_then(|v| v.as_str())?;
-    if format != "html5-app" {
+    if format != "html5-app" && format != "spa-bundle" {
         return None;
     }
 
@@ -468,10 +468,10 @@ fn extract_html5_slug(doc: &crate::projection::document::ProjectedDocument) -> O
         .map(|s| s.to_string())
 }
 
-/// Extract HTML5 app slug from a raw BSON data document.
-/// Same logic as `extract_html5_slug` but for raw MongoDB documents
+/// Extract app slug from a raw BSON data document.
+/// Same logic as `extract_app_slug` but for raw MongoDB documents
 /// used in the slug index load and resolve paths.
-fn extract_html5_slug_from_data(data: &bson::Document) -> Option<String> {
+fn extract_app_slug_from_data(data: &bson::Document) -> Option<String> {
     // Parse contentBody (JSON string or BSON object) for the HTML5 slug
     if let Ok(content_body) = data.get_str("contentBody") {
         if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
@@ -497,9 +497,10 @@ fn extract_html5_slug_from_data(data: &bson::Document) -> Option<String> {
 }
 
 /// Spawn a background task that watches the projection store's update channel
-/// for html5-app content changes and invalidates the app file cache accordingly.
+/// for bundled app content changes and invalidates the app file cache accordingly.
 ///
-/// When a content update signal arrives with `contentFormat == "html5-app"`:
+/// When a content update signal arrives with `contentFormat == "html5-app"` or
+/// `contentFormat == "spa-bundle"`:
 /// 1. `invalidate_app(app_id)` — clears all cached files for that app
 /// 2. `refresh_app(app_id)` — clears the blob hash index entry so the next
 ///    request re-resolves with the fresh blob_hash
@@ -513,11 +514,11 @@ pub fn spawn_app_cache_invalidation_task(
         loop {
             match update_rx.recv().await {
                 Ok(doc) => {
-                    if let Some(slug) = extract_html5_slug(&doc) {
+                    if let Some(slug) = extract_app_slug(&doc) {
                         info!(
                             slug = %slug,
                             doc_id = %doc.doc_id,
-                            "HTML5 app content updated — invalidating cache"
+                            "App content updated — invalidating cache"
                         );
                         let deleted = cache.invalidate_app(&slug).await;
                         cache.refresh_app(&slug).await;
@@ -579,7 +580,7 @@ mod tests {
     }
 
     // =========================================================================
-    // extract_html5_slug tests
+    // extract_app_slug tests
     // =========================================================================
 
     fn make_projected_doc(
@@ -597,7 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_html5_slug_with_slug_field() {
+    fn test_extract_app_slug_html5_app_with_slug_field() {
         // slug for HTML5 apps lives inside contentBody (JSON string),
         // NOT at the top level of data (which is the Holochain app context)
         let doc = make_projected_doc(
@@ -610,11 +611,41 @@ mod tests {
                 "blobHash": "sha256-abc"
             }),
         );
-        assert_eq!(extract_html5_slug(&doc), Some("quiz-1".to_string()));
+        assert_eq!(extract_app_slug(&doc), Some("quiz-1".to_string()));
     }
 
     #[test]
-    fn test_extract_html5_slug_falls_back_to_id() {
+    fn test_extract_app_slug_spa_bundle_with_slug_field() {
+        // spa-bundle format must also be matched (the bug this fixes)
+        let doc = make_projected_doc(
+            "Content",
+            "content-lamad-app",
+            serde_json::json!({
+                "contentFormat": "spa-bundle",
+                "hAppId": "lamad",
+                "contentBody": "{\"slug\":\"lamad\",\"entryPoint\":\"index.html\"}",
+                "blobHash": "sha256-xyz"
+            }),
+        );
+        assert_eq!(extract_app_slug(&doc), Some("lamad".to_string()));
+    }
+
+    #[test]
+    fn test_extract_app_slug_spa_bundle_falls_back_to_id() {
+        let doc = make_projected_doc(
+            "Content",
+            "lamad-root",
+            serde_json::json!({
+                "contentFormat": "spa-bundle",
+                "id": "lamad-root",
+                "blobHash": "sha256-xyz"
+            }),
+        );
+        assert_eq!(extract_app_slug(&doc), Some("lamad-root".to_string()));
+    }
+
+    #[test]
+    fn test_extract_app_slug_html5_app_falls_back_to_id() {
         let doc = make_projected_doc(
             "Content",
             "simulation-phys",
@@ -624,14 +655,11 @@ mod tests {
                 "blobHash": "sha256-def"
             }),
         );
-        assert_eq!(
-            extract_html5_slug(&doc),
-            Some("simulation-phys".to_string())
-        );
+        assert_eq!(extract_app_slug(&doc), Some("simulation-phys".to_string()));
     }
 
     #[test]
-    fn test_extract_html5_slug_ignores_non_html5_app() {
+    fn test_extract_app_slug_ignores_non_app_format() {
         let doc = make_projected_doc(
             "Content",
             "concept-123",
@@ -640,11 +668,11 @@ mod tests {
                 "slug": "concept-123"
             }),
         );
-        assert_eq!(extract_html5_slug(&doc), None);
+        assert_eq!(extract_app_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_slug_ignores_non_content_doc_type() {
+    fn test_extract_app_slug_ignores_non_content_doc_type() {
         let doc = make_projected_doc(
             "Human",
             "human-abc",
@@ -653,11 +681,11 @@ mod tests {
                 "slug": "quiz-1"
             }),
         );
-        assert_eq!(extract_html5_slug(&doc), None);
+        assert_eq!(extract_app_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_slug_returns_none_for_missing_format() {
+    fn test_extract_app_slug_returns_none_for_missing_format() {
         let doc = make_projected_doc(
             "Content",
             "content-no-format",
@@ -666,11 +694,11 @@ mod tests {
                 "blobHash": "sha256-abc"
             }),
         );
-        assert_eq!(extract_html5_slug(&doc), None);
+        assert_eq!(extract_app_slug(&doc), None);
     }
 
     #[test]
-    fn test_extract_html5_slug_returns_none_for_empty_slug() {
+    fn test_extract_app_slug_returns_none_for_empty_slug() {
         let doc = make_projected_doc(
             "Content",
             "content-empty",
@@ -680,6 +708,20 @@ mod tests {
                 "id": ""
             }),
         );
-        assert_eq!(extract_html5_slug(&doc), None);
+        assert_eq!(extract_app_slug(&doc), None);
+    }
+
+    #[test]
+    fn test_extract_app_slug_spa_bundle_returns_none_for_empty_slug() {
+        let doc = make_projected_doc(
+            "Content",
+            "spa-empty",
+            serde_json::json!({
+                "contentFormat": "spa-bundle",
+                "slug": "",
+                "id": ""
+            }),
+        );
+        assert_eq!(extract_app_slug(&doc), None);
     }
 }
