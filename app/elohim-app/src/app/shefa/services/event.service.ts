@@ -28,6 +28,10 @@ import { map } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
+import {
+  ProtocolEventType,
+  PROTOCOL_EVENT_MAPPINGS,
+} from '@app/elohim/models/protocol-event-types.model';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 // Re-export for backwards compatibility
@@ -71,33 +75,47 @@ export class EventService {
   private readonly storageApi = inject(StorageApiService);
 
   // ===========================================================================
-  // Content Interaction Events
+  // Protocol-Level Content Interaction
   // ===========================================================================
 
   /**
-   * Record a content view event.
+   * Record a content interaction as a protocol-level REA event.
+   *
+   * This is the generic protocol primitive. A "view" is an attention resource
+   * event. A "complete" is an achievement resource event. The interaction type
+   * determines the REA action and resource mapping.
    */
-  recordContentView(agentId: string, contentId: string): Observable<EconomicEventView> {
+  recordContentInteraction(
+    agentId: string,
+    contentId: string,
+    interactionType: ProtocolEventType,
+  ): Observable<EconomicEventView> {
+    const mapping = PROTOCOL_EVENT_MAPPINGS[interactionType];
     return this.storageApi.createEconomicEvent({
-      action: REAActions.USE,
+      action: mapping.action,
       provider: agentId,
       receiver: contentId,
-      lamadEventType: LamadEventTypes.CONTENT_VIEW,
+      lamadEventType: interactionType,
       contentId,
     });
   }
 
+  // ===========================================================================
+  // Content Interaction Events (deprecated — use recordContentInteraction)
+  // ===========================================================================
+
   /**
-   * Record content completion.
+   * @deprecated Use recordContentInteraction(agentId, contentId, 'content-view') instead.
+   */
+  recordContentView(agentId: string, contentId: string): Observable<EconomicEventView> {
+    return this.recordContentInteraction(agentId, contentId, 'content-view');
+  }
+
+  /**
+   * @deprecated Use recordContentInteraction(agentId, contentId, 'content-complete') instead.
    */
   recordContentComplete(agentId: string, contentId: string): Observable<EconomicEventView> {
-    return this.storageApi.createEconomicEvent({
-      action: REAActions.PRODUCE,
-      provider: agentId,
-      receiver: agentId,
-      lamadEventType: LamadEventTypes.CONTENT_COMPLETE,
-      contentId,
-    });
+    return this.recordContentInteraction(agentId, contentId, 'content-complete');
   }
 
   // ===========================================================================

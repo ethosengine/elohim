@@ -10,6 +10,7 @@ import { TestBed } from '@angular/core/testing';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import { EventService, LamadEventTypes, REAActions } from './event.service';
+import { ProtocolEventTypes } from '@app/elohim/models/protocol-event-types.model';
 import { vi } from 'vitest';
 
 describe('EventService', () => {
@@ -353,6 +354,39 @@ describe('EventService', () => {
         expect(service.hasCompleted).toBeDefined();
         expect(typeof service.hasCompleted).toBe('function');
       });
+    });
+  });
+
+  describe('recordContentInteraction', () => {
+    it('should record an interaction with the specified event type', () => {
+      const agentId = 'agent-1';
+      const contentId = 'content-1';
+
+      service.recordContentInteraction(agentId, contentId, 'content-view');
+
+      expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'use',
+          provider: agentId,
+          receiver: contentId,
+          lamadEventType: 'content-view',
+          contentId,
+        }),
+      );
+    });
+
+    it('should record content-complete interaction', () => {
+      const agentId = 'agent-1';
+      const contentId = 'content-1';
+
+      service.recordContentInteraction(agentId, contentId, 'content-complete');
+
+      expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'produce',
+          lamadEventType: 'content-complete',
+        }),
+      );
     });
   });
 });
