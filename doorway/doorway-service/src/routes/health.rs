@@ -303,7 +303,6 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 
     // storage
     let storage_ready = args.storage_url.is_some();
-    let storage_url = args.storage_url.as_deref().unwrap_or("").to_string();
 
     // projection counts from hot cache
     let (content, humans, relationships) = state
@@ -337,7 +336,6 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         },
         "storage": {
             "ready": storage_ready,
-            "url": storage_url,
         },
         "projection": {
             "ready": projection_ready,

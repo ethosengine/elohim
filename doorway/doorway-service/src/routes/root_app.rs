@@ -494,18 +494,14 @@ pub async fn handle_root_app_request(state: Arc<AppState>, path: &str) -> Respon
             super::apps::handle_app_request(Arc::clone(&state), &index_apps_path).await;
 
         if index_response.status().is_success() {
-            // index.html is now in MongoDB cache — read it back to get the bytes cleanly.
-            if let Some(cached_index) = cache.get(&slug, "index.html", &blob_hash).await {
-                return Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", get_mime_type("index.html"))
-                    .header("Cache-Control", cache_control_for("index.html"))
-                    .header("X-Root-App", slug.as_str())
-                    .header("X-Cache", "MISS")
-                    .header("X-SPA-Fallback", "true")
-                    .body(Full::new(Bytes::from(cached_index.data)))
-                    .unwrap();
-            }
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "text/html; charset=utf-8")
+                .header("Cache-Control", cache_control_for("index.html"))
+                .header("X-Root-App", slug.as_str())
+                .header("X-SPA-Fallback", "true")
+                .body(index_response.into_body())
+                .unwrap();
         }
 
         // index.html also not found — cache is fully cold; serve bootstrap
