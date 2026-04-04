@@ -978,6 +978,36 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    observation_sessions (id) {
+        id -> Text,
+        started_at -> Text,
+        ended_at -> Nullable<Text>,
+        ttl_seconds -> Integer,
+        source -> Text,
+        metadata_json -> Nullable<Text>,
+        report_content_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    observation_entries (id) {
+        id -> Integer,
+        session_id -> Text,
+        timestamp -> Text,
+        origin -> Text,
+        category -> Text,
+        severity -> Text,
+        method -> Nullable<Text>,
+        path -> Nullable<Text>,
+        status_code -> Nullable<Integer>,
+        message -> Text,
+        context_json -> Nullable<Text>,
+    }
+}
+
+diesel::joinable!(observation_entries -> observation_sessions (session_id));
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1014,6 +1044,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     knowledge_maps,
     local_sessions,
     node_stewardship,
+    observation_entries,
+    observation_sessions,
     precedents,
     premium_gates,
     proposal_options,
