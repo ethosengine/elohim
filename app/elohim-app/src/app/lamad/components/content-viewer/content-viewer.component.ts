@@ -48,6 +48,7 @@ import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reactio
 
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
+import { ResilienceService, type ResilienceView } from '../../services/resilience.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 import { SeoService } from '../../../services/seo.service';
@@ -104,6 +105,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   // Stewardship data
   stewardship: ContentStewardshipView | null = null;
+
+  // Resilience data
+  resilience: ResilienceView | null = null;
 
   // Governance data
   governanceState: GovernanceStateRecord | null = null;
@@ -169,6 +173,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly document = inject(DOCUMENT);
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
+  private readonly resilienceService = inject(ResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
 
   /** Default feedback profile type for learning content */
@@ -395,6 +400,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           // Load trust badge data for Attestations tab
           this.loadTrustBadge(nodeId);
           this.loadStewardship(nodeId);
+          this.loadResilience(nodeId);
 
           // Load governance data for Governance tab
           this.loadGovernanceData(nodeId);
@@ -489,6 +495,23 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       displayName: a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown',
       ratio: a.allocation?.allocationRatio ?? 0,
     }));
+  }
+
+  /**
+   * Load resilience data for the Network tab.
+   */
+  private loadResilience(nodeId: string): void {
+    this.resilienceService
+      .getContentResilience(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: resilience => {
+          this.resilience = resilience;
+        },
+        error: () => {
+          // Resilience is supplemental — don't block on failure
+        },
+      });
   }
 
   /**

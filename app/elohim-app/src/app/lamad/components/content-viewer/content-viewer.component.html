@@ -626,7 +626,60 @@
 
       <!-- Network Tab -->
       <section *ngSwitchCase="'network'" class="network-tab">
-        <!-- Attention Metrics (protocol-native analytics for stewards) -->
+        <!-- Resilience Section -->
+        <div class="resilience-section" data-testid="viewer-resilience-section">
+          <div class="resilience-header">
+            <h3>Resilience</h3>
+            <span
+              class="health-badge"
+              [ngClass]="resilience?.health?.status || 'unknown'"
+              data-testid="viewer-health-badge"
+            >{{ (resilience?.health?.status || 'unknown') | titlecase }}</span>
+          </div>
+
+          <div class="resilience-grid" *ngIf="resilience; else loadingResilience">
+            <div class="resilience-metric">
+              <span class="metric-label">Encoding</span>
+              <span class="metric-value">{{ resilience.encoding.strategy }}
+                <span *ngIf="resilience.encoding.parityShards > 0">
+                  (can lose {{ resilience.health.canSurviveFailures }} peers)
+                </span>
+              </span>
+            </div>
+
+            <div class="resilience-metric">
+              <span class="metric-label">Shards</span>
+              <span class="metric-value">
+                {{ resilience.distribution.shardsWithLocations }}/{{ resilience.distribution.totalShards }} distributed
+              </span>
+            </div>
+
+            <div class="resilience-metric">
+              <span class="metric-label">Peers</span>
+              <span class="metric-value">{{ resilience.distribution.distinctPeers }} holding shards</span>
+            </div>
+
+            <div class="resilience-metric" *ngIf="resilience.stewardship.stewardCount > 0">
+              <span class="metric-label">Stewards</span>
+              <span class="metric-value">
+                <span *ngFor="let a of resilience.stewardship.allocations; let last = last">
+                  {{ a.stewardPresenceId }} ({{ (a.allocationRatio * 100) | number:'1.0-0' }}%){{ last ? '' : ' · ' }}
+                </span>
+              </span>
+            </div>
+
+            <div class="resilience-metric" *ngIf="resilience.commitments.totalCommittedBytes > 0">
+              <span class="metric-label">Storage Committed</span>
+              <span class="metric-value">{{ resilience.commitments.totalCommittedBytes / 1073741824 | number:'1.0-0' }}GB</span>
+            </div>
+          </div>
+
+          <ng-template #loadingResilience>
+            <div class="resilience-loading">Loading resilience data...</div>
+          </ng-template>
+        </div>
+
+        <!-- Attention Metrics (existing) -->
         <app-content-analytics
           *ngIf="node"
           [contentId]="node.id"
@@ -638,7 +691,6 @@
           <p>Explore related concepts in the knowledge graph</p>
         </div>
 
-        <!-- Mini Graph Visualization -->
         <div class="mini-graph-container">
           <app-mini-graph
             *ngIf="node"
@@ -651,7 +703,6 @@
           ></app-mini-graph>
         </div>
 
-        <!-- Explore in Full Graph Button -->
         <div class="network-actions">
           <button
             type="button"
