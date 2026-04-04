@@ -347,6 +347,60 @@ impl P2PHandle {
         }
     }
 
+    /// Distribute all shards of a blob to delivery peers.
+    /// Returns the number of shards successfully distributed.
+    pub async fn distribute_shards(
+        &self,
+        content_id: &str,
+        blob_data: &[u8],
+        pool: &crate::db::DbPool,
+        h_app_id: &str,
+    ) -> Result<usize, String> {
+        let encoder =
+            crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
+        let manifest =
+            encoder.create_manifest(blob_data, "application/octet-stream", "commons");
+        let shards = encoder.create_shards(blob_data, &manifest.encoding);
+
+        let peers = self.delivery_peers();
+        if peers.is_empty() {
+            tracing::info!(content_id, "No delivery peers for shard distribution");
+            return Ok(0);
+        }
+
+        let mut distributed = 0usize;
+
+        for (i, shard_data) in shards.iter().enumerate() {
+            let hash = &manifest.shard_hashes[i];
+            let peer = &peers[i % peers.len()];
+
+            match self
+                .push_shard(&peer.peer_id, hash, shard_data.clone())
+                .await
+            {
+                Ok(()) => {
+                    tracing::info!(content_id, shard_index = i, peer = %peer.peer_id, "Shard distributed");
+                    if let Ok(mut conn) = pool.get() {
+                        let location = crate::db::models::NewShardLocation {
+                            shard_hash: hash,
+                            peer_id: &peer.peer_id,
+                            h_app_id,
+                            status: "announced",
+                        };
+                        let _ =
+                            crate::db::shard_locations::upsert_location(&mut conn, &location);
+                    }
+                    distributed += 1;
+                }
+                Err(e) => {
+                    tracing::warn!(content_id, shard_index = i, peer = %peer.peer_id, error = %e, "Shard push failed");
+                }
+            }
+        }
+
+        Ok(distributed)
+    }
+
     /// Full P2P content resolution: EPR Head -> shard fetch -> (EprHead, content_bytes).
     ///
     /// Resolves the EPR Head for metadata, extracts blob_cid, then fetches the

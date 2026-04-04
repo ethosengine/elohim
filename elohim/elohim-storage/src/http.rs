@@ -2181,6 +2181,10 @@ impl HttpServer {
                     }
                 }
 
+                // Capture distribution data before manifest recording consumes manifest_data
+                #[cfg(feature = "p2p")]
+                let distribution_data = (manifest_data.0.clone(), manifest_data.1.clone());
+
                 // Record shard manifest if content has a blob
                 if result.is_ok() {
                     if manifest_data.1.is_some() {
@@ -2236,6 +2240,46 @@ impl HttpServer {
                                                 "Recorded shard manifest"
                                             );
                                         }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+
+                // Auto-distribute shards to peers
+                #[cfg(feature = "p2p")]
+                if result.is_ok() {
+                    if let (Some(ref handle), Some(ref pool)) =
+                        (&self.p2p_handle, &self.db_pool)
+                    {
+                        if let (ref content_id, Some(ref blob_hash)) = distribution_data {
+                            let handle = handle.clone();
+                            let pool = pool.clone();
+                            let content_id = content_id.clone();
+                            let blob_store = self.blob_store.clone();
+                            let blob_hash = blob_hash.clone();
+                            tokio::spawn(async move {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    match handle
+                                        .distribute_shards(
+                                            &content_id,
+                                            &data,
+                                            &pool,
+                                            "lamad",
+                                        )
+                                        .await
+                                    {
+                                        Ok(n) => tracing::info!(
+                                            content_id = %content_id,
+                                            shards = n,
+                                            "Shard distribution complete"
+                                        ),
+                                        Err(e) => tracing::warn!(
+                                            content_id = %content_id,
+                                            error = %e,
+                                            "Shard distribution failed"
+                                        ),
                                     }
                                 }
                             });
@@ -2368,6 +2412,15 @@ impl HttpServer {
                     }
                 }
 
+                // Capture distribution data before manifest_inputs is consumed
+                #[cfg(feature = "p2p")]
+                let distribution_items: Vec<(String, String)> = manifest_inputs
+                    .iter()
+                    .filter_map(|(id, bh, _, _, _)| {
+                        bh.as_ref().map(|h| (id.clone(), h.clone()))
+                    })
+                    .collect();
+
                 // Record shard manifests for items with blobs
                 if let Some(ref pool) = self.db_pool {
                     let blob_store = self.blob_store.clone();
@@ -2428,6 +2481,33 @@ impl HttpServer {
                                 }
                             }
                             tracing::debug!("Bulk shard manifest recording complete");
+                        });
+                    }
+                }
+
+                // Auto-distribute shards to peers
+                #[cfg(feature = "p2p")]
+                if let (Some(ref handle), Some(ref pool)) =
+                    (&self.p2p_handle, &self.db_pool)
+                {
+                    if !distribution_items.is_empty() {
+                        let handle = handle.clone();
+                        let pool = pool.clone();
+                        let blob_store = self.blob_store.clone();
+                        tokio::spawn(async move {
+                            for (content_id, blob_hash) in distribution_items {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let _ = handle
+                                        .distribute_shards(
+                                            &content_id,
+                                            &data,
+                                            &pool,
+                                            "lamad",
+                                        )
+                                        .await;
+                                }
+                            }
+                            tracing::info!("Bulk shard distribution complete");
                         });
                     }
                 }
