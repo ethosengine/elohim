@@ -197,6 +197,31 @@ Given(
 );
 
 /**
+ * Collect observation report from the first doorway (best-effort).
+ * Works for both HTTP and Playwright modes.
+ */
+async function collectObservationReport(
+  world: E2EWorld,
+  scenario: { pickle: { name: string }; result?: { status: typeof Status.FAILED } }
+): Promise<void> {
+  const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
+  for (const [, doorway] of world.doorways) {
+    if (!doorway.client.observationId) break;
+    try {
+      const report = await doorway.client.getObservationReport();
+      const errorCount = report.summary.bySeverity['error'] ?? 0;
+      if (errorCount > 0 || scenario.result?.status === Status.FAILED) {
+        mkdirSync('reports/observations', { recursive: true });
+        writeFileSync(`reports/observations/${safeName}.json`, JSON.stringify(report, null, 2));
+      }
+    } catch {
+      // Best-effort — don't mask the real test result
+    }
+    break;
+  }
+}
+
+/**
  * Capture artifacts on failure, assert console cleanliness on pass, then run cleanup.
  */
 After(async function (this: E2EWorld, scenario) {
@@ -224,27 +249,7 @@ After(async function (this: E2EWorld, scenario) {
     }
   }
 
-  // Collect observation report (works for both HTTP and Playwright modes)
-  const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
-  for (const [, doorway] of this.doorways) {
-    if (doorway.client.observationId) {
-      try {
-        const report = await doorway.client.getObservationReport();
-        const errorCount = report.summary.bySeverity['error'] ?? 0;
-        if (errorCount > 0 || scenario.result?.status === Status.FAILED) {
-          mkdirSync('reports/observations', { recursive: true });
-          writeFileSync(
-            `reports/observations/${safeName}.json`,
-            JSON.stringify(report, null, 2)
-          );
-        }
-      } catch {
-        // Best-effort — don't mask the real test result
-      }
-    }
-    break;
-  }
-
+  await collectObservationReport(this, scenario);
   await this.runCleanup();
 });
 

@@ -371,7 +371,7 @@ export interface ObservationReport {
     bySeverity: Record<string, number>;
     byCategory: Record<string, number>;
   };
-  issues: Array<{
+  issues: {
     id: string;
     category: string;
     severity: string;
@@ -379,7 +379,7 @@ export interface ObservationReport {
     entryCount: number;
     relatedContentIds: string[];
     suggestedCause: string;
-  }>;
+  }[];
   systemState: {
     storageHealthy: boolean;
     conductorConnected: boolean;
