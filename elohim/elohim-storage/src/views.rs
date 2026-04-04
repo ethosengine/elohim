@@ -90,8 +90,8 @@ use crate::db::models::{
     AccessGrant, AgreementRow, App, Appeal, Challenge, Content, ContentAttestation, ContentMastery,
     ContentStewardship, ContentWithTags, ContributorDashboard, ContributorPresence,
     CustodianMetrics, Discussion, EconomicEvent, GovernanceDisposition, GovernanceSignal,
-    GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, Precedent,
-    PremiumGate, Proposal, ProposalOption, RankedVote, ReaCommitment, Relationship,
+    GovernanceState, Human, HumanRelationship, LocalSession, NodeStewardship, ObservationEntry,
+    Precedent, PremiumGate, Proposal, ProposalOption, RankedVote, ReaCommitment, Relationship,
     RelationshipWithContent, Schedule, Statement, StatementVote, StewardCredential, StewardedNode,
     StewardshipAllocation, StewardshipAllocationWithPresence, TokenBalance, TokenMintEvent,
     TokenTransfer, Vote,
@@ -5501,4 +5501,213 @@ mod schema_version_tests {
         assert!(view.title.is_none());
         assert!(view.metadata.is_none());
     }
+}
+
+// ============================================================================
+// Observation Sessions — Views
+// ============================================================================
+
+/// Input for beginning a new observation session.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeginObservationInputView {
+    pub source: String,
+    #[serde(default = "default_obs_ttl")]
+    pub ttl_seconds: i32,
+    #[serde(default)]
+    pub metadata: Option<JsonVal>,
+}
+
+fn default_obs_ttl() -> i32 {
+    300
+}
+
+/// Response returned after beginning an observation session.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeginObservationResponseView {
+    pub session_id: String,
+    pub expires_at: String,
+}
+
+/// Input for appending a single entry to an observation session.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationEntryInputView {
+    pub origin: String,
+    pub category: String,
+    #[serde(default = "default_obs_severity")]
+    pub severity: String,
+    #[serde(default)]
+    pub method: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub status_code: Option<i32>,
+    pub message: String,
+    #[serde(default)]
+    pub context: Option<JsonVal>,
+}
+
+fn default_obs_severity() -> String {
+    "info".to_string()
+}
+
+/// A single observation entry as returned in a report.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationEntryView {
+    pub timestamp: String,
+    pub origin: String,
+    pub category: String,
+    pub severity: String,
+    pub method: Option<String>,
+    pub path: Option<String>,
+    pub status_code: Option<i32>,
+    pub message: String,
+    pub context: Option<JsonVal>,
+}
+
+impl From<ObservationEntry> for ObservationEntryView {
+    fn from(e: ObservationEntry) -> Self {
+        Self {
+            timestamp: e.timestamp,
+            origin: e.origin,
+            category: e.category,
+            severity: e.severity,
+            method: e.method,
+            path: e.path,
+            status_code: e.status_code,
+            message: e.message,
+            context: parse_json_opt(&e.context_json),
+        }
+    }
+}
+
+/// A detected issue surfaced from observation entries.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationIssueView {
+    pub id: String,
+    pub category: String,
+    pub severity: String,
+    pub title: String,
+    pub entry_count: usize,
+    pub related_content_ids: Vec<String>,
+    pub suggested_cause: String,
+}
+
+/// Duration metadata for an observation report.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationDurationView {
+    pub started_at: String,
+    pub ended_at: String,
+    pub duration_ms: i64,
+}
+
+/// Aggregate counts across entries in a session.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationSummaryView {
+    pub total_entries: usize,
+    pub by_origin: std::collections::HashMap<String, usize>,
+    pub by_severity: std::collections::HashMap<String, usize>,
+    pub by_category: std::collections::HashMap<String, usize>,
+}
+
+/// Snapshot of relevant system health at report time.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationSystemStateView {
+    pub storage_healthy: bool,
+    pub conductor_connected: bool,
+    pub p2p_peer_count: usize,
+}
+
+/// Full observation report returned when a session is closed.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationReportView {
+    pub content_id: String,
+    pub session_id: String,
+    pub source: String,
+    pub metadata: Option<JsonVal>,
+    pub duration: ObservationDurationView,
+    pub summary: ObservationSummaryView,
+    pub issues: Vec<ObservationIssueView>,
+    pub system_state: ObservationSystemStateView,
+}
+
+// =========================================================================
+// Resilience Views
+// =========================================================================
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResilienceView {
+    pub content_id: String,
+    pub encoding: EncodingInfoView,
+    pub distribution: DistributionView,
+    pub stewardship: ResilienceStewardshipView,
+    pub commitments: CommitmentHealthView,
+    pub health: HealthScoreView,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EncodingInfoView {
+    pub strategy: String,
+    pub data_shards: i32,
+    pub parity_shards: i32,
+    pub total_size_bytes: i64,
+    pub shard_size_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DistributionView {
+    pub total_shards: i32,
+    pub shards_with_locations: i32,
+    pub distinct_peers: i32,
+    pub shards: Vec<ShardInfoView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ShardInfoView {
+    pub hash: String,
+    pub shard_type: String,
+    pub peer_ids: Vec<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResilienceStewardshipView {
+    pub steward_count: i32,
+    pub allocations: Vec<StewardshipAllocationView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CommitmentHealthView {
+    pub active_peers: i32,
+    pub total_committed_bytes: i64,
+    pub total_used_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HealthScoreView {
+    pub score: f32,
+    pub can_survive_failures: i32,
+    pub status: String,
 }

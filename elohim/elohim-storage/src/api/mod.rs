@@ -34,6 +34,7 @@ pub mod presence;
 pub mod rea_commitments;
 pub mod recognition;
 pub mod registry;
+pub mod resilience;
 pub mod resources;
 pub mod risk;
 pub mod routing;
@@ -130,6 +131,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("weather") {
         let resource_path = sub_path.strip_prefix("weather").unwrap_or("");
         weather::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("resilience") {
+        let resource_path = sub_path.strip_prefix("resilience").unwrap_or("");
+        resilience::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("risk") {
         let resource_path = sub_path.strip_prefix("risk").unwrap_or("");
         risk::handle(req, method, resource_path, &pool, &app_ctx).await
