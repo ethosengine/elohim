@@ -187,7 +187,7 @@ Given('the Service Worker is active', async function (this: E2EWorld) {
 Then('the Service Worker is registered and active', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const swState = await device.page.evaluate(async () => {
+  const swState = (await device.page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration('/apps/');
     if (!reg) return { registered: false, active: false, scope: '' };
     return {
@@ -195,7 +195,7 @@ Then('the Service Worker is registered and active', async function (this: E2EWor
       active: reg.active?.state === 'activated',
       scope: reg.scope,
     };
-  }) as { registered: boolean; active: boolean; scope: string };
+  })) as { registered: boolean; active: boolean; scope: string };
 
   assert.ok(swState.registered, 'Service Worker not registered for /apps/');
   assert.ok(
@@ -218,10 +218,10 @@ Then(
   async function (this: E2EWorld, pathPrefix: string) {
     const device = firstPlaywright(this);
 
-    const swScope = await device.page.evaluate(async () => {
+    const swScope = (await device.page.evaluate(async () => {
       const reg = await navigator.serviceWorker.getRegistration('/apps/');
       return reg?.scope ?? '';
-    }) as string;
+    })) as string;
 
     assert.ok(swScope.includes(pathPrefix), `SW scope "${swScope}" does not cover "${pathPrefix}"`);
   }
@@ -261,11 +261,11 @@ Given(
 Given('the Service Worker has cached all app files', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const cacheCount = await device.page.evaluate(async () => {
+  const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
     const keys = await cache.keys();
     return keys.length;
-  }) as number;
+  })) as number;
 
   assert.ok(cacheCount > 0, 'SW CacheStorage is empty — app files were not cached');
 });
@@ -503,7 +503,9 @@ When(
 Then('the app loads and functions normally', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+  const bodyLength = (await device.page.evaluate(
+    () => document.body?.innerText?.length ?? 0
+  )) as number;
   assert.ok(bodyLength > 0, 'Page body is empty — app did not render');
 });
 
@@ -519,7 +521,9 @@ Then(
     // By the time we reach this step, the page has loaded.
     const device = firstPlaywright(this);
 
-    const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+    const bodyLength = (await device.page.evaluate(
+      () => document.body?.innerText?.length ?? 0
+    )) as number;
     assert.ok(bodyLength > 0, 'Page body is empty — app did not render within the time budget');
   }
 );
@@ -631,11 +635,11 @@ Then('the SW downloads the ZIP blob once', async function (this: E2EWorld) {
 Then('the SW extracts all app files into CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const cacheCount = await device.page.evaluate(async () => {
+  const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
     const keys = await cache.keys();
     return keys.length;
-  }) as number;
+  })) as number;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract files from ZIP');
 });
@@ -643,11 +647,11 @@ Then('the SW extracts all app files into CacheStorage', async function (this: E2
 Then('the SW extracts all files from the ZIP into CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const cacheCount = await device.page.evaluate(async () => {
+  const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
     const keys = await cache.keys();
     return keys.length;
-  }) as number;
+  })) as number;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract ZIP files');
 });
@@ -678,11 +682,11 @@ Then('the SW fetches each file individually', async function (this: E2EWorld) {
 Then('each file is cached in SW CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const cacheCount = await device.page.evaluate(async () => {
+  const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
     const keys = await cache.keys();
     return keys.length;
-  }) as number;
+  })) as number;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty after individual file fetch');
 });
@@ -711,11 +715,11 @@ Then(
     const device = firstPlaywright(this);
 
     // Verify CacheStorage has entries
-    const cacheCount = await device.page.evaluate(async () => {
+    const cacheCount = (await device.page.evaluate(async () => {
       const cache = await caches.open('apps-v1');
       const keys = await cache.keys();
       return keys.length;
-    }) as number;
+    })) as number;
     assert.ok(cacheCount > 0, 'CacheStorage empty — SW cannot serve subsequent requests');
   }
 );
@@ -729,7 +733,9 @@ Then('the requested file is returned from the local extraction', async function 
   const device = firstPlaywright(this);
 
   // Page loaded successfully with files from extraction
-  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+  const bodyLength = (await device.page.evaluate(
+    () => document.body?.innerText?.length ?? 0
+  )) as number;
   assert.ok(bodyLength >= 0, 'Page did not load — local extraction may have failed');
 });
 
@@ -838,11 +844,11 @@ Then(
     const device = firstPlaywright(this);
 
     // After eviction, CacheStorage should be empty for this app
-    const cacheCount = await device.page.evaluate(async () => {
+    const cacheCount = (await device.page.evaluate(async () => {
       const cache = await caches.open('apps-v1');
       const keys = await cache.keys();
       return keys.length;
-    }) as number;
+    })) as number;
 
     assert.equal(
       cacheCount,
@@ -909,10 +915,10 @@ Then(
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
 
-    const iframeSrc = await device.page.evaluate(() => {
-      const iframe = document.querySelector('iframe[src*="/apps/"]') as HTMLIFrameElement | null;
+    const iframeSrc = (await device.page.evaluate(() => {
+      const iframe = document.querySelector('iframe[src*="/apps/"]');
       return iframe?.src ?? iframe?.getAttribute('src') ?? '';
-    }) as string;
+    })) as string;
 
     if (iframeSrc) {
       const pageOrigin = new URL(device.page.url()).origin;
@@ -936,11 +942,11 @@ Then(
 Then('the SW fetch event fires for the request', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const cacheCount = await device.page.evaluate(async () => {
+  const cacheCount = (await device.page.evaluate(async () => {
     const cache = await caches.open('apps-v1');
     const keys = await cache.keys();
     return keys.length;
-  }) as number;
+  })) as number;
 
   // SW intercepted the request if it cached files
   assert.ok(cacheCount > 0, 'SW did not intercept — CacheStorage is empty');
@@ -1144,9 +1150,9 @@ Then('the SW cache resumes serving', async function (this: E2EWorld) {
 Given('elohim-cache-core WASM is loaded in the browser', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const wasmLoaded = await device.page.evaluate(() => {
+  const wasmLoaded = (await device.page.evaluate(() => {
     return !!(globalThis as unknown as Record<string, unknown>).__elohim_cache_core;
-  }) as boolean;
+  })) as boolean;
 
   assert.ok(wasmLoaded, 'elohim-cache-core WASM not loaded — DNA pipeline may not have run');
 });
@@ -1259,7 +1265,9 @@ Then(
  */
 Then('the content is served successfully from the network', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
-  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+  const bodyLength = (await device.page.evaluate(
+    () => document.body?.innerText?.length ?? 0
+  )) as number;
   assert.ok(bodyLength > 0, 'Page is empty — content was not served from network');
 });
 
@@ -1304,7 +1312,9 @@ Then(
     const device = firstPlaywright(this);
 
     // WASM bypass is transparent — the content should still load.
-    const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+    const bodyLength = (await device.page.evaluate(
+      () => document.body?.innerText?.length ?? 0
+    )) as number;
     assert.ok(bodyLength > 0, 'Content did not load after WASM bypass');
   }
 );
@@ -1316,7 +1326,9 @@ Then(
  */
 Then('{string} loads and functions normally', async function (this: E2EWorld, _appSlug: string) {
   const device = firstPlaywright(this);
-  const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+  const bodyLength = (await device.page.evaluate(
+    () => document.body?.innerText?.length ?? 0
+  )) as number;
   assert.ok(bodyLength > 0, `App "${_appSlug}" did not render — may have crashed`);
 });
 
@@ -1381,15 +1393,14 @@ Given('the bootstrap page is displayed', async function (this: E2EWorld) {
   await device.page.goto(`${doorway.url}/`, { waitUntil: 'networkidle' });
 
   const title = await device.page.title();
-  const bodyText = await device.page.evaluate(
+  const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''
-  ) as string;
+  )) as string;
 
   // Bootstrap page should mention loading or progress, not the full SPA
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
   const isBootstrap = bodyText.includes('loading') || bodyText.includes('starting');
   assert.ok(
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     isBootstrap || title.toLowerCase().includes('loading'),
     `Expected bootstrap page but got: title="${title}" body snippet="${bodyText.slice(0, 100)}"`
   );
@@ -1450,7 +1461,9 @@ Then(
   async function (this: E2EWorld, _humanName: string) {
     const device = firstPlaywright(this);
 
-    const bodyLength = await device.page.evaluate(() => document.body?.innerText?.length ?? 0) as number;
+    const bodyLength = (await device.page.evaluate(
+      () => document.body?.innerText?.length ?? 0
+    )) as number;
     assert.ok(bodyLength > 0, 'SPA did not render — bootstrap page may not have auto-navigated');
   }
 );
@@ -1465,13 +1478,12 @@ Then('the bootstrap page reloads the browser', async function (this: E2EWorld) {
 
   // After 30s the bootstrap page should reload — verify via URL staying at /
   // or by checking for the reload timer message in the page content
-  const bodyText = await device.page.evaluate(
+  const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''
-  ) as string;
+  )) as string;
 
   // Either the page reloaded (showing loading state) or shows a reload message
   const hasReloadMessage =
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing
     bodyText.includes('reload') || bodyText.includes('loading') || bodyText.includes('starting');
 
   assert.ok(hasReloadMessage, 'Bootstrap page did not reload or show reload message');
@@ -1485,17 +1497,16 @@ Then('the bootstrap page reloads the browser', async function (this: E2EWorld) {
 Then('a message is shown explaining the delay', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const bodyText = await device.page.evaluate(
+  const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''
-  ) as string;
+  )) as string;
 
   // Bootstrap page should explain the delay
-  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing */
+
   const hasExplanation =
     bodyText.includes('loading') ||
     bodyText.includes('starting') ||
     bodyText.includes('taking longer');
-  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   assert.ok(hasExplanation, 'Bootstrap page does not explain the delay to the user');
 });
@@ -1509,11 +1520,11 @@ Then('the bootstrap page displays a loading indicator', async function (this: E2
   const device = firstPlaywright(this);
 
   // Look for common loading indicator patterns
-  const hasIndicator = await device.page.evaluate(() => {
+  const hasIndicator = (await device.page.evaluate(() => {
     const spinners = document.querySelectorAll('[class*="spinner"], [class*="loading"], progress');
     const bodyText = document.body?.textContent?.toLowerCase() ?? '';
     return spinners.length > 0 || bodyText.includes('loading') || bodyText.includes('starting');
-  }) as boolean;
+  })) as boolean;
 
   assert.ok(hasIndicator, 'Bootstrap page does not display a loading indicator');
 });
@@ -1752,18 +1763,17 @@ When(String.raw`an unauthenticated request is made for \/`, async function (this
 Then(/^the response is the bootstrap page \(not the SPA\)$/, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const bodyText = await device.page.evaluate(
+  const bodyText = (await device.page.evaluate(
     () => document.body?.textContent?.toLowerCase() ?? ''
-  ) as string;
+  )) as string;
   const title = await device.page.title();
 
   // Bootstrap page should indicate loading, not the full Angular SPA
-  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing */
+
   const isBootstrap =
     bodyText.includes('loading') ||
     bodyText.includes('starting') ||
     title.toLowerCase().includes('loading');
-  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   assert.ok(
     isBootstrap,
