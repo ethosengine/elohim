@@ -434,4 +434,152 @@ mod tests {
         let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
         assert_eq!(reconstructed, data);
     }
+
+    #[test]
+    fn test_rs_reconstruct_after_dropping_max_parity() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 25,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+            rs_threshold: 50,
+            single_shard_max: 10,
+        });
+
+        let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+        let shards = encoder.create_shards(&data, &manifest.encoding);
+
+        assert_eq!(manifest.encoding, "rs-4-7");
+        assert_eq!(shards.len(), 7);
+
+        // Drop all 3 parity shards (indices 4, 5, 6)
+        let mut shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        shard_opts[4] = None;
+        shard_opts[5] = None;
+        shard_opts[6] = None;
+
+        let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
+        assert_eq!(
+            reconstructed, data,
+            "Must reconstruct from data shards alone"
+        );
+    }
+
+    #[test]
+    fn test_rs_reconstruct_after_dropping_3_mixed_shards() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 25,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+            rs_threshold: 50,
+            single_shard_max: 10,
+        });
+
+        let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+        let shards = encoder.create_shards(&data, &manifest.encoding);
+
+        // Drop 2 data shards and 1 parity shard
+        let mut shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        shard_opts[0] = None; // data shard 0
+        shard_opts[2] = None; // data shard 2
+        shard_opts[5] = None; // parity shard 1
+
+        let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
+        assert_eq!(
+            reconstructed, data,
+            "Must reconstruct from 4 remaining shards"
+        );
+    }
+
+    #[test]
+    fn test_rs_fails_when_too_many_shards_lost() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 25,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+            rs_threshold: 50,
+            single_shard_max: 10,
+        });
+
+        let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+        let shards = encoder.create_shards(&data, &manifest.encoding);
+
+        // Drop 4 shards — only 3 remain, but we need 4 data shards minimum
+        let mut shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        shard_opts[0] = None;
+        shard_opts[1] = None;
+        shard_opts[2] = None;
+        shard_opts[4] = None;
+
+        let result = encoder.reconstruct(&manifest, &shard_opts);
+        assert!(
+            result.is_err(),
+            "Must fail when fewer than data_shards remain"
+        );
+    }
+
+    #[test]
+    fn test_chunked_roundtrip() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 10,
+            single_shard_max: 5,
+            rs_threshold: 500,
+            ..Default::default()
+        });
+
+        let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder.create_manifest(&data, "text/plain", "commons");
+        let shards = encoder.create_shards(&data, &manifest.encoding);
+
+        assert_eq!(manifest.encoding, "chunked");
+        assert_eq!(shards.len(), 8); // 73 bytes / 10 = 8 chunks
+
+        let shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
+        assert_eq!(reconstructed, data);
+    }
+
+    #[test]
+    fn test_chunked_fails_on_missing_shard() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 10,
+            single_shard_max: 5,
+            rs_threshold: 500,
+            ..Default::default()
+        });
+
+        let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder.create_manifest(&data, "text/plain", "commons");
+        let shards = encoder.create_shards(&data, &manifest.encoding);
+
+        let mut shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        shard_opts[3] = None;
+
+        let result = encoder.reconstruct(&manifest, &shard_opts);
+        assert!(result.is_err(), "Chunked encoding requires all shards");
+    }
+
+    #[test]
+    fn test_single_shard_roundtrip() {
+        let encoder = ShardEncoder::new(ShardConfig::default());
+
+        let data = b"The fruit back on the tree.";
+        let manifest = encoder.create_manifest(data, "text/plain", "commons");
+        let shards = encoder.create_shards(data, &manifest.encoding);
+
+        assert_eq!(manifest.encoding, "none");
+        assert_eq!(shards.len(), 1);
+
+        let shard_opts: Vec<Option<Vec<u8>>> =
+            shards.iter().map(|s| Some(s.clone())).collect();
+        let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
+        assert_eq!(reconstructed, data);
+    }
 }
