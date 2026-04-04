@@ -74,6 +74,16 @@ type PendingShardMap = Arc<
     >,
 >;
 
+/// Map of pending shard push requests: outbound request ID → reply sender
+type PendingShardPushMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<(), String>>,
+        >,
+    >,
+>;
+
 use dashmap::DashMap;
 
 use crate::blob_store::BlobStore;
@@ -178,6 +188,8 @@ pub struct P2PNode {
     pending_epr_resolves: PendingEprMap,
     /// Pending shard fetch requests awaiting responses from peers
     pending_shard_fetches: PendingShardMap,
+    /// Pending shard push requests awaiting acknowledgment
+    pending_shard_pushes: PendingShardPushMap,
     /// Whether startup EPR Head publication has run
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
     /// Extraction cache for delivery capability advertisement
@@ -218,6 +230,13 @@ pub enum P2PCommand {
     FetchShard {
         hash: String,
         reply: oneshot::Sender<Option<Vec<u8>>>,
+    },
+    /// Push a shard to a peer for replication
+    PushShard {
+        peer_id: PeerId,
+        hash: String,
+        data: Vec<u8>,
+        reply: oneshot::Sender<Result<(), String>>,
     },
 }
 
@@ -296,6 +315,35 @@ impl P2PHandle {
         match tokio::time::timeout(Duration::from_secs(5), reply_rx).await {
             Ok(Ok(result)) => result,
             _ => None,
+        }
+    }
+
+    /// Push a shard to a specific peer for replication.
+    /// Returns Ok(()) on acknowledgment, Err on timeout/failure.
+    pub async fn push_shard(
+        &self,
+        peer_id: &str,
+        hash: &str,
+        data: Vec<u8>,
+    ) -> Result<(), String> {
+        let peer_id: PeerId = peer_id
+            .parse()
+            .map_err(|e| format!("Invalid peer ID: {e}"))?;
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(P2PCommand::PushShard {
+                peer_id,
+                hash: hash.to_string(),
+                data,
+                reply: tx,
+            })
+            .await
+            .map_err(|_| "P2P command channel closed".to_string())?;
+
+        match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err("Push response channel dropped".to_string()),
+            Err(_) => Err("Push timed out after 30s".to_string()),
         }
     }
 
@@ -450,6 +498,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             pending_shard_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            pending_shard_pushes: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -672,6 +723,26 @@ impl P2PNode {
                     let _ = reply.send(None);
                 }
             }
+            P2PCommand::PushShard {
+                peer_id,
+                hash,
+                data,
+                reply,
+            } => {
+                let request = ShardRequest::Push {
+                    hash: hash.clone(),
+                    data,
+                };
+                let request_id = swarm
+                    .behaviour_mut()
+                    .shard_protocol
+                    .send_request(&peer_id, request);
+                debug!(peer = %peer_id, hash = %hash, request_id = ?request_id, "Sent shard push request to peer");
+                self.pending_shard_pushes
+                    .lock()
+                    .await
+                    .insert(request_id, reply);
+            }
         }
     }
 
@@ -850,9 +921,10 @@ impl P2PNode {
                         request_id,
                         response,
                     } => {
-                        let pending_tx =
+                        // Check pending fetch requests
+                        let pending_fetch_tx =
                             self.pending_shard_fetches.lock().await.remove(&request_id);
-                        if let Some(tx) = pending_tx {
+                        if let Some(tx) = pending_fetch_tx {
                             match response {
                                 ShardResponse::Data(data) => {
                                     debug!(request_id = ?request_id, size = data.len(), "Shard fetch completed");
@@ -861,6 +933,26 @@ impl P2PNode {
                                 _ => {
                                     debug!(request_id = ?request_id, response = ?response, "Shard fetch returned non-data");
                                     let _ = tx.send(None);
+                                }
+                            }
+                        }
+                        // Check pending push requests
+                        else if let Some(tx) =
+                            self.pending_shard_pushes.lock().await.remove(&request_id)
+                        {
+                            match response {
+                                ShardResponse::PushAck => {
+                                    debug!(request_id = ?request_id, "Shard push acknowledged");
+                                    let _ = tx.send(Ok(()));
+                                }
+                                ShardResponse::Error(e) => {
+                                    debug!(request_id = ?request_id, error = %e, "Shard push rejected");
+                                    let _ = tx.send(Err(e));
+                                }
+                                _ => {
+                                    let _ = tx.send(Err(
+                                        "Unexpected response to push".to_string(),
+                                    ));
                                 }
                             }
                         } else {
@@ -880,6 +972,10 @@ impl P2PNode {
                 // Clean up any pending shard fetch so the caller gets None instead of hanging
                 if let Some(tx) = self.pending_shard_fetches.lock().await.remove(&request_id) {
                     let _ = tx.send(None);
+                }
+                // Clean up any pending shard push so the caller gets an error instead of hanging
+                if let Some(tx) = self.pending_shard_pushes.lock().await.remove(&request_id) {
+                    let _ = tx.send(Err(format!("Outbound failure: {error:?}")));
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
