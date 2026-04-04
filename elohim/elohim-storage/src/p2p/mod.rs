@@ -84,6 +84,16 @@ type PendingShardPushMap = Arc<
     >,
 >;
 
+/// Map of pending shard verification requests: outbound request ID → (shard_hash, peer_id)
+type PendingVerificationMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            (String, String),
+        >,
+    >,
+>;
+
 use dashmap::DashMap;
 
 use crate::blob_store::BlobStore;
@@ -190,6 +200,8 @@ pub struct P2PNode {
     pending_shard_fetches: PendingShardMap,
     /// Pending shard push requests awaiting acknowledgment
     pending_shard_pushes: PendingShardPushMap,
+    /// Pending shard verification (Have) requests
+    pending_verifications: PendingVerificationMap,
     /// Whether startup EPR Head publication has run
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
     /// Extraction cache for delivery capability advertisement
@@ -557,6 +569,9 @@ impl P2PNode {
             pending_shard_pushes: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_verifications: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
@@ -660,6 +675,8 @@ impl P2PNode {
 
         let mut status_interval = tokio::time::interval(Duration::from_secs(30));
         let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
+        let mut verify_interval = tokio::time::interval(Duration::from_secs(300));
+        verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut command_rx = self.command_rx.lock().await;
 
         loop {
@@ -686,6 +703,10 @@ impl P2PNode {
                 _ = sync_interval.tick() => {
                     drop(swarm);
                     self.initiate_sync_round().await;
+                }
+                _ = verify_interval.tick() => {
+                    self.verify_shard_locations(&mut *swarm).await;
+                    drop(swarm);
                 }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
@@ -1009,6 +1030,33 @@ impl P2PNode {
                                     ));
                                 }
                             }
+                        }
+                        // Check pending verification requests
+                        else if let Some((shard_hash, peer_id_str)) =
+                            self.pending_verifications.lock().await.remove(&request_id)
+                        {
+                            if let Some(ref pool) = self.db_pool {
+                                if let Ok(mut conn) = pool.get() {
+                                    match &response {
+                                        ShardResponse::Have(true) => {
+                                            let _ = crate::db::shard_locations::update_verified(
+                                                &mut conn,
+                                                &shard_hash,
+                                                &peer_id_str,
+                                            );
+                                        }
+                                        ShardResponse::Have(false) | ShardResponse::NotFound => {
+                                            let _ = crate::db::shard_locations::mark_lost(
+                                                &mut conn,
+                                                &shard_hash,
+                                                &peer_id_str,
+                                            );
+                                            info!(shard = %shard_hash, peer = %peer_id_str, "Shard lost — peer reports not having it");
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
                         } else {
                             debug!(request_id = ?request_id, response = ?response, "Received shard response");
                         }
@@ -1030,6 +1078,20 @@ impl P2PNode {
                 // Clean up any pending shard push so the caller gets an error instead of hanging
                 if let Some(tx) = self.pending_shard_pushes.lock().await.remove(&request_id) {
                     let _ = tx.send(Err(format!("Outbound failure: {error:?}")));
+                }
+                // Mark lost for any pending verification request that failed
+                if let Some((shard_hash, peer_id_str)) =
+                    self.pending_verifications.lock().await.remove(&request_id)
+                {
+                    if let Some(ref pool) = self.db_pool {
+                        if let Ok(mut conn) = pool.get() {
+                            let _ = crate::db::shard_locations::mark_lost(
+                                &mut conn,
+                                &shard_hash,
+                                &peer_id_str,
+                            );
+                        }
+                    }
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
@@ -1403,6 +1465,62 @@ impl P2PNode {
                     }
                 }
             }
+        }
+    }
+
+    /// Verify that peers still hold their announced shards.
+    /// Sends Have requests and marks lost shards.
+    async fn verify_shard_locations(&self, swarm: &mut Swarm<ElohimStorageBehaviour>) {
+        let pool = match &self.db_pool {
+            Some(p) => p,
+            None => return,
+        };
+
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        use crate::db::diesel_schema::shard_locations;
+        use diesel::prelude::*;
+
+        let locations: Vec<crate::db::models::ShardLocationRow> = shard_locations::table
+            .filter(shard_locations::status.ne("lost"))
+            .limit(100)
+            .load(&mut conn)
+            .unwrap_or_default();
+
+        if locations.is_empty() {
+            return;
+        }
+
+        debug!(count = locations.len(), "Verifying shard locations");
+
+        for loc in &locations {
+            let peer_id: PeerId = match loc.peer_id.parse() {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            if !swarm.is_connected(&peer_id) {
+                let _ =
+                    crate::db::shard_locations::mark_lost(&mut conn, &loc.shard_hash, &loc.peer_id);
+                info!(shard = %loc.shard_hash, peer = %loc.peer_id, "Marked lost (peer disconnected)");
+                continue;
+            }
+
+            let request = ShardRequest::Have {
+                hash: loc.shard_hash.clone(),
+            };
+            let request_id = swarm
+                .behaviour_mut()
+                .shard_protocol
+                .send_request(&peer_id, request);
+
+            self.pending_verifications.lock().await.insert(
+                request_id,
+                (loc.shard_hash.clone(), loc.peer_id.clone()),
+            );
         }
     }
 
