@@ -24,7 +24,8 @@ type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 const ALLOWED_METHODS: &str = "GET, POST, PUT, DELETE, HEAD, OPTIONS";
 
 /// Request headers the browser may send.
-const ALLOWED_HEADERS: &str = "Content-Type, Authorization, Accept, X-Op, X-Requested-With";
+const ALLOWED_HEADERS: &str =
+    "Content-Type, Authorization, Accept, X-Op, X-Requested-With, X-Observation-Id";
 
 /// Response headers the browser may read from JavaScript.
 const EXPOSE_HEADERS: &str = "Content-Length, Content-Range, ETag";

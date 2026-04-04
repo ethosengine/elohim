@@ -66,6 +66,13 @@ pub async fn forward_to_storage(
         }
     }
 
+    // Forward observation session header if present
+    if let Some(obs_id) = req.headers().get("x-observation-id") {
+        if let Ok(obs_str) = obs_id.to_str() {
+            builder = builder.header("X-Observation-Id", obs_str);
+        }
+    }
+
     if matches!(method, Method::POST | Method::PUT | Method::PATCH) {
         match req.collect().await {
             Ok(collected) => {
