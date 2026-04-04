@@ -364,11 +364,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           this.omnibarContentAddress = contentNode.id;
           this.omnibarReach = (contentNode.reach as string) || 'commons';
           this.omnibarDeliverySource = window.location.hostname;
-          this.omnibarStewards = (contentNode.stewardedBy || []).map(s => ({
-            humanId: s.humanId,
-            displayName: s.humanId,
-            ratio: s.affinity ?? 0,
-          }));
+          // Omnibar stewards populated from allocation data in loadStewardship()
+          this.omnibarStewards = [];
 
           // Get current affinity
           this.affinity = this.affinityService.getAffinity(nodeId);
@@ -471,11 +468,27 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       .subscribe({
         next: stewardship => {
           this.stewardship = stewardship;
+          this.updateOmnibarStewards();
         },
         error: () => {
           // Stewardship is supplemental — don't block on failure
         },
       });
+  }
+
+  /**
+   * Update omnibar stewards from allocation data.
+   */
+  private updateOmnibarStewards(): void {
+    if (!this.stewardship?.allocations?.length) {
+      this.omnibarStewards = [];
+      return;
+    }
+    this.omnibarStewards = this.stewardship.allocations.map(a => ({
+      humanId: a.allocation?.stewardPresenceId || '',
+      displayName: a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown',
+      ratio: a.allocation?.allocationRatio ?? 0,
+    }));
   }
 
   /**
