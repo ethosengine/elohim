@@ -202,7 +202,7 @@ Given(
  */
 async function collectObservationReport(
   world: E2EWorld,
-  scenario: { pickle: { name: string }; result?: { status: typeof Status.FAILED } }
+  scenario: { pickle: { name: string }; result?: { status: string } }
 ): Promise<void> {
   const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
   for (const [, doorway] of world.doorways) {
