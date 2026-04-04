@@ -34,7 +34,6 @@ const CACHE_DISABLE = '/admin/cache/disable';
 const CACHE_ENABLE = '/admin/cache/enable';
 const CACHE_WARM = '/admin/cache/warm';
 const HEALTH_STARTUP = '/health/startup';
-const HEALTH = '/health';
 
 // ---------------------------------------------------------------------------
 // Helpers
