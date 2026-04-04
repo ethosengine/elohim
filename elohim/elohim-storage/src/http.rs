@@ -369,6 +369,16 @@ impl HttpServer {
         let path = req.uri().path().to_string();
         let method = req.method().clone();
 
+        // Extract observation session ID before req is consumed -- used by middleware aspect.
+        let obs_session_id: Option<String> = req
+            .headers()
+            .get("X-Observation-Id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        // Capture method string for middleware aspect before method is moved into the match.
+        let method_str = method.to_string();
+
         debug!(method = %method, path = %path, "Incoming request");
 
         let result = match (method, path.as_str()) {
@@ -527,6 +537,17 @@ impl HttpServer {
                         "lamad", // Default app context for cache stream
                     );
                     return Ok(response.map(Either::Right));
+                } else {
+                    Ok(response::service_unavailable("Database not available"))
+                }
+            }
+
+            // Observation Session API -- must be matched before the /api/v1/ catch-all
+            (method, p) if p.starts_with("/api/v1/observations") => {
+                if let Some(ref pool) = self.db_pool {
+                    let sub_path = p.strip_prefix("/api/v1/observations").unwrap_or("");
+                    self.handle_observation_request(req, method, sub_path, pool.clone())
+                        .await
                 } else {
                     Ok(response::service_unavailable("Database not available"))
                 }
@@ -703,6 +724,16 @@ impl HttpServer {
 
         match result {
             Ok(mut response) => {
+                // Observation middleware aspect: record non-2xx failures when session is active.
+                if let Some(ref session_id) = obs_session_id {
+                    self.maybe_observe_request(
+                        session_id,
+                        &method_str,
+                        &path,
+                        response.status().as_u16(),
+                    );
+                }
+
                 // Add CORS headers to ALL responses (not just preflight)
                 let headers = response.headers_mut();
                 headers.insert(
@@ -718,7 +749,7 @@ impl HttpServer {
                 headers.insert(
                     "Access-Control-Allow-Headers",
                     hyper::header::HeaderValue::from_static(
-                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version, X-Observation-Id",
                     ),
                 );
                 Ok(response.map(Either::Left))
