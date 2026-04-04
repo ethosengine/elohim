@@ -685,7 +685,19 @@ async fn handle_request(
     req: Request<Incoming>,
 ) -> Result<Response<BoxBody>, hyper::Error> {
     let method = req.method().clone();
+    let method_str = method.to_string();
     let path = req.uri().path().to_string();
+
+    // Extract observation session ID before req is consumed by the match block.
+    // Used to fire-and-forget doorway-originated error contributions to storage.
+    let observation_id: Option<String> = req
+        .headers()
+        .get("x-observation-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // Snapshot storage URL before state is moved into match arms.
+    let storage_url_for_obs: Option<String> = state.args.storage_url.clone();
 
     // Check if this is a signal subdomain request (signal.*.elohim.host)
     let host = req
@@ -1410,7 +1422,74 @@ async fn handle_request(
         _ => to_boxed(not_found_response(&path)),
     };
 
+    // Fire-and-forget: contribute doorway-originated errors to the observation session.
+    // Only fires when the client sent X-Observation-Id AND doorway itself produced a 4xx/5xx
+    // (i.e. errors before the request ever reached elohim-storage, such as registry misses,
+    // auth failures at the gateway level, or conductor unavailability).
+    if let Some(ref obs_id) = observation_id {
+        let status = response.status().as_u16();
+        if status >= 400 {
+            if let Some(ref storage_url) = storage_url_for_obs {
+                maybe_contribute_observation(
+                    obs_id,
+                    storage_url,
+                    "route",
+                    if status >= 500 { "error" } else { "warning" },
+                    &method_str,
+                    &path,
+                    status,
+                    &format!("Doorway returned {} before reaching storage", status),
+                );
+            }
+        }
+    }
+
     Ok(response)
+}
+
+/// Fire-and-forget: contribute a doorway observation entry to storage.
+///
+/// Called when doorway itself produces a 4xx/5xx response — i.e. errors that occur
+/// before the request reaches elohim-storage (registry misses, auth failures, conductor
+/// unavailability). Doorway observes things storage can't see; this surfaces them into
+/// the same observation session the client is tracking.
+///
+/// The spawn is intentionally detached — we never await it. A failure to deliver the
+/// observation entry must never affect the original response.
+fn maybe_contribute_observation(
+    observation_id: &str,
+    storage_url: &str,
+    category: &str,
+    severity: &str,
+    method: &str,
+    path: &str,
+    status_code: u16,
+    message: &str,
+) {
+    let url = format!(
+        "{}/api/v1/observations/{}/entries",
+        storage_url.trim_end_matches('/'),
+        observation_id
+    );
+    let body = serde_json::json!({
+        "origin": "doorway",
+        "category": category,
+        "severity": severity,
+        "method": method,
+        "path": path,
+        "statusCode": status_code,
+        "message": message
+    });
+
+    tokio::spawn(async move {
+        let client = reqwest::Client::new();
+        let _ = client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await;
+    });
 }
 
 /// Handle bootstrap service requests

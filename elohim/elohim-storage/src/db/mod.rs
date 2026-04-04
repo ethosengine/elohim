@@ -69,11 +69,18 @@ pub mod responsibility_demand_configs;
 // Token decay events (shefa — elohim-token sprint 3)
 pub mod token_decay_events;
 
+// Shard protocol tables (P2P Resilience — Sprint B)
+pub mod shard_locations;
+pub mod shard_manifests;
+
 // Stewarded node topology (node registry + node-human stewardship)
 pub mod stewarded_nodes;
 
 // Policy cache for stewardship enforcement
 pub mod policy_cache;
+
+// Observation session diagnostic system (Category C — operational)
+pub mod observation_sessions;
 
 use std::path::Path;
 use std::time::Duration;

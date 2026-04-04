@@ -236,6 +236,7 @@ export * from "./UpdateRiskAlertInputView";
 export * from "./UpdateScheduleInputView";
 export * from "./UpdateSpatialContextInputView";
 export * from "./UpsertPolicyInputView";
+export * from "./VerificationResultView";
 export * from "./VoteOnStatementInputView";
 export * from "./VoteView";
 export * from "./VulnerabilityAssessmentView";

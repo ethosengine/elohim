@@ -334,6 +334,35 @@ diesel::table! {
 }
 
 diesel::table! {
+    shard_locations (shard_hash, peer_id) {
+        shard_hash -> Text,
+        peer_id -> Text,
+        h_app_id -> Text,
+        status -> Text,
+        first_seen -> Text,
+        last_verified -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    shard_manifests (content_id, h_app_id) {
+        content_id -> Text,
+        h_app_id -> Text,
+        blob_hash -> Text,
+        blob_cid -> Nullable<Text>,
+        encoding -> Text,
+        data_shard_count -> Integer,
+        parity_shard_count -> Integer,
+        shard_hashes_json -> Text,
+        total_size_bytes -> BigInt,
+        shard_size_bytes -> BigInt,
+        mime_type -> Text,
+        reach -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     stewardship_allocations (id) {
         id -> Text,
         h_app_id -> Text,
@@ -978,6 +1007,36 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    observation_sessions (id) {
+        id -> Text,
+        started_at -> Text,
+        ended_at -> Nullable<Text>,
+        ttl_seconds -> Integer,
+        source -> Text,
+        metadata_json -> Nullable<Text>,
+        report_content_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    observation_entries (id) {
+        id -> Integer,
+        session_id -> Text,
+        timestamp -> Text,
+        origin -> Text,
+        category -> Text,
+        severity -> Text,
+        method -> Nullable<Text>,
+        path -> Nullable<Text>,
+        status_code -> Nullable<Integer>,
+        message -> Text,
+        context_json -> Nullable<Text>,
+    }
+}
+
+diesel::joinable!(observation_entries -> observation_sessions (session_id));
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1014,6 +1073,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     knowledge_maps,
     local_sessions,
     node_stewardship,
+    observation_entries,
+    observation_sessions,
     precedents,
     premium_gates,
     proposal_options,
@@ -1025,6 +1086,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     risk_alerts,
     schema_version,
     schedules,
+    shard_locations,
+    shard_manifests,
     statement_votes,
     statements,
     steward_affinity,

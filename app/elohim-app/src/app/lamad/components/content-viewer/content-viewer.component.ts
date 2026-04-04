@@ -48,6 +48,11 @@ import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reactio
 
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
+import {
+  ResilienceService,
+  type ResilienceView,
+  type VerificationResultView,
+} from '../../services/resilience.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 import { SeoService } from '../../../services/seo.service';
@@ -104,6 +109,11 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   // Stewardship data
   stewardship: ContentStewardshipView | null = null;
+
+  // Resilience data
+  resilience: ResilienceView | null = null;
+  verificationResult: VerificationResultView | null = null;
+  isVerifying = false;
 
   // Governance data
   governanceState: GovernanceStateRecord | null = null;
@@ -169,6 +179,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly document = inject(DOCUMENT);
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
+  private readonly resilienceService = inject(ResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
 
   /** Default feedback profile type for learning content */
@@ -364,11 +375,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           this.omnibarContentAddress = contentNode.id;
           this.omnibarReach = (contentNode.reach as string) || 'commons';
           this.omnibarDeliverySource = window.location.hostname;
-          this.omnibarStewards = (contentNode.stewardedBy || []).map(s => ({
-            humanId: s.humanId,
-            displayName: s.humanId,
-            ratio: s.affinity ?? 0,
-          }));
+          // Omnibar stewards populated from allocation data in loadStewardship()
+          this.omnibarStewards = [];
 
           // Get current affinity
           this.affinity = this.affinityService.getAffinity(nodeId);
@@ -398,6 +406,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           // Load trust badge data for Attestations tab
           this.loadTrustBadge(nodeId);
           this.loadStewardship(nodeId);
+          this.loadResilience(nodeId);
 
           // Load governance data for Governance tab
           this.loadGovernanceData(nodeId);
@@ -471,9 +480,64 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       .subscribe({
         next: stewardship => {
           this.stewardship = stewardship;
+          this.updateOmnibarStewards();
         },
         error: () => {
           // Stewardship is supplemental — don't block on failure
+        },
+      });
+  }
+
+  /**
+   * Update omnibar stewards from allocation data.
+   */
+  private updateOmnibarStewards(): void {
+    if (!this.stewardship?.allocations?.length) {
+      this.omnibarStewards = [];
+      return;
+    }
+    this.omnibarStewards = this.stewardship.allocations.map(a => ({
+      humanId: a.allocation?.stewardPresenceId || '',
+      displayName: a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown',
+      ratio: a.allocation?.allocationRatio ?? 0,
+    }));
+  }
+
+  /**
+   * Load resilience data for the Network tab.
+   */
+  private loadResilience(nodeId: string): void {
+    this.resilienceService
+      .getContentResilience(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: resilience => {
+          this.resilience = resilience;
+        },
+        error: () => {
+          // Resilience is supplemental — don't block on failure
+        },
+      });
+  }
+
+  /**
+   * Trigger on-demand resilience verification (reconstruct from shards).
+   */
+  verifyResilience(): void {
+    if (!this.node || this.isVerifying) return;
+    this.isVerifying = true;
+    this.verificationResult = null;
+
+    this.resilienceService
+      .verifyResilience(this.node.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: result => {
+          this.verificationResult = result;
+          this.isVerifying = false;
+        },
+        error: () => {
+          this.isVerifying = false;
         },
       });
   }
@@ -940,9 +1004,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Resilience icon — indicates stewardship health.
    */
   getResilienceIcon(): string {
-    const stewardCount = this.node?.stewardedBy?.length || 0;
+    const stewardCount = this.stewardship?.allocations?.length || 0;
     if (stewardCount >= 3) return '\u{1F7E2}'; // green circle
     if (stewardCount >= 1) return '\u{1F7E1}'; // yellow circle
+    if (this.stewardship === null) return '\u{1F504}'; // loading (arrows)
     return '\u{26AA}'; // white circle (no stewards)
   }
 
@@ -951,24 +1016,35 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    */
   getResilienceTooltip(): string {
     if (!this.node) return '';
+    if (this.stewardship === null) return 'Loading stewardship data...';
 
     const lines: string[] = [];
 
-    // Stewards
-    if (this.node.stewardedBy?.length) {
-      const stewards = this.node.stewardedBy
-        .sort((a, b) => b.affinity - a.affinity)
-        .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
+    const allocs = this.stewardship?.allocations || [];
+    if (allocs.length > 0) {
+      const stewards = allocs
+        .sort(
+          (a, b) =>
+            (b.allocation?.allocationRatio ?? 0) - (a.allocation?.allocationRatio ?? 0),
+        )
+        .map((a) => {
+          const name =
+            a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown';
+          const pct = Math.round((a.allocation?.allocationRatio ?? 0) * 100);
+          const type = a.allocation?.contributionType || 'steward';
+          return `${name} (${type}, ${pct}%)`;
+        })
         .join(', ');
       lines.push(`Stewards: ${stewards}`);
     } else {
       lines.push('No stewards assigned');
     }
 
-    // Trust score
     if (this.node.trustScore != null) {
       lines.push(`Trust: ${Math.round(this.node.trustScore * 100)}%`);
     }
+
+    lines.push(`Reach: ${this.node.reach || 'commons'}`);
 
     return lines.join('\n') || 'No resilience data available';
   }

@@ -94,7 +94,7 @@ import { Component, input, output } from '@angular/core';
     .menu-backdrop {
       position: fixed;
       inset: 0;
-      z-index: 99;
+      z-index: 9998;
     }
 
     .menu-dropdown {
@@ -109,7 +109,7 @@ import { Component, input, output } from '@angular/core';
       border-radius: 8px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
       list-style: none;
-      z-index: 100;
+      z-index: 9999;
     }
 
     .menu-item {

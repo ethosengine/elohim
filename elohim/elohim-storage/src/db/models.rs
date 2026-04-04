@@ -18,11 +18,12 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
-    node_stewardship, places, precedents, premium_gates, proposal_options, proposals, ranked_votes,
-    rea_commitments, relationships, responsibility_demand_configs, risk_alerts, schedules,
+    node_stewardship, observation_entries, observation_sessions, places, precedents, premium_gates,
+    proposal_options, proposals, ranked_votes, rea_commitments, relationships,
+    responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
     spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
-    token_transfers, votes,
+    stewardship_allocations, token_balances, token_decay_events, token_mint_events, token_transfers,
+    votes,
 };
 
 // ============================================================================
@@ -2647,4 +2648,141 @@ pub struct NewTokenDecayEvent<'a> {
     pub decay_amount: f32,
     pub obligation_level: &'a str,
     pub dignity_floor: f32,
+}
+
+// ============================================================================
+// Shard Manifest Models (P2P Resilience — Sprint B)
+// ============================================================================
+
+/// Shard manifest row from SELECT query.
+/// Category C (operational): local projection of encoding state per content item.
+/// No dht_anchor_hash — rebuilt from local blob store, not shared via DHT.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = shard_manifests)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ShardManifestRow {
+    pub content_id: String,
+    pub h_app_id: String,
+    pub blob_hash: String,
+    pub blob_cid: Option<String>,
+    pub encoding: String,
+    pub data_shard_count: i32,
+    pub parity_shard_count: i32,
+    pub shard_hashes_json: String,
+    pub total_size_bytes: i64,
+    pub shard_size_bytes: i64,
+    pub mime_type: String,
+    pub reach: String,
+    pub created_at: String,
+}
+
+/// New shard manifest for INSERT/REPLACE.
+/// `created_at` is omitted — SQLite provides the default via `datetime('now')`.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = shard_manifests)]
+pub struct NewShardManifest<'a> {
+    pub content_id: &'a str,
+    pub h_app_id: &'a str,
+    pub blob_hash: &'a str,
+    pub blob_cid: Option<&'a str>,
+    pub encoding: &'a str,
+    pub data_shard_count: i32,
+    pub parity_shard_count: i32,
+    pub shard_hashes_json: &'a str,
+    pub total_size_bytes: i64,
+    pub shard_size_bytes: i64,
+    pub mime_type: &'a str,
+    pub reach: &'a str,
+}
+
+// ============================================================================
+// Shard Location Models (P2P Resilience — Sprint B)
+// ============================================================================
+
+/// Shard location row from SELECT query.
+/// Category C (operational): tracks which peers hold which shards.
+/// No dht_anchor_hash — rebuilt from shard protocol ack events, not shared via DHT.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = shard_locations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ShardLocationRow {
+    pub shard_hash: String,
+    pub peer_id: String,
+    pub h_app_id: String,
+    pub status: String,
+    pub first_seen: String,
+    pub last_verified: Option<String>,
+}
+
+/// New shard location for INSERT/REPLACE.
+/// `first_seen` is omitted — SQLite provides the default via `datetime('now')`.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = shard_locations)]
+pub struct NewShardLocation<'a> {
+    pub shard_hash: &'a str,
+    pub peer_id: &'a str,
+    pub h_app_id: &'a str,
+    pub status: &'a str,
+}
+
+// ============================================================================
+// Observation Sessions (Operational — Category C)
+// ============================================================================
+
+/// Active or closed diagnostic observation session.
+/// Category C (operational): ephemeral per-node session, not shared via DHT.
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = observation_sessions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ObservationSession {
+    pub id: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub ttl_seconds: i32,
+    pub source: String,
+    pub metadata_json: Option<String>,
+    pub report_content_id: Option<String>,
+}
+
+/// New observation session for INSERT.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = observation_sessions)]
+pub struct NewObservationSession<'a> {
+    pub id: &'a str,
+    pub ttl_seconds: i32,
+    pub source: &'a str,
+    pub metadata_json: Option<&'a str>,
+}
+
+/// Single entry appended to an observation session.
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = observation_entries)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ObservationEntry {
+    pub id: i32,
+    pub session_id: String,
+    pub timestamp: String,
+    pub origin: String,
+    pub category: String,
+    pub severity: String,
+    pub method: Option<String>,
+    pub path: Option<String>,
+    pub status_code: Option<i32>,
+    pub message: String,
+    pub context_json: Option<String>,
+}
+
+/// New observation entry for INSERT.
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = observation_entries)]
+pub struct NewObservationEntry<'a> {
+    pub session_id: &'a str,
+    pub origin: &'a str,
+    pub category: &'a str,
+    pub severity: &'a str,
+    pub method: Option<&'a str>,
+    pub path: Option<&'a str>,
+    pub status_code: Option<i32>,
+    pub message: &'a str,
+    pub context_json: Option<&'a str>,
 }

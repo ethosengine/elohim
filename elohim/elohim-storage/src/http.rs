@@ -90,6 +90,15 @@ use crate::views::{
     StewardedNodeView,
     StewardshipAllocationView,
     StewardshipSeedView,
+    BeginObservationInputView,
+    BeginObservationResponseView,
+    ObservationDurationView,
+    ObservationEntryInputView,
+    ObservationEntryView,
+    ObservationIssueView,
+    ObservationReportView,
+    ObservationSummaryView,
+    ObservationSystemStateView,
     UpdateAllocationInputView,
     UpdateContentInputView,
     SUPPORTED_SCHEMA_VERSIONS,
@@ -360,6 +369,16 @@ impl HttpServer {
         let path = req.uri().path().to_string();
         let method = req.method().clone();
 
+        // Extract observation session ID before req is consumed -- used by middleware aspect.
+        let obs_session_id: Option<String> = req
+            .headers()
+            .get("X-Observation-Id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        // Capture method string for middleware aspect before method is moved into the match.
+        let method_str = method.to_string();
+
         debug!(method = %method, path = %path, "Incoming request");
 
         let result = match (method, path.as_str()) {
@@ -518,6 +537,17 @@ impl HttpServer {
                         "lamad", // Default app context for cache stream
                     );
                     return Ok(response.map(Either::Right));
+                } else {
+                    Ok(response::service_unavailable("Database not available"))
+                }
+            }
+
+            // Observation Session API -- must be matched before the /api/v1/ catch-all
+            (method, p) if p.starts_with("/api/v1/observations") => {
+                if let Some(ref pool) = self.db_pool {
+                    let sub_path = p.strip_prefix("/api/v1/observations").unwrap_or("");
+                    self.handle_observation_request(req, method, sub_path, pool.clone())
+                        .await
                 } else {
                     Ok(response::service_unavailable("Database not available"))
                 }
@@ -694,6 +724,16 @@ impl HttpServer {
 
         match result {
             Ok(mut response) => {
+                // Observation middleware aspect: record non-2xx failures when session is active.
+                if let Some(ref session_id) = obs_session_id {
+                    self.maybe_observe_request(
+                        session_id,
+                        &method_str,
+                        &path,
+                        response.status().as_u16(),
+                    );
+                }
+
                 // Add CORS headers to ALL responses (not just preflight)
                 let headers = response.headers_mut();
                 headers.insert(
@@ -709,7 +749,7 @@ impl HttpServer {
                 headers.insert(
                     "Access-Control-Allow-Headers",
                     hyper::header::HeaderValue::from_static(
-                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version, X-Observation-Id",
                     ),
                 );
                 Ok(response.map(Either::Left))
@@ -2130,6 +2170,15 @@ impl HttpServer {
                     input_view.tags.clone(),
                 );
 
+                // Capture manifest-relevant data before consuming input_view
+                let manifest_data = (
+                    input_view.id.clone(),
+                    input_view.blob_hash.clone(),
+                    input_view.blob_cid.clone(),
+                    input_view.content_format.clone().unwrap_or_default(),
+                    input_view.reach.clone().unwrap_or_else(|| "commons".to_string()),
+                );
+
                 let input: db::content_diesel::CreateContentInput = input_view.into();
                 let result = services.content.create(input);
 
@@ -2169,6 +2218,112 @@ impl HttpServer {
                                 handle.publish_epr_head(id, bytes).await;
                             }
                         });
+                    }
+                }
+
+                // Capture distribution data before manifest recording consumes manifest_data
+                #[cfg(feature = "p2p")]
+                let distribution_data = (manifest_data.0.clone(), manifest_data.1.clone());
+
+                // Record shard manifest if content has a blob
+                if result.is_ok() {
+                    if manifest_data.1.is_some() {
+                        if let Some(ref pool) = self.db_pool {
+                            let blob_store = self.blob_store.clone();
+                            let pool = pool.clone();
+                            let (content_id, blob_hash, blob_cid, content_format, reach) =
+                                manifest_data;
+                            let blob_hash = blob_hash.unwrap(); // Safe: checked above
+                            tokio::spawn(async move {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let encoder = crate::sharding::ShardEncoder::new(
+                                        crate::sharding::ShardConfig::default(),
+                                    );
+                                    let manifest =
+                                        encoder.create_manifest(&data, &content_format, &reach);
+                                    let shard_hashes_json =
+                                        serde_json::to_string(&manifest.shard_hashes)
+                                            .unwrap_or_else(|_| "[]".to_string());
+                                    if let Ok(mut conn) = pool.get() {
+                                        let new_manifest =
+                                            crate::db::models::NewShardManifest {
+                                                content_id: &content_id,
+                                                h_app_id: "lamad",
+                                                blob_hash: &blob_hash,
+                                                blob_cid: blob_cid.as_deref(),
+                                                encoding: &manifest.encoding,
+                                                data_shard_count: manifest.data_shards as i32,
+                                                parity_shard_count: (manifest.total_shards
+                                                    - manifest.data_shards)
+                                                    as i32,
+                                                shard_hashes_json: &shard_hashes_json,
+                                                total_size_bytes: manifest.total_size as i64,
+                                                shard_size_bytes: manifest.shard_size as i64,
+                                                mime_type: &manifest.mime_type,
+                                                reach: &reach,
+                                            };
+                                        if let Err(e) =
+                                            crate::db::shard_manifests::upsert_manifest(
+                                                &mut conn,
+                                                &new_manifest,
+                                            )
+                                        {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "Failed to record shard manifest"
+                                            );
+                                        } else {
+                                            tracing::debug!(
+                                                content_id = %content_id,
+                                                encoding = %manifest.encoding,
+                                                "Recorded shard manifest"
+                                            );
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+
+                // Auto-distribute shards to peers
+                #[cfg(feature = "p2p")]
+                if result.is_ok() {
+                    if let (Some(ref handle), Some(ref pool)) =
+                        (&self.p2p_handle, &self.db_pool)
+                    {
+                        if let (ref content_id, Some(ref blob_hash)) = distribution_data {
+                            let handle = handle.clone();
+                            let pool = pool.clone();
+                            let content_id = content_id.clone();
+                            let blob_store = self.blob_store.clone();
+                            let blob_hash = blob_hash.clone();
+                            tokio::spawn(async move {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    match handle
+                                        .distribute_shards(
+                                            &content_id,
+                                            &data,
+                                            &pool,
+                                            "lamad",
+                                        )
+                                        .await
+                                    {
+                                        Ok(n) => tracing::info!(
+                                            content_id = %content_id,
+                                            shards = n,
+                                            "Shard distribution complete"
+                                        ),
+                                        Err(e) => tracing::warn!(
+                                            content_id = %content_id,
+                                            error = %e,
+                                            "Shard distribution failed"
+                                        ),
+                                    }
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -2231,6 +2386,20 @@ impl HttpServer {
             })
             .collect();
 
+        // Capture manifest-relevant data before input_views are consumed
+        let manifest_inputs: Vec<_> = input_views
+            .iter()
+            .map(|v| {
+                (
+                    v.id.clone(),
+                    v.blob_hash.clone(),
+                    v.blob_cid.clone(),
+                    v.content_format.clone().unwrap_or_default(),
+                    v.reach.clone().unwrap_or_else(|| "commons".to_string()),
+                )
+            })
+            .collect();
+
         let items: Vec<db::content_diesel::CreateContentInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
@@ -2279,6 +2448,106 @@ impl HttpServer {
                                 }
                             }
                             info!(count = inserted, "Published EPR Heads to DHT");
+                        });
+                    }
+                }
+
+                // Capture distribution data before manifest_inputs is consumed
+                #[cfg(feature = "p2p")]
+                let distribution_items: Vec<(String, String)> = manifest_inputs
+                    .iter()
+                    .filter_map(|(id, bh, _, _, _)| {
+                        bh.as_ref().map(|h| (id.clone(), h.clone()))
+                    })
+                    .collect();
+
+                // Record shard manifests for items with blobs
+                if let Some(ref pool) = self.db_pool {
+                    let blob_store = self.blob_store.clone();
+                    let pool = pool.clone();
+                    let items_with_blobs: Vec<_> = manifest_inputs
+                        .into_iter()
+                        .filter(|(_, blob_hash, _, _, _)| blob_hash.is_some())
+                        .collect();
+                    if !items_with_blobs.is_empty() {
+                        tokio::spawn(async move {
+                            for (content_id, blob_hash, blob_cid, content_format, reach) in
+                                items_with_blobs
+                            {
+                                let blob_hash = blob_hash.unwrap(); // Safe: filtered above
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let encoder = crate::sharding::ShardEncoder::new(
+                                        crate::sharding::ShardConfig::default(),
+                                    );
+                                    let manifest = encoder.create_manifest(
+                                        &data,
+                                        &content_format,
+                                        &reach,
+                                    );
+                                    let shard_hashes_json =
+                                        serde_json::to_string(&manifest.shard_hashes)
+                                            .unwrap_or_else(|_| "[]".to_string());
+                                    if let Ok(mut conn) = pool.get() {
+                                        let new_manifest =
+                                            crate::db::models::NewShardManifest {
+                                                content_id: &content_id,
+                                                h_app_id: "lamad",
+                                                blob_hash: &blob_hash,
+                                                blob_cid: blob_cid.as_deref(),
+                                                encoding: &manifest.encoding,
+                                                data_shard_count: manifest.data_shards as i32,
+                                                parity_shard_count: (manifest.total_shards
+                                                    - manifest.data_shards)
+                                                    as i32,
+                                                shard_hashes_json: &shard_hashes_json,
+                                                total_size_bytes: manifest.total_size as i64,
+                                                shard_size_bytes: manifest.shard_size as i64,
+                                                mime_type: &manifest.mime_type,
+                                                reach: &reach,
+                                            };
+                                        if let Err(e) =
+                                            crate::db::shard_manifests::upsert_manifest(
+                                                &mut conn,
+                                                &new_manifest,
+                                            )
+                                        {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "Failed to record shard manifest"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            tracing::debug!("Bulk shard manifest recording complete");
+                        });
+                    }
+                }
+
+                // Auto-distribute shards to peers
+                #[cfg(feature = "p2p")]
+                if let (Some(ref handle), Some(ref pool)) =
+                    (&self.p2p_handle, &self.db_pool)
+                {
+                    if !distribution_items.is_empty() {
+                        let handle = handle.clone();
+                        let pool = pool.clone();
+                        let blob_store = self.blob_store.clone();
+                        tokio::spawn(async move {
+                            for (content_id, blob_hash) in distribution_items {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let _ = handle
+                                        .distribute_shards(
+                                            &content_id,
+                                            &data,
+                                            &pool,
+                                            "lamad",
+                                        )
+                                        .await;
+                                }
+                            }
+                            tracing::info!("Bulk shard distribution complete");
                         });
                     }
                 }
@@ -5571,6 +5840,584 @@ impl HttpServer {
             _ => "application/octet-stream",
         }
     }
+
+    // =========================================================================
+    // Observation Session API
+    // =========================================================================
+
+    /// Dispatcher for `/api/v1/observations[/*]` requests.
+    ///
+    /// Routes:
+    /// - `POST /api/v1/observations/begin`           -> begin a new session
+    /// - `POST /api/v1/observations/{id}/entries`    -> append entries
+    /// - `GET  /api/v1/observations/{id}/report`     -> generate/return report
+    async fn handle_observation_request(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        sub_path: &str,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // POST /api/v1/observations/begin
+        if sub_path == "/begin" && method == Method::POST {
+            return self.handle_observation_begin(req, &pool).await;
+        }
+
+        // POST /api/v1/observations/{id}/entries
+        // GET  /api/v1/observations/{id}/report
+        if let Some(rest) = sub_path.strip_prefix('/') {
+            let parts: Vec<&str> = rest.splitn(2, '/').collect();
+            if parts.len() == 2 {
+                let session_id = parts[0];
+                match (method.clone(), parts[1]) {
+                    (Method::POST, "entries") => {
+                        return self
+                            .handle_observation_add_entries(req, session_id, &pool)
+                            .await;
+                    }
+                    (Method::GET, "report") => {
+                        return self.handle_observation_report(session_id, &pool).await;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(response::not_found(&format!(
+            "Unknown observation route: /api/v1/observations{}",
+            sub_path
+        )))
+    }
+
+    /// POST /api/v1/observations/begin
+    ///
+    /// Begin a new observation session. Returns the session ID and computed expiry.
+    async fn handle_observation_begin(
+        &self,
+        req: Request<Incoming>,
+        pool: &DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body_bytes = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+
+        let input: BeginObservationInputView = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        let metadata_str = input
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_string(&m.0).unwrap_or_default());
+
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("DB connection failed: {}", e)))?;
+
+        let session = db::observation_sessions::begin_session(
+            &mut conn,
+            &input.source,
+            input.ttl_seconds,
+            metadata_str.as_deref(),
+        )
+        .map_err(|e| StorageError::Internal(format!("Failed to begin session: {}", e)))?;
+
+        // Compute expiry from started_at + ttl_seconds
+        let expires_at = chrono::DateTime::parse_from_rfc3339(&session.started_at)
+            .map(|dt| {
+                (dt + chrono::Duration::seconds(session.ttl_seconds as i64))
+                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+            })
+            .unwrap_or_else(|_| session.started_at.clone());
+
+        let view = BeginObservationResponseView {
+            session_id: session.id,
+            expires_at,
+        };
+
+        Ok(response::created(&view))
+    }
+
+    /// POST /api/v1/observations/{id}/entries
+    ///
+    /// Append one or an array of observation entries to an active session.
+    /// Returns 201 with empty body on success.
+    async fn handle_observation_add_entries(
+        &self,
+        req: Request<Incoming>,
+        session_id: &str,
+        pool: &DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("DB connection failed: {}", e)))?;
+
+        // Guard: session must be active
+        let is_active = db::observation_sessions::is_session_active(&mut conn, session_id)
+            .map_err(|e| StorageError::Internal(format!("Session check failed: {}", e)))?;
+
+        if !is_active {
+            return Ok(response::bad_request(&format!(
+                "Observation session '{}' is not active or does not exist",
+                session_id
+            )));
+        }
+
+        let body_bytes = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+
+        // Accept single entry or array
+        let entries: Vec<ObservationEntryInputView> = if body_bytes.first() == Some(&b'[') {
+            serde_json::from_slice(&body_bytes)
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON array: {}", e)))?
+        } else {
+            let single: ObservationEntryInputView = serde_json::from_slice(&body_bytes)
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            vec![single]
+        };
+
+        for entry in &entries {
+            let context_str = entry
+                .context
+                .as_ref()
+                .map(|c| serde_json::to_string(&c.0).unwrap_or_default());
+
+            db::observation_sessions::append_entry(
+                &mut conn,
+                session_id,
+                &entry.origin,
+                &entry.category,
+                &entry.severity,
+                entry.method.as_deref(),
+                entry.path.as_deref(),
+                entry.status_code,
+                &entry.message,
+                context_str.as_deref(),
+            )
+            .map_err(|e| StorageError::Internal(format!("Append entry failed: {}", e)))?;
+        }
+
+        // 201 with empty body -- entries accepted
+        Ok(Response::builder()
+            .status(StatusCode::CREATED)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from("{}")))
+            .unwrap())
+    }
+
+    /// GET /api/v1/observations/{id}/report
+    ///
+    /// Generates a diagnostic report for the session, then closes the session
+    /// and purges its entries. Idempotent: if a report_content_id is already
+    /// recorded on the session, returns the existing report content ID.
+    ///
+    /// Content ID is stable: `obs-report-for-{scenarioId}` when scenarioId is
+    /// present in session metadata, otherwise `obs-report-{sessionId}`.
+    async fn handle_observation_report(
+        &self,
+        session_id: &str,
+        pool: &DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("DB connection failed: {}", e)))?;
+
+        let session = db::observation_sessions::get_session(&mut conn, session_id)
+            .map_err(|e| StorageError::Internal(format!("Session lookup failed: {}", e)))?
+            .ok_or_else(|| {
+                StorageError::NotFound(format!(
+                    "Observation session '{}' not found",
+                    session_id
+                ))
+            })?;
+
+        // Idempotent: return existing content ID if already reported
+        if let Some(ref existing_id) = session.report_content_id {
+            let body = serde_json::json!({ "contentId": existing_id, "cached": true });
+            return Ok(response::ok(&body));
+        }
+
+        // Read all entries for this session
+        let entries = db::observation_sessions::get_entries(&mut conn, session_id)
+            .map_err(|e| StorageError::Internal(format!("Get entries failed: {}", e)))?;
+
+        // Build summary counts
+        let total_entries = entries.len();
+        let mut by_origin: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut by_severity: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut by_category: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+
+        for entry in &entries {
+            *by_origin.entry(entry.origin.clone()).or_insert(0) += 1;
+            *by_severity.entry(entry.severity.clone()).or_insert(0) += 1;
+            *by_category.entry(entry.category.clone()).or_insert(0) += 1;
+        }
+
+        // Correlate issues from entries
+        let issues = correlate_issues(&entries);
+
+        // Determine content ID -- stable per scenarioId if present in metadata
+        let scenario_id = session
+            .metadata_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .and_then(|v| v.get("scenarioId").and_then(|s| s.as_str()).map(String::from));
+
+        let content_id = match scenario_id {
+            Some(ref sid) => format!("obs-report-for-{}", sid),
+            None => format!("obs-report-{}", session_id),
+        };
+
+        // Compute duration
+        let ended_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let duration_ms = chrono::DateTime::parse_from_rfc3339(&session.started_at)
+            .map(|start| {
+                chrono::Utc::now()
+                    .signed_duration_since(start)
+                    .num_milliseconds()
+            })
+            .unwrap_or(0);
+
+        // System state snapshot
+        let system_state = ObservationSystemStateView {
+            storage_healthy: self.db_pool.is_some(),
+            conductor_connected: self.import_api.is_some(),
+            p2p_peer_count: 0,
+        };
+
+        let metadata = session
+            .metadata_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .map(crate::views::JsonVal);
+
+        let entry_views: Vec<ObservationEntryView> = entries
+            .iter()
+            .cloned()
+            .map(ObservationEntryView::from)
+            .collect();
+
+        let report = ObservationReportView {
+            content_id: content_id.clone(),
+            session_id: session_id.to_string(),
+            source: session.source.clone(),
+            metadata,
+            duration: ObservationDurationView {
+                started_at: session.started_at.clone(),
+                ended_at: ended_at.clone(),
+                duration_ms,
+            },
+            summary: ObservationSummaryView {
+                total_entries,
+                by_origin,
+                by_severity,
+                by_category,
+            },
+            issues,
+            system_state,
+        };
+
+        // Persist report as a content node so it is addressable as an EPR
+        let report_body = serde_json::to_string(&serde_json::json!({
+            "entries": entry_views,
+            "report": report,
+        }))
+        .unwrap_or_default();
+
+        if let Some(ref services) = self.services {
+            let create_input = db::content_diesel::CreateContentInput {
+                id: content_id.clone(),
+                title: format!("Observation Report: {}", session.source),
+                description: Some(format!(
+                    "Diagnostic report for session {} ({})",
+                    session_id, session.source
+                )),
+                content_type: "observation-report".to_string(),
+                content_format: "json".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: Some(report_body.len() as i32),
+                metadata_json: session.metadata_json.clone(),
+                reach: "familiar".to_string(),
+                created_by: Some("elohim-storage".to_string()),
+                tags: vec!["observation".to_string(), "diagnostic".to_string()],
+                content_body: Some(report_body),
+            };
+
+            // Non-fatal: if content already exists (idempotent scenario), just log
+            match services.content.create(create_input) {
+                Ok(_) => {
+                    debug!(content_id = %content_id, "Observation report persisted as content node");
+                }
+                Err(e) => {
+                    debug!(
+                        content_id = %content_id,
+                        error = %e,
+                        "Observation report content node already exists or failed (non-fatal)"
+                    );
+                }
+            }
+        }
+
+        // Close session and purge entries
+        db::observation_sessions::close_session(&mut conn, session_id, Some(&content_id))
+            .map_err(|e| StorageError::Internal(format!("Close session failed: {}", e)))?;
+
+        db::observation_sessions::purge_entries(&mut conn, session_id)
+            .map_err(|e| StorageError::Internal(format!("Purge entries failed: {}", e)))?;
+
+        Ok(response::ok(&report))
+    }
+
+    /// Observation middleware aspect.
+    ///
+    /// Called after the main request handler when `X-Observation-Id` is present.
+    /// Appends an entry to the named session for any non-2xx response status.
+    /// Successes (2xx) are not recorded -- only failures carry diagnostic signal.
+    fn maybe_observe_request(
+        &self,
+        session_id: &str,
+        method: &str,
+        path: &str,
+        status_code: u16,
+    ) {
+        // Only observe failures
+        if status_code < 300 {
+            return;
+        }
+
+        let pool = match self.db_pool.as_ref() {
+            Some(p) => p,
+            None => return,
+        };
+
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        // Infer category from path
+        let category = if path.starts_with("/db/content") || path.starts_with("/api/v1/content") {
+            "content"
+        } else if path.starts_with("/db/allocations")
+            || path.starts_with("/api/v1/stewardship")
+        {
+            "stewardship"
+        } else if path.starts_with("/api/v1/mastery") {
+            "mastery"
+        } else if path.starts_with("/api/v1/governance") {
+            "governance"
+        } else if path.starts_with("/api/v1/identity") || path.starts_with("/db/humans") {
+            "identity"
+        } else if path.starts_with("/blob/") || path.starts_with("/shard/") {
+            "blob"
+        } else {
+            "api"
+        };
+
+        // Infer severity from status code
+        let severity = if status_code >= 500 {
+            "error"
+        } else if status_code >= 400 {
+            "warning"
+        } else {
+            "info"
+        };
+
+        let message = format!("HTTP {} {} -> {}", method, path, status_code);
+
+        let _ = db::observation_sessions::append_entry(
+            &mut conn,
+            session_id,
+            "elohim-storage",
+            category,
+            severity,
+            Some(method),
+            Some(path),
+            Some(status_code as i32),
+            &message,
+            None,
+        );
+    }
+}
+
+/// Correlate observation entries into actionable issues.
+///
+/// Groups error/warning entries by failure pattern:
+/// - 401 clusters → single auth issue
+/// - 404 per content ID → not-found issue per content
+/// - 405 per path → method-not-allowed issue per path
+/// - 503 mentioning "imagodei" → identity/conductor issue
+///
+/// Content IDs are extracted from `/db/content/{id}` and
+/// `/db/allocations/content/{id}` paths.
+fn correlate_issues(
+    entries: &[crate::db::models::ObservationEntry],
+) -> Vec<ObservationIssueView> {
+    use std::collections::HashMap;
+
+    let mut issues: HashMap<String, ObservationIssueView> = HashMap::new();
+
+    for entry in entries {
+        if entry.severity != "error" && entry.severity != "warning" {
+            continue;
+        }
+
+        let path = entry.path.as_deref().unwrap_or("");
+        let status = entry.status_code.unwrap_or(0);
+
+        // Extract content ID from well-known path patterns
+        let content_id_from_path = if let Some(rest) = path.strip_prefix("/db/content/") {
+            let id = rest.split('/').next().unwrap_or("").to_string();
+            if id.is_empty() { None } else { Some(id) }
+        } else if let Some(rest) = path.strip_prefix("/db/allocations/content/") {
+            let id = rest.split('/').next().unwrap_or("").to_string();
+            if id.is_empty() { None } else { Some(id) }
+        } else {
+            None
+        };
+
+        match status {
+            401 => {
+                let key = "auth-401".to_string();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: "auth".to_string(),
+                    severity: "error".to_string(),
+                    title: "Authentication failures detected".to_string(),
+                    entry_count: 0,
+                    related_content_ids: vec![],
+                    suggested_cause:
+                        "Agent session may be missing or expired. Check X-Agent-Id header."
+                            .to_string(),
+                });
+                issue.entry_count += 1;
+                if let Some(ref cid) = content_id_from_path {
+                    if !issue.related_content_ids.contains(cid) {
+                        issue.related_content_ids.push(cid.clone());
+                    }
+                }
+            }
+            404 => {
+                let key = if let Some(ref cid) = content_id_from_path {
+                    format!("not-found-{}", cid)
+                } else {
+                    format!("not-found-{}", path.replace('/', "-").trim_matches('-'))
+                };
+                let related = content_id_from_path
+                    .clone()
+                    .map(|s| vec![s])
+                    .unwrap_or_default();
+                let path_clone = path.to_string();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: "content".to_string(),
+                    severity: "warning".to_string(),
+                    title: format!("Content not found: {}", path_clone),
+                    entry_count: 0,
+                    related_content_ids: related,
+                    suggested_cause:
+                        "Content ID may not be seeded or may belong to a different h_app_id."
+                            .to_string(),
+                });
+                issue.entry_count += 1;
+            }
+            405 => {
+                let key = format!(
+                    "method-not-allowed-{}",
+                    path.replace('/', "-").trim_matches('-')
+                );
+                let path_clone = path.to_string();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: "routing".to_string(),
+                    severity: "warning".to_string(),
+                    title: format!("Method not allowed on: {}", path_clone),
+                    entry_count: 0,
+                    related_content_ids: vec![],
+                    suggested_cause:
+                        "HTTP method is not registered for this route. Check API specification."
+                            .to_string(),
+                });
+                issue.entry_count += 1;
+            }
+            503 if entry.message.contains("imagodei") || path.contains("imagodei") => {
+                let key = "conductor-imagodei".to_string();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: "infrastructure".to_string(),
+                    severity: "error".to_string(),
+                    title: "Imagodei (identity) conductor unreachable".to_string(),
+                    entry_count: 0,
+                    related_content_ids: vec![],
+                    suggested_cause:
+                        "The imagodei DNA conductor is not responding. Verify that elohim-storage                          is connected and the hApp is installed."
+                            .to_string(),
+                });
+                issue.entry_count += 1;
+            }
+            503 => {
+                let key = "service-unavailable".to_string();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: "infrastructure".to_string(),
+                    severity: "error".to_string(),
+                    title: "Service unavailable responses detected".to_string(),
+                    entry_count: 0,
+                    related_content_ids: vec![],
+                    suggested_cause:
+                        "Backend service or database pool is not initialised. Check startup logs."
+                            .to_string(),
+                });
+                issue.entry_count += 1;
+            }
+            _ => {
+                // Other error/warning entries: group by severity + category
+                let key = format!("{}-{}", entry.severity, entry.category);
+                let sev = entry.severity.clone();
+                let cat = entry.category.clone();
+                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                    id: key,
+                    category: cat,
+                    severity: sev,
+                    title: format!(
+                        "Repeated {} in category: {}",
+                        entry.severity, entry.category
+                    ),
+                    entry_count: 0,
+                    related_content_ids: vec![],
+                    suggested_cause: "Review log entries for details.".to_string(),
+                });
+                issue.entry_count += 1;
+                if let Some(ref cid) = content_id_from_path {
+                    if !issue.related_content_ids.contains(cid) {
+                        issue.related_content_ids.push(cid.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<ObservationIssueView> = issues.into_values().collect();
+    // Sort: errors first, then warnings; within each severity sort by id
+    result.sort_by(|a, b| {
+        let sev_order = |s: &str| match s {
+            "error" => 0u8,
+            "warning" => 1,
+            _ => 2,
+        };
+        sev_order(&a.severity)
+            .cmp(&sev_order(&b.severity))
+            .then(a.id.cmp(&b.id))
+    });
+    result
 }
 
 /// Build the static route manifest for doorway discovery.
@@ -6029,6 +6876,20 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::get("/api/v1/stewardship/access/time")
                 .handler("check_time_access")
                 .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/resilience — Content resilience projection
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/resilience/{content_id}")
+                .handler("get_resilience")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/resilience/{content_id}/verify")
+                .handler("verify_resilience")
                 .build(),
         )
         // =====================================================================
@@ -6979,6 +7840,24 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::get("/api/v1/cache/stream")
                 .handler("cache_stream")
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/observations -- Observation Session API
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/observations/begin")
+                .handler("observation_begin")
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/observations/{id}/entries")
+                .handler("observation_add_entries")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/observations/{id}/report")
+                .handler("observation_report")
                 .build(),
         )
         // Blob proxy: doorway caches blobs from /blob/{hash}

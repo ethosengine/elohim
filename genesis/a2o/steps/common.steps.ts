@@ -134,14 +134,40 @@ BeforeAll(function () {
 
 /**
  * Clear Playwright capture state before each scenario so errors don't bleed across scenarios.
+ * Also begins an observation session on the first registered doorway (best-effort).
  */
-Before(function (this: E2EWorld) {
+Before(async function (this: E2EWorld, scenario) {
   for (const [, human] of this.humans) {
     for (const device of human.devices) {
       if (device instanceof PlaywrightDevice) {
         device.clearCapture();
       }
     }
+  }
+
+  // Start observation session if a doorway is registered
+  for (const [, doorway] of this.doorways) {
+    try {
+      const featureSlug = scenario.pickle.uri
+        .replace(/^.*features\//, '')
+        .replace(/\.feature$/, '')
+        .replace(/\//g, '-');
+      const scenarioSlug = scenario.pickle.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      const scenarioId = `${featureSlug}--${scenarioSlug}`;
+
+      await doorway.client.beginObservation({
+        scenario: scenario.pickle.name,
+        scenarioId,
+        tags: scenario.pickle.tags.map(t => t.name),
+        feature: scenario.pickle.uri,
+      });
+    } catch {
+      // Observation is best-effort — don't block scenarios if storage is down
+    }
+    break; // Only observe on the first doorway
   }
 });
 
@@ -196,6 +222,27 @@ After(async function (this: E2EWorld, scenario) {
           errorReport.map(e => `  ${e}`).join('\n')
       );
     }
+  }
+
+  // Collect observation report (works for both HTTP and Playwright modes)
+  const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
+  for (const [, doorway] of this.doorways) {
+    if (doorway.client.observationId) {
+      try {
+        const report = await doorway.client.getObservationReport();
+        const errorCount = report.summary.bySeverity['error'] ?? 0;
+        if (errorCount > 0 || scenario.result?.status === Status.FAILED) {
+          mkdirSync('reports/observations', { recursive: true });
+          writeFileSync(
+            `reports/observations/${safeName}.json`,
+            JSON.stringify(report, null, 2)
+          );
+        }
+      } catch {
+        // Best-effort — don't mask the real test result
+      }
+    }
+    break;
   }
 
   await this.runCleanup();
