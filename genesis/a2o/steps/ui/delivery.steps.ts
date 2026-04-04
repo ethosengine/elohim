@@ -917,7 +917,7 @@ Then(
 
     const iframeSrc = (await device.page.evaluate(() => {
       const iframe = document.querySelector('iframe[src*="/apps/"]');
-      return iframe?.src ?? iframe?.getAttribute('src') ?? '';
+      return (iframe as HTMLIFrameElement | null)?.src ?? iframe?.getAttribute('src') ?? '';
     })) as string;
 
     if (iframeSrc) {

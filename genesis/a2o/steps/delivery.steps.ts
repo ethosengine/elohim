@@ -20,8 +20,8 @@ import { E2EWorld } from '../src/framework/world.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const NO_DOORWAY = NO_DOORWAY;
-const NO_RESPONSE = NO_RESPONSE;
+const NO_DOORWAY = 'No doorway registered';
+const NO_RESPONSE = 'No response captured';
 
 interface AppResponse {
   status: number;
