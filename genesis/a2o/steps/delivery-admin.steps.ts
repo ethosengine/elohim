@@ -29,12 +29,12 @@ import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // Admin API paths — extracted to satisfy sonarjs/no-duplicate-string
-const CACHE_STATS = CACHE_STATS;
-const CACHE_DISABLE = CACHE_DISABLE;
-const CACHE_ENABLE = CACHE_ENABLE;
-const CACHE_WARM = CACHE_WARM;
-const HEALTH_STARTUP = HEALTH_STARTUP;
-const HEALTH = HEALTH;
+const CACHE_STATS = '/admin/cache/stats';
+const CACHE_DISABLE = '/admin/cache/disable';
+const CACHE_ENABLE = '/admin/cache/enable';
+const CACHE_WARM = '/admin/cache/warm';
+const HEALTH_STARTUP = '/health/startup';
+const HEALTH = '/health';
 
 // ---------------------------------------------------------------------------
 // Helpers
