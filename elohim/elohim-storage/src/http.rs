@@ -2130,6 +2130,15 @@ impl HttpServer {
                     input_view.tags.clone(),
                 );
 
+                // Capture manifest-relevant data before consuming input_view
+                let manifest_data = (
+                    input_view.id.clone(),
+                    input_view.blob_hash.clone(),
+                    input_view.blob_cid.clone(),
+                    input_view.content_format.clone().unwrap_or_default(),
+                    input_view.reach.clone().unwrap_or_else(|| "commons".to_string()),
+                );
+
                 let input: db::content_diesel::CreateContentInput = input_view.into();
                 let result = services.content.create(input);
 
@@ -2169,6 +2178,68 @@ impl HttpServer {
                                 handle.publish_epr_head(id, bytes).await;
                             }
                         });
+                    }
+                }
+
+                // Record shard manifest if content has a blob
+                if result.is_ok() {
+                    if manifest_data.1.is_some() {
+                        if let Some(ref pool) = self.db_pool {
+                            let blob_store = self.blob_store.clone();
+                            let pool = pool.clone();
+                            let (content_id, blob_hash, blob_cid, content_format, reach) =
+                                manifest_data;
+                            let blob_hash = blob_hash.unwrap(); // Safe: checked above
+                            tokio::spawn(async move {
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let encoder = crate::sharding::ShardEncoder::new(
+                                        crate::sharding::ShardConfig::default(),
+                                    );
+                                    let manifest =
+                                        encoder.create_manifest(&data, &content_format, &reach);
+                                    let shard_hashes_json =
+                                        serde_json::to_string(&manifest.shard_hashes)
+                                            .unwrap_or_else(|_| "[]".to_string());
+                                    if let Ok(mut conn) = pool.get() {
+                                        let new_manifest =
+                                            crate::db::models::NewShardManifest {
+                                                content_id: &content_id,
+                                                h_app_id: "lamad",
+                                                blob_hash: &blob_hash,
+                                                blob_cid: blob_cid.as_deref(),
+                                                encoding: &manifest.encoding,
+                                                data_shard_count: manifest.data_shards as i32,
+                                                parity_shard_count: (manifest.total_shards
+                                                    - manifest.data_shards)
+                                                    as i32,
+                                                shard_hashes_json: &shard_hashes_json,
+                                                total_size_bytes: manifest.total_size as i32,
+                                                shard_size_bytes: manifest.shard_size as i32,
+                                                mime_type: &manifest.mime_type,
+                                                reach: &reach,
+                                            };
+                                        if let Err(e) =
+                                            crate::db::shard_manifests::upsert_manifest(
+                                                &mut conn,
+                                                &new_manifest,
+                                            )
+                                        {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "Failed to record shard manifest"
+                                            );
+                                        } else {
+                                            tracing::debug!(
+                                                content_id = %content_id,
+                                                encoding = %manifest.encoding,
+                                                "Recorded shard manifest"
+                                            );
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -2231,6 +2302,20 @@ impl HttpServer {
             })
             .collect();
 
+        // Capture manifest-relevant data before input_views are consumed
+        let manifest_inputs: Vec<_> = input_views
+            .iter()
+            .map(|v| {
+                (
+                    v.id.clone(),
+                    v.blob_hash.clone(),
+                    v.blob_cid.clone(),
+                    v.content_format.clone().unwrap_or_default(),
+                    v.reach.clone().unwrap_or_else(|| "commons".to_string()),
+                )
+            })
+            .collect();
+
         let items: Vec<db::content_diesel::CreateContentInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
@@ -2279,6 +2364,70 @@ impl HttpServer {
                                 }
                             }
                             info!(count = inserted, "Published EPR Heads to DHT");
+                        });
+                    }
+                }
+
+                // Record shard manifests for items with blobs
+                if let Some(ref pool) = self.db_pool {
+                    let blob_store = self.blob_store.clone();
+                    let pool = pool.clone();
+                    let items_with_blobs: Vec<_> = manifest_inputs
+                        .into_iter()
+                        .filter(|(_, blob_hash, _, _, _)| blob_hash.is_some())
+                        .collect();
+                    if !items_with_blobs.is_empty() {
+                        tokio::spawn(async move {
+                            for (content_id, blob_hash, blob_cid, content_format, reach) in
+                                items_with_blobs
+                            {
+                                let blob_hash = blob_hash.unwrap(); // Safe: filtered above
+                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                    let encoder = crate::sharding::ShardEncoder::new(
+                                        crate::sharding::ShardConfig::default(),
+                                    );
+                                    let manifest = encoder.create_manifest(
+                                        &data,
+                                        &content_format,
+                                        &reach,
+                                    );
+                                    let shard_hashes_json =
+                                        serde_json::to_string(&manifest.shard_hashes)
+                                            .unwrap_or_else(|_| "[]".to_string());
+                                    if let Ok(mut conn) = pool.get() {
+                                        let new_manifest =
+                                            crate::db::models::NewShardManifest {
+                                                content_id: &content_id,
+                                                h_app_id: "lamad",
+                                                blob_hash: &blob_hash,
+                                                blob_cid: blob_cid.as_deref(),
+                                                encoding: &manifest.encoding,
+                                                data_shard_count: manifest.data_shards as i32,
+                                                parity_shard_count: (manifest.total_shards
+                                                    - manifest.data_shards)
+                                                    as i32,
+                                                shard_hashes_json: &shard_hashes_json,
+                                                total_size_bytes: manifest.total_size as i32,
+                                                shard_size_bytes: manifest.shard_size as i32,
+                                                mime_type: &manifest.mime_type,
+                                                reach: &reach,
+                                            };
+                                        if let Err(e) =
+                                            crate::db::shard_manifests::upsert_manifest(
+                                                &mut conn,
+                                                &new_manifest,
+                                            )
+                                        {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "Failed to record shard manifest"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            tracing::debug!("Bulk shard manifest recording complete");
                         });
                     }
                 }
