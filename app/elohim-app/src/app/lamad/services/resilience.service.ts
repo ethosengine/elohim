@@ -43,6 +43,21 @@ export interface ResilienceView {
   };
 }
 
+export interface VerificationResultView {
+  contentId: string;
+  verified: boolean;
+  encoding: string;
+  shardsAvailable: number;
+  shardsNeeded: number;
+  shardsUsedForReconstruction: number;
+  shardsIntentionallySkipped: number;
+  reconstructionTimeMs: number;
+  originalHash: string;
+  reconstructedHash: string;
+  hashMatch: boolean;
+  error: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ResilienceService {
   private readonly http = inject(HttpClient);
@@ -52,6 +67,14 @@ export class ResilienceService {
     const baseUrl = this.storageClient.getStorageBaseUrl();
     return this.http.get<ResilienceView>(
       `${baseUrl}/api/v1/resilience/${encodeURIComponent(contentId)}`,
+    );
+  }
+
+  verifyResilience(contentId: string): Observable<VerificationResultView> {
+    const baseUrl = this.storageClient.getStorageBaseUrl();
+    return this.http.post<VerificationResultView>(
+      `${baseUrl}/api/v1/resilience/${encodeURIComponent(contentId)}/verify`,
+      {},
     );
   }
 }

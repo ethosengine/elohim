@@ -48,7 +48,11 @@ import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reactio
 
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
-import { ResilienceService, type ResilienceView } from '../../services/resilience.service';
+import {
+  ResilienceService,
+  type ResilienceView,
+  type VerificationResultView,
+} from '../../services/resilience.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 import { SeoService } from '../../../services/seo.service';
@@ -108,6 +112,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   // Resilience data
   resilience: ResilienceView | null = null;
+  verificationResult: VerificationResultView | null = null;
+  isVerifying = false;
 
   // Governance data
   governanceState: GovernanceStateRecord | null = null;
@@ -510,6 +516,28 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         },
         error: () => {
           // Resilience is supplemental — don't block on failure
+        },
+      });
+  }
+
+  /**
+   * Trigger on-demand resilience verification (reconstruct from shards).
+   */
+  verifyResilience(): void {
+    if (!this.node || this.isVerifying) return;
+    this.isVerifying = true;
+    this.verificationResult = null;
+
+    this.resilienceService
+      .verifyResilience(this.node.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: result => {
+          this.verificationResult = result;
+          this.isVerifying = false;
+        },
+        error: () => {
+          this.isVerifying = false;
         },
       });
   }

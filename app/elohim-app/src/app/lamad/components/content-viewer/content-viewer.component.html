@@ -674,6 +674,54 @@
             </div>
           </div>
 
+          <!-- Shard Distribution Map -->
+          <div class="shard-map" *ngIf="resilience && resilience.distribution.shards.length > 0">
+            <span class="metric-label">Shard Map</span>
+            <div class="shard-grid">
+              <div
+                *ngFor="let shard of resilience.distribution.shards; let i = index"
+                class="shard-cell"
+                [ngClass]="{
+                  'shard-data': shard.shardType === 'data',
+                  'shard-parity': shard.shardType === 'parity',
+                  'shard-missing': shard.peerIds.length === 0
+                }"
+                [title]="'Shard ' + i + ' (' + shard.shardType + '): ' + (shard.peerIds.length > 0 ? shard.peerIds.length + ' peers' : 'no peers')"
+              >
+                {{ shard.peerIds.length > 0 ? shard.peerIds.length : '?' }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Verify Button -->
+          <div class="verify-section">
+            <button
+              type="button"
+              class="btn-verify"
+              (click)="verifyResilience()"
+              [disabled]="isVerifying"
+              data-testid="viewer-verify-resilience"
+            >
+              {{ isVerifying ? 'Verifying...' : 'Verify Resilience' }}
+            </button>
+
+            <div class="verification-result" *ngIf="verificationResult" data-testid="viewer-verification-result">
+              <div class="verify-status" [ngClass]="verificationResult.verified ? 'pass' : 'fail'">
+                {{ verificationResult.verified ? 'PASS' : 'FAIL' }}
+              </div>
+              <div class="verify-details">
+                <span>{{ verificationResult.shardsUsedForReconstruction }}/{{ verificationResult.shardsNeeded }} shards used</span>
+                <span *ngIf="verificationResult.shardsIntentionallySkipped > 0">
+                  ({{ verificationResult.shardsIntentionallySkipped }} skipped to prove RS)
+                </span>
+                <span>{{ verificationResult.reconstructionTimeMs }}ms</span>
+                <span *ngIf="verificationResult.error">
+                  Error: {{ verificationResult.error }}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <ng-template #loadingResilience>
             <div class="resilience-loading">Loading resilience data...</div>
           </ng-template>
