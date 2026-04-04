@@ -14,9 +14,22 @@ pub fn upsert_location(
     conn: &mut SqliteConnection,
     location: &NewShardLocation,
 ) -> Result<(), StorageError> {
-    diesel::replace_into(shard_locations::table)
+    // Try insert first — if row exists, preserve first_seen and update status only
+    let inserted = diesel::insert_or_ignore_into(shard_locations::table)
         .values(location)
         .execute(conn)?;
+
+    if inserted == 0 {
+        // Row exists — just update status
+        diesel::update(
+            shard_locations::table
+                .filter(shard_locations::shard_hash.eq(location.shard_hash))
+                .filter(shard_locations::peer_id.eq(location.peer_id)),
+        )
+        .set(shard_locations::status.eq(location.status))
+        .execute(conn)?;
+    }
+
     Ok(())
 }
 

@@ -56,8 +56,8 @@ async fn handle_get_resilience(
             strategy: m.encoding.clone(),
             data_shards: m.data_shard_count,
             parity_shards: m.parity_shard_count,
-            total_size_bytes: m.total_size_bytes as i64,
-            shard_size_bytes: m.shard_size_bytes as i64,
+            total_size_bytes: m.total_size_bytes,
+            shard_size_bytes: m.shard_size_bytes,
         },
         None => EncodingInfoView {
             strategy: "unknown".to_string(),
@@ -226,26 +226,26 @@ async fn handle_verify_resilience(
         crate::db::content_diesel::get_content(&mut conn, ctx, content_id)?;
 
     let data_shards = manifest_row.data_shard_count;
-    let parity_shards = manifest_row.parity_shard_count;
+    let _parity_shards = manifest_row.parity_shard_count;
 
-    let (verified, reconstructed_hash, shards_used, skipped, error_msg) =
+    // Availability check: verifies shard locations exist, does not fetch/reconstruct bytes
+    let total_shards = shard_hashes.len() as i32;
+    let missing = total_shards - available;
+
+    let (verified, reconstructed_hash, shards_located, shards_missing, error_msg) =
         if let Some(ref content) = content {
             if let Some(ref blob_hash) = content.blob_hash {
-                // Verify based on shard availability:
-                // RS reconstruction needs exactly data_shards; parity shards
-                // can substitute for missing data shards.
-                let can_reconstruct = available >= data_shards;
+                // Check whether enough shards have known locations for
+                // reconstruction to be theoretically possible.
+                let data_shards_needed = data_shards;
+                let sufficient = available >= data_shards_needed;
 
-                if can_reconstruct {
-                    // Intentionally skip parity shards to prove RS works —
-                    // report how many parity shards we could have used but didn't.
-                    let parity_available =
-                        parity_shards.min(available.saturating_sub(data_shards));
+                if sufficient {
                     (
                         true,
                         blob_hash.clone(),
                         available,
-                        parity_available,
+                        missing,
                         None,
                     )
                 } else {
@@ -253,7 +253,7 @@ async fn handle_verify_resilience(
                         false,
                         String::new(),
                         available,
-                        0,
+                        missing,
                         Some(format!(
                             "Only {} of {} required shards available",
                             available, data_shards
@@ -287,8 +287,8 @@ async fn handle_verify_resilience(
         encoding: manifest_row.encoding,
         shards_available: available,
         shards_needed: data_shards,
-        shards_used_for_reconstruction: shards_used,
-        shards_intentionally_skipped: skipped,
+        shards_located,
+        shards_missing,
         reconstruction_time_ms: elapsed.as_millis() as u64,
         original_hash: manifest_row.blob_hash,
         reconstructed_hash,

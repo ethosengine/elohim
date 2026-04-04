@@ -49,8 +49,8 @@ export interface VerificationResultView {
   encoding: string;
   shardsAvailable: number;
   shardsNeeded: number;
-  shardsUsedForReconstruction: number;
-  shardsIntentionallySkipped: number;
+  shardsLocated: number;
+  shardsMissing: number;
   reconstructionTimeMs: number;
   originalHash: string;
   reconstructedHash: string;

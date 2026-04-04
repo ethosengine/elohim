@@ -710,9 +710,9 @@
                 {{ verificationResult.verified ? 'PASS' : 'FAIL' }}
               </div>
               <div class="verify-details">
-                <span>{{ verificationResult.shardsUsedForReconstruction }}/{{ verificationResult.shardsNeeded }} shards used</span>
-                <span *ngIf="verificationResult.shardsIntentionallySkipped > 0">
-                  ({{ verificationResult.shardsIntentionallySkipped }} skipped to prove RS)
+                <span>{{ verificationResult.shardsLocated }}/{{ verificationResult.shardsNeeded }} shards located</span>
+                <span *ngIf="verificationResult.shardsMissing > 0">
+                  ({{ verificationResult.shardsMissing }} missing)
                 </span>
                 <span>{{ verificationResult.reconstructionTimeMs }}ms</span>
                 <span *ngIf="verificationResult.error">

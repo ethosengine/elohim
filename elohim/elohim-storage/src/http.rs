@@ -2257,8 +2257,8 @@ impl HttpServer {
                                                     - manifest.data_shards)
                                                     as i32,
                                                 shard_hashes_json: &shard_hashes_json,
-                                                total_size_bytes: manifest.total_size as i32,
-                                                shard_size_bytes: manifest.shard_size as i32,
+                                                total_size_bytes: manifest.total_size as i64,
+                                                shard_size_bytes: manifest.shard_size as i64,
                                                 mime_type: &manifest.mime_type,
                                                 reach: &reach,
                                             };
@@ -2500,8 +2500,8 @@ impl HttpServer {
                                                     - manifest.data_shards)
                                                     as i32,
                                                 shard_hashes_json: &shard_hashes_json,
-                                                total_size_bytes: manifest.total_size as i32,
-                                                shard_size_bytes: manifest.shard_size as i32,
+                                                total_size_bytes: manifest.total_size as i64,
+                                                shard_size_bytes: manifest.shard_size as i64,
                                                 mime_type: &manifest.mime_type,
                                                 reach: &reach,
                                             };
