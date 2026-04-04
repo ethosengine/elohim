@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "title": "Garden of Understanding: Adam and Eve's Love Map",
   "description": "An intimate path where a gardener-steward and a truth-seeker discover what they can teach each other about tending the world",
-  "purpose": "Build mutual understanding between partners through complementary teaching - each sharing their domain of passion with the other",
+  "purpose": "Build mutual understanding between partners through mutual teaching - each sharing their domain of passion with the other",
   "createdBy": "system-negotiation",
   "contributors": [],
   "createdAt": "2026-02-25T00:00:00.000Z",
@@ -291,9 +291,9 @@
           "stepType": "content",
           "resourceId": "concept-different-values-coexist",
           "stepTitle": "Different Values Can Coexist",
-          "stepNarrative": "You don't have to see the world the same way to tend it together. Celebrate your complementary perspectives - the gardener and the questioner need each other.",
+          "stepNarrative": "You don't have to see the world the same way to tend it together. Celebrate your different perspectives - the gardener and the questioner need each other.",
           "learningObjectives": [
-            "Appreciate complementary perspectives in partnership",
+            "Appreciate different perspectives in partnership",
             "Identify how different values strengthen your shared life"
           ],
           "optional": false,
@@ -311,7 +311,7 @@
           "stepNarrative": "Reflect on what you've learned about each other. Name one thing your partner taught you that changed how you see the world. This is your garden now - tend it together.",
           "learningObjectives": [
             "Synthesize mutual learning into shared understanding",
-            "Commit to ongoing complementary growth"
+            "Commit to ongoing mutual growth"
           ],
           "optional": false,
           "completionCriteria": [
@@ -324,7 +324,7 @@
       "estimatedDuration": "55 minutes"
     }
   ],
-  "tags": ["love-map", "intimate", "complementary", "family"],
+  "tags": ["love-map", "intimate", "mutual", "family"],
   "difficulty": "intermediate",
   "estimatedDuration": "3-4 hours",
   "pathType": "journey",
