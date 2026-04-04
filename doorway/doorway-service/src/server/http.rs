@@ -1456,6 +1456,7 @@ async fn handle_request(
 ///
 /// The spawn is intentionally detached — we never await it. A failure to deliver the
 /// observation entry must never affect the original response.
+#[allow(clippy::too_many_arguments)]
 fn maybe_contribute_observation(
     observation_id: &str,
     storage_url: &str,

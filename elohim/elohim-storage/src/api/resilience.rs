@@ -48,8 +48,7 @@ async fn handle_get_resilience(
     let mut conn = get_conn(pool)?;
 
     // 1. Get shard manifest
-    let manifest =
-        crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
+    let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
 
     let encoding = match &manifest {
         Some(m) => EncodingInfoView {
@@ -122,9 +121,7 @@ async fn handle_get_resilience(
 
     // 3. Get stewardship allocations
     let allocs = crate::db::stewardship_allocations::get_allocations_for_content(
-        &mut conn,
-        ctx,
-        content_id,
+        &mut conn, ctx, content_id,
     )?;
     let stewardship = ResilienceStewardshipView {
         steward_count: allocs.len() as i32,
@@ -222,8 +219,7 @@ async fn handle_verify_resilience(
     }
 
     // 3. Look up original content to get blob_hash for comparison
-    let content =
-        crate::db::content_diesel::get_content(&mut conn, ctx, content_id)?;
+    let content = crate::db::content_diesel::get_content(&mut conn, ctx, content_id)?;
 
     let data_shards = manifest_row.data_shard_count;
     let _parity_shards = manifest_row.parity_shard_count;
@@ -241,13 +237,7 @@ async fn handle_verify_resilience(
                 let sufficient = available >= data_shards_needed;
 
                 if sufficient {
-                    (
-                        true,
-                        blob_hash.clone(),
-                        available,
-                        missing,
-                        None,
-                    )
+                    (true, blob_hash.clone(), available, missing, None)
                 } else {
                     (
                         false,

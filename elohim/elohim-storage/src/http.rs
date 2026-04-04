@@ -55,6 +55,8 @@ use crate::views::{
     AccountImportResultView,
     AccountPackageInputView,
     AccountPackageView,
+    BeginObservationInputView,
+    BeginObservationResponseView,
     CollectiveParticipationView,
     CollectiveSeedView,
     CollectiveView,
@@ -83,15 +85,6 @@ use crate::views::{
     InitiateClaimInputView,
     LocalSessionView,
     NodeStewardshipView,
-    PackageManifestView,
-    RelationshipSeedView,
-    RelationshipView,
-    ScheduleView,
-    StewardedNodeView,
-    StewardshipAllocationView,
-    StewardshipSeedView,
-    BeginObservationInputView,
-    BeginObservationResponseView,
     ObservationDurationView,
     ObservationEntryInputView,
     ObservationEntryView,
@@ -99,6 +92,13 @@ use crate::views::{
     ObservationReportView,
     ObservationSummaryView,
     ObservationSystemStateView,
+    PackageManifestView,
+    RelationshipSeedView,
+    RelationshipView,
+    ScheduleView,
+    StewardedNodeView,
+    StewardshipAllocationView,
+    StewardshipSeedView,
     UpdateAllocationInputView,
     UpdateContentInputView,
     SUPPORTED_SCHEMA_VERSIONS,
@@ -2176,7 +2176,10 @@ impl HttpServer {
                     input_view.blob_hash.clone(),
                     input_view.blob_cid.clone(),
                     input_view.content_format.clone().unwrap_or_default(),
-                    input_view.reach.clone().unwrap_or_else(|| "commons".to_string()),
+                    input_view
+                        .reach
+                        .clone()
+                        .unwrap_or_else(|| "commons".to_string()),
                 );
 
                 let input: db::content_diesel::CreateContentInput = input_view.into();
@@ -2226,73 +2229,66 @@ impl HttpServer {
                 let distribution_data = (manifest_data.0.clone(), manifest_data.1.clone());
 
                 // Record shard manifest if content has a blob
-                if result.is_ok() {
-                    if manifest_data.1.is_some() {
-                        if let Some(ref pool) = self.db_pool {
-                            let blob_store = self.blob_store.clone();
-                            let pool = pool.clone();
-                            let (content_id, blob_hash, blob_cid, content_format, reach) =
-                                manifest_data;
-                            let blob_hash = blob_hash.unwrap(); // Safe: checked above
-                            tokio::spawn(async move {
-                                if let Ok(data) = blob_store.get(&blob_hash).await {
-                                    let encoder = crate::sharding::ShardEncoder::new(
-                                        crate::sharding::ShardConfig::default(),
-                                    );
-                                    let manifest =
-                                        encoder.create_manifest(&data, &content_format, &reach);
-                                    let shard_hashes_json =
-                                        serde_json::to_string(&manifest.shard_hashes)
-                                            .unwrap_or_else(|_| "[]".to_string());
-                                    if let Ok(mut conn) = pool.get() {
-                                        let new_manifest =
-                                            crate::db::models::NewShardManifest {
-                                                content_id: &content_id,
-                                                h_app_id: "lamad",
-                                                blob_hash: &blob_hash,
-                                                blob_cid: blob_cid.as_deref(),
-                                                encoding: &manifest.encoding,
-                                                data_shard_count: manifest.data_shards as i32,
-                                                parity_shard_count: (manifest.total_shards
-                                                    - manifest.data_shards)
-                                                    as i32,
-                                                shard_hashes_json: &shard_hashes_json,
-                                                total_size_bytes: manifest.total_size as i64,
-                                                shard_size_bytes: manifest.shard_size as i64,
-                                                mime_type: &manifest.mime_type,
-                                                reach: &reach,
-                                            };
-                                        if let Err(e) =
-                                            crate::db::shard_manifests::upsert_manifest(
-                                                &mut conn,
-                                                &new_manifest,
-                                            )
-                                        {
-                                            tracing::warn!(
-                                                content_id = %content_id,
-                                                error = %e,
-                                                "Failed to record shard manifest"
-                                            );
-                                        } else {
-                                            tracing::debug!(
-                                                content_id = %content_id,
-                                                encoding = %manifest.encoding,
-                                                "Recorded shard manifest"
-                                            );
-                                        }
+                if result.is_ok() && manifest_data.1.is_some() {
+                    if let Some(ref pool) = self.db_pool {
+                        let blob_store = self.blob_store.clone();
+                        let pool = pool.clone();
+                        let (content_id, blob_hash, blob_cid, content_format, reach) =
+                            manifest_data;
+                        let blob_hash = blob_hash.unwrap(); // Safe: checked above
+                        tokio::spawn(async move {
+                            if let Ok(data) = blob_store.get(&blob_hash).await {
+                                let encoder = crate::sharding::ShardEncoder::new(
+                                    crate::sharding::ShardConfig::default(),
+                                );
+                                let manifest =
+                                    encoder.create_manifest(&data, &content_format, &reach);
+                                let shard_hashes_json =
+                                    serde_json::to_string(&manifest.shard_hashes)
+                                        .unwrap_or_else(|_| "[]".to_string());
+                                if let Ok(mut conn) = pool.get() {
+                                    let new_manifest = crate::db::models::NewShardManifest {
+                                        content_id: &content_id,
+                                        h_app_id: "lamad",
+                                        blob_hash: &blob_hash,
+                                        blob_cid: blob_cid.as_deref(),
+                                        encoding: &manifest.encoding,
+                                        data_shard_count: manifest.data_shards as i32,
+                                        parity_shard_count: (manifest.total_shards
+                                            - manifest.data_shards)
+                                            as i32,
+                                        shard_hashes_json: &shard_hashes_json,
+                                        total_size_bytes: manifest.total_size as i64,
+                                        shard_size_bytes: manifest.shard_size as i64,
+                                        mime_type: &manifest.mime_type,
+                                        reach: &reach,
+                                    };
+                                    if let Err(e) = crate::db::shard_manifests::upsert_manifest(
+                                        &mut conn,
+                                        &new_manifest,
+                                    ) {
+                                        tracing::warn!(
+                                            content_id = %content_id,
+                                            error = %e,
+                                            "Failed to record shard manifest"
+                                        );
+                                    } else {
+                                        tracing::debug!(
+                                            content_id = %content_id,
+                                            encoding = %manifest.encoding,
+                                            "Recorded shard manifest"
+                                        );
                                     }
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
                 }
 
                 // Auto-distribute shards to peers
                 #[cfg(feature = "p2p")]
                 if result.is_ok() {
-                    if let (Some(ref handle), Some(ref pool)) =
-                        (&self.p2p_handle, &self.db_pool)
-                    {
+                    if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
                         if let (ref content_id, Some(ref blob_hash)) = distribution_data {
                             let handle = handle.clone();
                             let pool = pool.clone();
@@ -2302,12 +2298,7 @@ impl HttpServer {
                             tokio::spawn(async move {
                                 if let Ok(data) = blob_store.get(&blob_hash).await {
                                     match handle
-                                        .distribute_shards(
-                                            &content_id,
-                                            &data,
-                                            &pool,
-                                            "lamad",
-                                        )
+                                        .distribute_shards(&content_id, &data, &pool, "lamad")
                                         .await
                                     {
                                         Ok(n) => tracing::info!(
@@ -2456,9 +2447,7 @@ impl HttpServer {
                 #[cfg(feature = "p2p")]
                 let distribution_items: Vec<(String, String)> = manifest_inputs
                     .iter()
-                    .filter_map(|(id, bh, _, _, _)| {
-                        bh.as_ref().map(|h| (id.clone(), h.clone()))
-                    })
+                    .filter_map(|(id, bh, _, _, _)| bh.as_ref().map(|h| (id.clone(), h.clone())))
                     .collect();
 
                 // Record shard manifests for items with blobs
@@ -2479,38 +2468,32 @@ impl HttpServer {
                                     let encoder = crate::sharding::ShardEncoder::new(
                                         crate::sharding::ShardConfig::default(),
                                     );
-                                    let manifest = encoder.create_manifest(
-                                        &data,
-                                        &content_format,
-                                        &reach,
-                                    );
+                                    let manifest =
+                                        encoder.create_manifest(&data, &content_format, &reach);
                                     let shard_hashes_json =
                                         serde_json::to_string(&manifest.shard_hashes)
                                             .unwrap_or_else(|_| "[]".to_string());
                                     if let Ok(mut conn) = pool.get() {
-                                        let new_manifest =
-                                            crate::db::models::NewShardManifest {
-                                                content_id: &content_id,
-                                                h_app_id: "lamad",
-                                                blob_hash: &blob_hash,
-                                                blob_cid: blob_cid.as_deref(),
-                                                encoding: &manifest.encoding,
-                                                data_shard_count: manifest.data_shards as i32,
-                                                parity_shard_count: (manifest.total_shards
-                                                    - manifest.data_shards)
-                                                    as i32,
-                                                shard_hashes_json: &shard_hashes_json,
-                                                total_size_bytes: manifest.total_size as i64,
-                                                shard_size_bytes: manifest.shard_size as i64,
-                                                mime_type: &manifest.mime_type,
-                                                reach: &reach,
-                                            };
-                                        if let Err(e) =
-                                            crate::db::shard_manifests::upsert_manifest(
-                                                &mut conn,
-                                                &new_manifest,
-                                            )
-                                        {
+                                        let new_manifest = crate::db::models::NewShardManifest {
+                                            content_id: &content_id,
+                                            h_app_id: "lamad",
+                                            blob_hash: &blob_hash,
+                                            blob_cid: blob_cid.as_deref(),
+                                            encoding: &manifest.encoding,
+                                            data_shard_count: manifest.data_shards as i32,
+                                            parity_shard_count: (manifest.total_shards
+                                                - manifest.data_shards)
+                                                as i32,
+                                            shard_hashes_json: &shard_hashes_json,
+                                            total_size_bytes: manifest.total_size as i64,
+                                            shard_size_bytes: manifest.shard_size as i64,
+                                            mime_type: &manifest.mime_type,
+                                            reach: &reach,
+                                        };
+                                        if let Err(e) = crate::db::shard_manifests::upsert_manifest(
+                                            &mut conn,
+                                            &new_manifest,
+                                        ) {
                                             tracing::warn!(
                                                 content_id = %content_id,
                                                 error = %e,
@@ -2527,9 +2510,7 @@ impl HttpServer {
 
                 // Auto-distribute shards to peers
                 #[cfg(feature = "p2p")]
-                if let (Some(ref handle), Some(ref pool)) =
-                    (&self.p2p_handle, &self.db_pool)
-                {
+                if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
                     if !distribution_items.is_empty() {
                         let handle = handle.clone();
                         let pool = pool.clone();
@@ -2538,12 +2519,7 @@ impl HttpServer {
                             for (content_id, blob_hash) in distribution_items {
                                 if let Ok(data) = blob_store.get(&blob_hash).await {
                                     let _ = handle
-                                        .distribute_shards(
-                                            &content_id,
-                                            &data,
-                                            &pool,
-                                            "lamad",
-                                        )
+                                        .distribute_shards(&content_id, &data, &pool, "lamad")
                                         .await;
                                 }
                             }
@@ -6029,10 +6005,7 @@ impl HttpServer {
         let session = db::observation_sessions::get_session(&mut conn, session_id)
             .map_err(|e| StorageError::Internal(format!("Session lookup failed: {}", e)))?
             .ok_or_else(|| {
-                StorageError::NotFound(format!(
-                    "Observation session '{}' not found",
-                    session_id
-                ))
+                StorageError::NotFound(format!("Observation session '{}' not found", session_id))
             })?;
 
         // Idempotent: return existing content ID if already reported
@@ -6068,7 +6041,11 @@ impl HttpServer {
             .metadata_json
             .as_deref()
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-            .and_then(|v| v.get("scenarioId").and_then(|s| s.as_str()).map(String::from));
+            .and_then(|v| {
+                v.get("scenarioId")
+                    .and_then(|s| s.as_str())
+                    .map(String::from)
+            });
 
         let content_id = match scenario_id {
             Some(ref sid) => format!("obs-report-for-{}", sid),
@@ -6181,13 +6158,7 @@ impl HttpServer {
     /// Called after the main request handler when `X-Observation-Id` is present.
     /// Appends an entry to the named session for any non-2xx response status.
     /// Successes (2xx) are not recorded -- only failures carry diagnostic signal.
-    fn maybe_observe_request(
-        &self,
-        session_id: &str,
-        method: &str,
-        path: &str,
-        status_code: u16,
-    ) {
+    fn maybe_observe_request(&self, session_id: &str, method: &str, path: &str, status_code: u16) {
         // Only observe failures
         if status_code < 300 {
             return;
@@ -6206,9 +6177,7 @@ impl HttpServer {
         // Infer category from path
         let category = if path.starts_with("/db/content") || path.starts_with("/api/v1/content") {
             "content"
-        } else if path.starts_with("/db/allocations")
-            || path.starts_with("/api/v1/stewardship")
-        {
+        } else if path.starts_with("/db/allocations") || path.starts_with("/api/v1/stewardship") {
             "stewardship"
         } else if path.starts_with("/api/v1/mastery") {
             "mastery"
@@ -6258,9 +6227,7 @@ impl HttpServer {
 ///
 /// Content IDs are extracted from `/db/content/{id}` and
 /// `/db/allocations/content/{id}` paths.
-fn correlate_issues(
-    entries: &[crate::db::models::ObservationEntry],
-) -> Vec<ObservationIssueView> {
+fn correlate_issues(entries: &[crate::db::models::ObservationEntry]) -> Vec<ObservationIssueView> {
     use std::collections::HashMap;
 
     let mut issues: HashMap<String, ObservationIssueView> = HashMap::new();
@@ -6276,10 +6243,18 @@ fn correlate_issues(
         // Extract content ID from well-known path patterns
         let content_id_from_path = if let Some(rest) = path.strip_prefix("/db/content/") {
             let id = rest.split('/').next().unwrap_or("").to_string();
-            if id.is_empty() { None } else { Some(id) }
+            if id.is_empty() {
+                None
+            } else {
+                Some(id)
+            }
         } else if let Some(rest) = path.strip_prefix("/db/allocations/content/") {
             let id = rest.split('/').next().unwrap_or("").to_string();
-            if id.is_empty() { None } else { Some(id) }
+            if id.is_empty() {
+                None
+            } else {
+                Some(id)
+            }
         } else {
             None
         };
@@ -6287,17 +6262,19 @@ fn correlate_issues(
         match status {
             401 => {
                 let key = "auth-401".to_string();
-                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
-                    id: key,
-                    category: "auth".to_string(),
-                    severity: "error".to_string(),
-                    title: "Authentication failures detected".to_string(),
-                    entry_count: 0,
-                    related_content_ids: vec![],
-                    suggested_cause:
-                        "Agent session may be missing or expired. Check X-Agent-Id header."
-                            .to_string(),
-                });
+                let issue = issues
+                    .entry(key.clone())
+                    .or_insert_with(|| ObservationIssueView {
+                        id: key,
+                        category: "auth".to_string(),
+                        severity: "error".to_string(),
+                        title: "Authentication failures detected".to_string(),
+                        entry_count: 0,
+                        related_content_ids: vec![],
+                        suggested_cause:
+                            "Agent session may be missing or expired. Check X-Agent-Id header."
+                                .to_string(),
+                    });
                 issue.entry_count += 1;
                 if let Some(ref cid) = content_id_from_path {
                     if !issue.related_content_ids.contains(cid) {
@@ -6316,17 +6293,19 @@ fn correlate_issues(
                     .map(|s| vec![s])
                     .unwrap_or_default();
                 let path_clone = path.to_string();
-                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
-                    id: key,
-                    category: "content".to_string(),
-                    severity: "warning".to_string(),
-                    title: format!("Content not found: {}", path_clone),
-                    entry_count: 0,
-                    related_content_ids: related,
-                    suggested_cause:
-                        "Content ID may not be seeded or may belong to a different h_app_id."
-                            .to_string(),
-                });
+                let issue = issues
+                    .entry(key.clone())
+                    .or_insert_with(|| ObservationIssueView {
+                        id: key,
+                        category: "content".to_string(),
+                        severity: "warning".to_string(),
+                        title: format!("Content not found: {}", path_clone),
+                        entry_count: 0,
+                        related_content_ids: related,
+                        suggested_cause:
+                            "Content ID may not be seeded or may belong to a different h_app_id."
+                                .to_string(),
+                    });
                 issue.entry_count += 1;
             }
             405 => {
@@ -6335,17 +6314,19 @@ fn correlate_issues(
                     path.replace('/', "-").trim_matches('-')
                 );
                 let path_clone = path.to_string();
-                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
-                    id: key,
-                    category: "routing".to_string(),
-                    severity: "warning".to_string(),
-                    title: format!("Method not allowed on: {}", path_clone),
-                    entry_count: 0,
-                    related_content_ids: vec![],
-                    suggested_cause:
-                        "HTTP method is not registered for this route. Check API specification."
-                            .to_string(),
-                });
+                let issue = issues
+                    .entry(key.clone())
+                    .or_insert_with(|| ObservationIssueView {
+                        id: key,
+                        category: "routing".to_string(),
+                        severity: "warning".to_string(),
+                        title: format!("Method not allowed on: {}", path_clone),
+                        entry_count: 0,
+                        related_content_ids: vec![],
+                        suggested_cause:
+                            "HTTP method is not registered for this route. Check API specification."
+                                .to_string(),
+                    });
                 issue.entry_count += 1;
             }
             503 if entry.message.contains("imagodei") || path.contains("imagodei") => {
@@ -6365,7 +6346,9 @@ fn correlate_issues(
             }
             503 => {
                 let key = "service-unavailable".to_string();
-                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
+                let issue =
+                    issues.entry(key.clone()).or_insert_with(|| {
+                        ObservationIssueView {
                     id: key,
                     category: "infrastructure".to_string(),
                     severity: "error".to_string(),
@@ -6375,7 +6358,8 @@ fn correlate_issues(
                     suggested_cause:
                         "Backend service or database pool is not initialised. Check startup logs."
                             .to_string(),
-                });
+                }
+                    });
                 issue.entry_count += 1;
             }
             _ => {
@@ -6383,18 +6367,20 @@ fn correlate_issues(
                 let key = format!("{}-{}", entry.severity, entry.category);
                 let sev = entry.severity.clone();
                 let cat = entry.category.clone();
-                let issue = issues.entry(key.clone()).or_insert_with(|| ObservationIssueView {
-                    id: key,
-                    category: cat,
-                    severity: sev,
-                    title: format!(
-                        "Repeated {} in category: {}",
-                        entry.severity, entry.category
-                    ),
-                    entry_count: 0,
-                    related_content_ids: vec![],
-                    suggested_cause: "Review log entries for details.".to_string(),
-                });
+                let issue = issues
+                    .entry(key.clone())
+                    .or_insert_with(|| ObservationIssueView {
+                        id: key,
+                        category: cat,
+                        severity: sev,
+                        title: format!(
+                            "Repeated {} in category: {}",
+                            entry.severity, entry.category
+                        ),
+                        entry_count: 0,
+                        related_content_ids: vec![],
+                        suggested_cause: "Review log entries for details.".to_string(),
+                    });
                 issue.entry_count += 1;
                 if let Some(ref cid) = content_id_from_path {
                     if !issue.related_content_ids.contains(cid) {

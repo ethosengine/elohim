@@ -87,10 +87,7 @@ type PendingShardPushMap = Arc<
 /// Map of pending shard verification requests: outbound request ID → (shard_hash, peer_id)
 type PendingVerificationMap = Arc<
     tokio::sync::Mutex<
-        std::collections::HashMap<
-            request_response::OutboundRequestId,
-            (String, String),
-        >,
+        std::collections::HashMap<request_response::OutboundRequestId, (String, String)>,
     >,
 >;
 
@@ -332,12 +329,7 @@ impl P2PHandle {
 
     /// Push a shard to a specific peer for replication.
     /// Returns Ok(()) on acknowledgment, Err on timeout/failure.
-    pub async fn push_shard(
-        &self,
-        peer_id: &str,
-        hash: &str,
-        data: Vec<u8>,
-    ) -> Result<(), String> {
+    pub async fn push_shard(&self, peer_id: &str, hash: &str, data: Vec<u8>) -> Result<(), String> {
         let peer_id: PeerId = peer_id
             .parse()
             .map_err(|e| format!("Invalid peer ID: {e}"))?;
@@ -368,10 +360,8 @@ impl P2PHandle {
         pool: &crate::db::DbPool,
         h_app_id: &str,
     ) -> Result<usize, String> {
-        let encoder =
-            crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
-        let manifest =
-            encoder.create_manifest(blob_data, "application/octet-stream", "commons");
+        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
+        let manifest = encoder.create_manifest(blob_data, "application/octet-stream", "commons");
         let shards = encoder.create_shards(blob_data, &manifest.encoding);
 
         let peers = self.delivery_peers();
@@ -399,8 +389,7 @@ impl P2PHandle {
                             h_app_id,
                             status: "announced",
                         };
-                        let _ =
-                            crate::db::shard_locations::upsert_location(&mut conn, &location);
+                        let _ = crate::db::shard_locations::upsert_location(&mut conn, &location);
                     }
                     distributed += 1;
                 }
@@ -705,7 +694,7 @@ impl P2PNode {
                     self.initiate_sync_round().await;
                 }
                 _ = verify_interval.tick() => {
-                    self.verify_shard_locations(&mut *swarm).await;
+                    self.verify_shard_locations(&mut swarm).await;
                     drop(swarm);
                 }
                 _ = shutdown.recv() => {
@@ -1025,9 +1014,7 @@ impl P2PNode {
                                     let _ = tx.send(Err(e));
                                 }
                                 _ => {
-                                    let _ = tx.send(Err(
-                                        "Unexpected response to push".to_string(),
-                                    ));
+                                    let _ = tx.send(Err("Unexpected response to push".to_string()));
                                 }
                             }
                         }
@@ -1517,10 +1504,10 @@ impl P2PNode {
                 .shard_protocol
                 .send_request(&peer_id, request);
 
-            self.pending_verifications.lock().await.insert(
-                request_id,
-                (loc.shard_hash.clone(), loc.peer_id.clone()),
-            );
+            self.pending_verifications
+                .lock()
+                .await
+                .insert(request_id, (loc.shard_hash.clone(), loc.peer_id.clone()));
         }
     }
 
