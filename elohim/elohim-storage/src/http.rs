@@ -6181,6 +6181,15 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/resilience — Content resilience projection
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/resilience/{content_id}")
+                .handler("get_resilience")
+                .cache_ttl(30)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/recognition — Recognition distribution pipeline
         // =====================================================================
         .route(
