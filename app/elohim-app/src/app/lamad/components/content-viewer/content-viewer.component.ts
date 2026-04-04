@@ -497,9 +497,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       return;
     }
     this.omnibarStewards = this.stewardship.allocations.map(a => ({
-      humanId: a.allocation?.stewardPresenceId || '',
-      displayName: a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown',
-      ratio: a.allocation?.allocationRatio ?? 0,
+      humanId: a.stewardPresenceId || '',
+      displayName: a.steward?.displayName || a.stewardPresenceId || 'Unknown',
+      ratio: a.allocationRatio ?? 0,
     }));
   }
 
@@ -1025,13 +1025,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       const stewards = allocs
         .sort(
           (a, b) =>
-            (b.allocation?.allocationRatio ?? 0) - (a.allocation?.allocationRatio ?? 0),
+            (b.allocationRatio ?? 0) - (a.allocationRatio ?? 0),
         )
         .map((a) => {
           const name =
-            a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown';
-          const pct = Math.round((a.allocation?.allocationRatio ?? 0) * 100);
-          const type = a.allocation?.contributionType || 'steward';
+            a.steward?.displayName || a.stewardPresenceId || 'Unknown';
+          const pct = Math.round((a.allocationRatio ?? 0) * 100);
+          const type = a.contributionType || 'steward';
           return `${name} (${type}, ${pct}%)`;
         })
         .join(', ');
