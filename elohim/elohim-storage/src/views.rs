@@ -5711,3 +5711,21 @@ pub struct HealthScoreView {
     pub can_survive_failures: i32,
     pub status: String,
 }
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct VerificationResultView {
+    pub content_id: String,
+    pub verified: bool,
+    pub encoding: String,
+    pub shards_available: i32,
+    pub shards_needed: i32,
+    pub shards_used_for_reconstruction: i32,
+    pub shards_intentionally_skipped: i32,
+    pub reconstruction_time_ms: u64,
+    pub original_hash: String,
+    pub reconstructed_hash: String,
+    pub hash_match: bool,
+    pub error: Option<String>,
+}

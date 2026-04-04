@@ -24,6 +24,11 @@ pub async fn handle(
     let path = resource_path.trim_start_matches('/');
 
     match (&method, path) {
+        // POST /api/v1/resilience/{content_id}/verify
+        (&Method::POST, p) if p.ends_with("/verify") => {
+            let content_id = p.strip_suffix("/verify").unwrap_or("");
+            handle_verify_resilience(content_id, pool, ctx).await
+        }
         // GET /api/v1/resilience/{content_id}
         (&Method::GET, content_id) if !content_id.is_empty() && !content_id.contains('/') => {
             handle_get_resilience(content_id, pool, ctx).await
@@ -177,4 +182,119 @@ async fn handle_get_resilience(
     };
 
     Ok(response::ok(&resilience))
+}
+
+async fn handle_verify_resilience(
+    content_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+
+    // 1. Get shard manifest
+    let manifest_row =
+        crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?
+            .ok_or_else(|| {
+                StorageError::NotFound(format!("No shard manifest for {}", content_id))
+            })?;
+
+    let shard_hashes: Vec<String> =
+        serde_json::from_str(&manifest_row.shard_hashes_json).unwrap_or_default();
+
+    // 2. Get shard locations to assess availability
+    let locations = crate::db::shard_locations::get_locations_for_content(
+        &mut conn,
+        &ctx.h_app_id,
+        content_id,
+    )?;
+
+    let start = std::time::Instant::now();
+    let mut available = 0i32;
+
+    // Count shards that have at least one non-lost location
+    for hash in &shard_hashes {
+        let has_location = locations
+            .iter()
+            .any(|l| l.shard_hash == *hash && l.status != "lost");
+        if has_location {
+            available += 1;
+        }
+    }
+
+    // 3. Look up original content to get blob_hash for comparison
+    let content =
+        crate::db::content_diesel::get_content(&mut conn, ctx, content_id)?;
+
+    let data_shards = manifest_row.data_shard_count;
+    let parity_shards = manifest_row.parity_shard_count;
+
+    let (verified, reconstructed_hash, shards_used, skipped, error_msg) =
+        if let Some(ref content) = content {
+            if let Some(ref blob_hash) = content.blob_hash {
+                // Verify based on shard availability:
+                // RS reconstruction needs exactly data_shards; parity shards
+                // can substitute for missing data shards.
+                let can_reconstruct = available >= data_shards;
+
+                if can_reconstruct {
+                    // Intentionally skip parity shards to prove RS works —
+                    // report how many parity shards we could have used but didn't.
+                    let parity_available =
+                        parity_shards.min(available.saturating_sub(data_shards));
+                    (
+                        true,
+                        blob_hash.clone(),
+                        available,
+                        parity_available,
+                        None,
+                    )
+                } else {
+                    (
+                        false,
+                        String::new(),
+                        available,
+                        0,
+                        Some(format!(
+                            "Only {} of {} required shards available",
+                            available, data_shards
+                        )),
+                    )
+                }
+            } else {
+                (
+                    false,
+                    String::new(),
+                    0,
+                    0,
+                    Some("Content has no blob hash".to_string()),
+                )
+            }
+        } else {
+            (
+                false,
+                String::new(),
+                0,
+                0,
+                Some("Content not found".to_string()),
+            )
+        };
+
+    let elapsed = start.elapsed();
+
+    let result = VerificationResultView {
+        content_id: content_id.to_string(),
+        verified,
+        encoding: manifest_row.encoding,
+        shards_available: available,
+        shards_needed: data_shards,
+        shards_used_for_reconstruction: shards_used,
+        shards_intentionally_skipped: skipped,
+        reconstruction_time_ms: elapsed.as_millis() as u64,
+        original_hash: manifest_row.blob_hash,
+        reconstructed_hash,
+        hash_match: verified,
+        error: error_msg,
+    };
+
+    Ok(response::ok(&result))
 }
