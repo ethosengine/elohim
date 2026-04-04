@@ -8,7 +8,7 @@ Feature: Collective governance
 
   Scenario: Create a proposal
     When I create a proposal titled "Study Romans next quarter"
-    With type "sense-check"
+    And type "sense-check"
     And description "Romans provides foundational theology for our group's next season"
     Then the proposal appears in the collective's proposals tab
     And the proposal status is "voting"

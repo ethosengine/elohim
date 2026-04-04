@@ -295,41 +295,49 @@
             ></app-graduated-feedback>
           </div>
 
-          <!-- Signal Summary (when aggregates exist) -->
+          <!-- Signal Summary -->
           <div
             class="signal-summary"
-            *ngIf="aggregatedSignals && aggregatedSignals.reactionCounts.total > 0"
+            *ngIf="aggregatedSignals"
+            data-testid="viewer-signal-summary"
           >
-            <div class="signal-metric">
-              <span class="metric-label">Community Sentiment</span>
-              <span
-                class="metric-value"
-                [ngClass]="{
-                  positive: aggregatedSignals.sentimentScore > 0.6,
-                  neutral:
-                    aggregatedSignals.sentimentScore >= 0.4 &&
-                    aggregatedSignals.sentimentScore <= 0.6,
-                  negative: aggregatedSignals.sentimentScore < 0.4,
-                }"
-              >
-                {{ aggregatedSignals.sentimentScore * 100 | number: '1.0-0' }}%
-              </span>
-            </div>
-            <div class="signal-metric" *ngIf="aggregatedSignals.effectivenessScore > 0">
-              <span class="metric-label">Effectiveness</span>
-              <span class="metric-value">
-                {{ aggregatedSignals.effectivenessScore * 100 | number: '1.0-0' }}%
-              </span>
-            </div>
-            <div class="signal-metric">
-              <span class="metric-label">Consensus</span>
-              <span
-                class="metric-value consensus-badge"
-                [ngClass]="aggregatedSignals.consensusState.level"
-              >
-                {{ aggregatedSignals.consensusState.level | titlecase }}
-              </span>
-            </div>
+            <ng-container *ngIf="aggregatedSignals.reactionCounts.total > 0; else emptySignals">
+              <div class="signal-metric">
+                <span class="metric-label">Community Sentiment</span>
+                <span
+                  class="metric-value"
+                  [ngClass]="{
+                    positive: aggregatedSignals.sentimentScore > 0.6,
+                    neutral:
+                      aggregatedSignals.sentimentScore >= 0.4 &&
+                      aggregatedSignals.sentimentScore <= 0.6,
+                    negative: aggregatedSignals.sentimentScore < 0.4,
+                  }"
+                >
+                  {{ aggregatedSignals.sentimentScore * 100 | number: '1.0-0' }}%
+                </span>
+              </div>
+              <div class="signal-metric" *ngIf="aggregatedSignals.effectivenessScore > 0">
+                <span class="metric-label">Effectiveness</span>
+                <span class="metric-value">
+                  {{ aggregatedSignals.effectivenessScore * 100 | number: '1.0-0' }}%
+                </span>
+              </div>
+              <div class="signal-metric">
+                <span class="metric-label">Consensus</span>
+                <span
+                  class="metric-value consensus-badge"
+                  [ngClass]="aggregatedSignals.consensusState.level"
+                >
+                  {{ aggregatedSignals.consensusState.level | titlecase }}
+                </span>
+              </div>
+            </ng-container>
+            <ng-template #emptySignals>
+              <div class="signal-empty" data-testid="viewer-signal-empty">
+                <span class="metric-label">{{ aggregatedSignals.reactionCounts.total }} signals from 0 participants</span>
+              </div>
+            </ng-template>
           </div>
         </div>
 

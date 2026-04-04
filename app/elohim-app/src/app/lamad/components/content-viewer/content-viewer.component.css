@@ -1733,6 +1733,12 @@
   color: #95a5a6;
 }
 
+.signal-empty {
+  padding: 0.5rem 0;
+  opacity: 0.5;
+  font-size: 0.85rem;
+}
+
 /* Stewardship Section */
 
 .stewardship-section {
