@@ -940,9 +940,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Resilience icon — indicates stewardship health.
    */
   getResilienceIcon(): string {
-    const stewardCount = this.node?.stewardedBy?.length || 0;
+    const stewardCount = this.stewardship?.allocations?.length || 0;
     if (stewardCount >= 3) return '\u{1F7E2}'; // green circle
     if (stewardCount >= 1) return '\u{1F7E1}'; // yellow circle
+    if (this.stewardship === null) return '\u{1F504}'; // loading (arrows)
     return '\u{26AA}'; // white circle (no stewards)
   }
 
@@ -951,24 +952,35 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    */
   getResilienceTooltip(): string {
     if (!this.node) return '';
+    if (this.stewardship === null) return 'Loading stewardship data...';
 
     const lines: string[] = [];
 
-    // Stewards
-    if (this.node.stewardedBy?.length) {
-      const stewards = this.node.stewardedBy
-        .sort((a, b) => b.affinity - a.affinity)
-        .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
+    const allocs = this.stewardship?.allocations || [];
+    if (allocs.length > 0) {
+      const stewards = allocs
+        .sort(
+          (a, b) =>
+            (b.allocation?.allocationRatio ?? 0) - (a.allocation?.allocationRatio ?? 0),
+        )
+        .map((a) => {
+          const name =
+            a.presence?.displayName || a.allocation?.stewardPresenceId || 'Unknown';
+          const pct = Math.round((a.allocation?.allocationRatio ?? 0) * 100);
+          const type = a.allocation?.contributionType || 'steward';
+          return `${name} (${type}, ${pct}%)`;
+        })
         .join(', ');
       lines.push(`Stewards: ${stewards}`);
     } else {
       lines.push('No stewards assigned');
     }
 
-    // Trust score
     if (this.node.trustScore != null) {
       lines.push(`Trust: ${Math.round(this.node.trustScore * 100)}%`);
     }
+
+    lines.push(`Reach: ${this.node.reach || 'commons'}`);
 
     return lines.join('\n') || 'No resilience data available';
   }
