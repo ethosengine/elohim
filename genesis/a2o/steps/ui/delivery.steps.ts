@@ -19,6 +19,7 @@
 import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
+
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
@@ -27,6 +28,13 @@ import { E2EWorld } from '../../src/framework/world.js';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const SW_LOG_CAPABILITY = '[apps-sw] capability:';
+const SW_LOG_ZIP_FETCH = '[apps-sw] zip-fetch:';
+const SW_LOG_CACHE_PUT = '[apps-sw] cache-put:';
+const SW_LOG_CACHE_HIT = '[apps-sw] cache-hit:';
+const APPS_PATH = '/apps/';
+const NO_DOORWAY_MSG = NO_DOORWAY_MSG;
 
 function requirePlaywright(world: E2EWorld, humanName: string): PlaywrightDevice {
   const human = world.getHuman(humanName);
@@ -61,16 +69,57 @@ interface DeliveryEvidence {
 function collectDeliveryEvidence(device: PlaywrightDevice): DeliveryEvidence {
   const logs = device.consoleLogs;
   return {
-    capabilityProbes: logs.filter(l => l.text.includes('[apps-sw] capability:')).length,
-    zipFetches: logs.filter(l => l.text.includes('[apps-sw] zip-fetch:')).length,
-    cachePuts: logs.filter(l => l.text.includes('[apps-sw] cache-put:')).length,
-    cacheHits: logs.filter(l => l.text.includes('[apps-sw] cache-hit:')).length,
-    directStorageRequests: device.failedRequests.filter(r => r.url.includes('/apps/')).length,
+    capabilityProbes: logs.filter(l => l.text.includes(SW_LOG_CAPABILITY)).length,
+    zipFetches: logs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH)).length,
+    cachePuts: logs.filter(l => l.text.includes(SW_LOG_CACHE_PUT)).length,
+    cacheHits: logs.filter(l => l.text.includes(SW_LOG_CACHE_HIT)).length,
+    directStorageRequests: device.failedRequests.filter(r => r.url.includes(APPS_PATH)).length,
   };
 }
 
-// Store evidence between When and Then steps
-const evidenceStore = new WeakMap<E2EWorld, DeliveryEvidence>();
+/** Map a Gherkin event label to its evidence field value. Returns undefined for unknown labels. */
+function resolveEvidenceField(eventName: string, evidence: DeliveryEvidence): number | undefined {
+  switch (eventName) {
+    case 'capability probes sent':
+      return evidence.capabilityProbes;
+    case 'ZIP blob fetches':
+      return evidence.zipFetches;
+    case 'CacheStorage puts':
+      return evidence.cachePuts;
+    case 'direct storage requests':
+      return evidence.directStorageRequests;
+    case 'cache hits':
+      return evidence.cacheHits;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Assert a single evidence row from the "browser console evidence shows:" table.
+ * Extracted to reduce cognitive complexity of the step function.
+ */
+function assertEvidenceRow(
+  eventName: string,
+  actual: number,
+  threshold: number,
+  isMinimum: boolean,
+  evidence: DeliveryEvidence
+): void {
+  const totalSwLogs = evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
+  if (isMinimum) {
+    // For "30+" — only assert if the SW logging is active (evidence > 0 total)
+    if (totalSwLogs > 0) {
+      assert.ok(actual >= threshold, `"${eventName}": expected >= ${threshold}, got ${actual}`);
+    }
+  } else if (threshold === 0) {
+    // Zero threshold is a critical safety assertion — always enforce
+    assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
+  } else if (totalSwLogs > 0) {
+    // Non-zero exact count — only assert when SW logging is active
+    assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Operator Login (for delivery-diagnostics Background)
@@ -84,6 +133,7 @@ const evidenceStore = new WeakMap<E2EWorld, DeliveryEvidence>();
  */
 Given(
   'human {string} is logged in on doorway {string} as operator',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
     // Delegate to the existing fixture-human login step by looking up the doorway
     // and creating a Playwright device with the operator's credentials.
@@ -153,7 +203,7 @@ Then('the Service Worker is registered and active', async function (this: E2EWor
     `Service Worker registered but not active (state: ${JSON.stringify(swState)})`
   );
   assert.ok(
-    swState.scope.includes('/apps/'),
+    swState.scope.includes(APPS_PATH),
     `SW scope "${swState.scope}" does not include /apps/`
   );
 });
@@ -191,7 +241,7 @@ Given(
   async function (this: E2EWorld, _appSlug: string) {
     const device = firstPlaywright(this);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     // Navigate to the origin so we can call the CacheStorage API
     await device.page.goto(`${doorway.url}/`, { waitUntil: 'domcontentloaded' });
@@ -250,6 +300,7 @@ Given('the Service Worker has cached {string}', async function (this: E2EWorld, 
  *
  * Example: And browser console logging is enabled
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Given('browser console logging is enabled', async function (this: E2EWorld) {
   // PlaywrightDevice captures all console logs automatically from init().
   // Clear prior capture so evidence starts clean for this scenario.
@@ -303,7 +354,7 @@ When(
   async function (this: E2EWorld, humanName: string) {
     const device = requirePlaywright(this, humanName);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
     await device.page.goto(`${doorway.url}/`, { waitUntil: 'networkidle' });
@@ -320,7 +371,7 @@ When(
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
     await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
@@ -340,16 +391,13 @@ When(
 When('{word} loads {string}', async function (this: E2EWorld, humanName: string, appSlug: string) {
   const device = requirePlaywright(this, humanName);
   const doorway = [...this.doorways.values()][0];
-  assert.ok(doorway, 'No doorway registered');
+  assert.ok(doorway, NO_DOORWAY_MSG);
 
   device.clearCapture();
   await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
     waitUntil: 'networkidle',
     timeout: 30_000,
   });
-
-  // Collect structured SW evidence from console logs for Then assertions
-  evidenceStore.set(this, collectDeliveryEvidence(device));
 });
 
 /**
@@ -362,15 +410,13 @@ When(
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
     await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
-
-    evidenceStore.set(this, collectDeliveryEvidence(device));
   }
 );
 
@@ -388,7 +434,7 @@ When('{word} goes offline', async function (this: E2EWorld, humanName: string) {
   await device.page.evaluate(() => {
     // Override fetch to simulate offline by rejecting all network requests
     // SW cache should intercept before fetch is called
-    (window as unknown as Record<string, unknown>).__e2e_offline = true;
+    (globalThis as unknown as Record<string, unknown>).__e2e_offline = true;
   });
 });
 
@@ -402,7 +448,7 @@ Given(
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
     await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
@@ -485,15 +531,15 @@ Then(
  */
 Then(
   'all app files are served with {int} status',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, _expectedStatus: number) {
     const device = firstPlaywright(this);
 
-    const failed = device.failedRequests.filter(r => r.url.includes('/apps/'));
-    assert.equal(
-      failed.length,
-      0,
-      `${failed.length} app requests failed:\n${failed.map(f => `  ${f.method} ${f.url}: ${f.failure}`).join('\n')}`
-    );
+    const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
+    const failedLines = failed
+      .map(f => '  ' + f.method + ' ' + f.url + ': ' + f.failure)
+      .join('\n');
+    assert.equal(failed.length, 0, `${failed.length} app requests failed:\n${failedLines}`);
   }
 );
 
@@ -509,10 +555,11 @@ Then(
  */
 Then(
   'the SW capability probe returns deliveryMode {string}',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, expectedMode: string) {
     const device = firstPlaywright(this);
 
-    const capLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] capability:'));
+    const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
 
     if (capLogs.length === 0) {
       // SW may not have logged yet — this is a best-effort assertion
@@ -536,11 +583,12 @@ Then(
  */
 Then(
   /^the SW downloads the ZIP blob via a single GET \/blob\/\{hash\} request$/,
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
 
     // Check [apps-sw] zip-fetch: log lines — one per ZIP download
-    const zipLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] zip-fetch:'));
+    const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
 
     if (zipLogs.length > 0) {
       assert.equal(
@@ -559,10 +607,11 @@ Then(
  *
  * Example: Then the SW downloads the ZIP blob once
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW downloads the ZIP blob once', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const zipLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] zip-fetch:'));
+  const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
 
   if (zipLogs.length > 0) {
     assert.equal(
@@ -608,11 +657,12 @@ Then('the SW extracts all files from the ZIP into CacheStorage', async function 
  *
  * Example: Then the SW fetches each file individually
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW fetches each file individually', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
   // In extracted mode, there should be NO zip-fetch: logs
-  const zipLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] zip-fetch:'));
+  const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
   assert.equal(
     zipLogs.length,
     0,
@@ -642,10 +692,11 @@ Then('each file is cached in SW CacheStorage', async function (this: E2EWorld) {
  *
  * Example: And no ZIP download occurs
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('no ZIP download occurs', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const zipLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] zip-fetch:'));
+  const zipLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_ZIP_FETCH));
   assert.equal(zipLogs.length, 0, `ZIP was downloaded — expected extracted delivery mode`);
 });
 
@@ -704,12 +755,10 @@ Then('the requested file is returned from the local extraction', async function 
  */
 Then(
   'the browser console evidence shows:',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, dataTable: { rawTable: string[][] }) {
     const device = firstPlaywright(this);
     const evidence = collectDeliveryEvidence(device);
-
-    // Store for downstream assertions
-    evidenceStore.set(this, evidence);
 
     // Skip header row
     const rows = dataTable.rawTable.slice(1);
@@ -718,49 +767,16 @@ Then(
       const eventName = row[0]?.trim() ?? '';
       const countStr = row[1]?.trim() ?? '0';
       const isMinimum = countStr.endsWith('+');
-      const threshold = parseInt(countStr.replace('+', ''), 10);
+      const threshold = Number.parseInt(countStr.replace('+', ''), 10);
 
-      let actual: number;
-      switch (eventName) {
-        case 'capability probes sent':
-          actual = evidence.capabilityProbes;
-          break;
-        case 'ZIP blob fetches':
-          actual = evidence.zipFetches;
-          break;
-        case 'CacheStorage puts':
-          actual = evidence.cachePuts;
-          break;
-        case 'direct storage requests':
-          actual = evidence.directStorageRequests;
-          break;
-        case 'cache hits':
-          actual = evidence.cacheHits;
-          break;
-        default:
-          // Unknown event — skip with a warning rather than fail
-          // (evidence labels may evolve before SW logging is deployed)
-          continue;
+      const actual = resolveEvidenceField(eventName, evidence);
+      if (actual === undefined) {
+        // Unknown event — skip with a warning rather than fail
+        // (evidence labels may evolve before SW logging is deployed)
+        continue;
       }
 
-      if (isMinimum) {
-        // For "30+" — only assert if the SW logging is active (evidence > 0 total)
-        const totalSwLogs = evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
-        if (totalSwLogs > 0) {
-          assert.ok(actual >= threshold, `"${eventName}": expected >= ${threshold}, got ${actual}`);
-        }
-      } else {
-        // Exact count — only assert when expected is 0 (critical safety assertion)
-        // or when SW logging is active
-        if (threshold === 0) {
-          assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
-        } else {
-          const totalSwLogs = evidence.capabilityProbes + evidence.zipFetches + evidence.cachePuts;
-          if (totalSwLogs > 0) {
-            assert.equal(actual, threshold, `"${eventName}": expected ${threshold}, got ${actual}`);
-          }
-        }
-      }
+      assertEvidenceRow(eventName, actual, threshold, isMinimum, evidence);
     }
   }
 );
@@ -772,6 +788,7 @@ Then(
  */
 Then(
   'elohim-storage received at most {int} HTTP requests total',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, maxRequests: number) {
     const device = firstPlaywright(this);
     const evidence = collectDeliveryEvidence(device);
@@ -859,7 +876,7 @@ Given(
   async function (this: E2EWorld, appSlug: string) {
     const device = firstPlaywright(this);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     // Navigate to the app content page that contains the iframe renderer
     // This is the Angular route that embeds the html5-app in an iframe
@@ -893,7 +910,7 @@ Then(
     const device = firstPlaywright(this);
 
     const iframeSrc = await device.page.evaluate(() => {
-      const iframe = document.querySelector('iframe[src*="/apps/"]') as HTMLIFrameElement | null;
+      const iframe = document.querySelector('iframe[src*="/apps/"]');
       return iframe?.src ?? iframe?.getAttribute('src') ?? '';
     });
 
@@ -934,6 +951,7 @@ Then('the SW fetch event fires for the request', async function (this: E2EWorld)
  *
  * Example: And no CORS preflight is triggered
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('no CORS preflight is triggered', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
@@ -945,11 +963,8 @@ Then('no CORS preflight is triggered', async function (this: E2EWorld) {
       (l.text.toLowerCase().includes('cors') || l.text.toLowerCase().includes('preflight'))
   );
 
-  assert.equal(
-    corsPreflight.length,
-    0,
-    `CORS preflight detected:\n${corsPreflight.map(l => `  [${l.level}] ${l.text}`).join('\n')}`
-  );
+  const corsLines = corsPreflight.map(l => '  [' + l.level + '] ' + l.text).join('\n');
+  assert.equal(corsPreflight.length, 0, `CORS preflight detected:\n${corsLines}`);
 });
 
 /**
@@ -957,10 +972,11 @@ Then('no CORS preflight is triggered', async function (this: E2EWorld) {
  *
  * Example: And zero network requests are attempted
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('zero network requests are attempted', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const networkRequests = device.failedRequests.filter(r => r.url.includes('/apps/'));
+  const networkRequests = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(
     networkRequests.length,
     0,
@@ -978,6 +994,7 @@ Then('zero network requests are attempted', async function (this: E2EWorld) {
  *
  * Example: Then the SW logs which source served each file
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW logs which source served each file', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
@@ -987,8 +1004,8 @@ Then('the SW logs which source served each file', async function (this: E2EWorld
       l.text.includes('[apps-sw] cache-hit:') ||
       l.text.includes('[apps-sw] peer-hit:') ||
       l.text.includes('[apps-sw] fallback:') ||
-      l.text.includes('[apps-sw] zip-fetch:') ||
-      l.text.includes('[apps-sw] capability:')
+      l.text.includes(SW_LOG_ZIP_FETCH) ||
+      l.text.includes(SW_LOG_CAPABILITY)
   );
 
   // If SW logging from Task 5 is deployed, we expect at least some log lines
@@ -1009,6 +1026,7 @@ Then('the SW logs which source served each file', async function (this: E2EWorld
  *
  * Example: And sources are one of: "sw-cache", "peer-extracted", "peer-compressed-local-extract", "doorway-proxy"
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then(/^sources are one of: (.+)$/, async function (this: E2EWorld, sourcesRaw: string) {
   const device = firstPlaywright(this);
 
@@ -1127,7 +1145,7 @@ Given('elohim-cache-core WASM is loaded in the browser', async function (this: E
   const device = firstPlaywright(this);
 
   const wasmLoaded = await device.page.evaluate(() => {
-    return !!(window as unknown as Record<string, unknown>).__elohim_cache_core;
+    return !!(globalThis as unknown as Record<string, unknown>).__elohim_cache_core;
   });
 
   assert.ok(wasmLoaded, 'elohim-cache-core WASM not loaded — DNA pipeline may not have run');
@@ -1170,7 +1188,7 @@ When(
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
     const startTime = Date.now();
@@ -1181,7 +1199,6 @@ When(
 
     // Store load time for latency assertions
     (this as unknown as Record<string, unknown>).__lastLoadMs = Date.now() - startTime;
-    evidenceStore.set(this, collectDeliveryEvidence(device));
   }
 );
 
@@ -1190,11 +1207,12 @@ When(
  *
  * Example: Then the content lookup resolves from the WASM cache
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('the content lookup resolves from the WASM cache', async function (this: E2EWorld) {
   // The WASM cache is transparent to the browser's network panel.
   // Verify indirectly by checking no /apps/ network requests failed.
   const device = firstPlaywright(this);
-  const failed = device.failedRequests.filter(r => r.url.includes('/apps/'));
+  const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(failed.length, 0, 'Network requests failed — WASM cache may not have served');
 });
 
@@ -1203,9 +1221,10 @@ Then('the content lookup resolves from the WASM cache', async function (this: E2
  *
  * Example: And no network request is made for that content
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('no network request is made for that content', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
-  const appRequests = device.failedRequests.filter(r => r.url.includes('/apps/'));
+  const appRequests = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
   assert.equal(appRequests.length, 0, 'Network request made — WASM cache did not intercept');
 });
 
@@ -1266,20 +1285,12 @@ Then(
  *
  * Example: Given elohim-cache-core WASM failed to load with a 404 response
  */
+
 Given('elohim-cache-core WASM failed to load with a 404 response', async function (this: E2EWorld) {
-  const device = firstPlaywright(this);
-
-  // Check for the expected 404 warning in console logs
   // In dev, the WASM is not built, so this is the normal state.
-  const wasm404Warnings = device.consoleLogs.filter(
-    l =>
-      (l.level === 'warning' || l.level === 'warn') &&
-      (l.text.includes('elohim-cache-core') || l.text.includes('wasm'))
-  );
-
   // This step succeeds whether or not WASM 404 was seen — the scenario
   // tests behavior when WASM is absent (common in dev/alpha).
-  void wasm404Warnings; // intentionally unused — presence is optional
+  // No assertions needed: the precondition is satisfied by observing the env state.
 });
 
 /**
@@ -1314,6 +1325,7 @@ Then('{string} loads and functions normally', async function (this: E2EWorld, _a
  *
  * Example: And no errors are shown to Timothy
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('no errors are shown to {word}', async function (this: E2EWorld, _humanName: string) {
   const device = firstPlaywright(this);
 
@@ -1332,6 +1344,7 @@ Then('no errors are shown to {word}', async function (this: E2EWorld, _humanName
  */
 Then(
   'the browser console contains exactly {int} warning about WASM unavailability',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, expectedCount: number) {
     const device = firstPlaywright(this);
 
@@ -1362,7 +1375,7 @@ Then(
 Given('the bootstrap page is displayed', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
   const doorway = [...this.doorways.values()][0];
-  assert.ok(doorway, 'No doorway registered');
+  assert.ok(doorway, NO_DOORWAY_MSG);
 
   // Navigate to root — if SPA not extracted, doorway returns bootstrap page
   await device.page.goto(`${doorway.url}/`, { waitUntil: 'networkidle' });
@@ -1373,8 +1386,10 @@ Given('the bootstrap page is displayed', async function (this: E2EWorld) {
   );
 
   // Bootstrap page should mention loading or progress, not the full SPA
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const isBootstrap = bodyText.includes('loading') || bodyText.includes('starting');
   assert.ok(
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     isBootstrap || title.toLowerCase().includes('loading'),
     `Expected bootstrap page but got: title="${title}" body snippet="${bodyText.slice(0, 100)}"`
   );
@@ -1385,7 +1400,7 @@ Given('the bootstrap page is displayed', async function (this: E2EWorld) {
  *
  * Example: And /health/startup is returning rootApp: pending
  */
-Given('\\/health\\/startup is returning rootApp: pending', async function (this: E2EWorld) {
+Given(String.raw`\/health\/startup is returning rootApp: pending`, async function (this: E2EWorld) {
   // Documentation marker — the startup status is controlled by the doorway service.
   // In test, we observe the state we find; we can't force it to pending without
   // stopping extraction.
@@ -1396,17 +1411,20 @@ Given('\\/health\\/startup is returning rootApp: pending', async function (this:
  *
  * Example: And /health/startup returns network errors on every poll
  */
-Given('\\/health\\/startup returns network errors on every poll', async function (this: E2EWorld) {
-  // Documentation marker — simulating network errors requires intercepting
-  // fetch in the page context. Placeholder for future implementation.
-});
+Given(
+  String.raw`\/health\/startup returns network errors on every poll`,
+  async function (this: E2EWorld) {
+    // Documentation marker — simulating network errors requires intercepting
+    // fetch in the page context. Placeholder for future implementation.
+  }
+);
 
 /**
  * Verify the bootstrap page navigated to / when rootApp became ready.
  *
  * Example: Then the bootstrap page navigates to / automatically
  */
-Then('the bootstrap page navigates to \\/ automatically', async function (this: E2EWorld) {
+Then(String.raw`the bootstrap page navigates to \/ automatically`, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
   // Wait for the auto-navigation to complete
@@ -1414,7 +1432,7 @@ Then('the bootstrap page navigates to \\/ automatically', async function (this: 
 
   const url = device.page.url();
   const doorway = [...this.doorways.values()][0];
-  assert.ok(doorway, 'No doorway registered');
+  assert.ok(doorway, NO_DOORWAY_MSG);
 
   assert.ok(
     url === `${doorway.url}/` || url.endsWith('/'),
@@ -1453,6 +1471,7 @@ Then('the bootstrap page reloads the browser', async function (this: E2EWorld) {
 
   // Either the page reloaded (showing loading state) or shows a reload message
   const hasReloadMessage =
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing
     bodyText.includes('reload') || bodyText.includes('loading') || bodyText.includes('starting');
 
   assert.ok(hasReloadMessage, 'Bootstrap page did not reload or show reload message');
@@ -1471,10 +1490,12 @@ Then('a message is shown explaining the delay', async function (this: E2EWorld) 
   );
 
   // Bootstrap page should explain the delay
+  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing */
   const hasExplanation =
     bodyText.includes('loading') ||
     bodyText.includes('starting') ||
     bodyText.includes('taking longer');
+  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   assert.ok(hasExplanation, 'Bootstrap page does not explain the delay to the user');
 });
@@ -1503,11 +1524,11 @@ Then('the bootstrap page displays a loading indicator', async function (this: E2
  * Example: When the SPA extraction completes and /health/startup returns rootApp: ready
  */
 When(
-  'the SPA extraction completes and \\/health\\/startup returns rootApp: ready',
+  String.raw`the SPA extraction completes and \/health\/startup returns rootApp: ready`,
   async function (this: E2EWorld) {
     // In tests, we poll the health endpoint and wait for ready.
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
     // Poll /health/startup until rootApp is ready (max 60s)
     const maxWait = 60_000;
@@ -1558,10 +1579,11 @@ When('{int} seconds have elapsed', async function (this: E2EWorld, seconds: numb
  *
  * Example: Then the SW sends a HEAD capability probe to the serving peer
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 Then('the SW sends a HEAD capability probe to the serving peer', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
 
-  const capLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] capability:'));
+  const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
   if (capLogs.length === 0) {
     // SW logging not yet deployed — documentation marker
     return;
@@ -1576,10 +1598,11 @@ Then('the SW sends a HEAD capability probe to the serving peer', async function 
  */
 Then(
   'the probe response includes the delivery mode and blob_hash',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
 
-    const capLogs = device.consoleLogs.filter(l => l.text.includes('[apps-sw] capability:'));
+    const capLogs = device.consoleLogs.filter(l => l.text.includes(SW_LOG_CAPABILITY));
     if (capLogs.length === 0) {
       // SW logging not yet deployed — documentation marker
       return;
@@ -1606,13 +1629,14 @@ Then(
  */
 Then(
   'the SW uses the indicated delivery mode for subsequent file requests',
+  // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
 
     // Verify the SW served the content (either via zip or extracted files)
     const swLogs = device.consoleLogs.filter(
       l =>
-        l.text.includes('[apps-sw] zip-fetch:') ||
+        l.text.includes(SW_LOG_ZIP_FETCH) ||
         l.text.includes('[apps-sw] cache-hit:') ||
         l.text.includes('[apps-sw] peer-hit:')
     );
@@ -1648,13 +1672,13 @@ Given(
     const { statusCode, body } = await request(`${doorway.url}/admin/cache/clear/${contentId}`, {
       method: 'POST',
     });
-    if (statusCode !== 200) {
+    if (statusCode === 200) {
+      await body.arrayBuffer(); // drain
+    } else {
       // Admin API may not be wired yet — log and continue (best-effort)
       const text = await body.text();
-      // eslint-disable-next-line no-console
+
       console.warn(`Cache clear for "${contentId}" returned ${statusCode}: ${text}`);
-    } else {
-      await body.arrayBuffer(); // drain
     }
   }
 );
@@ -1697,10 +1721,11 @@ Given(
  */
 Given(
   'content {string} has been seeded as spa-bundle with a valid blobHash',
-  async function (this: E2EWorld, contentId: string) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async function (this: E2EWorld, _contentId: string) {
     // Verify the content exists in the system
     const doorway = [...this.doorways.values()][0];
-    assert.ok(doorway, 'No doorway registered');
+    assert.ok(doorway, NO_DOORWAY_MSG);
     // Documentation precondition — seeding is done by the genesis seeder
   }
 );
@@ -1710,10 +1735,10 @@ Given(
  *
  * Example: When an unauthenticated request is made for /
  */
-When('an unauthenticated request is made for \\/', async function (this: E2EWorld) {
+When(String.raw`an unauthenticated request is made for \/`, async function (this: E2EWorld) {
   const device = firstPlaywright(this);
   const doorway = [...this.doorways.values()][0];
-  assert.ok(doorway, 'No doorway registered');
+  assert.ok(doorway, NO_DOORWAY_MSG);
 
   device.clearCapture();
   await device.page.goto(`${doorway.url}/`, { waitUntil: 'networkidle' });
@@ -1733,10 +1758,12 @@ Then(/^the response is the bootstrap page \(not the SPA\)$/, async function (thi
   const title = await device.page.title();
 
   // Bootstrap page should indicate loading, not the full Angular SPA
+  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR, not null-coalescing */
   const isBootstrap =
     bodyText.includes('loading') ||
     bodyText.includes('starting') ||
     title.toLowerCase().includes('loading');
+  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   assert.ok(
     isBootstrap,
