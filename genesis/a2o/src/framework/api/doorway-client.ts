@@ -352,6 +352,42 @@ export interface AdminListUsersParams {
 }
 
 // ---------------------------------------------------------------------------
+// Observation Session types (mirrors doorway /api/v1/observations endpoints)
+// ---------------------------------------------------------------------------
+
+export interface ObservationReport {
+  contentId: string;
+  sessionId: string;
+  source: string;
+  metadata?: Record<string, unknown>;
+  duration: {
+    startedAt: string;
+    endedAt: string;
+    durationMs: number;
+  };
+  summary: {
+    totalEntries: number;
+    byOrigin: Record<string, number>;
+    bySeverity: Record<string, number>;
+    byCategory: Record<string, number>;
+  };
+  issues: Array<{
+    id: string;
+    category: string;
+    severity: string;
+    title: string;
+    entryCount: number;
+    relatedContentIds: string[];
+    suggestedCause: string;
+  }>;
+  systemState: {
+    storageHealthy: boolean;
+    conductorConnected: boolean;
+    p2pPeerCount: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
@@ -360,6 +396,9 @@ export class DoorwayClient {
     private readonly baseUrl: string,
     private token?: string
   ) {}
+
+  /** Active observation session ID, if any. */
+  observationId: string | null = null;
 
   get url(): string {
     return this.baseUrl;
@@ -623,6 +662,36 @@ export class DoorwayClient {
   private headers(): Record<string, string> {
     const h: Record<string, string> = {};
     if (this.token) h['authorization'] = `Bearer ${this.token}`;
+    if (this.observationId) h['x-observation-id'] = this.observationId;
     return h;
+  }
+
+  // -- Observations ---------------------------------------------------------
+
+  /**
+   * Begin an observation session. All subsequent requests will carry
+   * X-Observation-Id and the infrastructure will auto-observe.
+   */
+  async beginObservation(metadata?: Record<string, unknown>): Promise<string> {
+    const resp = await this.post<{ sessionId: string; expiresAt: string }>(
+      '/api/v1/observations/begin',
+      { source: 'a2o', ttlSeconds: 300, metadata }
+    );
+    this.observationId = resp.sessionId;
+    return resp.sessionId;
+  }
+
+  /**
+   * Fetch the composed observation report and clear the session.
+   */
+  async getObservationReport(): Promise<ObservationReport> {
+    if (!this.observationId) {
+      throw new Error('No active observation session');
+    }
+    const report = await this.get<ObservationReport>(
+      `/api/v1/observations/${this.observationId}/report`
+    );
+    this.observationId = null;
+    return report;
   }
 }
