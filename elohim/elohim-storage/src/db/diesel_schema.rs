@@ -334,6 +334,35 @@ diesel::table! {
 }
 
 diesel::table! {
+    shard_locations (shard_hash, peer_id) {
+        shard_hash -> Text,
+        peer_id -> Text,
+        h_app_id -> Text,
+        status -> Text,
+        first_seen -> Text,
+        last_verified -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    shard_manifests (content_id, h_app_id) {
+        content_id -> Text,
+        h_app_id -> Text,
+        blob_hash -> Text,
+        blob_cid -> Nullable<Text>,
+        encoding -> Text,
+        data_shard_count -> Integer,
+        parity_shard_count -> Integer,
+        shard_hashes_json -> Text,
+        total_size_bytes -> Integer,
+        shard_size_bytes -> Integer,
+        mime_type -> Text,
+        reach -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     stewardship_allocations (id) {
         id -> Text,
         h_app_id -> Text,
@@ -1057,6 +1086,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     risk_alerts,
     schema_version,
     schedules,
+    shard_locations,
+    shard_manifests,
     statement_votes,
     statements,
     steward_affinity,
