@@ -145,6 +145,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "Jenkinsfile"; then
     PROJECTS="$PROJECTS orchestrator"
   fi
+  if echo "$CHANGED" | grep -q "^genesis/orchestrator/.*\.mjs\|^genesis/orchestrator/.*\.json"; then
+    PROJECTS="$PROJECTS orchestrator"
+  fi
   if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
     PROJECTS="$PROJECTS genesis-a2o"
   fi
@@ -254,7 +257,8 @@ run_gate() {
         rc=$?
         ;;
       orchestrator)
-        pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
+        pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1 && \
+        node --test orchestrator-strategy.test.mjs graph-walker.test.mjs 2>&1
         rc=$?
         ;;
       schema-validate)
