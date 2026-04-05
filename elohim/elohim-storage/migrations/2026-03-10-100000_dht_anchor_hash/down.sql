@@ -1,2 +1,0 @@
--- SQLite ALTER TABLE DROP COLUMN requires 3.35.0+
--- These are additive-only columns, safe to leave

@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS appeals;
-DROP TABLE IF EXISTS challenges;
