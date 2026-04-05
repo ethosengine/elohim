@@ -252,9 +252,9 @@ checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 
 [[package]]
 name = "holo_hash"
-version = "0.7.0-dev.8"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f12d450ef270c6272f82257316ba5b1407f2a9ded5d2368cce5661a4931c4ef"
+checksum = "8d4d7ada0089a52dc48498e4deab38c056b665a666b5f8717161c8d0248fd31e"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -295,9 +295,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.7.0-dev.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7bc417ce1361ded4dbaf7b2dd602309670bafb4929b7ae8451268e653f198aa"
+checksum = "3d10cf3ca40b04f1e180817d9b059d1fe11b3e05e3127c0a5f0ad4651ddad6cb"
 dependencies = [
  "cfg-if",
  "colored",

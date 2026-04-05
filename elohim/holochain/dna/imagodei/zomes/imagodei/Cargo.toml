@@ -13,3 +13,4 @@ holochain_serialized_bytes.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 imagodei_integrity = { path = "../imagodei_integrity" }
+imagodei-types = { path = "../../../../../sdk/domains/imagodei/types" }

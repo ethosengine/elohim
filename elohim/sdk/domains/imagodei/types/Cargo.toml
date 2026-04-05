@@ -5,7 +5,7 @@ edition = "2021"
 description = "Wire types for imagodei domain coordinator functions"
 
 [dependencies]
-holo_hash = { version = "0.7.0-dev.3", features = ["encoding"] }
+holo_hash = { version = "=0.6.0", features = ["encoding"] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

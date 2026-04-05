@@ -603,9 +603,18 @@ version = "0.1.0"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
+ "imagodei-types",
  "imagodei_integrity",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "imagodei-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
 ]
 
 [[package]]

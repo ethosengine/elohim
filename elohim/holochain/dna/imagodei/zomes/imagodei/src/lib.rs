@@ -21,16 +21,7 @@ pub use stewardship::*;
 // Input/Output Types
 // =============================================================================
 
-/// Input for creating/updating a Human profile
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateHumanInput {
-    pub id: String,
-    pub display_name: String,
-    pub bio: Option<String>,
-    pub affinities: Vec<String>,
-    pub profile_reach: String,
-    pub location: Option<String>,
-}
+pub use imagodei_types::CreateHumanInput;
 
 /// Input for creating/updating an Agent profile
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,12 +38,7 @@ pub struct CreateAgentInput {
     pub activity_pub_type: Option<String>,
 }
 
-/// Output from profile operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HumanOutput {
-    pub action_hash: ActionHash,
-    pub human: Human,
-}
+pub use imagodei_types::HumanOutput;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentOutput {
@@ -254,7 +240,19 @@ pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
         )?;
     }
 
-    Ok(HumanOutput { action_hash, human })
+    Ok(HumanOutput {
+        action_hash,
+        human: imagodei_types::Human {
+            id: human.id,
+            display_name: human.display_name,
+            bio: human.bio,
+            affinities: human.affinities,
+            profile_reach: human.profile_reach,
+            location: human.location,
+            created_at: human.created_at,
+            updated_at: human.updated_at,
+        },
+    })
 }
 
 /// Get my Human profile (bound to calling agent)
@@ -274,7 +272,19 @@ pub fn get_human_by_agent_key(agent_key: AgentPubKey) -> ExternResult<Option<Hum
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
-                    return Ok(Some(HumanOutput { action_hash, human }));
+                    return Ok(Some(HumanOutput {
+                        action_hash,
+                        human: imagodei_types::Human {
+                            id: human.id,
+                            display_name: human.display_name,
+                            bio: human.bio,
+                            affinities: human.affinities,
+                            profile_reach: human.profile_reach,
+                            location: human.location,
+                            created_at: human.created_at,
+                            updated_at: human.updated_at,
+                        },
+                    }));
                 }
             }
         }
@@ -296,7 +306,19 @@ pub fn get_human_by_id(id: String) -> ExternResult<Option<HumanOutput>> {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
-                    return Ok(Some(HumanOutput { action_hash, human }));
+                    return Ok(Some(HumanOutput {
+                        action_hash,
+                        human: imagodei_types::Human {
+                            id: human.id,
+                            display_name: human.display_name,
+                            bio: human.bio,
+                            affinities: human.affinities,
+                            profile_reach: human.profile_reach,
+                            location: human.location,
+                            created_at: human.created_at,
+                            updated_at: human.updated_at,
+                        },
+                    }));
                 }
             }
         }
@@ -328,7 +350,19 @@ pub fn update_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
 
     let action_hash = update_entry(existing.action_hash, &EntryTypes::Human(human.clone()))?;
 
-    Ok(HumanOutput { action_hash, human })
+    Ok(HumanOutput {
+        action_hash,
+        human: imagodei_types::Human {
+            id: human.id,
+            display_name: human.display_name,
+            bio: human.bio,
+            affinities: human.affinities,
+            profile_reach: human.profile_reach,
+            location: human.location,
+            created_at: human.created_at,
+            updated_at: human.updated_at,
+        },
+    })
 }
 
 // =============================================================================
