@@ -128,51 +128,7 @@ impl DiscoveryService {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to get cells from admin interface: {}", e);
-                warn!(
-                    "Falling back to default import configuration for '{}'",
-                    self.config.installed_app_id
-                );
-
-                // Fallback: Use default config when admin interface is unavailable
-                // This allows seeding to work even when we can't enumerate cells
-                // Use valid base64 placeholder (all zeros) to avoid decode errors
-                let fallback_dna_hash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string();
-                let fallback_agent = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string();
-
-                // Store a placeholder ZomeCallConfig
-                self.zome_configs.insert(
-                    fallback_dna_hash.clone(),
-                    ZomeCallConfig {
-                        dna_hash: fallback_dna_hash.clone(),
-                        agent_pub_key: fallback_agent,
-                        zome_name: self.config.zome_name.clone(),
-                        app_id: self.config.installed_app_id.clone(),
-                        role_name: "lamad".to_string(), // Default fallback role
-                    },
-                );
-
-                // Store default import config
-                let default_import_config = ImportConfig {
-                    enabled: true,
-                    base_route: "/import".to_string(),
-                    batch_types: vec![doorway_client::ImportBatchType::new("content")
-                        .queue_fn("queue_import")
-                        .process_fn("process_import_chunk")
-                        .status_fn("get_import_status")
-                        .max_items(5000)
-                        .chunk_size(50)],
-                    require_auth: false,
-                    allowed_agents: None,
-                };
-                self.import_config_store
-                    .set_config(&fallback_dna_hash, default_import_config);
-
-                result.errors.push(format!(
-                    "Admin connection failed ({e}), using fallback config"
-                ));
-                result.import_configs_found = 1;
-
-                info!("Fallback import config registered for /import/content");
+                result.errors.push(format!("Admin connection failed: {e}"));
                 return result;
             }
         };
@@ -305,98 +261,28 @@ impl DiscoveryService {
         Ok(cells)
     }
 
-    /// Discover import config from a cell
+    /// Discover import config from a cell.
+    ///
+    /// Not yet implemented — returns None. Import config comes from
+    /// steward self-registration via build_manifest(), not DNA introspection.
     async fn discover_import_config(
         &self,
         _cell: &CellInfo,
         _zome_config: &ZomeCallConfig,
     ) -> Result<Option<ImportConfig>, String> {
-        // TODO: Actually call __doorway_import_config on the zome
-        // For now, we'll use a hardcoded config that matches what the zome declares
-        //
-        // The actual implementation would:
-        // 1. Build a zome call using ZomeCallBuilder
-        // 2. Send it via WorkerPool
-        // 3. Parse the ImportConfig response
-        //
-        // For now, assume the elohim DNA has the standard import config
-
-        // Return hardcoded config for elohim DNA
-        Ok(Some(ImportConfig {
-            enabled: true,
-            base_route: "/import".to_string(),
-            batch_types: vec![doorway_client::ImportBatchType::new("content")
-                .queue_fn("queue_import")
-                .process_fn("process_import_chunk")
-                .status_fn("get_import_status")
-                .max_items(5000)
-                .chunk_size(50)],
-            require_auth: false,
-            allowed_agents: None,
-        }))
+        Ok(None)
     }
 
-    /// Discover routes from a cell via __doorway_routes
+    /// Discover routes from a cell via __doorway_routes.
+    ///
+    /// Not yet implemented — returns None. Routes come from steward
+    /// self-registration via build_manifest(), not DNA introspection.
     async fn discover_routes(
         &self,
         _cell: &CellInfo,
         _zome_config: &ZomeCallConfig,
     ) -> Result<Option<DoorwayRoutes>, String> {
-        // TODO: Actually call __doorway_routes on the zome
-        // For now, we'll return a default route config that matches what
-        // the elohim DNA would declare.
-        //
-        // The actual implementation would:
-        // 1. Build a zome call for __doorway_routes
-        // 2. Send it via WorkerPool
-        // 3. Parse the DoorwayRoutes response
-        //
-        // For now, return default elohim routes
-
-        use doorway_client::{DoorwayRoutesBuilder, Route};
-
-        Ok(Some(
-            DoorwayRoutesBuilder::new()
-                // Content API routes
-                .route(
-                    Route::get("/api/v1/content/{id}")
-                        .handler("get_content")
-                        .cache_ttl(3600)
-                        .public_if_reach("commons")
-                        .build(),
-                )
-                .route(
-                    Route::get("/api/v1/content")
-                        .handler("list_content")
-                        .cache_ttl(300)
-                        .build(),
-                )
-                .route(
-                    Route::post("/api/v1/content")
-                        .handler("create_content")
-                        .auth_required()
-                        .build(),
-                )
-                // Path API routes
-                .route(
-                    Route::get("/api/v1/paths/{id}")
-                        .handler("get_path")
-                        .cache_ttl(3600)
-                        .public_if_reach("commons")
-                        .build(),
-                )
-                .route(
-                    Route::get("/api/v1/paths")
-                        .handler("list_paths")
-                        .cache_ttl(300)
-                        .build(),
-                )
-                // Blob proxy - doorway caches, agent's elohim-storage is authoritative
-                .with_blobs_at("/store")
-                // Stream proxy for media
-                .with_streaming()
-                .build(),
-        ))
+        Ok(None)
     }
 }
 

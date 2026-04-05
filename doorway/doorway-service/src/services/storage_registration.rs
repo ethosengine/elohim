@@ -223,39 +223,17 @@ async fn register_with_conductor(
     zome_name: &str,
     input: &RegisterContentServerInput,
 ) -> Result<(), String> {
-    // For prototype, we'll use a simple approach:
-    // Log the registration intent. In production, this would make an actual zome call.
-    //
-    // TODO: Implement actual zome call using the conductor WebSocket protocol
-    // This requires:
-    // 1. Connect to conductor app interface
-    // 2. Authenticate with IssueAppAuthenticationToken
-    // 3. Call the infrastructure zome's register_content_server function
-    //
-    // For now, this is a placeholder that logs the intent.
-    // The actual zome call would be similar to what ImportClient does.
-
-    debug!(
+    // Storage registration via infrastructure zome is not yet implemented.
+    // Log the intent for debugging, return error so callers don't assume success.
+    info!(
         conductor_url = conductor_url,
         zome_name = zome_name,
         content_hash = %input.content_hash,
         capability = %input.capability,
-        "Would register content server with infrastructure zome (not implemented)"
+        "Storage registration skipped (zome call not yet implemented)"
     );
 
-    // TODO: When implementing, use something like:
-    // let client = ImportClient::new(conductor_url);
-    // client.call_zome(cell_id, zome_name, "register_content_server", payload).await
-
-    // For now, return success to allow the prototype to continue
-    // This means storage registration is a no-op until we implement the zome call
-    info!(
-        capability = %input.capability,
-        endpoint = ?input.endpoints,
-        "Storage registration intent logged (zome call not yet implemented)"
-    );
-
-    Ok(())
+    Err("register_with_conductor not yet implemented".to_string())
 }
 
 #[cfg(test)]

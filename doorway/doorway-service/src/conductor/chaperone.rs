@@ -438,12 +438,12 @@ pub async fn handle_hc_connect(
     let app_port = match admin.list_app_interfaces().await {
         Ok(ports) if !ports.is_empty() => ports[0],
         Ok(_) => {
-            warn!("Chaperone: no app interfaces found, using default 4445");
-            4445
+            error!("Chaperone: no app interfaces registered on conductor");
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "No app interfaces");
         }
         Err(e) => {
-            warn!("Chaperone: list_app_interfaces failed: {}, using 4445", e);
-            4445
+            error!("Chaperone: list_app_interfaces failed: {}", e);
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "List app interfaces");
         }
     };
 

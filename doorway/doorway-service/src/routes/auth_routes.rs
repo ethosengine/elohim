@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
@@ -768,11 +768,17 @@ async fn handle_register(
                     Some(p)
                 }
                 Err(e) => {
-                    warn!(
-                        "Agent provisioning failed, falling back to local keys: {}",
+                    error!(
+                        "Agent provisioning failed — cannot complete registration: {}",
                         e
                     );
-                    None
+                    return json_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &ErrorResponse {
+                            error: format!("Agent provisioning failed: {e}"),
+                            code: Some("PROVISIONING_FAILED".into()),
+                        },
+                    );
                 }
             }
         } else {
@@ -2216,12 +2222,6 @@ async fn handle_recover_custody(
         );
     }
 
-    // Get doorway ID for the recovery request
-    let doorway_id = match &state.args.doorway_id {
-        Some(id) => id.clone(),
-        None => "unknown-doorway".to_string(),
-    };
-
     // Get MongoDB connection
     let mongo = match &state.mongo {
         Some(m) => m,
@@ -2288,35 +2288,14 @@ async fn handle_recover_custody(
         );
     }
 
-    // TODO: Call imagodei zome to create RecoveryRequest in DHT
-    // For now, create a mock response until zome integration is complete
-    let request_id = format!(
-        "recovery-{}-{}",
-        user.human_id,
-        chrono::Utc::now().timestamp()
-    );
-    let expires_at = (chrono::Utc::now() + chrono::Duration::hours(48)).to_rfc3339();
-    let required_approvals = 2u32; // TODO: Calculate from relationships
-
-    info!(
-        "Recovery request created for {} (request_id: {})",
-        body.identifier, request_id
-    );
-
-    // TODO: Emit signal to notify emergency contacts
-
+    // Recovery requires imagodei zome integration (RecoveryRequest DHT entry).
+    // Not yet implemented — return 501 so callers know the feature doesn't exist.
     json_response(
-        StatusCode::OK,
-        &RecoverCustodyResponse {
-            request_id,
-            required_approvals,
-            expires_at,
-            status: "pending".to_string(),
-            instructions: format!(
-                "Your recovery request has been submitted to doorway '{doorway_id}'. \
-                 Contact your emergency contacts to approve your recovery. \
-                 You need {required_approvals} approvals to regain access."
-            ),
+        StatusCode::NOT_IMPLEMENTED,
+        &ErrorResponse {
+            error: "Social recovery is not yet implemented. Requires imagodei zome integration."
+                .into(),
+            code: Some("NOT_IMPLEMENTED".into()),
         },
     )
 }
@@ -2352,44 +2331,11 @@ async fn handle_check_recovery_status(
         );
     }
 
-    // TODO: Fetch RecoveryRequest from DHT via imagodei zome
-    // For now, return mock status
-
-    // Mock: Check if request_id looks valid
-    if !body.request_id.starts_with("recovery-") {
-        return json_response(
-            StatusCode::NOT_FOUND,
-            &ErrorResponse {
-                error: "Recovery request not found".into(),
-                code: Some("REQUEST_NOT_FOUND".into()),
-            },
-        );
-    }
-
-    // TODO: Get actual status from DHT
-    let status = "pending"; // Could be: pending, approved, rejected, expired, completed
-    let current_approvals = 0u32;
-    let required_approvals = 2u32;
-    let confidence_score = 0.0f64;
-
-    // Generate recovery_token if approved
-    let recovery_token = if status == "approved" {
-        // Generate a short-lived token for recovery activation
-        Some(format!("recovery-token-{}", uuid::Uuid::new_v4()))
-    } else {
-        None
-    };
-
     json_response(
-        StatusCode::OK,
-        &CheckRecoveryStatusResponse {
-            status: status.to_string(),
-            current_approvals,
-            required_approvals,
-            confidence_score,
-            recovery_token,
-            expires_at: (chrono::Utc::now() + chrono::Duration::hours(48)).to_rfc3339(),
-            votes: vec![], // TODO: Fetch from DHT
+        StatusCode::NOT_IMPLEMENTED,
+        &ErrorResponse {
+            error: "Recovery status checking is not yet implemented.".into(),
+            code: Some("NOT_IMPLEMENTED".into()),
         },
     )
 }
@@ -2406,7 +2352,7 @@ async fn handle_check_recovery_status(
 /// 4. Activate key, generate JWT with recovery_mode flag
 async fn handle_activate_recovery(
     req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
+    _state: Arc<AppState>,
 ) -> Response<BoxBody> {
     let body: ActivateRecoveryRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -2431,81 +2377,12 @@ async fn handle_activate_recovery(
         );
     }
 
-    // Validate password strength
-    if body.new_password.len() < 8 {
-        return json_response(
-            StatusCode::BAD_REQUEST,
-            &ErrorResponse {
-                error: "Password must be at least 8 characters".into(),
-                code: Some("WEAK_PASSWORD".into()),
-            },
-        );
-    }
-
-    // TODO: Validate recovery request is approved in DHT
-    // For now, extract human_id from request_id format: "recovery-{human_id}-{timestamp}"
-    let parts: Vec<&str> = body.request_id.split('-').collect();
-    if parts.len() < 2 || parts[0] != "recovery" {
-        return json_response(
-            StatusCode::BAD_REQUEST,
-            &ErrorResponse {
-                error: "Invalid recovery request ID".into(),
-                code: Some("INVALID_REQUEST_ID".into()),
-            },
-        );
-    }
-
-    // TODO: Get actual human_id from DHT recovery request
-    // For now, assume the second part is human_id (this is a placeholder)
-
-    // Get MongoDB connection
-    let mongo = match &state.mongo {
-        Some(m) => m,
-        None => {
-            return json_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &ErrorResponse {
-                    error: "Database not available".into(),
-                    code: Some("DB_UNAVAILABLE".into()),
-                },
-            )
-        }
-    };
-
-    let _collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
-        Ok(c) => c,
-        Err(e) => {
-            return json_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &ErrorResponse {
-                    error: format!("Database error: {e}"),
-                    code: Some("DB_ERROR".into()),
-                },
-            )
-        }
-    };
-
-    // TODO: Look up user by human_id from recovery request
-    // For now, this is a placeholder - in production, we'd validate against DHT
-    warn!(
-        "Recovery activation placeholder - would validate request {} in DHT",
-        body.request_id
-    );
-
-    // In production:
-    // 1. Fetch RecoveryRequest from DHT
-    // 2. Verify status == "approved"
-    // 3. Verify not expired
-    // 4. Get human_id and identifier from request
-    // 5. Generate new custodial key
-    // 6. Update MongoDB user
-    // 7. Mark recovery as completed in DHT
-
-    // For now, return error indicating feature is in development
+    // Recovery activation requires DHT-verified approval.
+    // Not yet implemented — return 501.
     json_response(
         StatusCode::NOT_IMPLEMENTED,
         &ErrorResponse {
-            error: "Recovery activation requires DHT integration. Coming soon.".into(),
+            error: "Recovery activation is not yet implemented.".into(),
             code: Some("NOT_IMPLEMENTED".into()),
         },
     )

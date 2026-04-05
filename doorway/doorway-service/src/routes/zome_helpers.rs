@@ -97,20 +97,11 @@ pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Res
 ///
 /// Returns the agent public key that the conductor uses for this app.
 /// This is needed for auth responses.
+///
+/// Requires discovery to have completed successfully (imagodei role
+/// must be in zome_configs). Returns error if not found.
 pub fn get_agent_pub_key(state: &AppState) -> Result<String> {
-    // Try imagodei first, fall back to any available config
-    if let Ok(config) = get_zome_config_by_role(state, "imagodei") {
-        return Ok(config.agent_pub_key);
-    }
-
-    // Fall back to first available config
-    if let Some(entry) = state.zome_configs.iter().next() {
-        return Ok(entry.value().agent_pub_key.clone());
-    }
-
-    Err(DoorwayError::Internal(
-        "No zome configs discovered - conductor not ready?".into(),
-    ))
+    get_zome_config_by_role(state, "imagodei").map(|config| config.agent_pub_key)
 }
 
 // =============================================================================
