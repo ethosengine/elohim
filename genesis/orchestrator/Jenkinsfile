@@ -41,6 +41,7 @@ import groovy.transform.Field
         changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'VERSION'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-agent-sdk', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
+        cascades: false,      // Edge changes don't auto-trigger genesis/app rebuilds
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://doorway-alpha.elohim.host/health',
