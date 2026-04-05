@@ -41,8 +41,8 @@ pub use did_resolver::{
     DIDResolverError, DIDResolverStats, Service as DIDService, VerificationMethod,
 };
 pub use discovery::{
-    spawn_discovery_task, spawn_discovery_task_with_routes, CellInfo, DiscoveryConfig,
-    DiscoveryResult, DiscoveryService,
+    spawn_discovery_task, spawn_discovery_task_with_routes, spawn_discovery_task_with_signal,
+    CellInfo, DiscoveryConfig, DiscoveryResult, DiscoveryService,
 };
 pub use elohim_verifier::{
     AnswerScore, ClientQuestion, ElohimVerifier, LearningPreferences, PathCompletion,

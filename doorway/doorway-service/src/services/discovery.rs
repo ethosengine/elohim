@@ -421,6 +421,42 @@ pub fn spawn_discovery_task(
     })
 }
 
+/// Spawn discovery as a background task with completion signal.
+///
+/// The `ready_tx` channel is set to `true` when discovery completes successfully
+/// (all cells discovered and stored in zome_configs). Routes can wait on the
+/// corresponding receiver before attempting conductor operations.
+pub fn spawn_discovery_task_with_signal(
+    config: DiscoveryConfig,
+    zome_configs: Arc<DashMap<String, ZomeCallConfig>>,
+    import_config_store: Arc<ImportConfigStore>,
+    ready_tx: tokio::sync::watch::Sender<bool>,
+) -> tokio::task::JoinHandle<DiscoveryResult> {
+    tokio::spawn(async move {
+        // Wait a bit for conductor to be ready
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let service = DiscoveryService::new(config, zome_configs, import_config_store);
+        let result = service.discover().await;
+
+        if result.cells_discovered > 0 && result.errors.is_empty() {
+            let _ = ready_tx.send(true);
+            info!(
+                "Discovery ready signal sent ({} cells)",
+                result.cells_discovered
+            );
+        } else {
+            warn!(
+                "Discovery completed with issues: {} cells, {} errors — readiness NOT signaled",
+                result.cells_discovered,
+                result.errors.len()
+            );
+        }
+
+        result
+    })
+}
+
 /// Spawn discovery with route registry as a background task
 pub fn spawn_discovery_task_with_routes(
     config: DiscoveryConfig,

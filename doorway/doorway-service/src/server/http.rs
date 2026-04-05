@@ -78,6 +78,9 @@ pub struct AppState {
     pub import_config_store: Option<Arc<crate::services::ImportConfigStore>>,
     /// Zome call configs by DNA hash (discovered from conductor)
     pub zome_configs: Arc<dashmap::DashMap<String, ZomeCallConfig>>,
+    /// Discovery completion signal. Routes that need zome_configs wait on this.
+    /// `false` = discovery not yet complete, `true` = discovery succeeded and zome_configs populated.
+    pub discovery_ready: tokio::sync::watch::Receiver<bool>,
     /// Single-connection import client for batch operations
     /// Uses ONE connection to conductor to avoid overwhelming during imports
     pub import_client: Option<Arc<crate::services::ImportClient>>,
@@ -183,6 +186,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            discovery_ready: tokio::sync::watch::channel(false).1,
             import_client: None, // Set later via set_import_client()
             debug_hub: Arc::new(routes::DebugHub::new(true)),
             conductor_registry: None,
@@ -268,6 +272,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            discovery_ready: tokio::sync::watch::channel(false).1,
             import_client: None, // Set later via set_import_client()
             debug_hub: Arc::new(routes::DebugHub::new(true)),
             conductor_registry: None,
@@ -368,6 +373,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            discovery_ready: tokio::sync::watch::channel(false).1,
             import_client: None, // Set later via set_import_client()
             debug_hub: Arc::new(routes::DebugHub::new(true)),
             conductor_registry: None,
@@ -471,6 +477,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            discovery_ready: tokio::sync::watch::channel(false).1,
             import_client: None, // Set later via set_import_client()
             debug_hub: Arc::new(routes::DebugHub::new(true)),
             conductor_registry: None,

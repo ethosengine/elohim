@@ -21,7 +21,7 @@ use doorway::{
     },
     server,
     services::{
-        self, register_local_storage, spawn_discovery_task, DiscoveryConfig,
+        self, register_local_storage, spawn_discovery_task_with_signal, DiscoveryConfig,
         StorageRegistrationConfig,
     },
     worker::{PoolConfig, WorkerPool},
@@ -440,6 +440,10 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    // Create discovery readiness channel before Arc::new(state)
+    let (discovery_tx, discovery_rx) = tokio::sync::watch::channel(false);
+    state.discovery_ready = discovery_rx;
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)
@@ -455,10 +459,11 @@ async fn main() -> anyhow::Result<()> {
                 ..DiscoveryConfig::default()
             };
 
-            let _discovery_handle = spawn_discovery_task(
+            let _discovery_handle = spawn_discovery_task_with_signal(
                 discovery_config,
                 Arc::clone(&state.zome_configs),
                 Arc::clone(import_config_store),
+                discovery_tx,
             );
             info!(
                 "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
