@@ -318,27 +318,28 @@ impl DiscoveryService {
             .await
             .map_err(|e| format!("Failed to send: {e}"))?;
 
-        // Read response
-        let response = tokio::time::timeout(self.config.timeout, read.next())
-            .await
-            .map_err(|_| "Timeout waiting for response")?
-            .ok_or("Connection closed")?
-            .map_err(|e| format!("Read error: {e}"))?;
+        // Read response, skipping Ping/Pong keepalive frames
+        let response_bytes = loop {
+            let msg = tokio::time::timeout(self.config.timeout, read.next())
+                .await
+                .map_err(|_| "Timeout waiting for response")?
+                .ok_or("Connection closed")?
+                .map_err(|e| format!("Read error: {e}"))?;
 
-        let response_bytes = match response {
-            Message::Binary(b) => b,
-            Message::Text(t) => t.into_bytes(),
-            other => {
-                return Err(format!(
-                    "Unexpected response type: {:?}",
-                    match &other {
-                        Message::Ping(_) => "Ping",
-                        Message::Pong(_) => "Pong",
-                        Message::Close(_) => "Close",
-                        Message::Frame(_) => "Frame",
-                        _ => "Unknown",
-                    }
-                ))
+            match msg {
+                Message::Binary(b) => break b,
+                Message::Text(t) => break t.into_bytes(),
+                Message::Ping(payload) => {
+                    debug!("Received WebSocket Ping, responding with Pong");
+                    write
+                        .send(Message::Pong(payload))
+                        .await
+                        .map_err(|e| format!("Failed to send Pong: {e}"))?;
+                    continue;
+                }
+                Message::Pong(_) => continue,
+                Message::Close(_) => return Err("Connection closed by peer".to_string()),
+                other => return Err(format!("Unexpected response type: {other:?}")),
             }
         };
 
