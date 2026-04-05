@@ -8,7 +8,7 @@ use tracing::{debug, warn};
 
 use crate::server::AppState;
 use crate::types::{DoorwayError, Result};
-use crate::worker::{ZomeCallBuilder, ZomeCallConfig};
+use crate::worker::ZomeCallConfig;
 
 // =============================================================================
 // Imagodei Zome Types
@@ -53,47 +53,37 @@ pub struct Human {
 // Zome Call Functions
 // =============================================================================
 
-/// Call imagodei::create_human via the worker pool
+/// Call imagodei::create_human via ZomeCaller
 ///
 /// This creates a new Human profile in the imagodei DNA, bound to the
 /// calling agent's public key.
 ///
+/// Uses ZomeCaller which passes role_name directly to the conductor
+/// (the conductor resolves role_name to cell_id internally). This avoids
+/// depending on discovery populating zome_configs.
+///
 /// # Arguments
-/// * `state` - AppState containing worker pool and zome configs
+/// * `state` - AppState containing ZomeCaller
 /// * `input` - CreateHumanInput with profile data
 ///
 /// # Returns
 /// * `Ok(HumanOutput)` - Created human with action_hash
-/// * `Err(DoorwayError)` - If worker pool unavailable, zome config not found, or zome call fails
+/// * `Err(DoorwayError)` - If ZomeCaller unavailable or zome call fails
 pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Result<HumanOutput> {
-    // Get worker pool for APP interface
-    let pool = state.pool.as_ref().ok_or_else(|| {
-        DoorwayError::Internal("Worker pool not available - conductor not connected?".into())
+    let zome_caller = state.zome_caller.as_ref().ok_or_else(|| {
+        DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
     })?;
-
-    // Get imagodei zome config
-    let zome_config = get_zome_config_by_role(state, "imagodei")?;
 
     debug!(
         human_id = %input.id,
         display_name = %input.display_name,
-        "Calling create_human on imagodei zome"
+        "Calling create_human on imagodei zome via ZomeCaller"
     );
 
-    // Build the zome call
-    let builder = ZomeCallBuilder::new(zome_config);
-    let payload = builder.build_zome_call("create_human", &input)?;
-
-    // Send via worker pool
-    let response = pool
-        .request(payload)
+    let result: HumanOutput = zome_caller
+        .call("imagodei", "imagodei", "create_human", &input)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Zome call failed: {e}")))?;
-
-    // Parse response
-    let result: HumanOutput = builder
-        .parse_response(&response)?
-        .ok_or_else(|| DoorwayError::Holochain("Empty response from create_human".into()))?;
+        .map_err(|e| DoorwayError::Holochain(format!("create_human failed: {e}")))?;
 
     debug!(
         human_id = %result.human.id,

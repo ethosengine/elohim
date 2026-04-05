@@ -16,15 +16,10 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use doorway_client::DoorwayRoutes;
-use futures_util::{SinkExt, StreamExt};
-use rmpv::Value;
-use tokio_tungstenite::{
-    connect_async_with_config,
-    tungstenite::{http::Request, protocol::Message},
-};
 use tracing::{debug, info, warn};
 
 use super::{ImportConfig, ImportConfigStore, RouteRegistry};
+use crate::conductor::typed_admin::TypedAdminClient;
 use crate::worker::ZomeCallConfig;
 
 // =============================================================================
@@ -265,163 +260,40 @@ impl DiscoveryService {
         result
     }
 
-    /// Get cells from conductor admin interface
+    /// Get cells from conductor admin interface using TypedAdminClient.
+    ///
+    /// Uses the official `holochain_client::AdminWebsocket` via TypedAdminClient,
+    /// which handles the conductor wire protocol correctly (typed enum matching
+    /// for CellInfo::Provisioned, proper MessagePack framing).
     async fn get_cells(&self) -> Result<Vec<CellInfo>, String> {
-        // Connect to admin interface
-        let host = self
-            .config
-            .admin_url
-            .split("//")
-            .last()
-            .unwrap_or("localhost:4444");
-
-        let request = Request::builder()
-            .uri(&self.config.admin_url)
-            .header("Host", host)
-            .header("Connection", "Upgrade")
-            .header("Upgrade", "websocket")
-            .header("Sec-WebSocket-Version", "13")
-            .header(
-                "Sec-WebSocket-Key",
-                tokio_tungstenite::tungstenite::handshake::client::generate_key(),
-            )
-            // Add Origin header to pass conductor's allowed_origins check
-            .header("Origin", "http://localhost:8080")
-            .body(())
-            .map_err(|e| format!("Failed to build request: {e}"))?;
-
-        let (ws_stream, _) = tokio::time::timeout(
+        let admin = tokio::time::timeout(
             self.config.timeout,
-            connect_async_with_config(request, None, false),
+            TypedAdminClient::connect(&self.config.admin_url),
         )
         .await
         .map_err(|_| "Timeout connecting to admin interface")?
-        .map_err(|e| format!("WebSocket connect failed: {e}"))?;
+        .map_err(|e| format!("Admin connect failed: {e}"))?;
 
-        let (mut write, mut read) = ws_stream.split();
+        let app_info = tokio::time::timeout(
+            self.config.timeout,
+            admin.get_app_info(&self.config.installed_app_id),
+        )
+        .await
+        .map_err(|_| "Timeout getting app info")?
+        .map_err(|e| format!("get_app_info failed: {e}"))?;
 
-        // Send list_apps request
-        let list_apps = rmpv::Value::Map(vec![
-            (
-                Value::String("type".into()),
-                Value::String("list_apps".into()),
-            ),
-            (Value::String("value".into()), Value::Nil),
-        ]);
-
-        let mut buf = Vec::new();
-        rmpv::encode::write_value(&mut buf, &list_apps)
-            .map_err(|e| format!("Failed to encode: {e}"))?;
-
-        write
-            .send(Message::Binary(buf))
-            .await
-            .map_err(|e| format!("Failed to send: {e}"))?;
-
-        // Read response, skipping Ping/Pong keepalive frames
-        let response_bytes = loop {
-            let msg = tokio::time::timeout(self.config.timeout, read.next())
-                .await
-                .map_err(|_| "Timeout waiting for response")?
-                .ok_or("Connection closed")?
-                .map_err(|e| format!("Read error: {e}"))?;
-
-            match msg {
-                Message::Binary(b) => break b,
-                Message::Text(t) => break t.into_bytes(),
-                Message::Ping(payload) => {
-                    debug!("Received WebSocket Ping, responding with Pong");
-                    write
-                        .send(Message::Pong(payload))
-                        .await
-                        .map_err(|e| format!("Failed to send Pong: {e}"))?;
-                    continue;
-                }
-                Message::Pong(_) => continue,
-                Message::Close(_) => return Err("Connection closed by peer".to_string()),
-                other => return Err(format!("Unexpected response type: {other:?}")),
-            }
-        };
-
-        // Parse response to extract cell info
-        self.parse_list_apps_response(&response_bytes)
-    }
-
-    /// Parse list_apps response to extract cell info.
-    ///
-    /// Handles two conductor response formats:
-    /// - Array format: cell_info is `[[role_name, [variant_info]]]`
-    /// - Map format: cell_info is `{role_name: [variant_info]}`
-    fn parse_list_apps_response(&self, response: &[u8]) -> Result<Vec<CellInfo>, String> {
-        let value: Value = rmpv::decode::read_value(&mut &response[..])
-            .map_err(|e| format!("Failed to decode response: {e}"))?;
-
-        debug!(
-            "list_apps response structure: {}",
-            summarize_value(&value, 3)
-        );
-
-        // Response format: { type: "list_apps", data: [{ installed_app_id, cell_info: ... }] }
-        let data = value
-            .as_map()
-            .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some("data")))
-            .map(|(_, v)| v)
-            .ok_or("Missing 'data' field")?;
-
-        let apps = data.as_array().ok_or("Expected array of apps")?;
-
-        let mut cells = Vec::new();
-
-        for app in apps {
-            let app_map = app.as_map().ok_or("Expected app object")?;
-
-            let app_id = app_map
-                .iter()
-                .find(|(k, _)| k.as_str() == Some("installed_app_id"))
-                .and_then(|(_, v)| v.as_str())
-                .unwrap_or("");
-
-            if app_id != self.config.installed_app_id {
-                continue;
-            }
-
-            let cell_info = app_map
-                .iter()
-                .find(|(k, _)| k.as_str() == Some("cell_info"))
-                .map(|(_, v)| v)
-                .ok_or("Missing cell_info")?;
-
-            debug!("cell_info structure: {}", summarize_value(cell_info, 4));
-
-            // Try map format first: { role_name: [variant_info, ...] }
-            if let Some(cell_map) = cell_info.as_map() {
-                for (role_key, role_variants) in cell_map {
-                    let role_name = role_key.as_str().unwrap_or("unknown").to_string();
-                    self.extract_cells_from_variants(&role_name, role_variants, &mut cells);
-                }
-            }
-            // Then try array format: [[role_name, [variant_info, ...]], ...]
-            else if let Some(arr) = cell_info.as_array() {
-                for item in arr {
-                    if let Some(pair) = item.as_array() {
-                        if pair.len() >= 2 {
-                            let role_name = pair[0].as_str().unwrap_or("unknown").to_string();
-                            self.extract_cells_from_variants(&role_name, &pair[1], &mut cells);
-                        }
-                    }
-                    // Also handle map entries within the array
-                    else if let Some(item_map) = item.as_map() {
-                        for (role_key, role_variants) in item_map {
-                            let role_name = role_key.as_str().unwrap_or("unknown").to_string();
-                            self.extract_cells_from_variants(&role_name, role_variants, &mut cells);
-                        }
-                    }
-                }
-            }
-        }
+        let cells: Vec<CellInfo> = app_info
+            .cell_ids
+            .into_iter()
+            .map(|(role_name, (dna_hash, agent_pub_key))| CellInfo {
+                dna_hash: encode_base64(&dna_hash),
+                agent_pub_key: encode_base64(&agent_pub_key),
+                role_name,
+            })
+            .collect();
 
         info!(
-            "Parsed {} cells: [{}]",
+            "Discovered {} cells: [{}]",
             cells.len(),
             cells
                 .iter()
@@ -429,65 +301,8 @@ impl DiscoveryService {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
+
         Ok(cells)
-    }
-
-    /// Extract CellInfo from variant data for a given role.
-    /// Handles both single variant and array of variants.
-    fn extract_cells_from_variants(
-        &self,
-        role_name: &str,
-        variants: &Value,
-        cells: &mut Vec<CellInfo>,
-    ) {
-        // variants can be a single variant or an array of variants
-        let variant_list: Vec<&Value> = if let Some(arr) = variants.as_array() {
-            arr.iter().collect()
-        } else {
-            vec![variants]
-        };
-
-        for variant in variant_list {
-            // Try direct provisioned map: { provisioned: { cell_id: [...] } }
-            if let Some(variant_map) = variant.as_map() {
-                for (variant_type, variant_data) in variant_map {
-                    if variant_type.as_str() == Some("provisioned") {
-                        if let Some(cell) =
-                            self.extract_cell_from_provisioned(role_name, variant_data)
-                        {
-                            cells.push(cell);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Extract CellInfo from a provisioned variant's data.
-    fn extract_cell_from_provisioned(
-        &self,
-        role_name: &str,
-        provisioned_data: &Value,
-    ) -> Option<CellInfo> {
-        let data_map = provisioned_data.as_map()?;
-        let cell_id = data_map
-            .iter()
-            .find(|(k, _)| k.as_str() == Some("cell_id"))
-            .map(|(_, v)| v)?;
-
-        let id_arr = cell_id.as_array()?;
-        if id_arr.len() < 2 {
-            return None;
-        }
-
-        let dna_hash = encode_base64(id_arr[0].as_slice().unwrap_or(&[]));
-        let agent_pub_key = encode_base64(id_arr[1].as_slice().unwrap_or(&[]));
-
-        Some(CellInfo {
-            dna_hash,
-            agent_pub_key,
-            role_name: role_name.to_string(),
-        })
     }
 
     /// Discover import config from a cell
@@ -589,55 +404,6 @@ impl DiscoveryService {
 fn encode_base64(bytes: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
-}
-
-/// Summarize a MessagePack value for debug logging (avoids dumping binary blobs).
-fn summarize_value(value: &Value, max_depth: usize) -> String {
-    if max_depth == 0 {
-        return "...".to_string();
-    }
-    match value {
-        Value::Nil => "nil".to_string(),
-        Value::Boolean(b) => b.to_string(),
-        Value::Integer(i) => i.to_string(),
-        Value::F32(f) => f.to_string(),
-        Value::F64(f) => f.to_string(),
-        Value::String(s) => format!("\"{}\"", s.as_str().unwrap_or("?")),
-        Value::Binary(b) => format!("<bin:{}>", b.len()),
-        Value::Array(arr) => {
-            let items: Vec<String> = arr
-                .iter()
-                .take(3)
-                .map(|v| summarize_value(v, max_depth - 1))
-                .collect();
-            let suffix = if arr.len() > 3 {
-                format!("...+{}", arr.len() - 3)
-            } else {
-                String::new()
-            };
-            format!("[{}{}]", items.join(", "), suffix)
-        }
-        Value::Map(m) => {
-            let items: Vec<String> = m
-                .iter()
-                .take(5)
-                .map(|(k, v)| {
-                    format!(
-                        "{}: {}",
-                        summarize_value(k, 1),
-                        summarize_value(v, max_depth - 1)
-                    )
-                })
-                .collect();
-            let suffix = if m.len() > 5 {
-                format!("...+{}", m.len() - 5)
-            } else {
-                String::new()
-            };
-            format!("{{{}{}}}", items.join(", "), suffix)
-        }
-        Value::Ext(tag, data) => format!("<ext:{}:{}>", tag, data.len()),
-    }
 }
 
 /// Spawn discovery as a background task
