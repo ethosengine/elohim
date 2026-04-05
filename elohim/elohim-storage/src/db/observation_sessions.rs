@@ -8,7 +8,9 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use super::diesel_schema::{observation_entries, observation_sessions};
-use super::models::{NewObservationEntry, NewObservationSession, ObservationEntry, ObservationSession};
+use super::models::{
+    NewObservationEntry, NewObservationSession, ObservationEntry, ObservationSession,
+};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -37,8 +39,9 @@ pub fn begin_session(
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Insert observation session failed: {}", e)))?;
 
-    get_session(conn, &id)?
-        .ok_or_else(|| StorageError::Internal("Failed to retrieve created observation session".into()))
+    get_session(conn, &id)?.ok_or_else(|| {
+        StorageError::Internal("Failed to retrieve created observation session".into())
+    })
 }
 
 /// Get an observation session by ID. Returns None if not found.
@@ -115,10 +118,7 @@ pub fn append_entry(
 
     // We need to set timestamp separately since it has a DB default but we want explicit control
     diesel::insert_into(observation_entries::table)
-        .values((
-            &new_entry,
-            observation_entries::timestamp.eq(&timestamp),
-        ))
+        .values((&new_entry, observation_entries::timestamp.eq(&timestamp)))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Insert observation entry failed: {}", e)))?;
 
@@ -138,10 +138,7 @@ pub fn get_entries(
 }
 
 /// Delete all entries for a session. Returns the count of deleted rows.
-pub fn purge_entries(
-    conn: &mut SqliteConnection,
-    session_id: &str,
-) -> Result<usize, StorageError> {
+pub fn purge_entries(conn: &mut SqliteConnection, session_id: &str) -> Result<usize, StorageError> {
     diesel::delete(
         observation_entries::table.filter(observation_entries::session_id.eq(session_id)),
     )

@@ -453,8 +453,7 @@ mod tests {
         assert_eq!(shards.len(), 7);
 
         // Drop all 3 parity shards (indices 4, 5, 6)
-        let mut shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[4] = None;
         shard_opts[5] = None;
         shard_opts[6] = None;
@@ -481,8 +480,7 @@ mod tests {
         let shards = encoder.create_shards(&data, &manifest.encoding);
 
         // Drop 2 data shards and 1 parity shard
-        let mut shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[0] = None; // data shard 0
         shard_opts[2] = None; // data shard 2
         shard_opts[5] = None; // parity shard 1
@@ -509,8 +507,7 @@ mod tests {
         let shards = encoder.create_shards(&data, &manifest.encoding);
 
         // Drop 4 shards — only 3 remain, but we need 4 data shards minimum
-        let mut shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[0] = None;
         shard_opts[1] = None;
         shard_opts[2] = None;
@@ -539,8 +536,7 @@ mod tests {
         assert_eq!(manifest.encoding, "chunked");
         assert_eq!(shards.len(), 8); // 73 bytes / 10 = 8 chunks
 
-        let shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
         assert_eq!(reconstructed, data);
     }
@@ -558,8 +554,7 @@ mod tests {
         let manifest = encoder.create_manifest(&data, "text/plain", "commons");
         let shards = encoder.create_shards(&data, &manifest.encoding);
 
-        let mut shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[3] = None;
 
         let result = encoder.reconstruct(&manifest, &shard_opts);
@@ -577,8 +572,7 @@ mod tests {
         assert_eq!(manifest.encoding, "none");
         assert_eq!(shards.len(), 1);
 
-        let shard_opts: Vec<Option<Vec<u8>>> =
-            shards.iter().map(|s| Some(s.clone())).collect();
+        let shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
         assert_eq!(reconstructed, data);
     }

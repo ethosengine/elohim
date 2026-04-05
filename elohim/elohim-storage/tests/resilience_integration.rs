@@ -39,13 +39,7 @@ fn test_full_rs_pipeline_with_simulated_peer_failure() {
     // Peer 2: shards [2]
     // Peer 3: shards [3]
     // Peer 4: shards [4]
-    let peer_shards: Vec<Vec<usize>> = vec![
-        vec![0, 5],
-        vec![1, 6],
-        vec![2],
-        vec![3],
-        vec![4],
-    ];
+    let peer_shards: Vec<Vec<usize>> = vec![vec![0, 5], vec![1, 6], vec![2], vec![3], vec![4]];
 
     // 4. Simulate 2 peers going offline (lose shards 0, 1, 5, 6)
     let offline_peers = [0usize, 1];

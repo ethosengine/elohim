@@ -22,8 +22,8 @@ use super::diesel_schema::{
     proposal_options, proposals, ranked_votes, rea_commitments, relationships,
     responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
     spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_decay_events, token_mint_events, token_transfers,
-    votes,
+    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
+    token_transfers, votes,
 };
 
 // ============================================================================
