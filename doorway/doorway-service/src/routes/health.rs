@@ -63,6 +63,9 @@ pub struct HealthResponse {
     /// P2P network status (from elohim-storage sidecar)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p2p: Option<P2PHealth>,
+    /// Whether zome discovery has completed (zome_configs populated)
+    #[serde(rename = "discoveryComplete")]
+    pub discovery_complete: bool,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -223,6 +226,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             writer: args.projection_writer,
         },
         p2p,
+        discovery_complete: *state.discovery_ready.borrow(),
         error,
     }
 }
