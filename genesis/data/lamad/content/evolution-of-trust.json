@@ -1,5 +1,5 @@
 {
-  "id": "simulation-evolution-of-trust",
+  "id": "evolution-of-trust",
   "contentType": "collective",
   "title": "The Evolution of Trust",
   "name": "Evolution of Trust",
@@ -63,13 +63,13 @@
   },
   "reach": "commons",
   "trustScore": 1,
-  "did": "did:web:elohim.host:content:simulation-evolution-of-trust",
+  "did": "did:web:elohim.host:content:evolution-of-trust",
   "activityPubType": "Application",
   "openGraphMetadata": {
     "ogTitle": "The Evolution of Trust",
     "ogDescription": "An interactive guide to the game theory of trust. Explore why and how trust evolves through playable simulations.",
     "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/simulation-evolution-of-trust",
+    "ogUrl": "https://elohim-protocol.org/content/evolution-of-trust",
     "ogImage": "https://ncase.me/trust/social/thumbnail.png",
     "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
     "articleAuthor": "Nicky Case"
@@ -77,8 +77,8 @@
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "WebApplication",
-    "@id": "https://elohim-protocol.org/content/simulation-evolution-of-trust",
-    "identifier": "did:web:elohim.host:content:simulation-evolution-of-trust",
+    "@id": "https://elohim-protocol.org/content/evolution-of-trust",
+    "identifier": "did:web:elohim.host:content:evolution-of-trust",
     "name": "The Evolution of Trust",
     "description": "An interactive guide to the game theory of trust through playable simulations",
     "applicationCategory": "Educational",

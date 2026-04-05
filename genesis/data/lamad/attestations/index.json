@@ -390,7 +390,7 @@
     },
     {
       "id": "att-evolution-trust-accessibility",
-      "contentId": "simulation-evolution-of-trust",
+      "contentId": "evolution-of-trust",
       "attestationType": "accessibility-checked",
       "reachGranted": "community",
       "grantedBy": {
@@ -407,7 +407,7 @@
     },
     {
       "id": "att-evolution-trust-license",
-      "contentId": "simulation-evolution-of-trust",
+      "contentId": "evolution-of-trust",
       "attestationType": "license-cleared",
       "reachGranted": "commons",
       "grantedBy": {

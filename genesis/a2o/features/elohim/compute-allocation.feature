@@ -1,4 +1,4 @@
-@testnet @compute-allocation
+@testnet @compute-allocation @local
 Feature: Community compute allocation
   As Matthew, I have a distributed app to test.
   I request compute from my community, peers provision

@@ -330,6 +330,43 @@
       "flags": [{"type": "unguarded-minor", "reason": "Minor account without guardian linkage", "severity": "warning"}, {"type": "high-connection-velocity", "reason": "Accepting connections rapidly without vetting"}],
       "affinities": ["social-media", "trends", "music", "fashion"],
       "notes": "Vulnerable minor without guardian oversight. Importance of guardian controls."
+    },
+    {
+      "id": "human-susan-household",
+      "displayName": "Susan",
+      "bio": "Matthew's sister. Household member exploring how families can steward digital resources together.",
+      "category": "core-family",
+      "profileReach": "network",
+      "location": {"layer": "neighborhood", "name": "Tech Valley"},
+      "communities": ["community-local-church", "community-homeschool-coop"],
+      "affinities": ["family-systems", "education", "digital-stewardship", "community-building"]
+    },
+    {
+      "id": "human-miriam-author",
+      "displayName": "Miriam",
+      "bio": "Trusted content author. Contributes educational materials with a focus on accessibility and inclusion.",
+      "category": "community",
+      "profileReach": "community",
+      "location": {"layer": "city", "name": "Riverside"},
+      "affinities": ["content-creation", "accessibility", "education", "inclusion"]
+    },
+    {
+      "id": "human-levi-contributor",
+      "displayName": "Levi",
+      "bio": "Moderate-trust contributor. Building reputation through consistent, quality contributions.",
+      "category": "community",
+      "profileReach": "network",
+      "location": {"layer": "city", "name": "Riverside"},
+      "affinities": ["knowledge-sharing", "peer-review", "open-source"]
+    },
+    {
+      "id": "human-ezra-newcomer",
+      "displayName": "Ezra",
+      "bio": "New to the network. Eager to contribute but still building trust and understanding norms.",
+      "category": "newcomer",
+      "profileReach": "private",
+      "location": {"layer": "city", "name": "New Haven"},
+      "affinities": ["learning", "community-building", "governance"]
     }
   ],
   "relationships": [
@@ -356,21 +393,24 @@
     {"source": "human-meriadoc-moneybags", "target": "human-matthew-manager", "type": "network_connection", "intimacy": "connection"},
     {"source": "human-meriadoc-moneybags", "target": "human-pete-pastor", "type": "congregation_member", "intimacy": "connection"},
     {"source": "human-georgina-grocer", "target": "human-jessica-spouse", "type": "community_member", "intimacy": "recognition"},
-    {"source": "human-tommy-teacher", "target": "human-janice-janitor", "type": "coworker", "intimacy": "connection", "context": "org-valley-school-district"}
+    {"source": "human-tommy-teacher", "target": "human-janice-janitor", "type": "coworker", "intimacy": "connection", "context": "org-valley-school-district"},
+    {"source": "human-matthew-manager", "target": "human-susan-household", "type": "sibling", "intimacy": "intimate"},
+    {"source": "human-susan-household", "target": "human-georgina-grocer", "type": "community_member", "intimacy": "connection"},
+    {"source": "human-susan-household", "target": "human-pete-pastor", "type": "congregation_member", "intimacy": "trusted"}
   ],
   "categories": {
-    "core-family": {"description": "Matthew's household and the originals", "count": 6},
+    "core-family": {"description": "Matthew's household and the originals", "count": 7},
     "workplace": {"description": "EthosEngine team", "count": 1},
-    "community": {"description": "Neighborhood connections", "count": 3},
+    "community": {"description": "Neighborhood connections", "count": 5},
     "affinity": {"description": "Faith, education, and interest networks", "count": 4},
     "local-economy": {"description": "Workers and business owners", "count": 7},
-    "newcomer": {"description": "Immigrants and refugees", "count": 2},
+    "newcomer": {"description": "Immigrants and refugees", "count": 3},
     "visitor": {"description": "Anonymous explorers", "count": 1},
     "red-team": {"description": "Adversarial actors for testing", "count": 5}
   },
   "summary": {
-    "totalHumans": 29,
-    "totalRelationships": 24,
-    "byIntimacy": {"intimate": 6, "trusted": 5, "connection": 12, "recognition": 1}
+    "totalHumans": 33,
+    "totalRelationships": 27,
+    "byIntimacy": {"intimate": 7, "trusted": 6, "connection": 13, "recognition": 1}
   }
 }

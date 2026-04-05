@@ -10,10 +10,11 @@
  *   - Post-deployment health verification
  *   - Clear decision matrix showing what will be built and why
  *   - Deployment manifest comparing expected vs actual versions
+ *   - Commit message tags: [build:edge], [build:dna], [build:app], [build:all], [skip ci]
  *
  * Dependency Graph:
- *   elohim-holochain (DNA/hApp, WASM) [cascades: false]
- *       ├──► elohim-edge (builds after DNA when both change, but DNA doesn't auto-trigger Edge)
+ *   elohim-holochain (DNA/hApp, WASM) [cascades: true]
+ *       ├──► elohim-edge (auto-triggered when DNA changes, ensures new hApp is deployed)
  *       │                                    ├──► elohim-genesis (seed + test)
  *       └──► elohim-steward (manual only)    │
  *   elohim (Angular app) ───────────────────┘
@@ -31,7 +32,7 @@ import groovy.transform.Field
         changePatterns: ['elohim/holochain/dna/', 'elohim/elohim-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
-        cascades: false,      // Sprint 5: DNA changes don't auto-trigger Edge rebuilds
+        cascades: true,       // DNA changes auto-trigger Edge redeploy (ensures new hApp bundle is installed)
         triggersGenesis: true,
         deploymentCheck: null  // No deployment, just artifacts
     ],
@@ -697,12 +698,41 @@ spec:
 ═══════════════════════════════════════════════════════════════════════════════
                         """
 
-                        // Check for [skip ci] in commit message (webhook-triggered builds only)
+                        // Check for commit message tags (webhook-triggered builds only)
                         if (env.BUILD_TRIGGER == 'WEBHOOK') {
                             def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
                             if (commitMsg =~ /(?i)\[(skip ci|ci skip|no ci)\]/) {
                                 echo "⏭️  [skip ci] detected in commit message — skipping all pipelines"
                                 env.SKIP_CI = 'true'
+                            }
+
+                            // Parse [build:*] tags to force-include pipelines
+                            // Supported: [build:edge], [build:dna], [build:app], [build:genesis], [build:all]
+                            def buildTags = []
+                            def buildTagAliases = [
+                                'edge': 'elohim-edge',
+                                'dna': 'elohim-holochain',
+                                'app': 'elohim',
+                                'genesis': 'elohim-genesis',
+                                'sophia': 'elohim-sophia',
+                                'steward': 'elohim-steward'
+                            ]
+                            def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
+                            tagMatcher.each { match ->
+                                match[1].split(',').each { tag ->
+                                    tag = tag.trim().toLowerCase()
+                                    if (tag == 'all') {
+                                        buildTags.addAll(PIPELINES.keySet().findAll { !PIPELINES[it].manualOnly })
+                                    } else if (buildTagAliases[tag]) {
+                                        buildTags.add(buildTagAliases[tag])
+                                    } else {
+                                        echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
+                                    }
+                                }
+                            }
+                            if (buildTags) {
+                                env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
+                                echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
                             }
                         }
 
@@ -802,6 +832,17 @@ spec:
                             }
 
                             pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
+
+                            // Inject [build:*] commit message overrides into the pipeline set
+                            if (env.FORCE_BUILD_PIPELINES) {
+                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+                                    if (!pipelines.contains(name) && PIPELINES[name]) {
+                                        pipelines.add(name)
+                                        analysis[name].shouldRun = true
+                                        analysis[name].matchedPatterns.add('commit-tag:[build:*]')
+                                    }
+                                }
+                            }
 
                             // Propagate: if a dependency is building, auto-include its dependents
                             pipelines = propagateDependencies(pipelines, analysis)

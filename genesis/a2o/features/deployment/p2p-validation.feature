@@ -1,4 +1,4 @@
-@e2e @deployment @epic:elohim-p2p-infrastructure
+@e2e @deployment @p2p @epic:elohim-p2p-infrastructure
 Feature: P2P Peer Validation
   As a deployment pipeline
   I want to validate that P2P peers are connected and syncing

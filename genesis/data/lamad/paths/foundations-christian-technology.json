@@ -112,7 +112,7 @@
         },
         {
           "order": 4,
-          "resourceId": "simulation-evolution-of-trust",
+          "resourceId": "evolution-of-trust",
           "stepTitle": "Interactive: The Evolution of Trust",
           "stepNarrative": "Experience how trust evolves (or breaks down) through Nicky Case's acclaimed interactive simulation. This game-theory exploration demonstrates why cooperation emerges and what conditions destroy it - essential insights for building trustworthy technology.",
           "learningObjectives": [
@@ -429,7 +429,7 @@
     },
     {
       "order": 4,
-      "resourceId": "simulation-evolution-of-trust",
+      "resourceId": "evolution-of-trust",
       "stepTitle": "Interactive: The Evolution of Trust",
       "stepNarrative": "Experience trust dynamics through interactive play",
       "learningObjectives": [
