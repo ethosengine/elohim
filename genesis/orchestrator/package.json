@@ -3,6 +3,9 @@
   "private": true,
   "description": "CI/CD orchestrator - Jenkinsfile linting and pipeline management",
   "scripts": {
+    "test": "node --test orchestrator-strategy.test.mjs graph-walker.test.mjs",
+    "test:strategy": "node --test orchestrator-strategy.test.mjs",
+    "test:graph": "node --test graph-walker.test.mjs",
     "lint:jenkinsfiles": "npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --failon error",
     "lint:jenkinsfiles:fix": "npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --fix"
   },
