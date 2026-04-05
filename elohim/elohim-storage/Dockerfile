@@ -91,10 +91,9 @@ RUN echo "Building at ${CACHE_BUST}" && \
     cargo build --release
 
 # Verify migrations are actually embedded in the binary.
-# The binary prints migration count on --help stderr or we check the strings.
-# If embed_migrations! ran against an empty dir, "lamad_provenance" won't appear.
-RUN strings target/release/elohim-storage | grep -q "lamad_provenance" \
-    || (echo "FATAL: embed_migrations! did not pick up migrations. Binary has no lamad_provenance migration embedded." && exit 1)
+# If embed_migrations! ran against an empty dir, none of our CREATE TABLE statements appear.
+RUN strings target/release/elohim-storage | grep -q "CREATE TABLE content" \
+    || (echo "FATAL: embed_migrations! did not pick up migrations. Binary has no schema embedded." && exit 1)
 
 # Runtime stage
 FROM debian:bookworm-slim
