@@ -3,6 +3,7 @@
 //! Provides helper functions for calling specific zome functions from the
 //! doorway's HTTP handlers, particularly for identity management operations.
 
+use holo_hash::ActionHash;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -32,7 +33,7 @@ pub struct CreateHumanInput {
 /// Matches HumanOutput in the zome
 #[derive(Debug, Clone, Deserialize)]
 pub struct HumanOutput {
-    pub action_hash: Vec<u8>,
+    pub action_hash: ActionHash,
     pub human: Human,
 }
 
@@ -167,24 +168,22 @@ mod tests {
     }
 
     #[test]
-    fn test_human_output_deserialization() {
-        // Simulate a response from the zome
+    fn test_human_deserialization() {
+        // Test Human struct deserialization (HumanOutput uses ActionHash
+        // which requires MessagePack from the conductor, not JSON)
         let json = r#"{
-            "action_hash": [1, 2, 3, 4],
-            "human": {
-                "id": "test-123",
-                "display_name": "Test",
-                "bio": null,
-                "affinities": [],
-                "profile_reach": "public",
-                "location": null,
-                "created_at": "2024-01-01T00:00:00Z",
-                "updated_at": "2024-01-01T00:00:00Z"
-            }
+            "id": "test-123",
+            "display_name": "Test",
+            "bio": null,
+            "affinities": [],
+            "profile_reach": "public",
+            "location": null,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
         }"#;
 
-        let output: HumanOutput = serde_json::from_str(json).unwrap();
-        assert_eq!(output.human.id, "test-123");
-        assert_eq!(output.human.display_name, "Test");
+        let human: Human = serde_json::from_str(json).unwrap();
+        assert_eq!(human.id, "test-123");
+        assert_eq!(human.display_name, "Test");
     }
 }
