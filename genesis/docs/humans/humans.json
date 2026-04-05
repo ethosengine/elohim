@@ -401,7 +401,8 @@
   "categories": {
     "core-family": {"description": "Matthew's household and the originals", "count": 7},
     "workplace": {"description": "EthosEngine team", "count": 1},
-    "community": {"description": "Neighborhood connections", "count": 5},
+    "community": {"description": "Neighborhood connections", "count": 4},
+    "edge-case": {"description": "Boundary and edge-case testing", "count": 1},
     "affinity": {"description": "Faith, education, and interest networks", "count": 4},
     "local-economy": {"description": "Workers and business owners", "count": 7},
     "newcomer": {"description": "Immigrants and refugees", "count": 3},
@@ -411,6 +412,6 @@
   "summary": {
     "totalHumans": 33,
     "totalRelationships": 27,
-    "byIntimacy": {"intimate": 7, "trusted": 6, "connection": 13, "recognition": 1}
+    "byIntimacy": {"intimate": 5, "trusted": 7, "connection": 14, "recognition": 1}
   }
 }

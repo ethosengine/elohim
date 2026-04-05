@@ -145,7 +145,7 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "Jenkinsfile"; then
     PROJECTS="$PROJECTS orchestrator"
   fi
-  if echo "$CHANGED" | grep -q "^genesis/orchestrator/.*\.mjs\|^genesis/orchestrator/.*\.json"; then
+  if echo "$CHANGED" | grep -qE "^genesis/orchestrator/.*\.(mjs|json)$"; then
     PROJECTS="$PROJECTS orchestrator"
   fi
   if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
