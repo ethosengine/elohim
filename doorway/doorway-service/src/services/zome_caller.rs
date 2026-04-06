@@ -1,41 +1,47 @@
-//! ZomeCaller - Generic zome call mechanism for federation and service registration
+//! ZomeCaller - Signed zome call client using official holochain_client
 //!
-//! Provides a single-connection client (like ImportClient) that can call any zome
-//! function on a Holochain conductor. Used by:
+//! Makes signed zome calls to the Holochain conductor via AppWebsocket.
+//! Used by:
 //! - Federation service (register_doorway, record_heartbeat, find_publishers)
-//! - Storage registration (register_content_server)
+//! - Identity management (create_human via auth routes)
 //!
-//! ## Auth Flow
-//! 1. Issue AppAuthenticationToken from admin interface
-//! 2. Connect to app interface with token
-//! 3. Discover cell_id for role_name via list_apps
-//! 4. Build CallZome envelope (MessagePack), send, parse response
+//! ## Auth & Signing Flow
+//! 1. Connect to admin interface, list apps to find cell_id
+//! 2. Authorize signing credentials for the cell
+//! 3. Issue app auth token, connect AppWebsocket with signer
+//! 4. All zome calls are automatically signed by the client
 
-use holochain_conductor_api::AppResponse;
-use holochain_serialized_bytes::prelude::*;
-use holochain_websocket::WireMessage;
-use rmpv::Value;
+use holochain_client::{
+    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
+    ZomeCallTarget,
+};
+use holochain_types::prelude::ExternIO;
+use holochain_zome_types::prelude::CellId;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
 
-use crate::projection::app_auth::{self};
-use crate::worker::ConductorConnection;
-
-/// Generic zome call client with single-connection lazy init
+/// Generic zome call client with signed requests.
+///
+/// Follows the same pattern as elohim-storage's HcClient — uses the official
+/// holochain_client::AppWebsocket which handles request signing automatically.
 pub struct ZomeCaller {
-    admin_url: String,
-    app_url: String,
+    admin_addr: String,
+    app_addr: String,
     installed_app_id: String,
-    /// The single conductor connection (lazily initialized)
-    connection: RwLock<Option<Arc<ConductorConnection>>>,
+    /// The connected AppWebsocket (lazily initialized)
+    app_ws: RwLock<Option<AppWebsocket>>,
+    /// Cell ID discovered from app info
+    cell_id: RwLock<Option<CellId>>,
     /// Lock to prevent concurrent connection attempts
     connecting: Mutex<()>,
 }
 
 impl ZomeCaller {
-    /// Create a new ZomeCaller
+    /// Create a new ZomeCaller.
+    ///
+    /// `admin_url` and `app_url` can be either `ws://host:port` URLs or `host:port` addresses.
     pub fn new(admin_url: &str, app_url: &str, installed_app_id: &str) -> Self {
         info!(
             admin_url = %admin_url,
@@ -44,106 +50,173 @@ impl ZomeCaller {
             "ZomeCaller created"
         );
         Self {
-            admin_url: admin_url.to_string(),
-            app_url: app_url.to_string(),
+            admin_addr: strip_ws_scheme(admin_url),
+            app_addr: strip_ws_scheme(app_url),
             installed_app_id: installed_app_id.to_string(),
-            connection: RwLock::new(None),
+            app_ws: RwLock::new(None),
+            cell_id: RwLock::new(None),
             connecting: Mutex::new(()),
         }
     }
 
-    /// Get or create the conductor connection (with app auth)
-    async fn get_connection(&self) -> Result<Arc<ConductorConnection>, String> {
-        // Fast path: check if we have a connection
+    /// Get or create the AppWebsocket connection with signing credentials.
+    async fn ensure_connected(&self) -> Result<(), String> {
+        // Fast path: already connected
         {
-            let conn = self.connection.read().await;
-            if let Some(ref c) = *conn {
-                if c.is_connected().await {
-                    return Ok(Arc::clone(c));
-                }
+            let ws = self.app_ws.read().await;
+            if ws.is_some() {
+                return Ok(());
             }
         }
 
-        // Slow path: need to (re)connect
+        // Slow path: connect with signing credentials
         let _lock = self.connecting.lock().await;
 
         // Double-check after acquiring lock
         {
-            let conn = self.connection.read().await;
-            if let Some(ref c) = *conn {
-                if c.is_connected().await {
-                    return Ok(Arc::clone(c));
-                }
+            let ws = self.app_ws.read().await;
+            if ws.is_some() {
+                return Ok(());
             }
         }
 
-        // Get auth token from admin interface
-        info!("ZomeCaller authenticating via admin interface");
-        let token = app_auth::issue_app_token(
-            &self.admin_url,
-            &self.installed_app_id,
-            300, // 5 minute token
-        )
-        .await?;
+        info!("ZomeCaller connecting to conductor");
 
-        // Connect to app interface with post-connection authentication
-        info!("ZomeCaller connecting to app interface at {}", self.app_url);
-        let conn = ConductorConnection::connect_with_auth(&self.app_url, Some(token.token.clone()))
+        // Step 1: Connect to admin interface
+        let admin_ws =
+            AdminWebsocket::connect(&self.admin_addr, Some(String::from("doorway-zome-caller")))
+                .await
+                .map_err(|e| format!("Admin connect failed: {e}"))?;
+
+        info!("ZomeCaller connected to admin at {}", self.admin_addr);
+
+        // Step 2: Find cell_id from app info
+        let apps = admin_ws
+            .list_apps(None)
             .await
-            .map_err(|e| format!("ZomeCaller connection failed: {e}"))?;
+            .map_err(|e| format!("list_apps failed: {e}"))?;
 
-        let conn = Arc::new(conn);
+        let app_info = apps
+            .iter()
+            .find(|a| a.installed_app_id == self.installed_app_id)
+            .ok_or_else(|| format!("App '{}' not found", self.installed_app_id))?;
 
-        // Store the connection
+        // Find first provisioned cell
+        let cell_id = app_info
+            .cell_info
+            .values()
+            .flat_map(|cells| cells.iter())
+            .find_map(|cell| match cell {
+                holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| "No provisioned cells found".to_string())?;
+
+        info!(
+            app_id = %self.installed_app_id,
+            "Found cell for app"
+        );
+
+        // Step 3: Authorize signing credentials
+        let signer = ClientAgentSigner::default();
+        let credentials = admin_ws
+            .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                cell_id: cell_id.clone(),
+                functions: None, // All functions
+            })
+            .await
+            .map_err(|e| format!("authorize_signing_credentials failed: {e}"))?;
+
+        signer.add_credentials(cell_id.clone(), credentials);
+        info!("Signing credentials authorized");
+
+        // Step 4: Issue app auth token
+        let token = admin_ws
+            .issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
+                installed_app_id: self.installed_app_id.clone(),
+                expiry_seconds: 3600,
+                single_use: false,
+            })
+            .await
+            .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
+
+        // Step 5: Connect AppWebsocket with signer
+        let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
+        let app_ws = AppWebsocket::connect(&self.app_addr, token.token, signer_arc, None)
+            .await
+            .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
+
+        info!(
+            "ZomeCaller connected to app interface at {} with signing",
+            self.app_addr
+        );
+
+        // Store connection and cell_id
         {
-            let mut write_conn = self.connection.write().await;
-            *write_conn = Some(Arc::clone(&conn));
+            let mut ws = self.app_ws.write().await;
+            *ws = Some(app_ws);
+        }
+        {
+            let mut cid = self.cell_id.write().await;
+            *cid = Some(cell_id);
         }
 
-        info!("ZomeCaller connected to conductor");
-        Ok(conn)
+        Ok(())
     }
 
-    /// Call a zome function with raw bytes payload, return raw bytes
+    /// Call a zome function with raw bytes payload, return raw bytes.
+    ///
+    /// The AppWebsocket handles signing automatically.
     pub async fn call_zome(
         &self,
-        role_name: &str,
+        _role_name: &str,
         zome_name: &str,
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, String> {
-        let conn = self.get_connection().await?;
+        self.ensure_connected().await?;
 
-        // Build CallZome request envelope
-        let call_zome_request = build_call_zome_request(role_name, zome_name, fn_name, payload);
-
-        let request_id = 1u64;
-        let envelope = build_request_envelope(request_id, &call_zome_request);
+        let cell_id = self.cell_id.read().await.clone().ok_or("No cell_id")?;
 
         debug!(
-            role_name = %role_name,
             zome_name = %zome_name,
             fn_name = %fn_name,
-            "ZomeCaller sending zome call ({} bytes)",
-            envelope.len()
+            payload_len = payload.len(),
+            "ZomeCaller making signed zome call"
         );
 
-        match conn.request(envelope, 30_000).await {
-            Ok(response) => {
-                debug!("ZomeCaller got response ({} bytes)", response.len());
-                parse_zome_response(&response)
+        // Hold read lock only for the call, then release
+        let result = {
+            let ws = self.app_ws.read().await;
+            let app_ws = ws.as_ref().ok_or("Not connected")?;
+            app_ws
+                .call_zome(
+                    ZomeCallTarget::CellId(cell_id),
+                    zome_name.into(),
+                    fn_name.into(),
+                    ExternIO::from(payload),
+                )
+                .await
+        };
+
+        match result {
+            Ok(extern_io) => {
+                debug!(
+                    result_len = extern_io.as_bytes().len(),
+                    "ZomeCaller zome call succeeded"
+                );
+                Ok(extern_io.into_vec())
             }
             Err(e) => {
-                warn!("ZomeCaller request failed: {}", e);
-                // Clear connection so next call reconnects
-                let mut write_conn = self.connection.write().await;
-                *write_conn = None;
+                warn!("Zome call failed, clearing connection: {e}");
+                let mut ws = self.app_ws.write().await;
+                *ws = None;
                 Err(format!("Zome call failed: {e}"))
             }
         }
     }
 
-    /// Typed wrapper: serialize input with MessagePack, deserialize output
+    /// Typed wrapper: serialize input with MessagePack, deserialize output.
     pub async fn call<I: Serialize, O: DeserializeOwned>(
         &self,
         role_name: &str,
@@ -159,11 +232,13 @@ impl ZomeCaller {
             .await?;
 
         rmp_serde::from_slice(&response_bytes).map_err(|e| {
-            // Dump response structure on failure for debugging
-            let structure = match rmpv::decode::read_value(&mut std::io::Cursor::new(&response_bytes)) {
-                Ok(val) => format!("{val:?}"),
-                Err(decode_err) => format!("<raw {} bytes, decode err: {decode_err}>", response_bytes.len()),
-            };
+            let structure =
+                match rmpv::decode::read_value(&mut std::io::Cursor::new(&response_bytes)) {
+                    Ok(val) => format!("{val:?}"),
+                    Err(decode_err) => {
+                        format!("<raw {} bytes, decode err: {decode_err}>", response_bytes.len())
+                    }
+                };
             format!(
                 "Failed to deserialize response: {e} | response_bytes({} bytes) structure: {structure}",
                 response_bytes.len()
@@ -173,241 +248,31 @@ impl ZomeCaller {
 
     /// Check if currently connected
     pub async fn is_connected(&self) -> bool {
-        let conn = self.connection.read().await;
-        if let Some(ref c) = *conn {
-            c.is_connected().await
-        } else {
-            false
-        }
+        self.app_ws.read().await.is_some()
     }
 }
 
-/// Build a CallZome inner request (MessagePack)
-fn build_call_zome_request(
-    role_name: &str,
-    zome_name: &str,
-    fn_name: &str,
-    payload: Vec<u8>,
-) -> Vec<u8> {
-    let data = Value::Map(vec![
-        (
-            Value::String("role_name".into()),
-            Value::String(role_name.into()),
-        ),
-        (
-            Value::String("zome_name".into()),
-            Value::String(zome_name.into()),
-        ),
-        (
-            Value::String("fn_name".into()),
-            Value::String(fn_name.into()),
-        ),
-        (Value::String("payload".into()), Value::Binary(payload)),
-    ]);
-
-    let inner = Value::Map(vec![
-        (
-            Value::String("type".into()),
-            Value::String("call_zome".into()),
-        ),
-        (Value::String("value".into()), data),
-    ]);
-
-    let mut buf = Vec::new();
-    rmpv::encode::write_value(&mut buf, &inner).expect("Failed to encode call_zome request");
-    buf
-}
-
-/// Build the request envelope (same pattern as app_auth.rs)
-fn build_request_envelope(id: u64, inner_data: &[u8]) -> Vec<u8> {
-    let envelope = Value::Map(vec![
-        (Value::String("id".into()), Value::Integer(id.into())),
-        (
-            Value::String("type".into()),
-            Value::String("request".into()),
-        ),
-        (
-            Value::String("data".into()),
-            Value::Binary(inner_data.to_vec()),
-        ),
-    ]);
-
-    let mut buf = Vec::new();
-    rmpv::encode::write_value(&mut buf, &envelope).expect("Failed to encode envelope");
-    buf
-}
-
-/// Parse zome call response using official Holochain types.
+/// Strip `ws://` or `wss://` scheme from a URL, returning just `host:port`.
 ///
-/// The conductor WebSocket response has three layers:
-/// 1. `WireMessage::Response { id, data }` — the outer envelope
-/// 2. `AppResponse::ZomeCalled(Box<ExternIO>)` — the app-level response
-/// 3. `ExternIO(Vec<u8>)` — the raw msgpack bytes of the zome return value
-fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
-    // Layer 1: Deserialize WireMessage envelope
-    let sb = SerializedBytes::from(UnsafeBytes::from(data.to_vec()));
-    let wire_msg: WireMessage = sb
-        .try_into()
-        .map_err(|e: SerializedBytesError| format!("Failed to decode WireMessage: {e}"))?;
-
-    match wire_msg {
-        WireMessage::Response { id: _, data } => {
-            let response_bytes =
-                data.ok_or_else(|| "Conductor returned empty response (None)".to_string())?;
-
-            // Layer 2: Deserialize AppResponse
-            let sb = SerializedBytes::from(UnsafeBytes::from(response_bytes));
-            let app_response: AppResponse = sb
-                .try_into()
-                .map_err(|e: SerializedBytesError| format!("Failed to decode AppResponse: {e}"))?;
-
-            match app_response {
-                AppResponse::ZomeCalled(extern_io) => {
-                    // Layer 3: ExternIO contains the raw bytes of the zome return value
-                    debug!(
-                        bytes_len = extern_io.as_bytes().len(),
-                        "parse_zome_response: extracted ExternIO from ZomeCalled"
-                    );
-                    Ok(extern_io.into_vec())
-                }
-                AppResponse::Error(e) => Err(format!("Conductor AppResponse error: {e:?}")),
-                other => Err(format!("Unexpected AppResponse variant: {other:?}")),
-            }
-        }
-        WireMessage::Signal { .. } => Err("Received Signal instead of Response".to_string()),
-        other => Err(format!("Unexpected WireMessage type: {other:?}")),
-    }
+/// `ToSocketAddrs` (used by holochain_client) needs `host:port`, not a URL.
+fn strip_ws_scheme(url: &str) -> String {
+    url.trim_start_matches("ws://")
+        .trim_start_matches("wss://")
+        .to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    /// Get a string field from a MessagePack map
-    fn get_string_field(map: &[(Value, Value)], key: &str) -> Option<String> {
-        for (k, v) in map {
-            if let Value::String(k_str) = k {
-                if k_str.as_str() == Some(key) {
-                    if let Value::String(v_str) = v {
-                        return v_str.as_str().map(|s| s.to_string());
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// Get a field from a MessagePack map
-    fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
-        for (k, v) in map {
-            if let Value::String(k_str) = k {
-                if k_str.as_str() == Some(key) {
-                    return Some(v);
-                }
-            }
-        }
-        None
-    }
-
     use super::*;
-    use std::io::Cursor;
 
     #[test]
-    fn test_build_call_zome_request() {
-        let payload = rmp_serde::to_vec(&"test").unwrap();
-        let request = build_call_zome_request(
-            "infrastructure",
-            "infrastructure",
-            "register_doorway",
-            payload,
+    fn test_strip_ws_scheme() {
+        assert_eq!(strip_ws_scheme("ws://localhost:8445"), "localhost:8445");
+        assert_eq!(strip_ws_scheme("wss://host:443"), "host:443");
+        assert_eq!(strip_ws_scheme("localhost:8445"), "localhost:8445");
+        assert_eq!(
+            strip_ws_scheme("ws://elohim-matthew-alpha-0.headless:8445"),
+            "elohim-matthew-alpha-0.headless:8445"
         );
-        assert!(!request.is_empty());
-
-        // Verify it can be decoded
-        let mut cursor = Cursor::new(&request);
-        let decoded = rmpv::decode::read_value(&mut cursor).unwrap();
-        assert!(matches!(decoded, Value::Map(_)));
-    }
-
-    #[test]
-    fn test_build_request_envelope() {
-        let inner = build_call_zome_request(
-            "infrastructure",
-            "infrastructure",
-            "test_fn",
-            vec![0xc0], // msgpack nil
-        );
-        let envelope = build_request_envelope(42, &inner);
-
-        let mut cursor = Cursor::new(&envelope);
-        let decoded = rmpv::decode::read_value(&mut cursor).unwrap();
-
-        if let Value::Map(map) = decoded {
-            let id = get_field(&map, "id");
-            assert!(matches!(id, Some(Value::Integer(_))));
-
-            let msg_type = get_string_field(&map, "type");
-            assert_eq!(msg_type.as_deref(), Some("request"));
-        } else {
-            panic!("Expected map");
-        }
-    }
-
-    #[test]
-    fn test_parse_zome_response_roundtrip() {
-        use holochain_zome_types::prelude::ExternIO;
-
-        // Build mock zome return data (what the zome function would return)
-        let action_hash_bytes: Vec<u8> = vec![0u8; 39];
-        let test_data = rmp_serde::to_vec_named(&serde_json::json!({
-            "action_hash": action_hash_bytes,
-            "human": {
-                "id": "test-123",
-                "display_name": "Test",
-                "bio": null,
-                "affinities": [],
-                "profile_reach": "public",
-                "location": null,
-                "created_at": "2024-01-01T00:00:00Z",
-                "updated_at": "2024-01-01T00:00:00Z"
-            }
-        }))
-        .unwrap();
-
-        // Layer 3: Wrap in ExternIO
-        let extern_io = ExternIO::from(test_data.clone());
-
-        // Layer 2: Wrap in AppResponse::ZomeCalled
-        let app_response = AppResponse::ZomeCalled(Box::new(extern_io));
-        let app_sb: SerializedBytes = app_response.try_into().unwrap();
-
-        // Layer 1: Wrap in WireMessage::Response
-        let wire_msg = WireMessage::Response {
-            id: 1,
-            data: Some(UnsafeBytes::from(app_sb).into()),
-        };
-        let wire_sb: SerializedBytes = wire_msg.try_into().unwrap();
-
-        // Parse using our function
-        let result = parse_zome_response(wire_sb.bytes()).unwrap();
-        assert_eq!(result, test_data);
-    }
-
-    #[test]
-    fn test_parse_zome_response_error() {
-        use holochain_conductor_api::ExternalApiWireError;
-
-        // Build an error response
-        let app_response =
-            AppResponse::Error(ExternalApiWireError::InternalError("test error".into()));
-        let app_sb: SerializedBytes = app_response.try_into().unwrap();
-
-        let wire_msg = WireMessage::Response {
-            id: 1,
-            data: Some(UnsafeBytes::from(app_sb).into()),
-        };
-        let wire_sb: SerializedBytes = wire_msg.try_into().unwrap();
-
-        let result = parse_zome_response(wire_sb.bytes());
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Conductor AppResponse error"));
     }
 }
