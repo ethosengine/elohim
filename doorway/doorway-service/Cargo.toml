@@ -119,6 +119,9 @@ doorway-client = { path = "../../crates/doorway-client" }
 # Shared wire types with imagodei DNA — compiler enforces agreement
 imagodei-types = { path = "../../elohim/sdk/domains/imagodei/types" }
 
+# Shared wire types with infrastructure DNA — compiler enforces agreement
+infrastructure-types = { path = "../../elohim/sdk/domains/infrastructure/types" }
+
 # Shared compute reporting types
 elohim-compute = { path = "../../elohim/elohim-compute" }
 

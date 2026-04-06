@@ -13,133 +13,78 @@ use hdk::prelude::*;
 use infrastructure_integrity::*;
 
 // =============================================================================
-// Input/Output Types
+// Wire Types (re-exported from shared crate)
 // =============================================================================
 
-/// Input for registering a new doorway
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterDoorwayInput {
-    pub id: String,
-    pub url: String,
-    pub capabilities_json: String,
-    pub reach: String,
-    pub region: Option<String>,
-    pub bandwidth_mbps: Option<u32>,
-    pub version: String,
-}
-
-/// Output from doorway registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DoorwayOutput {
-    pub action_hash: ActionHash,
-    pub doorway: DoorwayRegistration,
-}
-
-/// Input for recording a heartbeat
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordHeartbeatInput {
-    pub doorway_id: String,
-    pub status: String,
-    pub uptime_ratio: f32,
-    pub active_connections: u32,
-    pub content_served: u64,
-}
-
-/// Input for recording a daily summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordSummaryInput {
-    pub doorway_id: String,
-    pub date: String,
-    pub uptime_ratio: f32,
-    pub total_content_served: u64,
-    pub peak_connections: u32,
-    pub heartbeat_count: u32,
-}
-
-/// Input for recording a health attestation (peer observation)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordHealthAttestationInput {
-    pub attestor_doorway_id: String,
-    pub subject_doorway_id: String,
-    pub observed_status: String,
-    pub response_time_ms: Option<u32>,
-    pub conductor_healthy: Option<bool>,
-}
-
-/// Output from health attestation queries
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HealthAttestationOutput {
-    pub action_hash: String,
-    pub entry_hash: String,
-    pub attestation: HealthAttestation,
-    pub author: String,
-}
+pub use infrastructure_types::{
+    ContentServerOutput, DoorwayOutput, FindPublishersInput, FindPublishersOutput,
+    HealthAttestationOutput, RecordHealthAttestationInput, RecordHeartbeatInput,
+    RecordSummaryInput, RegisterContentServerInput, RegisterDoorwayInput, StorageEndpointInput,
+};
 
 // =============================================================================
-// ContentServer Input/Output Types
+// Integrity → Wire Type Conversions
 // =============================================================================
 
-/// Input for registering a content server
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterContentServerInput {
-    /// Content hash this server can provide (e.g., "sha256-abc123")
-    /// Use "*" for wildcard registration (can serve any content of this capability)
-    pub content_hash: String,
-    /// Capability: blob, html5_app, media_stream, learning_package, custom
-    pub capability: String,
-    /// URL where this server accepts content requests (DEPRECATED - use endpoints)
-    pub serve_url: Option<String>,
-    /// Multiple reachable endpoints for content fetching (NEW)
-    /// If empty and serve_url is provided, an endpoint will be auto-created from serve_url
-    pub endpoints: Option<Vec<StorageEndpointInput>>,
-    /// Server priority (0-100, higher = preferred)
-    pub priority: Option<u8>,
-    /// Geographic region for latency-based routing
-    pub region: Option<String>,
-    /// Bandwidth capacity in Mbps
-    pub bandwidth_mbps: Option<u32>,
+/// Convert integrity DoorwayRegistration to wire type.
+fn doorway_to_wire(
+    entry: &infrastructure_integrity::DoorwayRegistration,
+) -> infrastructure_types::DoorwayRegistration {
+    infrastructure_types::DoorwayRegistration {
+        id: entry.id.clone(),
+        url: entry.url.clone(),
+        operator_agent: entry.operator_agent.clone(),
+        operator_human: entry.operator_human.clone(),
+        capabilities_json: entry.capabilities_json.clone(),
+        reach: entry.reach.clone(),
+        region: entry.region.clone(),
+        bandwidth_mbps: entry.bandwidth_mbps,
+        version: entry.version.clone(),
+        tier: entry.tier.clone(),
+        registered_at: entry.registered_at.clone(),
+        updated_at: entry.updated_at.clone(),
+    }
 }
 
-/// Input for a storage endpoint
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StorageEndpointInput {
-    /// Base URL for fetching content (hash appended)
-    pub url: String,
-    /// Protocol type: "http", "https", "libp2p"
-    pub protocol: String,
-    /// Priority within this server (0-100, higher = preferred)
-    pub priority: Option<u8>,
+/// Convert integrity HealthAttestation to wire type.
+fn attestation_to_wire(
+    entry: &infrastructure_integrity::HealthAttestation,
+) -> infrastructure_types::HealthAttestation {
+    infrastructure_types::HealthAttestation {
+        attestor_doorway_id: entry.attestor_doorway_id.clone(),
+        operator_agent: entry.operator_agent.clone(),
+        subject_doorway_id: entry.subject_doorway_id.clone(),
+        observed_status: entry.observed_status.clone(),
+        response_time_ms: entry.response_time_ms,
+        conductor_healthy: entry.conductor_healthy,
+        timestamp: entry.timestamp,
+    }
 }
 
-/// Output from content server operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContentServerOutput {
-    pub action_hash: ActionHash,
-    pub server: ContentServer,
-}
-
-/// Input for finding content publishers
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FindPublishersInput {
-    /// Content hash to find publishers for
-    pub content_hash: String,
-    /// Optional: filter by capability
-    pub capability: Option<String>,
-    /// Optional: prefer publishers in this region
-    pub prefer_region: Option<String>,
-    /// Maximum number of publishers to return (default: 10)
-    pub limit: Option<usize>,
-    /// Only return online publishers (default: true)
-    pub online_only: Option<bool>,
-}
-
-/// Output from finding publishers
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FindPublishersOutput {
-    /// Content hash queried
-    pub content_hash: String,
-    /// Found publishers, sorted by priority
-    pub publishers: Vec<ContentServerOutput>,
+/// Convert integrity ContentServer to wire type.
+fn content_server_to_wire(
+    entry: &infrastructure_integrity::ContentServer,
+) -> infrastructure_types::ContentServer {
+    infrastructure_types::ContentServer {
+        content_hash: entry.content_hash.clone(),
+        capability: entry.capability.clone(),
+        serve_url: entry.serve_url.clone(),
+        endpoints: entry
+            .endpoints
+            .iter()
+            .map(|e| infrastructure_types::StorageEndpoint {
+                url: e.url.clone(),
+                protocol: e.protocol.clone(),
+                priority: e.priority,
+            })
+            .collect(),
+        online: entry.online,
+        priority: entry.priority,
+        region: entry.region.clone(),
+        bandwidth_mbps: entry.bandwidth_mbps,
+        registered_at: entry.registered_at,
+        last_heartbeat: entry.last_heartbeat,
+    }
 }
 
 // =============================================================================
@@ -211,35 +156,60 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 
         let author = action.author().clone();
 
-        if let Some(doorway) = record.entry().to_app_option::<DoorwayRegistration>().ok().flatten() {
+        if let Some(doorway) = record
+            .entry()
+            .to_app_option::<DoorwayRegistration>()
+            .ok()
+            .flatten()
+        {
             emit_signal(InfrastructureSignal::DoorwayCommitted {
                 action_hash,
                 entry_hash,
                 doorway,
                 author,
             })?;
-        } else if let Some(heartbeat) = record.entry().to_app_option::<DoorwayHeartbeat>().ok().flatten() {
+        } else if let Some(heartbeat) = record
+            .entry()
+            .to_app_option::<DoorwayHeartbeat>()
+            .ok()
+            .flatten()
+        {
             emit_signal(InfrastructureSignal::DoorwayHeartbeatCommitted {
                 action_hash,
                 entry_hash,
                 heartbeat,
                 author,
             })?;
-        } else if let Some(summary) = record.entry().to_app_option::<DoorwayHeartbeatSummary>().ok().flatten() {
+        } else if let Some(summary) = record
+            .entry()
+            .to_app_option::<DoorwayHeartbeatSummary>()
+            .ok()
+            .flatten()
+        {
             emit_signal(InfrastructureSignal::DoorwaySummaryCommitted {
                 action_hash,
                 entry_hash,
                 summary,
                 author,
             })?;
-        } else if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+        } else if let Some(server) = record
+            .entry()
+            .to_app_option::<ContentServer>()
+            .ok()
+            .flatten()
+        {
             emit_signal(InfrastructureSignal::ContentServerCommitted {
                 action_hash,
                 entry_hash,
                 server,
                 author,
             })?;
-        } else if let Some(attestation) = record.entry().to_app_option::<HealthAttestation>().ok().flatten() {
+        } else if let Some(attestation) = record
+            .entry()
+            .to_app_option::<HealthAttestation>()
+            .ok()
+            .flatten()
+        {
             emit_signal(InfrastructureSignal::HealthAttestationCommitted {
                 action_hash: action_hash.to_string(),
                 entry_hash: entry_hash.to_string(),
@@ -268,9 +238,10 @@ pub fn register_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutp
 
     // Check if doorway already exists with this ID
     if get_doorway_by_id(input.id.clone())?.is_some() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway with ID '{}' already exists", input.id)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway with ID '{}' already exists",
+            input.id
+        ))));
     }
 
     let doorway = DoorwayRegistration {
@@ -293,23 +264,38 @@ pub fn register_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutp
     // Create ID lookup link
     let id_anchor = StringAnchor::new("doorway_id", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToDoorway, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToDoorway,
+        (),
+    )?;
 
     // Create operator lookup link
     let operator_anchor = StringAnchor::new("doorway_operator", &doorway.operator_agent);
     let operator_anchor_hash = hash_entry(&EntryTypes::StringAnchor(operator_anchor))?;
-    create_link(operator_anchor_hash, action_hash.clone(), LinkTypes::OperatorToDoorway, ())?;
+    create_link(
+        operator_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OperatorToDoorway,
+        (),
+    )?;
 
     // Create region link if specified
     if let Some(ref region) = input.region {
         let region_anchor = StringAnchor::new("doorway_region", region);
         let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
-        create_link(region_anchor_hash, action_hash.clone(), LinkTypes::RegionToDoorway, ())?;
+        create_link(
+            region_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::RegionToDoorway,
+            (),
+        )?;
     }
 
     Ok(DoorwayOutput {
         action_hash,
-        doorway,
+        doorway: doorway_to_wire(&doorway),
     })
 }
 
@@ -322,10 +308,12 @@ pub fn update_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutput
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let existing = get_doorway_by_id(input.id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", input.id)
-        )))?;
+    let existing = get_doorway_by_id(input.id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            input.id
+        )))
+    })?;
 
     if existing.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -348,11 +336,14 @@ pub fn update_doorway(input: RegisterDoorwayInput) -> ExternResult<DoorwayOutput
         updated_at: timestamp,
     };
 
-    let action_hash = update_entry(existing.action_hash, &EntryTypes::DoorwayRegistration(doorway.clone()))?;
+    let action_hash = update_entry(
+        existing.action_hash,
+        &EntryTypes::DoorwayRegistration(doorway.clone()),
+    )?;
 
     Ok(DoorwayOutput {
         action_hash,
-        doorway,
+        doorway: doorway_to_wire(&doorway),
     })
 }
 
@@ -368,10 +359,15 @@ pub fn get_doorway_by_id(id: String) -> ExternResult<Option<DoorwayOutput>> {
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(doorway) = record.entry().to_app_option::<DoorwayRegistration>().ok().flatten() {
+                if let Some(doorway) = record
+                    .entry()
+                    .to_app_option::<DoorwayRegistration>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(Some(DoorwayOutput {
                         action_hash,
-                        doorway,
+                        doorway: doorway_to_wire(&doorway),
                     }));
                 }
             }
@@ -394,10 +390,15 @@ pub fn get_doorways_by_operator(operator_agent: String) -> ExternResult<Vec<Door
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(doorway) = record.entry().to_app_option::<DoorwayRegistration>().ok().flatten() {
+                if let Some(doorway) = record
+                    .entry()
+                    .to_app_option::<DoorwayRegistration>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(DoorwayOutput {
                         action_hash,
-                        doorway,
+                        doorway: doorway_to_wire(&doorway),
                     });
                 }
             }
@@ -420,10 +421,15 @@ pub fn get_doorways_by_region(region: String) -> ExternResult<Vec<DoorwayOutput>
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(doorway) = record.entry().to_app_option::<DoorwayRegistration>().ok().flatten() {
+                if let Some(doorway) = record
+                    .entry()
+                    .to_app_option::<DoorwayRegistration>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(DoorwayOutput {
                         action_hash,
-                        doorway,
+                        doorway: doorway_to_wire(&doorway),
                     });
                 }
             }
@@ -446,10 +452,12 @@ pub fn record_heartbeat(input: RecordHeartbeatInput) -> ExternResult<ActionHash>
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let doorway = get_doorway_by_id(input.doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", input.doorway_id)
-        )))?;
+    let doorway = get_doorway_by_id(input.doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            input.doorway_id
+        )))
+    })?;
 
     if doorway.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -469,7 +477,12 @@ pub fn record_heartbeat(input: RecordHeartbeatInput) -> ExternResult<ActionHash>
     let action_hash = create_entry(&EntryTypes::DoorwayHeartbeat(heartbeat))?;
 
     // Link from doorway to heartbeat
-    create_link(doorway.action_hash, action_hash.clone(), LinkTypes::DoorwayToHeartbeat, ())?;
+    create_link(
+        doorway.action_hash,
+        action_hash.clone(),
+        LinkTypes::DoorwayToHeartbeat,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -482,10 +495,12 @@ pub fn record_heartbeat(input: RecordHeartbeatInput) -> ExternResult<ActionHash>
 pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
 
-    let doorway = get_doorway_by_id(input.doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", input.doorway_id)
-        )))?;
+    let doorway = get_doorway_by_id(input.doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            input.doorway_id
+        )))
+    })?;
 
     if doorway.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -505,12 +520,22 @@ pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHas
     let action_hash = create_entry(&EntryTypes::DoorwayHeartbeatSummary(summary))?;
 
     // Link from doorway to summary
-    create_link(doorway.action_hash, action_hash.clone(), LinkTypes::DoorwayToSummary, ())?;
+    create_link(
+        doorway.action_hash,
+        action_hash.clone(),
+        LinkTypes::DoorwayToSummary,
+        (),
+    )?;
 
     // Link by date for cross-doorway queries
     let date_anchor = StringAnchor::new("summary_date", &input.date);
     let date_anchor_hash = hash_entry(&EntryTypes::StringAnchor(date_anchor))?;
-    create_link(date_anchor_hash, action_hash.clone(), LinkTypes::SummaryByDate, ())?;
+    create_link(
+        date_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SummaryByDate,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -518,10 +543,12 @@ pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHas
 /// Get recent heartbeats for a doorway
 #[hdk_extern]
 pub fn get_doorway_heartbeats(doorway_id: String) -> ExternResult<Vec<DoorwayHeartbeat>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", doorway_id)
-        )))?;
+    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            doorway_id
+        )))
+    })?;
 
     let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToHeartbeat)?;
     let links = get_links(query, GetStrategy::default())?;
@@ -530,7 +557,12 @@ pub fn get_doorway_heartbeats(doorway_id: String) -> ExternResult<Vec<DoorwayHea
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(heartbeat) = record.entry().to_app_option::<DoorwayHeartbeat>().ok().flatten() {
+                if let Some(heartbeat) = record
+                    .entry()
+                    .to_app_option::<DoorwayHeartbeat>()
+                    .ok()
+                    .flatten()
+                {
                     heartbeats.push(heartbeat);
                 }
             }
@@ -543,10 +575,12 @@ pub fn get_doorway_heartbeats(doorway_id: String) -> ExternResult<Vec<DoorwayHea
 /// Get daily summaries for a doorway
 #[hdk_extern]
 pub fn get_doorway_summaries(doorway_id: String) -> ExternResult<Vec<DoorwayHeartbeatSummary>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", doorway_id)
-        )))?;
+    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            doorway_id
+        )))
+    })?;
 
     let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToSummary)?;
     let links = get_links(query, GetStrategy::default())?;
@@ -555,7 +589,12 @@ pub fn get_doorway_summaries(doorway_id: String) -> ExternResult<Vec<DoorwayHear
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(summary) = record.entry().to_app_option::<DoorwayHeartbeatSummary>().ok().flatten() {
+                if let Some(summary) = record
+                    .entry()
+                    .to_app_option::<DoorwayHeartbeatSummary>()
+                    .ok()
+                    .flatten()
+                {
                     summaries.push(summary);
                 }
             }
@@ -580,10 +619,13 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
     let timestamp = now.as_micros();
 
     // Verify attestor is a registered doorway operator
-    let attestor_doorway = get_doorway_by_id(input.attestor_doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Attestor doorway '{}' not found", input.attestor_doorway_id)
-        )))?;
+    let attestor_doorway =
+        get_doorway_by_id(input.attestor_doorway_id.clone())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Attestor doorway '{}' not found",
+                input.attestor_doorway_id
+            )))
+        })?;
 
     if attestor_doorway.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -592,10 +634,13 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
     }
 
     // Verify subject doorway exists
-    let subject_doorway = get_doorway_by_id(input.subject_doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Subject doorway '{}' not found", input.subject_doorway_id)
-        )))?;
+    let subject_doorway =
+        get_doorway_by_id(input.subject_doorway_id.clone())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Subject doorway '{}' not found",
+                input.subject_doorway_id
+            )))
+        })?;
 
     let attestation = HealthAttestation {
         attestor_doorway_id: input.attestor_doorway_id,
@@ -623,10 +668,12 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
 /// Get all health attestations for a doorway (observations by peers).
 #[hdk_extern]
 pub fn get_doorway_attestations(doorway_id: String) -> ExternResult<Vec<HealthAttestationOutput>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", doorway_id)
-        )))?;
+    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            doorway_id
+        )))
+    })?;
 
     let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToAttestation)?;
     let links = get_links(query, GetStrategy::default())?;
@@ -651,7 +698,7 @@ pub fn get_doorway_attestations(doorway_id: String) -> ExternResult<Vec<HealthAt
                     attestations.push(HealthAttestationOutput {
                         action_hash: action_hash.to_string(),
                         entry_hash,
-                        attestation,
+                        attestation: attestation_to_wire(&attestation),
                         author,
                     });
                 }
@@ -679,10 +726,12 @@ pub fn update_doorway_tier(doorway_id: String) -> ExternResult<DoorwayOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let existing = get_doorway_by_id(doorway_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Doorway '{}' not found", doorway_id)
-        )))?;
+    let existing = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Doorway '{}' not found",
+            doorway_id
+        )))
+    })?;
 
     if existing.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -710,16 +759,28 @@ pub fn update_doorway_tier(doorway_id: String) -> ExternResult<DoorwayOutput> {
     };
 
     let doorway = DoorwayRegistration {
+        id: existing.doorway.id,
+        url: existing.doorway.url,
+        operator_agent: existing.doorway.operator_agent,
+        operator_human: existing.doorway.operator_human,
+        capabilities_json: existing.doorway.capabilities_json,
+        reach: existing.doorway.reach,
+        region: existing.doorway.region,
+        bandwidth_mbps: existing.doorway.bandwidth_mbps,
+        version: existing.doorway.version,
         tier: new_tier.to_string(),
+        registered_at: existing.doorway.registered_at,
         updated_at: timestamp,
-        ..existing.doorway
     };
 
-    let action_hash = update_entry(existing.action_hash, &EntryTypes::DoorwayRegistration(doorway.clone()))?;
+    let action_hash = update_entry(
+        existing.action_hash,
+        &EntryTypes::DoorwayRegistration(doorway.clone()),
+    )?;
 
     Ok(DoorwayOutput {
         action_hash,
-        doorway,
+        doorway: doorway_to_wire(&doorway),
     })
 }
 
@@ -732,22 +793,23 @@ pub fn update_doorway_tier(doorway_id: String) -> ExternResult<DoorwayOutput> {
 /// Creates a ContentServer entry and links for discovery by doorways.
 /// Any agent can register to serve content they have stored.
 #[hdk_extern]
-pub fn register_content_server(input: RegisterContentServerInput) -> ExternResult<ContentServerOutput> {
+pub fn register_content_server(
+    input: RegisterContentServerInput,
+) -> ExternResult<ContentServerOutput> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let now_secs = now.as_seconds_and_nanos().0 as u64;
 
     // Build endpoints list
     let endpoints: Vec<StorageEndpoint> = match input.endpoints {
-        Some(eps) if !eps.is_empty() => {
-            eps.into_iter()
-                .map(|e| StorageEndpoint {
-                    url: e.url,
-                    protocol: e.protocol,
-                    priority: e.priority.unwrap_or(50),
-                })
-                .collect()
-        }
+        Some(eps) if !eps.is_empty() => eps
+            .into_iter()
+            .map(|e| StorageEndpoint {
+                url: e.url,
+                protocol: e.protocol,
+                priority: e.priority.unwrap_or(50),
+            })
+            .collect(),
         _ => {
             // Backwards compatibility: create endpoint from serve_url if provided
             if let Some(ref url) = input.serve_url {
@@ -785,28 +847,51 @@ pub fn register_content_server(input: RegisterContentServerInput) -> ExternResul
     // Create content hash lookup link (primary discovery path)
     let hash_anchor = StringAnchor::new("content_hash", &input.content_hash);
     let hash_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hash_anchor))?;
-    create_link(hash_anchor_hash, action_hash.clone(), LinkTypes::HashToContentServer, ())?;
+    create_link(
+        hash_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HashToContentServer,
+        (),
+    )?;
 
     // Create agent lookup link (for finding all servers an agent operates)
-    let agent_anchor = StringAnchor::new("content_server_agent", &agent_info.agent_initial_pubkey.to_string());
+    let agent_anchor = StringAnchor::new(
+        "content_server_agent",
+        &agent_info.agent_initial_pubkey.to_string(),
+    );
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToContentServer, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToContentServer,
+        (),
+    )?;
 
     // Create capability lookup link
     let cap_anchor = StringAnchor::new("content_server_capability", &input.capability);
     let cap_anchor_hash = hash_entry(&EntryTypes::StringAnchor(cap_anchor))?;
-    create_link(cap_anchor_hash, action_hash.clone(), LinkTypes::CapabilityToContentServer, ())?;
+    create_link(
+        cap_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::CapabilityToContentServer,
+        (),
+    )?;
 
     // Create region lookup link if specified
     if let Some(ref region) = input.region {
         let region_anchor = StringAnchor::new("content_server_region", region);
         let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
-        create_link(region_anchor_hash, action_hash.clone(), LinkTypes::RegionToContentServer, ())?;
+        create_link(
+            region_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::RegionToContentServer,
+            (),
+        )?;
     }
 
     Ok(ContentServerOutput {
         action_hash,
-        server,
+        server: content_server_to_wire(&server),
     })
 }
 
@@ -814,18 +899,29 @@ pub fn register_content_server(input: RegisterContentServerInput) -> ExternResul
 ///
 /// Call periodically to indicate this server is still alive and serving.
 #[hdk_extern]
-pub fn update_content_server_heartbeat(action_hash: ActionHash) -> ExternResult<ContentServerOutput> {
+pub fn update_content_server_heartbeat(
+    action_hash: ActionHash,
+) -> ExternResult<ContentServerOutput> {
     let now = sys_time()?;
     let now_secs = now.as_seconds_and_nanos().0 as u64;
 
     let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "ContentServer not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("ContentServer not found".to_string())))?;
 
-    let mut server = record.entry().to_app_option::<ContentServer>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid ContentServer entry".to_string())))?;
+    let mut server = record
+        .entry()
+        .to_app_option::<ContentServer>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid ContentServer entry".to_string()
+            ))
+        })?;
 
     server.last_heartbeat = now_secs;
     server.online = true;
@@ -834,7 +930,7 @@ pub fn update_content_server_heartbeat(action_hash: ActionHash) -> ExternResult<
 
     Ok(ContentServerOutput {
         action_hash: new_action_hash,
-        server,
+        server: content_server_to_wire(&server),
     })
 }
 
@@ -844,13 +940,22 @@ pub fn update_content_server_heartbeat(action_hash: ActionHash) -> ExternResult<
 #[hdk_extern]
 pub fn mark_content_server_offline(action_hash: ActionHash) -> ExternResult<ContentServerOutput> {
     let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "ContentServer not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("ContentServer not found".to_string())))?;
 
-    let mut server = record.entry().to_app_option::<ContentServer>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid ContentServer entry".to_string())))?;
+    let mut server = record
+        .entry()
+        .to_app_option::<ContentServer>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid ContentServer entry".to_string()
+            ))
+        })?;
 
     server.online = false;
 
@@ -858,7 +963,7 @@ pub fn mark_content_server_offline(action_hash: ActionHash) -> ExternResult<Cont
 
     Ok(ContentServerOutput {
         action_hash: new_action_hash,
-        server,
+        server: content_server_to_wire(&server),
     })
 }
 
@@ -882,7 +987,12 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                if let Some(server) = record
+                    .entry()
+                    .to_app_option::<ContentServer>()
+                    .ok()
+                    .flatten()
+                {
                     // Apply filters
                     if online_only && !server.online {
                         continue;
@@ -896,7 +1006,7 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
 
                     publishers.push(ContentServerOutput {
                         action_hash,
-                        server,
+                        server: content_server_to_wire(&server),
                     });
                 }
             }
@@ -910,7 +1020,11 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
             let a_matches = a.server.region.as_ref() == Some(preferred);
             let b_matches = b.server.region.as_ref() == Some(preferred);
             if a_matches != b_matches {
-                return if a_matches { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+                return if a_matches {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                };
             }
         }
         // Then by priority (higher is better)
@@ -928,7 +1042,9 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
 
 /// Get all content servers operated by an agent.
 #[hdk_extern]
-pub fn get_content_servers_by_agent(agent_pubkey: String) -> ExternResult<Vec<ContentServerOutput>> {
+pub fn get_content_servers_by_agent(
+    agent_pubkey: String,
+) -> ExternResult<Vec<ContentServerOutput>> {
     let agent_anchor = StringAnchor::new("content_server_agent", &agent_pubkey);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
 
@@ -939,10 +1055,15 @@ pub fn get_content_servers_by_agent(agent_pubkey: String) -> ExternResult<Vec<Co
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                if let Some(server) = record
+                    .entry()
+                    .to_app_option::<ContentServer>()
+                    .ok()
+                    .flatten()
+                {
                     servers.push(ContentServerOutput {
                         action_hash,
-                        server,
+                        server: content_server_to_wire(&server),
                     });
                 }
             }
@@ -954,7 +1075,9 @@ pub fn get_content_servers_by_agent(agent_pubkey: String) -> ExternResult<Vec<Co
 
 /// Get all content servers with a specific capability.
 #[hdk_extern]
-pub fn get_content_servers_by_capability(capability: String) -> ExternResult<Vec<ContentServerOutput>> {
+pub fn get_content_servers_by_capability(
+    capability: String,
+) -> ExternResult<Vec<ContentServerOutput>> {
     let cap_anchor = StringAnchor::new("content_server_capability", &capability);
     let cap_anchor_hash = hash_entry(&EntryTypes::StringAnchor(cap_anchor))?;
 
@@ -965,10 +1088,15 @@ pub fn get_content_servers_by_capability(capability: String) -> ExternResult<Vec
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                if let Some(server) = record
+                    .entry()
+                    .to_app_option::<ContentServer>()
+                    .ok()
+                    .flatten()
+                {
                     servers.push(ContentServerOutput {
                         action_hash,
-                        server,
+                        server: content_server_to_wire(&server),
                     });
                 }
             }
