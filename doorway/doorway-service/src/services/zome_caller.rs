@@ -156,8 +156,17 @@ impl ZomeCaller {
             .call_zome(role_name, zome_name, fn_name, payload)
             .await?;
 
-        rmp_serde::from_slice(&response_bytes)
-            .map_err(|e| format!("Failed to deserialize response: {e}"))
+        rmp_serde::from_slice(&response_bytes).map_err(|e| {
+            // Dump response structure on failure for debugging
+            let structure = match rmpv::decode::read_value(&mut std::io::Cursor::new(&response_bytes)) {
+                Ok(val) => format!("{val:?}"),
+                Err(decode_err) => format!("<raw {} bytes, decode err: {decode_err}>", response_bytes.len()),
+            };
+            format!(
+                "Failed to deserialize response: {e} | response_bytes({} bytes) structure: {structure}",
+                response_bytes.len()
+            )
+        })
     }
 
     /// Check if currently connected
@@ -259,19 +268,58 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
 
             // The zome call result is wrapped in { type: "...", value: <result bytes> }
             if let Value::Map(ref inner_map) = inner {
-                if let Some(Value::Binary(result_bytes)) = get_field(inner_map, "value") {
-                    return Ok(result_bytes.clone());
+                let inner_type =
+                    get_string_field(inner_map, "type").unwrap_or_else(|| "<no type>".to_string());
+
+                if let Some(value_field) = get_field(inner_map, "value") {
+                    match value_field {
+                        Value::Binary(result_bytes) => {
+                            debug!(
+                                inner_type = %inner_type,
+                                result_len = result_bytes.len(),
+                                "parse_zome_response: extracted Binary value"
+                            );
+                            return Ok(result_bytes.clone());
+                        }
+                        Value::Map(ref result_map) => {
+                            debug!(
+                                inner_type = %inner_type,
+                                fields = result_map.len(),
+                                "parse_zome_response: re-encoding Map value"
+                            );
+                            let mut buf = Vec::new();
+                            rmpv::encode::write_value(&mut buf, &Value::Map(result_map.clone()))
+                                .map_err(|e| format!("Failed to re-encode result: {e}"))?;
+                            return Ok(buf);
+                        }
+                        other => {
+                            warn!(
+                                inner_type = %inner_type,
+                                value_type = %other.to_string().chars().take(200).collect::<String>(),
+                                "parse_zome_response: unexpected value type (not Binary or Map), falling through"
+                            );
+                        }
+                    }
+                } else {
+                    warn!(
+                        inner_type = %inner_type,
+                        inner_keys = ?inner_map.iter().map(|(k, _)| format!("{k}")).collect::<Vec<_>>(),
+                        "parse_zome_response: inner map has no 'value' field"
+                    );
                 }
-                // Some responses may have the value directly as a map
-                if let Some(Value::Map(ref result_map)) = get_field(inner_map, "value") {
-                    let mut buf = Vec::new();
-                    rmpv::encode::write_value(&mut buf, &Value::Map(result_map.clone()))
-                        .map_err(|e| format!("Failed to re-encode result: {e}"))?;
-                    return Ok(buf);
-                }
+            } else {
+                warn!(
+                    inner_kind = "not-a-map",
+                    inner_debug = %format!("{inner:?}").chars().take(300).collect::<String>(),
+                    "parse_zome_response: inner is not a Map"
+                );
             }
 
-            // If inner is directly the result bytes, return them
+            // Fallthrough: return inner_bytes directly (may cause downstream deserialization errors)
+            warn!(
+                inner_bytes_len = inner_bytes.len(),
+                "parse_zome_response: falling through to raw inner_bytes — this likely means the response envelope has an unexpected format"
+            );
             return Ok(inner_bytes.clone());
         }
     }
