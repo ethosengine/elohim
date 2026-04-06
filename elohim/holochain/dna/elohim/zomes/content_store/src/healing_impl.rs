@@ -258,17 +258,15 @@ pub fn emit_healing_signal(signal: HealingSignal) -> ExternResult<()> {
     hc_rna::emit_healing_signal(signal)
 }
 
-/// Internal helper to get content by ID (simplified for example)
-/// In real implementation, would use DHT queries
+/// TODO: Unused — stub for content healing (self-repair via DHT queries).
+/// Review whether healing needs content-by-ID lookup and implement with real DHT queries.
 fn get_content_by_id_internal(id: &str) -> ExternResult<Option<Content>> {
-    // This would use actual DHT queries in production
-    // For now, return Ok(Some(_)) to avoid blocking healing
     Ok(None)
 }
 
-/// Internal helper to get path by ID
+/// TODO: Unused — stub for path healing (self-repair via DHT queries).
+/// Review whether healing needs path-by-ID lookup and implement with real DHT queries.
 fn get_path_by_id_internal(id: &str) -> ExternResult<Option<LearningPath>> {
-    // This would use actual DHT queries in production
     Ok(None)
 }
 

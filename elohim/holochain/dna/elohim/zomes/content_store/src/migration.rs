@@ -160,9 +160,9 @@ fn transform_content_v1_to_current(v1_content: Content) -> Content {
     v1_content
 }
 
-/// Transform learning path from v1 schema to current schema
+/// TODO: Unused — stub for v1→current path schema migration.
+/// Review whether path schema evolved and implement field transformations, or remove if v1 is obsolete.
 fn transform_path_v1_to_current(v1_path: LearningPath) -> LearningPath {
-    // Customize for path schema changes
     v1_path
 }
 

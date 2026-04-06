@@ -4233,6 +4233,8 @@ fn create_id_to_content_link(id: &str, target: &ActionHash) -> ExternResult<()> 
     Ok(())
 }
 
+/// TODO: Unused — intended for content-type index links (browse by type)?
+/// Review whether content discovery needs type-anchor links and complete integration.
 fn create_type_to_content_link(content_type: &str, target: &ActionHash) -> ExternResult<()> {
     let anchor = StringAnchor::new("content_type", content_type);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
@@ -4247,6 +4249,8 @@ fn create_tag_to_content_link(tag: &str, target: &ActionHash) -> ExternResult<()
     Ok(())
 }
 
+/// TODO: Unused — intended for author-to-content provenance links?
+/// Review whether content attribution needs agent-anchor links and complete integration.
 fn create_author_to_content_link(target: &ActionHash) -> ExternResult<()> {
     let agent_info = agent_info()?;
     create_link(
@@ -8492,6 +8496,9 @@ pub fn generate_shards(input: GenerateShardsInput) -> ExternResult<GenerateShard
 /// - Signed by custodian_agent_id
 /// - Contains shard hash for integrity
 /// - Timestamped for audit trail
+///
+/// TODO: Unused — intended for content provenance verification (watermarking projected content)?
+/// Review whether EPR projection needs watermarks for off-network consumers and complete integration.
 ///
 /// Content projected outside network carries watermark so consumers can verify:
 /// "Is this actually from Sheila's Elohim presence, or a fake?"

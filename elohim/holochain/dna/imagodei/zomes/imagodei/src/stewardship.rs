@@ -248,7 +248,8 @@ fn get_my_steward_tier(subject_id: &str) -> ExternResult<String> {
     Ok("guide".to_string())
 }
 
-/// Merge two policies (child adds restrictions to parent)
+/// TODO: Unused — intended for hierarchical device policy inheritance?
+/// Review whether stewardship needs parent/child policy merging and complete integration.
 fn merge_policies(parent: &DevicePolicy, child: &DevicePolicy) -> DevicePolicy {
     // Parse JSON arrays
     let mut blocked_categories: Vec<String> =
