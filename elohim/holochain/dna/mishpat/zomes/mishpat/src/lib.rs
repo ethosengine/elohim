@@ -1,340 +1,247 @@
 use hdk::prelude::*;
 use mishpat_integrity::*;
 
+// Re-export all wire types from qahal-types crate.
+// Integrity entry types (Challenge, Proposal, etc.) stay in mishpat_integrity
+// and are converted to wire types at construction sites below.
+pub use qahal_types::{
+    // Challenge
+    ChallengeOutput,
+    CreateChallengeInput,
+    // Discussion
+    CreateDiscussionInput,
+    // GovernanceReaction
+    CreateGovernanceReactionInput,
+    // GovernanceState
+    CreateGovernanceStateInput,
+    // GraduatedFeedback
+    CreateGraduatedFeedbackInput,
+    // OpinionStatement
+    CreateOpinionStatementInput,
+    // Precedent
+    CreatePrecedentInput,
+    // Proposal
+    CreateProposalInput,
+    // ProposalVote
+    CreateProposalVoteInput,
+    // StatementVote
+    CreateStatementVoteInput,
+    // Credential verification
+    CredentialVerification,
+    DiscussionOutput,
+    GetGovernanceStateInput,
+    GovernanceReactionOutput,
+    GovernanceStateOutput,
+    GraduatedFeedbackOutput,
+    OpinionStatementOutput,
+    PrecedentOutput,
+    ProposalOutput,
+    ProposalVoteOutput,
+    QueryChallengesInput,
+    QueryDiscussionsInput,
+    QueryGovernanceReactionsInput,
+    QueryGovernanceStatesInput,
+    QueryGraduatedFeedbackInput,
+    QueryOpinionStatementsInput,
+    QueryPrecedentsInput,
+    QueryProposalVotesInput,
+    QueryProposalsInput,
+    QueryStatementVotesInput,
+    StatementVoteOutput,
+    VerificationStatus,
+};
+
 // ============================================================
-// INPUT / OUTPUT TYPES
+// INTEGRITY → WIRE TYPE CONVERTERS
 // ============================================================
+// These convert integrity entry types (which use #[hdk_entry_helper])
+// to qahal-types wire types (plain serde) at construction sites.
 
-// ---- Challenge ----
-
-/// Input for creating a challenge
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateChallengeInput {
-    pub id: Option<String>,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub challenger_id: String,
-    pub challenger_name: String,
-    pub challenger_standing: String,
-    pub grounds: String,
-    pub description: String,
-    pub evidence_json: String,
-    pub status: String,
-    pub priority: String,
-    pub sla_deadline: Option<String>,
-    pub assigned_elohim: Option<String>,
-    pub resolution_json: Option<String>,
-    pub metadata_json: String,
+fn wire_challenge(e: &mishpat_integrity::Challenge) -> qahal_types::Challenge {
+    qahal_types::Challenge {
+        id: e.id.clone(),
+        entity_type: e.entity_type.clone(),
+        entity_id: e.entity_id.clone(),
+        challenger_id: e.challenger_id.clone(),
+        challenger_name: e.challenger_name.clone(),
+        challenger_standing: e.challenger_standing.clone(),
+        grounds: e.grounds.clone(),
+        description: e.description.clone(),
+        evidence_json: e.evidence_json.clone(),
+        status: e.status.clone(),
+        filed_at: e.filed_at.clone(),
+        acknowledged_at: e.acknowledged_at.clone(),
+        sla_deadline: e.sla_deadline.clone(),
+        assigned_elohim: e.assigned_elohim.clone(),
+        priority: e.priority.clone(),
+        resolution_json: e.resolution_json.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Output for challenge
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ChallengeOutput {
-    pub action_hash: ActionHash,
-    pub challenge: Challenge,
+fn wire_proposal(e: &mishpat_integrity::Proposal) -> qahal_types::Proposal {
+    qahal_types::Proposal {
+        id: e.id.clone(),
+        title: e.title.clone(),
+        proposal_type: e.proposal_type.clone(),
+        description: e.description.clone(),
+        proposer_id: e.proposer_id.clone(),
+        proposer_name: e.proposer_name.clone(),
+        rationale: e.rationale.clone(),
+        status: e.status.clone(),
+        phase: e.phase.clone(),
+        amendments_json: e.amendments_json.clone(),
+        voting_config_json: e.voting_config_json.clone(),
+        current_votes_json: e.current_votes_json.clone(),
+        outcome_json: e.outcome_json.clone(),
+        related_entity_type: e.related_entity_type.clone(),
+        related_entity_id: e.related_entity_id.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Input for querying challenges
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryChallengesInput {
-    pub entity_type: Option<String>,
-    pub entity_id: Option<String>,
-    pub challenger_id: Option<String>,
-    pub status: Option<String>,
-    pub limit: Option<u32>,
+fn wire_precedent(e: &mishpat_integrity::Precedent) -> qahal_types::Precedent {
+    qahal_types::Precedent {
+        id: e.id.clone(),
+        title: e.title.clone(),
+        summary: e.summary.clone(),
+        full_reasoning: e.full_reasoning.clone(),
+        binding: e.binding.clone(),
+        scope_json: e.scope_json.clone(),
+        citations: e.citations,
+        status: e.status.clone(),
+        established_by: e.established_by.clone(),
+        established_at: e.established_at.clone(),
+        superseded_by: e.superseded_by.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-// ---- Proposal ----
-
-/// Input for creating a proposal
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateProposalInput {
-    pub id: Option<String>,
-    pub title: String,
-    pub proposal_type: String,
-    pub description: String,
-    pub proposer_id: String,
-    pub proposer_name: String,
-    pub rationale: String,
-    pub status: String,
-    pub phase: String,
-    pub amendments_json: String,
-    pub voting_config_json: String,
-    pub current_votes_json: String,
-    pub outcome_json: Option<String>,
-    pub related_entity_type: Option<String>,
-    pub related_entity_id: Option<String>,
-    pub metadata_json: String,
+fn wire_discussion(e: &mishpat_integrity::Discussion) -> qahal_types::Discussion {
+    qahal_types::Discussion {
+        id: e.id.clone(),
+        entity_type: e.entity_type.clone(),
+        entity_id: e.entity_id.clone(),
+        category: e.category.clone(),
+        title: e.title.clone(),
+        messages_json: e.messages_json.clone(),
+        status: e.status.clone(),
+        message_count: e.message_count,
+        last_activity_at: e.last_activity_at.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Output for proposal
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ProposalOutput {
-    pub action_hash: ActionHash,
-    pub proposal: Proposal,
+fn wire_governance_state(e: &mishpat_integrity::GovernanceState) -> qahal_types::GovernanceState {
+    qahal_types::GovernanceState {
+        id: e.id.clone(),
+        entity_type: e.entity_type.clone(),
+        entity_id: e.entity_id.clone(),
+        status: e.status.clone(),
+        status_basis_json: e.status_basis_json.clone(),
+        labels_json: e.labels_json.clone(),
+        active_challenges_json: e.active_challenges_json.clone(),
+        active_proposals_json: e.active_proposals_json.clone(),
+        precedent_ids_json: e.precedent_ids_json.clone(),
+        last_updated: e.last_updated.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Input for querying proposals
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryProposalsInput {
-    pub proposal_type: Option<String>,
-    pub proposer_id: Option<String>,
-    pub status: Option<String>,
-    pub limit: Option<u32>,
+fn wire_governance_reaction(
+    e: &mishpat_integrity::GovernanceReaction,
+) -> qahal_types::GovernanceReaction {
+    qahal_types::GovernanceReaction {
+        id: e.id.clone(),
+        content_id: e.content_id.clone(),
+        content_type: e.content_type.clone(),
+        reactor_id: e.reactor_id.clone(),
+        reaction: e.reaction.clone(),
+        intensity: e.intensity,
+        mediated: e.mediated,
+        mediation_accepted: e.mediation_accepted,
+        context_json: e.context_json.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-// ---- Precedent ----
-
-/// Input for creating a precedent
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatePrecedentInput {
-    pub id: Option<String>,
-    pub title: String,
-    pub summary: String,
-    pub full_reasoning: String,
-    pub binding: String,              // constitutional, binding-network, binding-local, persuasive
-    pub scope_json: String,
-    pub established_by: String,
-    pub status: String,
-    pub superseded_by: Option<String>,
-    pub metadata_json: String,
+fn wire_graduated_feedback(
+    e: &mishpat_integrity::GraduatedFeedback,
+) -> qahal_types::GraduatedFeedback {
+    qahal_types::GraduatedFeedback {
+        id: e.id.clone(),
+        content_id: e.content_id.clone(),
+        content_type: e.content_type.clone(),
+        responder_id: e.responder_id.clone(),
+        feedback_context: e.feedback_context.clone(),
+        position: e.position,
+        intensity: e.intensity,
+        reasoning: e.reasoning.clone(),
+        updated_count: e.updated_count,
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Output for precedent
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PrecedentOutput {
-    pub action_hash: ActionHash,
-    pub precedent: Precedent,
+fn wire_proposal_vote(e: &mishpat_integrity::ProposalVote) -> qahal_types::ProposalVote {
+    qahal_types::ProposalVote {
+        id: e.id.clone(),
+        proposal_id: e.proposal_id.clone(),
+        voter_id: e.voter_id.clone(),
+        voter_name: e.voter_name.clone(),
+        position: e.position.clone(),
+        reasoning: e.reasoning.clone(),
+        version: e.version,
+        previous_position: e.previous_position.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-/// Input for querying precedents
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryPrecedentsInput {
-    pub status: Option<String>,
-    pub binding: Option<String>,
-    pub limit: Option<u32>,
+fn wire_opinion_statement(
+    e: &mishpat_integrity::OpinionStatement,
+) -> qahal_types::OpinionStatement {
+    qahal_types::OpinionStatement {
+        id: e.id.clone(),
+        context_id: e.context_id.clone(),
+        author_id: e.author_id.clone(),
+        text: e.text.clone(),
+        status: e.status.clone(),
+        vote_count: e.vote_count,
+        agree_count: e.agree_count,
+        disagree_count: e.disagree_count,
+        pass_count: e.pass_count,
+        consensus_score: e.consensus_score,
+        cluster_json: e.cluster_json.clone(),
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
-// ---- Discussion ----
-
-/// Input for creating a discussion
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateDiscussionInput {
-    pub id: Option<String>,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub category: String,
-    pub title: String,
-    pub messages_json: String,
-    pub status: String,
-    pub metadata_json: String,
-}
-
-/// Output for discussion
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DiscussionOutput {
-    pub action_hash: ActionHash,
-    pub discussion: Discussion,
-}
-
-/// Input for querying discussions
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryDiscussionsInput {
-    pub entity_type: Option<String>,
-    pub entity_id: Option<String>,
-    pub category: Option<String>,
-    pub status: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- GovernanceState ----
-
-/// Input for creating/updating governance state
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateGovernanceStateInput {
-    pub id: Option<String>,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub status: String,
-    pub status_basis_json: String,
-    pub labels_json: String,
-    pub active_challenges_json: String,
-    pub active_proposals_json: String,
-    pub precedent_ids_json: String,
-    pub metadata_json: String,
-}
-
-/// Output for governance state
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GovernanceStateOutput {
-    pub action_hash: ActionHash,
-    pub governance_state: GovernanceState,
-}
-
-/// Input for getting governance state
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetGovernanceStateInput {
-    pub entity_type: String,
-    pub entity_id: String,
-}
-
-/// Input for querying governance states
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryGovernanceStatesInput {
-    pub status: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- GovernanceReaction ----
-
-/// Input for creating a governance reaction
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateGovernanceReactionInput {
-    pub id: Option<String>,
-    pub content_id: String,
-    pub content_type: String,
-    pub reactor_id: String,
-    pub reaction: String,
-    pub intensity: u8,
-    pub mediated: bool,
-    pub mediation_accepted: bool,
-    pub context_json: String,
-    pub metadata_json: String,
-}
-
-/// Output for governance reaction
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GovernanceReactionOutput {
-    pub action_hash: ActionHash,
-    pub reaction: GovernanceReaction,
-}
-
-/// Input for querying governance reactions
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryGovernanceReactionsInput {
-    pub content_id: Option<String>,
-    pub reactor_id: Option<String>,
-    pub reaction_type: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- GraduatedFeedback ----
-
-/// Input for creating graduated feedback
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateGraduatedFeedbackInput {
-    pub id: Option<String>,
-    pub content_id: String,
-    pub content_type: String,
-    pub responder_id: String,
-    pub feedback_context: String,
-    pub position: i8,
-    pub intensity: u8,
-    pub reasoning: Option<String>,
-    pub metadata_json: String,
-}
-
-/// Output for graduated feedback
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GraduatedFeedbackOutput {
-    pub action_hash: ActionHash,
-    pub feedback: GraduatedFeedback,
-}
-
-/// Input for querying graduated feedback
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryGraduatedFeedbackInput {
-    pub content_id: Option<String>,
-    pub responder_id: Option<String>,
-    pub feedback_context: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- ProposalVote ----
-
-/// Input for casting a proposal vote
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateProposalVoteInput {
-    pub id: Option<String>,
-    pub proposal_id: String,
-    pub voter_id: String,
-    pub voter_name: String,
-    pub position: String,
-    pub reasoning: Option<String>,
-    pub version: u32,
-    pub previous_position: Option<String>,
-    pub metadata_json: String,
-}
-
-/// Output for proposal vote
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ProposalVoteOutput {
-    pub action_hash: ActionHash,
-    pub vote: ProposalVote,
-}
-
-/// Input for querying proposal votes
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryProposalVotesInput {
-    pub proposal_id: Option<String>,
-    pub voter_id: Option<String>,
-    pub position: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- OpinionStatement ----
-
-/// Input for creating an opinion statement
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateOpinionStatementInput {
-    pub id: Option<String>,
-    pub context_id: String,
-    pub author_id: String,
-    pub text: String,
-    pub status: String,
-    pub metadata_json: String,
-}
-
-/// Output for opinion statement
-#[derive(Serialize, Deserialize, Debug)]
-pub struct OpinionStatementOutput {
-    pub action_hash: ActionHash,
-    pub statement: OpinionStatement,
-}
-
-/// Input for querying opinion statements
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryOpinionStatementsInput {
-    pub context_id: Option<String>,
-    pub author_id: Option<String>,
-    pub limit: Option<u32>,
-}
-
-// ---- StatementVote ----
-
-/// Input for casting a statement vote
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateStatementVoteInput {
-    pub id: Option<String>,
-    pub statement_id: String,
-    pub voter_id: String,
-    pub vote: String,
-    pub metadata_json: String,
-}
-
-/// Output for statement vote
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StatementVoteOutput {
-    pub action_hash: ActionHash,
-    pub statement_vote: StatementVote,
-}
-
-/// Input for querying statement votes
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryStatementVotesInput {
-    pub statement_id: Option<String>,
-    pub voter_id: Option<String>,
-    pub limit: Option<u32>,
+fn wire_statement_vote(e: &mishpat_integrity::StatementVote) -> qahal_types::StatementVote {
+    qahal_types::StatementVote {
+        id: e.id.clone(),
+        statement_id: e.statement_id.clone(),
+        voter_id: e.voter_id.clone(),
+        vote: e.vote.clone(),
+        created_at: e.created_at.clone(),
+        metadata_json: e.metadata_json.clone(),
+    }
 }
 
 // ============================================================
@@ -347,9 +254,9 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let challenge_id = input.id.unwrap_or_else(|| {
-        format!("chal-{}-{}", input.entity_id, timestamp)
-    });
+    let challenge_id = input
+        .id
+        .unwrap_or_else(|| format!("chal-{}-{}", input.entity_id, timestamp));
 
     let challenge = Challenge {
         id: challenge_id.clone(),
@@ -378,27 +285,47 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
     // Link by ID
     let id_anchor = StringAnchor::new("challenge_id", &challenge_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToChallenge, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToChallenge,
+        (),
+    )?;
 
     // Link by entity
     let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
     let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
     let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
-    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::EntityToChallenge, ())?;
+    create_link(
+        entity_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::EntityToChallenge,
+        (),
+    )?;
 
     // Link by challenger
     let challenger_anchor = StringAnchor::new("challenge_challenger", &input.challenger_id);
     let challenger_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenger_anchor))?;
-    create_link(challenger_anchor_hash, action_hash.clone(), LinkTypes::ChallengerToChallenge, ())?;
+    create_link(
+        challenger_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ChallengerToChallenge,
+        (),
+    )?;
 
     // Link by status
     let status_anchor = StringAnchor::new("challenge_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ChallengeByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ChallengeByStatus,
+        (),
+    )?;
 
     Ok(ChallengeOutput {
         action_hash,
-        challenge,
+        challenge: wire_challenge(&challenge),
     })
 }
 
@@ -412,13 +339,17 @@ pub fn get_challenge_by_id(id: String) -> ExternResult<Option<ChallengeOutput>> 
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
             if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
-                return Ok(Some(ChallengeOutput { action_hash, challenge }));
+                return Ok(Some(ChallengeOutput {
+                    action_hash,
+                    challenge: wire_challenge(&challenge),
+                }));
             }
         }
     }
@@ -433,7 +364,11 @@ pub fn query_challenges(input: QueryChallengesInput) -> ExternResult<Vec<Challen
     let limit = input.limit.unwrap_or(100) as usize;
 
     if input.entity_type.is_some() && input.entity_id.is_some() {
-        let entity_key = format!("{}:{}", input.entity_type.as_ref().unwrap(), input.entity_id.as_ref().unwrap());
+        let entity_key = format!(
+            "{}:{}",
+            input.entity_type.as_ref().unwrap(),
+            input.entity_id.as_ref().unwrap()
+        );
         let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
         let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
 
@@ -441,19 +376,24 @@ pub fn query_challenges(input: QueryChallengesInput) -> ExternResult<Vec<Challen
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
+                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten()
+                {
                     // Filter by status if specified
                     if let Some(ref status) = input.status {
                         if &challenge.status != status {
                             continue;
                         }
                     }
-                    results.push(ChallengeOutput { action_hash, challenge });
+                    results.push(ChallengeOutput {
+                        action_hash,
+                        challenge: wire_challenge(&challenge),
+                    });
                 }
             }
         }
@@ -465,13 +405,18 @@ pub fn query_challenges(input: QueryChallengesInput) -> ExternResult<Vec<Challen
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
-                    results.push(ChallengeOutput { action_hash, challenge });
+                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten()
+                {
+                    results.push(ChallengeOutput {
+                        action_hash,
+                        challenge: wire_challenge(&challenge),
+                    });
                 }
             }
         }
@@ -490,9 +435,7 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let proposal_id = input.id.unwrap_or_else(|| {
-        format!("prop-{}", timestamp)
-    });
+    let proposal_id = input.id.unwrap_or_else(|| format!("prop-{}", timestamp));
 
     let proposal = Proposal {
         id: proposal_id.clone(),
@@ -520,26 +463,46 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
     // Link by ID
     let id_anchor = StringAnchor::new("proposal_id", &proposal_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToProposal, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToProposal,
+        (),
+    )?;
 
     // Link by type
     let type_anchor = StringAnchor::new("proposal_type", &input.proposal_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::ProposalByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProposalByType,
+        (),
+    )?;
 
     // Link by proposer
     let proposer_anchor = StringAnchor::new("proposal_proposer", &input.proposer_id);
     let proposer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposer_anchor))?;
-    create_link(proposer_anchor_hash, action_hash.clone(), LinkTypes::ProposerToProposal, ())?;
+    create_link(
+        proposer_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProposerToProposal,
+        (),
+    )?;
 
     // Link by status
     let status_anchor = StringAnchor::new("proposal_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ProposalByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProposalByStatus,
+        (),
+    )?;
 
     Ok(ProposalOutput {
         action_hash,
-        proposal,
+        proposal: wire_proposal(&proposal),
     })
 }
 
@@ -559,7 +522,10 @@ pub fn get_proposal_by_id(id: String) -> ExternResult<Option<ProposalOutput>> {
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
             if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
-                return Ok(Some(ProposalOutput { action_hash, proposal }));
+                return Ok(Some(ProposalOutput {
+                    action_hash,
+                    proposal: wire_proposal(&proposal),
+                }));
             }
         }
     }
@@ -581,8 +547,9 @@ pub fn query_proposals(input: QueryProposalsInput) -> ExternResult<Vec<ProposalO
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
@@ -598,7 +565,10 @@ pub fn query_proposals(input: QueryProposalsInput) -> ExternResult<Vec<ProposalO
                             continue;
                         }
                     }
-                    results.push(ProposalOutput { action_hash, proposal });
+                    results.push(ProposalOutput {
+                        action_hash,
+                        proposal: wire_proposal(&proposal),
+                    });
                 }
             }
         }
@@ -610,13 +580,17 @@ pub fn query_proposals(input: QueryProposalsInput) -> ExternResult<Vec<ProposalO
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
                 if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
-                    results.push(ProposalOutput { action_hash, proposal });
+                    results.push(ProposalOutput {
+                        action_hash,
+                        proposal: wire_proposal(&proposal),
+                    });
                 }
             }
         }
@@ -635,9 +609,7 @@ pub fn create_precedent(input: CreatePrecedentInput) -> ExternResult<PrecedentOu
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let precedent_id = input.id.unwrap_or_else(|| {
-        format!("prec-{}", timestamp)
-    });
+    let precedent_id = input.id.unwrap_or_else(|| format!("prec-{}", timestamp));
 
     let precedent = Precedent {
         id: precedent_id.clone(),
@@ -646,7 +618,7 @@ pub fn create_precedent(input: CreatePrecedentInput) -> ExternResult<PrecedentOu
         full_reasoning: input.full_reasoning,
         binding: input.binding.clone(),
         scope_json: input.scope_json.clone(),
-        citations: 0,  // Starts at 0, incremented when cited
+        citations: 0, // Starts at 0, incremented when cited
         status: input.status.clone(),
         established_by: input.established_by,
         established_at: timestamp.clone(),
@@ -661,21 +633,36 @@ pub fn create_precedent(input: CreatePrecedentInput) -> ExternResult<PrecedentOu
     // Link by ID
     let id_anchor = StringAnchor::new("precedent_id", &precedent_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPrecedent, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPrecedent,
+        (),
+    )?;
 
     // Link by scope (use raw JSON as key — caller controls granularity)
     let scope_anchor = StringAnchor::new("precedent_scope", &input.scope_json);
     let scope_anchor_hash = hash_entry(&EntryTypes::StringAnchor(scope_anchor))?;
-    create_link(scope_anchor_hash, action_hash.clone(), LinkTypes::PrecedentByScope, ())?;
+    create_link(
+        scope_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PrecedentByScope,
+        (),
+    )?;
 
     // Link by status
     let status_anchor = StringAnchor::new("precedent_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::PrecedentByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PrecedentByStatus,
+        (),
+    )?;
 
     Ok(PrecedentOutput {
         action_hash,
-        precedent,
+        precedent: wire_precedent(&precedent),
     })
 }
 
@@ -689,13 +676,17 @@ pub fn get_precedent_by_id(id: String) -> ExternResult<Option<PrecedentOutput>> 
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
             if let Some(precedent) = record.entry().to_app_option::<Precedent>().ok().flatten() {
-                return Ok(Some(PrecedentOutput { action_hash, precedent }));
+                return Ok(Some(PrecedentOutput {
+                    action_hash,
+                    precedent: wire_precedent(&precedent),
+                }));
             }
         }
     }
@@ -717,19 +708,24 @@ pub fn query_precedents(input: QueryPrecedentsInput) -> ExternResult<Vec<Precede
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(precedent) = record.entry().to_app_option::<Precedent>().ok().flatten() {
+                if let Some(precedent) = record.entry().to_app_option::<Precedent>().ok().flatten()
+                {
                     // Filter by binding if specified
                     if let Some(ref binding) = input.binding {
                         if &precedent.binding != binding {
                             continue;
                         }
                     }
-                    results.push(PrecedentOutput { action_hash, precedent });
+                    results.push(PrecedentOutput {
+                        action_hash,
+                        precedent: wire_precedent(&precedent),
+                    });
                 }
             }
         }
@@ -748,9 +744,9 @@ pub fn create_discussion(input: CreateDiscussionInput) -> ExternResult<Discussio
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let discussion_id = input.id.unwrap_or_else(|| {
-        format!("disc-{}-{}", input.entity_id, timestamp)
-    });
+    let discussion_id = input
+        .id
+        .unwrap_or_else(|| format!("disc-{}-{}", input.entity_id, timestamp));
 
     let discussion = Discussion {
         id: discussion_id.clone(),
@@ -772,27 +768,47 @@ pub fn create_discussion(input: CreateDiscussionInput) -> ExternResult<Discussio
     // Link by ID
     let id_anchor = StringAnchor::new("discussion_id", &discussion_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToDiscussion, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToDiscussion,
+        (),
+    )?;
 
     // Link by entity
     let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
     let entity_anchor = StringAnchor::new("discussion_entity", &entity_key);
     let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
-    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::EntityToDiscussion, ())?;
+    create_link(
+        entity_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::EntityToDiscussion,
+        (),
+    )?;
 
     // Link by category
     let category_anchor = StringAnchor::new("discussion_category", &input.category);
     let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
-    create_link(category_anchor_hash, action_hash.clone(), LinkTypes::DiscussionByCategory, ())?;
+    create_link(
+        category_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::DiscussionByCategory,
+        (),
+    )?;
 
     // Link by status
     let status_anchor = StringAnchor::new("discussion_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::DiscussionByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::DiscussionByStatus,
+        (),
+    )?;
 
     Ok(DiscussionOutput {
         action_hash,
-        discussion,
+        discussion: wire_discussion(&discussion),
     })
 }
 
@@ -806,13 +822,17 @@ pub fn get_discussion_by_id(id: String) -> ExternResult<Option<DiscussionOutput>
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
             if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
-                return Ok(Some(DiscussionOutput { action_hash, discussion }));
+                return Ok(Some(DiscussionOutput {
+                    action_hash,
+                    discussion: wire_discussion(&discussion),
+                }));
             }
         }
     }
@@ -827,7 +847,11 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
     let limit = input.limit.unwrap_or(100) as usize;
 
     if input.entity_type.is_some() && input.entity_id.is_some() {
-        let entity_key = format!("{}:{}", input.entity_type.as_ref().unwrap(), input.entity_id.as_ref().unwrap());
+        let entity_key = format!(
+            "{}:{}",
+            input.entity_type.as_ref().unwrap(),
+            input.entity_id.as_ref().unwrap()
+        );
         let entity_anchor = StringAnchor::new("discussion_entity", &entity_key);
         let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
 
@@ -835,12 +859,15 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
+                if let Some(discussion) =
+                    record.entry().to_app_option::<Discussion>().ok().flatten()
+                {
                     // Filter by category/status if specified
                     if let Some(ref category) = input.category {
                         if &discussion.category != category {
@@ -852,7 +879,10 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
                             continue;
                         }
                     }
-                    results.push(DiscussionOutput { action_hash, discussion });
+                    results.push(DiscussionOutput {
+                        action_hash,
+                        discussion: wire_discussion(&discussion),
+                    });
                 }
             }
         }
@@ -864,13 +894,19 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
-                    results.push(DiscussionOutput { action_hash, discussion });
+                if let Some(discussion) =
+                    record.entry().to_app_option::<Discussion>().ok().flatten()
+                {
+                    results.push(DiscussionOutput {
+                        action_hash,
+                        discussion: wire_discussion(&discussion),
+                    });
                 }
             }
         }
@@ -885,13 +921,15 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
 
 /// Create or update governance state for an entity
 #[hdk_extern]
-pub fn set_governance_state(input: CreateGovernanceStateInput) -> ExternResult<GovernanceStateOutput> {
+pub fn set_governance_state(
+    input: CreateGovernanceStateInput,
+) -> ExternResult<GovernanceStateOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let governance_state_id = input.id.unwrap_or_else(|| {
-        format!("gs-{}:{}", input.entity_type, input.entity_id)
-    });
+    let governance_state_id = input
+        .id
+        .unwrap_or_else(|| format!("gs-{}:{}", input.entity_type, input.entity_id));
 
     let governance_state = GovernanceState {
         id: governance_state_id,
@@ -915,22 +953,34 @@ pub fn set_governance_state(input: CreateGovernanceStateInput) -> ExternResult<G
     let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
     let entity_anchor = StringAnchor::new("governance_state_entity", &entity_key);
     let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
-    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::IdToGovernanceState, ())?;
+    create_link(
+        entity_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToGovernanceState,
+        (),
+    )?;
 
     // Link by status
     let status_anchor = StringAnchor::new("governance_state_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::GovernanceStateByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GovernanceStateByStatus,
+        (),
+    )?;
 
     Ok(GovernanceStateOutput {
         action_hash,
-        governance_state,
+        governance_state: wire_governance_state(&governance_state),
     })
 }
 
 /// Get governance state for an entity
 #[hdk_extern]
-pub fn get_governance_state(input: GetGovernanceStateInput) -> ExternResult<Option<GovernanceStateOutput>> {
+pub fn get_governance_state(
+    input: GetGovernanceStateInput,
+) -> ExternResult<Option<GovernanceStateOutput>> {
     let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
     let entity_anchor = StringAnchor::new("governance_state_entity", &entity_key);
     let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
@@ -940,13 +990,24 @@ pub fn get_governance_state(input: GetGovernanceStateInput) -> ExternResult<Opti
 
     // Return the most recent governance state
     if let Some(link) = links.last() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid governance state hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid governance state hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
-            if let Some(governance_state) = record.entry().to_app_option::<GovernanceState>().ok().flatten() {
-                return Ok(Some(GovernanceStateOutput { action_hash, governance_state }));
+            if let Some(governance_state) = record
+                .entry()
+                .to_app_option::<GovernanceState>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(GovernanceStateOutput {
+                    action_hash,
+                    governance_state: wire_governance_state(&governance_state),
+                }));
             }
         }
     }
@@ -956,7 +1017,9 @@ pub fn get_governance_state(input: GetGovernanceStateInput) -> ExternResult<Opti
 
 /// Query governance states by status
 #[hdk_extern]
-pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResult<Vec<GovernanceStateOutput>> {
+pub fn query_governance_states(
+    input: QueryGovernanceStatesInput,
+) -> ExternResult<Vec<GovernanceStateOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -968,13 +1031,24 @@ pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResul
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid governance state hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid governance state hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(governance_state) = record.entry().to_app_option::<GovernanceState>().ok().flatten() {
-                    results.push(GovernanceStateOutput { action_hash, governance_state });
+                if let Some(governance_state) = record
+                    .entry()
+                    .to_app_option::<GovernanceState>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(GovernanceStateOutput {
+                        action_hash,
+                        governance_state: wire_governance_state(&governance_state),
+                    });
                 }
             }
         }
@@ -989,12 +1063,17 @@ pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResul
 
 /// Record a low-friction emotional reaction to content
 #[hdk_extern]
-pub fn create_governance_reaction(input: CreateGovernanceReactionInput) -> ExternResult<GovernanceReactionOutput> {
+pub fn create_governance_reaction(
+    input: CreateGovernanceReactionInput,
+) -> ExternResult<GovernanceReactionOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     let reaction_id = input.id.unwrap_or_else(|| {
-        format!("rxn-{}-{}-{}", input.content_id, input.reactor_id, timestamp)
+        format!(
+            "rxn-{}-{}-{}",
+            input.content_id, input.reactor_id, timestamp
+        )
     });
 
     let reaction = GovernanceReaction {
@@ -1017,27 +1096,44 @@ pub fn create_governance_reaction(input: CreateGovernanceReactionInput) -> Exter
     // Link by content
     let content_anchor = StringAnchor::new("reaction_content", &input.content_id);
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToReactions, ())?;
+    create_link(
+        content_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToReactions,
+        (),
+    )?;
 
     // Link by agent
     let agent_anchor = StringAnchor::new("reaction_agent", &input.reactor_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToReactions, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToReactions,
+        (),
+    )?;
 
     // Link by reaction type
     let type_anchor = StringAnchor::new("reaction_type", &input.reaction);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::ReactionByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ReactionByType,
+        (),
+    )?;
 
     Ok(GovernanceReactionOutput {
         action_hash,
-        reaction,
+        reaction: wire_governance_reaction(&reaction),
     })
 }
 
 /// Query governance reactions
 #[hdk_extern]
-pub fn query_governance_reactions(input: QueryGovernanceReactionsInput) -> ExternResult<Vec<GovernanceReactionOutput>> {
+pub fn query_governance_reactions(
+    input: QueryGovernanceReactionsInput,
+) -> ExternResult<Vec<GovernanceReactionOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -1049,18 +1145,27 @@ pub fn query_governance_reactions(input: QueryGovernanceReactionsInput) -> Exter
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(reaction) = record.entry().to_app_option::<GovernanceReaction>().ok().flatten() {
+                if let Some(reaction) = record
+                    .entry()
+                    .to_app_option::<GovernanceReaction>()
+                    .ok()
+                    .flatten()
+                {
                     if let Some(ref reaction_type) = input.reaction_type {
                         if &reaction.reaction != reaction_type {
                             continue;
                         }
                     }
-                    results.push(GovernanceReactionOutput { action_hash, reaction });
+                    results.push(GovernanceReactionOutput {
+                        action_hash,
+                        reaction: wire_governance_reaction(&reaction),
+                    });
                 }
             }
         }
@@ -1072,13 +1177,22 @@ pub fn query_governance_reactions(input: QueryGovernanceReactionsInput) -> Exter
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(reaction) = record.entry().to_app_option::<GovernanceReaction>().ok().flatten() {
-                    results.push(GovernanceReactionOutput { action_hash, reaction });
+                if let Some(reaction) = record
+                    .entry()
+                    .to_app_option::<GovernanceReaction>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(GovernanceReactionOutput {
+                        action_hash,
+                        reaction: wire_governance_reaction(&reaction),
+                    });
                 }
             }
         }
@@ -1093,12 +1207,17 @@ pub fn query_governance_reactions(input: QueryGovernanceReactionsInput) -> Exter
 
 /// Record medium-friction scaled feedback (Loomio/Forby style)
 #[hdk_extern]
-pub fn create_graduated_feedback(input: CreateGraduatedFeedbackInput) -> ExternResult<GraduatedFeedbackOutput> {
+pub fn create_graduated_feedback(
+    input: CreateGraduatedFeedbackInput,
+) -> ExternResult<GraduatedFeedbackOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     let feedback_id = input.id.unwrap_or_else(|| {
-        format!("fb-{}-{}-{}", input.content_id, input.responder_id, input.feedback_context)
+        format!(
+            "fb-{}-{}-{}",
+            input.content_id, input.responder_id, input.feedback_context
+        )
     });
 
     let feedback = GraduatedFeedback {
@@ -1121,27 +1240,44 @@ pub fn create_graduated_feedback(input: CreateGraduatedFeedbackInput) -> ExternR
     // Link by content
     let content_anchor = StringAnchor::new("feedback_content", &input.content_id);
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToFeedback, ())?;
+    create_link(
+        content_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToFeedback,
+        (),
+    )?;
 
     // Link by agent
     let agent_anchor = StringAnchor::new("feedback_agent", &input.responder_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToFeedback, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToFeedback,
+        (),
+    )?;
 
     // Link by context
     let context_anchor = StringAnchor::new("feedback_context", &input.feedback_context);
     let context_anchor_hash = hash_entry(&EntryTypes::StringAnchor(context_anchor))?;
-    create_link(context_anchor_hash, action_hash.clone(), LinkTypes::FeedbackByContext, ())?;
+    create_link(
+        context_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::FeedbackByContext,
+        (),
+    )?;
 
     Ok(GraduatedFeedbackOutput {
         action_hash,
-        feedback,
+        feedback: wire_graduated_feedback(&feedback),
     })
 }
 
 /// Query graduated feedback
 #[hdk_extern]
-pub fn query_graduated_feedback(input: QueryGraduatedFeedbackInput) -> ExternResult<Vec<GraduatedFeedbackOutput>> {
+pub fn query_graduated_feedback(
+    input: QueryGraduatedFeedbackInput,
+) -> ExternResult<Vec<GraduatedFeedbackOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -1153,18 +1289,27 @@ pub fn query_graduated_feedback(input: QueryGraduatedFeedbackInput) -> ExternRes
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid feedback hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid feedback hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(feedback) = record.entry().to_app_option::<GraduatedFeedback>().ok().flatten() {
+                if let Some(feedback) = record
+                    .entry()
+                    .to_app_option::<GraduatedFeedback>()
+                    .ok()
+                    .flatten()
+                {
                     if let Some(ref ctx) = input.feedback_context {
                         if &feedback.feedback_context != ctx {
                             continue;
                         }
                     }
-                    results.push(GraduatedFeedbackOutput { action_hash, feedback });
+                    results.push(GraduatedFeedbackOutput {
+                        action_hash,
+                        feedback: wire_graduated_feedback(&feedback),
+                    });
                 }
             }
         }
@@ -1176,13 +1321,22 @@ pub fn query_graduated_feedback(input: QueryGraduatedFeedbackInput) -> ExternRes
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid feedback hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid feedback hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(feedback) = record.entry().to_app_option::<GraduatedFeedback>().ok().flatten() {
-                    results.push(GraduatedFeedbackOutput { action_hash, feedback });
+                if let Some(feedback) = record
+                    .entry()
+                    .to_app_option::<GraduatedFeedback>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(GraduatedFeedbackOutput {
+                        action_hash,
+                        feedback: wire_graduated_feedback(&feedback),
+                    });
                 }
             }
         }
@@ -1201,9 +1355,9 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let vote_id = input.id.unwrap_or_else(|| {
-        format!("pv-{}-{}", input.proposal_id, input.voter_id)
-    });
+    let vote_id = input
+        .id
+        .unwrap_or_else(|| format!("pv-{}-{}", input.proposal_id, input.voter_id));
 
     let vote = ProposalVote {
         id: vote_id.clone(),
@@ -1224,27 +1378,44 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
     // Link from proposal
     let proposal_anchor = StringAnchor::new("proposal_vote_proposal", &input.proposal_id);
     let proposal_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposal_anchor))?;
-    create_link(proposal_anchor_hash, action_hash.clone(), LinkTypes::ProposalToVotes, ())?;
+    create_link(
+        proposal_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProposalToVotes,
+        (),
+    )?;
 
     // Link by agent
     let agent_anchor = StringAnchor::new("proposal_vote_agent", &input.voter_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToVotes, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToVotes,
+        (),
+    )?;
 
     // Link by position
     let position_anchor = StringAnchor::new("proposal_vote_position", &input.position);
     let position_anchor_hash = hash_entry(&EntryTypes::StringAnchor(position_anchor))?;
-    create_link(position_anchor_hash, action_hash.clone(), LinkTypes::VoteByPosition, ())?;
+    create_link(
+        position_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::VoteByPosition,
+        (),
+    )?;
 
     Ok(ProposalVoteOutput {
         action_hash,
-        vote,
+        vote: wire_proposal_vote(&vote),
     })
 }
 
 /// Query proposal votes
 #[hdk_extern]
-pub fn query_proposal_votes(input: QueryProposalVotesInput) -> ExternResult<Vec<ProposalVoteOutput>> {
+pub fn query_proposal_votes(
+    input: QueryProposalVotesInput,
+) -> ExternResult<Vec<ProposalVoteOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -1261,13 +1432,21 @@ pub fn query_proposal_votes(input: QueryProposalVotesInput) -> ExternResult<Vec<
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(vote) = record.entry().to_app_option::<ProposalVote>().ok().flatten() {
+                if let Some(vote) = record
+                    .entry()
+                    .to_app_option::<ProposalVote>()
+                    .ok()
+                    .flatten()
+                {
                     if let Some(ref position) = input.position {
                         if &vote.position != position {
                             continue;
                         }
                     }
-                    results.push(ProposalVoteOutput { action_hash, vote });
+                    results.push(ProposalVoteOutput {
+                        action_hash,
+                        vote: wire_proposal_vote(&vote),
+                    });
                 }
             }
         }
@@ -1284,8 +1463,16 @@ pub fn query_proposal_votes(input: QueryProposalVotesInput) -> ExternResult<Vec<
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(vote) = record.entry().to_app_option::<ProposalVote>().ok().flatten() {
-                    results.push(ProposalVoteOutput { action_hash, vote });
+                if let Some(vote) = record
+                    .entry()
+                    .to_app_option::<ProposalVote>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(ProposalVoteOutput {
+                        action_hash,
+                        vote: wire_proposal_vote(&vote),
+                    });
                 }
             }
         }
@@ -1300,13 +1487,15 @@ pub fn query_proposal_votes(input: QueryProposalVotesInput) -> ExternResult<Vec<
 
 /// Create a Polis-style opinion statement for clustering
 #[hdk_extern]
-pub fn create_opinion_statement(input: CreateOpinionStatementInput) -> ExternResult<OpinionStatementOutput> {
+pub fn create_opinion_statement(
+    input: CreateOpinionStatementInput,
+) -> ExternResult<OpinionStatementOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let statement_id = input.id.unwrap_or_else(|| {
-        format!("stmt-{}-{}", input.context_id, timestamp)
-    });
+    let statement_id = input
+        .id
+        .unwrap_or_else(|| format!("stmt-{}-{}", input.context_id, timestamp));
 
     let statement = OpinionStatement {
         id: statement_id.clone(),
@@ -1330,26 +1519,46 @@ pub fn create_opinion_statement(input: CreateOpinionStatementInput) -> ExternRes
     // Link by context
     let context_anchor = StringAnchor::new("opinion_context", &input.context_id);
     let context_anchor_hash = hash_entry(&EntryTypes::StringAnchor(context_anchor))?;
-    create_link(context_anchor_hash, action_hash.clone(), LinkTypes::ContextToStatements, ())?;
+    create_link(
+        context_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContextToStatements,
+        (),
+    )?;
 
     // Link by agent
     let agent_anchor = StringAnchor::new("opinion_agent", &input.author_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToStatements, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToStatements,
+        (),
+    )?;
 
     Ok(OpinionStatementOutput {
         action_hash,
-        statement,
+        statement: wire_opinion_statement(&statement),
     })
 }
 
 /// Get opinion statement by action hash
 #[hdk_extern]
-pub fn get_opinion_statement(action_hash: ActionHash) -> ExternResult<Option<OpinionStatementOutput>> {
+pub fn get_opinion_statement(
+    action_hash: ActionHash,
+) -> ExternResult<Option<OpinionStatementOutput>> {
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(statement) = record.entry().to_app_option::<OpinionStatement>().ok().flatten() {
-            return Ok(Some(OpinionStatementOutput { action_hash, statement }));
+        if let Some(statement) = record
+            .entry()
+            .to_app_option::<OpinionStatement>()
+            .ok()
+            .flatten()
+        {
+            return Ok(Some(OpinionStatementOutput {
+                action_hash,
+                statement: wire_opinion_statement(&statement),
+            }));
         }
     }
     Ok(None)
@@ -1357,7 +1566,9 @@ pub fn get_opinion_statement(action_hash: ActionHash) -> ExternResult<Option<Opi
 
 /// Query opinion statements for a deliberation context
 #[hdk_extern]
-pub fn query_opinion_statements(input: QueryOpinionStatementsInput) -> ExternResult<Vec<OpinionStatementOutput>> {
+pub fn query_opinion_statements(
+    input: QueryOpinionStatementsInput,
+) -> ExternResult<Vec<OpinionStatementOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -1369,13 +1580,22 @@ pub fn query_opinion_statements(input: QueryOpinionStatementsInput) -> ExternRes
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid statement hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid statement hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(statement) = record.entry().to_app_option::<OpinionStatement>().ok().flatten() {
-                    results.push(OpinionStatementOutput { action_hash, statement });
+                if let Some(statement) = record
+                    .entry()
+                    .to_app_option::<OpinionStatement>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(OpinionStatementOutput {
+                        action_hash,
+                        statement: wire_opinion_statement(&statement),
+                    });
                 }
             }
         }
@@ -1387,13 +1607,22 @@ pub fn query_opinion_statements(input: QueryOpinionStatementsInput) -> ExternRes
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid statement hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid statement hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(statement) = record.entry().to_app_option::<OpinionStatement>().ok().flatten() {
-                    results.push(OpinionStatementOutput { action_hash, statement });
+                if let Some(statement) = record
+                    .entry()
+                    .to_app_option::<OpinionStatement>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(OpinionStatementOutput {
+                        action_hash,
+                        statement: wire_opinion_statement(&statement),
+                    });
                 }
             }
         }
@@ -1412,9 +1641,9 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let vote_id = input.id.unwrap_or_else(|| {
-        format!("sv-{}-{}", input.statement_id, input.voter_id)
-    });
+    let vote_id = input
+        .id
+        .unwrap_or_else(|| format!("sv-{}-{}", input.statement_id, input.voter_id));
 
     let statement_vote = StatementVote {
         id: vote_id.clone(),
@@ -1430,22 +1659,34 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
     // Link from statement
     let statement_anchor = StringAnchor::new("statement_vote_statement", &input.statement_id);
     let statement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(statement_anchor))?;
-    create_link(statement_anchor_hash, action_hash.clone(), LinkTypes::StatementToVotes, ())?;
+    create_link(
+        statement_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::StatementToVotes,
+        (),
+    )?;
 
     // Link by agent
     let agent_anchor = StringAnchor::new("statement_vote_agent", &input.voter_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToStatementVotes, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToStatementVotes,
+        (),
+    )?;
 
     Ok(StatementVoteOutput {
         action_hash,
-        statement_vote,
+        statement_vote: wire_statement_vote(&statement_vote),
     })
 }
 
 /// Query statement votes
 #[hdk_extern]
-pub fn query_statement_votes(input: QueryStatementVotesInput) -> ExternResult<Vec<StatementVoteOutput>> {
+pub fn query_statement_votes(
+    input: QueryStatementVotesInput,
+) -> ExternResult<Vec<StatementVoteOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -1457,13 +1698,24 @@ pub fn query_statement_votes(input: QueryStatementVotesInput) -> ExternResult<Ve
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid statement vote hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid statement vote hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(statement_vote) = record.entry().to_app_option::<StatementVote>().ok().flatten() {
-                    results.push(StatementVoteOutput { action_hash, statement_vote });
+                if let Some(statement_vote) = record
+                    .entry()
+                    .to_app_option::<StatementVote>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(StatementVoteOutput {
+                        action_hash,
+                        statement_vote: wire_statement_vote(&statement_vote),
+                    });
                 }
             }
         }
@@ -1475,13 +1727,24 @@ pub fn query_statement_votes(input: QueryStatementVotesInput) -> ExternResult<Ve
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid statement vote hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid statement vote hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(statement_vote) = record.entry().to_app_option::<StatementVote>().ok().flatten() {
-                    results.push(StatementVoteOutput { action_hash, statement_vote });
+                if let Some(statement_vote) = record
+                    .entry()
+                    .to_app_option::<StatementVote>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(StatementVoteOutput {
+                        action_hash,
+                        statement_vote: wire_statement_vote(&statement_vote),
+                    });
                 }
             }
         }
@@ -1509,24 +1772,7 @@ pub fn query_statement_votes(input: QueryStatementVotesInput) -> ExternResult<Ve
 // =============================================================================
 // Credential Verification (for P2P trust negotiation)
 // =============================================================================
-
-/// Status of a verified credential
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum VerificationStatus {
-    Valid,
-    NotFound,
-    Revoked,
-    Expired,
-}
-
-/// Result of verifying a single credential against the DHT
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CredentialVerification {
-    pub hash: ActionHash,
-    pub status: VerificationStatus,
-    pub entry_type: Option<String>,
-    pub agent: Option<AgentPubKey>,
-}
+// VerificationStatus and CredentialVerification re-exported from qahal_types above.
 
 /// Verify multiple credentials against the DHT.
 /// Used by elohim-storage during P2P trust negotiation to verify
