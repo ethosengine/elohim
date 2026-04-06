@@ -86,7 +86,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use diesel::prelude::*;
-use diesel::r2d2::{self, ConnectionManager, Pool};
+use diesel::r2d2::{self, ConnectionManager, CustomizeConnection, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use tracing::info;
 
@@ -113,6 +113,22 @@ pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 /// Type alias for pooled connection
 pub type PooledConn = r2d2::PooledConnection<ConnectionManager<SqliteConnection>>;
 
+/// Sets SQLite PRAGMAs on each new connection from the pool.
+#[derive(Debug)]
+struct SqlitePragmas;
+
+impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragmas {
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        // Wait up to 5 seconds for a locked database instead of failing immediately.
+        // This prevents "database is locked" errors during bulk seeding operations
+        // where multiple connections may contend for write access.
+        diesel::sql_query("PRAGMA busy_timeout = 5000")
+            .execute(conn)
+            .map_err(|e| diesel::r2d2::Error::QueryError(e))?;
+        Ok(())
+    }
+}
+
 /// Initialize a Diesel connection pool
 pub fn init_pool(database_url: &str) -> Result<DbPool, StorageError> {
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
@@ -120,6 +136,7 @@ pub fn init_pool(database_url: &str) -> Result<DbPool, StorageError> {
     Pool::builder()
         .max_size(10)
         .connection_timeout(Duration::from_secs(30))
+        .connection_customizer(Box::new(SqlitePragmas))
         .build(manager)
         .map_err(|e| StorageError::Internal(format!("Failed to create connection pool: {}", e)))
 }
