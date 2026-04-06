@@ -18,13 +18,42 @@ cost hours to debug. Shared types make drift impossible.
 ## The Pattern
 
 ```
-DNA coordinator zome                    Consumer (doorway, storage, etc.)
-        │                                        │
-        └──── both depend on ─────┐──────────────┘
-                                  │
-                    sdk/domains/{domain}/types/
-                    (Cargo crate, zero HDK deps)
+                        Rust (compile-time enforcement)
+                    ┌─────────────────────────────────────┐
+                    │                                     │
+       DNA coordinator zome              Consumer (doorway, storage)
+              │                                    │
+              └──── both depend on ───┐────────────┘
+                                      │
+                       sdk/domains/{domain}/types/
+                       (Cargo crate, zero HDK deps)
+                                      │
+                                      │ cargo test --features ts
+                                      │ (ts-rs generates TypeScript)
+                                      ▼
+                              types/bindings/*.ts
+                                      │
+                                      │ pnpm run wire-types:generate
+                                      │ (copies into storage-client-ts)
+                                      ▼
+                    ┌─────────────────────────────────────┐
+                    │                                     │
+                    │   @elohim/storage-client/wire-types  │
+                    │                                     │
+                    │   import { CreateHumanInput }        │
+                    │     from '.../wire-types/imagodei';  │
+                    │                                     │
+                    └──────────┬──────────────┬────────────┘
+                               │              │
+                TypeScript (compile-time enforcement)
+                               │              │
+                          elohim-app       seeder
 ```
+
+**Two compilers, one source of truth:** The Rust compiler catches mismatches
+between zomes and doorway. The TypeScript compiler catches mismatches between
+the Angular app, the seeder, and the wire format. Both derive from the same
+Rust struct definitions in `sdk/domains/{domain}/types/`.
 
 The types crate:
 - Defines input/output structs with `serde::{Serialize, Deserialize}`
@@ -177,14 +206,14 @@ hit the conductor.
 
 ## Existing Implementations
 
-| Domain | Status | Crate Path |
-|--------|--------|------------|
-| imagodei | Done | `elohim/sdk/domains/imagodei/types/` |
-| lamad | Planned | `elohim/sdk/domains/lamad/types/` |
-| shefa | Planned | `elohim/sdk/domains/shefa/types/` |
-| qahal | Planned | `elohim/sdk/domains/qahal/types/` |
-| avodah | Planned | `elohim/sdk/domains/avodah/types/` |
-| infrastructure | Planned | `elohim/sdk/domains/infrastructure/types/` (doorway federation) |
+| Domain | Crate | Types | Tests | Zome Wired | Doorway Wired | TS Generated |
+|--------|-------|-------|-------|------------|---------------|--------------|
+| imagodei | `imagodei/types/` | 3 | 2 | imagodei | zome_helpers.rs | 3 files |
+| infrastructure | `infrastructure/types/` | 16 | 4 | infrastructure | federation.rs | 15 files |
+| qahal | `qahal/types/` | 40 | 10 | mishpat | N/A | 43 files |
+| lamad | `lamad/types/` | 54 | 13 | content_store | N/A | 56 files |
+| shefa | `shefa/types/` | 30+ | 9 | content_store | N/A | 35 files |
+| avodah | `avodah/types/` | 30+ | 9 | content_store | N/A | 40 files |
 
 ## Build Commands
 
@@ -195,6 +224,12 @@ cd elohim/sdk/domains/{domain}/types && cargo check
 # Test MessagePack roundtrips
 cd elohim/sdk/domains/{domain}/types && cargo test
 
+# Generate TypeScript from a single domain
+cd elohim/sdk/domains/{domain}/types && RUSTFLAGS="" cargo test --features ts
+
+# Generate TypeScript for ALL domains and copy into @elohim/storage-client
+pnpm run wire-types:generate
+
 # Verify zome still compiles with shared types
 cd elohim/holochain/dna/{dna}
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check --target wasm32-unknown-unknown
@@ -202,3 +237,31 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check --target wasm32-unknown
 # Verify doorway still compiles
 cd doorway/doorway-service && RUSTFLAGS="" cargo check
 ```
+
+## TypeScript Integration
+
+Wire types are distributed via the `@elohim/storage-client` npm package:
+
+```typescript
+// Per-domain import (coordinator I/O types, snake_case)
+import { CreateHumanInput, Human, HumanOutput } from '@elohim/storage-client/wire-types/imagodei';
+import { CreateChallengeInput, Challenge } from '@elohim/storage-client/wire-types/qahal';
+import { CreateContentInput, Content } from '@elohim/storage-client/wire-types/lamad';
+
+// Namespace import (all domains)
+import { lamad, shefa, qahal } from '@elohim/storage-client/wire-types';
+```
+
+These sit alongside the existing HTTP API types:
+
+```typescript
+// HTTP API types (camelCase, from views.rs)
+import { ContentView, HumanView } from '@elohim/storage-client/generated';
+
+// Coordinator wire types (snake_case, from domain types crates)
+import { Content, Human } from '@elohim/storage-client/wire-types/lamad';
+```
+
+The HTTP types represent what elohim-storage serves over JSON. The wire types
+represent what the conductor exchanges over MessagePack. Both derive from the
+same domain — the compiler enforces both.
